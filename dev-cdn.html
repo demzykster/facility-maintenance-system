@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>מערכת אחזקה</title>
+    <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from "https://esm.sh/react@19.1.0";
+      import { createRoot } from "https://esm.sh/react-dom@19.1.0/client";
+
+      const storagePrefix = "facility-maintenance:";
+
+      if (!window.storage) {
+        window.storage = {
+          async get(key) {
+            const value = window.localStorage.getItem(storagePrefix + key);
+            return value === null ? null : { value };
+          },
+          async set(key, value) {
+            window.localStorage.setItem(storagePrefix + key, value);
+          },
+          async delete(key) {
+            window.localStorage.removeItem(storagePrefix + key);
+          },
+          async list(prefix = "") {
+            const keys = [];
+            for (let i = 0; i < window.localStorage.length; i += 1) {
+              const rawKey = window.localStorage.key(i);
+              if (rawKey?.startsWith(storagePrefix + prefix)) {
+                keys.push(rawKey.slice(storagePrefix.length));
+              }
+            }
+            return { keys };
+          }
+        };
+      }
+
+      const source = await fetch("/src/App.jsx").then((response) => response.text());
+      const cdnSource = source
+        .replace('from "react"', 'from "https://esm.sh/react@19.1.0"')
+        .replace('from "lucide-react"', 'from "https://esm.sh/lucide-react@0.468.0?deps=react@19.1.0"')
+        .replace('from "xlsx"', 'from "https://esm.sh/xlsx@0.18.5"');
+      const compiled = Babel.transform(cdnSource, {
+        presets: [["react", { runtime: "classic" }]],
+        sourceType: "module"
+      }).code;
+      const moduleUrl = URL.createObjectURL(new Blob([compiled], { type: "text/javascript" }));
+      const { default: App } = await import(moduleUrl);
+
+      createRoot(document.getElementById("root")).render(
+        React.createElement(React.StrictMode, null, React.createElement(App))
+      );
+    </script>
+  </body>
+</html>
