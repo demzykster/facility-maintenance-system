@@ -6,8 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer
-} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck} from "lucide-react";
 import * as XLSX from "xlsx";
 
 /* ============================================================
@@ -19,8 +18,8 @@ const mem = {};
 const withTimeout = (promise, ms = 2000) => Promise.race([promise, new Promise((res) => setTimeout(() => res(undefined), ms))]);
 const store = {
   async get(k, sh = false) { try { if (window?.storage) { const r = await withTimeout(window.storage.get(k, sh)); if (r !== undefined) return r ? r.value : null; } } catch (e) {} return k in mem ? mem[k] : null; },
-  async set(k, v, sh = false) { mem[k] = v; try { if (window?.storage) { await withTimeout(window.storage.set(k, v, sh)); } } catch (e) {} },
-  async del(k, sh = false) { delete mem[k]; try { if (window?.storage) { await withTimeout(window.storage.delete(k, sh)); } } catch (e) {} },
+  async set(k, v, sh = false) { mem[k] = v; if (!(window?.storage)) return true; try { const r = await withTimeout(window.storage.set(k, v, sh)); if (r === undefined) throw new Error("timeout"); return true; } catch (e) { try { store._onFail && store._onFail(); } catch (_) {} return false; } },
+  async del(k, sh = false) { delete mem[k]; if (!(window?.storage)) return true; try { const r = await withTimeout(window.storage.delete(k, sh)); if (r === undefined) throw new Error("timeout"); return true; } catch (e) { try { store._onFail && store._onFail(); } catch (_) {} return false; } },
   async list(p, sh = false) { try { if (window?.storage) { const r = await withTimeout(window.storage.list(p, sh)); if (r !== undefined) return r ? r.keys : []; } } catch (e) {} return Object.keys(mem).filter((x) => x.startsWith(p)); },
 };
 
@@ -58,6 +57,49 @@ const PRIORITIES = [
 ];
 const PRIO_ALIAS = { urgent: "high" };
 const prOf = (id) => PRIORITIES.find((p) => p.id === (PRIO_ALIAS[id] || id)) || PRIORITIES[1];
+// ---- מטלות ניהול (Management tasks) ----
+const TASK_STATUS = [
+  { id: "todo", label: "לביצוע", color: "#64748B" },
+  { id: "in_progress", label: "בתהליך", color: "#2563EB" },
+  { id: "waiting", label: "ממתין לגורם", color: "#CA8A04" },
+  { id: "done", label: "הושלם", color: "#16A34A" },
+  { id: "cancelled", label: "בוטל", color: "#9CA3AF" },
+];
+const tstOf = (id) => { const base = TASK_STATUS.find((s) => s.id === id) || TASK_STATUS[0]; const o = TASK_STATUS_META[base.id]; return o ? { ...base, label: o.label || base.label, color: o.color || base.color } : base; };
+let TASK_STATUS_META = {};
+const taskStatuses = () => TASK_STATUS.map((s) => tstOf(s.id));
+const PRANK = { high: 0, medium: 1, low: 2 };
+const TASK_MODES = [
+  { id: "deadline", label: "עם תאריך יעד" },
+  { id: "recurring", label: "חוזרת" },
+  { id: "permanent", label: "קבועה — אחריות מתמשכת" },
+  { id: "deferred", label: "דחויה / מתישהו" },
+];
+const taskModeLabel = (id) => (TASK_MODES.find((m) => m.id === id) || TASK_MODES[0]).label;
+const taskOpen = (t) => t.status !== "done" && t.status !== "cancelled";
+const taskOverdue = (t) => taskOpen(t) && (t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt < Date.now();
+const uName = (id, users) => (users || []).find((u) => u.id === id)?.name || "—";
+const taskVisible = (t, session, users) => { if (session.role === "admin") return true; const me = session.id; return t.ownerId === me || (t.responsibleIds || []).includes(me) || (t.participantIds || []).includes(me); };
+// ---- פגישות (Meetings) ----
+const MEETING_TYPES = [
+  { id: "boss", label: "פ.ע עם מנהל שלי", color: "#7C3AED" },
+  { id: "peers", label: "פ.ע עם קולגה", color: "#0891B2" },
+  { id: "leadership", label: "פגישה קבוצתית", color: "#2563EB" },
+];
+const MTG_FALLBACK = { id: "general", label: "פגישה", color: "#64748B" };
+const mtgType = (id) => MEETING_TYPES.find((m) => m.id === id) || MTG_FALLBACK;
+// Движок типов: тип встречи включает/выключает поля и дефолты (одна форма, не три)
+const MEETING_TYPE_CFG = {
+  boss: { importExcel: true, standingTopics: false, taskMulti: false, taskLocation: false, hint: "פגישת אחריות: עוברים על המשימות שלי. אפשר לייבא את ה-Excel של הממונה." },
+  peers: { importExcel: false, standingTopics: true, taskMulti: false, taskLocation: false, hint: "1:1 עם עמית: נקודות קב\u05f4ע (תקין/בעיה) + משימות חדשות. אפשר לקשר משימות מהממונה." },
+  leadership: { importExcel: true, standingTopics: true, taskMulti: true, taskLocation: true, hint: "פגישת הנהלה: משימות לכמה אנשים, קטגוריה ומיקום חופשי." },
+};
+const mtgCfg = (type) => MEETING_TYPE_CFG[type] || { importExcel: false, standingTopics: false, taskMulti: false, taskLocation: false, hint: "" };
+const ORIGIN_LABEL = { manual: "ידני", excel: "מ-Excel", ai: "ניתוח AI", meeting: "מפגישה", boss_meeting: "מפגישת הממונה", boss_excel: "Excel של הממונה" };
+const originLabel = (o) => ORIGIN_LABEL[o] || "ידני";
+const RECUR_LABEL = { weekly: "שבועית", monthly: "חודשית", quarterly: "רבעונית" };
+const RECUR_MS = { weekly: 7 * 86400000, monthly: 30 * 86400000, quarterly: 91 * 86400000 };
+const meetingVisible = (m, session, tasks) => session.role === "admin" || m.ownerId === session.id || (m.participantIds || []).includes(session.id) || (tasks || []).some((t) => (t.meetingId === m.id || (t.linkedMeetingIds || []).includes(m.id)) && (t.ownerId === session.id || (t.responsibleIds || []).includes(session.id)));
 const CAT_META = CATEGORIES.reduce((a, c) => ((a[c.id] = { Icon: c.Icon, color: c.color }), a), {});
 const catMeta = (id) => CAT_META[id] || { Icon: Wrench, color: "#94A3B8" };
 const DEFAULT_SLA = { high: 4, medium: 24, low: 72 };
@@ -102,7 +144,10 @@ const DOWNTIME = [
   { id: "minor", label: "תקלה שאינה מוציאה מכלל שימוש", desc: "ניתן להמשיך לעבוד · בדיקה/תחזוקה", color: "#CA8A04", prio: "low", oos: false },
   { id: "critical", label: "תקלה קריטית — אין תחליף", desc: "הכלי מושבת ואין תחליף", color: "#DC2626", prio: "high", oos: true },
 ];
-const dtOf = (id) => DOWNTIME.find((d) => d.id === id);
+// Уровни тяжести настраиваются админом (config.downtimeLevels); fallback — DOWNTIME. Поиск всегда что-то возвращает (целостность: ссылка на удалённый уровень не уронит экран).
+const dtLevels = (cfg) => (cfg && Array.isArray(cfg.downtimeLevels) && cfg.downtimeLevels.length) ? cfg.downtimeLevels : DOWNTIME;
+const dtOf = (id, cfg) => dtLevels(cfg).find((d) => d.id === id) || DOWNTIME.find((d) => d.id === id) || { id: id || "", label: id || "—", desc: "", color: "#6B7280", prio: "medium", oos: false };
+const DT_PALETTE = ["#16A34A", "#65A30D", "#CA8A04", "#EA580C", "#DC2626", "#B91C1C", "#7C3AED", "#0891B2", "#475569"];
 const WEAR = [{ id: "natural", label: "בלאי טבעי" }, { id: "disproportionate", label: "נזק בלתי פרופורציונלי" }];
 
 const FORKLIFT_TYPES = ["52-8FDF20", "8FBE15T", "GS4047", "LPE200", "LWE250", "LWI160", "MX-X", "OSE250", "RRE140B", "RRE200H", "RRE250E", "SPE160", "SWE160", "VCE150A"];
@@ -130,146 +175,48 @@ const TYPE_META_SEED = {
   "VCE150A": { insurance: true, tasrir: true, license: true, lease: true },
 };
 const FLEET_SEED = [
-  {id:"v-194099-99",code:"99",type:"52-8FDF20",supplier:"טויוטה",chassis:"508FDF25-816",license:"194099",leaseCost:0,notes:"מלגזת משקל נגדי (דיזל)",docs:{tasrir:{date:"2026-05-20",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194099-20_5_26.pdf"},license:{date:"2026-10-10",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194099-10_10_26.pdf"}}},
-  {id:"v-GS4716D2507-GS-4716D2507",code:"GS-4716D2507",type:"GS4047",supplier:"במת הרמה",chassis:"",license:"GS-4716D2507",leaseCost:0,notes:"במת הרמה",docs:{tasrir:{date:"2026-10-05",link:""}}},
-  {id:"v-6677941-6677941",code:"6677941",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6677941",leaseCost:0,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-11-01",link:""}}},
-  {id:"v-178051-51",code:"51",type:"RRE140B",supplier:"טויוטה",chassis:"6852072",license:"178051",leaseCost:3265,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-01-24",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/178051-24_1_27.pdf"},license:{date:"2026-07-19",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-09/1759069292.pdf"},lease:{date:"2028-08-05",link:""}}},
-  {id:"v-194335-335",code:"335",type:"RRE200H",supplier:"טויוטה",chassis:"6823359",license:"194335",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194335-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194335-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194336-336",code:"336",type:"RRE200H",supplier:"טויוטה",chassis:"6823360",license:"194336",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194336-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194336-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194337-337",code:"337",type:"RRE200H",supplier:"טויוטה",chassis:"6823687",license:"194337",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194337-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194337-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194338-338",code:"338",type:"RRE200H",supplier:"טויוטה",chassis:"6823688",license:"194338",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194338-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194338-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194339-339",code:"339",type:"RRE200H",supplier:"טויוטה",chassis:"6823689",license:"194339",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194339-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/c9691d80ff_194339-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194340-340",code:"340",type:"RRE200H",supplier:"טויוטה",chassis:"6823690",license:"194340",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194340-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194340-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194341-341",code:"341",type:"RRE200H",supplier:"טויוטה",chassis:"6823691",license:"194341",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194341-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194341-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194342-342",code:"342",type:"RRE200H",supplier:"טויוטה",chassis:"6823358",license:"194342",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194342-9_2_27.pdf"},license:{date:"2026-08-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194342-09_08_26.pdf"},lease:{date:"2027-08-17",link:""}}},
-  {id:"v-194343-343",code:"343",type:"RRE200H",supplier:"טויוטה",chassis:"6824725",license:"194343",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/194343-9_2_27.pdf"},license:{date:"2026-08-15",link:"https://cdsl.kuhcmed.me/uploads/public_files/2026-01/194343-15_08_26.pdf"},lease:{date:"2027-08-18",link:""}}},
-  {id:"v-194344-344",code:"344",type:"RRE200H",supplier:"טויוטה",chassis:"6824726",license:"194344",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/ac6b260158_194344-9_2_27.pdf"},license:{date:"2026-08-15",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/_2025_08_17_08_46_54_411066576900.pdf"},lease:{date:"2027-08-18",link:""}}},
-  {id:"v-178040-40",code:"40",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2019",license:"178040",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2026-07-21",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/40c950a75c_003.pdf"},license:{date:"2026-11-06",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-11/178040-06_11_26.pdf"},lease:{date:"2027-11-23",link:""}}},
-  {id:"v-178039-39",code:"39",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2020",license:"178039",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2027-06-20",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/178039-20_5_26.pdf"},license:{date:"2026-11-06",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-11/178039-06_11_26.pdf"},lease:{date:"2027-11-24",link:""}}},
-  {id:"v-178041-41",code:"41",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2018",license:"178041",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2027-06-20",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/178041-20_5_26.pdf"},license:{date:"2026-11-06",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-11/178041-06_11_26.pdf"},lease:{date:"2027-11-24",link:""}}},
-  {id:"v-213580-580",code:"580",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2159",license:"213580",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2027-06-20",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/213580-20_5_26.pdf"},license:{date:"2026-12-12",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-11/213580-12_12_26.pdf"},lease:{date:"2028-01-04",link:""}}},
+  {id:"v-194099-99",code:"99",type:"52-8FDF20",supplier:"טויוטה",chassis:"508FDF25-816",license:"194099",leaseCost:0,notes:"מלגזת משקל נגדי (דיזל)",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""}}},
+  {id:"v-None-722",code:"722",type:"52-8FDF20",supplier:"טויוטה",chassis:"6823722",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2027-09-15",link:""}}},
+  {id:"v-None-678120",code:"678120",type:"52-8FDF20",supplier:"טויוטה",chassis:"202",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2027-09-15",link:""}}},
+  {id:"v-GS4716D2507-GS-4716D2507",code:"GS-4716D2507",type:"GS4047",supplier:"במת הרמה",chassis:"",license:"GS-4716D2507",leaseCost:0,notes:"במת הרמה",docs:{tasrir:{date:"2026-06-08",link:""}}},
+  {id:"v-6677941-6677941",code:"6677941",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6677941",leaseCost:0,notes:"עגלת אדם רוכב",docs:{lease:{date:"2026-06-08",link:""}}},
+  {id:"v-6828150-6828150",code:"6828150",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6828150",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6831651-6831651",code:"6831651",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831651",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6831652-6831652",code:"6831652",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831652",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6831653-6831653",code:"6831653",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831653",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-178051-51",code:"51",type:"RRE140B",supplier:"טויוטה",chassis:"6852072",license:"178051",leaseCost:3265,notes:"מלגזת היגש",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194335-335",code:"335",type:"RRE200H",supplier:"טויוטה",chassis:"6823359",license:"194335",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194336-336",code:"336",type:"RRE200H",supplier:"טויוטה",chassis:"6823360",license:"194336",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194337-337",code:"337",type:"RRE200H",supplier:"טויוטה",chassis:"6823687",license:"194337",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194338-338",code:"338",type:"RRE200H",supplier:"טויוטה",chassis:"6823688",license:"194338",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194339-339",code:"339",type:"RRE200H",supplier:"טויוטה",chassis:"6823689",license:"194339",leaseCost:2810,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-178040-40",code:"40",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2019",license:"178040",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-178039-39",code:"39",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2020",license:"178039",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-178041-41",code:"41",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2018",license:"178041",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-213580-580",code:"580",type:"8FBE15T",supplier:"טויוטה",chassis:"8FBE15T-2159",license:"213580",leaseCost:2075,notes:"מלגזת משקל נגדי",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
   {id:"v-6387893-6387893",code:"6387893",type:"LWE250",supplier:"טויוטה",chassis:"",license:"6387893",leaseCost:0,notes:"עגלת נהג",docs:{}},
-  {id:"v-178070-70",code:"70",type:"VCE150A",supplier:"טויוטה",chassis:"6829589",license:"178070",leaseCost:7010,notes:"מלגזת צריח",docs:{tasrir:{date:"2027-06-20",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/178070-20_5_26.pdf"},license:{date:"2026-11-15",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-11/178070-15_11_26.pdf"},lease:{date:"2027-12-02",link:""}}},
-  {id:"v-6810635-6810635",code:"6810635",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810635",leaseCost:0,notes:"עגלת נהג",docs:{lease:{date:"2027-07-10",link:""}}},
-  {id:"v-6823722-6823722",code:"6823722",type:"SWE160",supplier:"טויוטה",chassis:"",license:"6823722",leaseCost:1310,notes:"עגלת אדם הולך עם תורן",docs:{tasrir:{date:"2027-02-09",link:""},lease:{date:"2027-09-14",link:""}}},
-  {id:"v-6883810-6883810",code:"6883810",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883810",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-03-03",link:""}}},
-  {id:"v-6883812-6883812",code:"6883812",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883812",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-02-02",link:""}}},
-  {id:"v-6883811-6883811",code:"6883811",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883811",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-03-29",link:""}}},
-  {id:"v-6882295-6882295",code:"6882295",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882295",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-02-02",link:""}}},
-  {id:"v-6851069-6851069",code:"6851069",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6851069",leaseCost:1705,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-03-29",link:""}}},
-  {id:"v-6851071-6851071",code:"6851071",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6851071",leaseCost:1705,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-03-29",link:""}}},
-  {id:"v-6851432-6851432",code:"6851432",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6851432",leaseCost:1705,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-02-10",link:""}}},
-  {id:"v-6851070-6851070",code:"6851070",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6851070",leaseCost:1965,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6851431-6851431",code:"6851431",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6851431",leaseCost:1965,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6851430-6851430",code:"6851430",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6851430",leaseCost:1965,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6890933-6890933",code:"6890933",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6890933",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6890932-6890932",code:"6890932",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6890932",leaseCost:1965,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-08-01",link:""}}},
-  {id:"v-6891245-6891245",code:"6891245",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6891245",leaseCost:1965,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6831446-6831446",code:"6831446",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6831446",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6882960-6882960",code:"6882960",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882960",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6882959-6882959",code:"6882959",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882959",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-05",link:""}}},
-  {id:"v-6882001-6882001",code:"6882001",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882001",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-05",link:""}}},
-  {id:"v-6881568-6881568",code:"6881568",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6881568",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-05",link:""}}},
-  {id:"v-6882961-6882961",code:"6882961",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882961",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-05",link:""}}},
-  {id:"v-6883275-6883275",code:"6883275",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883275",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-20",link:""}}},
-  {id:"v-6883274-6883274",code:"6883274",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883274",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-08-01",link:""}}},
-  {id:"v-6882002-6882002",code:"6882002",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882002",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-08-01",link:""}}},
-  {id:"v-6882003-6882003",code:"6882003",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882003",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-06-17",link:""}}},
-  {id:"v-6881569-6881569",code:"6881569",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6881569",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-06-17",link:""}}},
-  {id:"v-6881567-6881567",code:"6881567",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6881567",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-05",link:""}}},
-  {id:"v-6881171-6881171",code:"6881171",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6881171",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-05",link:""}}},
-  {id:"v-6880715-6880715",code:"6880715",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6880715",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-07-05",link:""}}},
-  {id:"v-6881173-6881173",code:"6881173",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6881173",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-08-31",link:""}}},
-  {id:"v-6882296-6882296",code:"6882296",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882296",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-08-31",link:""}}},
-  {id:"v-6880716-6880716",code:"6880716",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6880716",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6880714-6880714",code:"6880714",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6880714",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6881172-6881172",code:"6881172",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6881172",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6882620-6882620",code:"6882620",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882620",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6882619-6882619",code:"6882619",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882619",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6883276-6883276",code:"6883276",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883276",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6882621-6882621",code:"6882621",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882621",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6780037-6780037",code:"6780037",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6780037",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6430045-6430045",code:"6430045",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6430045",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6808106-6808106",code:"6808106",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6808106",leaseCost:1705,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6429435-6429435",code:"6429435",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6429435",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6808502-6808502",code:"6808502",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6808502",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6023768-6023768",code:"6023768",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6023768",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-09-13",link:""}}},
-  {id:"v-6766794-6766794",code:"6766794",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6766794",leaseCost:0,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-120823-120823",code:"120823",type:"RRE250E",supplier:"טויוטה",chassis:"12345678",license:"120823",leaseCost:0,notes:"מלגזת היגש",docs:{tasrir:{date:"2027-01-24",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-12/120823-24_1_27.pdf"},license:{date:"2026-09-01",link:""},lease:{date:"2028-08-11",link:""}}},
-  {id:"v-194347-347",code:"347",type:"SPE160",supplier:"טויוטה",chassis:"6823724",license:"194347",leaseCost:1550,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2026-01/194347-9_2_27.pdf"},license:{date:"2028-08-26",link:"https://cdsl.kuhcmed.me/uploads/public_files/2026-01/194347-28_8_26.pdf"},lease:{date:"2027-09-01",link:""}}},
-  {id:"v-194348-348",code:"348",type:"SPE160",supplier:"טויוטה",chassis:"6823688",license:"194348",leaseCost:1550,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2026-01/eba6fe2c53_194348-9_2_27.pdf"},license:{date:"2026-09-11",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194348-11_09_26.pdf"},lease:{date:"2027-09-14",link:""}}},
-  {id:"v-6951654-6951654",code:"6951654",type:"SPE160",supplier:"טויוטה",chassis:"",license:"6951654",leaseCost:0,notes:"עגלת אדם הולך עם תורן",docs:{tasrir:{date:"2026-10-25",link:""}}},
-  {id:"v-6828150-6828150",code:"6828150",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6828150",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-04-01",link:""}}},
-  {id:"v-6831651-6831651",code:"6831651",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831651",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831652-6831652",code:"6831652",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831652",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831653-6831653",code:"6831653",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831653",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831654-6831654",code:"6831654",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831654",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-21",link:""}}},
-  {id:"v-6831655-6831655",code:"6831655",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831655",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831656-6831656",code:"6831656",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831656",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831657-6831657",code:"6831657",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831657",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831658-6831658",code:"6831658",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831658",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831659-6831659",code:"6831659",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831659",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-6831660-6831660",code:"6831660",type:"LPE200",supplier:"טויוטה",chassis:"",license:"6831660",leaseCost:1210,notes:"עגלת אדם רוכב",docs:{lease:{date:"2027-10-14",link:""}}},
-  {id:"v-194895-895",code:"895",type:"SPE160",supplier:"טויוטה",chassis:"6865293",license:"194895",leaseCost:1870,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2026-10-05",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/33_0825.pdf"},license:{date:"2027-06-07",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194895-7_6_26.pdf"},lease:{date:"2028-08-31",link:""}}},
-  {id:"v-194896-896",code:"896",type:"SPE160",supplier:"טויוטה",chassis:"6865294",license:"194896",leaseCost:1870,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2026-10-05",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/34_0825.pdf"},license:{date:"2027-06-07",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/194896-7_6_26.pdf"},lease:{date:"2028-08-31",link:""}}},
-  {id:"v-6954052-6954052",code:"6954052",type:"SPE160",supplier:"טויוטה",chassis:"",license:"6954052",leaseCost:0,notes:"עגלת אדם הולך עם תורן",docs:{tasrir:{date:"2026-10-25",link:""}}},
-  {id:"v-6781202-6781202",code:"6781202",type:"SWE160",supplier:"טויוטה",chassis:"",license:"6781202",leaseCost:0,notes:"עגלת אדם הולך עם תורן",docs:{tasrir:{date:"2026-10-05",link:""},lease:{date:"2027-09-01",link:""}}},
-  {id:"v-6810634-6810634",code:"6810634",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810634",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-17",link:""}}},
-  {id:"v-6810269-6810269",code:"6810269",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810269",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-17",link:""}}},
-  {id:"v-6809857-6809857",code:"6809857",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809857",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6809856-6809856",code:"6809856",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809856",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6809591-6809591",code:"6809591",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809591",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6809587-6809587",code:"6809587",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809587",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-17",link:""}}},
-  {id:"v-6809586-6809586",code:"6809586",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809586",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-17",link:""}}},
-  {id:"v-6809589-6809589",code:"6809589",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809589",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-17",link:""}}},
-  {id:"v-6810640-6810640",code:"6810640",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810640",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810639-6810639",code:"6810639",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810639",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810638-6810638",code:"6810638",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810638",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810637-6810637",code:"6810637",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810637",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810636-6810636",code:"6810636",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810636",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810633-6810633",code:"6810633",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810633",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810632-6810632",code:"6810632",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810632",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810631-6810631",code:"6810631",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810631",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810630-6810630",code:"6810630",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810630",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6809588-6809588",code:"6809588",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809588",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6809590-6809590",code:"6809590",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809590",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810246-6810246",code:"6810246",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810246",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-17",link:""}}},
-  {id:"v-6810247-6810247",code:"6810247",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810247",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810248-6810248",code:"6810248",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810248",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810249-6810249",code:"6810249",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810249",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810250-6810250",code:"6810250",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810250",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810251-6810251",code:"6810251",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810251",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810252-6810252",code:"6810252",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810252",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810253-6810253",code:"6810253",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810253",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810254-6810254",code:"6810254",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810254",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810255-6810255",code:"6810255",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810255",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810256-6810256",code:"6810256",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810256",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810257-6810257",code:"6810257",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810257",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810270-6810270",code:"6810270",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810270",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810271-6810271",code:"6810271",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810271",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-06-17",link:""}}},
-  {id:"v-6810272-6810272",code:"6810272",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810272",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2026-07-14",link:""}}},
-  {id:"v-6810273-6810273",code:"6810273",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810273",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810274-6810274",code:"6810274",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810274",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810627-6810627",code:"6810627",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810627",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810628-6810628",code:"6810628",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810628",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-6810629-6810629",code:"6810629",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810629",leaseCost:850,notes:"עגלת נהג",docs:{lease:{date:"2026-06-02",link:""}}},
-  {id:"v-111236-236",code:"236",type:"MX-X",supplier:"קידמה",chassis:"12345678",license:"111236",leaseCost:4317,notes:"מלגזת צריח",docs:{tasrir:{date:"2026-10-05",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/111236_t.pdf"},license:{date:"2026-07-14",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/111236.pdf"}}},
-  {id:"v-None-52",code:"52",type:"SWE160",supplier:"טויוטה",chassis:"6954052",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2026-10-25",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/_2025_09_15_08_14_09_288197152599.pdf"}}},
-  {id:"v-None-654",code:"654",type:"SWE160",supplier:"טויוטה",chassis:"6951654",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2026-10-25",link:"https://cdsl.kuhcmed.me/uploads/public_files/2025-10/_2025_09_15_08_13_13_111213693578.pdf"}}},
-  {id:"v-None-722",code:"722",type:"52-8FDF20",supplier:"טויוטה",chassis:"6823722",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2027-02-09",link:"https://cdsl.kuhcmed.me/uploads/public_files/2026-01/6823722-9_2_27.pdf"}}},
-  {id:"v-None-678120",code:"678120",type:"52-8FDF20",supplier:"טויוטה",chassis:"202",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2026-10-05",link:""}}},
-  {id:"v-None-LPE200",code:"LPE200",type:"LPE200",supplier:"טויוטה",chassis:"6677941",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-50",code:"50",type:"LPE200",supplier:"טויוטה",chassis:"6828150",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-51-2",code:"51-2",type:"LPE200",supplier:"טויוטה",chassis:"6828151",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-52-2",code:"52-2",type:"LPE200",supplier:"טויוטה",chassis:"6828152",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-53",code:"53",type:"LPE200",supplier:"טויוטה",chassis:"6828153",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-54",code:"54",type:"LPE200",supplier:"טויוטה",chassis:"6828154",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-55",code:"55",type:"LPE200",supplier:"טויוטה",chassis:"6828155",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-56",code:"56",type:"LPE200",supplier:"טויוטה",chassis:"6828156",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-57",code:"57",type:"LPE200",supplier:"טויוטה",chassis:"6828157",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-58",code:"58",type:"LPE200",supplier:"טויוטה",chassis:"6828158",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-59",code:"59",type:"LPE200",supplier:"טויוטה",chassis:"6828159",license:"",leaseCost:0,notes:"",docs:{}},
-  {id:"v-None-60",code:"60",type:"LPE200",supplier:"טויוטה",chassis:"6828160",license:"",leaseCost:0,notes:"",docs:{}},
+  {id:"v-178070-70",code:"70",type:"VCE150A",supplier:"טויוטה",chassis:"6829589",license:"178070",leaseCost:7010,notes:"מלגזת צריח",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6810635-6810635",code:"6810635",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810635",leaseCost:0,notes:"עגלת נהג",docs:{lease:{date:"2026-06-08",link:""}}},
+  {id:"v-6766794-6766794",code:"6766794",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6766794",leaseCost:0,notes:"עגלת נהג",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6810634-6810634",code:"6810634",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810634",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6810269-6810269",code:"6810269",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6810269",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6809857-6809857",code:"6809857",type:"LWI160",supplier:"טויוטה",chassis:"",license:"6809857",leaseCost:860,notes:"עגלת נהג",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6823722-6823722",code:"6823722",type:"SWE160",supplier:"טויוטה",chassis:"",license:"6823722",leaseCost:1310,notes:"עגלת אדם הולך עם תורן",docs:{tasrir:{date:"2026-06-08",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6781202-6781202",code:"6781202",type:"SWE160",supplier:"טויוטה",chassis:"",license:"6781202",leaseCost:0,notes:"עגלת אדם הולך עם תורן",docs:{tasrir:{date:"2027-09-15",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-None-52",code:"52",type:"SWE160",supplier:"טויוטה",chassis:"6954052",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2027-09-15",link:""}}},
+  {id:"v-None-654",code:"654",type:"SWE160",supplier:"טויוטה",chassis:"6951654",license:"",leaseCost:0,notes:"",docs:{tasrir:{date:"2027-09-15",link:""}}},
+  {id:"v-6883810-6883810",code:"6883810",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883810",leaseCost:1965,notes:"מלקטת (כפולה)",docs:{lease:{date:"2026-06-08",link:""}}},
+  {id:"v-6883812-6883812",code:"6883812",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883812",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6883811-6883811",code:"6883811",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6883811",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6882295-6882295",code:"6882295",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6882295",leaseCost:1705,notes:"מלקטת (כפולה)",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6851069-6851069",code:"6851069",type:"OSE250",supplier:"טויוטה",chassis:"",license:"6851069",leaseCost:1705,notes:"מלקטת (סינגל)",docs:{lease:{date:"2028-03-10",link:""}}},
+  {id:"v-120823-120823",code:"120823",type:"RRE250E",supplier:"טויוטה",chassis:"12345678",license:"120823",leaseCost:0,notes:"מלגזת היגש",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194347-347",code:"347",type:"SPE160",supplier:"טויוטה",chassis:"6823724",license:"194347",leaseCost:1550,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194348-348",code:"348",type:"SPE160",supplier:"טויוטה",chassis:"6823688",license:"194348",leaseCost:1550,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-6951654-6951654",code:"6951654",type:"SPE160",supplier:"טויוטה",chassis:"",license:"6951654",leaseCost:0,notes:"עגלת אדם הולך עם תורן",docs:{tasrir:{date:"2027-09-15",link:""}}},
+  {id:"v-194895-895",code:"895",type:"SPE160",supplier:"טויוטה",chassis:"6865293",license:"194895",leaseCost:1870,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-194896-896",code:"896",type:"SPE160",supplier:"טויוטה",chassis:"6865294",license:"194896",leaseCost:1870,notes:"עגלת אדם רוכב עם תורן",docs:{tasrir:{date:"2027-09-15",link:""},license:{date:"2027-05-20",link:""},lease:{date:"2028-03-10",link:""}}},
+  {id:"v-111236-236",code:"236",type:"MX-X",supplier:"קידמה",chassis:"12345678",license:"111236",leaseCost:4317,notes:"מלגזת צריח",docs:{tasrir:{date:"2026-06-08",link:""},license:{date:"2027-05-20",link:""}}},
 ];
 
 const FREQS = [
@@ -285,7 +232,7 @@ const WIDGETS = [
   { id: "insp", label: "בקרת כלים לביצוע" }, { id: "pm", label: "תחזוקה מונעת" }, { id: "presence", label: "נוכחות טכנאים" }, { id: "costs", label: "עלויות החודש" },
 ];
 const DEFAULT_CONFIG = {
-  departments: ["שילוח", "קליטה", "מחסן", "קירור", "תפעול", "בקרת איכות", "הנהלה"],
+  departments: ["נפחי", "גלרייה", "מחסן", "קבלה", "החזרות", "הפצה", "שיגור", "בקרי איכות", "אחזקה", "ניקיון"],
   zones: ["אזור קבלת סחורה", "אזור משלוחים", "מחסן ראשי", "אזור קירור", "רחבת מלגזות", "רציפי טעינה", "משרדים", "חניון", "כללי"],
   suppliers: ["טויוטה", "במת הרמה", "קידמה", "Still", "קבלן חשמל א.ב.", "שירות מזגנים בע״מ", "ספק חלקים", "פנימי"],
   categories: CATEGORIES.map((c) => ({ id: c.id, label: c.label })),
@@ -299,14 +246,17 @@ const DEFAULT_CONFIG = {
   techWidgets: { tickets: true, pm: true, sla: true, presence: true },
   mgrWidgets: { tickets: true, pm: true, sla: true },
   notify: { new: true, confirm: true, back: true, ready: true, escalate: true, sla: true, doc: true, pm: true, upd: true },
-  companyName: "", siteName: "", defaultShiftEnd: "16:30",
-  vehicleTypes: [], modelSupplier: {}, modelType: {}, shifts: [],
+  companyName: "", siteName: "", defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
+  vehicleTypes: [], modelSupplier: {}, modelType: {}, shifts: [], workShifts: [],
 };
 
 /* ---------- helpers ---------- */
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 // Экранирование пользовательского текста перед вставкой в HTML-отчёты (защита от инъекции в окне отчёта)
 const esc = (v) => String(v ?? "").split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;").split(String.fromCharCode(34)).join("&quot;").split(String.fromCharCode(39)).join("&#39;");
+// Excel formula injection: ячейку, начинающуюся с = + - @ или управляющего символа, префиксуем апострофом, чтобы Excel не исполнил её как формулу.
+const cellSafe = (v) => (typeof v === "string" && /^[=+\-@\t\r\n]/.test(v)) ? "'" + v : v;
+const rowsSafe = (rows) => (Array.isArray(rows) ? rows : []).map((r) => (r && typeof r === "object" && !Array.isArray(r)) ? Object.fromEntries(Object.entries(r).map(([k, val]) => [k, cellSafe(val)])) : r);
 // Надёжная выгрузка: пробуем несколько методов, т.к. песочница артефакта часто блокирует download/popup
 const downloadBlob = (blob, filename) => {
   try {
@@ -338,6 +288,49 @@ const downloadXlsx = (wb, filename) => {
   alert("הסביבה חוסמת הורדת קבצים. נסו בדפדפן/בגרסת הענן.");
   return false;
 };
+// ---- Excel למטלות: ייצוא + ייבוא חכם ----
+const exportTasksXlsx = (tasks, users) => {
+  const rows = (tasks || []).map((t) => ({ "כותרת": t.title, "אחראים": (t.responsibleIds || []).map((id) => uName(id, users)).join(", "), "סטטוס": tstOf(t.status).label, "עדיפות": prOf(t.priority).label, "סוג": taskModeLabel(t.mode), "תאריך יעד": t.dueAt ? fmtDate(t.dueAt) : "", "מעקב הבא": t.nextActionAt ? fmtDate(t.nextActionAt) : "", "קטגוריה": t.category || "", "ממתין ל": t.waitingFor || "", "נפתח ע״י": t.createdBy?.name || "", "נפתח בתאריך": t.createdAt ? fmtDate(t.createdAt) : "" }));
+  if (!rows.length) { alert("אין מטלות לייצוא"); return; }
+  try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 18 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "מטלות"); downloadXlsx(wb, `מטלות_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {}
+};
+const exportMeetingsXlsx = (meetings, tasks, users) => {
+  const rows = (meetings || []).slice().sort((a, b) => b.at - a.at).map((m) => ({ "נושא": m.title, "סוג": mtgType(m.type).label, "מועד": `${fmtDate(m.at)} ${fmtTime(m.at)}`, "סטטוס": m.status === "done" ? "בוצעה" : m.status === "cancelled" ? "בוטלה" : "מתוכננת", "חזרתיות": m.recur ? RECUR_LABEL[m.recur] : "חד-פעמית", "משתתפים": (m.participantIds || []).map((id) => uName(id, users)).join(", "), "מטלות פתוחות": (tasks || []).filter((t) => t.meetingId === m.id && taskOpen(t)).length }));
+  if (!rows.length) { alert("אין פגישות לייצוא"); return; }
+  try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 18 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "פגישות"); downloadXlsx(wb, `פגישות_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {}
+};
+const XL_DATE = (v) => { if (v == null || v === "") return null; if (v instanceof Date && !isNaN(v)) return v.getTime(); if (typeof v === "number") { const d = new Date(Math.round((v - 25569) * 86400000)); return isNaN(d) ? null : d.getTime(); } const s = String(v).trim(); const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/); if (m) { let [, d, mo, y] = m; y = y.length === 2 ? "20" + y : y; const dt = new Date(+y, +mo - 1, +d); return isNaN(dt) ? null : dt.getTime(); } const dt = new Date(s); return isNaN(dt) ? null : dt.getTime(); };
+const XL_PRIO = (v) => { const s = String(v || "").toLowerCase(); if (/high|גבוה|דחוף|urgent|1/.test(s)) return "high"; if (/low|נמוך/.test(s)) return "low"; return "medium"; };
+const XL_STATUS = (v) => { const s = String(v || "").toLowerCase(); if (/done|הושלם|בוצע|complete|סגור/.test(s)) return "done"; if (/progress|בתהליך|בעבוד/.test(s)) return "in_progress"; if (/wait|ממתין|המתנה/.test(s)) return "waiting"; if (/cancel|בוטל/.test(s)) return "cancelled"; return "todo"; };
+const COL_HINTS = { title: ["נושא", "כותרת", "משימה", "מטלה", "task", "title", "subject", "item", "פעולה"], responsible: ["אחרא", "responsible", "owner", "assignee", "מבצע", "מי "], due: ["תאריך יעד", "יעד", "deadline", "due", "target", "מועד"], priority: ["עדיפות", "priority", "דחיפות"], status: ["מצב משימה", "סטטוס", "status", "מצב"], category: ["קטגוריה", "תחום", "category", "area"], desc: ["פירוט", "תיאור", "description", "details", "משימה"], note: ["הערה", "הערות", "note", "remark", "comment"] };
+const detectCol = (field, headers) => headers.find((x) => COL_HINTS[field].some((k) => String(x).toLowerCase().includes(k))) || "";
+const matchUserByName = (name, users) => { const n = String(name || "").trim().toLowerCase(); if (!n) return null; return (users || []).find((u) => u.name && (u.name.toLowerCase() === n || u.name.toLowerCase().includes(n) || n.includes(u.name.toLowerCase())))?.id || null; };
+const HEADER_KEYS = ["נושא", "משימה", "פירוט", "תיאור", "יעד", "תאריך", "מצב", "סטטוס", "אחרא", "הערה", "עדיפות", "priority", "status", "title", "task", "due", "date", "כותרת"];
+const detectHeaderRow = (aoa) => { let best = 0, bestScore = -1; for (let i = 0; i < Math.min(aoa.length, 10); i++) { const cells = (aoa[i] || []).map((c) => String(c == null ? "" : c).toLowerCase()); if (cells.filter((c) => c.trim()).length < 2) continue; const score = cells.filter((c) => HEADER_KEYS.some((k) => c.includes(k))).length; if (score > bestScore) { bestScore = score; best = i; } } return best; };
+const aoaToRows = (aoa) => { const hi = detectHeaderRow(aoa); const hdr = (aoa[hi] || []).map((c, idx) => String(c == null ? "" : c).trim() || `עמודה ${idx + 1}`); const rows = aoa.slice(hi + 1).map((r) => { const o = {}; hdr.forEach((h, idx) => { o[h] = r[idx] == null ? "" : r[idx]; }); return o; }).filter((o) => Object.values(o).some((v) => String(v).trim())); return { headers: hdr, rows }; };
+const XL_DUE = (v) => { const s = String(v == null ? "" : v).trim(); if (!s) return { mode: "deferred", dueAt: null }; if (/שוטף|שגרת|קבוע|ongoing|routine/i.test(s)) return { mode: "permanent", dueAt: null }; if (/מיידי|immediate|דחוף/i.test(s)) return { mode: "deferred", dueAt: null, urgent: true }; if (/tbd|לקבוע|טרם|בהמשך/i.test(s)) return { mode: "deferred", dueAt: null }; const d = XL_DATE(v); return d ? { mode: "deadline", dueAt: d } : { mode: "deferred", dueAt: null }; };
+const normTitle = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+// Разбор «дерева истории»: одна ячейка вида «вступление. DD/MM - текст, DD/MM - текст, …» → {lead, entries:[{at,text}]}.
+// Дату-маркер засчитываем только на границе предложения (начало / после , . ; перевода строки) — чтобы не ловить даты внутри текста (как «ב-27/3»). Год выводим хронологически от anchorYear (год даты строки).
+const parseHistory = (text, anchorYear) => {
+  const s = String(text == null ? "" : text).trim();
+  if (!s) return { lead: "", entries: [] };
+  const re = /(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?/g; const marks = []; let m;
+  while ((m = re.exec(s)) !== null) { const before = s.slice(0, m.index).replace(/\s+$/, ""); const lc = before.slice(-1); if (before === "" || ",.;\n".includes(lc)) marks.push({ idx: m.index, len: m[0].length, d: +m[1], mo: +m[2], y: m[3] ? +m[3] : null }); }
+  if (!marks.length) return { lead: s, entries: [] };
+  const lead = s.slice(0, marks[0].idx).replace(/[.,;\s]+$/, "").trim();
+  const entries = []; let runY = anchorYear || new Date().getFullYear(), prevMo = null;
+  for (let i = 0; i < marks.length; i++) {
+    const mk = marks[i], end = i + 1 < marks.length ? marks[i + 1].idx : s.length;
+    const txt = s.slice(mk.idx + mk.len, end).replace(/^\s*[-–:]\s*/, "").replace(/[,;\s]+$/, "").trim();
+    let y = mk.y != null ? (mk.y < 100 ? 2000 + mk.y : mk.y) : null;
+    if (y != null) runY = y; else { if (prevMo != null && mk.mo < prevMo) runY++; y = runY; }
+    prevMo = mk.mo;
+    const at = new Date(y, mk.mo - 1, mk.d).getTime();
+    if (txt && !isNaN(at)) entries.push({ at, text: txt });
+  }
+  return { lead, entries };
+};
 // Открыть отчёт в новом окне (для печати/сохранения PDF вручную)
 const openReport = (html) => {
   try { const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => { try { w.print(); } catch (e) {} }, 400); return true; } } catch (e) {}
@@ -359,10 +352,11 @@ const fleetInDept = (f, dept) => fleetDepts(f).includes(dept);
 const userDepts = (u) => (u && u.depts && u.depts.length) ? u.depts : (u && u.dept ? [u.dept] : []);
 const ticketNo = (t) => (t && t.num) ? `${tkLetter(t)}-${String(t.num).padStart(3, "0")}` : (t ? `${tkLetter(t)}-${String(t.id || "").slice(-4).toUpperCase()}` : "—");
 const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
-const fmtTime = (ts) => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+const fmtTime = (ts) => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
 const fmtDur = (ms) => { const h = Math.round(ms / 3600000); if (h < 1) return "פחות משעה"; if (h < 48) return `${h} שע׳`; return `${Math.round(h / 24)} ימים`; };
 const timeAgo = (ts) => { const s = (Date.now() - ts) / 1000; if (s < 60) return "כעת"; const m = s / 60; if (m < 60) return `לפני ${Math.floor(m)} ד׳`; const h = m / 60; if (h < 24) return `לפני ${Math.floor(h)} שע׳`; const d = h / 24; if (d < 30) return `לפני ${Math.floor(d)} ימים`; return fmtDate(ts); };
-const isOverdue = (t) => t.dueAt && Date.now() > t.dueAt && t.status !== "done" && t.status !== "cancelled";
+const pausedMs = (t, now = Date.now()) => (t.pauseAccumMs || 0) + (t.pauseSince ? Math.max(0, now - t.pauseSince) : 0);
+const isOverdue = (t) => t.dueAt && (Date.now() - pausedMs(t)) > t.dueAt && t.status !== "done" && t.status !== "cancelled";
 // "Гидравлика" теперь означает «мачта/подъём → требует תסקיר» (флаг типа tasrir, легаси: hydraulics).
 const typeMetaOf = (typeName, cfg) => (cfg?.typeMeta?.[typeName]) || {};
 const typeHydraulics = (typeName, cfg) => { const m = typeMetaOf(typeName, cfg); return !!(m.tasrir ?? m.hydraulics); };
@@ -432,6 +426,7 @@ const DRIVER_SHIFTS = [
   { id: "morning", label: "בוקר", color: "#F59E0B" },
   { id: "night", label: "לילה", color: "#6366F1" },
 ];
+const workShiftsOf = (cfg) => (cfg && cfg.workShifts && cfg.workShifts.length) ? cfg.workShifts : DRIVER_SHIFTS;
 const driverShiftMeta = (id) => DRIVER_SHIFTS.find((s) => s.id === id) || { id, label: id === "overlap" ? "חפיפה" : (id || "—"), color: "#0D9488" };
 const unitDrivers = (f) => (f && f.drivers) || {};
 const driverOf = (f, cat) => unitDrivers(f)[cat] || null;
@@ -440,6 +435,10 @@ const driverPending = (d) => !!(d && (d.status === "pending_add" || d.status ===
 const driverOwned = (d, session) => !!(d && session && (session.role === "admin" || d.addedByUid === session.id));
 const canFleetDocs = (session) => !!(session && (session.role === "admin" || session.fleetDocs));
 const canFleetTickets = (session) => !!(session && (session.role === "admin" || session.fleetTickets));
+const PERM_LEVELS = ["none", "view", "request", "manage", "full"];
+const permRank = (l) => { const i = PERM_LEVELS.indexOf(l); return i < 0 ? 0 : i; };
+const ROLE_PERM_DEFAULT = { admin: { ppe: "full" }, user: { ppe: "view" }, tech: { ppe: "view" }, worker: { ppe: "none" }, cleaner: { ppe: "none" } };
+const permLevel = (session, mod) => { if (!session) return "none"; if (session.role === "admin") return "full"; const p = session.perms && session.perms[mod]; if (p) return p; const d = ROLE_PERM_DEFAULT[session.role]; return (d && d[mod]) || "none"; };
 const fleetForSession = (session, fleet) => { if (!session || session.role === "admin") return fleet || []; const md = userDepts(session); if (!md.length) return fleet || []; return (fleet || []).filter((f) => fleetDepts(f).some((d) => md.includes(d))); };
 const pushDriverEvent = (cfg, evt) => ({ ...cfg, driverEvents: [{ id: uid(), at: Date.now(), ...evt }, ...((cfg.driverEvents || []).slice(0, 299))] });
 const pendingDriverReqs = (fleet) => { const out = []; (fleet || []).forEach((f) => DRIVER_SHIFTS.forEach((s) => { const d = driverOf(f, s.id); if (driverPending(d)) out.push({ unit: f, cat: s.id, driver: d }); })); return out.sort((a, b) => (b.driver.reqAt || 0) - (a.driver.reqAt || 0)); };
@@ -486,13 +485,13 @@ function buildDemoData(config) {
   const catId = (i) => cats[i % cats.length].id, catLbl = (id) => (cats.find((c) => c.id === id)?.label || "");
   const zns = config.zones || [], zone = (i) => zns.length ? zns[i % zns.length] : "כללי";
   const fleet = [
-    { id: "demo-f1", code: "מלגזה 12", type: "RRE200H", chassis: "CH-1012", license: "8821-72", docs: { insurance: D(-5), tasrir: D(120), license: D(9), lease: D(200) } },
-    { id: "demo-f2", code: "מלגזה 7", type: "SPE160", chassis: "CH-0707", license: "", docs: { insurance: D(60), tasrir: D(-3), license: D(45), lease: D(150) } },
-    { id: "demo-f3", code: "מלגזה 21", type: "LPE200", chassis: "CH-2121", license: "", docs: { insurance: D(80), lease: D(6) } },
+    { id: "demo-f1", code: "מלגזה 12", type: "RRE200H", chassis: "CH-1012", license: "8821-72", docs: { insurance: D(-5), tasrir: D(160), license: D(9), lease: D(240) } },
+    { id: "demo-f2", code: "מלגזה 7", type: "SPE160", chassis: "CH-0707", license: "", docs: { insurance: D(120), tasrir: D(-3), license: D(150), lease: D(220) } },
+    { id: "demo-f3", code: "מלגזה 21", type: "LPE200", chassis: "CH-2121", license: "", docs: { insurance: D(180), lease: D(200) } },
     { id: "demo-f4", code: "מלגזה 3", type: "52-8FDF20", chassis: "CH-0003", license: "5540-31", docs: { insurance: D(300), tasrir: D(280), license: D(290), lease: D(310) } },
-    { id: "demo-f5", code: "במה מתרוממת 1", type: "GS4047", chassis: "CH-B001", license: "", docs: { tasrir: D(20) } },
-    { id: "demo-f6", code: "מלגזה 18", type: "OSE250", chassis: "CH-1818", license: "", docs: { insurance: D(-12), lease: D(95) } },
-    { id: "demo-f7", code: "מלגזה 30", type: "MX-X", chassis: "CH-3030", license: "7790-55", docs: { insurance: D(70), tasrir: D(110), license: D(25), lease: D(140) } },
+    { id: "demo-f5", code: "במה מתרוממת 1", type: "GS4047", chassis: "CH-B001", license: "", docs: { tasrir: D(140) } },
+    { id: "demo-f6", code: "מלגזה 18", type: "OSE250", chassis: "CH-1818", license: "", docs: { insurance: D(150), lease: D(95) } },
+    { id: "demo-f7", code: "מלגזה 30", type: "MX-X", chassis: "CH-3030", license: "7790-55", docs: { insurance: D(170), tasrir: D(190), license: D(125), lease: D(240) } },
   ].map((f, i) => ({ supplier: i % 2 ? sup2 : sup, depts: [dep(i)], dept: dep(i), notes: "", model: f.type, ...f, demo: true, createdAt: now }));
   const by = (name, role, d) => ({ name, role, dept: d });
   const mk = (o) => ({ hasPhoto: false, closure: null, wearType: null, downtimeEnd: null, assignee: "", zone: "", asset: "", forkliftId: null, downtimeType: null, downtimeStart: null, categoryLabel: "", updatedAt: o.createdAt, ...o, demo: true });
@@ -504,7 +503,7 @@ function buildDemoData(config) {
     mk({ id: "demo-t5", num: 905, track: "facility", subject: "דלת חשמלית לא נסגרת", category: catId(3), categoryLabel: catLbl(catId(3)), priority: "medium", zone: zone(1), description: "הדלת נתקעת באמצע.", status: "pending_user", createdBy: by("מנהל מחלקה", "user", "שילוח"), createdAt: ts(-4), dueAt: ts(-1), log: [{ at: ts(-4), by: "מנהל מחלקה", byRole: "user", text: "נפתחה" }] }),
     mk({ id: "demo-t6", num: 906, track: "facility", subject: "ברז דולף במטבחון", category: catId(1), categoryLabel: catLbl(catId(1)), priority: "low", zone: zone(6), description: "טפטוף מתמשך.", status: "done", createdBy: by("מנהל מחלקה", "user", "שילוח"), createdAt: ts(-8), dueAt: ts(-5), closure: { costAmount: 120, costSupplier: sup, costNote: "הוחלף אטם.", signedBy: "ודים", signedAt: ts(-6), recordedAt: ts(-6) }, log: [{ at: ts(-8), by: "מנהל מחלקה", byRole: "user", text: "הקריאה נפתחה" }, { at: ts(-6.5), by: "טכנאי", byRole: "tech", text: "הטיפול הסתיים — הועבר לאישור הפותח" }, { at: ts(-6.2), by: "מנהל מחלקה", byRole: "user", text: "הפותח אישר שהתקלה טופלה" }, { at: ts(-6), by: "ודים", byRole: "admin", text: "נסגרה ואושרה ע״י ודים · עלות ₪120" }] }),
     mk({ id: "demo-t7", num: 907, track: "transport", subject: "תקלה שדווחה בטעות", category: "transport", priority: "low", asset: "מלגזה 30", forkliftId: "demo-f7", downtimeType: "minor", downtimeStart: ts(-5), description: "בוטל ע״י המדווח.", status: "cancelled", createdBy: by("מנהל מחלקה", "user", "שילוח"), createdAt: ts(-5), dueAt: ts(-4), log: [{ at: ts(-5), by: "מנהל מחלקה", byRole: "user", text: "נפתחה" }] }),
-    mk({ id: "demo-t8", num: 908, track: "transport", subject: "נזק לתורן עקב העמסה שגויה", category: "transport", priority: "medium", asset: "מלגזה 3", forkliftId: "demo-f4", downtimeType: "minor", downtimeStart: ts(-6), downtimeEnd: ts(-2), wearType: "disproportionate", description: "עיוות קל במסילת התורן בעקבות העמסה לא תקינה.", status: "done", routedTech: true, assignee: "טכנאי", createdBy: by("מנהל מחלקה", "user", "תפעול"), createdAt: ts(-6), dueAt: ts(-5), closure: { costAmount: 50, costSupplier: sup, costNote: "יישור והחלפת גלגלת.", signedBy: "ודים", signedAt: ts(-2), recordedAt: ts(-2) }, log: [
+    mk({ id: "demo-t8", num: 908, track: "transport", subject: "נזק לתורן עקב העמסה שגויה", category: "transport", priority: "medium", asset: "מלגזה 3", forkliftId: "demo-f4", downtimeType: "minor", downtimeStart: ts(-6), downtimeEnd: ts(-2), wearType: "disproportionate", statusMs: { "open": 86400000, "waiting:parts": 216000000, "pending_admin": 43200000 }, damageClass: "רשלנות", driverInvolved: "באבكر", description: "עיוות קל במסילת התורן בעקבות העמסה לא תקינה.", status: "done", routedTech: true, assignee: "טכנאי", createdBy: by("מנהל מחלקה", "user", "תפעול"), createdAt: ts(-6), dueAt: ts(-5), closure: { costAmount: 50, costSupplier: sup, costNote: "יישור והחלפת גלגלת.", signedBy: "ודים", signedAt: ts(-2), recordedAt: ts(-2) }, log: [
       { at: ts(-6), by: "מנהל מחלקה", byRole: "user", text: "הקריאה נפתחה והועברה לטכנאים" },
       { at: ts(-5.8), by: "טכנאי", byRole: "tech", text: "התקבלה לטיפול" },
       { at: ts(-5.5), by: "טכנאי", byRole: "tech", text: "סיווג: נזק בלתי פרופורציונלי" },
@@ -512,6 +511,13 @@ function buildDemoData(config) {
       { at: ts(-3), by: "מנהל מחלקה", byRole: "user", text: "הפותח אישר שהתקלה טופלה" },
       { at: ts(-2), by: "ודים", byRole: "admin", text: "נסגרה ואושרה ע״י ודים · עלות ₪50" },
     ] }),
+    mk({ id: "demo-t9", num: 909, track: "transport", subject: "החלפת גלגל קדמי", category: "transport", priority: "medium", asset: "מלגזה 7", forkliftId: "demo-f2", downtimeType: "minor", downtimeStart: ts(-0.4), description: "נדרש גלגל חלופי.", status: "waiting", waitingReason: "no_equipment", waitBall: "manager", assignee: "טכנאי", equipWaitSince: ts(-0.2), routedTech: true, createdBy: by("מנהל מחלקה", "user", "מחסן"), createdAt: ts(-0.4), dueAt: ts(1), log: [{ at: ts(-0.4), by: "מנהל מחלקה", byRole: "user", text: "נפתחה" }, { at: ts(-0.2), by: "טכנאי", byRole: "tech", text: "הטכנאי דיווח: הכלי לא התקבל — ממתין לקבלת הכלי מהמנהל" }] }),
+    mk({ id: "demo-t10", num: 910, track: "facility", subject: "החלפת מזגן במשרד", category: catId(2), categoryLabel: catLbl(catId(2)), priority: "medium", zone: zone(2), description: "המזגן אינו מקרר — נדרש אישור תקציב.", status: "waiting", waitingReason: "budget_approval", waitBall: "admin", assignee: "טכנאי", pauseSince: ts(-1), pauseAccumMs: 0, createdBy: by("מנהל מחלקה", "user", "שילוח"), createdAt: ts(-3), dueAt: ts(-0.5), log: [{ at: ts(-3), by: "מנהל מחלקה", byRole: "user", text: "נפתחה" }, { at: ts(-1), by: "טכנאי", byRole: "tech", text: "ממתין · ממתינה לאישור תקציב" }] }),
+    mk({ id: "demo-t11", num: 911, track: "facility", subject: "ידית דלת התרופפה שוב", category: catId(0), categoryLabel: catLbl(catId(0)), priority: "low", zone: zone(3), description: "תיקון קודם לא החזיק.", status: "rework", assignee: "טכנאי", createdBy: by("מנהל מחלקה", "user", "שילוח"), createdAt: ts(-2), dueAt: ts(1), log: [{ at: ts(-2), by: "מנהל מחלקה", byRole: "user", text: "נפתחה" }, { at: ts(-0.5), by: "מנהל מחלקה", byRole: "user", text: "הוחזר לתיקון חוזר" }] }),
+    mk({ id: "demo-t12", num: 912, track: "transport", subject: "בעיה חוזרת בבלמים", category: "transport", priority: "high", asset: "מלגזה 7", forkliftId: "demo-f2", downtimeType: "has_replacement", downtimeStart: ts(-1), description: "הבלמים שוב חלשים אחרי טיפול קודם.", status: "in_progress", returned: true, assignee: "טכנאי", routedTech: true, createdBy: by("ודים", "admin", "הנהלה"), createdAt: ts(-1), dueAt: ts(0.5), log: [{ at: ts(-1), by: "ודים", byRole: "admin", text: "נפתחה" }, { at: ts(-0.4), by: "מנהל מחלקה", byRole: "user", text: "הוחזר לטכנאי — לא טופל כראוי" }] }),
+    mk({ id: "demo-t14", num: 914, track: "transport", subject: "החלפת צמיג קדמי", category: "transport", priority: "medium", asset: "מלגזה 7", forkliftId: "demo-f2", downtimeType: "minor", downtimeStart: ts(-20), downtimeEnd: ts(-19), statusMs: { "open": 43200000, "waiting:parts": 43200000 }, damageClass: "נזק טבעי", driverInvolved: "פאדי", description: "צמיג שחוק.", status: "done", routedTech: true, assignee: "טכנאי", createdBy: by("מנהל מחלקה", "user", "מחסן"), createdAt: ts(-20), dueAt: ts(-19), closure: { costAmount: 380, costSupplier: sup, costNote: "הוחלף צמיג קדמי.", signedBy: "ודים", signedAt: ts(-19), recordedAt: ts(-19) }, log: [{ at: ts(-20), by: "מנהל מחלקה", byRole: "user", text: "נפתחה" }, { at: ts(-19), by: "ודים", byRole: "admin", text: "נסגרה · עלות ₪380" }] }),
+    mk({ id: "demo-t15", num: 915, track: "transport", subject: "תקלה חשמלית — נבדק והוחזר לשירות", category: "transport", priority: "high", asset: "מלגזה 3", forkliftId: "demo-f4", downtimeType: "critical", downtimeStart: ts(-0.6), backInServiceAt: ts(-0.15), description: "תקלה חשמלית; הכלי הושבת ואז הוחזר לשירות ידנית — הטיפול נמשך.", status: "in_progress", assignee: "טכנאי", routedTech: true, createdBy: by("טכנאי", "tech", ""), createdAt: ts(-0.6), dueAt: ts(0.4), log: [{ at: ts(-0.6), by: "טכנאי", byRole: "tech", text: "נפתחה · הכלי הושבת" }, { at: ts(-0.15), by: "ודים", byRole: "admin", text: "הכלי הוחזר לשירות (ידנית) — הטיפול בקריאה נמשך", kind: "other" }] }),
+    mk({ id: "demo-t16", num: 916, track: "transport", subject: "תקלה בהגה כוח", category: "transport", priority: "high", asset: "מלגזה 21", forkliftId: "demo-f3", downtimeType: "minor", downtimeStart: ts(-0.3), description: "הגה כבד מהרגיל. הקריאה שובצה לטכנאי שעזב — איש אינו רואה אותה.", status: "in_progress", assignee: "מקסים (עזב)", routedTech: true, createdBy: by("מנהל מחלקה", "user", "מחסן"), createdAt: ts(-0.3), dueAt: ts(0.6), log: [{ at: ts(-0.3), by: "מנהל מחלקה", byRole: "user", text: "נפתחה ושובצה לטכנאי" }] }),
   ];
   // ТО для годовой матрицы: история по месяцам текущего года + план вперёд. atM — абсолютный месяц года; ts — смещение от сегодня для будущих/просроченных.
   const Y = new Date(now).getFullYear(), curM = new Date(now).getMonth();
@@ -536,7 +542,7 @@ function buildDemoData(config) {
   const genFleet = [], genPm = [];
   for (let i = 0; i < 30; i++) {
     const id = "demo-f" + (8 + i), num = 40 + i, type = TYPES[i % TYPES.length];
-    genFleet.push({ id, code: "מלגזה " + num, type, model: type, chassis: "CH-" + (1000 + num), license: rnd() > 0.45 ? (1000 + ri(8000)) + "-" + (10 + ri(80)) : "", supplier: i % 2 ? sup2 : sup, depts: [dep(i)], dept: dep(i), notes: "", docs: { insurance: D(ri(320) - 25), tasrir: D(ri(320)), license: D(ri(320)), lease: D(ri(340)) }, demo: true, createdAt: now });
+    genFleet.push({ id, code: "מלגזה " + num, type, model: type, chassis: "CH-" + (1000 + num), license: rnd() > 0.45 ? (1000 + ri(8000)) + "-" + (10 + ri(80)) : "", supplier: i % 2 ? sup2 : sup, depts: [dep(i)], dept: dep(i), notes: "", docs: { insurance: D(60 + ri(280)), tasrir: D(60 + ri(280)), license: D(60 + ri(280)), lease: D(60 + ri(300)) }, demo: true, createdAt: now });
     const freq = i % 6 === 5 ? "yearly" : i % 3 === 2 ? "quarterly" : "monthly";
     const hist = [];
     if (freq === "monthly") { for (let m = 0; m < curM; m++) { const r = rnd(); if (r < 0.12) hist.push(hMiss(m, 8 + ri(14))); else if (r < 0.93) hist.push(hDone(m, 8 + ri(14), rnd() < 0.15)); } }
@@ -564,19 +570,74 @@ function buildDemoData(config) {
     { id: "de5", at: ts(-3), type: "rejected", sub: "move", unitCode: "מלגזה 21", toUnitCode: "מלגזה 7", driverName: "אורי", byName: "ודים", reqByUid: "builtin_mgr", reqByName: "מנהל מחלקה" },
     { id: "de6", at: ts(-0.5), type: "access", unitCode: "מלגזה 7", category: "morning", driverName: "יוסי אברהם", workNo: "2203", byName: "מנהל מחלקה", sub: "1" },
   ];
-  return { fleet: allFleet, tickets, pm: pm.concat(genPm), driverEvents, vehicleTypes: demoVehicleTypes, modelType: DEMO_TYPE_OF };
+  // --- Демо: уборка (зоны/обходы/жалобы) + смены (присутствие) + плановые отсутствия ---
+  const todayAt = (h, m = 0) => { const d = new Date(now); d.setHours(h, m, 0, 0); return d.getTime(); };
+  const _MD = config.departments || [];
+  const _fn = ["דוד", "יוסי", "משה", "אבי", "עמית", "רן", "ניר", "גיל", "עידו", "תום", "ליאור", "שי", "נדב", "אורי", "יואב", "אסף", "רועי", "דניאל", "איתי", "עומר"];
+  const demoMgrs = _MD.map((d, i) => ({ id: `demo-u-mgr-${i}`, name: `מנהל ${d}`, role: "user", email: `mgr${i}@chemipal.co.il`, password: "1234", pin: "", dept: d, depts: [d], mgrZones: [], shift: "morning", demo: true }));
+  if (_MD[0]) demoMgrs.push({ id: "demo-u-mgr-x", name: `מנהל ${_MD[0]} (משנה)`, role: "user", email: "mgrx@chemipal.co.il", password: "1234", pin: "", dept: _MD[0], depts: [_MD[0]], mgrZones: [], shift: "night", demo: true });
+  const demoWorkers = _MD.flatMap((d, i) => [
+    { id: `demo-u-w-${i}-a`, name: `${_fn[(i * 2) % _fn.length]} (${d})`, role: "worker", workerNo: String(3000 + i * 2), pin: "1234", email: "", password: "", dept: d, shift: "morning", employmentType: i % 3 === 0 ? "contractor" : "direct", contractorName: i % 3 === 0 ? "כ״א חיצוני בע״מ" : "", demo: true },
+    { id: `demo-u-w-${i}-b`, name: `${_fn[(i * 2 + 1) % _fn.length]} (${d})`, role: "worker", workerNo: String(3001 + i * 2), pin: "1234", email: "", password: "", dept: d, shift: "night", employmentType: "direct", contractorName: "", demo: true },
+  ]);
+  const dusers = [
+    { id: "demo-u-mgr1", name: "אורן (מנהל ניקיון)", role: "user", email: "oren@chemipal.co.il", password: "1234", pin: "", dept: "ניקיון", depts: ["ניקיון"], mgrZones: ["demo-z1", "demo-z2", "demo-z3"], demo: true },
+    { id: "demo-u-cl1", name: "רונן", role: "cleaner", workerNo: "2001", pin: "1234", email: "", password: "", dept: "", demo: true },
+    { id: "demo-u-cl2", name: "מאיה", role: "cleaner", workerNo: "2002", pin: "1234", email: "", password: "", dept: "", demo: true },
+    { id: "demo-u-cl3", name: "דמיטרי", role: "cleaner", workerNo: "2003", pin: "1234", email: "", password: "", dept: "", demo: true },
+    { id: "demo-u-tech1", name: "איגור", role: "tech", pin: "1234", email: "", password: "", supplier: "מוסך מרכזי", shiftStart: "07:30", shiftEnd: "16:30", techScope: "both", dept: "", demo: true },
+    { id: "demo-u-tech2", name: "סרגיי", role: "tech", pin: "1234", email: "", password: "", supplier: "מוסך מרכזי", shiftStart: "08:00", shiftEnd: "16:30", techScope: "transport", dept: "", demo: true },
+    { id: "demo-u-tech3", name: "ולנטין", role: "tech", pin: "1234", email: "", password: "", supplier: "", shiftStart: "07:30", shiftEnd: "16:30", techScope: "facility", dept: "", demo: true },
+    ...demoMgrs, ...demoWorkers,
+  ];
+  const z1ck = [{ id: "z1c1", label: "ניקוי משטחים" }, { id: "z1c2", label: "החלפת מגבות נייר" }, { id: "z1c3", label: "ריקון פח" }, { id: "z1c4", label: "שטיפת רצפה" }];
+  const z2ck = [{ id: "z2c1", label: "ניקוי אסלות" }, { id: "z2c2", label: "מילוי סבון" }, { id: "z2c3", label: "ניגוב מראות" }, { id: "z2c4", label: "ריקון פחים" }];
+  const z3ck = [{ id: "z3c1", label: "טאטוא מעברים" }, { id: "z3c2", label: "ניקוי משטחי עבודה" }];
+  const dzones = [
+    { id: "demo-z1", code: "Z-KIT2", name: "מטבחון קומה 2", building: "בניין A", floor: "קומה 2", checklist: z1ck, windows: [{ id: "z1w1", time: "08:00", tol: 15, items: null }, { id: "z1w2", time: "13:00", tol: 15, items: null }], activeDays: WORK_WEEK.slice(), cleanerId: "demo-u-cl1", cleanerName: "רונן", active: true, demo: true, createdAt: now },
+    { id: "demo-z2", code: "Z-WC1", name: "שירותים ראשי", building: "בניין A", floor: "קומה 1", checklist: z2ck, windows: [{ id: "z2w1", time: "07:30", tol: 20, items: null }, { id: "z2w2", time: "11:30", tol: 20, items: null }, { id: "z2w3", time: "15:30", tol: 20, items: null }], activeDays: [0, 1, 2, 3, 4, 5, 6], cleanerId: "demo-u-cl2", cleanerName: "מאיה", active: true, demo: true, createdAt: now },
+    { id: "demo-z3", code: "Z-WH-N", name: "מחסן צפון", building: "בניין B", floor: "", checklist: z3ck, windows: [{ id: "z3w1", time: "09:00", tol: 30, items: null }], activeDays: WORK_WEEK.slice(), cleanerId: "demo-u-cl3", cleanerName: "דמיטרי", active: true, demo: true, createdAt: now },
+  ];
+  const drounds = [
+    { id: "demo-r1", zoneId: "demo-z1", zoneName: "מטבחון קומה 2", zoneLoc: "בניין A · קומה 2", winId: "z1w1", winTime: "08:00", at: todayAt(8, 5), byUid: "demo-u-cl1", byName: "רונן", byRole: "cleaner", isCover: false, coverFor: "", items: { z1c1: true, z1c2: true, z1c3: true, z1c4: true }, doneCount: 4, total: 4, issues: [], demo: true },
+    { id: "demo-r2", zoneId: "demo-z2", zoneName: "שירותים ראשי", zoneLoc: "בניין A · קומה 1", winId: "z2w1", winTime: "07:30", at: todayAt(7, 40), byUid: "demo-u-cl2", byName: "מאיה", byRole: "cleaner", isCover: false, coverFor: "", items: { z2c1: true, z2c2: true, z2c3: true, z2c4: true }, doneCount: 4, total: 4, issues: [{ itemId: "z2c2", label: "מילוי סבון", reason: "מתקן הסבון שבור — דולף", photo: null, kind: "broken" }, { itemId: "z2c4", label: "ריקון פחים", reason: "חסרים שקיות אשפה", photo: null, kind: "dirty" }], demo: true },
+  ];
+  const dcomplaints = [
+    { id: "demo-c1", at: todayAt(9, 10), zoneId: "demo-z1", zoneName: "מטבחון קומה 2", zoneLoc: "בניין A · קומה 2", kind: "dirty", text: "כתם קפה גדול על השיש לא נוקה", photo: null, status: "open", ownerRole: "cleaner", verified: true, ticketId: null, reportedById: "demo-u-mgr1", reportedByName: "אורן", reportedByRole: "user", demo: true },
+    { id: "demo-c2", at: todayAt(7, 40), zoneId: "demo-z2", zoneName: "שירותים ראשי", zoneLoc: "בניין A · קומה 1", kind: "broken", text: "מתקן הסבון שבור — דולף", photo: null, status: "pending", ownerRole: "admin", verified: false, ticketId: null, fromRoundId: "demo-r2", reportedById: "demo-u-cl2", reportedByName: "מאיה", reportedByRole: "cleaner", demo: true },
+    { id: "demo-c3", at: todayAt(7, 41), zoneId: "demo-z2", zoneName: "שירותים ראשי", zoneLoc: "בניין A · קומה 1", kind: "round", text: "חסרים שקיות אשפה", photo: null, status: "open", ownerRole: "admin", verified: false, ticketId: null, fromRoundId: "demo-r2", reportedById: "demo-u-cl2", reportedByName: "מאיה", reportedByRole: "cleaner", demo: true },
+    { id: "demo-c4", at: ts(-0.2), zoneId: "demo-z1", zoneName: "מטבחון קומה 2", zoneLoc: "בניין A · קומה 2", kind: "dirty", text: "דיווח אנונימי: רצפה רטובה ומסוכנת ליד הכניסה", photo: null, status: "pending", ownerRole: "cleaner", verified: false, ticketId: null, reportedById: "", reportedByName: "דיווח אנונימי", reportedByRole: "anonymous", demo: true },
+    { id: "demo-c5", at: ts(-2), zoneId: "demo-z1", zoneName: "מטבחון קומה 2", zoneLoc: "בניין A · קומה 2", kind: "dirty", text: "פח עולה על גדותיו", photo: null, status: "resolved", ownerRole: "cleaner", verified: true, ticketId: null, resolvedAt: ts(-1.8), resolvedBy: "רונן", reportedById: "demo-u-mgr1", reportedByName: "אורן", reportedByRole: "user", demo: true },
+  ];
+  const dabs = [
+    { id: "demo-a1", userId: "demo-u-cl3", name: "דמיטרי", from: iso(0), to: iso(1), at: ts(-1), demo: true },
+    { id: "demo-a2", userId: "demo-u-cl2", name: "מאיה", from: iso(5), to: iso(7), at: ts(-0.5), demo: true },
+  ];
+  const dpresence = [
+    { id: "demo-u-tech1", name: "איגור", onShift: true, since: todayAt(7, 22), endedAt: null, lastSeen: now, day: iso(0), demo: true },
+    { id: "demo-u-tech2", name: "סרגיי", onShift: true, since: todayAt(8, 45), endedAt: null, lastSeen: now, day: iso(0), demo: true },
+    { id: "demo-u-tech3", name: "ולנטין", onShift: false, since: todayAt(7, 25), endedAt: todayAt(13, 0), lastSeen: todayAt(13, 0), day: iso(0), demo: true },
+  ];
+  return { fleet: allFleet, tickets, pm: pm.concat(genPm), driverEvents, vehicleTypes: demoVehicleTypes, modelType: DEMO_TYPE_OF, users: dusers, zones: dzones, rounds: drounds, complaints: dcomplaints, absences: dabs, presence: dpresence };
 }
 const isOpen = (t) => t.status !== "done" && t.status !== "cancelled";
+// כלי מושבת = קריאת שינוע פתוחה (לא ממתינה לאישור מנהל/הוחזרה לעובד) ברמת חומרה «מוציאה מכלל שימוש», שלא הוחזרה לשירות ידנית. נגזר מהקריאות — אין דגל נפרד שעלול להתנתק מהמציאות.
+const ticketBlocks = (t, cfg) => t.track === "transport" && isOpen(t) && t.status !== "pending_manager" && t.status !== "rework" && !t.backInServiceAt && !!dtOf(t.downtimeType, cfg).oos;
+const unitBlock = (f, tickets, cfg) => { if (!f) return null; const bs = (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).sort((a, b) => b.createdAt - a.createdAt); if (!bs.length) return null; return { ticket: bs[0], level: dtOf(bs[0].downtimeType, cfg), count: bs.length }; };
+// השבתה ידנית = פתיחת קריאת שינוע ברמה חוסמת. החזרה לשירות = סימון backInServiceAt על כל הקריאות החוסמות (הטיפול בקריאה עצמה נמשך).
+const buildBlockTicket = (f, cfg, by, reason) => { const now = Date.now(); const lvl = dtLevels(cfg).find((d) => d.oos) || DOWNTIME[2]; const rsn = (reason || "").trim(); return { id: uid(), track: "transport", subject: `השבתת כלי · ${f.code}`, category: "transport", priority: lvl.prio || "high", zone: "רחבת מלגזות", asset: f.code, forkliftId: f.id, downtimeType: lvl.id, wearType: null, description: rsn || "הכלי הושבת ידנית — אין להשתמש בו עד לתיקון.", status: "new", assignee: "", routedTech: true, downtimeStart: now, downtimeEnd: null, createdBy: { name: by.name, role: by.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: f.id, priority: lvl.prio || "high" }, cfg, [f]) * 3600000, hasPhoto: false, closure: null, log: [{ at: now, by: by.name, byRole: by.role, text: `הכלי הושבת ידנית${rsn ? " · סיבה: " + rsn : ""}`, kind: "open" }] }; };
+const clearBlockPatches = (f, tickets, cfg, by) => { const now = Date.now(); return (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).map((t) => ({ ...t, backInServiceAt: now, updatedAt: now, log: [...(t.log || []), { at: now, by: by.name, byRole: by.role, text: "הכלי הוחזר לשירות (ידנית) — הטיפול בקריאה נמשך", kind: "other" }] })); };
 // Жёсткая модель: чей сейчас «мяч» (кто должен действовать). Единый источник правды для всех экранов.
 const ballIn = (t) => {
-  // Особый случай: техник не получил клали — мяч у менеджера (подать технику), хотя статус waiting
-  if (t.status === "waiting" && t.waitingReason === "no_equipment") return "manager";
   const track = t.track || (t.forkliftId ? "transport" : "facility");
   const exec = t.mgrExec ? "manager" : "tech"; // кто исполнитель: менеджер (по зданию) или техник
   switch (t.status) {
     case "new": case "in_progress": case "waiting":
-      // facility-заявка без исполнителя и не в пуле — мяч у админа (разбор/назначение)
-      if (track === "facility" && !t.assignee && !t.routedTech) return "admin";
+      // Во время ожидания мяч определяется причиной (waitBall, записан при установке причины). Старые заявки: no_equipment→менеджер.
+      if (t.status === "waiting") { const wb = t.waitBall || (t.waitingReason === "no_equipment" ? "manager" : "executor"); if (wb === "manager") return "manager"; if (wb === "admin") return "admin"; }
+      // facility-заявка без исполнителя и не в пуле — мяч у админа (разбор/назначение).
+      // НО возвращённая заявка (t.returned) уже была у исполнителя — её НЕ диспетчеризуем заново через админа.
+      if (track === "facility" && !t.assignee && !t.routedTech && !t.returned) return "admin";
       return exec;
     case "pending_user": return "manager";
     case "pending_admin": return "admin";
@@ -585,24 +646,66 @@ const ballIn = (t) => {
     default: return "none"; // done / cancelled
   }
 };
+// «у кого мяч» — кто сейчас держит заявку, для отображения на карточке
+const ballHolder = (t) => {
+  const who = ballIn(t);
+  if (who === "admin") return { key: "admin", label: "מנהל המערכת", Icon: ShieldCheck, color: "#4F46E5" };
+  if (who === "manager") return { key: "manager", label: (t.status === "waiting" && t.waitingReason === "no_equipment") ? "מנהל מחלקה · להעביר כלי" : (t.status === "pending_manager" ? "מנהל מחלקה · לאישור דיווח" : (t.status === "pending_user" ? "מנהל מחלקה · לאישור ביצוע" : "מנהל מחלקה")), Icon: User, color: "#0D9488" };
+  if (who === "tech") return { key: "tech", label: t.assignee ? ("טכנאי · " + t.assignee) : "צוות טכני · ממתין לקבלה", Icon: Wrench, color: "#D97706" };
+  return null; // none — סגורה/בוטלה/הוחזרה לעובד
+};
+// Есть ли активный техник, который МОЖЕТ принять заявку (по типу/поставщику/категории). Пусто → заявка «без принимающего».
+const eligibleTechs = (t, users, fleet) => {
+  const track = t.track || (t.forkliftId ? "transport" : "facility");
+  return (users || []).filter((u) => {
+    if (u.role !== "tech" || u.active === false) return false;
+    const scope = u.techScope || "transport";
+    if (track === "transport") { if (scope === "facility") return false; if (u.supplier && t.forkliftId) { const f = (fleet || []).find((x) => x.id === t.forkliftId); if (f && f.supplier && f.supplier !== u.supplier) return false; } return true; }
+    if (scope === "transport") return false;
+    const cats = u.techCats || []; if (cats.length && t.category && !cats.includes(t.category)) return false; return true;
+  });
+};
+// «Между стульев»: заявка открыта, мяч у бригады техников, но принять некому (нет техника, либо назначенный исчез/неактивен).
+const needsHandler = (t, users, fleet) => {
+  if (!isOpen(t) || ballIn(t) !== "tech") return false;
+  if (t.assignee) return !(users || []).some((u) => u.role === "tech" && u.active !== false && u.name === t.assignee);
+  return eligibleTechs(t, users, fleet).length === 0;
+};
 const WAIT_LABEL = "ממתינה לחלקים";
+// Причины ожидания — ДЕФОЛТНЫЙ список (сид). Админ редактирует в настройках (config.waitReasons).
+// ball: у кого мяч во время ожидания (executor|manager|admin). pauseSla: останавливает ли часы SLA (учёт — Phase 2). setters: кто может ставить (tech|manager|both).
 const WAIT_REASONS = [
-  { id: "no_equipment", label: "לא התקבל הכלי" },
-  { id: "parts", label: "ממתינה לחלקים" },
-  { id: "supplier", label: "ממתינה לספק" },
-  { id: "access", label: "ממתינה לגישה" },
-  { id: "manager_decision", label: "ממתינה להחלטת מנהל" },
-  { id: "requester_confirmation", label: "ממתינה לאישור הפותח" },
-  { id: "scheduled_date", label: "מתוזמנת לתאריך" },
-  { id: "safety_hold", label: "עצירת בטיחות" },
-  { id: "budget_approval", label: "ממתינה לאישור תקציב" },
-  { id: "external_contractor", label: "ממתינה לקבלן חוץ" },
-  { id: "other", label: "אחר" },
+  { id: "no_equipment", label: "לא התקבל הכלי", ball: "manager", pauseSla: true, setters: "tech" },
+  { id: "parts", label: "ממתינה לחלקים", ball: "executor", pauseSla: true, setters: "both" },
+  { id: "supplier", label: "ממתינה לספק", ball: "executor", pauseSla: true, setters: "both" },
+  { id: "access", label: "ממתינה לגישה", ball: "executor", pauseSla: true, setters: "both" },
+  { id: "manager_decision", label: "ממתינה להחלטת מנהל", ball: "manager", pauseSla: false, setters: "both" },
+  { id: "requester_confirmation", label: "ממתינה לאישור הפותח", ball: "manager", pauseSla: false, setters: "manager" },
+  { id: "scheduled_date", label: "מתוזמנת לתאריך", ball: "executor", pauseSla: true, setters: "manager" },
+  { id: "safety_hold", label: "עצירת בטיחות", ball: "manager", pauseSla: true, setters: "manager" },
+  { id: "budget_approval", label: "ממתינה לאישור תקציב", ball: "admin", pauseSla: true, setters: "manager" },
+  { id: "external_contractor", label: "ממתינה לקבלן חוץ", ball: "executor", pauseSla: true, setters: "manager" },
+  { id: "other", label: "אחר", ball: "executor", pauseSla: false, setters: "both" },
 ];
-const waitReasonLabel = (id) => (WAIT_REASONS.find((r) => r.id === id)?.label || "ממתינה");
-// Техник видит ТОЛЬКО то, что физически мешает ему продвигать ремонт (не админ-причины).
-const TECH_WAIT_IDS = ["parts", "supplier", "access", "manager_decision"];
-const TECH_WAIT_REASONS = WAIT_REASONS.filter((r) => TECH_WAIT_IDS.includes(r.id)).map((r) => r.id === "manager_decision" ? { ...r, label: "צריך עזרה / החלטה" } : r);
+const wReasons = (cfg) => (cfg && Array.isArray(cfg.waitReasons) && cfg.waitReasons.length) ? cfg.waitReasons : WAIT_REASONS;
+const wReasonOf = (cfg, id) => wReasons(cfg).find((r) => r.id === id) || WAIT_REASONS.find((r) => r.id === id) || null;
+const waitReasonLabel = (id, cfg) => (wReasonOf(cfg, id)?.label || "ממתינה");
+const reasonBall = (cfg, id) => (wReasonOf(cfg, id)?.ball || "executor");
+// Причины, которые роль может ВЫСТАВЛЯТЬ (один список, фильтр по setters). no_equipment ставится отдельной кнопкой техника.
+const reasonsForRole = (cfg, role) => wReasons(cfg).filter((r) => r.id !== "no_equipment" && (r.setters === "both" || (role === "tech" ? r.setters === "tech" : r.setters === "manager"))).map((r) => (r.id === "manager_decision" && r.label === "ממתינה להחלטת מנהל") ? { ...r, label: "צריך עזרה / החלטה" } : r);
+const reasonPauses = (cfg, id) => !!(wReasonOf(cfg, id)?.pauseSla);
+// Бухгалтерия паузы SLA: при входе в «ожидание» с причиной, останавливающей SLA — копим время; при выходе — финализируем. now позволяет «бэкдейт» (точка разворота).
+const pausePatch = (prev, patch, cfg, now = Date.now()) => {
+  const ns = ("status" in patch) ? patch.status : prev.status;
+  const nr = ("waitingReason" in patch) ? patch.waitingReason : prev.waitingReason;
+  const wasP = prev.status === "waiting" && reasonPauses(cfg, prev.waitingReason);
+  const willP = ns === "waiting" && reasonPauses(cfg, nr);
+  let acc = prev.pauseAccumMs || 0, since = prev.pauseSince || null;
+  if (wasP && since && !willP) { acc += Math.max(0, now - since); since = null; }
+  else if (!wasP && willP) since = now;
+  else if (wasP && willP && !since) since = now;
+  return { pauseAccumMs: acc, pauseSince: since };
+};
 
 // ---- Risk Score ----
 function computeRisk(ticket, fleet, config) {
@@ -688,6 +791,22 @@ const startOfDay = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); ret
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const presenceOf = (presence, userId) => { const r = (presence || []).find((x) => x.id === userId); if (!r) return { onShift: false }; const active = r.onShift && r.day === todayKey(); return { ...r, onShift: active }; };
 const lastSeenText = (ts) => { if (!ts) return ""; const m = Math.floor((Date.now() - ts) / 60000); if (m < 1) return "פעיל כעת"; if (m < 60) return `פעיל לפני ${m} ד׳`; const h = Math.floor(m / 60); return `פעיל לפני ${h} שע׳`; };
+// График смены техника: старт+конец (одно расписание на все дни). Источник — смена из настроек, иначе личные поля, иначе дефолт.
+const techSched = (u, cfg) => { const sh = (cfg?.shifts || []).find((s) => s.id === (u?.shiftId)); return { start: (sh && sh.start) || u?.shiftStart || cfg?.defaultShiftStart || "07:30", end: (sh && sh.end) || u?.shiftEnd || cfg?.defaultShiftEnd || "16:30" }; };
+const todayAtHM = (hm) => { const [hh, mm] = String(hm || "00:00").split(":").map(Number); const d = new Date(); d.setHours(hh || 0, mm || 0, 0, 0); return d.getTime(); };
+// Простой смены: опоздание к старту (вход позже старт+допуск) и ранний уход (выход раньше конец−допуск). Только рабочие дни.
+const isShiftWorkday = () => WORK_WEEK.includes(new Date().getDay());
+// Плановое отсутствие: есть ли у пользователя отгул, покрывающий день dk (ISO YYYY-MM-DD).
+const isAbsentOn = (userId, absences, dk) => { const d = dk || todayKey(); return (absences || []).some((a) => a.userId === userId && a.from && a.from <= d && (a.to || a.from) >= d); };
+const shiftIdle = (rec, u, cfg) => {
+  const sc = techSched(u, cfg); const lg = (cfg?.lateGraceMin ?? 10) * 60000, eg = (cfg?.earlyGraceMin ?? 10) * 60000;
+  const sTs = todayAtHM(sc.start), eTs = todayAtHM(sc.end);
+  const since = (rec && rec.day === todayKey()) ? rec.since : null;
+  const endedAt = (rec && rec.day === todayKey()) ? rec.endedAt : null;
+  const lateMin = since ? Math.max(0, Math.round((since - (sTs + lg)) / 60000)) : 0;
+  const earlyMin = endedAt ? Math.max(0, Math.round(((eTs - eg) - endedAt) / 60000)) : 0;
+  return { lateMin, earlyMin, sTs, eTs, lateThresh: sTs + lg };
+};
 const HE_DOW = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 const HE_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 const pmColor = (d) => (d <= 0 ? "#DC2626" : d <= 3 ? "#EA580C" : d <= 7 ? "#CA8A04" : "#16A34A");
@@ -819,15 +938,35 @@ const NOTIF_KINDS = [
 ];
 const NOTIF_KIND_LABEL = (k) => (NOTIF_KINDS.find((x) => x.kind === k) || {}).label || k;
 const DEFAULT_NOTIF_PREFS = { sort: "newest", group: false, hidden: {} };
-function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = []) {
+function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = []) {
   const ev = []; const vis = visibleTickets(session, tickets, fleet);
-  const shiftEvents = (go) => { (presence || []).filter((r) => r.day === todayKey()).forEach((r) => { if (r.since) ev.push({ key: "sh-on-" + r.id + r.since, at: r.since, kind: "confirm", go, title: "טכנאי התחיל משמרת", body: `${r.name} זמין כעת` }); if (r.endedAt) ev.push({ key: "sh-off-" + r.id + r.endedAt, at: r.endedAt, kind: "back", go, title: "טכנאי סיים משמרת", body: `${r.name} אינו זמין` }); }); };
+  (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "escalate", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "pm", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "pm", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
+  (meetings || []).forEach((m) => { if (m.status !== "planned") return; if (!(m.ownerId === session.id || (m.participantIds || []).includes(session.id))) return; const dt = m.at - Date.now(); if (dt > -3600000 && dt < 24 * 3600000) ev.push({ key: "mtg-" + m.id, at: m.at, kind: "pm", go: "tasks", title: `פגישה קרובה · ${m.title}`, body: `${fmtDate(m.at)} ${fmtTime(m.at)}` }); });
+  const shiftEvents = (go) => {
+    const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false);
+    const workday = isShiftWorkday();
+    techs.forEach((u) => {
+      const r = (presence || []).find((x) => x.id === u.id && x.day === todayKey());
+      const { lateMin, earlyMin, lateThresh } = shiftIdle(r, u, cfg);
+      if (r && r.since) {
+        ev.push({ key: "sh-on-" + u.id + r.since, at: r.since, kind: "confirm", go, title: "טכנאי התחיל משמרת", body: `${u.name}${lateMin > 0 ? " · באיחור " + lateMin + " ד׳" : " · בזמן"}` });
+        if (lateMin > 0) ev.push({ key: "sh-late-" + u.id + todayKey(), at: r.since, kind: "escalate", go, title: "טכנאי איחר לתחילת משמרת", body: `${u.name} · איחור ${lateMin} ד׳` });
+      } else if (workday && Date.now() > lateThresh) {
+        const mins = Math.round((Date.now() - lateThresh) / 60000);
+        ev.push({ key: "sh-noshow-" + u.id + todayKey(), at: lateThresh, kind: "escalate", go, title: "טכנאי טרם התחיל משמרת", body: `${u.name} · איחור ${mins} ד׳ (טרם נכנס למערכת)` });
+      }
+      if (r && r.endedAt) {
+        ev.push({ key: "sh-off-" + u.id + r.endedAt, at: r.endedAt, kind: "back", go, title: "טכנאי סיים משמרת", body: `${u.name}${earlyMin > 0 ? " · מוקדם ב-" + earlyMin + " ד׳" : ""}` });
+        if (earlyMin > 0) ev.push({ key: "sh-early-" + u.id + r.endedAt, at: r.endedAt, kind: "escalate", go, title: "טכנאי סיים משמרת מוקדם", body: `${u.name} · מוקדם ב-${earlyMin} ד׳` });
+      }
+    });
+  };
   if (session.role === "cleaner") {
     const nowTs = Date.now();
     (zones || []).filter((z) => z.active !== false && z.cleanerId === session.id).forEach((z) => zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => {
-      if (status === "due" || status === "overdue") ev.push({ key: `cls-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) - (+win.tol || 0) * 60000, kind: "cleaning", title: status === "overdue" ? "סבב ניקיון באיחור" : "סבב ניקיון לביצוע כעת", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}` });
+      if ((status === "due" || status === "overdue") && !isAbsentOn(session.id, absences)) ev.push({ key: `cls-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) - (+win.tol || 0) * 60000, kind: "cleaning", title: status === "overdue" ? "סבב ניקיון באיחור" : "סבב ניקיון לביצוע כעת", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}` });
     }));
-    (complaints || []).filter((c) => c.status === "open" && (zones || []).some((z) => z.id === c.zoneId && z.cleanerId === session.id)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", title: c.kind === "broken" ? "דווחה תקלה בזון שלך" : "דווח לכלוך בזון שלך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}${c.text ? " · " + c.text : ""}` }));
+    (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && c.reportedById !== session.id && (zones || []).some((z) => z.id === c.zoneId && z.cleanerId === session.id)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", title: c.kind === "broken" ? "דווחה תקלה באזור שלך" : "דווח לכלוך באזור שלך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}${c.text ? " · " + c.text : ""}` }));
     return ev.sort((a, b) => b.at - a.at);
   }
   if (session.role === "admin") {
@@ -839,18 +978,21 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
       if (isCriticalEscalated(t, cfg)) ev.push({ key: t.id + "-esc", at: t.createdAt + (cfg?.escalateCriticalHours ?? 2) * 3600000, ticketId: t.id, kind: "escalate", title: `השבתה קריטית ללא טכנאי · #${ticketNo(t)}`, body: `${t.asset || ""} · ${t.subject} — אף טכנאי לא קיבל את הקריאה מעל ${cfg?.escalateCriticalHours ?? 2} שע׳` });
     });
     (fleet || []).forEach((f) => { const s = docStatus(f, cfg); if (s.d != null && s.d <= (cfg?.docWarn?.yellow || 30)) ev.push({ key: "doc-" + f.id, at: Date.now() - (30 - Math.max(0, s.d)) * 3600000, kind: "doc", go: "fleet", fleetId: f.id, title: `מסמך פג-תוקף · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${s.label}` }); });
+    (fleet || []).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "fleet", fleetId: f.id, title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
+    tickets.filter((t) => needsHandler(t, users, fleet)).forEach((t) => ev.push({ key: "orphan-" + t.id, at: t.createdAt, ticketId: t.id, kind: "escalate", go: "tickets", title: `קריאה ללא מטפל · #${ticketNo(t)}`, body: `${t.subject} — ${t.assignee ? "המטפל אינו פעיל עוד" : "אין טכנאי פעיל לקבל"}. נדרש שיבוץ.` }));
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי קרוב", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
     pendingDriverReqs(fleet).forEach(({ unit, cat, driver }) => ev.push({ key: "drvreq-" + unit.id + cat, at: driver.reqAt || Date.now(), kind: "driver", go: "fleet", title: driver.status === "pending_add" ? "בקשת הוספת נהג — ממתין לאישורך" : "בקשת העברת נהג — ממתין לאישורך", body: `${driver.name} · ${unit.code} (${driverShiftMeta(cat).label})${driver.status === "pending_move" && driver.moveTo ? ` → ${driver.moveTo.unitCode}` : ""}${driver.needsChip ? " · צריך להנפיק צ׳יפ" : ""} · מ-${driver.addedByName || "מנהל"}` }));
     shiftEvents("team");
-    { const nowTs = Date.now(); (zones || []).filter((z) => z.active !== false).forEach((z) => zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => { if (status === "missed") ev.push({ key: `clmiss-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) + (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: "סבב ניקיון פוספס", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}${z.cleanerName ? " · " + z.cleanerName : ""}` }); })); }
+    { const nowTs = Date.now(); (zones || []).filter((z) => z.active !== false).forEach((z) => { const absent = isAbsentOn(z.cleanerId, absences); zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => { if (status === "missed") ev.push({ key: `clmiss-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) + (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: absent ? "סבב ניקיון — נדרש כיסוי (העובד בחופשה)" : "סבב ניקיון פוספס", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}${z.cleanerName ? " · " + z.cleanerName : ""}` }); }); }); }
     (complaints || []).filter((c) => c.status === "pending").forEach((c) => ev.push({ key: "cmpp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: "דיווח ממתין לאישורך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""} · ${c.reportedByRole === "anonymous" ? "אנונימי" : c.reportedByName}` }));
-    (complaints || []).filter((c) => c.status === "open").forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "דיווח תקלה בזון ניקיון" : "דיווח לכלוך בזון ניקיון", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""} · מ-${c.reportedByName}` }));
+    (complaints || []).filter((c) => c.status === "open").forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.escalatedTo === "admin" ? (c.escalatedAt || c.at) : c.at, kind: "cleaning", go: "cleaning", title: c.escalatedTo === "admin" ? "דיווח הועבר אליך לטיפול" : (c.kind === "broken" ? "דיווח תקלה באזור ניקיון" : "דיווח לכלוך באזור ניקיון"), body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""} · ${c.escalatedTo === "admin" ? "מ-" + (c.escalatedBy || "עובד ניקיון") : "מ-" + c.reportedByName}` }));
   } else if (session.role === "tech") {
     vis.forEach((t) => {
       if (t.status === "new") ev.push({ key: t.id + "-n", at: t.createdAt, ticketId: t.id, kind: "new", title: "קריאת שינוע חדשה", body: t.subject });
       (t.log || []).forEach((l, i) => { if (l.byRole === "user" && /הערות|הוחזר/.test(l.text)) ev.push({ key: `${t.id}-${i}`, at: l.at, ticketId: t.id, kind: "back", title: "הוחזר מהמשתמש", body: `${t.subject} — ${l.text}` }); });
     });
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי לביצוע", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
+    (fleet || []).filter((f) => techCanSeeFleet(session, f)).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label}` }); });
   } else {
     vis.forEach((t) => {
       if (t.status === "pending_user") ev.push({ key: t.id + "-pu", at: t.updatedAt, ticketId: t.id, kind: "confirm", title: "ממתינה לאישורך", body: t.subject });
@@ -858,13 +1000,14 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
       (t.log || []).forEach((l, i) => { if (l.byRole !== "user") ev.push({ key: `${t.id}-${i}`, at: l.at, ticketId: t.id, kind: "upd", title: `עדכון · #${ticketNo(t)}`, body: `${t.subject} — ${l.text}` }); });
     });
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); if (!f || !fleetDepts(f).some((d) => userDepts(session).includes(d))) return; const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "dept", title: "כלי מחלקתך לטיפול", body: `${unitLabel(f, cfg)} · ${d < 0 ? "באיחור — יש להוציא" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
+    if (session.role === "user") fleetForSession(session, fleet).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "dept", title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
     if (session.role === "user") (cfg.driverEvents || []).filter((e) => (e.type === "approved" || e.type === "rejected") && e.reqByUid === session.id).slice(0, 20).forEach((e) => ev.push({ key: "drvout-" + e.id, at: e.at, kind: "driver", go: "dept", title: e.type === "approved" ? "בקשת הנהג שלך אושרה" : "בקשת הנהג שלך נדחתה", body: `${e.sub === "move" ? "העברת" : "הוספת"} ${e.driverName} · ${e.unitCode}${e.toUnitCode ? ` → ${e.toUnitCode}` : ""}` }));
-    if (session.role === "user") { const mz = session.mgrZones || []; (complaints || []).filter((c) => c.status === "open" && mz.includes(c.zoneId)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "תקלה בזון של מחלקתך" : "לכלוך בזון של מחלקתך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}` })); }
+    if (session.role === "user") { const mz = session.mgrZones || []; (complaints || []).filter((c) => c.status === "open" && mz.includes(c.zoneId)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "תקלה באזור של מחלקתך" : "לכלוך באזור של מחלקתך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}` })); }
     shiftEvents("dept");
   }
   return ev.sort((a, b) => b.at - a.at);
 }
-function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = []) {
+function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = []) {
   const skey = `seen:${session.role}:${session.name}`;
   const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
   const [lastSeen, setLastSeen] = useState(null), [toast, setToast] = useState(null);
@@ -873,7 +1016,7 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   useEffect(() => { store.get(skey, false).then((v) => setLastSeen(v ? Number(v) : 0)); }, [skey]);
   useEffect(() => { store.get(pkey, false).then((v) => { if (v) try { const p = JSON.parse(v); setPrefsState({ ...DEFAULT_NOTIF_PREFS, ...p, hidden: p.hidden || {} }); } catch (e) {} }); }, [pkey]);
   const setPrefs = (patch) => setPrefsState((p) => { const np = { ...p, ...patch }; store.set(pkey, JSON.stringify(np), false); return np; });
-  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints]);
+  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
   const unread = lastSeen == null ? 0 : visible.filter((e) => e.at > lastSeen).length;
@@ -889,9 +1032,13 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
 /* ============================================================ ROOT */
 export default function App() {
   const [ready, setReady] = useState(false);
+  const [toast, setToast] = useState(null);
+  useEffect(() => { store._onFail = () => setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב"); return () => { store._onFail = null; }; }, []);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
   const [session, setSession] = useState(null);
   const [actAs, setActAs] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
+  TASK_STATUS_META = config.taskStatusMeta || {};
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [pm, setPm] = useState([]);
@@ -901,7 +1048,15 @@ export default function App() {
   const [presence, setPresence] = useState([]);
   const [zones, setZones] = useState([]);
   const [rounds, setRounds] = useState([]);
+  const [absences, setAbsences] = useState([]);
   const [complaints, setComplaints] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [ppe, setPpe] = useState([]);
+  const [ppeItems, setPpeItems] = useState([]);
+  const [ppeNorms, setPpeNorms] = useState([]);
+  const [ppeReqs, setPpeReqs] = useState([]);
+  const [ppeOrders, setPpeOrders] = useState([]);
   const [theme, setTheme] = useState("light");
   const snapRef = useRef({});
 
@@ -935,8 +1090,7 @@ export default function App() {
       if (added) us = await loadColl("user:");
     }
     setUsers(us);
-    const exFleet = await loadColl("fleet:");
-    if (exFleet.length === 0) { const now = Date.now(); await Promise.all(FLEET_SEED.map((f) => store.set(`fleet:${f.id}`, JSON.stringify({ ...f, depts: f.depts || [], dept: "", createdAt: now }), true))); }
+    // הצי אינו נטען אוטומטית: מצב ברירת המחדל ריק. הצי האמיתי (FLEET_SEED) נטען יחד עם «טען נתוני דמו».
     const s = await store.get("session:v1", false); if (s) try { const ss = JSON.parse(s); if (us.find((u) => u.id === ss.id && u.active)) setSession(ss); } catch {}
     await reloadAll();
     } catch (e) { console.error("init error", e); }
@@ -946,10 +1100,10 @@ export default function App() {
 
   async function loadColl(prefix) { const keys = await store.list(prefix, true); const arr = await Promise.all(keys.map(async (k) => { try { return JSON.parse(await store.get(k, true)); } catch { return null; } })); return arr.filter(Boolean); }
   async function reloadAll() {
-    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp] = await Promise.all([
+    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, pp, ppit, ppn, ppreq, pord] = await Promise.all([
       loadColl("ticket:"), loadColl("pm:"), loadColl("fleet:"), loadColl("insp:"),
       loadColl("itpl:"), loadColl("presence:"), loadColl("user:"),
-      loadColl("czone:"), loadColl("cround:"), loadColl("ccomplaint:"),
+      loadColl("czone:"), loadColl("cround:"), loadColl("ccomplaint:"), loadColl("cabsence:"), loadColl("mtask:"), loadColl("mmeet:"), loadColl("ppe:"), loadColl("ppeitem:"), loadColl("ppenorm:"), loadColl("ppereq:"), loadColl("ppeorder:"),
     ]);
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
@@ -964,6 +1118,14 @@ export default function App() {
     apply("czone", zn, setZones, zoneSort);
     apply("cround", rd, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
+    apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
+    apply("mmeet", mmt, setMeetings, (a, b) => b.at - a.at);
+    apply("ppe", pp, setPpe, (a, b) => b.at - a.at);
+    apply("ppeitem", ppit, setPpeItems, (a, b) => (a.name > b.name ? 1 : -1));
+    apply("ppenorm", ppn, setPpeNorms, null);
+    apply("ppereq", ppreq, setPpeReqs, (a, b) => b.at - a.at);
+    apply("ppeorder", pord, setPpeOrders, (a, b) => b.createdAt - a.createdAt);
+    apply("cabsence", abs, setAbsences, (a, b) => (a.from > b.from ? 1 : -1));
     // presence: мержим хранилище с текущим стейтом по свежести lastSeen — чтобы поллинг не затирал только что записанный статус при медленном/частичном хранилище
     setPresence((cur) => {
       const map = {};
@@ -977,6 +1139,10 @@ export default function App() {
   }
   const saveTicket = async (t) => {
     let rec = t;
+    const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
+    const _key = (x) => x.status === "waiting" ? ("waiting:" + (x.waitingReason || "other")) : (x.status || "new");
+    if (!_prev) { rec = { ...rec, statusMs: rec.statusMs || {}, statusSince: rec.statusSince || rec.createdAt || _now }; }
+    else { const pk = _key(_prev), nk = _key(rec); if (pk !== nk) { const sm = { ...(_prev.statusMs || {}) }; sm[pk] = (sm[pk] || 0) + Math.max(0, _now - (_prev.statusSince || _prev.createdAt || _now)); rec = { ...rec, statusMs: sm, statusSince: _now }; } else { rec = { ...rec, statusMs: rec.statusMs || _prev.statusMs || {}, statusSince: rec.statusSince || _prev.statusSince || _prev.createdAt || _now }; } }
     if (!rec.num) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
     await store.set(`ticket:${rec.id}`, JSON.stringify(rec), true);
     setTickets((p) => [rec, ...p.filter((x) => x.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
@@ -988,19 +1154,22 @@ export default function App() {
   const saveZone = async (z) => { await store.set(`czone:${z.id}`, JSON.stringify(z), true); setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); };
   const delZone = async (id) => { await store.del(`czone:${id}`, true); setZones((s) => s.filter((x) => x.id !== id)); };
   const saveRound = async (r) => { await store.set(`cround:${r.id}`, JSON.stringify(r), true); setRounds((s) => [...s.filter((x) => x.id !== r.id), r].sort((a, b) => b.at - a.at)); };
+  const saveAbsence = async (a) => { await store.set(`cabsence:${a.id}`, JSON.stringify(a), true); setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1))); };
+  const delAbsence = async (id) => { await store.del(`cabsence:${id}`, true); setAbsences((s) => s.filter((x) => x.id !== id)); };
   const spawnFacilityFromComplaint = async (c) => {
     const tid = uid(), now = Date.now(); const cat = (config.categories || [])[0];
-    const t = { id: tid, track: "facility", subject: (c.text || "").trim() || ("תקלה · " + c.zoneName), category: cat?.id || "", categoryLabel: cat?.label || "", priority: "medium", zone: c.zoneLoc || c.zoneName, asset: c.zoneName || "", forkliftId: null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null, description: `נפתח מדיווח על תקלה בזון ניקיון «${c.zoneName}»${c.zoneLoc ? " · " + c.zoneLoc : ""}.${c.text ? "\n" + c.text.trim() : ""}`, status: "new", assignee: "", routedTech: false, createdBy: { id: c.reportedById, name: c.reportedByName, role: c.reportedByRole === "anonymous" ? "user" : (c.reportedByRole || "user"), dept: "" }, createdAt: now, updatedAt: now, dueAt: now + 48 * 3600000, hasPhoto: !!c.photo, closure: null, log: [{ at: now, by: c.reportedByName, byRole: c.reportedByRole || "user", text: "נפתח מדיווח על תקלה בזון ניקיון" }] };
+    const t = { id: tid, track: "facility", subject: (c.text || "").trim() || ("תקלה · " + c.zoneName), category: cat?.id || "", categoryLabel: cat?.label || "", priority: "medium", zone: c.zoneLoc || c.zoneName, asset: c.zoneName || "", forkliftId: null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null, description: `נפתח מדיווח על תקלה באזור ניקיון «${c.zoneName}»${c.zoneLoc ? " · " + c.zoneLoc : ""}.${c.text ? "\n" + c.text.trim() : ""}`, status: "new", assignee: "", routedTech: false, createdBy: { id: c.reportedById, name: c.reportedByName, role: c.reportedByRole === "anonymous" ? "user" : (c.reportedByRole || "user"), dept: "" }, createdAt: now, updatedAt: now, dueAt: now + 48 * 3600000, hasPhoto: !!c.photo, closure: null, log: [{ at: now, by: c.reportedByName, byRole: c.reportedByRole || "user", text: "נפתח מדיווח על תקלה באזור ניקיון" }] };
     if (c.photo) { try { await store.set(`photo:${tid}`, c.photo, true); } catch (e) {} }
     await saveTicket(t); return tid;
   };
   const persistComplaint = async (comp) => { await store.set(`ccomplaint:${comp.id}`, JSON.stringify(comp), true); setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at)); };
   const fileComplaint = async (c) => {
     const trusted = c.reportedByRole === "admin" || c.reportedByRole === "user";
+    const ownerRole = c.reportedByRole === "cleaner" ? "admin" : "cleaner"; // מי אחראי לסגור: דיווח מעובד ניקיון ⇒ אצל המנהל/מערכת, לא חוזר אליו
     const status = trusted ? "open" : "pending";
     let ticketId = null;
     if (c.kind === "broken" && status === "open") ticketId = await spawnFacilityFromComplaint(c);
-    await persistComplaint({ ...c, id: c.id || uid(), at: c.at || Date.now(), status, verified: trusted, ticketId, demo: false });
+    await persistComplaint({ ...c, id: c.id || uid(), at: c.at || Date.now(), status, ownerRole, verified: trusted, ticketId, demo: false });
   };
   const approveComplaint = async (c) => {
     let ticketId = c.ticketId || null;
@@ -1008,7 +1177,9 @@ export default function App() {
     await persistComplaint({ ...c, status: "open", verified: true, ticketId, approvedBy: effSession.name, approvedAt: Date.now() });
   };
   const rejectComplaint = async (c) => { await persistComplaint({ ...c, status: "rejected", resolvedAt: Date.now(), resolvedBy: effSession.name }); };
+  const escalateComplaint = async (c) => { await persistComplaint({ ...c, status: "open", escalatedTo: "admin", escalatedAt: Date.now(), escalatedBy: effSession.name }); };
   const resolveComplaint = async (c) => { await persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name }); };
+  const progressComplaint = async (c) => { await persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() }); };
   const delFleet = async (id) => { await store.del(`fleet:${id}`, true); setFleet((s) => s.filter((x) => x.id !== id)); };
   const saveInsp = async (i) => { await store.set(`insp:${i.id}`, JSON.stringify(i), true); setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); };
   const saveTpl = async (t) => { await store.set(`itpl:${t.id}`, JSON.stringify(t), true); setTemplates((s) => [...s.filter((x) => x.id !== t.id), t]); };
@@ -1016,6 +1187,20 @@ export default function App() {
   const saveUser = async (u) => { await store.set(`user:${u.id}`, JSON.stringify(u), true); setUsers((s) => [...s.filter((x) => x.id !== u.id), u]); };
   const delUser = async (id) => { await store.del(`user:${id}`, true); setUsers((s) => s.filter((x) => x.id !== id)); };
   const saveConfig = async (n) => { setConfig(n); await store.set("config:v1", JSON.stringify(n), true); };
+  const saveTask = async (t) => { await store.set(`mtask:${t.id}`, JSON.stringify(t), true); setTasks((s) => [t, ...s.filter((x) => x.id !== t.id)].sort((a, b) => b.createdAt - a.createdAt)); };
+  const delTask = async (id) => { await store.del(`mtask:${id}`, true); setTasks((s) => s.filter((x) => x.id !== id)); };
+  const saveMeeting = async (m) => { await store.set(`mmeet:${m.id}`, JSON.stringify(m), true); setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); };
+  const delMeeting = async (id) => { await store.del(`mmeet:${id}`, true); setMeetings((s) => s.filter((x) => x.id !== id)); };
+  const savePpeItem = async (x) => { await store.set(`ppeitem:${x.id}`, JSON.stringify(x), true); setPpeItems((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (a.name > b.name ? 1 : -1))); };
+  const delPpeItem = async (id) => { await store.del(`ppeitem:${id}`, true); setPpeItems((s) => s.filter((y) => y.id !== id)); };
+  const savePpe = async (x) => { await store.set(`ppe:${x.id}`, JSON.stringify(x), true); setPpe((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); };
+  const delPpe = async (id) => { await store.del(`ppe:${id}`, true); setPpe((s) => s.filter((y) => y.id !== id)); };
+  const saveNorm = async (x) => { await store.set(`ppenorm:${x.id}`, JSON.stringify(x), true); setPpeNorms((s) => [x, ...s.filter((y) => y.id !== x.id)]); };
+  const delNorm = async (id) => { await store.del(`ppenorm:${id}`, true); setPpeNorms((s) => s.filter((y) => y.id !== id)); };
+  const savePpeReq = async (x) => { await store.set(`ppereq:${x.id}`, JSON.stringify(x), true); setPpeReqs((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); };
+  const delPpeReq = async (id) => { await store.del(`ppereq:${id}`, true); setPpeReqs((s) => s.filter((y) => y.id !== id)); };
+  const savePpeOrder = async (x) => { await store.set(`ppeorder:${x.id}`, JSON.stringify(x), true); setPpeOrders((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.createdAt - a.createdAt)); };
+  const delPpeOrder = async (id) => { await store.del(`ppeorder:${id}`, true); setPpeOrders((s) => s.filter((y) => y.id !== id)); };
   // авто-миграция Тип/Модель: группировка по типу; версия 2 пересобирает старый 1:1
   useEffect(() => {
     if (ready && fleet.length && config.vtMigV !== 2) {
@@ -1038,10 +1223,10 @@ export default function App() {
   const firstWorker = (users || []).find((u) => u.role === "worker" && u.active !== false);
   const firstCleaner = (users || []).find((u) => u.role === "cleaner" && u.active !== false);
   const effSession = !impersonating ? session
-    : actAs === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: firstTech.shiftId || "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftEnd: session.shiftEnd || "16:30", techScope: "transport", techCats: [] })
+    : actAs === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: firstTech.shiftId || "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", techScope: "transport", techCats: [] })
     : actAs === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })
     : actAs === "cleaner" ? (firstCleaner ? { id: firstCleaner.id, name: firstCleaner.name, role: "cleaner" } : { ...session, role: "cleaner" })
-    : (firstMgr ? { id: firstMgr.id, name: firstMgr.name, role: "user", dept: firstMgr.dept || config.departments[0] || "", depts: userDepts(firstMgr).length ? userDepts(firstMgr) : [config.departments[0] || ""], email: firstMgr.email || "", fleetDocs: !!firstMgr.fleetDocs, fleetTickets: !!firstMgr.fleetTickets, mgrZones: firstMgr.mgrZones || [] } : { ...session, role: "user", dept: session.dept || config.departments[0] || "", mgrZones: session.mgrZones || [] });
+    : (firstMgr ? { id: firstMgr.id, name: firstMgr.name, role: "user", dept: firstMgr.dept || config.departments[0] || "", depts: userDepts(firstMgr).length ? userDepts(firstMgr) : [config.departments[0] || ""], email: firstMgr.email || "", fleetDocs: !!firstMgr.fleetDocs, fleetTickets: !!firstMgr.fleetTickets, mgrZones: firstMgr.mgrZones || [], shift: firstMgr.shift || "", perms: firstMgr.perms || undefined } : { ...session, role: "user", dept: session.dept || config.departments[0] || "", mgrZones: session.mgrZones || [] });
   const effLogout = impersonating ? (async () => setActAs(null)) : logout;
   // В режиме симуляции пишем присутствие под личностью имперсонируемого техника — чтобы статус был сквозным (видно и админу, и менеджеру).
   const effSetShift = !impersonating ? setShift : (async (on) => {
@@ -1052,22 +1237,84 @@ export default function App() {
     setPresence((s) => [...s.filter((x) => x.id !== id), rec]);
   });
   const loadDemo = async () => {
-    const { fleet: df, tickets: dt, pm: dp, driverEvents, vehicleTypes, modelType } = buildDemoData(config);
+    const cfg0 = { ...config, departments: DEFAULT_CONFIG.departments };
+    const { fleet: df, tickets: dt, pm: dp, driverEvents, vehicleTypes, modelType, users: du, zones: dz, rounds: dr, complaints: dc, absences: da, presence: dpr } = buildDemoData(cfg0);
+    const adminU = users.find((u) => u.role === "admin"), mgrs = users.filter((u) => u.role === "user");
+    const aId = adminU?.id || "demo-admin", mId = mgrs[0]?.id || aId, m2 = mgrs[1]?.id || mId;
+    const DAY = 86400000, now = Date.now(), mklog = (txt, by, off = 0) => ({ at: now - off * DAY, by, byRole: "admin", text: txt, kind: "open" });
+    const demoTasks = [
+      { id: "mt-1", title: "להכין הצעת תקציב אחזקה ל-Q3", desc: "לפי דרישת המנכ״ל בישיבת ההנהלה — פירוט עלויות צפויות לכלי שינוע ולמבנה.", responsibleIds: [aId], participantIds: [], ownerId: aId, priority: "high", status: "in_progress", mode: "deadline", dueAt: now + 4 * DAY, recur: null, nextActionAt: now + 2 * DAY, category: "תקציב", waitingFor: "", isPrivate: false, meetingId: "mm-0", linkedMeetingIds: ["mm-2"], origin: "boss_meeting", createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 3 * DAY, updatedAt: now - 1 * DAY, demo: true, log: [mklog("המטלה נוצרה (מישיבה עם המנכ״ל)", adminU?.name || "ודים", 3)] },
+      { id: "mt-2", title: "לחתום חוזה מול ספק מלגזות חדש", desc: "מעבר לספק חלופי לחלקים.", responsibleIds: [mId], participantIds: [], ownerId: aId, priority: "high", status: "waiting", mode: "deadline", dueAt: now - 1 * DAY, recur: null, nextActionAt: now, category: "ספקים", waitingFor: "ממתין להצעת מחיר סופית מהספק", isPrivate: false, meetingId: "mm-1", createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 8 * DAY, updatedAt: now - 2 * DAY, demo: true, log: [mklog("שובץ למנהל המחלקה", adminU?.name || "ודים", 8)] },
+      { id: "mt-3", title: "סבב בטיחות שבועי במחסן", desc: "בדיקת מטפים, יציאות חירום, סימון נתיבי מלגזות.", responsibleIds: [mId], participantIds: [], ownerId: aId, priority: "medium", status: "todo", mode: "recurring", dueAt: now + 2 * DAY, recur: "weekly", nextActionAt: null, category: "בטיחות", waitingFor: "", isPrivate: false, createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 10 * DAY, updatedAt: now - 6 * DAY, demo: true, log: [mklog("מטלה חוזרת שבועית", adminU?.name || "ודים", 10)] },
+      { id: "mt-4", title: "מעקב מול הנהלה — דוח אחזקה חודשי", desc: "אחריות מתמשכת: סיכום חודשי למנכ״ל.", responsibleIds: [aId], participantIds: [], ownerId: aId, priority: "medium", status: "todo", mode: "permanent", dueAt: null, recur: null, nextActionAt: null, category: "ניהול", waitingFor: "", isPrivate: false, createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 20 * DAY, updatedAt: now - 20 * DAY, demo: true, log: [mklog("אחריות קבועה", adminU?.name || "ודים", 20)] },
+      { id: "mt-5", title: "לתאם הדרכת נהגים חדשים", desc: "", responsibleIds: [m2], participantIds: [], ownerId: aId, priority: "low", status: "done", mode: "deadline", dueAt: now - 5 * DAY, recur: null, nextActionAt: null, category: "כ״א", waitingFor: "", isPrivate: false, createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 12 * DAY, updatedAt: now - 5 * DAY, demo: true, log: [mklog("נוצרה", adminU?.name || "ודים", 12), { at: now - 5 * DAY, by: uName(m2, users), byRole: "user", text: "סטטוס שונה ל«הושלם»", kind: "other" }] },
+    ];
+    const demoMeetings = [
+      { id: "mm-0", title: "פגישה עם המנכ״ל", type: "boss", purpose: "מעבר על המשימות והדיווח מול המנכ״ל", at: now - 3 * DAY + 10 * 3600000, participantIds: [aId], agenda: "תקציב Q3, מצב צי המלגזות, כוח אדם.", decisions: "", recur: null, status: "done", ownerId: aId, createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 5 * DAY, updatedAt: now - 3 * DAY, demo: true, log: [{ at: now - 3 * DAY, by: adminU?.name || "ודים", byRole: "admin", text: "📌 הוחלט: להגיש הצעת תקציב Q3 עד סוף השבוע", kind: "other" }] },
+      { id: "mm-1", title: "ישיבת הנהלה שבועית", type: "leadership", purpose: "סטטוס שבועי וחריגות", standingTopics: [{ id: "tp-sla", text: "חריגות SLA פתוחות" }, { id: "tp-safety", text: "אירועי בטיחות" }], topicMarks: {}, at: now + 1 * DAY + 9 * 3600000, participantIds: [aId, mId].filter(Boolean), agenda: "סטטוס קריאות פתוחות, חריגות SLA, ספקים.", decisions: "", recur: "weekly", status: "planned", ownerId: aId, createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 7 * DAY, updatedAt: now - 7 * DAY, demo: true, log: [{ at: now - 7 * DAY, by: adminU?.name || "ודים", byRole: "admin", text: "פגישה שבועית קבועה", kind: "open" }] },
+      { id: "mm-2", title: "סנכרון מול ספקי שירות", type: "peers", purpose: "תיאום מול עמית", standingTopics: [{ id: "tp-resp", text: "זמני תגובה של ספקים" }, { id: "tp-contract", text: "חידוש חוזים" }], topicMarks: { "tp-resp": "issue" }, at: now + 5 * DAY + 11 * 3600000, participantIds: [aId, m2].filter(Boolean), agenda: "חוזי שירות, זמני תגובה.", decisions: "", recur: "monthly", status: "planned", ownerId: aId, createdBy: { name: adminU?.name || "ודים", role: "admin" }, createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY, demo: true, log: [{ at: now - 2 * DAY, by: adminU?.name || "ודים", byRole: "admin", text: "נקבעה", kind: "open" }] },
+    ];
+    const demoPpeItems = [
+      { id: "ppe-gloves", name: "כפפות עבודה", category: "gloves", sizes: ["אחיד"], stockBySize: { "אחיד": 40 }, unitCost: 12, minStock: 20, clawbackEligible: false, active: true, demo: true, createdAt: now },
+      { id: "ppe-helmet", name: "קסדת מגן", category: "head", sizes: ["אחיד"], stockBySize: { "אחיד": 18 }, unitCost: 45, minStock: 8, clawbackEligible: true, active: true, demo: true, createdAt: now },
+      { id: "ppe-shoes", name: "נעלי בטיחות", category: "shoes", sizes: ["40", "41", "42", "43", "44", "45", "46"], stockBySize: { "40": 3, "41": 5, "42": 6, "43": 4, "44": 5, "45": 2, "46": 1 }, minBySize: { "40": 2, "41": 3, "42": 3, "43": 3, "44": 3, "45": 2, "46": 2 }, unitCost: 240, minStock: 12, clawbackEligible: true, active: true, demo: true, createdAt: now },
+      { id: "ppe-shoes-up", name: "נעלי בטיחות משודרגות", category: "shoes", sizes: ["40", "41", "42", "43", "44", "45", "46"], stockBySize: { "40": 1, "41": 2, "42": 2, "43": 2, "44": 1, "45": 1, "46": 0 }, minBySize: { "40": 1, "41": 1, "42": 1, "43": 1, "44": 1, "45": 1, "46": 1 }, unitCost: 380, minStock: 6, clawbackEligible: true, active: true, demo: true, createdAt: now },
+      { id: "ppe-vest", name: "אפוד זוהר", category: "hivis", sizes: ["אחיד"], stockBySize: { "אחיד": 30 }, unitCost: 25, minStock: 12, clawbackEligible: true, active: true, demo: true, createdAt: now },
+      { id: "ppe-ear", name: "אוזניות מגן", category: "ear", sizes: ["אחיד"], stockBySize: { "אחיד": 9 }, unitCost: 35, minStock: 10, clawbackEligible: false, active: true, demo: true, createdAt: now },
+      { id: "ppe-shirt-s", name: "חולצת קיץ", category: "clothing", sizes: ["S", "M", "L", "XL", "XXL"], stockBySize: { S: 4, M: 8, L: 8, XL: 5, XXL: 2 }, minBySize: { S: 3, M: 4, L: 4, XL: 3, XXL: 3 }, unitCost: 55, minStock: 10, clawbackEligible: true, active: true, demo: true, createdAt: now },
+      { id: "ppe-shirt-w", name: "חולצת חורף", category: "clothing", sizes: ["S", "M", "L", "XL", "XXL"], stockBySize: { S: 3, M: 6, L: 6, XL: 4, XXL: 1 }, minBySize: { S: 2, M: 3, L: 3, XL: 2, XXL: 2 }, unitCost: 90, minStock: 8, clawbackEligible: true, active: true, demo: true, createdAt: now },
+      { id: "ppe-pants", name: "מכנס דגמ״ח", category: "clothing", sizes: ["S", "M", "L", "XL", "XXL"], stockBySize: { S: 3, M: 5, L: 5, XL: 4, XXL: 1 }, minBySize: { S: 2, M: 3, L: 3, XL: 2, XXL: 2 }, unitCost: 120, minStock: 8, clawbackEligible: true, active: true, demo: true, createdAt: now },
+      { id: "ppe-galosh", name: "ערדליים", category: "other", sizes: ["אחיד"], stockBySize: { "אחיד": 12 }, unitCost: 60, minStock: 5, clawbackEligible: false, active: true, demo: true, createdAt: now },
+    ];
+    const _AD = DEFAULT_CONFIG.departments;
+    const _except = (ex) => _AD.filter((d) => !ex.includes(d));
+    const _normMap = {
+      "ppe-helmet": { depts: _except(["הפצה", "שיגור"]), policy: "free" },
+      "ppe-shoes": { depts: _AD, policy: "free" },
+      "ppe-shoes-up": { depts: _AD, policy: "subsidized", pct: 50 },
+      "ppe-vest": { depts: _AD, policy: "free" },
+      "ppe-ear": { depts: ["קבלה"], policy: "free" },
+      "ppe-shirt-s": { depts: ["הפצה"], policy: "free" },
+      "ppe-shirt-w": { depts: ["הפצה"], policy: "free" },
+      "ppe-pants": { depts: ["הפצה"], policy: "free" },
+    };
+    const demoNorms = [];
+    Object.entries(_normMap).forEach(([itemId, cfg]) => cfg.depts.forEach((d, k) => { if (d) demoNorms.push({ id: `pn-${itemId}-${k}`, dept: d, itemId, active: true, policy: cfg.policy, workerPct: cfg.pct || 50, periodMonths: PPE_PERIOD_DEFAULT, createdAt: now }); }));
+    const _byBag = { id: aId, name: adminU?.name || "ודים" };
+    const demoPpe = [
+      { id: "pp-1", workerId: "demo-u-w-5-b", workerName: "שי (הפצה)", workerNo: "3011", dept: "הפצה", employmentType: "direct", itemId: "ppe-shirt-s", itemName: "חולצת קיץ", category: "clothing", size: "L", qty: 1, at: now - 6 * DAY, by: _byBag, unitCost: 55, workerCharge: 0, clawbackEligible: true, note: "", origin: "manual", demo: true },
+      { id: "pp-2", workerId: "demo-u-w-5-b", workerName: "שי (הפצה)", workerNo: "3011", dept: "הפצה", employmentType: "direct", itemId: "ppe-pants", itemName: "מכנס דגמ״ח", category: "clothing", size: "L", qty: 1, at: now - 6 * DAY, by: _byBag, unitCost: 120, workerCharge: 0, clawbackEligible: true, note: "", origin: "manual", demo: true },
+      { id: "pp-3", workerId: "demo-u-w-3-a", workerName: "ניר (קבלה)", workerNo: "3006", dept: "קבלה", employmentType: "contractor", itemId: "ppe-shoes", itemName: "נעלי בטיחות", category: "shoes", size: "43", qty: 1, at: now - 2 * DAY, by: _byBag, unitCost: 240, workerCharge: 240, clawbackEligible: true, note: "קבלן — תשלום מלא", origin: "manual", demo: true },
+      { id: "pp-4", workerId: "demo-u-w-3-a", workerName: "ניר (קבלה)", workerNo: "3006", dept: "קבלה", employmentType: "contractor", itemId: "ppe-ear", itemName: "אוזניות מגן", category: "ear", size: "אחיד", qty: 1, at: now - 2 * DAY, by: _byBag, unitCost: 35, workerCharge: 35, clawbackEligible: false, note: "", origin: "manual", demo: true },
+      { id: "pp-5", workerId: "demo-u-cl1", workerName: "רונן", workerNo: "2001", dept: "", employmentType: "direct", itemId: "ppe-vest", itemName: "אפוד זוהר", category: "hivis", size: "אחיד", qty: 1, at: now - 1 * DAY, by: _byBag, unitCost: 25, workerCharge: 0, clawbackEligible: true, note: "", origin: "manual", demo: true },
+    ];
     await Promise.all([
       ...df.map((f) => store.set(`fleet:${f.id}`, JSON.stringify(f), true)),
+      ...FLEET_SEED.map((f) => store.set(`fleet:${f.id}`, JSON.stringify({ ...f, depts: f.depts || [], dept: "", demo: true, createdAt: now }), true)),
       ...dt.map((t) => store.set(`ticket:${t.id}`, JSON.stringify(t), true)),
       ...dp.map((p) => store.set(`pm:${p.id}`, JSON.stringify(p), true)),
+      ...(du || []).map((u) => store.set(`user:${u.id}`, JSON.stringify(u), true)),
+      ...(dz || []).map((z) => store.set(`czone:${z.id}`, JSON.stringify(z), true)),
+      ...(dr || []).map((r) => store.set(`cround:${r.id}`, JSON.stringify(r), true)),
+      ...(dc || []).map((c) => store.set(`ccomplaint:${c.id}`, JSON.stringify(c), true)),
+      ...(da || []).map((a) => store.set(`cabsence:${a.id}`, JSON.stringify(a), true)),
+      ...(dpr || []).map((p) => store.set(`presence:${p.id}`, JSON.stringify(p), true)),
+      ...demoTasks.map((t) => store.set(`mtask:${t.id}`, JSON.stringify(t), true)),
+      ...demoMeetings.map((m) => store.set(`mmeet:${m.id}`, JSON.stringify(m), true)),
+      ...demoPpeItems.map((x) => store.set(`ppeitem:${x.id}`, JSON.stringify(x), true)),
+      ...demoPpe.map((x) => store.set(`ppe:${x.id}`, JSON.stringify(x), true)),
+      ...demoNorms.map((x) => store.set(`ppenorm:${x.id}`, JSON.stringify(x), true)),
     ]);
     const exTypes = config.vehicleTypes || [];
     const mergedTypes = exTypes.concat((vehicleTypes || []).filter((v) => !exTypes.some((e) => e.name === v.name)));
-    await saveConfig({ ...config, vehicleTypes: mergedTypes, modelType: { ...(config.modelType || {}), ...modelType }, driverEvents });
+    await saveConfig({ ...config, departments: DEFAULT_CONFIG.departments, vehicleTypes: mergedTypes, modelType: { ...(config.modelType || {}), ...modelType }, driverEvents });
     await reloadAll();
   };
   const clearDemo = async () => {
     const dels = [];
-    for (const pre of ["ticket:", "fleet:", "pm:", "insp:", "photo:"]) {
+    for (const pre of ["ticket:", "fleet:", "pm:", "insp:", "photo:", "user:", "czone:", "cround:", "ccomplaint:", "cabsence:", "presence:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:"]) {
       const arr = await loadColl(pre);
-      arr.filter((x) => x && x.demo).forEach((x) => dels.push(store.del(`${pre}${x.id}`, true)));
+      arr.filter((x) => x && (x.demo || (pre === "fleet:" && String(x.id).startsWith("v-")))).forEach((x) => dels.push(store.del(`${pre}${x.id}`, true)));
     }
     await Promise.all(dels);
     if ((config.driverEvents || []).some((e) => String(e.id).startsWith("de"))) await saveConfig({ ...config, driverEvents: [] });
@@ -1080,7 +1327,7 @@ export default function App() {
       if (t.hasPhoto) { try { const p = await store.get(`photo:${t.id}`, true); if (p) photos[`photo:${t.id}`] = p; } catch {} }
       if (t.hasAfterPhoto) { try { const p = await store.get(`photo:after:${t.id}`, true); if (p) photos[`photo:after:${t.id}`] = p; } catch {} }
     }
-    return { __app: "maintenance-cmms", v: 1, exportedAt: Date.now(), config, users, fleet, tickets, pm, insp, templates, zones, rounds, complaints, photos };
+    return { __app: "maintenance-cmms", v: 1, exportedAt: Date.now(), config, users, fleet, tickets, pm, insp, templates, zones, rounds, complaints, absences, photos };
   };
   const importBackup = async (data) => {
     if (!data || data.__app !== "maintenance-cmms") throw new Error("invalid");
@@ -1088,11 +1335,30 @@ export default function App() {
     const writeColl = async (pre, arr) => { for (const x of (Array.isArray(arr) ? arr : [])) if (x && x.id) await store.set(`${pre}${x.id}`, JSON.stringify(x), true); };
     await writeColl("user:", data.users); await writeColl("fleet:", data.fleet); await writeColl("ticket:", data.tickets);
     await writeColl("pm:", data.pm); await writeColl("insp:", data.insp); await writeColl("itpl:", data.templates);
-    await writeColl("czone:", data.zones); await writeColl("cround:", data.rounds); await writeColl("ccomplaint:", data.complaints);
+    await writeColl("czone:", data.zones); await writeColl("cround:", data.rounds); await writeColl("ccomplaint:", data.complaints); await writeColl("cabsence:", data.absences);
     if (data.photos && typeof data.photos === "object") { for (const [k, v] of Object.entries(data.photos)) { if (typeof v === "string" && (k.startsWith("photo:"))) { try { await store.set(k, v, true); } catch {} } } }
     await reloadAll();
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, approveComplaint, rejectComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, theme, toggleTheme, reloadAll, loadDemo, clearDemo, demoActive, getBackup: buildBackup, importBackup };
+  // Вход техника = начало смены. Берём первый вход за день (не затираем, если уже стартовал; повторный вход днём — не новый старт).
+  useEffect(() => {
+    if (!session || session.role !== "tech" || impersonating) return;
+    let cancelled = false;
+    (async () => {
+      let prev = null;
+      try { const raw = await store.get(`presence:${session.id}`, true); if (raw) prev = JSON.parse(typeof raw === "string" ? raw : raw.value); } catch (e) {}
+      const today = todayKey();
+      const started = prev && prev.day === today && prev.since;
+      const rec = started
+        ? { ...prev, onShift: true, lastSeen: Date.now() }
+        : { id: session.id, name: session.name, onShift: true, since: Date.now(), endedAt: null, lastSeen: Date.now(), day: today };
+      if (cancelled) return;
+      await store.set(`presence:${session.id}`, JSON.stringify(rec), true);
+      setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]);
+    })();
+    return () => { cancelled = true; };
+  }, [session && session.id, session && session.role, impersonating]);
+
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, theme, toggleTheme, reloadAll, loadDemo, clearDemo, demoActive, getBackup: buildBackup, importBackup };
 
   return (
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
@@ -1109,6 +1375,7 @@ export default function App() {
               {[["admin", "מנהל מערכת", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "עובד ניקיון", Sparkles]].map(([r, l, Ic]) => <button key={r} className={"rs-btn" + (((actAs || "admin") === r) ? " on" : "")} title={l} onClick={() => setActAs(r === "admin" ? null : r)}><Ic size={17} /></button>)}
             </div>}
           </>)}
+      {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
     </div>
   );
 }
@@ -1120,19 +1387,21 @@ function WorkerApp(p) {
   const [track, setTrack] = useState(null);
   const [subject, setSubject] = useState(""), [description, setDescription] = useState(""), [forkliftId, setForkliftId] = useState("");
   const [photo, setPhoto] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [sent, setSent] = useState(false);
+  const [noPhoto, setNoPhoto] = useState(false), [noPhotoReason, setNoPhotoReason] = useState("");
   const [open, setOpen] = useState(null);
   const fileRef = useRef(null);
   const myReports = useMemo(() => tickets.filter((t) => t.reportedBy && t.reportedBy.id === session.id).sort((a, b) => b.createdAt - a.createdAt), [tickets, session.id]);
   const myFleet = useMemo(() => (fleet || []).filter((f) => { const d = f.depts || (f.dept ? [f.dept] : []); return session.dept && d.includes(session.dept); }), [fleet, session.dept]);
   const grabPhoto = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
-  const reset = () => { setTrack(null); setSubject(""); setDescription(""); setForkliftId(""); setPhoto(null); setErr(""); };
+  const reset = () => { setTrack(null); setSubject(""); setDescription(""); setForkliftId(""); setPhoto(null); setNoPhoto(false); setNoPhotoReason(""); setErr(""); };
   const submit = async () => {
     if (busy) return;
     if (!track) return setErr("בחרו על מה הדיווח");
     if (!subject.trim()) return setErr("נא להזין כותרת");
     if (track === "transport" && !forkliftId) return setErr("נא לבחור כלי שינוע");
     if (!description.trim()) return setErr("נא לתאר את התקלה");
-    if (!photo) return setErr("חובה לצרף תמונה");
+    if (!photo && !noPhoto) return setErr("צרפו תמונה, או סמנו «אין אפשרות לצרף תמונה»");
+    if (!photo && noPhoto && !noPhotoReason.trim()) return setErr("נא לפרט מדוע אין אפשרות לצרף תמונה");
     setErr(""); setBusy(true);
     const id = uid(); const now = Date.now();
     const t = {
@@ -1143,20 +1412,23 @@ function WorkerApp(p) {
       description: description.trim(), status: "pending_manager", assignee: "", routedTech: undefined, mgrExec: undefined,
       reportedBy: { id: session.id, name: session.name, dept: session.dept || "" },
       createdBy: { id: session.id, name: session.name, role: "worker", dept: session.dept || "" },
-      createdAt: now, updatedAt: now, dueAt: null, hasPhoto: true, closure: null,
-      log: [{ at: now, by: session.name, byRole: "worker", text: "הדיווח נשלח לאישור מנהל המחלקה", kind: "open" }],
+      createdAt: now, updatedAt: now, dueAt: null, hasPhoto: !!photo, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", closure: null,
+      log: [{ at: now, by: session.name, byRole: "worker", text: (!photo && noPhoto) ? `הדיווח נשלח ללא תמונה — ${noPhotoReason.trim()}` : "הדיווח נשלח לאישור מנהל המחלקה", kind: "open" }],
     };
-    try { await store.set(`photo:${id}`, photo, true); await saveTicket(t); reset(); setSent(true); setTimeout(() => setSent(false), 3500); setView("mine"); }
+    try { if (photo) await store.set(`photo:${id}`, photo, true); await saveTicket(t); reset(); setSent(true); setTimeout(() => setSent(false), 3500); setView("mine"); }
     catch (e) { setErr("שגיאה בשליחה."); }
     finally { setBusy(false); }
   };
+  const toSign = (p.ppeReqs || []).filter((r) => r.workerId === session.id && r.status === "worker_sign");
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{view === "new" ? "דיווח תקלה" : view === "activity" ? "יומן פעילות" : "הדיווחים שלי"}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
       <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn" onClick={onLogout} title="יציאה"><LogOut size={20} /></button></div>
     </div>
-    <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
+    <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><HardHat size={16} /> הציוד שלי{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
     <div className="worker-body">
+      {toSign.length > 0 && view !== "ppe" && <button type="button" onClick={() => setView("ppe")} style={{ width: "100%", textAlign: "start", display: "flex", alignItems: "center", gap: 10, background: "#B91C1C", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px", marginBottom: 12, cursor: "pointer", boxShadow: "0 2px 10px rgba(185,28,28,0.35)" }}><PenLine size={22} /><div style={{ flex: 1 }}><div style={{ fontWeight: 800, fontSize: 15 }}>יש לך {toSign.length === 1 ? "מסמך" : `${toSign.length} מסמכים`} לחתימה</div><div style={{ fontSize: 12.5, opacity: 0.92 }}>לחצו לצפייה ולחתימה על קבלת הציוד</div></div><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button>}
+      
       {sent && <div className="banner" style={{ background: "#DCFCE7", color: "#166534", borderColor: "#86EFAC" }}><CheckCircle2 size={16} /> הדיווח נשלח למנהל המחלקה. תקבלו עדכון כאן.</div>}
       {view === "new" ? (<>
         <div className="wk-hint">דווחו על תקלה בקצרה. מנהל המחלקה יבדוק וימשיך משם.</div>
@@ -1165,18 +1437,21 @@ function WorkerApp(p) {
           <button className={"wk-track" + (track === "transport" ? " on" : "")} onClick={() => setTrack("transport")}><Truck size={22} /><span>כלי שינוע</span></button>
         </div></div>
         {track === "transport" && (myFleet.length > 0
-          ? <label className="field"><span>כלי שינוע *</span><select value={forkliftId} onChange={(e) => setForkliftId(e.target.value)}><option value="">— בחרו כלי —</option>{myFleet.map((f) => <option key={f.id} value={f.id}>{unitLabel(f, config)}</option>)}</select></label>
+          ? <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={myFleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} /></div>
           : <div className="note">אין כלי שינוע המשויכים למחלקה שלך. ניתן לדווח על מבנה, או לפנות למנהל המחלקה.</div>)}
         {track && <>
           <label className="field"><span>כותרת *</span><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="לדוגמה: דליפת מים ליד המחסן" /></label>
           <label className="field"><span>תיאור *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="מה קרה? איפה?" /></label>
-          <div className="field"><span>תמונה * (חובה)</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabPhoto(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>}</div>
+          <div className="field"><span>תמונה {noPhoto ? "" : "* (חובה)"}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabPhoto(e.target.files?.[0])} />{!noPhoto && (photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>)}
+            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={noPhoto} onChange={(e) => { setNoPhoto(e.target.checked); if (e.target.checked) setPhoto(null); setErr(""); }} /> אין אפשרות לצרף תמונה</label>
+            {noPhoto && <textarea rows={2} value={noPhotoReason} onChange={(e) => setNoPhotoReason(e.target.value)} placeholder="חובה לפרט: מדוע אין אפשרות לצרף תמונה? (לדוגמה: אין מצלמה במכשיר)" style={{ marginTop: 6 }} />}
+          </div>
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? <><span className="spinner sm" /> שולח…</> : <><Send size={16} /> שליחת דיווח</>}</button>
         </>}
         {!track && err && <div className="err">{err}</div>}
         <div style={{ height: 24 }} />
-      </>) : view === "activity" ? (
+      </>) : view === "ppe" ? (<PpeMyView ppe={p.ppe} items={p.ppeItems} norms={p.ppeNorms} session={session} reqs={p.ppeReqs} savePpeReq={p.savePpeReq} config={p.config} />) : view === "activity" ? (
         <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={(id) => { const t = tickets.find((x) => x.id === id); if (t) setOpen(t); }} />
       ) : (<>
         {myReports.length === 0 ? <Empty text="עדיין לא דיווחת" Icon={ListChecks} sub="פתחו דיווח חדש בלשונית «דיווח חדש»" /> : <div className="cards">{myReports.map((t) => { const s = stOf(t.status); const tr = TRACKS[t.track] || TRACKS.facility; return <button key={t.id} className="wk-card" onClick={() => setOpen(t)}><div className="wk-card-top"><span className="wk-card-subj">{t.subject}</span><span className="badge sm" style={{ background: s.bg, color: s.color }}>{s.label}</span></div><div className="wk-card-sub"><tr.Icon size={13} /> {tr.short} · {fmtDate(t.createdAt)}</div></button>; })}</div>}
@@ -1203,7 +1478,7 @@ function WorkerReportView({ report, session, saveTicket, onClose }) {
     } finally { setBusy(false); }
   };
   return (<div className="ovl-backdrop" onClick={onClose}><div className="ovl-inner wk-view" onClick={(e) => e.stopPropagation()}>
-    <div className="form-head"><button className="icon-btn" onClick={onClose}><X size={22} /></button><div className="form-title">הדיווח שלי</div></div>
+    <div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">הדיווח שלי</div></div>
     <div className="body">
       <div className="wk-view-head"><span className="badge sm" style={{ background: s.bg, color: s.color }}>{s.label}</span><span className="wk-view-track"><tr.Icon size={14} /> {tr.short}</span></div>
       <h3 className="wk-view-subj">{report.subject}</h3>
@@ -1250,13 +1525,13 @@ function PublicReport({ zones, onSubmit, onClose }) {
     setDone(true);
   };
   return (<div className="pub-wrap"><div className="pub-card">
-    <button className="icon-btn pub-x" onClick={onClose}><X size={20} /></button>
+    <button className="icon-btn pub-x" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
     {done ? <div className="pub-done"><CheckCircle2 size={44} color="#16A34A" /><div className="pub-done-t">הדיווח התקבל</div><div className="pub-done-s">תודה. הדיווח יועבר לבדיקת מנהל המערכת.</div><button className="btn-primary full" onClick={onClose}>סגירה</button></div>
       : !zone ? <>
         <div className="pub-logo"><Sparkles size={24} /></div>
         <div className="pub-title">דיווח מהיר על בעיה</div>
-        <div className="pub-sub">בחרו את הזון. במכשיר אמיתי — סריקת ה-QR בכניסה בוחרת את הזון אוטומטית.</div>
-        {active.length === 0 ? <div className="note">לא הוגדרו זונות.</div> : <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>}
+        <div className="pub-sub">בחרו את האזור. במכשיר אמיתי — סריקת ה-QR בכניסה בוחרת את האזור אוטומטית.</div>
+        {active.length === 0 ? <div className="note">לא הוגדרו אזורים.</div> : <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>}
       </> : <>
         <div className="pub-title">{zone.name}</div>
         <div className="pub-sub">{zoneLoc(zone) || ""}</div>
@@ -1265,7 +1540,7 @@ function PublicReport({ zones, onSubmit, onClose }) {
         <label className="field"><span>פירוט (רשות)</span><input value={text} onChange={(e) => setText(e.target.value)} placeholder="מה ראיתם?" /></label>
         {err && <div className="err">{err}</div>}
         <button className="btn-primary full" onClick={submit} disabled={busy}>שליחת דיווח אנונימי</button>
-        <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setZone(null); setProb(null); setPhoto(null); setText(""); }}>חזרה לבחירת זון</button>
+        <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setZone(null); setProb(null); setPhoto(null); setText(""); }}>חזרה לבחירת אזור</button>
         <div className="pub-foot">הדיווח האנונימי עובר לאישור מנהל המערכת לפני שהוא מגיע לטיפול.</div>
       </>}
   </div></div>);
@@ -1274,34 +1549,34 @@ function PublicReport({ zones, onSubmit, onClose }) {
 function Login({ users, config, onLogin, theme, toggleTheme, zones, onAnonReport }) {
   const [mode, setMode] = useState("user"), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [code, setCode] = useState(""), [workerNo, setWorkerNo] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false);
   const active = users.filter((u) => u.active !== false);
-  useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); if (d.email) setEmail(d.email); if (d.password) setPassword(d.password); if (d.code) setCode(d.code); if (d.workerNo) { setWorkerNo(d.workerNo); setMode("worker"); } else if (d.code && !d.email) setMode("tech"); } catch {} }); }, []);
+  useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); if (d.email) setEmail(d.email); if (d.workerNo) setWorkerNo(d.workerNo); if (d.mode) setMode(d.mode); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
-  const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.shiftId || "", techScope: u.techScope || "transport", techCats: u.techCats || [], fleetDocs: !!u.fleetDocs, fleetTickets: !!u.fleetTickets, mgrZones: u.mgrZones || [] });
+  const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.shiftId || "", techScope: u.techScope || "transport", techCats: u.techCats || [], fleetDocs: !!u.fleetDocs, fleetTickets: !!u.fleetTickets, mgrZones: u.mgrZones || [], shift: u.shift || "", perms: u.perms || undefined });
   const dfltDept = config?.departments?.[0] || "";
   const submitUser = () => {
     const b = BUILTIN_LOGINS.find((x) => (x.role === "admin" || x.role === "user") && x.email.toLowerCase() === email.trim().toLowerCase() && x.password === password);
-    if (b) { remember_save({ email: email.trim(), password: remember ? password : "" }); return finish({ ...b, dept: b.dept || dfltDept }); }
+    if (b) { remember_save({ email: email.trim(), mode: "user" }); return finish({ ...b, dept: b.dept || dfltDept }); }
     const u = active.find((x) => x.role !== "tech" && x.role !== "worker" && (x.email || "").toLowerCase() === email.trim().toLowerCase());
     if (!u) return setErr("לא נמצא משתמש עם דוא״ל זה");
     if (u.password !== password) return setErr("הסיסמה שגויה");
-    remember_save({ email: email.trim(), password: remember ? password : "" });
+    remember_save({ email: email.trim(), mode: "user" });
     finish(u);
   };
   const submitTech = () => {
-    if (code.trim() === "1234") { remember_save({ code: remember ? "1234" : "" }); return finish(BUILTIN_LOGINS.find((x) => x.role === "tech")); }
+    if (code.trim() === "1234") { remember_save({ mode: "tech" }); return finish(BUILTIN_LOGINS.find((x) => x.role === "tech")); }
     const u = active.find((x) => x.role === "tech" && x.pin === code.trim());
     if (!u) return setErr("קוד טכנאי שגוי");
-    remember_save({ code: remember ? code.trim() : "" });
+    remember_save({ mode: "tech" });
     finish(u);
   };
   const submitWorker = () => {
     const bw = BUILTIN_LOGINS.find((x) => x.role === "worker");
-    if (workerNo.trim() === bw.workerNo && code.trim() === bw.pin) { remember_save({ workerNo: bw.workerNo, code: remember ? bw.pin : "" }); return finish({ ...bw, dept: bw.dept || dfltDept }); }
+    if (workerNo.trim() === bw.workerNo && code.trim() === bw.pin) { remember_save({ workerNo: bw.workerNo, mode: "worker" }); return finish({ ...bw, dept: bw.dept || dfltDept }); }
     const bc = BUILTIN_LOGINS.find((x) => x.role === "cleaner");
-    if (bc && workerNo.trim() === bc.workerNo && code.trim() === bc.pin) { remember_save({ workerNo: bc.workerNo, code: remember ? bc.pin : "" }); return finish({ ...bc, dept: bc.dept || dfltDept }); }
+    if (bc && workerNo.trim() === bc.workerNo && code.trim() === bc.pin) { remember_save({ workerNo: bc.workerNo, mode: "worker" }); return finish({ ...bc, dept: bc.dept || dfltDept }); }
     const u = active.find((x) => (x.role === "worker" || x.role === "cleaner") && String(x.workerNo || "").trim() === workerNo.trim() && (x.pin || "") === code.trim());
     if (!u) return setErr("מספר עובד או קוד שגויים");
-    remember_save({ workerNo: workerNo.trim(), code: remember ? code.trim() : "" });
+    remember_save({ workerNo: workerNo.trim(), mode: "worker" });
     finish(u);
   };
   return (
@@ -1349,8 +1624,8 @@ function UserApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
   const [view, setView] = useState("tickets");
   const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip");
-  const goNotif = (go) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); } };
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints);
+  const goNotif = (go) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); } };
+  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
   const myPm = useMemo(() => pmVisible(session, pm, fleet), [pm, fleet, session]);
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
@@ -1361,7 +1636,7 @@ function UserApp(p) {
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
-        nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: view === "tickets", onClick: () => setView("tickets") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: view === "dept", onClick: () => setView("dept") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
+        nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: view === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: view === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: view === "dept", onClick: () => setView("dept") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
       <div className="main-col">
         <TopBar title={view === "activity" ? "יומן פעילות" : view === "dept" ? "המחלקה שלי" : "הקריאות שלי"} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
@@ -1372,7 +1647,7 @@ function UserApp(p) {
               <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>{needAct}</div><div className="stat-lbl">לאישורך</div></div>
               <div className="stat-box"><div className="stat-num">{mine.length}</div><div className="stat-lbl">סה״כ</div></div>
             </div>
-            {(() => { const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false); return <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle>{techs.length === 0 ? <div className="note" style={{ marginBottom: 12 }}>אין טכנאים מוגדרים.</div> : <div className="tech-strip">{techs.map((u) => { const pr = presenceOf(presence, u.id); return <span key={u.id} className="tech-chip"><span className={"presence-dot" + (pr.onShift ? " on" : "")} />{u.name}{u.supplier ? <span className="tech-chip-sup"> · {u.supplier}</span> : ""}<span className="tech-chip-stat">{pr.onShift ? (lastSeenText(pr.lastSeen) || "במשמרת") : "לא במשמרת"}</span></span>; })}</div>}</>; })()}
+            {(() => { const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false); return <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle>{techs.length === 0 ? <div className="note" style={{ marginBottom: 12 }}>אין טכנאים מוגדרים.</div> : <div className="tech-strip">{techs.map((u) => { const pr = presenceOf(presence, u.id); return <span key={u.id} className="tech-chip"><span className={"presence-dot" + (pr.onShift ? " on" : "")} />{u.name}{u.supplier ? <span className="tech-chip-sup"> · {u.supplier}</span> : ""}<span className="tech-chip-stat">{pr.onShift ? (lastSeenText(pr.lastSeen) || "במשמרת") : "לא במשמרת"}{(() => { const z = shiftIdle(pr, u, config); return z.lateMin > 0 ? " · איחר " + z.lateMin + " ד׳" : z.earlyMin > 0 ? " · מוקדם " + z.earlyMin + " ד׳" : ""; })()}</span></span>; })}</div>}</>; })()}
             {pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים לכלי המחלקה — להוצאה לטכנאי</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{pmSoon.slice(0, 6).map((x) => { const d = daysLeft(x.nextDue); const f = pmFleet(x, fleet); return <button key={x.id} className="attn-row" onClick={() => setPmView(x)}><span className="attn-dot" style={{ background: pmColor(d) }} /><span className="attn-main"><span className="attn-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="attn-meta">{x.title || "טיפול תקופתי"}</span></span><span className="attn-tag" style={{ color: pmColor(d), background: pmColor(d) + "1a" }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></button>; })}</div></>}
             <div className="row-between"><div className="chips">{[["open", "פתוחות"], ["closed", "סגורות"], ["all", "הכל"]].map(([id, lbl]) => <button key={id} className={"chip" + (filter === id ? " on" : "")} onClick={() => setFilter(id)}>{lbl}</button>)}</div></div>
             {(() => {
@@ -1396,9 +1671,10 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : view === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : (<>
-            <div className="seg-tabs s4" style={{ maxWidth: 620, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלים ותחזוקה</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
-            {deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
+          </>) : view === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : view === "tasks" ? (<ManageHub {...p} />) : (<>
+            <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלים ותחזוקה</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
+            {deptTab === "ppe" ? <PpeHub {...p} />
+              : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
               : deptTab === "cleaning" ? <ManagerCleaning session={session} zones={zones} rounds={rounds} complaints={complaints} fileComplaint={fileComplaint} resolveComplaint={resolveComplaint} />
               : deptTab === "team" ? <>
                 <div className="row-between"><SectionTitle><Users size={15} /> עובדי המחלקה{session.dept ? ` · ${session.dept}` : ""}</SectionTitle><button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> הוסף עובד</button></div>
@@ -1410,7 +1686,7 @@ function UserApp(p) {
         </div>
       </div>
       {view === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
-      <nav className="bottom-nav"><NavBtn active={view === "tickets"} onClick={() => setView("tickets")} Icon={ListChecks} label="קריאות" /><NavBtn active={view === "dept"} onClick={() => setView("dept")} Icon={Users} label="המחלקה" /><NavBtn active={view === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" /></nav>
+      <nav className="bottom-nav"><NavBtn active={view === "tickets"} onClick={() => setView("tickets")} Icon={ListChecks} label="קריאות" /><NavBtn active={view === "tasks"} onClick={() => setView("tasks")} Icon={ClipboardList} label="מטלות" /><NavBtn active={view === "dept"} onClick={() => setView("dept")} Icon={Users} label="המחלקה" /><NavBtn active={view === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" /></nav>
       <AIFab onClick={() => setShowAI(true)} />
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
@@ -1430,6 +1706,7 @@ function TechApp(p) {
   const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmRun, setPmRun] = useState(null);
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence);
   const myShift = presenceOf(presence, session.id);
+  const myIdle = shiftIdle(myShift, session, config);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
   const pool = mine.filter((t) => !t.assignee && ballIn(t) === "tech");
   const myOpen = mine.filter((t) => t.assignee === session.name && isOpen(t));
@@ -1463,7 +1740,7 @@ function TechApp(p) {
       <div className="main-col">
         <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
-          {tw.presence !== false && <div className="shift-bar"><div className="shift-info"><span className="presence-dot on" /><div><div className="shift-stat">במשמרת{(() => { const sn = (config.shifts || []).find((s) => s.id === session.shiftId)?.name; return sn ? " " + sn : ""; })()}</div><div className="shift-sub">{myShift.since ? "מאז " + fmtTime(myShift.since) : "מחובר"} · עד {fmtTime(effectiveEnd)}</div></div></div><button className="btn-ghost sm" onClick={endAndLogout}><Power size={15} /> סיום משמרת ויציאה</button></div>}
+          {tw.presence !== false && <div className="shift-bar"><div className="shift-info"><span className="presence-dot on" /><div><div className="shift-stat">במשמרת{(() => { const sn = (config.shifts || []).find((s) => s.id === session.shiftId)?.name; return sn ? " " + sn : ""; })()}</div><div className="shift-sub">{myShift.since ? "מאז " + fmtTime(myShift.since) : "מחובר"} · עד {fmtTime(effectiveEnd)}{myIdle.lateMin > 0 ? " · איחור " + myIdle.lateMin + " ד׳" : ""}</div></div></div><button className="btn-ghost sm" onClick={endAndLogout}><Power size={15} /> סיום משמרת ויציאה</button></div>}
           {sessWarn && <div className="ovl-backdrop modal2" style={{ zIndex: 60 }}><div className="modal2-panel" style={{ textAlign: "center" }}><div className="modal2-body"><div style={{ fontSize: 38, marginBottom: 6 }}>⏰</div><div className="form-title" style={{ marginBottom: 6 }}>המשמרת עומדת להסתיים</div><div className="note" style={{ margin: "0 0 14px" }}>בעוד כ-10 דקות תתבצע יציאה אוטומטית. ללא בחירה תוך 5 דקות — המערכת תוציא אותך אוטומטית.</div><div className="row2"><button className="btn-ghost" onClick={extendShift}>הארכה ב-60 ד׳</button><button className="btn-primary" onClick={endAndLogout}><Power size={15} /> סיום ויציאה</button></div></div></div></div>}
           {view === "tickets" ? (<>
             <div className="stat-strip">
@@ -1506,7 +1783,7 @@ function TechApp(p) {
 function TicketHistory({ ticket, onClose, onOpen }) {
   const log = [...(ticket.log || [])].sort((a, b) => a.at - b.at);
   return (<div className="ovl-inner">
-    <div className="form-head"><button className="icon-btn" onClick={onClose}><X size={22} /></button><div className="form-title">היסטוריית קריאה #{ticketNo(ticket)}</div></div>
+    <div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">היסטוריית קריאה #{ticketNo(ticket)}</div></div>
     <div className="body">
       <h2 className="detail-subj" style={{ marginTop: 4 }}>{ticket.subject}</h2>
       <div className="hint" style={{ marginBottom: 12 }}>{ticket.asset ? ticket.asset + " · " : ""}{trackOf(ticket) === "transport" ? "שינוע" : "אחזקה"} · {stOf(ticket.status).label}</div>
@@ -1522,7 +1799,7 @@ function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket }) {
     const vis = visibleTickets(session, tickets, fleet); const out = [];
     vis.forEach((t) => { const tr = trackOf(t); const ff = tr === "transport" ? (fleet || []).find((x) => x.id === t.forkliftId) : null; const depts = tr === "transport" ? fleetDepts(ff) : [t.reportedBy?.dept || t.createdBy?.dept || ""].filter(Boolean); (t.log || []).forEach((l, i) => out.push({ key: t.id + "-" + i, at: l.at, by: l.by || "—", byRole: l.byRole || "", text: l.text || "", kind: logKindOf(l), ticket: t, no: ticketNo(t), track: tr, depts, asset: t.asset || "" })); });
     const mDepts = userDepts(session); (config.driverEvents || []).forEach((ev) => { if (!(session.role === "admin" || ev.byUid === session.id || (ev.byDept && mDepts.includes(ev.byDept)))) return; out.push({ key: "dv-" + ev.id, at: ev.at, by: ev.byName || "—", byRole: ev.byDept === "הנהלה" ? "admin" : "user", text: driverEvtText(ev), kind: "driver", ticket: null, no: ev.unitCode || "", track: "transport", depts: ev.byDept ? [ev.byDept] : [], asset: ev.unitCode || "" }); });
-    (rounds || []).forEach((r) => { out.push({ key: "cr-" + r.id, at: r.at, by: r.byName || "—", byRole: "cleaner", text: `סבב ניקיון · ${r.zoneName}${r.zoneLoc ? " · " + r.zoneLoc : ""} · ${r.doneCount}/${r.total} פריטים${r.isCover ? " · כיסוי" : ""}${r.note ? " · " + r.note : ""}`, kind: "cleaning", ticket: null, no: r.zoneName || "", track: "facility", depts: [], asset: r.zoneName || "" }); });
+    (rounds || []).forEach((r) => { out.push({ key: "cr-" + r.id, at: r.at, by: r.byName || "—", byRole: "cleaner", text: `סבב ניקיון · ${r.zoneName}${r.zoneLoc ? " · " + r.zoneLoc : ""}${r.winTime ? " · " + r.winTime : ""} · ${r.doneCount}/${r.total} פריטים${r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}${(r.issues && r.issues.length) ? " · " + r.issues.length + " הערות" : (r.note ? " · " + r.note : "")}`, kind: "cleaning", ticket: null, no: r.zoneName || "", track: "facility", depts: [], asset: r.zoneName || "" }); });
     return out.sort((a, b) => b.at - a.at);
   }, [session, tickets, fleet, config, rounds]);
   const whoOpts = useMemo(() => [...new Set(entries.map((e) => e.by).filter((x) => x && x !== "—"))].sort((a, b) => a.localeCompare(b, "he")), [entries]);
@@ -1547,7 +1824,7 @@ function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket }) {
   const exportXlsx = () => {
     const rows = filtered.map((e) => ({ "תאריך": fmtDate(e.at), "שעה": fmtTime(e.at), "קריאה": e.no, "פעולה": logKindMeta(e.kind).label, "תיאור": e.text, "מבצע": e.by, "תפקיד": ROLE_LABEL[e.byRole] || e.byRole || "", "כלי/ציוד": e.asset, "מחלקה": e.depts.join(", "), "מסלול": e.track === "transport" ? "שינוע" : "אחזקה" }));
     if (!rows.length) return;
-    try { const ws = XLSX.utils.json_to_sheet(rows); ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 16 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "יומן פעילות"); downloadXlsx(wb, `activity-log_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {}
+    try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 16 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "יומן פעילות"); downloadXlsx(wb, `activity-log_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {}
   };
   const buildHtml = () => {
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -1585,11 +1862,12 @@ function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket }) {
     {repHtml && <ReportView html={repHtml} count={filtered.length} onClose={() => setRepHtml(null)} />}
   </>);
 }
-function DriverForm({ fixedCat, existing, isAdmin, dupCheck, onCancel, onSave }) {
+function DriverForm({ fixedCat, existing, isAdmin, dupCheck, onCancel, onSave, users, saveUser, config }) {
   const [step, setStep] = useState(1);
+  const [driverUserId, setDriverUserId] = useState(existing?.userId || "");
   const [name, setName] = useState(existing?.name || ""), [workNo, setWorkNo] = useState(existing?.workNo || ""), [category, setCategory] = useState(fixedCat || "morning"), [cross, setCross] = useState(!!existing?.cross), [err, setErr] = useState("");
   const isEdit = !!existing;
-  const baseVals = () => ({ name: name.trim(), workNo: workNo.trim(), category, cross });
+  const baseVals = () => ({ name: name.trim(), workNo: workNo.trim(), category, cross, userId: driverUserId || (existing && existing.userId) || "" });
   const dups = (dupCheck && workNo.trim()) ? dupCheck(name, workNo) : []; // другие «сиденья» того же рабочего номера
   const next = () => { if (!name.trim()) return setErr("נא להזין שם נהג"); if (!workNo.trim()) return setErr("נא להזין מספר עובד"); if (dups.length) return setErr("לעובד מותר מקום ישיבה אחד בלבד"); if (isEdit) return onSave({ ...baseVals(), needsChip: false }); setErr(""); setStep(2); };
   if (step === 2) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={() => setStep(1)}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">הוספת עובד — צ׳יפ</div></div>
@@ -1599,10 +1877,12 @@ function DriverForm({ fixedCat, existing, isAdmin, dupCheck, onCancel, onSave })
       <button className="choice-btn" onClick={() => onSave({ ...baseVals(), needsChip: false })}><div className="choice-t">הוסף — לעובד כבר יש צ׳יפ</div><div className="choice-s">{isAdmin ? "יתווסף מיד" : "יתווסף מיד למערכת, ללא צורך באישור"}</div></button>
       <div style={{ height: 20 }} />
     </div></div>);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">{isEdit ? "עריכת נהג" : "הוספת נהג"}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{isEdit ? "עריכת נהג" : "הוספת נהג"}</div></div>
     <div className="body">
-      <label className="field"><span>שם הנהג *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="ישראל ישראלי" autoFocus /></label>
-      <label className="field"><span>מספר עובד *</span><input value={workNo} onChange={(e) => setWorkNo(e.target.value)} inputMode="numeric" placeholder="1042" /></label>
+      {isEdit
+        ? <><label className="field"><span>שם הנהג *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="ישראל ישראלי" autoFocus /></label>
+      <label className="field"><span>מספר עובד *</span><input value={workNo} onChange={(e) => setWorkNo(e.target.value)} inputMode="numeric" placeholder="1042" /></label></>
+        : <UserPicker users={users} config={config} saveUser={saveUser} value={driverUserId} onChange={(u) => { setDriverUserId(u ? u.id : ""); setName(u ? u.name : ""); setWorkNo(u ? (u.workerNo || "") : ""); }} label="נהג (חיפוש לפי שם או מספר)" lockRole="worker" hint="חפשו עובד קיים או צרו חדש — כך הנהג מקושר לכרטיס משתמש." />}
       {!isEdit && <div className="field"><span>משמרת</span><div className="seg-tabs s2">{DRIVER_SHIFTS.map((s) => <button key={s.id} className={category === s.id ? "on" : ""} onClick={() => setCategory(s.id)}>{s.label}</button>)}</div></div>}
       {dups.length > 0 && <div className="dup-block"><AlertTriangle size={14} /> חסום: עובד מס׳ {workNo} כבר משובץ ב-{dups.map((x) => `${x.unit.code} (${driverShiftMeta(x.shift).label})`).join(", ")}. לעובד מותר מקום ישיבה אחד בלבד. כדי לתת לו גישה לכלי נוסף — השתמשו בכפתור «גישה» על הנהג.</div>}
       <label className="chk-line" style={{ marginTop: 6 }}><input type="checkbox" checked={cross} onChange={(e) => setCross(e.target.checked)} /> חוצה משמרת — עובד גם במשמרת השנייה / תופס כלי של מחליפו</label>
@@ -1614,7 +1894,7 @@ function MovePicker({ units, source, onCancel, onSave }) {
   const [unitId, setUnitId] = useState(""), [category, setCategory] = useState(source.cat), [err, setErr] = useState("");
   const opts = units.filter((u) => u.id !== source.unit.id);
   const save = () => { const u = units.find((x) => x.id === unitId); if (!u) return setErr("בחרו כלי יעד"); onSave(u, category); };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">העברת נהג לכלי אחר</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">העברת נהג לכלי אחר</div></div>
     <div className="body">
       <div className="hint" style={{ marginBottom: 10 }}>{source.driver.name} · {driverShiftMeta(source.cat).label} · מ-{source.unit.code}. ההעברה תישלח לאישור מנהל המערכת (שינוי הרשאות במערכת החיצונית).</div>
       <label className="field"><span>כלי יעד</span><select value={unitId} onChange={(e) => setUnitId(e.target.value)}><option value="">— בחרו —</option>{opts.map((u) => { const occ = driverOf(u, category); return <option key={u.id} value={u.id}>{u.code}{driverActive(occ) || driverPending(occ) ? ` · תפוס (${occ.name})` : ""}</option>; })}</select></label>
@@ -1629,7 +1909,7 @@ function AccessPicker({ allFleet, config, driver, seatUnitId, onCancel, onSave }
   const opts = (allFleet || []).filter((u) => u.id !== seatUnitId).filter((u) => !q.trim() || `${u.code} ${unitTypeName(u, config)}`.toLowerCase().includes(q.toLowerCase()));
   const toggle = (id) => { const n = new Set(sel); n.has(id) ? n.delete(id) : n.add(id); setSel(n); };
   const save = () => onSave((allFleet || []).filter((u) => sel.has(u.id)).map((u) => ({ unitId: u.id, unitCode: u.code, dept: fleetDepts(u)[0] || "" })));
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">גישת {driver.name} לכלים</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">גישת {driver.name} לכלים</div></div>
     <div className="body">
       <div className="hint" style={{ marginBottom: 10 }}>סמנו כלים שהעובד מורשה לתפעל — מעבר לכלי הקבוע שלו, וגם ממחלקות אחרות. זו הרשאת גישה בלבד, אינה תופסת מקום במשמרת.</div>
       <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
@@ -1637,7 +1917,7 @@ function AccessPicker({ allFleet, config, driver, seatUnitId, onCancel, onSave }
       <button className="btn-primary full" onClick={save} style={{ marginTop: 10 }}>שמירת גישה ({sel.size})</button><div style={{ height: 20 }} />
     </div></div>);
 }
-function DriversBoard({ session, fleet, config, saveFleet, saveConfig }) {
+function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, users, saveUser }) {
   const isAdmin = session.role === "admin";
   const scoped = useMemo(() => fleetForSession(session, fleet).slice().sort((a, b) => (a.code > b.code ? 1 : -1)), [session, fleet]);
   const [catF, setCatF] = useState("all"), [presF, setPresF] = useState("all"), [deptF, setDeptF] = useState("all"), [q, setQ] = useState(""), [focus, setFocus] = useState(null);
@@ -1647,8 +1927,8 @@ function DriversBoard({ session, fleet, config, saveFleet, saveConfig }) {
   const dropDriver = async (unit, cat, evt) => { const drivers = { ...(unit.drivers || {}) }; delete drivers[cat]; await saveFleet({ ...unit, drivers }); if (evt) await saveConfig(pushDriverEvent(config, evt)); };
   const submitForm = async (v) => {
     const { unit, existing } = form; const cat = existing ? form.cat : v.category;
-    if (existing) { await writeDriver(unit, cat, { ...existing, name: v.name, workNo: v.workNo, cross: !!v.cross }, { type: "edited", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, byUid: session.id, byName: session.name, byDept: myDept }); }
-    else { const base = { name: v.name, workNo: v.workNo, cross: !!v.cross, addedByUid: session.id, addedByName: session.name, addedByDept: isAdmin ? "הנהלה" : myDept, at: Date.now(), needsChip: !!v.needsChip };
+    if (existing) { await writeDriver(unit, cat, { ...existing, name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || existing.userId || "" }, { type: "edited", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, byUid: session.id, byName: session.name, byDept: myDept }); }
+    else { const base = { name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || "", addedByUid: session.id, addedByName: session.name, addedByDept: isAdmin ? "הנהלה" : myDept, at: Date.now(), needsChip: !!v.needsChip };
       const immediate = isAdmin || !v.needsChip; // менеджер без чипа → сразу; с чипом → запрос
       if (immediate) await writeDriver(unit, cat, { ...base, status: "active" }, { type: "add", status: "active", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: !!v.needsChip, byUid: session.id, byName: session.name, byDept: isAdmin ? "הנהלה" : myDept });
       else await writeDriver(unit, cat, { ...base, status: "pending_add", reqAt: Date.now() }, { type: "add_req", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: true, byUid: session.id, byName: session.name, byDept: myDept }); }
@@ -1667,6 +1947,8 @@ function DriversBoard({ session, fleet, config, saveFleet, saveConfig }) {
     else if (d.status === "pending_move" && d.moveTo) { const tgt = fleet.find((x) => x.id === d.moveTo.unitId); const occ = tgt ? driverOf(tgt, d.moveTo.category) : null; if (occ && occ !== d && (driverActive(occ) || driverPending(occ))) { setMsg(`היעד תפוס (${tgt?.code} · ${driverShiftMeta(d.moveTo.category).label}) — יש לאשר/לטפל קודם בהעברת ${occ.name}`); return; } const src = { ...(unit.drivers || {}) }; delete src[cat]; await saveFleet({ ...unit, drivers: src }); if (tgt) { const nd = { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }; delete nd.moveTo; await saveFleet({ ...tgt, drivers: { ...(tgt.drivers || {}), [d.moveTo.category]: nd } }); } await saveConfig(pushDriverEvent(config, { type: "approved", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: d.moveTo.unitCode, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName })); }
   };
   const reject = async (unit, cat) => { const d = driverOf(unit, cat); if (!d) return; if (d.status === "pending_add") await dropDriver(unit, cat, { type: "rejected", sub: "add", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); else if (d.status === "pending_move") { const nd = { ...d, status: "active", decidedAt: Date.now() }; delete nd.moveTo; await writeDriver(unit, cat, nd, { type: "rejected", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); } };
+  const myShift = session.shift || "";
+  const canEditCat = (cat) => isAdmin || !myShift || myShift === cat;
   const reqs = isAdmin ? pendingDriverReqs(fleet) : [];
   const ins = useMemo(() => {
     const idle = scoped.filter((f) => !DRIVER_SHIFTS.some((s) => driverActive(driverOf(f, s.id))));
@@ -1692,11 +1974,11 @@ function DriversBoard({ session, fleet, config, saveFleet, saveConfig }) {
     const owned = driverOwned(d, session); const pend = driverPending(d);
     return <div className={"drv-chip" + (pend ? " pend" : "")}>
       <div className="drv-info"><span className="drv-name">{d.name}</span><span className="drv-no">#{d.workNo}</span>{d.cross ? <span className="drv-cross">חוצה</span> : null}{d.needsChip && d.status === "pending_add" ? <span className="drv-flag">צ׳יפ</span> : null}</div>
-      {pend ? <div className="drv-pend">{d.status === "pending_add" ? "ממתין לאישור הוספה" : `ממתין להעברה ל-${d.moveTo?.unitCode || ""}`}</div> : <div className="drv-by">{d.addedByName ? "ע״י " + d.addedByName : ""}</div>}
+      {pend ? <div className="drv-pend">{d.status === "pending_add" ? "ממתין לאישור הוספה" : `ממתין להעברה ל-${d.moveTo?.unitCode || ""}`}</div> : <div className="drv-by">{d.at ? "משובץ מ-" + fmtDate(d.at) : ""}</div>}
       {d.access && d.access.length > 0 ? <div className="drv-access"><ListChecks size={11} /> גישה: {d.access.map((a) => a.unitCode).join(", ")}</div> : null}
       <div className="drv-acts">
         {isAdmin && pend ? <><button className="drv-ok" onClick={() => approve(unit, cat)} title="אישור"><Check size={14} /></button><button className="drv-no2" onClick={() => reject(unit, cat)} title="דחייה"><X size={14} /></button></> : null}
-        {owned && !pend ? <><button className="icon-btn sm" onClick={() => setForm({ unit, cat, existing: d })} title="עריכה"><PenLine size={13} /></button><button className="icon-btn sm" onClick={() => setAccess({ unit, cat, driver: d })} title="גישה לכלים נוספים"><ListChecks size={13} /></button><button className="icon-btn sm" onClick={() => setMove({ unit, cat, driver: d })} title="החלפת כלי"><Truck size={13} /></button><button className="icon-btn sm danger" onClick={() => del(unit, cat, d)} title="מחיקה"><Trash2 size={13} /></button></> : null}
+        {!pend && canEditCat(cat) ? <><button className="icon-btn sm" onClick={() => setForm({ unit, cat, existing: d })} title="עריכה"><PenLine size={13} /></button><button className="icon-btn sm" onClick={() => setAccess({ unit, cat, driver: d })} title="גישה לכלים נוספים"><ListChecks size={13} /></button><button className="icon-btn sm" onClick={() => setMove({ unit, cat, driver: d })} title="החלפת כלי"><Truck size={13} /></button><button className="icon-btn sm danger" onClick={() => del(unit, cat, d)} title="מחיקה"><Trash2 size={13} /></button></> : null}
       </div>
     </div>;
   };
@@ -1725,10 +2007,10 @@ function DriversBoard({ session, fleet, config, saveFleet, saveConfig }) {
       const groups = new Map();
       rows.forEach((f) => { const dep = fleetDepts(f)[0] || "ללא מחלקה"; if (!groups.has(dep)) groups.set(dep, []); groups.get(dep).push(f); });
       const arr = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "he"));
-      const card = (f) => <div key={f.id} className="drv-unit"><div className="drv-unit-head"><span className="drv-unit-code">{f.code}</span><span className="drv-unit-desc">{unitDesc(f, config)}</span></div><div className="drv-slots">{(catF === "all" ? DRIVER_SHIFTS : DRIVER_SHIFTS.filter((s) => s.id === catF)).map((s) => { const d = driverOf(f, s.id); return <div key={s.id} className="drv-slot"><span className="drv-cat" style={{ background: s.color + "1a", color: s.color }}>{s.label}</span>{d ? <Chip unit={f} cat={s.id} d={d} /> : <button className="drv-add" onClick={() => setForm({ unit: f, cat: s.id, existing: null })}><Plus size={14} /> הוסף נהג</button>}</div>; })}</div></div>;
+      const card = (f) => { const blk = unitBlock(f, tickets, config); return <div key={f.id} className={"drv-unit" + (blk ? " blocked" : "")} style={blk ? { borderColor: blk.level.color } : {}}><div className="drv-unit-head"><span className="drv-unit-code">{f.code}</span><span className="drv-unit-desc">{unitDesc(f, config)}</span>{blk && <span className="blk-chip" style={{ background: blk.level.color, marginInlineStart: "auto" }}><ShieldAlert size={11} /> מושבת</span>}</div><div className="drv-slots">{(catF === "all" ? DRIVER_SHIFTS : DRIVER_SHIFTS.filter((s) => s.id === catF)).map((s) => { const d = driverOf(f, s.id); return <div key={s.id} className="drv-slot"><span className="drv-cat" style={{ background: s.color + "1a", color: s.color }}>{s.label}</span>{d ? <Chip unit={f} cat={s.id} d={d} /> : (canEditCat(s.id) ? <button className="drv-add" onClick={() => setForm({ unit: f, cat: s.id, existing: null })}><Plus size={14} /> הוסף נהג</button> : <span className="drv-cat" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא שובץ נהג</span>)}</div>; })}</div></div>; };
       return arr.map(([dep, units]) => <div key={dep} className="dept-group"><div className="dept-head"><span className="dept-line" /><span className="dept-name">מחלקה · {dep}</span><span className="dept-count">{units.length} כלים</span><span className="dept-line" /></div><div className="cards">{units.map(card)}</div></div>);
     })()}
-    {form && <Overlay persistent onClose={() => setForm(null)}><DriverForm fixedCat={form.cat} existing={form.existing} isAdmin={isAdmin} dupCheck={(name, workNo) => (name.trim() || workNo.trim()) ? driverDupes(scoped, { name, workNo }, form.unit.id, form.existing ? form.cat : null) : []} onCancel={() => setForm(null)} onSave={submitForm} /></Overlay>}
+    {form && <Overlay persistent onClose={() => setForm(null)}><DriverForm fixedCat={form.cat} existing={form.existing} isAdmin={isAdmin} users={users} saveUser={saveUser} config={config} dupCheck={(name, workNo) => (name.trim() || workNo.trim()) ? driverDupes(scoped, { name, workNo }, form.unit.id, form.existing ? form.cat : null) : []} onCancel={() => setForm(null)} onSave={submitForm} /></Overlay>}
     {move && <Overlay persistent onClose={() => setMove(null)}><MovePicker units={scoped} source={move} onCancel={() => setMove(null)} onSave={handleBTarget} /></Overlay>}
     {conflict && <Overlay persistent onClose={() => setConflict(null)}><div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={() => setConflict(null)}><X size={22} /></button><div className="form-title">הכלי תפוס</div></div>
       <div className="body">
@@ -1762,14 +2044,14 @@ function ManagerFleet(p) {
   const showDocs = canFleetDocs(session), showTickets = canFleetTickets(session);
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
-    {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} config={config} saveFleet={saveFleet} saveConfig={saveConfig} />
+    {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
       : tab === "pm" ? <><div className="note" style={{ marginBottom: 10 }}>טיפולים תקופתיים לכלי המחלקה. יש להוציא את הכלי לטכנאי במועד; הטכנאי יעדכן ביצוע.</div><PMSchedule items={myPm} fleet={fleet} onOpen={(x) => setPmView(x)} config={config} /></>
       : <>
       <ProblemUnitsPanel fleet={scoped} tickets={tickets} insp={insp} config={config} onOpen={(id) => setOpenId(id)} />
       <SectionTitle><Truck size={15} /> כלי השינוע של מחלקותיי ({scoped.length})</SectionTitle>
-      {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable"><div className="ftable-head"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; return <button key={f.id} className="ftable-row" onClick={() => setOpenId(f.id)}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b></span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
+      {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable"><div className="ftable-head"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
     </>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
     {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
   </>);
 }
@@ -1780,15 +2062,24 @@ const DEFAULT_CLEAN_CHECKLIST = [{ id: "floor", label: "שטיפת רצפה" }, 
 const lastRoundOf = (zoneId, rounds) => (rounds || []).filter((r) => r.zoneId === zoneId).reduce((m, r) => (r.at > m ? r.at : m), 0);
 const dayStart = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const dayLabel = (ts) => { const t = dayStart(Date.now()); if (ts === t) return "היום"; if (ts === t - 86400000) return "אתמול"; return fmtDate(ts); };
+// ימי פעילות של אזור ניקיון (0=ראשון … 6=שבת). ברירת מחדל לאזורים ישנים ללא הגדרה: כל יום (תאימות לאחור).
+const WEEKDAYS = [{ d: 0, short: "א׳", label: "ראשון" }, { d: 1, short: "ב׳", label: "שני" }, { d: 2, short: "ג׳", label: "שלישי" }, { d: 3, short: "ד׳", label: "רביעי" }, { d: 4, short: "ה׳", label: "חמישי" }, { d: 5, short: "ו׳", label: "שישי" }, { d: 6, short: "ש׳", label: "שבת" }];
+const WORK_WEEK = [0, 1, 2, 3, 4]; // ראשון–חמישי
+const zoneActiveDays = (z) => (Array.isArray(z.activeDays) ? z.activeDays : [0, 1, 2, 3, 4, 5, 6]);
+const isCleaningDay = (z, ts) => zoneActiveDays(z).includes(new Date(ts).getDay());
+const activeDaysLabel = (z) => { const d = zoneActiveDays(z); if (d.length === 7) return "כל יום"; if (d.length === 5 && WORK_WEEK.every((x) => d.includes(x))) return "א׳–ה׳"; if (!d.length) return "ללא ימים"; return WEEKDAYS.filter((w) => d.includes(w.d)).map((w) => w.short).join(" · "); };
+// פריטי הצ׳קליסט שרלוונטיים לחלון מסוים. win.items === undefined/null ⇒ כל הפריטים (תאימות לאחור + כולל פריטים עתידיים).
+const windowItems = (zone, win) => { const cl = zone.checklist || []; if (!win || !Array.isArray(win.items)) return cl; const set = new Set(win.items); return cl.filter((c) => set.has(c.id)); };
 const parseHM = (hm) => { const [h, m] = String(hm || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
 const windowAbs = (win, ts) => dayStart(ts) + parseHM(win.time) * 60000;
 const zoneTodayStatuses = (zone, rounds, now) => {
+  if (!isCleaningDay(zone, now)) return []; // לא יום ניקיון של האזור — אין חלונות / אין "פוספס"
   const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
   const ds = dayStart(now), eod = ds + 86400000;
   return ws.map((win, i) => {
     const target = ds + parseHM(win.time) * 60000, tol = (+win.tol || 0) * 60000, slotStart = target - tol;
     const nx = ws[i + 1]; const slotEnd = nx ? (ds + parseHM(nx.time) * 60000 - (+nx.tol || 0) * 60000) : eod;
-    const round = (rounds || []).find((r) => r.zoneId === zone.id && r.at >= slotStart && r.at < slotEnd);
+    const round = (rounds || []).find((r) => r.zoneId === zone.id && r.at >= ds && r.at < eod && (r.winId ? r.winId === win.id : (r.at >= slotStart && r.at < slotEnd)));
     let status;
     if (round) status = "done";
     else if (now < slotStart) status = "pending";
@@ -1800,67 +2091,142 @@ const zoneTodayStatuses = (zone, rounds, now) => {
 };
 const WIN_META = { done: { label: "בוצע", color: "#16A34A", bg: "#DCFCE7" }, due: { label: "כעת", color: "#B45309", bg: "#FEF3C7" }, overdue: { label: "באיחור", color: "#EA580C", bg: "#FFEDD5" }, missed: { label: "פוספס", color: "#DC2626", bg: "#FEE2E2" }, pending: { label: "מתוכנן", color: "#64748B", bg: "var(--surface-2)" } };
 const dayCompliance = (zone, rounds, dayTs, now) => {
+  if (!isCleaningDay(zone, dayTs)) return []; // יום ללא ניקיון מתוכנן — לא נספר בעמידה ביעדים
   const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
   const ds = dayStart(dayTs), eod = ds + 86400000;
   return ws.map((win, i) => {
     const target = ds + parseHM(win.time) * 60000, tol = (+win.tol || 0) * 60000, slotStart = target - tol;
     const nx = ws[i + 1]; const slotEnd = nx ? (ds + parseHM(nx.time) * 60000 - (+nx.tol || 0) * 60000) : eod;
-    const resolved = slotEnd <= now; const r = (rounds || []).find((x) => x.zoneId === zone.id && x.at >= slotStart && x.at < slotEnd);
+    const resolved = slotEnd <= now; const r = (rounds || []).find((x) => x.zoneId === zone.id && x.at >= ds && x.at < eod && (x.winId ? x.winId === win.id : (x.at >= slotStart && x.at < slotEnd)));
     return { resolved, done: !!r, onTime: r ? r.at <= target + tol : false };
   });
 };
-const COMPLAINT_KIND = { dirty: { label: "לכלוך", color: "#0EA5E9", Icon: Sparkles }, broken: { label: "תקלה / שבר", color: "#B45309", Icon: Wrench } };
-function ComplaintCard({ c, onResolve, onApprove, onReject }) {
+const COMPLAINT_KIND = { dirty: { label: "לכלוך", color: "#0EA5E9", Icon: Sparkles }, broken: { label: "תקלה / שבר", color: "#B45309", Icon: Wrench }, round: { label: "הערות סבב", color: "#DC2626", Icon: AlertTriangle } };
+function ComplaintCard({ c, onResolve, onApprove, onReject, onEscalate, onOpen }) {
   const k = COMPLAINT_KIND[c.kind] || COMPLAINT_KIND.dirty; const Ic = k.Icon;
   const anon = c.reportedByRole === "anonymous";
-  const border = (c.status === "resolved" || c.status === "rejected") ? "var(--muted)" : c.status === "pending" ? "#7C3AED" : k.color;
+  const escalated = c.escalatedTo === "admin";
+  const border = (c.status === "resolved" || c.status === "rejected") ? "var(--muted)" : c.status === "pending" ? "#7C3AED" : escalated ? "#DC2626" : k.color;
+  const srcLabel = anon ? "דיווח אנונימי · לא מאומת" : `${c.reportedByName}${c.reportedByRole === "user" ? " · מנהל מחלקה" : c.reportedByRole === "admin" ? " · מנהל מערכת" : c.reportedByRole === "worker" ? " · עובד" : c.reportedByRole === "cleaner" ? " · עובד ניקיון" : ""}`;
+  const nIss = (c.issues || []).length;
+  const statusLine = c.status === "pending" ? <span className="badge sm" style={{ background: "#EDE9FE", color: "#6D28D9" }}>ממתין לאישור</span>
+    : c.status === "resolved" ? <span className="cmp-done"><CheckCircle2 size={13} /> טופל{c.resolvedBy ? " · " + c.resolvedBy : ""}</span>
+      : c.status === "rejected" ? <span className="cmp-done" style={{ color: "var(--muted)" }}><X size={13} /> נדחה{c.resolvedBy ? " · " + c.resolvedBy : ""}</span>
+        : escalated ? <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>הועבר למנהל המערכת</span>
+          : c.ownerRole === "admin" ? (c.progress === "in_progress" ? <span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309" }}>בטיפול{c.progressNote ? " · " + c.progressNote : ""}</span> : <span className="badge sm" style={{ background: "#E0E7FF", color: "#4338CA" }}>התקבל — בטיפול ההנהלה</span>)
+            : c.kind === "broken" ? <span className="cmp-done" style={{ color: "var(--muted)" }}><Wrench size={13} /> מסלול אחזקה</span>
+              : <span className="cmp-done" style={{ color: "var(--muted)" }}>אצל עובד הניקיון</span>;
+  if (onOpen) return (<button className="cmp-card clk" style={{ borderInlineStartColor: border, width: "100%", textAlign: "start", cursor: "pointer" }} onClick={() => onOpen(c)}>
+    {c.photo && <img className="cmp-photo" src={c.photo} alt="" />}
+    <div className="cmp-body">
+      <div className="cmp-row1"><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}{nIss > 1 ? " · " + nIss : ""}</span><span className="cmp-zone">{c.zoneName}</span><ChevronLeft size={15} style={{ marginInlineStart: "auto", color: "var(--muted)" }} /></div>
+      <div className="cmp-meta">{c.zoneLoc ? c.zoneLoc + " · " : ""}{srcLabel} · {timeAgo(c.at)}</div>
+      {c.text && <div className="cmp-text" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.text}</div>}
+      <div style={{ marginTop: 4 }}>{statusLine}</div>
+    </div>
+  </button>);
   return (<div className="cmp-card" style={{ borderInlineStartColor: border }}>
     {c.photo && <img className="cmp-photo" src={c.photo} alt="" />}
     <div className="cmp-body">
-      <div className="cmp-row1"><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}</span>{c.status === "pending" && <span className="badge sm" style={{ background: "#EDE9FE", color: "#6D28D9" }}>ממתין לאישור</span>}<span className="cmp-zone">{c.zoneName}</span></div>
-      <div className="cmp-meta">{c.zoneLoc ? c.zoneLoc + " · " : ""}{anon ? "דיווח אנונימי · לא מאומת" : c.reportedByName} · {timeAgo(c.at)}{c.ticketId ? " · נפתחה קריאת אחזקה" : ""}</div>
+      <div className="cmp-row1"><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}</span>{c.status === "pending" && <span className="badge sm" style={{ background: "#EDE9FE", color: "#6D28D9" }}>ממתין לאישור</span>}{escalated && (c.status === "open") && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>הועבר למנהל המערכת</span>}<span className="cmp-zone">{c.zoneName}</span></div>
+      <div className="cmp-meta">{c.zoneLoc ? c.zoneLoc + " · " : ""}{srcLabel} · {timeAgo(c.at)}{c.ticketId ? " · נפתחה קריאת אחזקה" : ""}</div>
       {c.text && <div className="cmp-text">{c.text}</div>}
+      {!c.photo && c.noPhotoReason && <div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div>}
       {c.status === "pending" && onApprove
         ? <div className="cmp-actions"><button className="btn-primary sm" onClick={() => onApprove(c)}><Check size={14} /> אישור</button><button className="btn-ghost sm" onClick={() => onReject(c)}><X size={14} /> דחייה</button></div>
         : c.status === "resolved" ? <div className="cmp-done"><CheckCircle2 size={13} /> טופל{c.resolvedBy ? " · " + c.resolvedBy : ""}</div>
           : c.status === "rejected" ? <div className="cmp-done" style={{ color: "var(--muted)" }}><X size={13} /> נדחה{c.resolvedBy ? " · " + c.resolvedBy : ""}</div>
-            : (onResolve && c.kind === "dirty" && c.status === "open" && <button className="btn-ghost sm" onClick={() => onResolve(c)}><Check size={14} /> סמן כטופל</button>)}
+            : c.status === "open" && c.kind === "broken" ? <div className="cmp-done" style={{ color: "var(--muted)" }}><Wrench size={13} /> בטיפול במסלול האחזקה</div>
+              : (onResolve || onEscalate) ? <div className="cmp-actions">{onResolve && <button className="btn-primary sm" onClick={() => onResolve(c)}><Check size={14} /> סומן כטופל</button>}{onEscalate && !escalated && <button className="btn-ghost sm" onClick={() => onEscalate(c)}>העברה למנהל</button>}</div>
+                : <div className="cmp-done" style={{ color: "var(--muted)" }}>{escalated ? "ממתין לטיפול מנהל המערכת" : "אצל עובד הניקיון"}</div>}
     </div>
   </div>);
 }
 
-function ZoneForm({ zone, cleaners, onCancel, onSave, onDelete, canDelete }) {
+function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve, onProgress, onEscalate, onClose }) {
+  const k = COMPLAINT_KIND[c.kind] || COMPLAINT_KIND.dirty; const Ic = k.Icon;
+  const [rejectMode, setRejectMode] = useState(false), [reason, setReason] = useState(""), [resolveMode, setResolveMode] = useState(false), [note, setNote] = useState(""), [progMode, setProgMode] = useState(false), [pNote, setPNote] = useState(c.progressNote || "");
+  const inProg = c.progress === "in_progress";
+  const anon = c.reportedByRole === "anonymous";
+  const src = anon ? "דיווח אנונימי" : `${c.reportedByName}${c.reportedByRole === "user" ? " · מנהל מחלקה" : c.reportedByRole === "admin" ? " · מנהל מערכת" : c.reportedByRole === "worker" ? " · עובד" : c.reportedByRole === "cleaner" ? " · עובד ניקיון" : ""}`;
+  const issues = c.issues || [];
+  const cp = caps || {};
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פרטי דיווח</div></div>
+    <div className="body">
+      <div className="round-zone"><div className="rz-name">{c.zoneName}</div><div className="rz-loc">{c.zoneLoc || "—"} · {src} · {fmtDate(c.at)} {fmtTime(c.at)}</div><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}</span></div>
+      {c.text && <div className="field"><span>תיאור</span><div className="cmp-text">{c.text}</div></div>}
+      {issues.length > 0 && <div className="field"><span><AlertTriangle size={14} /> הערות ({issues.length})</span><div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}>{iss.photo && <img className="cmp-photo" src={iss.photo} alt="" />}<div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div></div></div>)}</div></div>}
+      {c.photo && issues.length === 0 && <div className="field"><span>תמונה</span><img src={c.photo} alt="" style={{ width: "100%", borderRadius: 12 }} /></div>}
+      {!c.photo && c.noPhotoReason && <div className="field"><span>תמונה</span><div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div></div>}
+      {round && <div className="field"><span>מקור</span><div className="audit-row"><span className="audit-kdot" style={{ background: "#0EA5E9" }} /><div className="audit-main"><div className="audit-text">סבב ניקיון{round.winTime ? " · " + round.winTime : ""}</div><div className="audit-meta">{round.byName} · {fmtTime(round.at)} · {round.doneCount}/{round.total} פריטים</div></div></div></div>}
+      <div className="field"><span>סטטוס והיסטוריה</span><div className="cmp-meta">
+        {c.status === "pending" ? "ממתין לאישור" : c.status === "resolved" ? "טופל" : c.status === "rejected" ? "נדחה" : inProg ? "בטיפול" : c.ownerRole === "admin" ? "התקבל — בטיפול ההנהלה" : c.escalatedTo === "admin" ? "הועבר למנהל המערכת" : "אצל עובד הניקיון"}
+        {c.approvedBy ? ` · אושר ע״י ${c.approvedBy}` : ""}{c.resolvedBy ? ` · נסגר ע״י ${c.resolvedBy}` : ""}
+        {inProg && c.progressNote ? <div style={{ marginTop: 4, color: "#B45309" }}>בטיפול: {c.progressNote}</div> : null}
+        {c.response ? <div style={{ marginTop: 4 }}>תגובה: {c.response}</div> : null}{c.rejectReason ? <div style={{ marginTop: 4 }}>סיבת דחייה: {c.rejectReason}</div> : null}
+      </div></div>
+      {progMode && <div className="field"><span>סטטוס טיפול (יוצג למדווח)</span><textarea rows={2} value={pNote} onChange={(e) => setPNote(e.target.value)} placeholder="לדוגמה: הוזמן — ממתין לאספקה" /></div>}
+      {rejectMode && <div className="field"><span>סיבת דחייה (חובה — העובד יראה)</span><textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="מדוע הדיווח נדחה?" /></div>}
+      {resolveMode && <div className="field"><span>תגובה לעובד (רשות)</span><textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="מה נעשה? (יוצג למדווח)" /></div>}
+      <div className="cmp-actions" style={{ flexWrap: "wrap" }}>
+        {cp.approve && c.status === "pending" && !rejectMode && <button className="btn-primary sm" onClick={() => onApprove(c)}><Check size={14} /> אישור — קבלה לטיפול</button>}
+        {cp.reject && c.status === "pending" && (rejectMode ? <button className="btn-primary sm" disabled={!reason.trim()} onClick={() => onReject({ ...c, rejectReason: reason.trim() })}><X size={14} /> אישור דחייה</button> : <button className="btn-ghost sm" onClick={() => setRejectMode(true)}><X size={14} /> דחייה</button>)}
+        {cp.resolve && c.status === "open" && !inProg && (progMode ? <button className="btn-primary sm" disabled={!pNote.trim()} onClick={() => onProgress({ ...c, progressNote: pNote.trim() })}><Clock size={14} /> שמירת סטטוס</button> : <button className="btn-ghost sm" onClick={() => setProgMode(true)}><Clock size={14} /> סמן «בטיפול»</button>)}
+        {cp.resolve && c.status === "open" && (resolveMode ? <button className="btn-primary sm" onClick={() => onResolve({ ...c, response: note.trim() })}><Check size={14} /> סגירה כטופל</button> : <button className="btn-primary sm" onClick={() => setResolveMode(true)}><Check size={14} /> סומן כטופל</button>)}
+        {cp.escalate && c.status === "open" && c.escalatedTo !== "admin" && c.ownerRole !== "admin" && <button className="btn-ghost sm" onClick={() => onEscalate(c)}>העברה למנהל המערכת</button>}
+      </div>
+      <div style={{ height: 20 }} />
+    </div></div>);
+}
+
+function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDelete }) {
   const [name, setName] = useState(zone.name || ""), [building, setBuilding] = useState(zone.building || ""), [floor, setFloor] = useState(zone.floor || ""), [code, setCode] = useState(zone.code || "");
   const [checklist, setChecklist] = useState(zone.checklist?.length ? zone.checklist : DEFAULT_CLEAN_CHECKLIST);
   const [windows, setWindows] = useState(zone.windows?.length ? zone.windows : [{ id: uid(), time: "06:00", tol: 60 }]);
   const [cleanerId, setCleanerId] = useState(zone.cleanerId || ""), [active, setActive] = useState(zone.active !== false), [err, setErr] = useState("");
+  const [activeDays, setActiveDays] = useState(Array.isArray(zone.activeDays) ? zone.activeDays : (zone.id ? [0, 1, 2, 3, 4, 5, 6] : WORK_WEEK));
+  const [mgrIds, setMgrIds] = useState((managers || []).filter((m) => (m.mgrZones || []).includes(zone.id)).map((m) => m.id));
+  const [openWin, setOpenWin] = useState(null);
+  const toggleDay = (d) => setActiveDays((s) => (s.includes(d) ? s.filter((x) => x !== d) : [...s, d]).sort((a, b) => a - b));
+  const toggleWinItem = (i, id) => setWindows((s) => s.map((w, j) => { if (j !== i) return w; const valid = checklist.filter((c) => (c.label || "").trim()).map((c) => c.id); const cur = Array.isArray(w.items) ? w.items.filter((x) => valid.includes(x)) : valid.slice(); const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]; return { ...w, items: next.length >= valid.length ? null : next }; }));
   const setCl = (i, v) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, label: v } : x)));
   const setWin = (i, k, v) => setWindows((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const save = () => {
-    if (!name.trim()) return setErr("נא להזין שם זון");
+    if (!name.trim()) return setErr("נא להזין שם אזור");
     const cl = checklist.filter((c) => (c.label || "").trim()).map((c) => ({ id: c.id || uid(), label: c.label.trim() }));
     if (!cl.length) return setErr("נא להוסיף לפחות פריט אחד בצ׳קליסט");
+    if (!activeDays.length) return setErr("נא לבחור לפחות יום פעילות אחד");
     const cleaner = cleaners.find((c) => c.id === cleanerId);
-    onSave({ id: zone.id || uid(), code: code.trim() || "Z" + Math.random().toString(36).slice(2, 6).toUpperCase(), name: name.trim(), building: building.trim(), floor: floor.trim(), checklist: cl, windows: windows.filter((w) => w.time).map((w) => ({ id: w.id || uid(), time: w.time, tol: +w.tol || 0 })), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() });
+    const clIds = new Set(cl.map((c) => c.id));
+    onSave({ id: zone.id || uid(), code: code.trim() || "Z" + Math.random().toString(36).slice(2, 6).toUpperCase(), name: name.trim(), building: building.trim(), floor: floor.trim(), checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
   };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">{zone.id ? "עריכת זון ניקיון" : "זון ניקיון חדש"}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{zone.id ? "עריכת אזור ניקיון" : "אזור ניקיון חדש"}</div></div>
     <div className="body">
-      <label className="field"><span>שם הזון *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: שירותים קומה 2 — אגף מזרח" /></label>
+      <label className="field"><span>שם האזור *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: שירותים קומה 2 — אגף מזרח" /></label>
       <div className="field-row"><label className="field"><span>בניין</span><input value={building} onChange={(e) => setBuilding(e.target.value)} placeholder="בניין A" /></label><label className="field"><span>קומה</span><input value={floor} onChange={(e) => setFloor(e.target.value)} placeholder="קומה 2" /></label></div>
-      <div className="field"><span>צ׳קליסט הזון *</span>
+      <div className="field"><span>צ׳קליסט האזור *</span>
         {checklist.map((c, i) => <div key={c.id || i} className="cl-row"><input value={c.label} onChange={(e) => setCl(i, e.target.value)} placeholder="פריט לבדיקה" /><button className="icon-btn sm" onClick={() => setChecklist((s) => s.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>)}
         <button className="btn-ghost sm" onClick={() => setChecklist((s) => [...s, { id: uid(), label: "" }])}><Plus size={14} /> הוספת פריט</button>
       </div>
       <div className="field"><span>חלונות סבב (שעה + סטייה מותרת בדקות)</span>
-        {windows.map((w, i) => <div key={w.id || i} className="cl-row"><input type="time" value={w.time} onChange={(e) => setWin(i, "time", e.target.value)} /><div className="win-tol">± <input type="number" min="0" value={w.tol} onChange={(e) => setWin(i, "tol", e.target.value)} /> ד׳</div><button className="icon-btn sm" onClick={() => setWindows((s) => s.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>)}
-        <button className="btn-ghost sm" onClick={() => setWindows((s) => [...s, { id: uid(), time: "12:00", tol: 60 }])}><Plus size={14} /> הוספת חלון</button>
-        <div className="hint">הסטייה קובעת כמה מוקדם/מאוחר מותר להגיע לסבב. ניהול ההתראות על פספוס — בשלב הבא.</div>
+        {windows.map((w, i) => { const valid = checklist.filter((c) => (c.label || "").trim()); const sel = Array.isArray(w.items) ? w.items : null; const cnt = sel ? valid.filter((c) => sel.includes(c.id)).length : valid.length; return <div key={w.id || i} style={{ marginBottom: 8 }}>
+          <div className="cl-row"><input type="time" value={w.time} onChange={(e) => setWin(i, "time", e.target.value)} /><div className="win-tol">± <input type="number" min="0" value={w.tol} onChange={(e) => setWin(i, "tol", e.target.value)} /> ד׳</div><button className="icon-btn sm" onClick={() => setWindows((s) => s.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>
+          <button className="btn-ghost sm" type="button" onClick={() => setOpenWin(openWin === i ? null : i)} style={{ marginTop: 4 }}>{openWin === i ? "▾" : "▸"} פריטים בסבב זה ({cnt}/{valid.length}){cnt < valid.length ? " · חלקי" : ""}</button>
+          {openWin === i && (valid.length === 0 ? <div className="hint">הגדירו תחילה פריטי צ׳קליסט למעלה.</div> : <div style={{ padding: "6px 8px", background: "var(--surface-2)", borderRadius: 10, marginTop: 4 }}>{valid.map((c) => { const on = sel ? sel.includes(c.id) : true; return <label key={c.id} className="chk-line"><input type="checkbox" checked={on} onChange={() => toggleWinItem(i, c.id)} /> {c.label}</label>; })}</div>)}
+        </div>; })}
+        <button className="btn-ghost sm" onClick={() => setWindows((s) => [...s, { id: uid(), time: "12:00", tol: 60, items: null }])}><Plus size={14} /> הוספת חלון</button>
+        <div className="hint">לכל סבב אפשר לבחור אילו פריטים נבדקים בו (כברירת מחדל — כולם). למשל סבב אמצע היום יכול לכלול רק חלק מהפריטים.</div>
       </div>
-      <label className="field"><span>עובד ניקיון אחראי</span><select value={cleanerId} onChange={(e) => setCleanerId(e.target.value)}><option value="">— ללא שיוך —</option>{cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="hint">כל עובד ניקיון יכול לבצע סבב בכל זון (כיסוי), אך זה הזון של האחראי.</div></label>
-      <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> זון פעיל</label>
+      <div className="field"><span>ימי פעילות (באילו ימים האזור מנוקה)</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>{WEEKDAYS.map((w) => { const on = activeDays.includes(w.d); return <button key={w.d} type="button" onClick={() => toggleDay(w.d)} className={"pr-pick" + (on ? " on" : "")} style={on ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9", minWidth: 40, justifyContent: "center" } : { minWidth: 40, justifyContent: "center" }}>{w.short}</button>; })}</div>
+        <div className="hint">בימים שלא נבחרו לא ייווצרו סבבים ולא יירשם «פוספס». ברירת מחדל: ראשון–חמישי.</div>
+      </div>
+      <label className="field"><span>עובד ניקיון אחראי</span><select value={cleanerId} onChange={(e) => setCleanerId(e.target.value)}><option value="">— ללא שיוך —</option>{cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="hint">כל עובד ניקיון יכול לבצע סבב בכל אזור (כיסוי), אך זה האזור של האחראי.</div></label>
+      {managers && <div className="field"><span>מנהלי מחלקה שרואים את האזור</span>{managers.length === 0 ? <div className="hint">אין מנהלי מחלקה. הוסיפו תחת «צוות ומשתמשים».</div> : <div className="chk-grid">{managers.map((m) => <label key={m.id} className={"chk-pill" + (mgrIds.includes(m.id) ? " on" : "")}><input type="checkbox" checked={mgrIds.includes(m.id)} onChange={() => setMgrIds((s) => s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id])} /> {m.name}</label>)}</div>}<div className="hint">אותה הגדרה כמו ב«צוות ומשתמשים» של המנהל — נשמרת לשני הכיוונים.</div></div>}
+      <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> אזור פעיל</label>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>שמירה</button>
-      {canDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת זון" onConfirm={onDelete} />}
+      {canDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת אזור" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
 }
@@ -1868,7 +2234,7 @@ function ZoneForm({ zone, cleaners, onCancel, onSave, onDelete, canDelete }) {
 function ZoneTag({ zone, onClose }) {
   const data = encodeURIComponent("czone:" + zone.id);
   const [imgOk, setImgOk] = useState(true);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onClose}><X size={22} /></button><div className="form-title">תווית להדפסה</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">תווית להדפסה</div></div>
     <div className="body">
       <div className="zone-tag">
         <div className="zt-name">{zone.name}</div>
@@ -1877,79 +2243,139 @@ function ZoneTag({ zone, onClose }) {
         <div className="zt-code">{zone.code}</div>
         <div className="zt-hint">סריקה לדיווח או לסבב ניקיון</div>
       </div>
-      <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו בכניסה לזון. ה-QR נוצר בשירות חיצוני — בתצוגה המוטמעת ייתכן שלא ייטען; הקוד למטה תמיד זמין כגיבוי. סריקת מצלמה אמיתית תעבוד באפליקציה העצמאית.</div>
+      <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו בכניסה לאזור. ה-QR נוצר בשירות חיצוני — בתצוגה המוטמעת ייתכן שלא ייטען; הקוד למטה תמיד זמין כגיבוי. סריקת מצלמה אמיתית תעבוד באפליקציה העצמאית.</div>
       <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={() => { try { window.print(); } catch (e) {} }}><Printer size={15} /> הדפסה</button>
       <div style={{ height: 16 }} />
     </div></div>);
 }
 
 function CleaningAdmin(p) {
-  const { zones, rounds, users, saveZone, delZone, complaints, fileComplaint, resolveComplaint, approveComplaint, rejectComplaint } = p;
+  const { zones, rounds, users, absences, saveZone, delZone, saveUser, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint } = p;
   const cleaners = useMemo(() => (users || []).filter((u) => u.role === "cleaner" && u.active !== false), [users]);
+  const managers = useMemo(() => (users || []).filter((u) => u.role === "user" && u.active !== false), [users]);
   const [tab, setTab] = useState("today"), [edit, setEdit] = useState(null), [tag, setTag] = useState(null), [rep, setRep] = useState(null), [showClosed, setShowClosed] = useState(false);
+  const [rZone, setRZone] = useState("all"), [rProblems, setRProblems] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null);
   const list = useMemo(() => (zones || []).slice().sort(zoneSort), [zones]);
-  const roundsByDay = useMemo(() => { const g = {}; (rounds || []).slice().sort((a, b) => b.at - a.at).slice(0, 120).forEach((r) => { const k = dayStart(r.at); (g[k] = g[k] || []).push(r); }); return Object.entries(g).sort((a, b) => b[0] - a[0]); }, [rounds]);
+  const roundsByDay = useMemo(() => { const g = {}; (rounds || []).slice().filter((r) => (rZone === "all" || r.zoneId === rZone) && (!rProblems || (r.issues || []).length > 0)).sort((a, b) => b.at - a.at).slice(0, 200).forEach((r) => { const k = dayStart(r.at); (g[k] = g[k] || []).push(r); }); return Object.entries(g).sort((a, b) => b[0] - a[0]); }, [rounds, rZone, rProblems]);
   const pending = useMemo(() => (complaints || []).filter((c) => c.status === "pending").sort((a, b) => b.at - a.at), [complaints]);
   const openC = useMemo(() => (complaints || []).filter((c) => c.status === "open").sort((a, b) => b.at - a.at), [complaints]);
+  const escC = useMemo(() => openC.filter((c) => c.escalatedTo === "admin"), [openC]);
+  const adminOwnedC = useMemo(() => openC.filter((c) => c.escalatedTo !== "admin" && c.ownerRole === "admin"), [openC]);
+  const plainOpenC = useMemo(() => openC.filter((c) => c.escalatedTo !== "admin" && c.ownerRole !== "admin"), [openC]);
   const closedC = useMemo(() => (complaints || []).filter((c) => c.status === "resolved" || c.status === "rejected").sort((a, b) => (b.resolvedAt || b.at) - (a.resolvedAt || a.at)), [complaints]);
   const needAttn = pending.length + openC.length;
   const today = useMemo(() => { const now = Date.now(); const rows = list.filter((z) => z.active !== false).map((z) => ({ z, sts: zoneTodayStatuses(z, rounds, now) })); const tot = rows.reduce((n, r) => n + r.sts.length, 0); const done = rows.reduce((n, r) => n + r.sts.filter((s) => s.status === "done").length, 0); return { rows, tot, done, missed: rows.filter((r) => r.sts.some((s) => s.status === "missed")), due: rows.filter((r) => r.sts.some((s) => s.status === "due" || s.status === "overdue")) }; }, [list, rounds]);
   const winChips = (sts) => <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div>;
   return (<>
-    <div className="seg-tabs s4" style={{ maxWidth: 560, marginBottom: 14 }}><button className={tab === "today" ? "on" : ""} onClick={() => setTab("today")}>היום</button><button className={tab === "zones" ? "on" : ""} onClick={() => setTab("zones")}>זונות</button><button className={tab === "complaints" ? "on" : ""} onClick={() => setTab("complaints")}>דיווחים{needAttn ? ` (${needAttn})` : ""}</button><button className={tab === "rounds" ? "on" : ""} onClick={() => setTab("rounds")}>סבבים</button></div>
-    {tab === "today" ? (list.length === 0 ? <Empty text="אין זונות עדיין" Icon={Sparkles} sub="הוסיפו זון בלשונית «זונות»" /> : <>
+    <div className="seg-tabs s4" style={{ maxWidth: 560, marginBottom: 14 }}><button className={tab === "today" ? "on" : ""} onClick={() => setTab("today")}>היום</button><button className={tab === "zones" ? "on" : ""} onClick={() => setTab("zones")}>אזורים</button><button className={tab === "complaints" ? "on" : ""} onClick={() => setTab("complaints")}>דיווחים{needAttn ? ` (${needAttn})` : ""}</button><button className={tab === "rounds" ? "on" : ""} onClick={() => setTab("rounds")}>סבבים</button></div>
+    {tab === "today" ? (list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלשונית «אזורים»" /> : <>
       <div className="comp-card"><div className="comp-big">{today.done}/{today.tot}</div><div className="comp-lbl">סבבים בוצעו היום</div><div className="comp-bar"><span style={{ width: (today.tot ? Math.round(today.done / today.tot * 100) : 0) + "%" }} /></div></div>
+      {(() => { const tk = todayKey(); const away = (absences || []).filter((a) => a.from <= tk && (a.to || a.from) >= tk); if (!away.length) return null; const zonesOf = (uid) => (zones || []).filter((z) => z.cleanerId === uid && z.active !== false).map((z) => z.name); return <div className="note" style={{ borderColor: "#FDE68A", marginBottom: 8 }}><CalendarClock size={13} /> בחופשה היום — נדרש כיסוי: {away.map((a) => `${a.name}${zonesOf(a.userId).length ? " (" + zonesOf(a.userId).join(", ") + ")" : ""}`).join(" · ")}</div>; })()}
       {today.missed.length > 0 && <><SectionTitle><AlertTriangle size={15} /> פוספסו ({today.missed.length})</SectionTitle><div className="cards">{today.missed.map(({ z, sts }) => <div key={z.id} className="tcard" style={{ borderInlineStartColor: "#DC2626" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>)}</div></>}
       {today.due.length > 0 && <><SectionTitle><Clock size={15} /> לביצוע כעת ({today.due.length})</SectionTitle><div className="cards">{today.due.map(({ z, sts }) => <div key={z.id} className="tcard" style={{ borderInlineStartColor: "#B45309" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>)}</div></>}
-      <SectionTitle><Sparkles size={15} /> כל הזונות היום</SectionTitle>
+      <SectionTitle><Sparkles size={15} /> כל האזורים היום</SectionTitle>
       <div className="cards">{today.rows.map(({ z, sts }) => <div key={z.id} className="tcard"><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>)}</div>
     </>)
-      : tab === "rounds" ? (roundsByDay.length === 0 ? <Empty text="אין סבבים עדיין" Icon={Sparkles} sub="הסבבים יופיעו כאן לאחר שעובד ניקיון יסרוק ויבצע" /> : roundsByDay.map(([day, rs]) => <div key={day} style={{ marginBottom: 16 }}><div className="day-h">{dayLabel(+day)}</div><div className="cards">{rs.map((r) => <div key={r.id} className="audit-row"><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: "#0EA5E9" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.zoneLoc ? " · " + r.zoneLoc : ""}</div><div className="audit-meta">{r.byName} · {r.doneCount}/{r.total} פריטים{r.isCover ? " · כיסוי" : ""}{r.photo ? " · 📷" : ""}</div></div></div>)}</div></div>))
+      : tab === "rounds" ? (<>
+        <div className="u-filters" style={{ marginBottom: 12 }}><select value={rZone} onChange={(e) => setRZone(e.target.value)}><option value="all">כל האזורים</option>{list.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}</select><button className={"wtoggle" + (rProblems ? " on" : "")} onClick={() => setRProblems((v) => !v)}><AlertTriangle size={14} /> רק עם הערות</button></div>
+        {roundsByDay.length === 0 ? <Empty text="אין סבבים להצגה" Icon={Sparkles} sub="שנו את הסינון או המתינו לסבבים" /> : roundsByDay.map(([day, rs]) => <div key={day} style={{ marginBottom: 16 }}><div className="day-h">{dayLabel(+day)}</div><div className="cards">{rs.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.zoneLoc ? " · " + r.zoneLoc : ""}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{r.byName} · {r.doneCount}/{r.total} פריטים{r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}{prob ? ` · ${r.issues.length} הערות` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div></div>)}
+      </>)
       : tab === "complaints" ? ((pending.length + openC.length + closedC.length) === 0 ? <Empty text="אין דיווחים" Icon={Sparkles} sub="דיווחי לכלוך ותקלות יופיעו כאן" /> : <>
-        {pending.length > 0 && <><SectionTitle><Clock size={15} /> ממתין לאישורך ({pending.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדים ומדיווח אנונימי. רק לאחר אישורך הם נפתחים ומגיעים לעובד הניקיון.</div><div className="cards">{pending.map((c) => <ComplaintCard key={c.id} c={c} onApprove={approveComplaint} onReject={rejectComplaint} />)}</div></>}
-        {openC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> פתוחים ({openC.length})</SectionTitle><div className="cards">{openC.map((c) => <ComplaintCard key={c.id} c={c} onResolve={resolveComplaint} />)}</div></>}
-        {closedC.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closedC.length})</button>{showClosed && <div className="cards">{closedC.map((c) => <ComplaintCard key={c.id} c={c} />)}</div>}</>}
+        {pending.length > 0 && <><SectionTitle><Clock size={15} /> ממתין לאישורך ({pending.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדים, מעובד ניקיון ומדיווח אנונימי. הקישו לפתיחה — אישור או דחייה עם סיבה.</div><div className="cards">{pending.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+        {escC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הועבר אליך לטיפול ({escC.length})</SectionTitle><div className="cards">{escC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+        {adminOwnedC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> בטיפולך ({adminOwnedC.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדי הניקיון שקיבלת לטיפול. סגרו כטופל לאחר הטיפול — העובד יראה את התגובה.</div><div className="cards">{adminOwnedC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+        {plainOpenC.length > 0 && <><SectionTitle><Clock size={15} /> אצל עובד הניקיון ({plainOpenC.length})</SectionTitle><div className="cards">{plainOpenC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+        {closedC.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closedC.length})</button>{showClosed && <div className="cards">{closedC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
       </>)
       : (<>
-        <div className="row-between"><SectionTitle><Sparkles size={15} /> זוני ניקיון ({list.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> זון חדש</button></div>
-        {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדי ניקיון. הוסיפו אותם תחת «צוות ומשתמשים» כדי לשייך אחראי לזון. בינתיים קיים עובד ניקיון לדוגמה לכניסה (מס׳ 1050 · קוד 1234).</div>}
-        {list.length === 0 ? <Empty text="אין זונות עדיין" Icon={Sparkles} sub="הוסיפו זון בלחיצה על «זון חדש»" /> : <div className="cards">{list.map((z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{(z.windows || []).length} סבבים/יום</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}</div>}
+        <div className="row-between"><SectionTitle><Sparkles size={15} /> אזורי ניקיון ({list.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> אזור חדש</button></div>
+        {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדי ניקיון. הוסיפו אותם תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור. בינתיים קיים עובד ניקיון לדוגמה לכניסה (מס׳ 1050 · קוד 1234).</div>}
+        {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : <div className="cards">{list.map((z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{(z.windows || []).length} סבבים · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}</div>}
       </>)}
-    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} canDelete={!!edit.id} onCancel={() => setEdit(null)} onSave={(z) => { saveZone(z); setEdit(null); }} onDelete={() => { delZone(edit.id); setEdit(null); }} /></Overlay>}
+    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} managers={managers} canDelete={!!edit.id} onCancel={() => setEdit(null)} onSave={(z, mgrIds) => { saveZone(z); (managers || []).forEach((m) => { const has = (m.mgrZones || []).includes(z.id); const want = (mgrIds || []).includes(m.id); if (has !== want) saveUser({ ...m, mgrZones: want ? [...(m.mgrZones || []), z.id] : (m.mgrZones || []).filter((x) => x !== z.id) }); }); setEdit(null); }} onDelete={() => { delZone(edit.id); setEdit(null); }} /></Overlay>}
     {tag && <Overlay onClose={() => setTag(null)}><ZoneTag zone={tag} onClose={() => setTag(null)} /></Overlay>}
+    {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
+    {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ approve: true, reject: true, resolve: cDetail.ownerRole === "admin" || cDetail.escalatedTo === "admin" }} onApprove={(c) => { approveComplaint(c); setCDetail(null); }} onReject={(c) => { rejectComplaint(c); setCDetail(null); }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onProgress={(c) => { progressComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
     {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={p.session} onCancel={() => setRep(null)} onSave={(c) => { fileComplaint(c); setRep(null); }} /></Overlay>}
   </>);
 }
 
-function RoundForm({ zone, session, onCancel, onSave }) {
-  const [done, setDone] = useState({}), [photo, setPhoto] = useState(null), [note, setNote] = useState(""), [busy, setBusy] = useState(false);
-  const fileRef = useRef(null);
-  const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
-  const cl = zone.checklist || [];
+function RoundForm({ zone, win, session, onCancel, onSave }) {
+  const [done, setDone] = useState({}), [issues, setIssues] = useState({}), [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  const fileRef = useRef(null); const photoTarget = useRef(null);
+  const resize = (file, cb) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); cb(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
+  const cl = windowItems(zone, win);
   const doneCount = cl.filter((c) => done[c.id]).length;
   const isCover = zone.cleanerId && zone.cleanerId !== session.id;
-  const submit = () => { if (busy) return; setBusy(true); onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), at: Date.now(), byUid: session.id, byName: session.name, isCover: !!isCover, items: done, doneCount, total: cl.length, photo: photo || null, note: note.trim() }); };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">סבב ניקיון</div></div>
+  const toggleIssue = (id) => { setErr(""); setIssues((s) => { if (s[id]) { const n = { ...s }; delete n[id]; return n; } return { ...s, [id]: { reason: "", photo: null, kind: "dirty" } }; }); setDone((d) => (d[id] ? { ...d, [id]: false } : d)); };
+  const setIssueReason = (id, v) => setIssues((s) => ({ ...s, [id]: { ...s[id], reason: v } }));
+  const setIssueKind = (id, k) => setIssues((s) => ({ ...s, [id]: { ...s[id], kind: k } }));
+  const grabIssuePhoto = (file) => { const id = photoTarget.current; if (!id) return; resize(file, (d) => setIssues((s) => ({ ...s, [id]: { ...s[id], photo: d } }))); };
+  const submit = () => {
+    if (busy) return;
+    const issArr = Object.entries(issues).map(([itemId, v]) => ({ itemId, label: (cl.find((c) => c.id === itemId) || {}).label || "", reason: (v.reason || "").trim(), photo: v.photo || null, kind: v.kind === "broken" ? "broken" : "dirty" }));
+    if (issArr.some((i) => !i.reason)) return setErr("יש למלא סיבה לכל פריט שסומן כבעיה (או לבטל את הסימון)");
+    const unaddressed = cl.filter((c) => !done[c.id] && !issues[c.id]);
+    if (unaddressed.length) return setErr("יש להתייחס לכל פריט: לסמן ✓ שבוצע, או לסמן בעיה. נותרו: " + unaddressed.map((c) => c.label).join(", "));
+    setBusy(true);
+    onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr });
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">סבב ניקיון{win?.time ? " · " + win.time : ""}</div></div>
     <div className="body">
-      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}</div>{isCover && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>כיסוי — לא הזון שלך</span>}</div>
-      <div className="field"><span>צ׳קליסט · {doneCount}/{cl.length}</span><div className="round-cl">{cl.map((c) => <label key={c.id} className={"round-item" + (done[c.id] ? " on" : "")}><input type="checkbox" checked={!!done[c.id]} onChange={(e) => setDone((s) => ({ ...s, [c.id]: e.target.checked }))} /><span className="ri-box">{done[c.id] && <Check size={14} />}</span>{c.label}</label>)}</div></div>
-      <div className="field"><span>תמונה (רשות)</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>}</div>
-      <label className="field"><span>הערה (רשות)</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="לדוגמה: חסר סבון, הוזמן" /></label>
-      <button className="btn-primary full" onClick={submit} disabled={busy}>{doneCount === cl.length ? "סיום סבב" : `סיום סבב (${doneCount}/${cl.length})`}</button>
+      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{win?.time ? " · סבב " + win.time : ""}</div>{isCover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{zone.cleanerName ? " · עבור " + zone.cleanerName : " — לא האזור שלך"}</span>}</div>
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabIssuePhoto(e.target.files?.[0])} />
+      <div className="field"><span>צ׳קליסט · {doneCount}/{cl.length}{Object.keys(issues).length ? ` · ${Object.keys(issues).length} הערות` : ""}</span>
+        <div className="round-cl">{cl.map((c) => { const iss = issues[c.id]; return <div key={c.id} style={{ border: iss ? "1.5px solid #FCA5A5" : "1px solid var(--line)", borderRadius: 10, marginBottom: 6, overflow: "hidden", background: iss ? "#FEF2F2" : "transparent" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px" }}>
+            <label className={"round-item" + (done[c.id] ? " on" : "")} style={{ flex: 1, margin: 0, border: "none", padding: 0, background: "transparent" }}><input type="checkbox" checked={!!done[c.id]} onChange={(e) => { const v = e.target.checked; setDone((s) => ({ ...s, [c.id]: v })); if (v) setIssues((s) => { if (!s[c.id]) return s; const n = { ...s }; delete n[c.id]; return n; }); }} /><span className="ri-box">{done[c.id] && <Check size={14} />}</span>{c.label}</label>
+            <button type="button" className="icon-btn sm" title={iss ? "ביטול סימון בעיה" : "סימון בעיה בפריט זה"} onClick={() => toggleIssue(c.id)} style={{ color: iss ? "#DC2626" : "var(--muted)", background: iss ? "#FEE2E2" : "var(--surface-2)" }}>{iss ? <X size={16} /> : <AlertTriangle size={16} />}</button>
+          </div>
+          {iss && <div style={{ padding: "0 10px 10px" }}>
+            <div className="pr-row" style={{ marginBottom: 6 }}><button type="button" className={"pr-pick" + (iss.kind !== "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "dirty")} style={iss.kind !== "broken" ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9" } : {}}>לכלוך / מתכלה</button><button type="button" className={"pr-pick" + (iss.kind === "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "broken")} style={iss.kind === "broken" ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" } : {}}>תקלה / שבר</button></div>
+            <textarea rows={2} value={iss.reason} onChange={(e) => setIssueReason(c.id, e.target.value)} placeholder={iss.kind === "broken" ? "מה התקלה? (חובה) — ייפתח דיווח תקלה לתיקון" : "מה הבעיה? (חובה) — לדוגמה: חסר נייר, כתם שלא יורד"} />
+            <div style={{ marginTop: 6 }}>{iss.photo ? <div className="photo-prev"><img src={iss.photo} alt="" /><button className="photo-x" onClick={() => setIssues((s) => ({ ...s, [c.id]: { ...s[c.id], photo: null } }))}><X size={16} /></button></div> : <button type="button" className="photo-add" onClick={() => { photoTarget.current = c.id; fileRef.current?.click(); }}><Camera size={18} /> צילום (רשות)</button>}</div>
+          </div>}
+        </div>; })}</div>
+        <div className="hint">יש להתייחס לכל פריט: סמנו ✓ למה שבוצע, או הקישו על המשולש לסימון בעיה (סיבה + תמונה). פריט עם בעיה ייפתח כדיווח אוטומטי.</div>
+      </div>
+      {err && <div className="err">{err}</div>}
+      {(() => { const addressed = cl.filter((c) => done[c.id] || issues[c.id]).length; const ni = Object.keys(issues).length; return <button className="btn-primary full" onClick={submit} disabled={busy}>{addressed === cl.length ? (ni ? `סיום סבב · ${ni} הערות` : "סיום סבב") : `סיום סבב (${addressed}/${cl.length} טופלו)`}</button>; })()}
+      <div style={{ height: 20 }} />
+    </div></div>);
+}
+
+function RoundDetail({ round, zone, onClose }) {
+  const win = zone && round.winId ? (zone.windows || []).find((w) => w.id === round.winId) : null;
+  const items = zone ? windowItems(zone, win) : [];
+  const issues = round.issues || [];
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פרטי סבב</div></div>
+    <div className="body">
+      <div className="round-zone"><div className="rz-name">{round.zoneName}</div><div className="rz-loc">{round.zoneLoc || "—"}{round.winTime ? " · סבב " + round.winTime : ""}</div>{issues.length > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{issues.length} הערות</span>}</div>
+      <div className="field"><span>סיכום</span>
+        <div className="audit-row"><span className="audit-kdot" style={{ background: issues.length ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{round.byName}{round.isCover ? " · כיסוי" + (round.coverFor ? " עבור " + round.coverFor : "") : ""}</div><div className="audit-meta">{dayLabel(dayStart(round.at))} · {fmtTime(round.at)} · בוצעו {round.doneCount}/{round.total} פריטים</div></div></div>
+      </div>
+      {issues.length > 0 && <div className="field"><span style={{ color: "#DC2626" }}><AlertTriangle size={14} /> הערות / בעיות ({issues.length})</span>
+        <div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}>{iss.photo && <img className="cmp-photo" src={iss.photo} alt="" />}<div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}><AlertTriangle size={12} /> {iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div><div className="cmp-meta">נפתח דיווח אוטומטי</div></div></div>)}</div>
+      </div>}
+      {items.length > 0 && <div className="field"><span>פירוט צ׳קליסט</span><div className="round-cl">{items.map((c) => { const ok = round.items && round.items[c.id]; const flagged = issues.some((x) => x.itemId === c.id); return <div key={c.id} className="round-item" style={{ cursor: "default", opacity: ok ? 1 : 0.55 }}><span className="ri-box" style={ok ? {} : { borderColor: "var(--muted)" }}>{ok && <Check size={14} />}</span>{c.label}{flagged && <AlertTriangle size={13} color="#DC2626" style={{ marginInlineStart: 6 }} />}{!ok && !flagged && <span style={{ color: "var(--muted)", fontSize: 12, marginInlineStart: 6 }}>· לא סומן</span>}</div>; })}</div></div>}
       <div style={{ height: 20 }} />
     </div></div>);
 }
 
 function ComplaintForm({ zone, session, onCancel, onSave }) {
   const [kind, setKind] = useState("dirty"), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  const [noPhoto, setNoPhoto] = useState(false), [noPhotoReason, setNoPhotoReason] = useState("");
   const fileRef = useRef(null);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); setErr(""); }; img.src = e.target.result; }; r.readAsDataURL(file); };
-  const submit = () => { if (busy) return; if (!photo) return setErr("חובה לצרף תמונה — הדיווח לא יישלח בלעדיה"); setBusy(true); onSave({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind, photo, text: text.trim(), reportedById: session.id, reportedByName: session.name, reportedByRole: session.role }); };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">דיווח על בעיה בזון</div></div>
+  const submit = () => { if (busy) return; if (!photo && !noPhoto) return setErr("צרפו תמונה, או סמנו «אין אפשרות לצרף תמונה»"); if (!photo && noPhoto && !noPhotoReason.trim()) return setErr("נא לפרט מדוע אין אפשרות לצרף תמונה"); setBusy(true); onSave({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind, photo: photo || null, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", text: text.trim(), reportedById: session.id, reportedByName: session.name, reportedByRole: session.role }); };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">דיווח על בעיה באזור</div></div>
     <div className="body">
       <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}</div></div>
       <div className="field"><span>סוג הבעיה</span><div className="pr-row"><button className={"pr-pick" + (kind === "dirty" ? " on" : "")} onClick={() => setKind("dirty")} style={kind === "dirty" ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9" } : {}}><Sparkles size={15} /> לכלוך — נדרש ניקיון</button><button className={"pr-pick" + (kind === "broken" ? " on" : "")} onClick={() => setKind("broken")} style={kind === "broken" ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}><Wrench size={15} /> תקלה / שבר</button></div>{kind === "broken" && <div className="hint">ייפתח כקריאת אחזקה רגילה ויעבור לטיפול הצוות הטכני.</div>}</div>
-      <div className="field"><span>תמונה * (חובה)</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>}</div>
+      <div className="field"><span>תמונה {noPhoto ? "" : "* (חובה)"}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{!noPhoto && (photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>)}
+        <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={noPhoto} onChange={(e) => { setNoPhoto(e.target.checked); if (e.target.checked) setPhoto(null); setErr(""); }} /> אין אפשרות לצרף תמונה</label>
+        {noPhoto && <textarea rows={2} value={noPhotoReason} onChange={(e) => setNoPhotoReason(e.target.value)} placeholder="חובה לפרט: מדוע אין אפשרות לצרף תמונה?" style={{ marginTop: 6 }} />}
+      </div>
       <label className="field"><span>תיאור (רשות)</span><input value={text} onChange={(e) => setText(e.target.value)} placeholder="לדוגמה: שלולית על הרצפה ליד הכיור" /></label>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={submit} disabled={busy}>שליחת דיווח</button>
@@ -1957,58 +2383,141 @@ function ComplaintForm({ zone, session, onCancel, onSave }) {
     </div></div>);
 }
 
+function ZoneSpec({ zone, onClose }) {
+  const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
+  const cl = zone.checklist || [];
+  const days = zoneActiveDays(zone);
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">מפרט האזור</div></div>
+    <div className="body">
+      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{zone.cleanerName ? " · אחראי: " + zone.cleanerName : " · ללא אחראי"}</div></div>
+      <div className="field"><span><CalendarClock size={14} /> ימי פעילות · {activeDaysLabel(zone)}</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>{WEEKDAYS.map((w) => { const on = days.includes(w.d); return <span key={w.d} className="badge sm" style={on ? { background: "#0EA5E9", color: "#fff", minWidth: 34, justifyContent: "center" } : { background: "var(--surface-2)", color: "var(--muted)", minWidth: 34, justifyContent: "center" }}>{w.short}</span>; })}</div>
+      </div>
+      <div className="field"><span><Clock size={14} /> סבבים וצ׳קליסט לכל סבב ({ws.length})</span>
+        {ws.length === 0
+          ? (cl.length === 0 ? <div className="hint">לא הוגדרו חלונות וצ׳קליסט.</div> : <div className="round-cl">{cl.map((c) => <div key={c.id} className="round-item" style={{ cursor: "default" }}><span className="ri-box"><Check size={14} /></span>{c.label}</div>)}</div>)
+          : ws.map((w) => { const items = windowItems(zone, w); const partial = Array.isArray(w.items); return <div key={w.id} style={{ background: "var(--surface-2)", borderRadius: 10, padding: "8px 10px", marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700 }}><span>סבב {w.time}</span><span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}>± {(+w.tol || 0)} ד׳ · {partial ? items.length + " מתוך " + cl.length + " פריטים" : "כל הפריטים"}</span></div>
+              {items.length === 0 ? <div className="hint">אין פריטים בסבב זה.</div> : <div className="round-cl" style={{ marginTop: 4 }}>{items.map((c) => <div key={c.id} className="round-item" style={{ cursor: "default" }}><span className="ri-box"><Check size={14} /></span>{c.label}</div>)}</div>}
+            </div>; })}
+      </div>
+      <div style={{ height: 20 }} />
+    </div></div>);
+}
+
+function ReportFlow({ zones, session, onSubmit, onClose }) {
+  const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
+  const [stage, setStage] = useState("scan"), [zone, setZone] = useState(null);
+  if (stage === "form" && zone) return <ComplaintForm zone={zone} session={session} onCancel={onClose} onSave={onSubmit} />;
+  return (<div className="pub-wrap"><div className="pub-card">
+    <button className="icon-btn pub-x" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
+    {stage === "scan" ? <>
+      <div className="pub-logo"><Camera size={24} /></div>
+      <div className="pub-title">סריקת QR של האזור</div>
+      <div className="pub-sub">סרקו את ה-QR שבכניסה לאזור כדי לפתוח דיווח. במכשיר אמיתי הסריקה בוחרת את האזור אוטומטית.</div>
+      <button className="btn-primary full" style={{ marginTop: 14 }} onClick={() => setStage("pick")}><Camera size={16} /> סריקה (הדגמה)</button>
+      <div className="pub-foot">בהדגמה זו תבחרו את האזור ידנית בשלב הבא במקום סריקת מצלמה.</div>
+    </> : <>
+      <div className="pub-logo"><Sparkles size={24} /></div>
+      <div className="pub-title">בחירת אזור</div>
+      <div className="pub-sub">תוצאת הסריקה — בחרו את האזור שדווח.</div>
+      {active.length === 0 ? <div className="note">אין אזורים פעילים במחלקתך.</div> : <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => { setZone(z); setStage("form"); }}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>}
+      <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => setStage("scan")}>חזרה לסריקה</button>
+    </>}
+  </div></div>);
+}
+
 function CleanerApp(p) {
-  const { session, zones, rounds, complaints, saveRound, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme } = p;
-  const [run, setRun] = useState(null), [sent, setSent] = useState(false), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false);
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints);
+  const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme, absences, saveAbsence, delAbsence } = p;
+  const [run, setRun] = useState(null), [sent, setSent] = useState(false), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
+  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, [], absences);
   const now = Date.now();
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const mine = active.filter((z) => z.cleanerId === session.id);
   const others = active.filter((z) => z.cleanerId !== session.id);
   const todo = useMemo(() => { const out = []; mine.forEach((z) => zoneTodayStatuses(z, rounds, now).forEach(({ win, status }) => { if (status === "due" || status === "overdue") out.push({ z, win, status }); })); return out.sort((a, b) => parseHM(a.win.time) - parseHM(b.win.time)); }, [mine, rounds]);
   const doneToday = useMemo(() => (rounds || []).filter((r) => r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
-  const doSave = (r) => { saveRound(r); setRun(null); setSent(true); setTimeout(() => setSent(false), 2600); };
-  const card = (z) => { const sts = zoneTodayStatuses(z, rounds, now); const next = sts.find((s) => s.status === "due") || sts.find((s) => s.status === "overdue") || sts.find((s) => s.status === "missed") || sts.find((s) => s.status === "pending"); const wm = next ? WIN_META[next.status] : null; const lr = lastRoundOf(z.id, rounds); const oc = (complaints || []).filter((c) => c.zoneId === z.id && c.status === "open").length; return <button key={z.id} className="tcard clk" onClick={() => setRun(z)} style={{ borderInlineStartColor: wm ? wm.color : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{oc} דיווחים</span>}{next && <span className="badge sm" style={{ background: wm.bg, color: wm.color }}>{next.status === "pending" ? "הבא " + next.win.time : wm.label + " · " + next.win.time}</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><ChevronLeft size={18} className="ni-go" /></button>; };
+  const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
+  const myReports = useMemo(() => (complaints || []).filter((c) => c.reportedById === session.id).sort((a, b) => b.at - a.at).slice(0, 30), [complaints, session.id]);
+  const doSave = (r) => { saveRound(r); const iss = r.issues || []; const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${list.length} ${kind === "broken" ? "תקלות" : "הערות"} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role }); const broken = iss.filter((x) => x.kind === "broken"); const dirty = iss.filter((x) => x.kind !== "broken"); if (broken.length) fileComplaint(mk("broken", broken)); if (dirty.length) fileComplaint(mk("round", dirty)); setRun(null); setSent(true); setTimeout(() => setSent(false), 2600); };
+  const card = (z, cover) => {
+    const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds);
+    const oc = (complaints || []).filter((c) => c.zoneId === z.id && c.status === "open" && c.ownerRole !== "admin").length;
+    const notDay = sts.length === 0;
+    const dueNow = sts.find((s) => s.status === "due" || s.status === "overdue");
+    const nextP = sts.find((s) => s.status === "pending");
+    const missed = sts.filter((s) => s.status === "missed");
+    const allDone = sts.length > 0 && sts.every((s) => s.status === "done");
+    let st, target;
+    if (notDay) st = { txt: "לא יום ניקיון", color: "var(--muted)", bg: "var(--surface-2)" };
+    else if (dueNow) { st = { txt: "עכשיו · סבב " + dueNow.win.time, color: WIN_META[dueNow.status].color, bg: WIN_META[dueNow.status].bg, go: 1 }; target = dueNow.win; }
+    else if (allDone) st = { txt: "✓ הושלם להיום", color: "#16A34A", bg: "#DCFCE7" };
+    else if (nextP) { st = { txt: "הסבב הבא בשעה " + nextP.win.time, color: "#0369A1", bg: "#E0F2FE" }; target = nextP.win; }
+    else if (missed.length) { st = { txt: "פוספס · השלמה: " + missed[0].win.time, color: "#DC2626", bg: "#FEE2E2", go: 1 }; target = missed[0].win; }
+    else st = { txt: "—", color: "var(--muted)", bg: "var(--surface-2)" };
+    const border = cover ? "#A855F7" : (st.go ? st.color : (allDone ? "#16A34A" : "#0EA5E9"));
+    const subMissed = !notDay && !dueNow && nextP && missed.length ? " · פוספס " + missed.map((m) => m.win.time).join(",") : "";
+    return <button key={z.id} className="tcard clk" disabled={!target} onClick={() => target && setRun({ zone: z, win: target })} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{z.cleanerName ? " · עבור " + z.cleanerName : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{oc} דיווחים</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
+  };
   return (<div className="worker-shell">
     <TopBar title="סבבי ניקיון" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} />
     <main className="content">
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> הסבב נרשם</div>}
-      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> לביצוע עכשיו ({todo.length})</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => setRun(z)}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}חלון {win.time} · {WIN_META[status].label}</div></div><ChevronLeft size={16} /></button>)}</div>}
-      {active.length === 0 ? <Empty text="לא הוגדרו זונות" Icon={Sparkles} sub="מנהל המערכת מגדיר זוני ניקיון" /> : <>
-        <SectionTitle><Sparkles size={15} /> הזונות שלי ({mine.length})</SectionTitle>
-        {mine.length === 0 ? <Empty text="אין זונות משויכים אליך" Icon={Sparkles} /> : <div className="cards">{mine.map(card)}</div>}
-        {others.length > 0 && <><SectionTitle><Sparkles size={15} /> זונות נוספים — כיסוי ({others.length})</SectionTitle><div className="cards">{others.map(card)}</div></>}
-        {doneToday.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowDone((v) => !v)}>{showDone ? "▾" : "▸"} בוצע היום ({doneToday.length})</button>{showDone && <div className="cards">{doneToday.map((r) => <div key={r.id} className="audit-row"><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}</div><div className="audit-meta">{r.doneCount}/{r.total} פריטים{r.isCover ? " · כיסוי" : ""}</div></div></div>)}</div>}</div>}
+      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> לביצוע עכשיו ({todo.length})</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => setRun({ zone: z, win })}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}חלון {win.time} · {WIN_META[status].label}</div></div><ChevronLeft size={16} /></button>)}</div>}
+      {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({myComplaints.length})</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+      {active.length === 0 ? <Empty text="לא הוגדרו אזורים" Icon={Sparkles} sub="מנהל המערכת מגדיר אזורי ניקיון" /> : <>
+        <SectionTitle><Sparkles size={15} /> האזורים שלי ({mine.length})</SectionTitle>
+        {mine.length === 0 ? <Empty text="אין אזורים משויכים אליך" Icon={Sparkles} /> : <div className="cards">{mine.map(card)}</div>}
+        {others.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowCover((v) => !v)}>{showCover ? "▾" : "▸"} כיסוי עמיתים ({others.length})</button>{showCover ? <div className="cards">{others.map((z) => card(z, true))}</div> : <div className="hint" style={{ marginInlineStart: 4 }}>מחליפים עמית היום? פִתחו כדי לבצע סבב באזור שלו — יירשם על שמכם ככיסוי.</div>}</div>}
+        {doneToday.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowDone((v) => !v)}>{showDone ? "▾" : "▸"} בוצע היום ({doneToday.length})</button>{showDone && <div className="cards">{doneToday.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{r.doneCount}/{r.total} פריטים{r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}{prob ? ` · ${r.issues.length} הערות` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div>}</div>}
       </>}
+      {myReports.length > 0 && <div style={{ marginTop: 6 }}><SectionTitle><AlertTriangle size={15} /> הדיווחים שלי ({myReports.length})</SectionTitle><div className="cards">{myReports.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></div>}
+      {(() => { const myAbs = (absences || []).filter((a) => a.userId === session.id && (a.to || a.from) >= todayKey()).sort((a, b) => (a.from > b.from ? 1 : -1)); return <div style={{ marginTop: 6 }}>
+        <button className="day-toggle" onClick={() => setShowAbs((v) => !v)}>{showAbs ? "▾" : "▸"} היעדרות מתוכננת{myAbs.length ? ` (${myAbs.length})` : ""}</button>
+        {showAbs && <div className="panel" style={{ marginTop: 6 }}>
+          <div className="hint" style={{ marginBottom: 8 }}>סמנו ימי היעדרות מראש. בימים אלה האזורים שלכם יסומנו לכיסוי והתראות «פוספס» לא יופנו אליכם.</div>
+          {myAbs.map((a) => <div key={a.id} className="reg-row" style={{ marginBottom: 6 }}><span style={{ flex: 1 }}>{fmtDate(new Date(a.from).getTime())}{(a.to && a.to !== a.from) ? " – " + fmtDate(new Date(a.to).getTime()) : ""}</span><button className="reg-del" onClick={() => delAbsence(a.id)}><Trash2 size={15} /></button></div>)}
+          <div className="field-row" style={{ marginTop: 6 }}><label className="field"><span>מתאריך</span><input type="date" value={absFrom} onChange={(e) => setAbsFrom(e.target.value)} /></label><label className="field"><span>עד תאריך (רשות)</span><input type="date" value={absTo} onChange={(e) => setAbsTo(e.target.value)} /></label></div>
+          <button className="btn-ghost sm" disabled={!absFrom || (absTo && absTo < absFrom)} onClick={() => { saveAbsence({ id: uid(), userId: session.id, name: session.name, from: absFrom, to: absTo || absFrom, at: Date.now() }); setAbsFrom(""); setAbsTo(""); }}><Plus size={14} /> הוספת היעדרות</button>
+        </div>}
+      </div>; })()}
     </main>
-    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run} session={session} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
+    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
+    {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
+    {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId), escalate: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId) }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onEscalate={(c) => { escalateComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
     {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={() => setShowNotif(false)} onGo={() => setShowNotif(false)} />}
   </div>);
 }
 
 function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, resolveComplaint }) {
-  const [rep, setRep] = useState(null), [showClosed, setShowClosed] = useState(false);
+  const [rep, setRep] = useState(null), [report, setReport] = useState(false), [showClosed, setShowClosed] = useState(false), [spec, setSpec] = useState(null), [cDetail, setCDetail] = useState(null);
   const mz = session.mgrZones || [];
   const myZones = useMemo(() => (zones || []).filter((z) => mz.includes(z.id)).sort(zoneSort), [zones, mz]);
   const open = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && c.status === "open").sort((a, b) => b.at - a.at), [complaints, mz]);
   const closed = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && (c.status === "resolved" || c.status === "rejected")).sort((a, b) => (b.resolvedAt || b.at) - (a.resolvedAt || a.at)), [complaints, mz]);
   const now = Date.now();
-  if (!mz.length) return <Empty text="לא שויכו זונות ניקיון למחלקתך" Icon={Sparkles} sub="מנהל המערכת משייך זונות בפרופיל שלך" />;
+  if (!mz.length) return <Empty text="לא שויכו אזורי ניקיון למחלקתך" Icon={Sparkles} sub="מנהל המערכת משייך אזורים בפרופיל שלך" />;
   return (<>
-    <div className="note" style={{ marginBottom: 12 }}>מצב הניקיון בזונות של מחלקתך. ניתן לדווח על בעיה — הדיווח מגיע אליך, לעובד הניקיון של הזון ולמנהל המערכת.</div>
-    <SectionTitle><Sparkles size={15} /> זונות מחלקתי ({myZones.length})</SectionTitle>
-    {myZones.length === 0 ? <Empty text="אין זונות פעילים" Icon={Sparkles} /> : <div className="cards">{myZones.map((z) => { const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div><div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}</div>}
-    {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({open.length})</SectionTitle><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onResolve={resolveComplaint} />)}</div></>}
-    {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} />)}</div>}</>}
+    <div className="note" style={{ marginBottom: 12 }}>מצב הניקיון באזורים של מחלקתך. ניתן לדווח על בעיה — הדיווח מגיע אליך, לעובד הניקיון של האזור ולמנהל המערכת.</div>
+    <button className="btn-primary full" style={{ marginBottom: 14 }} onClick={() => setReport(true)}><AlertTriangle size={15} /> דיווח על בעיה (סריקת QR)</button>
+    <SectionTitle><Sparkles size={15} /> אזורי מחלקתי ({myZones.length})</SectionTitle>
+    {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : <div className="cards">{myZones.map((z) => { const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}</div>}
+    {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({open.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>הקישו לצפייה בפרטים המלאים. דיווחי לכלוך נסגרים ע״י עובד הניקיון; דיווחים מעובד הניקיון בטיפול ההנהלה.</div><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+    {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
     {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={(c) => { fileComplaint(c); setRep(null); }} /></Overlay>}
+    {report && <Overlay onClose={() => setReport(false)}><ReportFlow zones={myZones} session={session} onSubmit={(c) => { fileComplaint(c); setReport(false); }} onClose={() => setReport(false)} /></Overlay>}
+    {spec && <Overlay onClose={() => setSpec(null)}><ZoneSpec zone={spec} onClose={() => setSpec(null)} /></Overlay>}
+    {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && cDetail.status === "open" }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
   </>);
 }
 
 function AssetsHub(p) {
+  const { assetNav } = p;
   const [t, setT] = useState("fleet");
+  useEffect(() => { if (assetNav?.tab) setT(assetNav.tab); }, [assetNav?._t]);
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 520, marginBottom: 14 }}><button className={t === "fleet" ? "on" : ""} onClick={() => setT("fleet")}>כלים ונהגים</button><button className={t === "insp" ? "on" : ""} onClick={() => setT("insp")}>בקרת כלים</button><button className={t === "pm" ? "on" : ""} onClick={() => setT("pm")}>לוח טיפולים</button></div>
-    {t === "insp" ? <InspectionsModule {...p} /> : t === "pm" ? <PMModule {...p} /> : <FleetModule {...p} />}
+    {t === "insp" ? <InspectionsModule {...p} /> : t === "pm" ? <PMModule {...p} /> : <FleetModule {...p} openFleetId={assetNav?.tab === "fleet" ? assetNav.fleetId : null} navT={assetNav?._t} />}
   </>);
 }
 function CleaningAnalytics({ zones, rounds, complaints }) {
@@ -2028,7 +2537,7 @@ function CleaningAnalytics({ zones, rounds, complaints }) {
     const byBuilding = {}; (complaints || []).filter((c) => c.at >= since && c.status !== "rejected").forEach((c) => { const z = active.find((x) => x.id === c.zoneId); const b = (z && z.building) || "ללא בניין"; byBuilding[b] = (byBuilding[b] || 0) + 1; });
     return { rows, totRounds, totComps, byBuilding, pct: totSched ? Math.round(totDone / totSched * 100) : null };
   }, [zones, rounds, complaints]);
-  if ((zones || []).filter((z) => z.active !== false).length === 0) return <Empty text="אין נתוני ניקיון" Icon={Sparkles} sub="הגדירו זונות והתחילו לבצע סבבים" />;
+  if ((zones || []).filter((z) => z.active !== false).length === 0) return <Empty text="אין נתוני ניקיון" Icon={Sparkles} sub="הגדירו אזורים והתחילו לבצע סבבים" />;
   const worst = data.rows.filter((r) => r.pct != null).sort((a, b) => a.pct - b.pct);
   const dirty = data.rows.filter((r) => r.comps > 0).sort((a, b) => b.comps - a.comps);
   const maxB = Math.max(1, ...Object.values(data.byBuilding));
@@ -2040,33 +2549,1456 @@ function CleaningAnalytics({ zones, rounds, complaints }) {
       <Kpi num={data.totRounds} label="סבבים בוצעו" color="#0EA5E9" />
       <Kpi num={data.totComps} label="דיווחים" color="#DC2626" />
     </div>
-    <SectionTitle><BarChart3 size={15} /> עמידה בחלונות לפי זון</SectionTitle>
+    <SectionTitle><BarChart3 size={15} /> עמידה בחלונות לפי אזור</SectionTitle>
     {worst.length === 0 ? <div className="note">אין עדיין חלונות שהסתיימו למדידה.</div> : <div className="cards" style={{ marginBottom: 6 }}>{worst.map((r) => <div key={r.z.id} className="ca-row"><div className="ca-row1"><span className="ca-name">{r.z.name}</span><span className="ca-pct" style={{ color: pctColor(r.pct) }}>{r.pct}%</span></div><div className="ca-bar"><span style={{ width: r.pct + "%", background: pctColor(r.pct) }} /></div><div className="ca-sub">{r.done}/{r.sched} חלונות · {r.onTime} בזמן{zoneLoc(r.z) ? " · " + zoneLoc(r.z) : ""}</div></div>)}</div>}
     {dirty.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הכי הרבה דיווחים</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{dirty.map((r) => <div key={r.z.id} className="tcard"><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{r.z.name}</span><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{r.comps} דיווחים</span></div><div className="tcard-sub">{zoneLoc(r.z) || "—"}</div></div></div>)}</div></>}
     {Object.keys(data.byBuilding).length > 0 && <><SectionTitle><Building2 size={15} /> דיווחים לפי בניין</SectionTitle><div className="cards">{Object.entries(data.byBuilding).sort((a, b) => b[1] - a[1]).map(([b, n]) => <div key={b} className="ca-row"><div className="ca-row1"><span className="ca-name">{b}</span><span className="ca-pct">{n}</span></div><div className="ca-bar"><span style={{ width: Math.round(n / maxB * 100) + "%", background: "#0EA5E9" }} /></div></div>)}</div></>}
   </>);
 }
 
-function InsightsHub({ tickets, fleet, pm, config, zones, rounds, complaints }) {
-  const [t, setT] = useState("perf");
+function ManageStats({ tasks, meetings, users }) {
+  const T = tasks || [], M = meetings || [];
+  const now = Date.now(), mo = now - 30 * 86400000;
+  const closed = T.filter((t) => t.status === "done" || t.status === "cancelled");
+  const openN = T.filter(taskOpen).length;
+  const overdueN = T.filter(taskOverdue).length;
+  const done30 = closed.filter((t) => (t.updatedAt || t.createdAt) >= mo).length;
+  const closeTimes = T.filter((t) => t.status === "done" && t.updatedAt && t.createdAt && t.updatedAt > t.createdAt).map((t) => (t.updatedAt - t.createdAt) / 86400000);
+  const avgClose = closeTimes.length ? Math.round((closeTimes.reduce((a, b) => a + b, 0) / closeTimes.length) * 10) / 10 : null;
+  const months = [];
+  const d0 = new Date(); d0.setDate(1); d0.setHours(0, 0, 0, 0);
+  for (let i = 5; i >= 0; i--) { const d = new Date(d0.getFullYear(), d0.getMonth() - i, 1); months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`, t: d.getTime(), end: new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() }); }
+  const byMonth = months.map((mm) => ({ ...mm, n: closed.filter((t) => { const at = t.updatedAt || t.createdAt; return at >= mm.t && at < mm.end; }).length }));
+  const maxMonth = Math.max(1, ...byMonth.map((x) => x.n));
+  const perResp = new Map();
+  T.filter((t) => t.status === "done").forEach((t) => { (t.responsibleIds || []).forEach((id) => perResp.set(id, (perResp.get(id) || 0) + 1)); });
+  const byResp = [...perResp.entries()].map(([id, n]) => ({ id, n, name: uName(id, users) })).sort((a, b) => b.n - a.n).slice(0, 8);
+  const maxResp = Math.max(1, ...byResp.map((x) => x.n));
+  const held = M.filter((m) => m.status === "done" && m.at >= mo).length;
+  const cancelledM = M.filter((m) => m.status === "cancelled" && m.at >= mo).length;
+  const plannedM = M.filter((m) => m.status === "planned" && m.at >= now).length;
   return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 14 }}><button className={t === "perf" ? "on" : ""} onClick={() => setT("perf")}>ביצועים</button><button className={t === "cleaning" ? "on" : ""} onClick={() => setT("cleaning")}>ניקיון</button><button className={t === "reports" ? "on" : ""} onClick={() => setT("reports")}>דיווחי עובדים</button></div>
-    {t === "reports" ? <WorkerReportsAnalytics tickets={tickets} dept={null} /> : t === "cleaning" ? <CleaningAnalytics zones={zones} rounds={rounds} complaints={complaints} /> : <Analytics tickets={tickets} fleet={fleet} pm={pm} config={config} />}
+    <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{openN}</span><span className="kpi-mini-l">מטלות פתוחות</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={overdueN ? { color: "#DC2626" } : {}}>{overdueN}</span><span className="kpi-mini-l">באיחור</span></div><div className="kpi-mini"><span className="kpi-mini-v">{done30}</span><span className="kpi-mini-l">הושלמו (30 ימים)</span></div><div className="kpi-mini"><span className="kpi-mini-v">{avgClose == null ? "—" : avgClose}</span><span className="kpi-mini-l">ימים לסגירה (ממוצע)</span></div></div>
+    <SectionTitle><BarChart3 size={15} /> מטלות שהושלמו לפי חודש</SectionTitle>
+    <div className="panel">{byMonth.map((mm) => <Bar key={mm.key} label={mm.label} value={mm.n} max={maxMonth} color="#16A34A" />)}</div>
+    <SectionTitle><Users size={15} /> הושלמו לפי אחראי</SectionTitle>
+    {byResp.length === 0 ? <div className="note">אין מטלות שהושלמו עדיין</div> : <div className="panel">{byResp.map((r) => <Bar key={r.id} label={r.name} value={r.n} max={maxResp} color="#2563EB" />)}</div>}
+    <SectionTitle><CalendarClock size={15} /> פגישות (30 ימים אחרונים)</SectionTitle>
+    <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{held}</span><span className="kpi-mini-l">התקיימו</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={cancelledM ? { color: "#DC2626" } : {}}>{cancelledM}</span><span className="kpi-mini-l">בוטלו</span></div><div className="kpi-mini"><span className="kpi-mini-v">{plannedM}</span><span className="kpi-mini-l">מתוכננות קדימה</span></div></div>
+    <div className="hint" style={{ marginTop: 8 }}>הנתונים לפי ההרשאות שלך. לדוח מפורט — «ייצוא ל-Excel» במסכי מטלות/פגישות.</div>
   </>);
 }
+function DamageReport({ tickets, fleet, config, saveTicket }) {
+  const [days, setDays] = useState(180);
+  const CLASSES = ["ללא ידע", "נזק טבעי", "רשלנות", "טעות אנוש"];
+  const since = Date.now() - days * 86400000;
+  const fleetOf = (t) => (fleet || []).find((f) => f.id === t.forkliftId) || {};
+  const rows = (tickets || []).filter((t) => t.track === "transport" && (t.createdAt || 0) >= since && (t.closure || t.downtimeStart || t.statusMs)).sort((a, b) => (b.downtimeStart || b.createdAt || 0) - (a.downtimeStart || a.createdAt || 0));
+  const fmtDur = (ms) => { if (!ms) return "—"; const d = ms / 86400000; if (d >= 1) return (Math.round(d * 10) / 10) + " ימים"; const h = ms / 3600000; if (h >= 1) return (Math.round(h * 10) / 10) + " שעות"; return Math.max(1, Math.round(ms / 60000)) + " ד׳"; };
+  const stName = (k) => k.startsWith("waiting:") ? ("המתנה · " + waitReasonLabel(k.slice(8), config)) : ((stOf(k) || {}).label || k);
+  const parts = (t) => Object.entries(t.statusMs || {}).filter(([k, v]) => v > 30000 && k !== "new" && k !== "done" && k !== "cancelled").sort((a, b) => b[1] - a[1]);
+  const totalDown = (t) => { const p = parts(t); if (p.length) return p.reduce((a, [, v]) => a + v, 0); return downtimeMs(t); };
+  const defDriver = (t) => { if (t.driverInvolved != null) return t.driverInvolved; const dr = fleetOf(t).drivers || {}; return (dr.morning && dr.morning.name) || (dr.night && dr.night.name) || ""; };
+  const causeOf = (t) => t.damageCause != null ? t.damageCause : ((t.closure && t.closure.costNote) || "");
+  const set = (t, patch) => saveTicket({ ...t, ...patch });
+  const txt = () => rows.map((t) => { const f = fleetOf(t); return [fmtDate(t.downtimeStart || t.createdAt), "כלי " + (f.code || t.asset || ""), f.type || "", t.subject || "", "נהג: " + (defDriver(t) || "—"), "סיווג: " + (t.damageClass || "—"), "₪" + (t.closure?.costAmount || 0), "השבתה: " + fmtDur(totalDown(t)), parts(t).map(([k, v]) => stName(k) + " " + fmtDur(v)).join(", ")].join(" | "); }).join("\n");
+  const copy = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt()); return; } } catch (e) {} try { const ta = document.getElementById("dmg-txt"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
+  const xlsx = () => { const r = rows.map((t) => { const f = fleetOf(t); return { "תאריך": fmtDate(t.downtimeStart || t.createdAt), "מס׳ כלי": f.code || t.asset || "", "סוג ציוד": f.type || "", "תיאור הנזק": t.subject || "", "תיאור האירוע": causeOf(t), "נהג מעורב": defDriver(t), "סיווג": t.damageClass || "", "עלות תיקון": (t.closure && t.closure.costAmount) || 0, "השבתה כוללת": fmtDur(totalDown(t)), "פירוט לפי סטטוס": parts(t).map(([k, v]) => `${stName(k)}: ${fmtDur(v)}`).join(" · ") }; }); if (!r.length) return; try { const ws = XLSX.utils.json_to_sheet(rowsSafe(r)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "נזקים"); downloadXlsx(wb, `damage_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {} };
+  const th = { textAlign: "start", padding: "6px 8px", fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", borderBottom: "1px solid var(--border)" };
+  const td = { padding: "6px 8px", fontSize: 13, borderBottom: "1px solid var(--border)", verticalAlign: "top" };
+  return (<div>
+    <div className="row-between" style={{ marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+      <SectionTitle><AlertTriangle size={15} /> דו״ח נזקים והשבתות (שינוע)</SectionTitle>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}><option value={30}>30 ימים</option><option value={90}>90 ימים</option><option value={180}>180 ימים</option><option value={365}>שנה</option></select>
+        <button className="btn-ghost sm" onClick={xlsx}><FileSpreadsheet size={15} /> Excel</button>
+      </div>
+    </div>
+    {rows.length === 0 ? <div className="note">אין אירועי שינוע בתקופה שנבחרה.</div> : <>
+    <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 920 }}>
+        <thead><tr><th style={th}>תאריך</th><th style={th}>מס׳ כלי</th><th style={th}>סוג</th><th style={th}>תיאור הנזק</th><th style={th}>נהג מעורב</th><th style={th}>סיווג האירוע</th><th style={th}>עלות</th><th style={th}>השבתה / פירוט</th><th style={th}>תיאור האירוע</th></tr></thead>
+        <tbody>{rows.map((t) => { const f = fleetOf(t); return <tr key={t.id}>
+          <td style={td}>{fmtDate(t.downtimeStart || t.createdAt)}</td>
+          <td style={{ ...td, fontWeight: 700 }}>{f.code || t.asset || "—"}</td>
+          <td style={td}>{f.type || "—"}</td>
+          <td style={{ ...td, maxWidth: 200 }}>{t.subject || t.description || "—"}</td>
+          <td style={td}><input value={defDriver(t)} onChange={(e) => set(t, { driverInvolved: e.target.value })} style={{ width: 110, fontSize: 12 }} /></td>
+          <td style={td}><select value={t.damageClass || ""} onChange={(e) => set(t, { damageClass: e.target.value })} style={{ fontSize: 12 }}><option value="">—</option>{CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
+          <td style={{ ...td, whiteSpace: "nowrap" }}>{t.closure ? ils(t.closure.costAmount || 0) : "—"}</td>
+          <td style={{ ...td, minWidth: 160 }}><b>{fmtDur(totalDown(t))}</b>{parts(t).length > 0 && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{parts(t).map(([k, v]) => `${stName(k)}: ${fmtDur(v)}`).join(" · ")}</div>}</td>
+          <td style={td}><input value={causeOf(t)} onChange={(e) => set(t, { damageCause: e.target.value })} placeholder="סיבת האירוע" style={{ width: 150, fontSize: 12 }} /></td>
+        </tr>; })}</tbody>
+      </table>
+    </div>
+    <div style={{ marginTop: 10 }}><div className="hint">טקסט להעתקה:</div><textarea id="dmg-txt" readOnly value={txt()} style={{ width: "100%", minHeight: 80, fontSize: 11, marginTop: 4, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 4 }} onClick={copy}>העתק טקסט</button></div>
+    </>}
+  </div>);
+}
+
+function BigudAnalytics({ ppe, items, users, config }) {
+  const _nd = new Date();
+  const [mY, setMY] = useState(_nd.getFullYear());
+  const [mM, setMM] = useState(_nd.getMonth());
+  const [mS, mE] = monthRange(mY, mM);
+  const mLabel = monthLabelOf(mY, mM);
+  const DAY = 86400000;
+  const uById = (id) => (users || []).find((u) => u.id === id);
+  const all = ppe || [];
+  const iss = all.filter((x) => ppeIsIssue(x) && x.at >= mS && x.at < mE);
+  const cnt = iss.length;
+  const companyCost = iss.reduce((s, x) => s + (x.unitCost || 0) * (x.qty || 1), 0);
+  const charged = iss.reduce((s, x) => s + (x.workerCharge || 0), 0);
+  const reasonBucket = (r) => { r = r || ""; if (/קבלן/.test(r)) return "קבלן — מלא"; if (/לפני תום|מוקדמת/.test(r)) return "לפני תום התקופה"; if (/לא הוחזר|הקודם|ללא החזרה/.test(r)) return "לא הוחזר הקודם"; return "אחר"; };
+  const byReason = {}; iss.filter((x) => (x.workerCharge || 0) > 0).forEach((x) => { const k = reasonBucket(x.chargeReason); byReason[k] = (byReason[k] || 0) + (x.workerCharge || 0); });
+  const reasonRows = Object.entries(byReason).sort((a, b) => b[1] - a[1]);
+  const itMap = {}; iss.forEach((x) => { itMap[x.itemId] = itMap[x.itemId] || { name: x.itemName, qty: 0 }; itMap[x.itemId].qty += (x.qty || 1); });
+  const top = Object.values(itMap).sort((a, b) => b.qty - a.qty).slice(0, 8); const topMax = Math.max(1, ...top.map((r) => r.qty));
+  const wMap = {}; iss.filter((x) => x.flagged).forEach((x) => { wMap[x.workerId] = wMap[x.workerId] || { name: x.workerName, no: x.workerNo, n: 0, sum: 0 }; wMap[x.workerId].n++; wMap[x.workerId].sum += (x.workerCharge || 0); });
+  const repeats = Object.values(wMap).sort((a, b) => b.sum - a.sum);
+  const paidMap = {}; iss.filter((x) => (x.workerCharge || 0) > 0).forEach((x) => { paidMap[x.itemId] = paidMap[x.itemId] || { name: x.itemName, n: 0, sum: 0 }; paidMap[x.itemId].n++; paidMap[x.itemId].sum += (x.workerCharge || 0); });
+  const paidItems = Object.values(paidMap).sort((a, b) => b.sum - a.sum);
+  let newN = 0, exN = 0, newCost = 0; iss.forEach((x) => { const w = uById(x.workerId); const isNew = w && w.createdAt && (x.at - w.createdAt) >= 0 && (x.at - w.createdAt) <= 14 * DAY; if (isNew) { newN++; newCost += (x.unitCost || 0) * (x.qty || 1); } else exN++; });
+  const cb = all.filter((x) => x.origin === "clawback" && x.at >= mS && x.at < mE);
+  const cbMap = {}; cb.forEach((x) => { cbMap[x.itemId] = cbMap[x.itemId] || { name: x.itemName, n: 0, sum: 0 }; cbMap[x.itemId].n++; cbMap[x.itemId].sum += (x.workerCharge || 0); });
+  const notReturned = Object.values(cbMap).sort((a, b) => b.sum - a.sum);
+  const dMap = {}; iss.forEach((x) => { const d = x.dept || "ללא מחלקה"; dMap[d] = dMap[d] || { name: d, cost: 0, n: 0 }; dMap[d].cost += (x.unitCost || 0) * (x.qty || 1); dMap[d].n++; });
+  const byDept = Object.values(dMap).sort((a, b) => b.cost - a.cost); const deptMax = Math.max(1, ...byDept.map((r) => r.cost));
+  const chargedRows = [...iss.filter((x) => (x.workerCharge || 0) > 0), ...cb.filter((x) => (x.workerCharge || 0) > 0)].sort((a, b) => (a.dept || "").localeCompare(b.dept || "") || (a.workerName || "").localeCompare(b.workerName || "") || a.at - b.at);
+  const contractors = chargedRows.filter((x) => x.employmentType === "contractor");
+  const direct = chargedRows.filter((x) => x.employmentType !== "contractor");
+  const finRows = (arr) => arr.map((x) => ({ "שם": x.workerName || "", "מספר": x.workerNo || "", "מחלקה": x.dept || "", "תאריך": fmtDate(x.at), "פריט": x.itemName + (x.size && x.size !== "אחיד" ? ` (${x.size})` : ""), "לניכוי (₪)": x.workerCharge || 0 }));
+  const exportFinance = () => { try { const wb = XLSX.utils.book_new(); const add = (arr, name) => { if (!arr.length) return; const ws = XLSX.utils.json_to_sheet(rowsSafe(finRows(arr))); ws["!cols"] = [{ wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 12 }]; XLSX.utils.book_append_sheet(wb, ws, name); }; add(contractors, "קבלנים"); add(direct, "ישירים"); if (!wb.SheetNames.length) return; downloadXlsx(wb, `ppe-finance_${mY}-${String(mM + 1).padStart(2, "0")}.xlsx`); } catch (e) {} };
+  const tdF = { padding: "4px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };
+  const card = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 12 };
+  const tile = { flex: "1 1 130px", padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10 };
+  return (<div>
+    <div className="row-between" style={{ marginBottom: 12, alignItems: "center" }}><SectionTitle><HardHat size={15} /> ביגוד עובדים — {mLabel}</SectionTitle><MonthPicker y={mY} m={mM} onChange={(Y, M) => { setMY(Y); setMM(M); }} /></div>
+    {cnt === 0 && cb.length === 0 ? <Empty text={"אין נתונים ל" + mLabel} Icon={HardHat} sub="בחרו חודש אחר עם הנפקות" /> : <>
+    <div style={card}><div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      <div style={tile}><div style={{ fontSize: 22, fontWeight: 800 }}>{cnt}</div><div className="hint">הנפקות</div></div>
+      <div style={tile}><div style={{ fontSize: 22, fontWeight: 800 }}>{ils(companyCost)}</div><div className="hint">עלות לחברה</div></div>
+      <div style={tile}><div style={{ fontSize: 22, fontWeight: 800, color: charged ? "#B45309" : "inherit" }}>{ils(charged)}</div><div className="hint">חויב מעובדים</div></div>
+    </div>{reasonRows.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>{reasonRows.map(([k, v]) => <span key={k} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: "#FEF3C7", color: "#92400E", fontWeight: 600 }}>{k}: {ils(v)}</span>)}</div>}</div>
+    {top.length > 0 && <div style={card}><SectionTitle>הנפקות לפי פריט</SectionTitle><div style={{ marginTop: 8 }}>{top.map((r, i) => <Bar key={i} label={r.name} value={r.qty} max={topMax} color="#0D9488" />)}</div></div>}
+    {byDept.length > 0 && <div style={card}><SectionTitle>עלות לפי מחלקה</SectionTitle><div style={{ marginTop: 8 }}>{byDept.map((r, i) => <Bar key={i} label={r.name + " · " + r.n + " הנפקות"} value={r.cost} max={deptMax} color="#2563EB" money />)}</div></div>}
+    <div style={card}><SectionTitle>עובדים חדשים מול קיימים</SectionTitle><div style={{ display: "flex", gap: 10, marginTop: 8 }}><div style={tile}><div style={{ fontSize: 20, fontWeight: 800 }}>{newN}</div><div className="hint">לעובדים חדשים (קליטה ≤14 ימים) · {ils(newCost)}</div></div><div style={tile}><div style={{ fontSize: 20, fontWeight: 800 }}>{exN}</div><div className="hint">לעובדים קיימים</div></div></div></div>
+    <div style={card}><SectionTitle>הנפקות חוזרות בחיוב (חריגות)</SectionTitle>{repeats.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין חריגות חיוב בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{repeats.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#B45309", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}{r.no ? " · מס׳ " + r.no : ""}</div><div className="task-row-sub">{r.n} הנפקות בחיוב</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: "#B45309" }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
+    <div style={card}><SectionTitle>פריטים שניתנו בתשלום</SectionTitle>{paidItems.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין פריטים בתשלום בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{paidItems.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#EA580C", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}</div><div className="task-row-sub">{r.n} הנפקות בתשלום</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700 }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
+    <div style={card}><SectionTitle>לא הוחזר בעזיבה</SectionTitle>{notReturned.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין פריטים שלא הוחזרו בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{notReturned.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#DC2626", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}</div><div className="task-row-sub">{r.n} לא הוחזרו</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: "#B45309" }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
+    <div style={card}><div className="row-between" style={{ marginBottom: 8 }}><SectionTitle>דוח חיובים לחשבות — {mLabel}</SectionTitle>{chargedRows.length > 0 && <button className="btn-ghost sm" onClick={exportFinance}><FileText size={14} /> ייצוא Excel</button>}</div>
+      {chargedRows.length === 0 ? <div className="hint">אין חיובים בחודש זה</div> : [["קבלנים", contractors], ["ישירים", direct]].map(([gname, arr]) => arr.length === 0 ? null : <div key={gname} style={{ marginBottom: 12 }}><div style={{ fontWeight: 800, marginBottom: 6 }}>{gname} · {arr.length} שורות · {ils(arr.reduce((s2, x) => s2 + (x.workerCharge || 0), 0))}</div><div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}><thead><tr>{["שם", "מספר", "מחלקה", "תאריך", "פריט", "לניכוי"].map((h) => <th key={h} style={{ textAlign: "start", padding: "4px 8px", borderBottom: "2px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead><tbody>{arr.map((x, i) => <tr key={i}><td style={tdF}>{x.workerName}</td><td style={tdF}>{x.workerNo || "—"}</td><td style={tdF}>{x.dept || "—"}</td><td style={tdF}>{fmtDate(x.at)}</td><td style={tdF}>{x.itemName}{x.size && x.size !== "אחיד" ? ` (${x.size})` : ""}</td><td style={{ ...tdF, fontWeight: 700, color: "#B45309" }}>{ils(x.workerCharge || 0)}</td></tr>)}</tbody></table></div></div>)}</div>
+    </>}
+    <div style={{ height: 24 }} />
+  </div>);
+}
+
+function InsightsHub({ tickets, fleet, pm, config, zones, rounds, complaints, onFilter, ctx, setCtx, tasks, meetings, users, saveTicket, ppe, ppeItems }) {
+  const [t, setT] = useState("perf");
+  return (<>
+    <div className="seg-tabs" style={{ maxWidth: 700, marginBottom: 14, flexWrap: "wrap" }}><button className={t === "perf" ? "on" : ""} onClick={() => setT("perf")}>ביצועים</button><button className={t === "bigud" ? "on" : ""} onClick={() => setT("bigud")}>ביגוד עובדים</button><button className={t === "damage" ? "on" : ""} onClick={() => setT("damage")}>נזקים</button><button className={t === "manage" ? "on" : ""} onClick={() => setT("manage")}>ניהול</button><button className={t === "cleaning" ? "on" : ""} onClick={() => setT("cleaning")}>בקרת ניקיון</button><button className={t === "reports" ? "on" : ""} onClick={() => setT("reports")}>דיווחי עובדים</button></div>
+    {t === "manage" ? <ManageStats tasks={tasks} meetings={meetings} users={users} /> : t === "reports" ? <WorkerReportsAnalytics tickets={tickets} dept={null} /> : t === "cleaning" ? <CleaningAnalytics zones={zones} rounds={rounds} complaints={complaints} /> : t === "damage" ? <DamageReport tickets={tickets} fleet={fleet} config={config} saveTicket={saveTicket} /> : t === "bigud" ? <BigudAnalytics ppe={ppe} items={ppeItems} users={users} config={config} /> : <Analytics tickets={tickets} fleet={fleet} pm={pm} config={config} onFilter={onFilter} ctx={ctx} setCtx={setCtx} />}
+  </>);
+}
+function PeoplePicker({ users, value, onChange, placeholder = "— בחרו אחראים —", me }) {
+  const [open, setOpen] = useState(false), [q, setQ] = useState("");
+  let pool = (users || []).filter((u) => u.active !== false && (u.role === "admin" || u.role === "user"));
+  if (me && !pool.some((u) => u.id === me)) { const self = (users || []).find((u) => u.id === me); if (self) pool = [self, ...pool]; }
+  pool = [...pool].sort((a, b) => (b.id === me) - (a.id === me));
+  const list = pool.filter((u) => !q.trim() || `${u.name} ${u.dept || ""}`.toLowerCase().includes(q.toLowerCase()));
+  const sel = (value || []);
+  const toggle = (id) => onChange(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
+  return (<>
+    <button type="button" className="unit-pick-btn" onClick={() => setOpen((o) => !o)}>{sel.length ? <span>{sel.map((id) => uName(id, users)).join(", ")}</span> : <span className="muted-txt">{placeholder}</span>}<ChevronLeft size={16} style={{ transform: open ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
+    {open && <div className="unit-pick">
+      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus placeholder="חיפוש לפי שם / מחלקה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="unit-pick-list">{list.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו אנשים</div> : list.map((u) => <button key={u.id} type="button" className={"unit-pick-row" + (sel.includes(u.id) ? " on" : "")} onClick={() => toggle(u.id)}>{sel.includes(u.id) ? <CheckCircle2 size={15} color="var(--primary)" style={{ flexShrink: 0 }} /> : <span className="ppk-box" />}<b style={{ marginInlineStart: 4 }}>{u.name}{u.id === me ? " (אני)" : ""}</b><span className="upr-desc">{u.role === "admin" ? "מנהל מערכת" : "מנהל מחלקה"}{u.dept ? ` · ${u.dept}` : ""}</span></button>)}</div>
+    </div>}
+  </>);
+}
+function TaskForm({ task, users, session, onCancel, onSave }) {
+  const [f, setF] = useState({ title: task.title || "", desc: task.desc || "", responsibleIds: task.responsibleIds || (task.id ? [] : [session.id]), priority: task.priority || "medium", status: task.status || "todo", mode: task.mode || "deadline", dueAt: task.dueAt || null, recur: task.recur || "weekly", nextActionAt: task.nextActionAt || null, category: task.category || "", locationText: task.locationText || "", waitingFor: task.waitingFor || "", isPrivate: !!task.isPrivate });
+  const [err, setErr] = useState("");
+  const [showMore, setShowMore] = useState(!!task.id);
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const save = () => {
+    if (!f.title.trim()) return setErr("נא להזין כותרת");
+    if (!f.responsibleIds.length) return setErr("נא לבחור לפחות אחראי אחד");
+    const now = Date.now();
+    const dueAt = (f.mode === "deadline" || f.mode === "recurring") ? f.dueAt : null;
+    onSave({ id: task.id || uid(), title: f.title.trim(), desc: f.desc.trim(), responsibleIds: f.responsibleIds, participantIds: task.participantIds || [], priority: f.priority, status: f.status, mode: f.mode, dueAt, recur: f.mode === "recurring" ? f.recur : null, nextActionAt: f.nextActionAt || null, category: f.category.trim(), locationText: (f.locationText || "").trim(), waitingFor: f.status === "waiting" ? f.waitingFor : "", isPrivate: f.isPrivate, meetingId: task.meetingId || null, linkedMeetingIds: task.linkedMeetingIds || [], origin: task.origin || "manual", ownerId: task.ownerId || session.id, createdBy: task.createdBy || { name: session.name, role: session.role }, createdAt: task.createdAt || now, updatedAt: now, log: task.log || [{ at: now, by: session.name, byRole: session.role, text: "המטלה נוצרה", kind: "open" }] });
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{task.id ? "עריכת מטלה" : "מטלה חדשה"}</div></div>
+    <div className="body">
+      <label className="field"><span>כותרת *</span><input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="מה צריך לעשות" /></label>
+      <div className="field"><span>אחראים *</span><PeoplePicker users={users} value={f.responsibleIds} onChange={(v) => set("responsibleIds", v)} me={session.id} /></div>
+      <div className="row2">
+        <label className="field"><span>עדיפות</span><select value={f.priority} onChange={(e) => set("priority", e.target.value)}>{PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
+        <label className="field"><span>תאריך יעד</span><input type="date" value={f.dueAt ? tsToDate(f.dueAt) : ""} onChange={(e) => set("dueAt", dateToTs(e.target.value))} disabled={f.mode === "permanent" || f.mode === "deferred"} /></label>
+      </div>
+      <button type="button" className="more-toggle" onClick={() => setShowMore((v) => !v)}>{showMore ? "− פחות פרטים" : "+ פרטים נוספים"}</button>
+      {showMore && <div className="more-fields">
+        <label className="field"><span>פירוט</span><textarea rows={3} value={f.desc} onChange={(e) => set("desc", e.target.value)} /></label>
+        <div className="row2">
+          <label className="field"><span>סטטוס</span><select value={f.status} onChange={(e) => set("status", e.target.value)}>{taskStatuses().map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></label>
+          <label className="field"><span>סוג מטלה</span><select value={f.mode} onChange={(e) => set("mode", e.target.value)}>{TASK_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></label>
+        </div>
+        {f.status === "waiting" && <label className="field"><span>ממתין למי / למה</span><input value={f.waitingFor} onChange={(e) => set("waitingFor", e.target.value)} placeholder="לדוגמה: ממתין לאישור תקציב מהמנכ״ל" /></label>}
+        {f.mode === "recurring" && <label className="field"><span>תדירות</span><select value={f.recur} onChange={(e) => set("recur", e.target.value)}><option value="weekly">שבועית</option><option value="monthly">חודשית</option><option value="quarterly">רבעונית</option></select></label>}
+        <label className="field"><span>תאריך מעקב / תזכורת הבאה</span><input type="date" value={f.nextActionAt ? tsToDate(f.nextActionAt) : ""} onChange={(e) => set("nextActionAt", dateToTs(e.target.value))} /><div className="hint">«מתי לחזור לבדוק» — נפרד מתאריך היעד הסופי.</div></label>
+        <label className="field"><span>קטגוריה / תחום</span><input value={f.category} onChange={(e) => set("category", e.target.value)} placeholder="לדוגמה: תקציב · ספקים · כ״א · בטיחות" /></label>
+        <label className="field"><span>הקשר / תיוג</span><input value={f.locationText} onChange={(e) => set("locationText", e.target.value)} placeholder="מיקום · מכשיר · נושא (לדוגמה: מחסן צפון · מלגזה 8FDF20 · בטיחות)" /></label>
+        <label className="chk-line"><input type="checkbox" checked={f.isPrivate} onChange={(e) => set("isPrivate", e.target.checked)} /> פרטית — רק אני רואה</label>
+      </div>}
+      {err && <div className="err">{err}</div>}
+      <button className="btn-primary full" onClick={save}>שמירה</button><div style={{ height: 24 }} />
+    </div></div>);
+}
+function TaskCard({ task, users, session, meetings, saveMeeting, onClose, onSave, onEdit, onDelete, onOpenMeeting }) {
+  const [note, setNote] = useState("");
+  const [linkOpen, setLinkOpen] = useState(false), [linkSel, setLinkSel] = useState("");
+  const st = tstOf(task.status), pr = prOf(task.priority);
+  const ownsMtg = (meetings || []).some((mm) => mm.ownerId === session.id && (mm.id === task.meetingId || (task.linkedMeetingIds || []).includes(mm.id)));
+  const canManage = session.role === "admin" || task.ownerId === session.id || (task.responsibleIds || []).includes(session.id) || ownsMtg;
+  const canDelete = session.role === "admin" || task.ownerId === session.id || ownsMtg;
+  const canComment = canManage || taskVisible(task, session, users);
+  const patch = async (changes, logText) => { const now = Date.now(); await onSave({ ...task, ...changes, updatedAt: now, log: [...(task.log || []), { at: now, by: session.name, byRole: session.role, text: logText, kind: "other" }] }); };
+  const setStatus = (s) => { if (s === task.status) return; patch({ status: s, waitingFor: s === "waiting" ? task.waitingFor : "" }, `סטטוס שונה ל«${tstOf(s).label}»`); };
+  const linkedIds = task.linkedMeetingIds || [];
+  const srcMtg = task.meetingId ? (meetings || []).find((x) => x.id === task.meetingId) : null;
+  const addOpts = (meetings || []).filter((mt) => mt.id !== task.meetingId && !linkedIds.includes(mt.id));
+  const linkAsTask = async (mid) => { const mt = (meetings || []).find((x) => x.id === mid); setLinkOpen(false); setLinkSel(""); await patch({ linkedMeetingIds: [...linkedIds, mid] }, `נוספה לסדר-היום של «${mt?.title || ""}» (כמשימה מקושרת)`); };
+  const linkAsTopic = async (mid) => { const mt = (meetings || []).find((x) => x.id === mid); setLinkOpen(false); setLinkSel(""); if (mt && saveMeeting) { const now = Date.now(); await saveMeeting({ ...mt, agenda: (mt.agenda ? mt.agenda + "\n" : "") + `• ${task.title}`, updatedAt: now, log: [...(mt.log || []), { at: now, by: session.name, byRole: session.role, text: `נושא לדיון מתוך מטלה: ${task.title}`, kind: "other" }] }); } await patch({}, `הוצגה כנושא לדיון בפגישה «${mt?.title || ""}»`); };
+  const removeLink = async (mid) => { const mt = (meetings || []).find((x) => x.id === mid); await patch({ linkedMeetingIds: linkedIds.filter((x) => x !== mid) }, `הוסר הקישור לפגישה «${mt?.title || ""}»`); };
+  const addNote = async () => { if (!note.trim()) return; await patch({}, note.trim()); setNote(""); };
+  const ovd = taskOverdue(task);
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">מטלה</div>{canManage && onEdit && <button className="icon-btn" onClick={onEdit} title="עריכה"><PenLine size={18} /></button>}</div>
+    <div className="body">
+      <h2 className="detail-subj">{task.title}</h2>
+      <div className="tk-chips" style={{ margin: "8px 0" }}><span className="badge sm" style={{ color: "#fff", background: st.color }}>{st.label}</span><span className="badge sm" style={{ color: pr.color, background: pr.bg }}>עדיפות {pr.label}</span>{ovd && <span className="badge sm ovd">באיחור</span>}<span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{taskModeLabel(task.mode)}</span>{task.isPrivate && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>פרטית</span>}</div>
+      {task.desc && <p className="detail-desc">{task.desc}</p>}
+      <div className="meta-grid">
+        <div className="meta-cell"><span className="meta-l">אחראים</span><span className="meta-v">{(task.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "—"}</span></div>
+        <div className="meta-cell"><span className="meta-l">נפתחה ע״י</span><span className="meta-v">{task.createdBy?.name || "—"}</span></div>
+        <div className="meta-cell"><span className="meta-l">מקור</span><span className="meta-v">{originLabel(task.origin)}</span></div>
+        {task.locationText && <div className="meta-cell"><span className="meta-l">הקשר</span><span className="meta-v"># {task.locationText}</span></div>}
+        {task.dueAt && <div className="meta-cell"><span className="meta-l">תאריך יעד</span><span className="meta-v" style={ovd ? { color: "#DC2626", fontWeight: 700 } : {}}>{fmtDate(task.dueAt)}</span></div>}
+        {task.nextActionAt && <div className="meta-cell"><span className="meta-l">מעקב הבא</span><span className="meta-v">{fmtDate(task.nextActionAt)}</span></div>}
+        {task.category && <div className="meta-cell"><span className="meta-l">תחום</span><span className="meta-v">{task.category}</span></div>}
+        {task.status === "waiting" && task.waitingFor && <div className="meta-cell"><span className="meta-l">ממתין ל</span><span className="meta-v">{task.waitingFor}</span></div>}
+      </div>
+      {canManage && taskOpen(task) && <div className="field" style={{ marginTop: 12 }}><span>שינוי סטטוס</span><div className="seg-tabs s3" style={{ flexWrap: "wrap" }}>{taskStatuses().map((s) => <button key={s.id} className={task.status === s.id ? "on" : ""} onClick={() => setStatus(s.id)} style={task.status === s.id ? { background: s.color, borderColor: s.color, color: "#fff" } : {}}>{s.label}</button>)}</div></div>}
+      {(srcMtg || linkedIds.length > 0 || (canManage && (meetings || []).length > 0)) && <><SectionTitle><CalendarClock size={14} /> פגישות מקושרות</SectionTitle>
+        <div className="link-chips">{srcMtg && <span className="mlink src clk" title="פתיחת פגישת המקור" role="button" onClick={() => onOpenMeeting && onOpenMeeting(srcMtg.id)}>מקור: {srcMtg.title}</span>}{linkedIds.map((id) => { const mt = (meetings || []).find((x) => x.id === id); return <span key={id} className="mlink clk" role="button" onClick={() => onOpenMeeting && mt && onOpenMeeting(mt.id)}>{mt?.title || "פגישה"}{canManage && <button className="mlink-x" aria-label="הסרה" onClick={(e) => { e.stopPropagation(); removeLink(id); }}>×</button>}</span>; })}{!srcMtg && linkedIds.length === 0 && <span className="hint">לא מקושרת לפגישה</span>}</div>
+        {canManage && addOpts.length > 0 && (linkOpen ? <div className="link-panel"><select value={linkSel} onChange={(e) => setLinkSel(e.target.value)}><option value="">— בחרו פגישה —</option>{addOpts.map((mt) => <option key={mt.id} value={mt.id}>{mt.title} · {fmtDate(mt.at)}</option>)}</select><div className="hint">איך להוסיף את המטלה לפגישה שנבחרה?</div><div className="row2"><button className="btn-ghost" disabled={!linkSel} onClick={() => linkAsTask(linkSel)}>כמשימה מקושרת</button><button className="btn-ghost" disabled={!linkSel} onClick={() => linkAsTopic(linkSel)}>כנושא לדיון</button></div><button type="button" className="more-toggle" onClick={() => { setLinkOpen(false); setLinkSel(""); }}>ביטול</button></div> : <button className="btn-ghost sm" style={{ marginTop: 6 }} onClick={() => setLinkOpen(true)}><Plus size={14} /> הוסף לפגישה נוספת</button>)}
+      </>}
+      <SectionTitle><Clock size={14} /> יומן ופעילות</SectionTitle>
+      <div className="timeline">{[...(task.log || [])].sort((a, b) => b.at - a.at).map((l, i) => <div key={i} className="tl-item"><div className="tl-dot" style={{ background: "var(--primary)" }} /><div className="tl-body"><div className="tl-text">{l.text}</div><div className="tl-meta">{l.by} · {fmtDate(l.at)} {fmtTime(l.at)}</div></div></div>)}</div>
+      {canComment && <div className="cmt-box"><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="הוסיפו הערה / עדכון…" onKeyDown={(e) => { if (e.key === "Enter") addNote(); }} /><button className="btn-ghost sm" onClick={addNote}><Plus size={14} /> הוסף</button></div>}
+      {canDelete && onDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} label="מחיקת מטלה" onConfirm={onDelete} />}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+function AIExtractView({ users, session, meetings, onCancel, onImport }) {
+  const [text, setText] = useState(""), [loading, setLoading] = useState(false), [err, setErr] = useState(""), [result, setResult] = useState(null), [mtgId, setMtgId] = useState("");
+  const names = (users || []).filter((u) => u.active !== false && (u.role === "admin" || u.role === "user")).map((u) => u.name);
+  const analyze = async () => {
+    if (!text.trim()) return setErr("הדביקו טקסט של סיכום פגישה");
+    setLoading(true); setErr("");
+    const today = tsToDate(Date.now());
+    const sys = `אתה עוזר שמחלץ משימות מסיכום פגישה בעברית. החזר אך ורק JSON תקין — מערך אובייקטים, ללא טקסט נוסף וללא code fences. כל אובייקט: {"title": string, "responsible": string, "due": string, "priority": "high"|"medium"|"low", "category": string, "desc": string}. «responsible» = שם אדם אם הוזכר אחרת ריק. «due» = תאריך YYYY-MM-DD אחרת ריק; היום ${today} — חשב תאריכים יחסיים. אם אין משימות החזר []. שמות אפשריים במערכת: ${names.join(", ") || "—"}.`;
+    try {
+      const raw = await callClaude([{ role: "user", content: text.trim() }], sys, 1500);
+      const arr = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      if (!Array.isArray(arr)) throw new Error("format");
+      setResult(arr); setErr("");
+    } catch (e) { setErr("לא הצלחתי לנתח את הטקסט. נסו שוב, או השתמשו בייבוא מ-Excel. (ייתכן שאין חיבור לרשת)"); }
+    setLoading(false);
+  };
+  const preview = (result || []).map((r) => {
+    const respRaw = String(r.responsible || "").split(/[,;\/]/).map((x) => x.trim()).filter(Boolean);
+    const matched = respRaw.map((nm) => ({ nm, id: matchUserByName(nm, users) }));
+    return { title: String(r.title || "").trim(), matched, unmatched: matched.filter((m) => !m.id).map((m) => m.nm), due: r.due ? XL_DATE(r.due) : null, priority: XL_PRIO(r.priority), category: String(r.category || "").trim(), desc: String(r.desc || "").trim() };
+  }).filter((p) => p.title);
+  const unmatchedAll = [...new Set(preview.flatMap((p) => p.unmatched))];
+  const doImport = () => {
+    if (!preview.length) return setErr("אין מטלות ליצירה");
+    const now = Date.now();
+    const tasks = preview.map((p, i) => { const ids = p.matched.map((m) => m.id).filter(Boolean); return { id: uid(), title: p.title, desc: p.desc, responsibleIds: ids.length ? ids : [session.id], participantIds: [], priority: p.priority, status: "todo", mode: p.due ? "deadline" : "deferred", dueAt: p.due, recur: null, nextActionAt: null, category: p.category, waitingFor: "", isPrivate: false, meetingId: mtgId || null, linkedMeetingIds: [], origin: "ai", ownerId: session.id, createdBy: { name: session.name, role: session.role }, createdAt: now + i, updatedAt: now + i, log: [{ at: now, by: session.name, byRole: session.role, text: "נוצרה מניתוח AI של סיכום פגישה", kind: "open" }] }; });
+    onImport(tasks);
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title"><Sparkles size={18} /> ניתוח סיכום פגישה</div></div>
+    <div className="body">
+      {!result ? <>
+        <div className="note">הדביקו טקסט חופשי של סיכום/פרוטוקול פגישה — Claude יזהה מטלות, אחראים, תאריכים ועדיפויות. תוצג תצוגה מקדימה לאישור לפני שנוצר משהו.</div>
+        <textarea rows={9} value={text} onChange={(e) => setText(e.target.value)} placeholder="לדוגמה: דנו בתקציב Q3. דוד יכין הצעת מחיר עד יום חמישי. רונית אחראית על הדרכת נהגים — עדיפות גבוהה. לבדוק חוזה ספק עד סוף החודש." style={{ marginTop: 10 }} />
+        {err && <div className="err">{err}</div>}
+        <button className="btn-primary full" style={{ marginTop: 12, justifyContent: "center" }} disabled={loading} onClick={analyze}>{loading ? "מנתח…" : <><Sparkles size={16} /> נתח עם AI</>}</button>
+      </> : <>
+        {meetings && meetings.length > 0 && <label className="field"><span>קשרו לפגישה (לא חובה)</span><select value={mtgId} onChange={(e) => setMtgId(e.target.value)}><option value="">— ללא —</option>{meetings.map((m) => <option key={m.id} value={m.id}>{m.title} · {fmtDate(m.at)}</option>)}</select></label>}
+        <SectionTitle>תצוגה מקדימה ({preview.length} מטלות)</SectionTitle>
+        {preview.length === 0 ? <div className="note">לא זוהו מטלות בטקסט.</div> : <>
+          {unmatchedAll.length > 0 && <div className="note" style={{ borderColor: "#FCD34D" }}>שמות שלא זוהו ({unmatchedAll.join(", ")}) — ישויכו אליך.</div>}
+          <div className="imp-prev">{preview.map((p, i) => <div key={i} className="imp-row"><div className="imp-t">{p.title}</div><div className="imp-meta">{p.matched.map((m) => m.id ? uName(m.id, users) : `⚠ ${m.nm}`).join(", ") || "— אליי"}{p.due ? ` · יעד ${fmtDate(p.due)}` : ""} · {prOf(p.priority).label}{p.category ? ` · ${p.category}` : ""}</div></div>)}</div>
+        </>}
+        {err && <div className="err">{err}</div>}
+        <div className="row2" style={{ marginTop: 12 }}><button className="btn-ghost" onClick={() => { setResult(null); setErr(""); }}>חזרה לעריכה</button><button className="btn-primary" disabled={!preview.length} onClick={doImport}><Check size={16} /> צור {preview.length} מטלות</button></div>
+      </>}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+function TaskImportWizard({ users, session, meetings, existing, defaultMeetingId, onCancel, onImport }) {
+  const [stage, setStage] = useState("pick");
+  const [sheets, setSheets] = useState({}), [sheetName, setSheetName] = useState(""), [rows, setRows] = useState([]), [headers, setHeaders] = useState([]), [map, setMap] = useState({}), [mtgId, setMtgId] = useState(defaultMeetingId || ""), [mode, setMode] = useState("create"), [err, setErr] = useState("");
+  const pickSheet = (name, allSheets) => { const aoa = (allSheets || sheets)[name] || []; const { headers: hdr, rows: rws } = aoaToRows(aoa); setSheetName(name); setHeaders(hdr); setRows(rws); setMap({ title: detectCol("title", hdr), responsible: detectCol("responsible", hdr), due: detectCol("due", hdr), priority: detectCol("priority", hdr), status: detectCol("status", hdr), category: detectCol("category", hdr), desc: detectCol("desc", hdr), note: detectCol("note", hdr) }); };
+  const onFile = (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const rd = new FileReader();
+    rd.onload = (ev) => { try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), { type: "array", cellDates: true });
+      const all = {}; wb.SheetNames.forEach((n) => { all[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "" }); });
+      if (!wb.SheetNames.length) { setErr("הקובץ ריק"); return; }
+      const named = wb.SheetNames.find((n) => /סטטוס|סטאטוס|status|משימ|מטל/i.test(n));
+      const best = named || wb.SheetNames.map((n) => { const { rows: r } = aoaToRows(all[n]); return { n, score: r.length }; }).sort((a, b) => b.score - a.score)[0].n;
+      setSheets(all); pickSheet(best, all); setStage("map"); setErr("");
+    } catch (x) { setErr("שגיאה בקריאת הקובץ. ודאו שזה Excel/CSV תקין."); } };
+    rd.readAsArrayBuffer(file);
+  };
+  // TODO (дедуп на будущее): считать дублем только при совпадении статуса — закрытая и открытая задача с одним названием НЕ дубль.
+  const preview = useMemo(() => {
+    const anchorCol = headers.find((h) => /תאריך/.test(h) && !/יעד/.test(h)) || "";
+    return rows.map((r) => {
+      const title = String(r[map.title] || "").trim();
+      const respRaw = String(r[map.responsible] || "").split(/[,;\/]/).map((x) => x.trim()).filter(Boolean);
+      const matched = respRaw.map((nm) => ({ nm, id: matchUserByName(nm, users) }));
+      const due = map.due ? XL_DUE(r[map.due]) : { mode: "deferred", dueAt: null };
+      const noteV = map.note ? String(r[map.note] || "").trim() : "";
+      const descV = map.desc ? String(r[map.desc] || "").trim() : "";
+      const aDate = anchorCol ? XL_DATE(r[anchorCol]) : null;
+      const hist = parseHistory(descV, aDate ? new Date(aDate).getFullYear() : new Date().getFullYear());
+      const lead = hist.entries.length ? hist.lead : descV;
+      const status = map.status ? XL_STATUS(r[map.status]) : "todo";
+      let action = "new", delta = "", existId = null, newHist = hist.entries, statusChanged = false;
+      if (mode === "update") {
+        const ex = (existing || []).find((e) => normTitle(e.title) === normTitle(title) && (!mtgId || e.meetingId === mtgId || (e.linkedMeetingIds || []).includes(mtgId)));
+        if (ex) {
+          existId = ex.id;
+          const days = new Set((ex.log || []).filter((l) => l.kind === "history").map((l) => fmtDate(l.at)));
+          newHist = hist.entries.filter((e) => !days.has(fmtDate(e.at)));
+          statusChanged = !!map.status && status !== ex.status;
+          if (!newHist.length && !statusChanged) { action = "nochange"; delta = "ללא שינוי"; }
+          else { action = "update"; const parts = []; if (newHist.length) parts.push(`+${newHist.length} עדכונים`); if (statusChanged) parts.push(`סטטוס→${tstOf(status).label}`); delta = parts.join(" · "); }
+        }
+      }
+      return { title, matched, unmatched: matched.filter((m) => !m.id).map((m) => m.nm), due, priority: due.urgent ? "high" : (map.priority ? XL_PRIO(r[map.priority]) : "medium"), status, category: map.category ? String(r[map.category] || "").trim() : "", desc: [lead, noteV ? "הערה: " + noteV : ""].filter(Boolean).join("\n"), history: hist.entries, createdAt: aDate || null, action, delta, existId, newHist, statusChanged };
+    }).filter((p) => p.title);
+  }, [rows, map, users, headers, mode, existing, mtgId]);
+  const unmatchedAll = [...new Set(preview.flatMap((p) => p.unmatched))];
+  const newN = preview.filter((p) => p.action === "new").length, updN = preview.filter((p) => p.action === "update").length, noChN = preview.filter((p) => p.action === "nochange").length;
+  const toImport = preview.filter((p) => p.action !== "nochange");
+  const newTaskOf = (p, i) => { const now = Date.now(); const ids = p.matched.map((m) => m.id).filter(Boolean); const created = p.createdAt || (now + i); const hlog = (p.history || []).map((e) => ({ at: e.at, by: session.name, byRole: session.role, text: e.text, kind: "history" })).sort((a, b) => a.at - b.at); return { id: uid(), title: p.title, desc: p.desc, responsibleIds: ids.length ? ids : [session.id], participantIds: [], priority: p.priority, status: p.status, mode: p.due.mode, dueAt: p.due.dueAt, recur: null, nextActionAt: null, category: p.category, waitingFor: "", isPrivate: false, meetingId: mtgId || null, linkedMeetingIds: [], origin: mtgId ? "boss_excel" : "excel", ownerId: session.id, createdBy: { name: session.name, role: session.role }, createdAt: created, updatedAt: now + i, log: [{ at: created, by: session.name, byRole: session.role, text: "יובאה מ-Excel" + (sheetName ? ` (גיליון: ${sheetName})` : ""), kind: "open" }, ...hlog] }; };
+  const doImport = () => {
+    if (!map.title) return setErr("בחרו עמודת «כותרת»");
+    if (!toImport.length) return setErr("אין שינויים לייבוא");
+    const now = Date.now();
+    const out = toImport.map((p, i) => {
+      if (mode === "update" && p.action === "update" && p.existId) {
+        const ex = (existing || []).find((e) => e.id === p.existId); if (!ex) return newTaskOf(p, i);
+        const hlog = (p.newHist || []).map((e) => ({ at: e.at, by: session.name, byRole: session.role, text: e.text, kind: "history" }));
+        const log = [...(ex.log || []), ...hlog, { at: now, by: session.name, byRole: session.role, text: "עודכן מ-Excel" + (sheetName ? ` (${sheetName})` : ""), kind: "other" }].sort((a, b) => a.at - b.at);
+        return { ...ex, status: p.statusChanged ? p.status : ex.status, updatedAt: now, log };
+      }
+      return newTaskOf(p, i);
+    });
+    onImport(out);
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">ייבוא מטלות מ-Excel</div></div>
+    <div className="body">
+      {stage === "pick" ? <>
+        <div className="note">בחרו קובץ Excel/CSV (למשל סיכום פגישה). המערכת תזהה אוטומטית את שורת הכותרות ואת העמודות — גם אם יש שורות כותרת מעל. תוצג תצוגה מקדימה לאישור, וכפילויות יסומנו.</div>
+        <label className="btn-primary full" style={{ marginTop: 14, cursor: "pointer", justifyContent: "center" }}><FileSpreadsheet size={16} /> בחירת קובץ<input type="file" accept=".xlsx,.xls,.csv" onChange={onFile} style={{ display: "none" }} /></label>
+        {err && <div className="err">{err}</div>}
+      </> : <>
+        {Object.keys(sheets).length > 1 && <label className="field"><span>גיליון</span><select value={sheetName} onChange={(e) => pickSheet(e.target.value)}>{Object.keys(sheets).map((n) => <option key={n} value={n}>{n}</option>)}</select></label>}
+        <div className="hint">זוהו {rows.length} שורות בגיליון «{sheetName}». התאימו עמודות במידת הצורך:</div>
+        <div className="imp-map">{[["title", "כותרת *"], ["responsible", "אחראים"], ["due", "תאריך יעד"], ["status", "סטטוס"], ["priority", "עדיפות"], ["category", "קטגוריה"], ["desc", "פירוט"], ["note", "הערה"]].map(([k, lbl]) => <label key={k} className="flt-field"><span className="flt-lbl">{lbl}</span><select value={map[k] || ""} onChange={(e) => setMap((mm) => ({ ...mm, [k]: e.target.value }))}><option value="">—</option>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</select></label>)}</div>
+        {meetings && meetings.length > 0 && <label className="field"><span>קשרו לפגישה (לא חובה)</span><select value={mtgId} onChange={(e) => setMtgId(e.target.value)}><option value="">— ללא —</option>{meetings.map((m) => <option key={m.id} value={m.id}>{m.title} · {fmtDate(m.at)}</option>)}</select></label>}
+        <div className="field"><span>מצב ייבוא</span><div className="seg-tabs s2"><button className={mode === "create" ? "on" : ""} onClick={() => setMode("create")}>צור חדשות</button><button className={mode === "update" ? "on" : ""} onClick={() => setMode("update")}>עדכן קיימות + הוסף</button></div><div className="hint">{mode === "update" ? "מטלות עם אותו שם (באותה פגישה) יעודכנו — יתווספו עדכוני היסטוריה חדשים וסטטוס, בלי לשכפל." : "כל השורות ייווצרו כמטלות חדשות."}</div></div>
+        <SectionTitle>תצוגה מקדימה{mode === "update" ? ` · ${newN} חדשות · ${updN} עדכון · ${noChN} ללא שינוי` : ` (${toImport.length} מטלות)`}</SectionTitle>
+        {unmatchedAll.length > 0 && <div className="note" style={{ borderColor: "#FCD34D" }}>שמות אחראים שלא זוהו ({unmatchedAll.join(", ")}) — ישויכו אליך.</div>}
+        <div className="imp-prev">{preview.slice(0, 40).map((p, i) => <div key={i} className="imp-row" style={p.action === "nochange" ? { opacity: 0.5 } : {}}><div className="imp-t">{mode === "update" && <span className={"act-tag " + p.action}>{p.action === "new" ? "חדשה" : p.action === "update" ? "עדכון" : "ללא שינוי"}</span>}{p.title}</div><div className="imp-meta">{mode === "update" && p.delta ? p.delta : `${p.matched.map((m) => m.id ? uName(m.id, users) : `⚠ ${m.nm}`).join(", ") || "— אליי"} · ${tstOf(p.status).label} · ${p.due.mode === "deadline" ? "יעד " + fmtDate(p.due.dueAt) : p.due.mode === "permanent" ? "שוטפת" : "ללא תאריך"}`}</div></div>)}{preview.length > 40 && <div className="hint">…ועוד {preview.length - 40}</div>}</div>
+        {err && <div className="err">{err}</div>}
+        <button className="btn-primary full" style={{ marginTop: 14 }} onClick={doImport}><Check size={16} /> {mode === "update" ? `אישור · ${newN} חדשות + ${updN} עדכונים` : `אישור וייבוא ${toImport.length} מטלות`}</button>
+      </>}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+function TasksModule(p) {
+  const { tasks, users, session, saveTask, delTask, meetings, saveMeeting, delMeeting } = p;
+  const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [imp, setImp] = useState(false), [ai, setAi] = useState(false), [openMeetingId, setOpenMeetingId] = useState(null);
+  const [st, setSt] = useState("open"), [who, setWho] = useState("all"), [pr, setPr] = useState("all"), [q, setQ] = useState(""), [grp, setGrp] = useState("status"), [coll, setColl] = useState({}), [quick, setQuick] = useState("all"), [moreOpen, setMoreOpen] = useState(false), [tagFilter, setTagFilter] = useState("");
+  const isAdmin = session.role === "admin";
+  const scope = (tasks || []).filter((t) => taskVisible(t, session, users) && (!t.isPrivate || t.ownerId === session.id));
+  const rows = scope.filter((t) => {
+    if (quick === "done") { if (!(t.status === "done" || t.status === "cancelled")) return false; }
+    else {
+      if (st === "open" && !taskOpen(t)) return false;
+      if (st === "done" && t.status !== "done") return false;
+      if (st !== "open" && st !== "done" && st !== "all" && t.status !== st) return false;
+    }
+    if (who !== "all" && !(t.responsibleIds || []).includes(who)) return false;
+    if (pr !== "all" && (PRIO_ALIAS[t.priority] || t.priority) !== pr) return false;
+    if (q.trim() && !`${t.title} ${t.desc || ""} ${t.category || ""} ${t.locationText || ""}`.toLowerCase().includes(q.toLowerCase())) return false;
+    if (tagFilter && (t.locationText || "") !== tagFilter) return false;
+    if (quick === "overdue" && !taskOverdue(t)) return false;
+    if (quick === "waiting" && t.status !== "waiting") return false;
+    if (quick === "mine" && !(t.responsibleIds || []).includes(session.id)) return false;
+    if (quick === "today") { const d = new Date(); const s0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); if (!t.dueAt || t.dueAt < s0 || t.dueAt >= s0 + 864e5) return false; }
+    if (quick === "week") { const d = new Date(); const s0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); if (!t.dueAt || t.dueAt < s0 || t.dueAt >= s0 + 7 * 864e5) return false; }
+    return true;
+  }).sort((a, b) => quick === "done" ? ((b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)) : ((taskOverdue(b) - taskOverdue(a)) || ((PRANK[PRIO_ALIAS[a.priority] || a.priority] ?? 1) - (PRANK[PRIO_ALIAS[b.priority] || b.priority] ?? 1)) || ((a.dueAt || 9e15) - (b.dueAt || 9e15)) || (b.createdAt - a.createdAt)));
+  const mtgOf = (id) => (meetings || []).find((m) => m.id === id);
+  const dueLabel = (t) => t.mode === "permanent" ? "שוטפת" : t.mode === "deferred" ? "ללא תאריך" : (t.dueAt ? fmtDate(t.dueAt) : "—");
+  const owners = [...new Set(scope.flatMap((t) => t.responsibleIds || []))];
+  const taskRow = (t) => { const s = tstOf(t.status), ovd = taskOverdue(t), mtg = mtgOf(t.meetingId), pri = prOf(t.priority), resp = (t.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "—"; return <button key={t.id} className={"task-row" + (ovd ? " ovd" : "")} onClick={() => setOpenId(t.id)} style={{ borderInlineStartColor: s.color }}>
+    <span className="tr-pri" style={{ background: pri.color }} title={"עדיפות " + pri.label} />
+    <div className="task-row-main"><div className="task-row-t">{t.title}</div>{t.desc && <div className="task-row-desc">{t.desc.split("\n")[0]}</div>}<div className="task-row-sub"><span className="tr-to">ל: {resp}</span>{t.ownerId && t.ownerId !== (t.responsibleIds || [])[0] && <span>· מאת {uName(t.ownerId, users)}</span>}{mtg && <span className="tr-mtg"><CalendarClock size={10} /> {mtg.title}</span>}{t.locationText && <span className="tr-loc" role="button" title="סינון לפי הקשר" onClick={(e) => { e.stopPropagation(); setTagFilter(t.locationText); }}># {t.locationText}</span>}{t.category && <span className="tr-cat">{t.category}</span>}{t.status === "waiting" && t.waitingFor && <span className="tr-wait">⏳ {t.waitingFor}</span>}</div></div>
+    <div className="task-row-side"><span className="badge sm" style={{ color: "#fff", background: s.color }}>{s.label}</span><span className="task-due" style={ovd ? { color: "#DC2626", fontWeight: 700 } : {}}>{dueLabel(t)}</span></div>
+  </button>; };
+  const grpKey = (t) => grp === "status" ? tstOf(t.status).label : grp === "to" ? ((t.responsibleIds || []).map((id) => uName(id, users))[0] || "ללא אחראי") : grp === "from" ? uName(t.ownerId, users) : grp === "meeting" ? (mtgOf(t.meetingId)?.title || "ללא פגישה") : prOf(t.priority).label;
+  const groups = (() => { if (grp === "none") return null; const m = new Map(); rows.forEach((t) => { const k = grpKey(t); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }); if (grp === "status") { const ord = taskStatuses().map((s) => s.label); return [...m.entries()].sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0])); } if (grp === "priority") { const ord = PRIORITIES.map((x) => x.label); return [...m.entries()].sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0])); } return [...m.entries()].sort((a, b) => b[1].length - a[1].length); })();
+  const overdueN = scope.filter(taskOverdue).length, openN = scope.filter(taskOpen).length;
+  const moAgo = Date.now() - 30 * 86400000;
+  const doneTotal = scope.filter((t) => t.status === "done" || t.status === "cancelled").length;
+  const doneMonth = scope.filter((t) => (t.status === "done" || t.status === "cancelled") && (t.updatedAt || t.createdAt) >= moAgo).length;
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> מטלות {isAdmin ? "" : "שלי"} · {openN} פתוחות{overdueN ? ` · ${overdueN} באיחור` : ""}</SectionTitle><div className="hdr-btns"><div className="more-wrap"><button className="btn-ghost sm" aria-label="עוד פעולות" onClick={() => setMoreOpen((v) => !v)}><SlidersHorizontal size={14} /> עוד</button>{moreOpen && <><div className="more-back" onClick={() => setMoreOpen(false)} /><div className="more-menu"><button onClick={() => { setMoreOpen(false); setAi(true); }}><Sparkles size={14} /> ניתוח פגישה (AI)</button><button onClick={() => { setMoreOpen(false); setImp(true); }}><FileSpreadsheet size={14} /> ייבוא מ-Excel</button><button onClick={() => { setMoreOpen(false); exportTasksXlsx(rows, users); }}><FileSpreadsheet size={14} /> ייצוא ל-Excel</button></div></>}</div><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> מטלה</button></div></div>
+    <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש מטלה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{openN}</span><span className="kpi-mini-l">פתוחות</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={overdueN ? { color: "#DC2626" } : {}}>{overdueN}</span><span className="kpi-mini-l">באיחור</span></div><div className="kpi-mini"><span className="kpi-mini-v">{doneMonth}</span><span className="kpi-mini-l">הושלמו (30 ימים)</span></div><div className="kpi-mini"><span className="kpi-mini-v">{doneTotal}</span><span className="kpi-mini-l">הושלמו סה״כ</span></div></div>
+    <div className="qchips">{[["all", "הכל"], ["mine", "שלי"], ["overdue", "באיחור"], ["today", "היום"], ["week", "השבוע"], ["waiting", "ממתין"], ["done", "הושלמו"]].map(([id, lbl]) => <button key={id} className={"qchip" + (quick === id ? " on" : "") + (id === "overdue" ? " danger" : "")} onClick={() => setQuick(id)}>{lbl}</button>)}</div>
+    {tagFilter && <div className="tag-bar">מסונן לפי הקשר: <b># {tagFilter}</b><button onClick={() => setTagFilter("")} aria-label="ביטול סינון">✕</button></div>}
+    {quick === "done" && <div className="hint" style={{ margin: "2px 0 6px" }}>היסטוריית מטלות שהושלמו/בוטלו — מהחדש לישן{rows.length > 60 ? ` · ${rows.length} סה״כ, צמצמו עם חיפוש או «מאת/אחראי»` : ""}.</div>}
+    <div className="fleet-filters">
+      <label className="flt-field"><span className="flt-lbl">סטטוס</span><select value={st} onChange={(e) => setSt(e.target.value)}><option value="open">פתוחות</option><option value="done">הושלמו</option><option value="all">הכל</option>{taskStatuses().map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></label>
+      {isAdmin && <label className="flt-field"><span className="flt-lbl">אחראי</span><select value={who} onChange={(e) => setWho(e.target.value)}><option value="all">הכל</option>{owners.map((id) => <option key={id} value={id}>{uName(id, users)}</option>)}</select></label>}
+      <label className="flt-field"><span className="flt-lbl">עדיפות</span><select value={pr} onChange={(e) => setPr(e.target.value)}><option value="all">הכל</option>{PRIORITIES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
+    </div>
+    <div className="fleet-results-bar"><span className="fleet-count">{rows.length} מטלות</span><div className="group-seg"><span className="group-lbl">קבץ לפי</span>{[["status", "סטטוס"], ["to", "אחראי"], ["from", "מאת"], ["meeting", "פגישה"], ["none", "ללא"]].map(([id, lbl]) => <button key={id} className={grp === id ? "on" : ""} onClick={() => setGrp(id)}>{lbl}</button>)}</div></div>
+    {rows.length === 0 ? <Empty text="אין מטלות" Icon={ClipboardList} sub="לחצו «מטלה» כדי להוסיף" />
+      : groups ? <div className="fleet-groups">{groups.map(([k, items]) => { const open = !coll[k]; return <div key={k} className="fgroup"><button className="fgroup-head" onClick={() => setColl((c) => ({ ...c, [k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{k}</span><span className="fgroup-count">{items.length}</span></button>{open && <div className="task-list">{items.map(taskRow)}</div>}</div>; })}</div>
+      : <div className="task-list">{rows.map(taskRow)}</div>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><TaskForm task={edit} users={users} session={session} onCancel={() => setEdit(null)} onSave={async (t) => { await saveTask(t); setEdit(null); }} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><TaskImportWizard users={users} session={session} existing={tasks} meetings={(meetings || []).filter((m) => m.status === "planned")} onCancel={() => setImp(false)} onImport={async (arr) => { for (const t of arr) await saveTask(t); setImp(false); }} /></Overlay>}
+    {ai && <Overlay persistent onClose={() => setAi(false)}><AIExtractView users={users} session={session} meetings={(meetings || []).filter((m) => m.status === "planned")} onCancel={() => setAi(false)} onImport={async (arr) => { for (const t of arr) await saveTask(t); setAi(false); }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><TaskCard task={tasks.find((x) => x.id === openId)} users={users} session={session} meetings={meetings} saveMeeting={p.saveMeeting} onClose={() => setOpenId(null)} onSave={saveTask} onEdit={() => { setEdit(tasks.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delTask(openId); setOpenId(null); }} onOpenMeeting={(mid) => { setOpenId(null); setOpenMeetingId(mid); }} /></Overlay>}
+    {openMeetingId && meetings.find((x) => x.id === openMeetingId) && <Overlay persistent onClose={() => setOpenMeetingId(null)}><MeetingCard meeting={meetings.find((x) => x.id === openMeetingId)} users={users} tasks={tasks} session={session} onClose={() => setOpenMeetingId(null)} onSave={saveMeeting} onSaveTask={saveTask} onNewTask={(mtg) => { setOpenMeetingId(null); setEdit({ meetingId: mtg.id, responsibleIds: [], participantIds: mtg.participantIds || [], origin: "meeting" }); }} onOpenTask={(tid) => { setOpenMeetingId(null); setOpenId(tid); }} /></Overlay>}
+  </>);
+}
+function MeetingForm({ meeting, users, session, onCancel, onSave }) {
+  const init = meeting.at ? new Date(meeting.at) : null;
+  const [f, setF] = useState({ title: meeting.title || "", type: meeting.type || "boss", purpose: meeting.purpose || "", date: meeting.at ? tsToDate(meeting.at) : tsToDate(Date.now()), time: init ? `${String(init.getHours()).padStart(2, "0")}:${String(init.getMinutes()).padStart(2, "0")}` : "09:00", participantIds: meeting.participantIds || [], agenda: meeting.agenda || "", recur: meeting.recur || "" });
+  const [topics, setTopics] = useState(meeting.standingTopics || []);
+  const [err, setErr] = useState("");
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const cfg = mtgCfg(f.type);
+  const save = () => {
+    if (!f.title.trim()) return setErr("נא להזין נושא");
+    const [h, mi] = (f.time || "09:00").split(":").map(Number);
+    const at = dateToTs(f.date) + ((h || 0) * 3600000) + ((mi || 0) * 60000);
+    const now = Date.now();
+    const cleanTopics = topics.map((t) => ({ id: t.id, text: (t.text || "").trim() })).filter((t) => t.text);
+    onSave({ ...meeting, id: meeting.id || uid(), title: f.title.trim(), type: f.type, purpose: f.purpose.trim(), at, participantIds: f.participantIds, agenda: f.agenda.trim(), decisions: meeting.decisions || "", recur: f.recur || null, standingTopics: cfg.standingTopics ? cleanTopics : (meeting.standingTopics || []), topicMarks: meeting.topicMarks || {}, status: meeting.status || "planned", ownerId: meeting.ownerId || session.id, createdBy: meeting.createdBy || { name: session.name, role: session.role }, createdAt: meeting.createdAt || now, updatedAt: now, log: meeting.log || [{ at: now, by: session.name, byRole: session.role, text: "הפגישה נקבעה", kind: "open" }] });
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{meeting.id ? "עריכת פגישה" : "פגישה חדשה"}</div></div>
+    <div className="body">
+      <label className="field"><span>נושא *</span><input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="לדוגמה: ישיבת הנהלה שבועית" /></label>
+      <label className="field"><span>סוג</span><select value={f.type} onChange={(e) => set("type", e.target.value)}>{MEETING_TYPES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></label>
+      {cfg.hint && <div className="hint" style={{ marginTop: -4 }}>{cfg.hint}</div>}
+      <label className="field"><span>מטרה</span><input value={f.purpose} onChange={(e) => set("purpose", e.target.value)} placeholder="מה רוצים להשיג בפגישה (לא חובה)" /></label>
+      <div className="row2"><label className="field"><span>תאריך</span><input type="date" value={f.date} onChange={(e) => set("date", e.target.value)} /></label><label className="field"><span>שעה</span><input type="time" value={f.time} onChange={(e) => set("time", e.target.value)} /></label></div>
+      <div className="field"><span>משתתפים</span><PeoplePicker users={users} value={f.participantIds} onChange={(v) => set("participantIds", v)} placeholder="— בחרו משתתפים —" me={session.id} /></div>
+      <label className="field"><span>סדר יום</span><textarea rows={3} value={f.agenda} onChange={(e) => set("agenda", e.target.value)} placeholder="נושאים לדיון…" /></label>
+      {cfg.standingTopics && <div className="field"><span>נקודות קבע (נבדקות בכל פגישה: תקין / בעיה)</span>
+        {topics.map((t, i) => <div key={t.id} className="topic-edit"><input value={t.text} onChange={(e) => setTopics((a) => a.map((x, j) => j === i ? { ...x, text: e.target.value } : x))} placeholder="לדוגמה: תקלות בטיחות פתוחות" /><button type="button" className="icon-btn" aria-label="הסרה" onClick={() => setTopics((a) => a.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>)}
+        <button type="button" className="btn-ghost sm" onClick={() => setTopics((a) => [...a, { id: "tp" + Date.now().toString(36) + a.length, text: "" }])}><Plus size={14} /> נקודת קבע</button>
+      </div>}
+      <label className="field"><span>חזרתיות</span><select value={f.recur} onChange={(e) => set("recur", e.target.value)}><option value="">חד-פעמית</option><option value="weekly">שבועית</option><option value="monthly">חודשית</option><option value="quarterly">רבעונית</option></select></label>
+      {err && <div className="err">{err}</div>}
+      <button className="btn-primary full" onClick={save}>שמירה</button><div style={{ height: 24 }} />
+    </div></div>);
+}
+function MeetingCard({ meeting: m, users, tasks, session, onClose, onSave, onSaveTask, onEdit, onDelete, onNewTask, onOpenTask }) {
+  const [note, setNote] = useState("");
+  const ty = mtgType(m.type);
+  const cfg = mtgCfg(m.type);
+  const [imp, setImp] = useState(false);
+  const [qTitle, setQTitle] = useState(""), [qLoc, setQLoc] = useState(""), [qResp, setQResp] = useState([]);
+  const addFinding = async () => {
+    if (!qTitle.trim() || !onSaveTask) return;
+    const now = Date.now();
+    await onSaveTask({ id: uid(), title: qTitle.trim(), desc: "", responsibleIds: qResp.length ? qResp : [session.id], participantIds: [], priority: "medium", status: "todo", mode: "deferred", dueAt: null, recur: null, nextActionAt: null, category: "", locationText: qLoc.trim(), waitingFor: "", isPrivate: false, meetingId: m.id, linkedMeetingIds: [], origin: "meeting", ownerId: session.id, createdBy: { name: session.name, role: session.role }, createdAt: now, updatedAt: now, log: [{ at: now, by: session.name, byRole: session.role, text: "נרשמה בפגישה", kind: "open" }] });
+    setQTitle(""); setQResp([]);
+  };
+  const [doneId, setDoneId] = useState(null), [doneNote, setDoneNote] = useState("");
+  const completeTask = async (t) => { if (!onSaveTask) return; const now = Date.now(); await onSaveTask({ ...t, status: "done", updatedAt: now, log: [...(t.log || []), { at: now, by: session.name, byRole: session.role, text: "בוצע" + (doneNote.trim() ? `: ${doneNote.trim()}` : ""), kind: "done" }] }); setDoneId(null); setDoneNote(""); };
+  const [issueForm, setIssueForm] = useState({});
+  const createFromIssue = async (topic) => { if (!onSaveTask) return; const f = issueForm[topic.id] || {}; const now = Date.now(); await onSaveTask({ id: uid(), title: (f.desc && f.desc.trim()) || topic.text, desc: f.desc ? f.desc.trim() : "", responsibleIds: (f.resp && f.resp.length) ? f.resp : [session.id], participantIds: [], priority: "high", status: "todo", mode: "deferred", dueAt: null, recur: null, nextActionAt: null, category: "", locationText: topic.text, waitingFor: "", isPrivate: false, meetingId: m.id, linkedMeetingIds: [], origin: "meeting", ownerId: session.id, createdBy: { name: session.name, role: session.role }, createdAt: now, updatedAt: now, log: [{ at: now, by: session.name, byRole: session.role, text: `נפתחה מנקודת קבע «${topic.text}»`, kind: "open" }] }); setIssueForm((s) => ({ ...s, [topic.id]: { desc: "", resp: [] } })); };
+  const linked = (tasks || []).filter((t) => t.meetingId === m.id || (t.linkedMeetingIds || []).includes(m.id));
+  const openLinked = linked.filter(taskOpen);
+  const canManage = session.role === "admin" || m.ownerId === session.id;
+  const patch = async (ch, txt) => { const now = Date.now(); await onSave({ ...m, ...ch, updatedAt: now, log: [...(m.log || []), { at: now, by: session.name, byRole: session.role, text: txt, kind: "other" }] }); };
+  const addNote = async () => { if (!note.trim()) return; await patch({}, "📌 " + note.trim()); setNote(""); };
+  const markTopic = async (t, val) => { const cur = (m.topicMarks || {})[t.id]; await patch({ topicMarks: { ...(m.topicMarks || {}), [t.id]: cur === val ? null : val } }, `נקודת קבע «${t.text}» → ${val === "ok" ? "תקין" : "בעיה"}`); };
+  const markDone = async () => {
+    const now = Date.now();
+    await patch({ status: "done" }, "הפגישה סומנה כבוצעה");
+    if (m.recur && RECUR_MS[m.recur]) {
+      const next = { ...m, id: uid(), at: (m.at || now) + RECUR_MS[m.recur], status: "planned", decisions: "", topicMarks: {}, createdAt: now, updatedAt: now, log: [{ at: now, by: session.name, byRole: session.role, text: `נוצרה אוטומטית כהמשך ל«${m.title}»`, kind: "open" }] };
+      await onSave(next);
+      for (const t of openLinked) await onSaveTask({ ...t, meetingId: next.id, updatedAt: now, log: [...(t.log || []), { at: now, by: session.name, byRole: session.role, text: `הועברה לפגישה הבאה (${fmtDate(next.at)})`, kind: "other" }] });
+    }
+    onClose();
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פגישה</div>{canManage && onEdit && <button className="icon-btn" onClick={onEdit} title="עריכה"><PenLine size={18} /></button>}</div>
+    <div className="body">
+      <h2 className="detail-subj">{m.title}</h2>
+      <div className="tk-chips" style={{ margin: "8px 0" }}><span className="badge sm" style={{ color: "#fff", background: ty.color }}>{ty.label}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{m.status === "done" ? "בוצעה" : m.status === "cancelled" ? "בוטלה" : "מתוכננת"}</span>{m.recur && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{RECUR_LABEL[m.recur]}</span>}</div>
+      <div className="meta-grid">
+        <div className="meta-cell"><span className="meta-l">מועד</span><span className="meta-v">{fmtDate(m.at)} {fmtTime(m.at)}</span></div>
+        <div className="meta-cell"><span className="meta-l">משתתפים</span><span className="meta-v">{(m.participantIds || []).map((id) => uName(id, users)).join(", ") || "—"}</span></div>
+      </div>
+      {m.purpose && <div className="meta-cell" style={{ marginBottom: 8 }}><span className="meta-l">מטרה</span><span className="meta-v">{m.purpose}</span></div>}
+      {m.agenda && <><SectionTitle>סדר יום</SectionTitle><p className="detail-desc">{m.agenda}</p></>}
+      {(m.standingTopics || []).length > 0 && <><SectionTitle><ListChecks size={14} /> נקודות קבע</SectionTitle><div className="topic-list">{m.standingTopics.map((t) => { const mk = (m.topicMarks || {})[t.id]; return <div key={t.id} className="topic-wrap"><div className="topic-row"><span className="topic-t">{t.text}</span>{canManage ? <div className="topic-seg"><button className={"tok" + (mk === "ok" ? " on" : "")} onClick={() => markTopic(t, "ok")}>תקין</button><button className={"tiss" + (mk === "issue" ? " on" : "")} onClick={() => markTopic(t, "issue")}>בעיה</button></div> : <span className={"badge sm"} style={{ background: mk === "issue" ? "#FEE2E2" : mk === "ok" ? "#DCFCE7" : "var(--surface-2)", color: mk === "issue" ? "#B91C1C" : mk === "ok" ? "#15803D" : "var(--muted)" }}>{mk === "issue" ? "בעיה" : mk === "ok" ? "תקין" : "—"}</span>}</div>{canManage && mk === "issue" && onSaveTask && <div className="issue-box"><div className="hint" style={{ color: "#B91C1C" }}>נרשמה בעיה — אפשר לפתוח משימה למעקב:</div><input placeholder="פירוט הבעיה (לא חובה)" value={(issueForm[t.id] || {}).desc || ""} onChange={(e) => setIssueForm((s) => ({ ...s, [t.id]: { ...(s[t.id] || {}), desc: e.target.value } }))} /><div className="qc-line"><div className="qc-pp"><PeoplePicker users={users} value={(issueForm[t.id] || {}).resp || []} onChange={(v) => setIssueForm((s) => ({ ...s, [t.id]: { ...(s[t.id] || {}), resp: v } }))} placeholder="אחראי (ברירת מחדל: אני)…" me={session.id} /></div><button className="btn-primary sm" onClick={() => createFromIssue(t)}><Plus size={14} /> צור משימה</button></div></div>}</div>; })}</div></>}
+      <div className="row-between" style={{ marginTop: 8 }}><SectionTitle><ClipboardList size={14} /> מטלות מהפגישה ({linked.length})</SectionTitle><div className="hdr-btns">{canManage && cfg.importExcel && onSaveTask && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={14} /> ייבוא</button>}{canManage && onNewTask && <button className="btn-ghost sm" onClick={() => onNewTask(m)}><Plus size={14} /> מטלה</button>}</div></div>
+      {canManage && onSaveTask && <div className="quick-cap">
+        <div className="qc-line">{cfg.taskLocation && <input className="qc-loc" placeholder="הקשר (מיקום · מכשיר · נושא)" value={qLoc} onChange={(e) => setQLoc(e.target.value)} />}<input className="qc-title" placeholder="רישום מהיר: מה הבעיה / המשימה…" value={qTitle} onChange={(e) => setQTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addFinding(); }} /></div>
+        <div className="qc-line"><div className="qc-pp"><PeoplePicker users={users} value={qResp} onChange={setQResp} placeholder="אחראי (ברירת מחדל: אני)…" me={session.id} /></div><button className="btn-primary sm" onClick={addFinding}><Plus size={15} /> הוסף</button></div>
+      </div>}
+      {linked.length === 0 ? <div className="note">אין מטלות מקושרות. אפשר לפתוח מטלה מהפגישה.</div> : (() => {
+        const groups = new Map();
+        linked.forEach((t) => { const rs = (t.responsibleIds || []).length ? t.responsibleIds : ["__none"]; rs.forEach((rid) => { if (!groups.has(rid)) groups.set(rid, []); groups.get(rid).push(t); }); });
+        const entries = [...groups.entries()].sort((a, b) => (b[0] === session.id) - (a[0] === session.id) || String(a[0] === "__none" ? "ת" : uName(a[0], users)).localeCompare(uName(b[0], users)));
+        return <div className="mtask-groups">{entries.map(([rid, items]) => <div key={rid} className="mtask-group"><div className="mtask-gh">{rid === "__none" ? "ללא אחראי" : uName(rid, users)}{rid === session.id ? " (אני)" : ""} · {items.length}</div><div className="task-list">{items.map((t) => { const s = tstOf(t.status); const ext = t.meetingId !== m.id; const ov = taskOverdue(t); const done = t.status === "done" || t.status === "cancelled"; return <div key={t.id + rid} className="mtask-item"><button className={"task-row" + (ov ? " ovd" : "")} onClick={() => onOpenTask && onOpenTask(t.id)} style={{ borderInlineStartColor: s.color }}><div className="task-row-main"><div className="task-row-t">{ext && <span className="mlink-tag">מקושרת</span>}{t.title}</div>{t.desc && <div className="task-row-desc">{t.desc.split("\n")[0]}</div>}{(t.locationText || ov) && <div className="task-row-sub">{t.locationText ? `# ${t.locationText}` : ""}{t.locationText && ov ? " · " : ""}{ov ? "באיחור" : ""}</div>}</div><span className="badge sm" style={{ color: "#fff", background: s.color }}>{s.label}</span></button>{canManage && onSaveTask && !done && <button className="mt-done" title="סמן כבוצע" onClick={() => { setDoneId(doneId === t.id ? null : t.id); setDoneNote(""); }}><Check size={16} /></button>}{doneId === t.id && <div className="done-box"><input autoFocus placeholder="מה בוצע? (לא חובה)" value={doneNote} onChange={(e) => setDoneNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") completeTask(t); }} /><button className="btn-primary sm" onClick={() => completeTask(t)}><Check size={14} /> בוצע</button></div>}</div>; })}</div></div>)}</div>;
+      })()}
+      <SectionTitle><Clock size={14} /> סיכום והחלטות</SectionTitle>
+      <div className="timeline">{[...(m.log || [])].sort((a, b) => b.at - a.at).map((l, i) => <div key={i} className="tl-item"><div className="tl-dot" style={{ background: "var(--primary)" }} /><div className="tl-body"><div className="tl-text">{l.text}</div><div className="tl-meta">{l.by} · {fmtDate(l.at)} {fmtTime(l.at)}</div></div></div>)}</div>
+      {canManage && <div className="cmt-box"><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="הוסיפו החלטה / סיכום…" onKeyDown={(e) => { if (e.key === "Enter") addNote(); }} /><button className="btn-ghost sm" onClick={addNote}><Plus size={14} /> הוסף</button></div>}
+      {canManage && m.status === "planned" && <div className="row2" style={{ marginTop: 14 }}><button className="btn-primary" onClick={markDone}><Check size={15} /> סומן כבוצעה{m.recur ? " + הבאה" : ""}</button><ConfirmBtn className="btn-ghost" label="ביטול הפגישה" onConfirm={() => patch({ status: "cancelled" }, "הפגישה בוטלה").then(onClose)} /></div>}
+      {canManage && onDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 12 }} label="מחיקת פגישה" onConfirm={onDelete} />}
+      {imp && <Overlay persistent onClose={() => setImp(false)}><TaskImportWizard users={users} session={session} existing={tasks} meetings={[m]} defaultMeetingId={m.id} onCancel={() => setImp(false)} onImport={async (arr) => { for (const t of arr) await onSaveTask(t); setImp(false); }} /></Overlay>}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+function MeetingsModule(p) {
+  const { meetings, tasks, users, session, saveMeeting, delMeeting, saveTask, delTask } = p;
+  const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [taskEdit, setTaskEdit] = useState(null), [openTaskId, setOpenTaskId] = useState(null);
+  const scope = (meetings || []).filter((m) => meetingVisible(m, session, tasks));
+  const now = Date.now();
+  const startToday = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); })();
+  const upcoming = scope.filter((m) => m.status === "planned" && m.at >= startToday).sort((a, b) => a.at - b.at);
+  const toSummarize = scope.filter((m) => m.status === "planned" && m.at < startToday).sort((a, b) => b.at - a.at);
+  const past = scope.filter((m) => m.status !== "planned").sort((a, b) => b.at - a.at);
+  const mo = now - 30 * 86400000;
+  const held = scope.filter((m) => m.status === "done" && m.at >= mo).length;
+  const cancelled = scope.filter((m) => m.status === "cancelled" && m.at >= mo).length;
+  const row = (m, late) => { const ty = mtgType(m.type); const soon = !!late || (m.status === "planned" && m.at - now < 2 * 86400000 && m.at > now - 86400000); const openN = (tasks || []).filter((t) => t.meetingId === m.id && taskOpen(t)).length; return <button key={m.id} className={"task-row" + (soon ? " ovd" : "")} onClick={() => setOpenId(m.id)} style={{ borderInlineStartColor: ty.color }}>
+    <div className="task-row-main"><div className="task-row-t">{m.title}</div><div className="task-row-sub">{ty.label} · {(m.participantIds || []).length} משתתפים{openN ? ` · ${openN} מטלות פתוחות` : ""}{m.recur ? ` · ${RECUR_LABEL[m.recur]}` : ""}{late ? " · עברה — להשלמה" : ""}</div></div>
+    <div className="task-row-side"><span className="task-due" style={soon ? { color: "#DC2626", fontWeight: 700 } : {}}>{fmtDate(m.at)}</span><span className="task-due">{fmtTime(m.at)}</span></div>
+  </button>; };
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><CalendarClock size={15} /> פגישות</SectionTitle><div className="hdr-btns"><button className="btn-ghost sm" onClick={() => exportMeetingsXlsx(scope, tasks, users)} title="ייצוא ל-Excel"><FileSpreadsheet size={14} /> ייצוא</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> פגישה</button></div></div>
+    <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{upcoming.length}</span><span className="kpi-mini-l">מתוכננות</span></div><div className="kpi-mini"><span className="kpi-mini-v">{held}</span><span className="kpi-mini-l">בוצעו (30 ימים)</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={cancelled ? { color: "#DC2626" } : {}}>{cancelled}</span><span className="kpi-mini-l">בוטלו (30 ימים)</span></div></div>
+    <SectionTitle>קרובות ({upcoming.length})</SectionTitle>
+    {upcoming.length === 0 ? <Empty text="אין פגישות מתוכננות" Icon={CalendarClock} sub="לחצו «פגישה» כדי לקבוע" /> : <div className="task-list">{upcoming.map((m) => row(m))}</div>}
+    {toSummarize.length > 0 && <><SectionTitle>להשלמה — התקיימו וטרם סוכמו ({toSummarize.length})</SectionTitle><div className="task-list">{toSummarize.map((m) => row(m, true))}</div></>}
+    {past.length > 0 && <><SectionTitle>אחרונות ({past.length})</SectionTitle><div className="task-list">{past.slice(0, 12).map((m) => row(m))}</div>{past.length > 12 && <div className="hint" style={{ textAlign: "center", marginTop: 6 }}>מוצגות 12 האחרונות מתוך {past.length}. לדוח מלא — «ייצוא ל-Excel».</div>}</>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><MeetingForm meeting={edit} users={users} session={session} onCancel={() => setEdit(null)} onSave={async (m) => { await saveMeeting(m); setEdit(null); }} /></Overlay>}
+    {taskEdit && <Overlay persistent onClose={() => setTaskEdit(null)}><TaskForm task={taskEdit} users={users} session={session} onCancel={() => setTaskEdit(null)} onSave={async (t) => { await saveTask(t); setTaskEdit(null); }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><MeetingCard meeting={meetings.find((x) => x.id === openId)} users={users} tasks={tasks} session={session} onClose={() => setOpenId(null)} onSave={saveMeeting} onSaveTask={saveTask} onEdit={() => { setEdit(meetings.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delMeeting(openId); setOpenId(null); }} onNewTask={(mtg) => { setOpenId(null); setTaskEdit({ meetingId: mtg.id, responsibleIds: [], participantIds: mtg.participantIds || [], origin: "meeting" }); }} onOpenTask={(tid) => setOpenTaskId(tid)} /></Overlay>}
+    {openTaskId && tasks.find((x) => x.id === openTaskId) && <Overlay persistent onClose={() => setOpenTaskId(null)}><TaskCard task={tasks.find((x) => x.id === openTaskId)} users={users} session={session} meetings={meetings} saveMeeting={saveMeeting} onClose={() => setOpenTaskId(null)} onSave={saveTask} onEdit={() => { setTaskEdit(tasks.find((x) => x.id === openTaskId)); setOpenTaskId(null); }} onDelete={async () => { await delTask(openTaskId); setOpenTaskId(null); }} onOpenMeeting={(mid) => { setOpenTaskId(null); setOpenId(mid); }} /></Overlay>}
+  </>);
+}
+function ManageHub(p) {
+  const [sub, setSub] = useState("tasks");
+  return (<>
+    <div className="seg-tabs s3" style={{ maxWidth: 360, marginBottom: 14 }}><button className={sub === "tasks" ? "on" : ""} onClick={() => setSub("tasks")}>מטלות</button><button className={sub === "meetings" ? "on" : ""} onClick={() => setSub("meetings")}>פגישות</button></div>
+    {sub === "meetings" ? <MeetingsModule {...p} /> : <TasksModule {...p} />}
+  </>);
+}
+/* ============================================================ PPE · בגדי עבודה ומגן (Stage 1) */
+const PPE_CATS = [
+  { id: "clothing", label: "בגדי עבודה", clawback: true },
+  { id: "shoes", label: "נעלי בטיחות", clawback: true },
+  { id: "gloves", label: "כפפות", clawback: false },
+  { id: "head", label: "קסדה / כובע מגן", clawback: true },
+  { id: "eye", label: "משקפי מגן", clawback: false },
+  { id: "ear", label: "הגנת שמע", clawback: false },
+  { id: "hivis", label: "אפוד זוהר", clawback: true },
+  { id: "other", label: "אחר", clawback: false },
+];
+const ppeCatLabel = (id) => (PPE_CATS.find((c) => c.id === id) || {}).label || id || "—";
+const ppeIsIssue = (x) => x.origin !== "clawback" && x.origin !== "return" && x.origin !== "restock";
+const ppeMoveType = (x) => x.origin === "restock" ? "restock" : x.origin === "return" ? "return" : x.origin === "clawback" ? "clawback" : "issue";
+const PPE_MOVE = { issue: { label: "הנפקה", color: "#475569" }, restock: { label: "חידוש מלאי", color: "#16A34A" }, "return": { label: "החזרה", color: "#0D9488" }, clawback: { label: "קיזוז בעזיבה", color: "#B45309" } };
+const ppeMoveLabel = (t) => (PPE_MOVE[t] || {}).label || t;
+const ppeSizes = (it) => (it && it.sizes && it.sizes.length) ? it.sizes : ["אחיד"];
+const szLbl = (s) => (s === "אחיד" || !s) ? "ללא מידה" : s;
+const ppeStockOf = (it, size) => (it && it.stockBySize && typeof it.stockBySize[size] === "number") ? it.stockBySize[size] : 0;
+const ppeTotalStock = (it) => ppeSizes(it).reduce((s, z) => s + ppeStockOf(it, z), 0);
+const ppeMinOf = (it, sz) => it ? (it.minBySize ? (it.minBySize[sz] || 0) : (ppeSizes(it).length <= 1 ? (it.minStock || 0) : 0)) : 0;
+const ppeMaxOf = (it, sz) => (it && it.maxBySize && it.maxBySize[sz]) || 0;
+const ppeLowSize = (it, sz) => { const m = ppeMinOf(it, sz); return m > 0 && ppeStockOf(it, sz) < m; };
+const ppeLow = (it) => ppeSizes(it).some((sz) => ppeLowSize(it, sz));
+const ppeMinTotal = (it) => ppeSizes(it).reduce((s, sz) => s + ppeMinOf(it, sz), 0);
+const ppeDeficits = (it) => ppeSizes(it).map((sz) => ({ size: sz, need: Math.max(0, ppeMinOf(it, sz) - ppeStockOf(it, sz)) })).filter((d) => d.need > 0);
+const ppeOnOrder = (it, sz, orders) => (orders || []).filter((o) => o.status === "draft" || o.status === "sent").reduce((s, o) => s + (o.lines || []).filter((l) => l.itemId === it.id && l.size === sz).reduce((s2, l) => s2 + Math.max(0, (l.qty || 0) - (l.received || 0)), 0), 0);
+const ppeNetDeficits = (it, orders) => ppeSizes(it).map((sz) => ({ size: sz, need: Math.max(0, ppeMinOf(it, sz) - ppeStockOf(it, sz) - ppeOnOrder(it, sz, orders)) })).filter((d) => d.need > 0);
+const ppeRecipients = (users) => (users || []).filter((u) => ["worker", "cleaner", "tech"].includes(u.role) && u.active !== false).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
+const employLabel = (t) => t === "contractor" ? "קבלן" : "ישיר";
+const empOf = (u) => u ? (u.employmentType || (u.role === "tech" ? "contractor" : "direct")) : "direct";
+const ppeWorkerDept = (u) => u ? (u.dept || (u.role === "cleaner" ? "ניקיון" : u.role === "tech" ? "אחזקה" : "")) : "";
+const PPE_CAT_ICON = { clothing: Shirt, shoes: Footprints, gloves: Hand, head: HardHat, eye: Glasses, ear: Headphones, hivis: Shirt, other: Package };
+const ppeCatIcon = (c) => PPE_CAT_ICON[c] || Package;
+const ppeNeedGroup = (it) => it ? (it.needGroup || (it.category === "shoes" ? "shoes" : it.category) || it.id) : "";
+const PPE_RETURNABLE_DEFAULT = { head: true, hivis: true, eye: true, ear: true };
+const ppeReturnable = (it) => it ? (it.returnable != null ? !!it.returnable : !!PPE_RETURNABLE_DEFAULT[it.category]) : false;
+const ppeIsUpgrade = (it, items) => { if (!it) return false; const g = ppeNeedGroup(it); const peers = (items || []).filter((x) => ppeNeedGroup(x) === g); return peers.length > 1 && peers.some((p) => (p.unitCost || 0) < (it.unitCost || 0)); };
+const ppeNormItemIds = (norms, dept) => (norms || []).filter((n) => n.dept === dept && n.active !== false).map((n) => n.itemId);
+const allowedItemsForDept = (items, norms, dept) => {
+  const active = (items || []).filter((x) => x.active !== false);
+  if (!dept) return [];
+  const ids = ppeNormItemIds(norms, dept);
+  return active.filter((x) => ids.includes(x.id));
+};
+const PPE_PERIOD_DEFAULT = 12;
+const PPE_CLAWBACK_DEFAULT = [{ maxDays: 14, pct: 100 }, { maxDays: 30, pct: 66 }, { maxDays: 90, pct: 33 }];
+const ppeNormFor = (norms, dept, itemId) => (norms || []).find((n) => n.dept === dept && n.itemId === itemId && n.active !== false);
+const ppeClawbackTable = (config) => (config && config.ppeClawback && config.ppeClawback.length) ? config.ppeClawback : PPE_CLAWBACK_DEFAULT;
+const ppeRecencyPct = (table, days) => { const rows = [...(table || [])].sort((a, b) => a.maxDays - b.maxDays); for (const r of rows) if (days <= r.maxDays) return r.pct; return 0; };
+const ppeHeldCount = (ppe, workerId, itemId, sinceAt) => { const f = (ppe || []).filter((x) => x.workerId === workerId && x.itemId === itemId && (!sinceAt || x.at >= sinceAt)); const iss = f.filter((x) => ppeIsIssue(x)).length; const ret = f.filter((x) => x.origin === "return").length; return Math.max(0, iss - ret); };
+const ppeLastHeldIssue = (ppe, workerId, itemId, sinceAt) => (ppe || []).filter((x) => x.workerId === workerId && x.itemId === itemId && ppeIsIssue(x) && (!sinceAt || x.at >= sinceAt)).sort((a, b) => b.at - a.at)[0] || null;
+const ppeComputeCharge = (item, emp, norm, lastIssueAt, qty, now, outstanding) => {
+  const full = (item.unitCost || 0) * Math.max(1, qty || 1);
+  if (ppeReturnable(item)) {
+    if (outstanding) return { charge: full, reason: "הקודם לא הוחזר — מחיר מלא" };
+    return { charge: 0, reason: "חינם (מותנה — בכפוף להחזרה ולתקופת ותק)" };
+  }
+  if (emp === "contractor") return { charge: full, reason: "קבלן — מחיר מלא" };
+  const periodMs = ((norm && norm.periodMonths) || PPE_PERIOD_DEFAULT) * 30 * 86400000;
+  if (lastIssueAt && (now - lastIssueAt) < periodMs) return { charge: full, reason: "לקיחה לפני תום התקופה — מחיר מלא" };
+  if (norm && norm.policy === "subsidized") { const pct = norm.workerPct != null ? norm.workerPct : 50; return { charge: Math.round(full * pct / 100), reason: `סבסוד — העובד משלם ${pct}%` }; }
+  return { charge: 0, reason: "חינם (מותנה — חיוב בעזיבה מוקדמת)" };
+};
+const ppeLastIssueAt = (ppe, workerId, itemId, beforeAt, sinceAt) => {
+  const rows = (ppe || []).filter((x) => x.workerId === workerId && x.itemId === itemId && ppeIsIssue(x) && (beforeAt == null || x.at < beforeAt) && (!sinceAt || x.at >= sinceAt));
+  return rows.length ? Math.max(...rows.map((x) => x.at)) : null;
+};
+const ppeEligibility = (ppe, workerId, item, norm, now, sinceAt) => {
+  if (!item) return null;
+  const last = ppeLastIssueAt(ppe, workerId, item.id, null, sinceAt);
+  if (!last) return { last: null };
+  const days = Math.max(0, Math.floor((now - last) / 86400000));
+  const period = (norm && norm.periodMonths) || PPE_PERIOD_DEFAULT;
+  const remainDays = Math.ceil(period * 30 - days);
+  return { last, days, withinPeriod: remainDays > 0, remainDays };
+};
+const ppeMaxWindow = (table) => (table || []).reduce((m, r) => Math.max(m, r.maxDays || 0), 0);
+const ppeExitCharge = (iss, item, table, now, returned) => {
+  if (!iss.clawbackEligible || !ppeIsIssue(iss)) return 0;
+  const full = (iss.unitCost || 0) * (iss.qty || 1);
+  const remaining = Math.max(0, full - (iss.workerCharge || 0));
+  if (remaining <= 0) return 0;
+  const days = Math.max(0, Math.floor((now - iss.at) / 86400000));
+  if (ppeReturnable(item)) { if (returned) return 0; return Math.round(remaining * ppeRecencyPct(table, days) / 100); }
+  return days <= ppeMaxWindow(table) ? remaining : 0;
+};
+
+function PpeItemForm({ item, onCancel, onSave, onDelete }) {
+  const it = item || {};
+  const [name, setName] = useState(it.name || "");
+  const [sku, setSku] = useState(it.sku || "");
+  const [category, setCategory] = useState(it.category || "clothing");
+  const [sizesStr, setSizesStr] = useState((it.sizes || []).filter((s) => s !== "אחיד").join(", "));
+  const [stock, setStock] = useState({ ...(it.stockBySize || {}) });
+  const [minB, setMinB] = useState(() => { if (it.minBySize) return { ...it.minBySize }; const ss = (it.sizes || []).filter((z) => z !== "אחיד"); if (!ss.length && it.minStock) return { "אחיד": it.minStock }; return {}; });
+  const [unitCost, setUnitCost] = useState(it.unitCost != null ? String(it.unitCost) : "");
+  const [clawback, setClawback] = useState(it.clawbackEligible != null ? !!it.clawbackEligible : ((PPE_CATS.find((c) => c.id === (it.category || "clothing")) || {}).clawback !== false));
+  const [returnable, setReturnable] = useState(it.returnable != null ? !!it.returnable : !!PPE_RETURNABLE_DEFAULT[it.category || "clothing"]);
+  const [active, setActive] = useState(it.active !== false);
+  const [err, setErr] = useState("");
+  const sizes = sizesStr.split(",").map((s) => s.trim()).filter(Boolean);
+  const effSizes = sizes.length ? sizes : ["אחיד"];
+  const setOne = (sz, v) => setStock((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
+  const [maxB, setMaxB] = useState(() => it.maxBySize ? { ...it.maxBySize } : {});
+  const setMinOne = (sz, v) => setMinB((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
+  const setMaxOne = (sz, v) => setMaxB((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
+  const onCat = (c) => { setCategory(c); const m = PPE_CATS.find((x) => x.id === c); if (m) setClawback(m.clawback !== false); };
+  const save = () => {
+    if (!name.trim()) return setErr("נא להזין שם פריט");
+    const sb = {}, mb = {}, mxb = {}; effSizes.forEach((sz) => { sb[sz] = Math.max(0, parseInt(stock[sz] || 0, 10) || 0); const m = Math.max(0, parseInt(minB[sz] || 0, 10) || 0); if (m > 0) mb[sz] = m; const mx = Math.max(0, parseInt(maxB[sz] || 0, 10) || 0); if (mx > 0) mxb[sz] = mx; });
+    onSave({ id: it.id || uid(), name: name.trim(), category, sizes: effSizes, stockBySize: sb, unitCost: Math.max(0, parseFloat(unitCost || "0") || 0), minBySize: mb, maxBySize: mxb, minStock: Object.values(mb).reduce((a, b) => a + b, 0), clawbackEligible: !!clawback, returnable: !!returnable, sku: sku.trim(), active, createdAt: it.createdAt || Date.now(), demo: it.demo || false });
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{it.id ? "עריכת פריט" : "פריט חדש"}</div></div>
+    <div className="body">
+      <label className="field"><span>שם הפריט *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: מעיל עבודה כתום" /></label>
+      <label className="field"><span>מק״ט (מספר קטלוגי לספק)</span><input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="לדוגמה: 4587-XL" /></label>
+      <label className="field"><span>קטגוריה</span><input value={(PPE_CATS.find((c) => c.id === category) || {}).label || category} onChange={(e) => onCat(e.target.value)} placeholder="לדוגמה: ביגוד, נעליים, כפפות" list="ppe-cat-suggest" /><datalist id="ppe-cat-suggest">{PPE_CATS.map((c) => <option key={c.id} value={c.label} />)}</datalist></label>
+      <label className="field"><span>מידות (מופרדות בפסיק — השאירו ריק לפריט במידה אחידה)</span><input value={sizesStr} onChange={(e) => setSizesStr(e.target.value)} placeholder="S, M, L, XL" /></label>
+      <div className="field"><span>מלאי ומינימום לפי מידה</span><div style={{ overflowX: "auto", marginTop: 4 }}><table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 320 }}><thead><tr>{["מידה", "במלאי", "מינימום", "מקסימום"].map((h, hi) => <th key={h} style={{ textAlign: hi === 0 ? "start" : "center", padding: "4px 8px", color: "var(--muted)", fontWeight: 600, fontSize: 12, borderBottom: "1px solid var(--border)" }}>{h}</th>)}</tr></thead><tbody>{effSizes.map((sz) => <tr key={sz}><td style={{ padding: "4px 8px", fontWeight: 700, whiteSpace: "nowrap" }}>{szLbl(sz)}</td><td style={{ padding: "3px 6px" }}><input type="number" min="0" value={stock[sz] ?? 0} onChange={(e) => setOne(sz, e.target.value)} style={{ width: 64, textAlign: "center" }} /></td><td style={{ padding: "3px 6px" }}><input type="number" min="0" value={minB[sz] ?? 0} onChange={(e) => setMinOne(sz, e.target.value)} style={{ width: 64, textAlign: "center" }} /></td><td style={{ padding: "3px 6px" }}><input type="number" min="0" value={maxB[sz] ?? 0} onChange={(e) => setMaxOne(sz, e.target.value)} style={{ width: 64, textAlign: "center" }} /></td></tr>)}</tbody></table></div></div>
+      <label className="field"><span>עלות רכישה ליחידה (₪)</span><input type="number" min="0" step="0.5" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="0" /></label>
+      <div style={{ marginTop: 2 }}><label className="chk-line"><input type="checkbox" checked={clawback} onChange={(e) => setClawback(e.target.checked)} /> כפוף לקיזוז בעזיבה</label><div className="hint" style={{ marginInlineStart: 26 }}>אם העובד עוזב לפני תום תקופת הוותק — נגבה קיזוז יחסי על הפריט לפי טבלת הקיזוז.</div></div>
+      <div style={{ marginTop: 2 }}><label className="chk-line"><input type="checkbox" checked={returnable} onChange={(e) => setReturnable(e.target.checked)} /> נאסף בחזרה בעזיבה</label><div className="hint" style={{ marginInlineStart: 26 }}>פריט שנאסף בעזיבה וחוזר למלאי (קסדה/אוזניות/אפוד). פריטים אישיים כמו נעליים ובגדים אינם נאספים.</div></div>
+      <div style={{ marginTop: 2 }}><label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> פריט פעיל</label><div className="hint" style={{ marginInlineStart: 26 }}>פריט פעיל מופיע בקטלוג, בהנפקות ובהזמנות. כיבוי מסתיר אותו מבלי למחוק היסטוריה.</div></div>
+      {err && <div className="err">{err}</div>}
+      <button className="btn-primary full" onClick={save}>שמירה</button>
+      {it.id && onDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת פריט" onConfirm={onDelete} />}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeRestock({ item, onCancel, onSave, session, onLog }) {
+  const [add, setAdd] = useState({});
+  const sizes = ppeSizes(item);
+  const setOne = (sz, v) => setAdd((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
+  const save = () => { const sb = { ...(item.stockBySize || {}) }; sizes.forEach((sz) => { sb[sz] = (sb[sz] || 0) + (add[sz] || 0); }); onSave({ ...item, stockBySize: sb }); if (onLog) { const moves = sizes.filter((sz) => (add[sz] || 0) > 0).map((sz) => ({ id: uid(), origin: "restock", itemId: item.id, itemName: item.name, category: item.category, size: sz, qty: add[sz], at: Date.now(), by: session ? { id: session.id, name: session.name } : null, unitCost: item.unitCost || 0, workerCharge: 0, note: "" })); if (moves.length) onLog(moves); } };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">הוספת מלאי · {item.name}</div></div>
+    <div className="body"><div className="field"><span>כמות להוספה לפי מידה</span><div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>{sizes.map((sz) => <label key={sz} style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 96 }}><span style={{ fontSize: 12, color: "var(--muted)" }}>{szLbl(sz)} (כעת {ppeStockOf(item, sz)})</span><input type="number" min="0" value={add[sz] ?? 0} onChange={(e) => setOne(sz, e.target.value)} style={{ width: 96 }} /></label>)}</div></div>
+      <button className="btn-primary full" onClick={save}>עדכון מלאי</button><div style={{ height: 24 }} /></div></div>);
+}
+
+function UserPicker({ users, config, saveUser, value, onChange, label, pool, lockRole, hint, suggestName }) {
+  const list = (pool || users || []);
+  const [q, setQ] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState(null);
+  const sel = list.find((u) => u.id === value) || (created && created.id === value ? created : null);
+  const ql = q.trim().toLowerCase();
+  const matches = ql ? list.filter((u) => (u.name || "").toLowerCase().includes(ql) || String(u.workerNo || "").includes(q.trim())).slice(0, 8) : [];
+  const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "9px 12px", background: "var(--surface)", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", textAlign: "start" };
+  if (sel) return <div className="field"><span>{label}</span><div className="row-between" style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px" }}><span style={{ fontWeight: 600 }}>{sel.name}{sel.workerNo ? ` · מס׳ ${sel.workerNo}` : ""}{sel.dept ? ` · ${sel.dept}` : ""}</span><button className="btn-ghost sm" onClick={() => { onChange(null); setCreated(null); setQ(""); }}>שנה</button></div></div>;
+  return (<div className="field"><span>{label}</span>
+    <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="הקלידו שם או מספר עובד" />
+    {suggestName && !q.trim() && <button className="btn-ghost sm" style={{ marginTop: 6 }} onClick={() => setQ(suggestName)}><Search size={13} /> נהג משמרת: {suggestName}</button>}
+    {q.trim() ? <div style={{ marginTop: 6, border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+      {matches.map((u) => <button key={u.id} style={rowStyle} onClick={() => { onChange(u); setQ(""); }}><span style={{ fontWeight: 600 }}>{u.name}</span><span style={{ color: "var(--muted)", fontSize: 12 }}>{ROLE_LABEL[u.role]}{u.workerNo ? ` · ${u.workerNo}` : ""}{u.dept ? ` · ${u.dept}` : ""}</span></button>)}
+      {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא «{q.trim()}» במערכת.</div>}
+      {saveUser && <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור חדש"}</button>}
+    </div> : (hint ? <div className="hint">{hint}</div> : null)}
+    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole={lockRole || "worker"} onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u); setCreating(false); setQ(""); }} /></Overlay>}
+  </div>);
+}
+
+const PPE_SIGN_DEFAULT = "אני, {שם} (מספר עובד {מספר}), מאשר/ת בזאת כי קיבלתי את פריטי הציוד המפורטים בטבלה שלעיל במצב תקין, וכי הוסברו לי תנאי השימוש, ההחזרה והקיזוז החלים עליהם.";
+function SignaturePad({ value, onChange, required }) {
+  const ref = useRef(null);
+  const drawing = useRef(false);
+  const [resign, setResign] = useState(false);
+  const pos = (e) => { const c = ref.current; const r = c.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: (t.clientX - r.left) * (c.width / r.width), y: (t.clientY - r.top) * (c.height / r.height) }; };
+  const start = (e) => { e.preventDefault(); drawing.current = true; const ctx = ref.current.getContext("2d"); const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+  const move = (e) => { if (!drawing.current) return; e.preventDefault(); const ctx = ref.current.getContext("2d"); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = "#111"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke(); };
+  const end = () => { if (!drawing.current) return; drawing.current = false; try { onChange(ref.current.toDataURL("image/png")); } catch (e) {} };
+  const clear = () => { const c = ref.current; c.getContext("2d").clearRect(0, 0, c.width, c.height); onChange(""); };
+  if (value && !resign) return (<div className="field" style={{ marginTop: 10 }}><span>חתימת העובד {required ? "(חובה)" : "(אופציונלי)"}</span><div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, background: "#fff", textAlign: "center" }}><img src={value} style={{ maxHeight: 90, maxWidth: "100%" }} alt="signature" /><div className="hint" style={{ color: "#0D9488", marginTop: 4 }}>חתימה התקבלה ✓</div></div><button className="btn-ghost sm" style={{ marginTop: 6 }} onClick={() => { setResign(true); onChange(""); }}>חתום מחדש</button></div>);
+  return (<div className="field" style={{ marginTop: 10 }}><span>חתימת העובד {required ? "(חובה)" : "(אופציונלי)"}</span><canvas ref={ref} width={420} height={140} style={{ width: "100%", height: 140, border: "1px dashed var(--border)", borderRadius: 10, background: "#fff", touchAction: "none" }} onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={move} onTouchEnd={end} /><button className="btn-ghost sm" style={{ marginTop: 6 }} onClick={clear}>נקה חתימה</button></div>);
+}
+function ppeDocBody(recs, worker, config) {
+  const w = worker || {};
+  const tpl = (config && config.ppeSignText) || PPE_SIGN_DEFAULT;
+  const today = new Date().toLocaleDateString("he-IL");
+  const dept = w.dept || (typeof ppeWorkerDept === "function" ? ppeWorkerDept(w) : "") || "";
+  const fill = (s) => (s || "").split("{שם}").join(w.name || "").split("{מספר}").join(w.workerNo || "").split("{מחלקה}").join(dept).split("{תאריך}").join(today);
+  const list = (recs || []).filter((r) => r.origin !== "return");
+  const td = 'style="border:1px solid #999;padding:8px;text-align:right;font-size:14px"';
+  const th = 'style="border:1px solid #999;padding:8px;text-align:right;font-size:14px;background:#f0f0f0"';
+  const rows = list.map((r) => '<tr' + (r.flagged ? ' style="background:#FEF3C7"' : '') + '><td ' + td + '>' + (r.itemName || '') + '</td><td ' + td + '>' + (r.size || '') + '</td><td ' + td + '>' + (r.qty || 1) + '</td><td ' + td + '>' + ((r.workerCharge > 0) ? ('\u20aa' + r.workerCharge) : '\u05d7\u05d9\u05e0\u05dd') + (r.chargeReason ? '<div style="font-size:11px;color:#777;margin-top:2px">' + r.chargeReason + (r.flagged ? ' \u26a0' : '') + '</div>' : '') + '</td></tr>').join('');
+  const cb = (list.find((r) => r.clawbackSnapshot && r.clawbackSnapshot.length) || {}).clawbackSnapshot || (typeof ppeClawbackTable === "function" ? ppeClawbackTable(config) : []);
+  const cbRows = (cb || []).map((r) => '<tr><td ' + td + '>עד ' + r.maxDays + ' ימים מיום הקבלה</td><td ' + td + '>' + r.pct + '% מהעלות</td></tr>').join('') + '<tr><td ' + td + '>לאחר מכן</td><td ' + td + '>ללא חיוב</td></tr>';
+  const sigRec = (recs || []).find((r) => r.signature);
+  const processedBy = (((recs || []).find((r) => r.by && r.by.name) || {}).by || {}).name || "";
+  const initiator = ((recs || []).find((r) => r.initiatedByName) || {}).initiatedByName || "";
+  const initAt = ((recs || []).find((r) => r.initiatedAt) || {}).initiatedAt || (((recs || [])[0] || {}).at);
+  const company = (config && config.companyName) || "";
+  return '<div style="font-family:Arial,Helvetica,sans-serif;direction:rtl;color:#111;padding:18px;background:#fff">'
+    + '<div style="font-size:18px;font-weight:700">אישור קבלת ציוד מגן' + (company ? ' · ' + company : '') + '</div>'
+    + '<div style="color:#555;font-size:13px;margin-top:2px">תאריך: ' + today + ' · עובד: ' + (w.name || '') + (w.workerNo ? ' · מספר ' + w.workerNo : '') + (dept ? ' · ' + dept : '') + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;margin:16px 0"><thead><tr><th ' + th + '>פריט</th><th ' + th + '>מידה</th><th ' + th + '>כמות</th><th ' + th + '>חיוב</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    + '<div style="font-size:14px;font-weight:700;margin-top:6px">תנאי קיזוז בעזיבה (לפריטים שאינם מוחזרים)</div>'
+    + '<table style="width:100%;border-collapse:collapse;margin:6px 0 12px"><thead><tr><th ' + th + '>תקופה מיום הקבלה</th><th ' + th + '>שיעור קיזוז</th></tr></thead><tbody>' + cbRows + '</tbody></table>'
+    + '<div style="line-height:1.8;font-size:14px;margin:14px 0">' + fill(tpl) + '</div>'
+    + '<div style="display:flex;gap:24px;margin-top:28px"><div style="flex:1;text-align:center"><div style="height:70px;border-bottom:1px solid #333;display:flex;align-items:flex-end;justify-content:center">' + (sigRec && sigRec.signature ? '<img src="' + sigRec.signature + '" style="max-width:220px;max-height:68px"/>' : '') + '</div><div style="font-size:12px;color:#444;margin-top:4px">חתימת העובד · ' + (w.name || '') + (w.workerNo ? ' · ' + w.workerNo : '') + '</div></div>'
+    + '<div style="flex:1;text-align:center"><div style="height:70px;border-bottom:1px solid #333;display:flex;align-items:flex-end;justify-content:center;font-size:15px;padding-bottom:6px">' + today + '</div><div style="font-size:12px;color:#444;margin-top:4px">תאריך</div></div></div>'
+    + '<div style="margin-top:18px;font-size:12px;color:#444;border-top:1px solid #ddd;padding-top:8px">טופל ע״י: ' + (initiator || processedBy || '—') + (initAt ? ' · ' + (typeof fmtDate === "function" ? fmtDate(initAt) : "") : "") + '</div>'
+    + '</div>';
+}
+function ppePrintDoc(recs, worker, config) {
+  const html = '<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>אישור קבלת ציוד</title></head><body>' + ppeDocBody(recs, worker, config) + '</body></html>';
+  try {
+    const f = document.createElement("iframe");
+    f.style.position = "fixed"; f.style.right = "0"; f.style.bottom = "0"; f.style.width = "0"; f.style.height = "0"; f.style.border = "0";
+    document.body.appendChild(f);
+    const d = f.contentWindow.document; d.open(); d.write(html); d.close();
+    setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {} setTimeout(() => { try { document.body.removeChild(f); } catch (e) {} }, 1500); }, 350);
+  } catch (e) {}
+}
+function PpeWorkerPicker({ users, config, session, saveUser, value, onChange, deptScope, lock }) {
+  const recips = ppeRecipients(users).filter((u) => !deptScope || !deptScope.length || (u.dept && deptScope.includes(u.dept)));
+  const [q, setQ] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState(null);
+  const sel = recips.find((u) => u.id === value) || (created && created.id === value ? created : null);
+  const ql = q.trim().toLowerCase();
+  const matches = ql ? recips.filter((u) => (u.name || "").toLowerCase().includes(ql) || String(u.workerNo || "").includes(q.trim())).slice(0, 8) : [];
+  const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "9px 12px", background: "var(--surface)", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", textAlign: "start" };
+  if (sel) return <div className="field"><span>עובד מקבל *</span><div className="row-between" style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px" }}><span style={{ fontWeight: 600 }}>{sel.name}{sel.workerNo ? ` · מס׳ ${sel.workerNo}` : ""}{sel.dept ? ` · ${sel.dept}` : ""}{empOf(sel) === "contractor" ? " · קבלן" : ""}</span>{!lock && <button className="btn-ghost sm" onClick={() => { onChange(""); setCreated(null); }}>שנה</button>}</div></div>;
+  return (<div className="field"><span>עובד מקבל * (חיפוש לפי שם או מספר)</span>
+    <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="הקלידו מספר עובד או שם" autoFocus />
+    {q.trim() ? <div style={{ marginTop: 6, border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+      {matches.map((u) => <button key={u.id} style={rowStyle} onClick={() => { onChange(u.id); setQ(""); }}><span style={{ fontWeight: 600 }}>{u.name}</span><span style={{ color: "var(--muted)", fontSize: 12 }}>{ROLE_LABEL[u.role]}{u.workerNo ? ` · ${u.workerNo}` : ""}{u.dept ? ` · ${u.dept}` : ""}</span></button>)}
+      {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא עובד «{q.trim()}» במערכת.</div>}
+      <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור עובד חדש"}</button>
+    </div> : <div className="hint">הקלידו מספר עובד — המערכת תאתר אותו. לא קיים? תוכלו ליצור אותו כאן (חיפוש לפי מספר מונע כפילות).</div>}
+    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole="worker" onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u.id); setCreating(false); setQ(""); }} /></Overlay>}
+  </div>);
+}
+
+function PpeIssueForm({ users, items, norms, ppe, config, session, saveUser, deptScope, onCancel, onIssue, initial, submitLabel, title, lockWorker, requester }) {
+  const [workerId, setWorkerId] = useState(initial?.workerId || "");
+  const [emp, setEmp] = useState("direct");
+  const [empTouched, setEmpTouched] = useState(false);
+  const [note, setNote] = useState(initial?.note || "");
+  const [lines, setLines] = useState(() => (initial?.lines || []).map((l) => ({ key: uid(), itemId: l.itemId, size: l.size, qty: String(l.qty || 1), charge: "0", chargeTouched: false })));
+  const [err, setErr] = useState("");
+  const worker = ppeRecipients(users).find((u) => u.id === workerId);
+  const reset = (worker && worker.ppeResetAt) || 0;
+  useEffect(() => { if (worker) setEmp(empOf(worker)); }, [workerId]);
+  const allowed = allowedItemsForDept(items, norms, worker ? ppeWorkerDept(worker) : "");
+  const itemOf = (id) => (items || []).find((x) => x.id === id);
+  const chargeInfo = (it, qty, retPrev) => { if (!it) return { charge: 0, reason: "" }; const q = Math.max(1, parseInt(qty || "1", 10) || 1); const norm = worker ? ppeNormFor(norms, ppeWorkerDept(worker), it.id) : null; const last = worker ? ppeLastIssueAt(ppe, worker.id, it.id, null, reset) : null; const out = worker ? (ppeHeldCount(ppe, worker.id, it.id, reset) > 0 && !retPrev) : false; return ppeComputeCharge(it, emp, norm, last, q, Date.now(), out); };
+  const autoCharge = (it, qty, retPrev) => chargeInfo(it, qty, retPrev).charge;
+  const addLine = () => setLines((s) => [...s, { key: uid(), itemId: "", size: "", qty: "1", charge: "0", chargeTouched: false }]);
+  const toggleItem = (it) => { const ex = lines.find((l) => l.itemId === it.id); if (ex) { rmLine(ex.key); return; } const g = ppeNeedGroup(it); setLines((s) => { const pruned = s.filter((l) => { const li = itemOf(l.itemId); return !(li && ppeNeedGroup(li) === g); }); return [...pruned, { key: uid(), itemId: it.id, size: ppeSizes(it)[0], qty: "1", charge: String(autoCharge(it, "1")), chargeTouched: false }]; }); };
+  const setLine = (key, patch) => setLines((s) => s.map((l) => l.key === key ? { ...l, ...patch } : l));
+  const rmLine = (key) => setLines((s) => s.filter((l) => l.key !== key));
+  useEffect(() => { setLines((s) => s.map((l) => l.chargeTouched ? l : { ...l, charge: String(autoCharge(itemOf(l.itemId), l.qty, l.retPrev)) })); }, [workerId, emp]);
+  const filled = lines.filter((l) => l.itemId);
+  const [sig, setSig] = useState(initial && initial.signature ? initial.signature : "");
+  const [sigMode, setSigMode] = useState(null);
+  const [docRecs, setDocRecs] = useState(null);
+  const save = (opts = {}) => {
+    if (!worker) return setErr("בחרו עובד");
+    if (!filled.length) return setErr("הוסיפו לפחות פריט אחד");
+    if (!sig && !opts.remote) return setErr("נדרשת חתימת העובד לפני ההמשך");
+    const recs = filled.map((l) => { const it = itemOf(l.itemId); const sz = l.size || ppeSizes(it)[0]; const q = Math.max(1, parseInt(l.qty || "1", 10) || 1); const ci = chargeInfo(it, l.qty, l.retPrev); const chg = Math.max(0, parseFloat(l.charge || "0") || 0); return { id: uid(), workerId: worker.id, workerName: worker.name, workerNo: worker.workerNo || "", dept: ppeWorkerDept(worker), employmentType: emp, itemId: it.id, itemName: it.name, category: it.category, size: sz, qty: q, at: Date.now(), by: { id: session.id, name: session.name }, unitCost: it.unitCost || 0, workerCharge: chg, clawbackEligible: !!it.clawbackEligible, note: note.trim(), origin: "manual", signature: sig || "", clawbackSnapshot: (typeof ppeClawbackTable === "function" ? ppeClawbackTable(config) : []), chargeReason: ci.reason || "", flagged: (chg > 0 && /לא הוחזר|לפני תום|מוקדמת|הקודם|ללא החזרה/.test(ci.reason || "")), initiatedByName: session.name, initiatedAt: Date.now(), awaitWorkerSign: !!opts.remote }; });
+    const extra = [];
+    filled.forEach((l) => { const it = itemOf(l.itemId); if (l.retPrev && ppeReturnable(it) && worker) { const prev = ppeLastHeldIssue(ppe, worker.id, it.id, reset); if (prev) extra.push({ id: uid(), workerId: worker.id, workerName: worker.name, workerNo: worker.workerNo || "", dept: ppeWorkerDept(worker), employmentType: emp, itemId: prev.itemId, itemName: prev.itemName, category: prev.category, size: prev.size, qty: prev.qty || 1, restocked: true, at: Date.now(), by: { id: session.id, name: session.name }, unitCost: prev.unitCost || 0, workerCharge: 0, note: "הוחזר עם הנפקה חדשה", origin: "return", linkedIssueId: prev.id }); } });
+    const __all = [...recs, ...extra];
+    if (!requester && sig) setDocRecs(__all); else onIssue(__all);
+  };
+  if (docRecs) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="חזרה" onClick={() => setDocRecs(null)}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">אישור קבלת ציוד</div></div>
+    <div className="body">
+      <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }} dangerouslySetInnerHTML={{ __html: ppeDocBody(docRecs, worker, config) }} />
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}><button className="btn-ghost" onClick={() => setDocRecs(null)}><ChevronLeft size={16} style={{ transform: "scaleX(-1)" }} /> חזרה לתיקון</button><button className="btn-ghost full" onClick={() => ppePrintDoc(docRecs, worker, config)}><Printer size={16} /> הדפס / שמור PDF</button><button className="btn-primary full" onClick={() => onIssue(docRecs)}>סיום ושמירה</button></div>
+      <div className="hint" style={{ marginTop: 8 }}>אם ההדפסה חסומה בתצוגה המוטמעת — המסמך מוצג כאן לצילום; בגרסה המותקנת ההדפסה / שמירה ל-PDF תעבוד.</div>
+      <div style={{ height: 20 }} />
+    </div></div>);
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{title || "הנפקת ציוד"}</div></div>
+    <div className="body">
+      <PpeWorkerPicker users={users} config={config} session={session} saveUser={saveUser} deptScope={deptScope} value={workerId} onChange={(id) => setWorkerId(id)} lock={lockWorker} />
+      {worker && <>
+        {allowed.length === 0 && <div className="note" style={{ color: "#B45309" }}>אין פריטים זמינים למחלקת העובד{worker.dept ? ` («${worker.dept}»)` : ""}. הגדירו «דרישות מחלקה» או הוסיפו פריטים פעילים לקטלוג.</div>}
+        <SectionTitle>פריטים להנפקה</SectionTitle>
+        {allowed.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>{allowed.flatMap((it) => { const l = lines.find((x) => x.itemId === it.id); const sel = !!l; const IconC = ppeCatIcon(it.category); const up = ppeIsUpgrade(it, items); const out = ppeTotalStock(it) <= 0; const els = [<button key={it.id + "-t"} type="button" onClick={() => toggleItem(it)} disabled={out && !sel} style={{ position: "relative", flex: "1 1 96px", maxWidth: 150, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "10px 6px", borderRadius: 10, border: sel ? "2px solid #0D9488" : "1px solid var(--border)", background: sel ? "rgba(13,148,136,0.08)" : "var(--surface)", cursor: (out && !sel) ? "not-allowed" : "pointer", opacity: (out && !sel) ? 0.45 : 1 }}><IconC size={22} color={sel ? "#0D9488" : "var(--muted)"} />{up && <span style={{ position: "absolute", top: 4, insetInlineEnd: 6, color: "#D97706", fontSize: 12 }}>★</span>}<span style={{ fontSize: 12, fontWeight: 600, textAlign: "center", lineHeight: 1.2 }}>{it.name}</span><span style={{ fontSize: 11, color: "var(--muted)" }}>{ppeTotalStock(it)} במלאי</span>{(() => { const el = worker ? ppeEligibility(ppe, worker.id, it, ppeNormFor(norms, ppeWorkerDept(worker), it.id), Date.now(), reset) : null; return el && el.last ? <span style={{ position: "absolute", top: 4, insetInlineStart: 6, fontSize: 10, fontWeight: 700, color: el.withinPeriod ? "#B45309" : "#0D9488" }} title={el.withinPeriod ? "בתוקף" : "זכאי"}>{el.withinPeriod ? "● בתוקף" : "✓"}</span> : null; })()}</button>]; if (sel) { const sizes = ppeSizes(it); const curSize = l.size || sizes[0]; const stockHere = ppeStockOf(it, curSize); els.push(<div key={it.id + "-d"} style={{ flexBasis: "100%", border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--surface)" }}><div className="chips">{sizes.map((sz) => { const st = ppeStockOf(it, sz); return <button key={sz} className={"chip" + (curSize === sz ? " on" : "")} onClick={() => setLine(l.key, { size: sz })}>{szLbl(sz)} · {st}</button>; })}</div><div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}><div><div style={{ fontWeight: 700 }}>חיוב: {Number(l.charge) > 0 ? ils(Number(l.charge)) : "חינם"}</div><div className="hint">{chargeInfo(it, l.qty).reason}{l.chargeTouched ? " · תוקן ידנית" : ""}</div></div>{!requester && (l.chargeTouched ? <input type="number" min="0" step="0.5" value={l.charge} onChange={(e) => setLine(l.key, { charge: e.target.value, chargeTouched: true })} style={{ width: 90 }} /> : <button className="btn-ghost sm" onClick={() => setLine(l.key, { chargeTouched: true })}>תיקון ידני</button>)}</div>{!requester && ppeReturnable(it) && worker && ppeHeldCount(ppe, worker.id, it.id, reset) > 0 && <label className="chk-line" style={{ margin: "6px 0 0", fontSize: 13 }}><input type="checkbox" checked={!!l.retPrev} onChange={(e) => setLine(l.key, { retPrev: e.target.checked, charge: String(autoCharge(it, l.qty, e.target.checked)), chargeTouched: false })} /> העובד החזיר את הפריט הקודם (אחרת — חיוב מלא)</label>}{(() => { const el = worker ? ppeEligibility(ppe, worker.id, it, ppeNormFor(norms, ppeWorkerDept(worker), it.id), Date.now(), reset) : null; return el && el.last ? <div className="hint" style={{ marginTop: 4, color: el.withinPeriod ? "#B45309" : "var(--muted)" }}>{el.withinPeriod ? `כבר הונפק לפני ${el.days} ימים · זכאות מתחדשת בעוד ${el.remainDays} ימים — הנפקה חוזרת בחיוב מלא` : `הונפק לאחרונה לפני ${el.days} ימים · בתוקף לזכאות`}</div> : null; })()}{stockHere < 1 && <div className="hint" style={{ color: "#B45309" }}>אין מלאי במידה זו — יתאפס בהנפקה.</div>}</div>); } return els; })}</div>}
+        <label className="field" style={{ marginTop: 10 }}><span>הערה (משותפת)</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="לא חובה" /></label>
+        {requester ? (sigMode === "here" ? (<><SignaturePad value={sig} onChange={setSig} required={true} />{err && <div className="err">{err}</div>}<div style={{ display: "flex", gap: 8 }}><button className="btn-ghost" onClick={() => { setSigMode(null); setSig(""); }}>חזרה</button><button className="btn-primary full" onClick={() => save()}>{submitLabel || "שליחת בקשה לאישור"}</button></div></>) : (<div style={{ marginTop: 12 }}><div className="hint" style={{ marginBottom: 8 }}>נדרשת חתימת העובד. בחרו כיצד להחתים:</div>{err && <div className="err">{err}</div>}<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="btn-primary full" onClick={() => save({ remote: true })}><Send size={15} /> שלח לעובד לחתימה</button><button className="btn-ghost full" onClick={() => setSigMode("here")}><PenLine size={15} /> החתם את העובד כאן</button></div></div>)) : (<><SignaturePad value={sig} onChange={setSig} required={true} />{err && <div className="err">{err}</div>}<button className="btn-primary full" onClick={() => save()}>{submitLabel || ("רישום הנפקה" + (filled.length > 1 ? ` (${filled.length} פריטים)` : ""))}</button></>)}
+      </>}
+      {!worker && err && <div className="err">{err}</div>}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeIssueCard({ iss, onClose, onFilterWorker, onDelete, onPrint, docHtml }) {
+  const Row = ({ k, v }) => <div className="row-between" style={{ padding: "7px 0", borderBottom: "1px solid var(--border)" }}><span style={{ color: "var(--muted)" }}>{k}</span><span style={{ fontWeight: 600, textAlign: "start" }}>{v}</span></div>;
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פרטי הנפקה</div></div>
+    <div className="body">
+      {docHtml && <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 12 }} dangerouslySetInnerHTML={{ __html: docHtml }} />}
+      <Row k="עובד" v={iss.workerName + (iss.workerNo ? ` · מס׳ ${iss.workerNo}` : "")} />
+      <Row k="שיוך" v={employLabel(iss.employmentType) + (iss.dept ? ` · ${iss.dept}` : "")} />
+      <Row k="פריט" v={`${iss.itemName}${iss.size && iss.size !== "אחיד" ? ` · ${iss.size}` : ""} ×${iss.qty}`} />
+      <Row k="קטגוריה" v={ppeCatLabel(iss.category)} />
+      <Row k="עלות רכישה" v={ils((iss.unitCost || 0) * (iss.qty || 1))} />
+      <Row k="חיוב העובד" v={iss.workerCharge > 0 ? ils(iss.workerCharge) : "חינם"} />
+      <Row k="הונפק" v={`${fmtDate(iss.at)} · ${(iss.by && iss.by.name) || "—"}`} />
+      {iss.note && <div className="note" style={{ marginTop: 8 }}>{iss.note}</div>}
+      {onPrint && <button className="btn-primary full" style={{ marginTop: 12 }} onClick={onPrint}><Printer size={15} /> הורד / הדפס אישור (PDF)</button>}
+      <button className="btn-ghost full" style={{ marginTop: 12 }} onClick={onFilterWorker}>הצג את כל ההנפקות של {iss.workerName}</button>
+      <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת הנפקה (המלאי יוחזר)" onConfirm={onDelete} />
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeItemCard({ item, ppe, onEdit, onClose, onRestock }) {
+  const moves = (ppe || []).filter((x) => x.itemId === item.id).sort((a, b) => b.at - a.at).slice(0, 12);
+  const low = ppeLow(item);
+  const Row = ({ k, v }) => (v != null && v !== "") ? <div className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid var(--border)" }}><span style={{ color: "var(--muted)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div> : null;
+  const movQty = (x) => { const t = ppeMoveType(x); return t === "issue" ? "−" + (x.qty || 1) : t === "restock" ? "＋" + (x.qty || 0) : t === "return" ? "＋" + (x.qty || 1) : "—"; };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">{item.name}</div></div>
+    <div className="body">
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ppeCatLabel(item.category)}</span>{low && <span className="badge sm" style={{ background: "#FEE2E2", color: "#B91C1C" }}>מלאי נמוך</span>}{item.active === false && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>מושבת</span>}</div>
+      <div className="field"><span>מלאי / מינימום לפי מידה</span><div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>{ppeSizes(item).map((sz) => { const lw = ppeLowSize(item, sz); const m = ppeMinOf(item, sz); return <span key={sz} style={{ padding: "4px 10px", borderRadius: 8, background: lw ? "#FEE2E2" : "var(--surface-2)", color: lw ? "#B91C1C" : "inherit", fontSize: 13 }}>{szLbl(sz)}: <b>{ppeStockOf(item, sz)}</b>{m ? ` / מינ׳ ${m}` : ""}</span>; })}</div></div>
+      <div style={{ marginTop: 8 }}>
+        <Row k="סה״כ במלאי" v={ppeTotalStock(item)} />
+        <Row k="מק״ט" v={item.sku} />
+        <Row k="עלות ליחידה" v={ils(item.unitCost || 0)} />
+        <Row k="מלאי מינימום (סה״כ)" v={ppeMinTotal(item)} />
+        <Row k="כפוף לקיזוז בעזיבה" v={item.clawbackEligible ? "כן" : "לא"} />
+        <Row k="נאסף בחזרה בעזיבה" v={ppeReturnable(item) ? "כן" : "לא"} />
+      </div>
+      <SectionTitle>תנועות אחרונות</SectionTitle>
+      {moves.length === 0 ? <Empty text="אין תנועות לפריט" Icon={Package} /> : <div className="task-list">{moves.map((x) => { const t = ppeMoveType(x); const col = t === "restock" ? "#16A34A" : t === "return" ? "#0D9488" : t === "clawback" ? "#B45309" : "#475569"; return <div key={x.id} className="task-row" style={{ borderInlineStartColor: col, cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{ppeMoveLabel(t)}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{x.workerName ? ` · ${x.workerName}` : ""}</div><div className="task-row-sub">{fmtDate(x.at)} · {(x.by && x.by.name) || "—"}</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: col }}>{movQty(x)}</span></div></div>; })}</div>}
+      {onRestock && <button className="btn-ghost full" style={{ marginTop: 14 }} onClick={onRestock}><Plus size={15} /> עדכון מלאי ידני</button>}<button className="btn-primary full" style={{ marginTop: 10 }} onClick={onEdit}><PenLine size={15} /> עריכת פריט</button>
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeCatalog({ items, ppe, onSave, onDelete, session, savePpe }) {
+  const [edit, setEdit] = useState(null), [view, setView] = useState(null), [restock, setRestock] = useState(null);
+  const list = [...(items || [])].sort((a, b) => ((a.active === false ? 1 : 0) - (b.active === false ? 1 : 0)) || (a.name > b.name ? 1 : -1));
+  const del = async (it) => { await onDelete(it.id); setEdit(null); setView(null); };
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> קטלוג ציוד</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> פריט</button></div>
+    {list.length === 0 ? <Empty text="הקטלוג ריק" Icon={Package} sub="הוסיפו פריט ציוד מגן/בגדי עבודה" /> : <div className="cards">{list.map((it) => { const low = ppeLow(it); return <button key={it.id} className="tcard" onClick={() => setView(it)} style={{ borderInlineStartColor: it.active === false ? "var(--muted)" : (low ? "#DC2626" : "#0D9488"), cursor: "pointer", textAlign: "start" }}>
+      <div className="tcard-main">
+        <div className="tcard-row1"><span className="tcard-subj">{it.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ppeCatLabel(it.category)}</span>{low && <span className="badge sm" style={{ background: "#FEE2E2", color: "#B91C1C" }}>מלאי נמוך</span>}{it.active === false && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>מושבת</span>}</div>
+        <div className="tcard-sub" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>{ppeSizes(it).map((sz) => <span key={sz} style={{ padding: "2px 8px", borderRadius: 6, background: "var(--surface-2)", fontSize: 12 }}>{szLbl(sz)}: <b>{ppeStockOf(it, sz)}</b></span>)}</div>
+        <div className="tcard-sub" style={{ marginTop: 4 }}>סה״כ {ppeTotalStock(it)} · עלות {ils(it.unitCost || 0)} · מינ׳ {ppeMinTotal(it)}{it.sku ? ` · מק״ט ${it.sku}` : ""}{it.clawbackEligible ? " · כפוף לקיזוז" : ""}</div>
+      </div>
+    </button>; })}</div>}
+    {view && <Overlay onClose={() => setView(null)}><PpeItemCard item={view} ppe={ppe} onEdit={() => { setEdit(view); setView(null); }} onRestock={() => { setRestock(view); setView(null); }} onClose={() => setView(null)} /></Overlay>}
+    {restock && <Overlay persistent onClose={() => setRestock(null)}><PpeRestockFlow items={items} preItem={restock} session={session} savePpe={savePpe} savePpeItem={onSave} onClose={() => setRestock(null)} /></Overlay>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><PpeItemForm item={edit.id ? edit : null} onCancel={() => setEdit(null)} onSave={async (x) => { await onSave(x); setEdit(null); }} onDelete={edit.id ? (() => del(edit)) : null} /></Overlay>}
+  </>);
+}
+
+function PpeNorms({ items, norms, config, onSave, onDelete }) {
+  const depts = config.departments || [];
+  const [dept, setDept] = useState(depts[0] || "");
+  const active = (items || []).filter((x) => x.active !== false);
+  const recFor = (id) => (norms || []).find((n) => n.dept === dept && n.itemId === id);
+  const toggle = async (it) => { const ex = recFor(it.id); if (ex) await onDelete(ex.id); else await onSave({ id: uid(), dept, itemId: it.id, active: true, policy: it.clawbackEligible ? "subsidized" : "free", workerPct: 50, periodMonths: PPE_PERIOD_DEFAULT, createdAt: Date.now() }); };
+  const patch = async (rec, p) => { await onSave({ ...rec, ...p }); };
+  const cnt = (norms || []).filter((n) => n.dept === dept).length;
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardCheck size={15} /> דרישות מחלקה ומדיניות חיוב</SectionTitle></div>
+    <div className="hint" style={{ marginBottom: 10 }}>בחרו אילו פריטים זמינים בכל מחלקה ומה מדיניות החיוב. מחלקה ללא הגדרה — מציגה את כל הפריטים, ללא הקצאה (מחיר מלא).</div>
+    <label className="field" style={{ maxWidth: 320 }}><span>מחלקה{cnt ? ` · ${cnt} פריטים מוגדרים` : " · ללא הגדרה"}</span><select value={dept} onChange={(e) => setDept(e.target.value)}>{depts.map((d) => <option key={d}>{d}</option>)}</select></label>
+    {active.length === 0 ? <Empty text="הקטלוג ריק" Icon={Package} sub="הוסיפו פריטים בקטלוג תחילה" /> : <div className="cards">{active.map((it) => { const rec = recFor(it.id); const on = !!rec; return <div key={it.id} className="tcard" style={{ borderInlineStartColor: on ? "#0D9488" : "var(--border)", cursor: "default" }}><div className="tcard-main">
+      <label className="chk-line" style={{ margin: 0 }}><input type="checkbox" checked={on} onChange={() => toggle(it)} /> <b>{it.name}</b> · {ppeCatLabel(it.category)} · {ils(it.unitCost || 0)}</label>
+      {on && <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <div className="seg-tabs s2" style={{ maxWidth: 220 }}><button className={rec.policy !== "subsidized" ? "on" : ""} onClick={() => patch(rec, { policy: "free" })}>חינם</button><button className={rec.policy === "subsidized" ? "on" : ""} onClick={() => patch(rec, { policy: "subsidized" })}>מסובסד</button></div>
+        {rec.policy === "subsidized" && <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>העובד משלם <input type="number" min="0" max="100" value={rec.workerPct != null ? rec.workerPct : 50} onChange={(e) => patch(rec, { workerPct: Math.max(0, Math.min(100, parseInt(e.target.value || "0", 10) || 0)) })} style={{ width: 60 }} />%</label>}
+        <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>תקופת זכאות <input type="number" min="1" value={rec.periodMonths || PPE_PERIOD_DEFAULT} onChange={(e) => patch(rec, { periodMonths: Math.max(1, parseInt(e.target.value || "1", 10) || 1) })} style={{ width: 60 }} /> חודשים</label>
+      </div>}
+    </div></div>; })}</div>}
+  </>);
+}
+
+
+function PpeRestockFlow({ items, session, savePpe, savePpeItem, onClose, preItem }) {
+  const [selId, setSelId] = useState(preItem ? preItem.id : ""), [q, setQ] = useState("");
+  const active = (items || []).filter((x) => x.active !== false);
+  const sel = active.find((x) => x.id === selId);
+  if (sel) return <PpeRestock item={sel} session={session} onLog={async (moves) => { for (const m of moves) await savePpe(m); }} onCancel={() => { if (preItem) onClose(); else setSelId(""); }} onSave={async (x) => { await savePpeItem(x); onClose(); }} />;
+  const ql = q.trim().toLowerCase();
+  const shown = ql ? active.filter((x) => (x.name || "").toLowerCase().includes(ql) || String(x.sku || "").toLowerCase().includes(ql)) : active;
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">חידוש מלאי — בחירת פריט</div></div>
+    <div className="body">
+      <label className="field"><span>בחרו פריט להוספת מלאי</span><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש לפי שם או מק״ט" autoFocus /></label>
+      <div className="cards">{shown.map((it) => <button key={it.id} className="tcard" onClick={() => setSelId(it.id)} style={{ borderInlineStartColor: ppeLow(it) ? "#DC2626" : "#0D9488", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{it.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ppeCatLabel(it.category)}</span></div><div className="tcard-sub" style={{ marginTop: 4 }}>סה״כ {ppeTotalStock(it)}{it.sku ? ` · מק״ט ${it.sku}` : ""}</div></div></button>)}{shown.length === 0 && <Empty text="לא נמצא פריט" Icon={Package} />}</div>
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeMoveCard({ mov, onClose, onFilterWorker }) {
+  const t = ppeMoveType(mov);
+  const Row = ({ k, v }) => (v != null && v !== "") ? <div className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid var(--border)" }}><span style={{ color: "var(--muted)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div> : null;
+  const qtyTxt = t === "issue" ? "−" + (mov.qty || 1) : t === "restock" ? "＋" + (mov.qty || 0) : t === "return" ? (mov.restocked ? "＋" + (mov.qty || 1) : (mov.qty || 1) + " (נמחק)") : "—";
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">{ppeMoveLabel(t)}</div></div>
+    <div className="body">
+      <div style={{ fontWeight: 800, fontSize: 18 }}>{mov.itemName}{mov.size && mov.size !== "אחיד" ? ` · ${mov.size}` : ""}</div>
+      <div style={{ marginTop: 10 }}>
+        <Row k="סוג תנועה" v={ppeMoveLabel(t)} />
+        <Row k="קטגוריה" v={ppeCatLabel(mov.category)} />
+        <Row k="כמות" v={qtyTxt} />
+        <Row k="תאריך" v={fmtDate(mov.at)} />
+        <Row k="עובד" v={mov.workerName} />
+        <Row k="מחלקה" v={mov.dept} />
+        {mov.workerCharge > 0 ? <Row k="חיוב עובד" v={ils(mov.workerCharge)} /> : null}
+        <Row k="בוצע ע״י" v={mov.by && mov.by.name} />
+        <Row k="הערה" v={mov.note} />
+      </div>
+      {onFilterWorker && <button className="btn-ghost full" style={{ marginTop: 12 }} onClick={onFilterWorker}>סינון תנועות העובד</button>}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeLog({ ppe, items, norms, users, config, session, deptScope, canIssue, canExit, reqMode, savePpe, delPpe, savePpeItem, saveUser, mStart, mEnd, mLabel, orders, savePpeOrder, delPpeOrder }) {
+  const [edit, setEdit] = useState(false), [openId, setOpenId] = useState(null), [wf, setWf] = useState(""), [exit, setExit] = useState(false), [openG, setOpenG] = useState({});
+  const [ordOpen, setOrdOpen] = useState(false);
+  const ordN = (orders || []).filter((o) => o.status === "draft" || o.status === "sent").length;
+  const [fType, setFType] = useState("all"), [q, setQ] = useState("");
+  const now = Date.now();
+  const _mS = mStart != null ? mStart : new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const _mE = mEnd != null ? mEnd : now + 1;
+  const _mL = mLabel || "החודש";
+  const base = deptScope ? (ppe || []).filter((x) => x.dept && deptScope.includes(x.dept)) : (ppe || []);
+  const sorted = [...base].sort((a, b) => b.at - a.at);
+  const ql = q.trim().toLowerCase();
+  const list = sorted.filter((x) => (fType === "all" || ppeMoveType(x) === fType) && (!wf || x.workerId === wf) && (ql ? ((x.itemName || "").toLowerCase().includes(ql) || (x.workerName || "").toLowerCase().includes(ql) || String(x.workerNo || "").includes(q.trim())) : (x.at >= _mS && x.at < _mE)));
+  const anyFilter = !!(ql || wf);
+  const groupOf = (x) => { const t = ppeMoveType(x); if (t === "issue") { const d = x.dept || "ללא מחלקה"; return { key: "iss:" + d, label: "הנפקות · מחלקה " + d }; } if (t === "restock") { if (x.orderId) return { key: "ord:" + x.orderId, label: (x.note && x.note.indexOf("קבלת הזמנה") === 0) ? x.note : "קבלת הזמנה" }; return { key: "rs", label: "חידוש מלאי ידני" }; } if (t === "return" || t === "clawback") { if (x.exitId) return { key: "exit:" + x.exitId, label: "עזיבת עובד · " + (x.workerName || "") }; if (t === "return") return { key: "ret", label: "החזרות עם הנפקה חוזרת" }; return { key: "cb", label: "קיזוזים" }; } return { key: "other", label: "אחר" }; };
+  const groups = []; const gmap = {}; list.forEach((x) => { const g = groupOf(x); if (!gmap[g.key]) { gmap[g.key] = { key: g.key, label: g.label, items: [], at: x.at }; groups.push(gmap[g.key]); } gmap[g.key].items.push(x); if (x.at > gmap[g.key].at) gmap[g.key].at = x.at; }); groups.sort((a, b) => b.at - a.at);
+  const last30 = sorted.filter((x) => x.at >= _mS && x.at < _mE);
+  const iss30 = last30.filter(ppeIsIssue);
+  const charge30 = iss30.reduce((s, x) => s + (x.workerCharge || 0), 0);
+  const restockQty30 = last30.filter((x) => x.origin === "restock").reduce((s, x) => s + (x.qty || 0), 0);
+  const ret30 = last30.filter((x) => x.origin === "return").length;
+  const lowItems = (items || []).filter((x) => x.active !== false && ppeLow(x));
+  const issue = async (recs) => { await ppeIssueRecs(recs, items, savePpeItem, savePpe); setEdit(false); };
+  const removeIssue = async (rec) => { const it = (items || []).find((x) => x.id === rec.itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; sb[rec.size] = (sb[rec.size] || 0) + rec.qty; await savePpeItem({ ...it, stockBySize: sb }); } await delPpe(rec.id); setOpenId(null); };
+  const wfWorker = wf ? (users || []).find((u) => u.id === wf) : null;
+  const TYPES = [["all", "הכל"], ["issue", "הנפקות"], ["restock", "חידושי מלאי"], ["return", "החזרות"], ["clawback", "קיזוזים"]];
+  const movQty = (x) => { const t = ppeMoveType(x); if (t === "issue") return "−" + (x.qty || 1); if (t === "restock") return "＋" + (x.qty || 0); if (t === "return") return x.restocked ? "＋" + (x.qty || 1) : (x.qty || 1) + " · נמחק"; return ""; };
+  const exportReport = () => { const rows = list.map((x) => ({ "תאריך": fmtDate(x.at), "סוג תנועה": ppeMoveLabel(ppeMoveType(x)), "פריט": x.itemName, "קטגוריה": ppeCatLabel(x.category), "מידה": x.size, "כמות": x.qty || 0, "עובד": x.workerName || "", "מספר עובד": x.workerNo || "", "מחלקה": x.dept || "", "חיוב": x.workerCharge || 0, "ביצע": (x.by && x.by.name) || "" })); if (!rows.length) return; try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 14 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "תנועות מלאי"); downloadXlsx(wb, `ppe-movements_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {} };
+  const open = openId ? sorted.find((x) => x.id === openId) : null;
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><HardHat size={15} /> תנועות מלאי</SectionTitle><div style={{ display: "flex", gap: 8 }}>{canExit && <button className="btn-ghost sm" onClick={() => setExit(true)}>עזיבת עובד</button>}{canIssue && <button className="btn-primary sm" onClick={() => setEdit(true)}><Plus size={15} /> הנפקה</button>}{reqMode && <span className="hint" style={{ alignSelf: "center" }}>להנפקה — פנה למנהל הציוד</span>}</div></div>
+    <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{iss30.length}</span><span className="kpi-mini-l">{"הנפקות · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={{ color: "#16A34A" }}>＋{restockQty30}</span><span className="kpi-mini-l">{"חידושי מלאי · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v">{ret30}</span><span className="kpi-mini-l">{"החזרות · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v">{ils(charge30)}</span><span className="kpi-mini-l">{"חיוב עובדים · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={lowItems.length ? { color: "#DC2626" } : {}}>{lowItems.length}</span><span className="kpi-mini-l">פריטים במלאי נמוך</span></div></div>
+    {(canIssue || (orders || []).length > 0) && <div style={{ marginBottom: 10 }}><button className="task-row" onClick={() => setOrdOpen((v) => !v)} style={{ borderInlineStartColor: "#2563EB", background: "var(--surface-2)" }}><div className="task-row-main"><div className="task-row-t">הזמנות רכש{ordN ? ` · ${ordN} פתוחות` : ""}</div><div className="task-row-sub">קבלות ויצירת הזמנות לספק</div></div><div className="task-row-side"><ChevronLeft size={16} style={{ transform: ordOpen ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></div></button>{ordOpen && <div style={{ marginTop: 8 }}><PpeOrders embedded orders={orders} items={items} config={config} session={session} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpeItem={savePpeItem} savePpe={savePpe} /></div>}</div>}
+    <div className="seg-tabs" style={{ flexWrap: "wrap", marginBottom: 10 }}>{TYPES.map(([k, l]) => <button key={k} className={fType === k ? "on" : ""} onClick={() => setFType(k)}>{l}</button>)}</div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "center" }}>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש פריט / עובד / מספר (בכל התקופה)" style={{ minWidth: 200, flex: "1 1 200px" }} />{q && <button className="btn-ghost sm" onClick={() => setQ("")}>נקה</button>}
+      <button className="btn-ghost sm" style={{ marginInlineStart: "auto" }} onClick={exportReport}>{ql ? `ייצוא Excel (${list.length})` : `ייצוא ${_mL} (${list.length})`}</button>
+    </div>
+    {wfWorker && <div className="tag-bar">מסונן לפי עובד: <b>{wfWorker.name}</b> <button className="btn-ghost sm" onClick={() => setWf("")}>נקה סינון</button></div>}
+    {list.length === 0 ? <Empty text="אין תנועות" Icon={HardHat} sub="הנפקות, חידושי מלאי והחזרות יופיעו כאן" /> : <div className="task-list">{groups.map((g) => { const isO = openG[g.key] !== undefined ? openG[g.key] : anyFilter; const net = g.items.reduce((s2, x) => { const tt = ppeMoveType(x); return s2 + (tt === "issue" ? -(x.qty || 1) : (tt === "restock" || (tt === "return" && x.restocked)) ? (x.qty || 1) : 0); }, 0); return <div key={g.key} style={{ marginBottom: 6 }}><button className="task-row" onClick={() => setOpenG((o) => ({ ...o, [g.key]: !isO }))} style={{ borderInlineStartColor: "#94A3B8", background: "var(--surface-2)" }}><div className="task-row-main"><div className="task-row-t">{g.label}</div><div className="task-row-sub">{g.items.length} תנועות · {fmtDate(g.at)}</div></div><div className="task-row-side">{net !== 0 && <span className="task-due" style={{ fontWeight: 700, color: net > 0 ? "#16A34A" : "#475569" }}>{net > 0 ? "＋" + net : net}</span>}<ChevronLeft size={16} style={{ transform: isO ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></div></button>{isO && <div style={{ paddingInlineStart: 8 }}>{g.items.map((x) => { const t = ppeMoveType(x); const col = t === "restock" ? "#16A34A" : t === "return" ? "#0D9488" : t === "clawback" ? "#B45309" : (x.employmentType === "contractor" ? "#EA580C" : "#0D9488"); const who = x.workerName || ""; return <button key={x.id} className="task-row" onClick={() => setOpenId(x.id)} style={{ borderInlineStartColor: col }}><div className="task-row-main"><div className="task-row-t">{x.itemName}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{who ? ` · ${who}` : ""}</div><div className="task-row-sub">{ppeMoveLabel(t)} · {ppeCatLabel(x.category)}{x.dept ? ` · ${x.dept}` : ""} · {(x.by && x.by.name) || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(x.at)}</span><span className="task-due" style={{ fontWeight: 700, color: col }}>{movQty(x)}</span>{x.workerCharge > 0 ? <span className="task-due" style={{ fontWeight: 700, color: "#B45309" }}>{ils(x.workerCharge)}</span> : null}</div></button>; })}</div>}</div>; })}</div>}
+    {edit && <Overlay persistent onClose={() => setEdit(false)}><PpeIssueForm users={users} items={(items || []).filter((x) => x.active !== false)} norms={norms} ppe={ppe} config={config} session={session} saveUser={saveUser} deptScope={deptScope} onCancel={() => setEdit(false)} onIssue={issue} /></Overlay>}
+    {exit && <Overlay persistent onClose={() => setExit(false)}><PpeExitSettlement ppe={ppe} users={users} items={items} config={config} session={session} savePpe={savePpe} savePpeItem={savePpeItem} saveUser={saveUser} onClose={() => setExit(false)} /></Overlay>}
+    
+    {open && (ppeMoveType(open) === "issue" ? <Overlay onClose={() => setOpenId(null)}><PpeIssueCard iss={open} onClose={() => setOpenId(null)} onFilterWorker={() => { setWf(open.workerId); setOpenId(null); }} onDelete={() => removeIssue(open)} docHtml={(() => { const batch = (ppe || []).filter((r) => r.workerId === open.workerId && Math.abs((r.at || 0) - (open.at || 0)) < 60000 && r.origin !== "return"); const worker = (users || []).find((u) => u.id === open.workerId) || { name: open.workerName, workerNo: open.workerNo, dept: open.dept }; return ppeDocBody(batch.length ? batch : [open], worker, config); })()} onPrint={() => { const batch = (ppe || []).filter((r) => r.workerId === open.workerId && Math.abs((r.at || 0) - (open.at || 0)) < 60000 && r.origin !== "return"); const worker = (users || []).find((u) => u.id === open.workerId) || { name: open.workerName, workerNo: open.workerNo, dept: open.dept }; ppePrintDoc(batch.length ? batch : [open], worker, config); }} /></Overlay> : <Overlay onClose={() => setOpenId(null)}><PpeMoveCard mov={open} onClose={() => setOpenId(null)} onFilterWorker={open.workerId ? () => { setWf(open.workerId); setOpenId(null); } : null} /></Overlay>)}
+  </>);
+}
+
+function PpeSignTemplate({ config, onSave }) {
+  const [txt, setTxt] = useState(config.ppeSignText || PPE_SIGN_DEFAULT);
+  const [saved, setSaved] = useState(false);
+  const save = async () => { await onSave({ ...config, ppeSignText: txt }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><FileText size={15} /> תבנית אישור קבלת ציוד (חתימה)</SectionTitle></div>
+    <div className="hint" style={{ marginBottom: 6 }}>ההצהרה שהעובד חותם עליה באישור הקבלה. שדות אוטומטיים: {"{שם}, {מספר}, {מחלקה}, {תאריך}"}. טבלת הפריטים ותנאי הקיזוז מתווספים אוטומטית.</div>
+    <textarea rows={5} value={txt} onChange={(e) => setTxt(e.target.value)} style={{ width: "100%" }} />
+    <button className="btn-primary" style={{ marginTop: 10 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת תבנית"}</button>
+  </>);
+}
+function PpeClawbackSettings({ config, onSave }) {
+  const [rows, setRows] = useState(ppeClawbackTable(config).map((r) => ({ maxDays: String(r.maxDays), pct: String(r.pct) })));
+  const [saved, setSaved] = useState(false);
+  const setOne = (i, k, v) => setRows((s) => s.map((r, j) => j === i ? { ...r, [k]: v } : r));
+  const add = () => setRows((s) => [...s, { maxDays: "", pct: "" }]);
+  const rm = (i) => setRows((s) => s.filter((_, j) => j !== i));
+  const save = async () => { const clean = rows.map((r) => ({ maxDays: Math.max(0, parseInt(r.maxDays || "0", 10) || 0), pct: Math.max(0, Math.min(100, parseInt(r.pct || "0", 10) || 0)) })).filter((r) => r.maxDays > 0).sort((a, b) => a.maxDays - b.maxDays); await onSave({ ...config, ppeClawback: clean }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardCheck size={15} /> קיזוז בעזיבה — מדרגות לפי ותק</SectionTitle></div>
+    <div className="hint" style={{ marginBottom: 10 }}>כמה אחוז מהיתרה (מחיר מלא פחות מה ששולם) ינוכה מעובד שעוזב, לפי כמה ימים עברו מההנפקה. מעבר למדרגה האחרונה — 0%. דוגמה: עד 30 יום 100%, עד 90 יום 75%, וכו׳.</div>
+    <div className="cards">{rows.map((r, i) => <div key={i} className="tcard" style={{ cursor: "default" }}><div className="tcard-main" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>עד <input type="number" min="1" value={r.maxDays} onChange={(e) => setOne(i, "maxDays", e.target.value)} style={{ width: 80 }} /> ימים</label>
+      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>ניכוי <input type="number" min="0" max="100" value={r.pct} onChange={(e) => setOne(i, "pct", e.target.value)} style={{ width: 70 }} />%</label>
+      <button className="icon-btn" aria-label="הסר" onClick={() => rm(i)} style={{ marginInlineStart: "auto" }}><X size={18} /></button>
+    </div></div>)}</div>
+    <button className="btn-ghost sm" style={{ marginTop: 8 }} onClick={add}><Plus size={14} /> הוסף מדרגה</button>
+    <button className="btn-primary full" style={{ marginTop: 12 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת מדרגות"}</button>
+  </>);
+}
+
+const ppeArchiveWorker = async (worker, plan, deps) => {
+  const { items, savePpe, savePpeItem, saveUser, session } = deps;
+  const now = Date.now();
+  const base = { workerId: worker.id, workerName: worker.name, workerNo: worker.workerNo || "", dept: worker.dept || "", employmentType: worker.employmentType || "direct", qty: 0, at: now, exitId: ("exit_" + now + "_" + worker.id), by: { id: session.id, name: session.name }, clawbackEligible: false };
+  for (const r of (plan.keep || [])) await savePpe({ id: uid(), ...base, itemId: r.iss.itemId, itemName: r.iss.itemName, category: r.iss.category, size: r.iss.size, unitCost: r.iss.unitCost || 0, workerCharge: r.amount, note: "קיזוז בעזיבה", origin: "clawback", linkedIssueId: r.iss.id });
+  for (const r of (plan.returns || [])) {
+    await savePpe({ id: uid(), ...base, itemId: r.iss.itemId, itemName: r.iss.itemName, category: r.iss.category, size: r.iss.size, unitCost: r.iss.unitCost || 0, qty: r.iss.qty || 1, restocked: true, workerCharge: 0, note: "הוחזר למלאי בעזיבה", origin: "return", linkedIssueId: r.iss.id });
+    const it = (items || []).find((x) => x.id === r.iss.itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; sb[r.iss.size] = (sb[r.iss.size] || 0) + (r.iss.qty || 1); await savePpeItem({ ...it, stockBySize: sb }); }
+  }
+  await saveUser({ ...worker, active: false, status: "archived", exitAt: now });
+};
+
+function PpeExitSettlement({ ppe, users, items, config, session, savePpe, savePpeItem, saveUser, onClose, initialWid }) {
+  const [q, setQ] = useState(""), [wid, setWid] = useState(initialWid || ""), [ret, setRet] = useState({}), [done, setDone] = useState(false);
+  const now = Date.now(), table = ppeClawbackTable(config);
+  const recips = (users || []).filter((u) => ["worker", "cleaner", "tech"].includes(u.role) && u.active !== false);
+  const ql = q.trim().toLowerCase();
+  const matches = ql ? recips.filter((u) => (u.name || "").toLowerCase().includes(ql) || String(u.workerNo || "").includes(q.trim())).slice(0, 8) : [];
+  const worker = recips.find((u) => u.id === wid);
+  const issued = worker ? (ppe || []).filter((x) => x.workerId === worker.id && ppeIsIssue(x) && x.at >= ((worker && worker.ppeResetAt) || 0)) : [];
+  const rows = issued.map((x) => { const it = (items || []).find((i) => i.id === x.itemId); const retbl = ppeReturnable(it || x); const returned = retbl ? !!ret[x.id] : false; const amount = ppeExitCharge(x, it || x, table, now, returned); return { iss: x, retbl, returned, amount, days: Math.max(0, Math.floor((now - x.at) / 86400000)) }; });
+  const keep = rows.filter((r) => r.amount > 0).map((r) => ({ iss: r.iss, amount: r.amount }));
+  const returns = rows.filter((r) => r.retbl && r.returned).map((r) => ({ iss: r.iss }));
+  const total = keep.reduce((s, r) => s + r.amount, 0);
+  const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "9px 12px", background: "var(--surface)", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", textAlign: "start" };
+  const confirm = async () => { await ppeArchiveWorker(worker, { keep, returns }, { items, savePpe, savePpeItem, saveUser, session }); setDone(true); };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">עזיבת עובד — החזרת ציוד וקיזוז</div></div>
+    <div className="body">
+      {!worker ? <>
+        <label className="field"><span>עובד עוזב (חיפוש לפי מספר או שם)</span><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="הקלידו מספר עובד או שם" autoFocus /></label>
+        {q.trim() && <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>{matches.map((u) => <button key={u.id} style={rowStyle} onClick={() => { setWid(u.id); setQ(""); }}><span style={{ fontWeight: 600 }}>{u.name}</span><span style={{ color: "var(--muted)", fontSize: 12 }}>{u.workerNo ? `מס׳ ${u.workerNo}` : ""}{u.dept ? ` · ${u.dept}` : ""}</span></button>)}{matches.length === 0 && <div className="hint" style={{ padding: "10px 12px" }}>לא נמצא עובד פעיל תואם.</div>}</div>}
+      </> : done ? <div className="note" style={{ marginTop: 4, color: "#0D9488" }}>העובד הועבר לארכיון. קיזוז/החזרות נרשמו ביומן.</div> : <>
+        <div className="row-between" style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}><span style={{ fontWeight: 600 }}>{worker.name}{worker.workerNo ? ` · מס׳ ${worker.workerNo}` : ""}{worker.dept ? ` · ${worker.dept}` : ""}</span><button className="btn-ghost sm" onClick={() => setWid("")}>שנה</button></div>
+        {rows.length === 0 ? <div className="note" style={{ marginTop: 4 }}>לא הונפק לעובד ציוד הדורש טיפול — ניתן לארכב ישירות.</div> : <>
+          <SectionTitle>ציוד שהונפק — החזרה / קיזוז</SectionTitle>
+          <div className="task-list">{rows.map((r) => <div key={r.iss.id} className="task-row" style={{ borderInlineStartColor: r.returned ? "#0D9488" : (r.amount > 0 ? "#B45309" : "var(--muted)"), cursor: "default" }}>
+            <div className="task-row-main"><div className="task-row-t">{r.iss.itemName}{r.iss.size && r.iss.size !== "אחיד" ? ` · ${r.iss.size}` : ""}</div><div className="task-row-sub">לפני {r.days} ימים · {r.retbl ? "נאסף בחזרה" : "לא נאסף"}{r.amount > 0 ? ` · חיוב ${ils(r.amount)}` : (r.returned ? " · הוחזר" : " · ללא חוב")}</div></div>
+            <div className="task-row-side">{r.retbl ? <label className="chk-line" style={{ margin: 0, fontSize: 13 }}><input type="checkbox" checked={r.returned} onChange={(e) => setRet((s) => ({ ...s, [r.iss.id]: e.target.checked }))} /> הוחזר</label> : null}<span className="task-due" style={{ fontWeight: 700, color: r.amount > 0 ? "#B45309" : "#0D9488" }}>{r.amount > 0 ? ils(r.amount) : "₪0"}</span></div>
+          </div>)}</div>
+          <div className="row-between" style={{ marginTop: 12, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10, fontWeight: 700 }}><span>סה״כ לניכוי מהעובד</span><span style={{ color: total > 0 ? "#B45309" : "#0D9488" }}>{ils(total)}</span></div>
+        </>}
+        <button className="btn-primary full" style={{ marginTop: 12 }} onClick={confirm}>לסגור במערכת ולהעביר לארכיון{total > 0 ? ` · קיזוז ${ils(total)}` : ""}</button>
+      </>}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function ArchiveWorkerCard({ worker, ppe, onClose, onRestore }) {
+  const recs = (ppe || []).filter((x) => x.workerId === worker.id).sort((a, b) => b.at - a.at);
+  const issued = recs.filter((x) => x.origin !== "clawback" && x.origin !== "return");
+  const owed = recs.reduce((s, x) => s + (x.workerCharge || 0), 0);
+  const typeLabel = (x) => x.origin === "clawback" ? "קיזוז בעזיבה" : x.origin === "return" ? "החזרה" : "הנפקה";
+  const Row = ({ k, v }) => <div className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid var(--border)" }}><span style={{ color: "var(--muted)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div>;
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">כרטיס עובד בארכיון</div></div>
+    <div className="body">
+      <div style={{ fontWeight: 800, fontSize: 18 }}>{worker.name}</div>
+      <div style={{ marginTop: 10, marginBottom: 8 }}>
+        <Row k="תפקיד" v={ROLE_LABEL[worker.role] || worker.role} />
+        <Row k="מספר עובד" v={worker.workerNo || "—"} />
+        <Row k="מחלקה" v={worker.dept || "—"} />
+        {worker.supplier ? <Row k="קבלן" v={worker.supplier} /> : null}
+        <Row k="נסגר במערכת" v={worker.exitAt ? fmtDate(worker.exitAt) : "—"} />
+        <Row k="פריטים שהונפקו" v={issued.length} />
+        {owed > 0 ? <Row k="חוב שנותר" v={ils(owed)} /> : null}
+      </div>
+      <SectionTitle><HardHat size={15} /> היסטוריית ציוד</SectionTitle>
+      {recs.length === 0 ? <Empty text="לא הונפק ציוד" Icon={HardHat} /> : <div className="task-list">{recs.map((x) => <div key={x.id} className="task-row" style={{ borderInlineStartColor: x.origin === "clawback" ? "#B45309" : x.origin === "return" ? "#0D9488" : "var(--muted)", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{x.itemName}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{x.qty > 1 ? ` ×${x.qty}` : ""}</div><div className="task-row-sub">{ppeCatLabel(x.category)} · {typeLabel(x)} · {fmtDate(x.at)}</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: x.workerCharge > 0 ? "#B45309" : "#0D9488" }}>{x.workerCharge > 0 ? ils(x.workerCharge) : (x.origin === "return" ? "הוחזר" : "חינם")}</span></div></div>)}</div>}
+      {onRestore && <button className="btn-primary full" style={{ marginTop: 14 }} onClick={() => onRestore(worker)}>שחזור עובד — חזרה לעבודה (ללא ביגוד)</button>}
+      <div className="hint" style={{ marginTop: 6 }}>שחזור מחזיר את העובד לרשימה הפעילה עם מספר העובד וההיסטוריה, ומאפס את זכאות הביגוד — הוא מתחיל «ללא ביגוד» כעובד חדש. הרישומים הקודמים נשמרים בכרטיס זה.</div>
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeMyView({ ppe, items, norms, session, reqs, savePpeReq, config }) {
+  const [signing, setSigning] = useState(null);
+  const [wsig, setWsig] = useState("");
+  const [rejMode, setRejMode] = useState(false);
+  const [rejReason, setRejReason] = useState("");
+  const toSign = (reqs || []).filter((r) => r.workerId === session.id && r.status === "worker_sign").sort((a, b) => b.at - a.at);
+  const reset = (session && session.ppeResetAt) || 0;
+  const mine = (ppe || []).filter((x) => x.workerId === session.id && x.at >= reset);
+  const received = mine.filter((x) => ppeIsIssue(x)).sort((a, b) => b.at - a.at);
+  const owed = mine.reduce((s, x) => s + (x.workerCharge || 0), 0);
+  const myDept = ppeWorkerDept(session); const myNorms = (norms || []).filter((n) => n.dept === myDept && n.active !== false);
+  const have = new Set(received.map((x) => x.itemId));
+  const missing = myNorms.filter((n) => !have.has(n.itemId)).map((n) => (items || []).find((it) => it.id === n.itemId)).filter(Boolean);
+  return (<div style={{ padding: 16 }}>
+    {toSign.length > 0 && <div style={{ marginBottom: 14 }}>{toSign.map((r) => <div key={r.id} style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 12, padding: 14, marginBottom: 8 }}><div style={{ fontWeight: 800, marginBottom: 4 }}>מסמך הממתין לחתימתך</div><div style={{ fontSize: 13, color: "#92400E", marginBottom: 8 }}>{(r.lines || []).map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ")}</div><button className="btn-primary full" onClick={() => { setSigning(r); setWsig(""); setRejMode(false); setRejReason(""); }}><PenLine size={15} /> צפה וחתום</button></div>)}</div>}
+    {signing && (() => { const w = { name: signing.workerName, workerNo: signing.workerNo, dept: signing.dept }; const dr = (signing.lines || []).map((l) => ({ itemName: l.itemName, size: l.size, qty: l.qty, category: l.category, workerCharge: l.workerCharge || 0, chargeReason: l.chargeReason || "", clawbackEligible: !!l.clawbackEligible, clawbackSnapshot: (typeof ppeClawbackTable === "function" ? ppeClawbackTable(config) : []) })); return <Overlay persistent onClose={() => setSigning(null)}><div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={() => setSigning(null)}><X size={22} /></button><div className="form-title">חתימה על קבלת ציוד</div></div><div className="body"><div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }} dangerouslySetInnerHTML={{ __html: ppeDocBody(dr, w, config) }} />{rejMode ? (<div style={{ marginTop: 12 }}><label className="field"><span>סיבת הסירוב</span><textarea value={rejReason} onChange={(e) => setRejReason(e.target.value)} placeholder="לא חובה" /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost" onClick={() => setRejMode(false)}>חזרה</button><button className="btn-danger full" onClick={() => { savePpeReq({ ...signing, status: "rejected", rejectReason: rejReason.trim(), rejectedByWorker: true, decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now() }); setSigning(null); }}>אישור סירוב</button></div></div>) : (<><SignaturePad value={wsig} onChange={setWsig} required={true} /><div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}><button className="btn-danger" onClick={() => setRejMode(true)}>סירוב לחתום</button><button className="btn-primary full" disabled={!wsig} onClick={() => { if (!wsig) return; savePpeReq({ ...signing, status: "pending", signature: wsig, workerSignedAt: Date.now(), awaitWorkerSign: false }); setSigning(null); }}><CheckCircle2 size={15} /> מאשר וחותם</button></div></>)}<div style={{ height: 20 }} /></div></div></Overlay>; })()}
+    <SectionTitle><HardHat size={15} /> הציוד שלי</SectionTitle>
+    {received.length === 0 ? <Empty text="טרם הונפק לך ציוד" Icon={HardHat} /> : <div className="task-list">{received.map((x) => <div key={x.id} className="task-row" style={{ borderInlineStartColor: "#0D9488" }}><div className="task-row-main"><div className="task-row-t">{x.itemName}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{x.qty > 1 ? ` ×${x.qty}` : ""}</div><div className="task-row-sub">{ppeCatLabel(x.category)} · {fmtDate(x.at)}</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: x.workerCharge > 0 ? "#B45309" : "#0D9488" }}>{x.workerCharge > 0 ? ils(x.workerCharge) : "חינם"}</span></div></div>)}</div>}
+    {owed > 0 && <div className="row-between" style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10, fontWeight: 700 }}><span>סה״כ לחיוב</span><span style={{ color: "#B45309" }}>{ils(owed)}</span></div>}
+    {missing.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>זכאות שטרם נוצלה</SectionTitle><div className="chips">{missing.map((it) => <span key={it.id} className="chip">{it.name}</span>)}</div></div>}
+    <div style={{ height: 24 }} />
+  </div>);
+}
+
+function PpeDashboard({ items, ppe, config, pend, onPend, onCreateOrder, onCatalog, onMovements, mStart, mEnd, mLabel, orders }) {
+  const [open, setOpen] = useState({});
+  const [flt, setFlt] = useState(null);
+  const active = (items || []).filter((x) => x.active !== false);
+  const now = Date.now();
+  const iss = (ppe || []).filter((x) => ppeIsIssue(x));
+  const c90 = {}; iss.filter((x) => x.at >= now - 90 * 86400000).forEach((x) => { c90[x.itemId] = (c90[x.itemId] || 0) + (x.qty || 1); });
+  const c30count = iss.filter((x) => x.at >= mStart && x.at < mEnd).length;
+  const charge30 = iss.filter((x) => x.at >= mStart && x.at < mEnd).reduce((s2, x) => s2 + (x.workerCharge || 0), 0);
+  const flagged30 = iss.filter((x) => x.at >= mStart && x.at < mEnd && x.flagged).length;
+  const low = active.filter((x) => ppeLow(x));
+  const out = active.filter((x) => ppeTotalStock(x) <= 0);
+  const cats = {}; active.forEach((it) => { const c = it.category || "other"; (cats[c] = cats[c] || []).push(it); });
+  const reorder = active.map((x) => { const defs = ppeNetDeficits(x, orders); return { it: x, defs, need: defs.reduce((s2, d) => s2 + d.need, 0) }; }).filter((r) => r.need > 0);
+  const top = Object.entries(c90).map(([id, n]) => ({ it: active.find((x) => x.id === id), n })).filter((r) => r.it).sort((a2, b2) => b2.n - a2.n).slice(0, 8);
+  const topMax = Math.max(1, ...top.map((r) => r.n));
+  const recs = []; active.forEach((it) => { const used = c90[it.id] || 0; const min = ppeMinTotal(it); if (min > 0 && used > min * 1.5) recs.push({ it, kind: "up", text: `ביקוש גבוה (${used} ב-90 ימים) מול מינימום ${min} — שקול להעלות מינימום` }); else if (used === 0 && min > 0 && ppeTotalStock(it) > min * 2) recs.push({ it, kind: "down", text: `אין ביקוש ב-90 ימים, מלאי ${ppeTotalStock(it)} מול מינימום ${min} — שקול להוריד מינימום` }); });
+  const cardBase = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 };
+  const Kpi = ({ v, l, c, Ic, on, onClick }) => <button type="button" onClick={onClick} disabled={!onClick} style={{ flex: "1 1 130px", textAlign: "start", ...cardBase, borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, cursor: onClick ? "pointer" : "default", outline: on ? "2px solid #0D9488" : "none" }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 28, fontWeight: 800, color: c || "inherit" }}>{v}</span><Ic size={20} color={c || "var(--muted)"} /></div><span style={{ fontSize: 13, color: "var(--muted)" }}>{l}</span></button>;
+  const ItemRow = ({ it }) => { const sizes = ppeSizes(it); const lw = ppeLow(it); return <div style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}><div className="row-between"><span style={{ fontWeight: 600 }}>{it.name}{ppeIsUpgrade(it, active) ? " ★" : ""}</span><span style={{ fontSize: 12, color: lw ? "#DC2626" : "var(--muted)" }}>סה״כ {ppeTotalStock(it)}{ppeMinTotal(it) ? ` · מינ׳ ${ppeMinTotal(it)}` : ""} · {ils(it.unitCost || 0)}</span></div><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>{sizes.map((sz) => { const sl = ppeLowSize(it, sz); return <span key={sz} style={{ padding: "2px 8px", borderRadius: 6, background: sl ? "#FEE2E2" : "var(--surface-2)", color: sl ? "#B91C1C" : "inherit", fontSize: 12 }}>{szLbl(sz)}: <b>{ppeStockOf(it, sz)}</b></span>; })}</div></div>; };
+  const fltItems = flt === "low" ? low : flt === "out" ? out : null;
+  return (<div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+      <Kpi v={active.length} l="פריטים בקטלוג" Ic={Package} onClick={onCatalog} />
+      {pend ? <Kpi v={pend} l="בקשות ממתינות" c="#B45309" Ic={ClipboardList} onClick={onPend} /> : null}
+      <Kpi v={low.length} l="מתחת למינימום" c={low.length ? "#DC2626" : null} Ic={AlertTriangle} on={flt === "low"} onClick={low.length ? (() => setFlt(flt === "low" ? null : "low")) : null} />
+      <Kpi v={out.length} l="אזל מהמלאי" c={out.length ? "#DC2626" : null} Ic={PackageX} on={flt === "out"} onClick={out.length ? (() => setFlt(flt === "out" ? null : "out")) : null} />
+      <Kpi v={c30count} l={"הנפקות · " + mLabel} Ic={PackageCheck} onClick={onMovements} />
+      <Kpi v={ils(charge30)} l={"חיוב עובדים · " + mLabel} Ic={Coins} onClick={onMovements} />
+      <Kpi v={flagged30} l={"חריגות הנפקה · " + mLabel} c={flagged30 ? "#B45309" : null} Ic={AlertTriangle} onClick={onMovements} />
+    </div>
+    {fltItems && <div style={{ ...cardBase, marginTop: 12 }}><div className="row-between" style={{ marginBottom: 4 }}><b>{flt === "low" ? "מתחת למינימום" : "אזל מהמלאי"} ({fltItems.length})</b><button className="btn-ghost sm" onClick={() => setFlt(null)}>סגור</button></div>{fltItems.map((it) => <ItemRow key={it.id} it={it} />)}</div>}
+    {reorder.length > 0 && <div style={{ marginTop: 22 }}><div className="row-between"><SectionTitle><AlertTriangle size={15} /> להזמנה — מתחת למינימום</SectionTitle></div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>{reorder.map(({ it, need, defs }) => { const IconC = ppeCatIcon(it.category); return <div key={it.id} style={{ ...cardBase, borderInlineStart: "4px solid #DC2626" }}><div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><IconC size={18} color="#DC2626" />{it.name}</div><div style={{ marginTop: 6, fontSize: 13, color: "var(--muted)" }}>במלאי {ppeTotalStock(it)} · מינימום {ppeMinTotal(it)}</div><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>{ppeSizes(it).map((sz) => { const sl = ppeLowSize(it, sz); const m = ppeMinOf(it, sz); return <span key={sz} style={{ padding: "2px 8px", borderRadius: 6, background: sl ? "#FEE2E2" : "var(--surface-2)", color: sl ? "#B91C1C" : "inherit", fontSize: 12 }}>{szLbl(sz)}: <b>{ppeStockOf(it, sz)}</b>{m ? `/${m}` : ""}</span>; })}</div><div style={{ marginTop: 8, display: "inline-block", background: "#FEE2E2", color: "#B91C1C", borderRadius: 8, padding: "2px 10px", fontWeight: 700, fontSize: 13 }}>חסר {need} ({defs.length} מידות)</div></div>; })}</div></div>}
+    <div style={{ marginTop: 22 }}><div className="row-between"><SectionTitle><Package size={15} /> מלאי לפי קטגוריה</SectionTitle>{onCreateOrder && <button className="btn-primary sm" onClick={onCreateOrder}><Plus size={15} /> צור הזמנת רכש</button>}</div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>{Object.entries(cats).map(([c, list]) => { const IconC = ppeCatIcon(c); const tot = list.reduce((s2, x) => s2 + ppeTotalStock(x), 0); const minSum = list.reduce((s2, x) => s2 + ppeMinTotal(x), 0); const lowN = list.filter((x) => ppeLow(x)).length; const pct = minSum > 0 ? Math.min(100, Math.round(tot / minSum * 100)) : 100; const ratio = minSum > 0 ? tot / minSum : 99; const col = lowN > 0 ? "#DC2626" : (ratio < 1.3 ? "#D97706" : "#0D9488"); const isOpen = !!open[c]; return <div key={c} style={{ ...cardBase, cursor: "pointer", gridColumn: isOpen ? "1 / -1" : "auto" }} onClick={() => setOpen((o) => ({ ...o, [c]: !o[c] }))}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><IconC size={18} color={col} />{ppeCatLabel(c)}</div><span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>{list.length} פריטים <ChevronLeft size={14} style={{ transform: isOpen ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></span></div><div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 6 }}><span style={{ fontSize: 24, fontWeight: 800 }}>{tot}</span><span style={{ fontSize: 12, color: "var(--muted)" }}>במלאי{minSum ? ` · מינ׳ ${minSum}` : ""}</span></div><div style={{ marginTop: 8, height: 6, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: col }} /></div>{lowN > 0 && <div style={{ marginTop: 6, fontSize: 12, color: "#DC2626" }}>{lowN} פריטים מתחת למינימום</div>}{isOpen && <div style={{ marginTop: 10, borderTop: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>{list.map((it) => <ItemRow key={it.id} it={it} />)}</div>}</div>; })}</div></div>
+    
+    {recs.length > 0 && <div style={{ marginTop: 22 }}><SectionTitle>המלצות מלאי</SectionTitle><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12, marginTop: 8 }}>{recs.map((r) => <div key={r.it.id} style={{ ...cardBase, borderInlineStart: "4px solid " + (r.kind === "up" ? "#B45309" : "var(--muted)") }}><div style={{ fontWeight: 700 }}>{r.it.name}</div><div style={{ marginTop: 4, fontSize: 13, color: "var(--muted)" }}>{r.text}</div></div>)}</div></div>}
+    <div style={{ height: 24 }} />
+  </div>);
+}
+
+const ppeIssueRecs = async (recs, items, savePpeItem, savePpe) => {
+  const arr = Array.isArray(recs) ? recs : [recs];
+  const delta = {};
+  arr.forEach((r) => { const sgn = r.origin === "return" ? 1 : (ppeIsIssue(r) ? -1 : 0); if (!sgn) return; delta[r.itemId] = delta[r.itemId] || {}; delta[r.itemId][r.size] = (delta[r.itemId][r.size] || 0) + sgn * (r.qty || 1); });
+  for (const itemId of Object.keys(delta)) { const it = (items || []).find((x) => x.id === itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; Object.entries(delta[itemId]).forEach(([sz, d]) => { sb[sz] = Math.max(0, (sb[sz] || 0) + d); }); await savePpeItem({ ...it, stockBySize: sb }); } }
+  for (const r of arr) await savePpe(r);
+};
+
+function PpeRequester({ ppe, items, norms, reqs, users, config, session, saveUser, savePpeReq, delPpeReq, deptScope }) {
+  const [form, setForm] = useState(false);
+  const mine = (reqs || []).filter((r) => r.by && r.by.id === session.id).sort((a, b) => b.at - a.at);
+  const pend = mine.filter((r) => r.status === "pending" || r.status === "worker_sign");
+  const done = mine.filter((r) => r.status !== "pending" && r.status !== "worker_sign");
+  const submit = (recs) => {
+    const arr = Array.isArray(recs) ? recs : [recs];
+    if (!arr.length) return;
+    const r0 = arr[0];
+    const req = { id: uid(), status: (r0.awaitWorkerSign ? "worker_sign" : "pending"), awaitWorkerSign: !!r0.awaitWorkerSign, workerId: r0.workerId, workerName: r0.workerName, workerNo: r0.workerNo || "", dept: r0.dept || "", lines: arr.map((r) => ({ itemId: r.itemId, itemName: r.itemName, category: r.category, size: r.size, qty: r.qty, workerCharge: r.workerCharge || 0, chargeReason: r.chargeReason || "", clawbackEligible: !!r.clawbackEligible, unitCost: r.unitCost || 0 })), note: (r0.note || "").trim(), signature: r0.signature || "", by: { id: session.id, name: session.name }, at: Date.now() };
+    savePpeReq(req); setForm(false);
+  };
+  const chip = (r) => r.status === "approved" ? <span className="badge sm" style={{ background: "#DCFCE7", color: "#166534" }}>אושרה והונפקה</span> : r.status === "rejected" ? <span className="badge sm" style={{ background: "#FEE2E2", color: "#B91C1C" }}>נדחתה</span> : r.status === "worker_sign" ? <span className="badge sm" style={{ background: "#FEF9C3", color: "#854D0E" }}>ממתינה לחתימת העובד</span> : <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>ממתינה</span>;
+  const lineTxt = (r) => r.lines.map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ");
+  const Card = ({ r }) => <div className="task-row" style={{ borderInlineStartColor: r.status === "approved" ? "#0D9488" : r.status === "rejected" ? "#DC2626" : "#D97706", cursor: "default" }}>
+    <div className="task-row-main"><div className="task-row-t">{r.workerName}{r.workerNo ? ` · מס׳ ${r.workerNo}` : ""}</div><div className="task-row-sub">{lineTxt(r)}</div>{r.status === "rejected" && r.rejectReason && <div className="task-row-sub" style={{ color: "#B91C1C" }}>סיבת דחייה: {r.rejectReason}</div>}</div>
+    <div className="task-row-side"><span className="task-due">{fmtDate(r.at)}</span>{chip(r)}{(r.status === "pending" || r.status === "worker_sign") && <button className="btn-ghost sm" onClick={() => delPpeReq(r.id)}>ביטול</button>}</div>
+  </div>;
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><HardHat size={15} /> בקשות הנפקת ביגוד</SectionTitle><button className="btn-primary sm" onClick={() => setForm(true)}><Plus size={15} /> שלח בקשה</button></div>
+    <div className="hint" style={{ marginBottom: 10 }}>בחרו עובד מהמחלקות שלכם ואת הפריטים הדרושים. הבקשה תישלח למנהל הציוד/HR לאישור והנפקה. ניפוק מהמלאי מתבצע רק לאחר אישור.</div>
+    {pend.length > 0 && <><SectionTitle>ממתינות לאישור ({pend.length})</SectionTitle><div className="task-list">{pend.map((r) => <Card key={r.id} r={r} />)}</div></>}
+    {done.length > 0 && <div style={{ marginTop: 14 }}><SectionTitle>היסטוריה</SectionTitle><div className="task-list">{done.slice(0, 20).map((r) => <Card key={r.id} r={r} />)}</div></div>}
+    {mine.length === 0 && <Empty text="טרם נשלחו בקשות" Icon={HardHat} sub="לחצו «שלח בקשה» כדי לבקש ניפוק לעובד" />}
+    {form && <Overlay persistent onClose={() => setForm(false)}><PpeIssueForm users={users} items={(items || []).filter((x) => x.active !== false)} norms={norms} ppe={ppe} config={config} session={session} saveUser={saveUser} deptScope={deptScope} onCancel={() => setForm(false)} onIssue={submit} submitLabel="שלח בקשה" title="בקשת הנפקת ציוד" requester={true} /></Overlay>}
+  </>);
+}
+
+function PpeRequests({ ppe, reqs, items, norms, users, config, session, savePpe, delPpe, savePpeItem, saveUser, savePpeReq, delPpeReq, compact }) {
+  const [approve, setApprove] = useState(null);
+  const [rejId, setRejId] = useState(null);
+  const [reason, setReason] = useState("");
+  const [showDone, setShowDone] = useState(false);
+  const all = (reqs || []).slice();
+  const pend = all.filter((r) => r.status === "pending").sort((a, b) => a.at - b.at);
+  const done = all.filter((r) => r.status !== "pending").sort((a, b) => (b.decidedAt || b.at) - (a.decidedAt || a.at));
+  const onApprove = async (recs) => {
+    const arr = (Array.isArray(recs) ? recs : [recs]).map((x) => ({ ...x, initiatedByName: (approve && approve.by && approve.by.name) || x.initiatedByName || "", initiatedAt: (approve && approve.at) || x.initiatedAt || Date.now() }));
+    await ppeIssueRecs(arr, items, savePpeItem, savePpe);
+    const r = approve;
+    if (r) await savePpeReq({ ...r, status: "approved", decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now(), issueIds: arr.map((x) => x.id) });
+    setApprove(null);
+  };
+  const doReject = async (r) => {
+    await savePpeReq({ ...r, status: "rejected", rejectReason: reason.trim(), decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now() });
+    setRejId(null); setReason("");
+  };
+  const lineTxt = (r) => r.lines.map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ");
+  return (<>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> בקשות הנפקה</SectionTitle></div>
+    {pend.length === 0 ? <Empty text="אין בקשות ממתינות" Icon={ClipboardList} sub="בקשות מהמנהלים יופיעו כאן לאישור" /> : <div className="task-list">{pend.map((r) => <div key={r.id} className="task-row" style={{ borderInlineStartColor: "#D97706", cursor: "default" }}>
+      <div className="task-row-main"><div className="task-row-t">{r.workerName}{r.workerNo ? ` · מס׳ ${r.workerNo}` : ""}{r.dept ? ` · ${r.dept}` : ""}</div><div className="task-row-sub">{lineTxt(r)}</div><div className="task-row-sub">מאת {(r.by && r.by.name) || "—"} · {fmtDate(r.at)}{r.note ? ` · ${r.note}` : ""}</div>
+        {rejId === r.id && <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="סיבת דחייה" autoFocus style={{ flex: 1 }} /><button className="btn-danger sm" onClick={() => doReject(r)}>דחה</button><button className="btn-ghost sm" onClick={() => { setRejId(null); setReason(""); }}>בטל</button></div>}</div>
+      {rejId !== r.id && <div className="task-row-side" style={{ flexDirection: "column", gap: 6 }}><button className="btn-primary sm" onClick={() => setApprove(r)}>אישור והנפקה</button><button className="btn-ghost sm" onClick={() => { setRejId(r.id); setReason(""); }}>דחייה</button></div>}
+    </div>)}</div>}
+    {!compact && done.length > 0 && <div style={{ marginTop: 16 }}><button className="btn-ghost sm" onClick={() => setShowDone((v) => !v)}>{showDone ? "הסתר" : "הצג"} בקשות מטופלות ({done.length})</button>{showDone && <div className="task-list" style={{ marginTop: 8 }}>{done.slice(0, 30).map((r) => <div key={r.id} className="task-row" style={{ borderInlineStartColor: r.status === "approved" ? "#0D9488" : "#DC2626", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.workerName} · {lineTxt(r)}</div><div className="task-row-sub">{r.status === "approved" ? "אושרה והונפקה" : `נדחתה${r.rejectReason ? ` — ${r.rejectReason}` : ""}`} · {(r.decidedBy && r.decidedBy.name) || ""} · {fmtDate(r.decidedAt || r.at)}</div></div></div>)}</div>}</div>}
+    {approve && <Overlay persistent onClose={() => setApprove(null)}><PpeIssueForm users={users} items={items} norms={norms} ppe={ppe} config={config} session={session} saveUser={saveUser} deptScope={null} initial={{ workerId: approve.workerId, lines: approve.lines.map((l) => ({ itemId: l.itemId, size: l.size, qty: l.qty })), note: approve.note, signature: approve.signature }} lockWorker={true} onCancel={() => setApprove(null)} onIssue={onApprove} submitLabel="אישור והנפקה" title="אישור בקשה והנפקה" /></Overlay>}
+  </>);
+}
+
+const PPE_ORDER_ST = { draft: { label: "טיוטה", color: "#64748B" }, sent: { label: "נשלחה לספק", color: "#2563EB" }, received: { label: "התקבלה ונסגרה", color: "#16A34A" }, cancelled: { label: "בוטלה", color: "#DC2626" } };
+const ppeOrderQty = (o) => (o.lines || []).reduce((s, l) => s + (l.qty || 0), 0);
+const ppeOrderRecv = (o) => (o.lines || []).reduce((s, l) => s + (l.received || 0), 0);
+
+const SUP_INDUSTRIES = [{ id: "transport", label: "תחבורה / מלגזות" }, { id: "facility", label: "מבנה ותחזוקה" }, { id: "clothing", label: "ביגוד וציוד מגן" }];
+const supIndLabel = (id) => (SUP_INDUSTRIES.find((x) => x.id === id) || {}).label || id;
+const supMeta = (config, name) => (config && config.supplierMeta && config.supplierMeta[name]) || {};
+function PpeOrderForm({ order, items, session, onCancel, onSave, config }) {
+  const o = order || {};
+  const active = (items || []).filter((x) => x.active !== false);
+  const [supplier, setSupplier] = useState(o.supplier || "");
+  const [note, setNote] = useState(o.note || "");
+  const [lines, setLines] = useState(() => (o.lines || []).map((l) => ({ ...l })));
+  const [pid, setPid] = useState("");
+  const [sizeQty, setSizeQty] = useState({});
+  const pickItem = active.find((x) => x.id === pid);
+  const psizes = pickItem ? ppeSizes(pickItem) : [];
+  const setSQ = (sz, v) => setSizeQty((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
+  const pickAndSuggest = (id) => { setPid(id); const it2 = active.find((x) => x.id === id); const sq = {}; if (it2) ppeDeficits(it2).forEach((d) => { sq[d.size] = d.need; }); setSizeQty(sq); };
+  const addLines = () => { if (!pickItem) return; setLines((s) => { const c = [...s]; psizes.forEach((sz) => { const q = sizeQty[sz] || 0; if (q <= 0) return; const i = c.findIndex((l) => l.itemId === pickItem.id && l.size === sz); if (i >= 0) c[i] = { ...c[i], qty: (c[i].qty || 0) + q }; else c.push({ itemId: pickItem.id, itemName: pickItem.name, sku: pickItem.sku || "", category: pickItem.category, size: sz, qty: q, received: 0 }); }); return c; }); setPid(""); setSizeQty({}); };
+  const rm = (i) => setLines((s) => s.filter((_, k) => k !== i));
+  const setQty = (i, v) => setLines((s) => s.map((l, k) => k === i ? { ...l, qty: Math.max(1, parseInt(v || "1", 10) || 1) } : l));
+  const save = () => { if (!lines.length) return; onSave({ id: o.id || uid(), status: o.status || "draft", supplier: supplier.trim(), note: note.trim(), lines, createdBy: o.createdBy || { id: session.id, name: session.name }, createdAt: o.createdAt || Date.now(), sentAt: o.sentAt || null, expectedAt: o.expectedAt || null, closedAt: o.closedAt || null }); };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{o.id ? "עריכת הזמנה" : "הזמנת רכש חדשה"}</div></div>
+    <div className="body">
+      <label className="field"><span>ספק</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— בחר ספק —</option>{(((config && config.suppliers) || []).filter((n) => { const mi = supMeta(config, n).industries; return !mi || mi.length === 0 || mi.includes("clothing"); })).map((n) => <option key={n} value={n}>{n}</option>)}{supplier && !((config && config.suppliers) || []).includes(supplier) && <option value={supplier}>{supplier}</option>}</select></label>
+      <SectionTitle>פריטים בהזמנה</SectionTitle>
+      {!o.id && (o.lines || []).length > 0 && <div className="hint" style={{ marginBottom: 8 }}>מולא אוטומטית לפי חוסרים — אפשר לערוך כמויות, להוסיף או למחוק.</div>}
+      <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <label className="field"><span>בחרו פריט</span><select value={pid} onChange={(e) => pickAndSuggest(e.target.value)}><option value="">בחרו פריט…</option>{active.map((it) => <option key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ""}</option>)}</select></label>
+        {pickItem && <><div className="hint" style={{ margin: "6px 0" }}>כמות לכל מידה (מוצע אוטומטית לפי חוסרים — ניתן לשנות)</div><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{psizes.map((sz) => { const lw = ppeLowSize(pickItem, sz); const m = ppeMinOf(pickItem, sz); return <div key={sz} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 86, border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}><span style={{ fontSize: 12, fontWeight: 700, textAlign: "center", color: lw ? "#B91C1C" : "inherit" }}>{szLbl(sz)}</span><span style={{ fontSize: 10, color: "var(--muted)", textAlign: "center" }}>במלאי {ppeStockOf(pickItem, sz)}{m ? ` / מינ׳ ${m}` : ""}</span><input type="number" min="0" value={sizeQty[sz] ?? 0} onChange={(e) => setSQ(sz, e.target.value)} style={{ width: 76 }} /></div>; })}</div><button className="btn-ghost sm" style={{ marginTop: 8 }} onClick={addLines}><Plus size={14} /> הוסף לפריט</button></>}
+      </div>
+      {lines.length === 0 ? <Empty text="טרם נוספו פריטים" Icon={Package} /> : <div className="task-list">{lines.map((l, i) => { const it = (items || []).find((x) => x.id === l.itemId); const stk = it ? ppeStockOf(it, l.size) : 0; const mn = it ? ppeMinOf(it, l.size) : 0; const mx = it ? ppeMaxOf(it, l.size) : 0; const after = stk + (l.qty || 0); const warn = (mx && after > mx) ? `מעל המקסימום (${mx})` : ((mn && after < mn) ? "עדיין מתחת למינימום" : ""); return <div key={i} className="task-row" style={{ borderInlineStartColor: warn ? "#B45309" : "#2563EB", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{l.itemName}{l.size && l.size !== "אחיד" ? ` · ${l.size}` : ""}</div><div className="task-row-sub">{l.sku ? `מק״ט ${l.sku}` : ppeCatLabel(l.category)}{warn ? ` · ${warn}` : ""}</div></div><div className="task-row-side"><input type="number" min="1" value={l.qty} onChange={(e) => setQty(i, e.target.value)} style={{ width: 70 }} /><button className="btn-ghost sm" onClick={() => rm(i)}><X size={14} /></button></div></div>; })}</div>}
+      <label className="field" style={{ marginTop: 10 }}><span>הערה</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="הערה לספק / פנימית" /></label>
+      <button className="btn-primary full" style={{ marginTop: 12 }} onClick={save} disabled={!lines.length}>שמירת טיוטה</button>
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeOrderCard({ order, items, session, savePpeOrder, delPpeOrder, savePpeItem, savePpe, onEdit, onClose }) {
+  const [recv, setRecv] = useState(null);
+  const [sendMode, setSendMode] = useState(false);
+  const [expected, setExpected] = useState("");
+  const st = PPE_ORDER_ST[order.status] || PPE_ORDER_ST.draft;
+  const q = ppeOrderQty(order), r = ppeOrderRecv(order);
+  const lead = (order.sentAt && order.closedAt) ? Math.max(0, Math.round((order.closedAt - order.sentAt) / 86400000)) : null;
+  const Row = ({ k, v }) => (v != null && v !== "") ? <div className="row-between" style={{ padding: "6px 0", borderBottom: "1px solid var(--border)" }}><span style={{ color: "var(--muted)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div> : null;
+  const orderXlsx = () => { const rows = (order.lines || []).map((l) => ({ "פריט": l.itemName, "מק״ט": l.sku || "", "מידה": l.size, "כמות": l.qty || 0 })); if (!rows.length) return; try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 10 }, { wch: 8 }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "הזמנה"); downloadXlsx(wb, `order_${(order.supplier || "ppe").replace(/[^\w\u0590-\u05FF]+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {} };
+  const orderText = "הזמנה" + (order.supplier ? ` — ${order.supplier}` : "") + "\n" + fmtDate(order.createdAt) + "\n————————\n" + (order.lines || []).map((l) => `${l.itemName}${l.sku ? ` | מק״ט ${l.sku}` : ""}${l.size && l.size !== "אחיד" ? ` | מידה ${l.size}` : ""} | כמות ${l.qty}`).join("\n");
+  const copyText = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(orderText); return; } } catch (e) {} try { const ta = document.getElementById("ordtxt-" + order.id); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
+  const send = async () => { await savePpeOrder({ ...order, status: "sent", sentAt: Date.now(), expectedAt: expected ? new Date(expected).getTime() : null }); setSendMode(false); onClose(); };
+  const cancel = async () => { await savePpeOrder({ ...order, status: "cancelled", closedAt: Date.now() }); onClose(); };
+  const startRecv = () => { const m = {}; (order.lines || []).forEach((l, i) => { m[i] = Math.max(0, (l.qty || 0) - (l.received || 0)); }); setRecv(m); };
+  const doReceive = async () => {
+    const now = Date.now();
+    const newLines = order.lines.map((l, i) => ({ ...l, received: Math.min(l.qty || 0, (l.received || 0) + (recv[i] || 0)) }));
+    const adds = {};
+    order.lines.forEach((l, i) => { const a = recv[i] || 0; if (a > 0) { adds[l.itemId] = adds[l.itemId] || {}; adds[l.itemId][l.size] = (adds[l.itemId][l.size] || 0) + a; } });
+    for (const itemId of Object.keys(adds)) { const it = (items || []).find((x) => x.id === itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; Object.entries(adds[itemId]).forEach(([sz, a]) => { sb[sz] = (sb[sz] || 0) + a; }); await savePpeItem({ ...it, stockBySize: sb }); } }
+    for (let i = 0; i < order.lines.length; i++) { const l = order.lines[i]; const a = recv[i] || 0; if (a > 0) await savePpe({ id: uid(), origin: "restock", itemId: l.itemId, itemName: l.itemName, category: l.category, size: l.size, qty: a, at: now, by: { id: session.id, name: session.name }, unitCost: 0, workerCharge: 0, note: "קבלת הזמנה" + (order.supplier ? ` · ${order.supplier}` : ""), orderId: order.id }); }
+    const fully = newLines.every((l) => (l.received || 0) >= (l.qty || 0));
+    await savePpeOrder({ ...order, lines: newLines, status: fully ? "received" : "sent", closedAt: fully ? now : order.closedAt });
+    setRecv(null); onClose();
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">הזמנת רכש</div></div>
+    <div className="body">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><div style={{ fontWeight: 800, fontSize: 17 }}>{order.supplier || "ללא ספק"}</div><span className="badge sm" style={{ background: st.color + "22", color: st.color }}>{st.label}</span></div>
+      <div>
+        <Row k="נוצר" v={fmtDate(order.createdAt)} />
+        <Row k="נשלח לספק" v={order.sentAt ? fmtDate(order.sentAt) : null} />
+        <Row k="צפי הגעה" v={order.expectedAt ? fmtDate(order.expectedAt) : null} />
+        <Row k="נסגר" v={order.closedAt ? fmtDate(order.closedAt) : null} />
+        <Row k="זמן אספקה" v={lead != null ? `${lead} ימים` : null} />
+        <Row k="נקלט מתוך הוזמן" v={`${r}/${q}`} />
+        {order.note ? <Row k="הערה" v={order.note} /> : null}
+      </div>
+      <SectionTitle>שורות ההזמנה</SectionTitle>
+      <div className="task-list">{(order.lines || []).map((l, i) => { const rem = (l.qty || 0) - (l.received || 0); return <div key={i} className="task-row" style={{ borderInlineStartColor: rem <= 0 ? "#16A34A" : "#2563EB", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{l.itemName}{l.size && l.size !== "אחיד" ? ` · ${l.size}` : ""}</div><div className="task-row-sub">{l.sku ? `מק״ט ${l.sku} · ` : ""}הוזמן {l.qty} · נקלט {l.received || 0}</div></div><div className="task-row-side">{recv ? <input type="number" min="0" max={rem} value={recv[i] ?? 0} onChange={(e) => setRecv((s) => ({ ...s, [i]: Math.max(0, Math.min(rem, parseInt(e.target.value || "0", 10) || 0)) }))} style={{ width: 70 }} /> : <span className="task-due" style={{ fontWeight: 700, color: rem <= 0 ? "#16A34A" : "var(--muted)" }}>{rem <= 0 ? "הושלם" : `נותרו ${rem}`}</span>}</div></div>; })}</div>
+      {(order.lines || []).length > 0 && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={orderXlsx}><FileSpreadsheet size={15} /> הורדת קובץ הזמנה לספק (Excel)</button>}
+      {(order.lines || []).length > 0 && <div style={{ marginTop: 10 }}><div className="hint">טקסט להעתקה (למייל/וואטסאפ):</div><textarea id={`ordtxt-${order.id}`} readOnly value={orderText} style={{ width: "100%", minHeight: 92, fontSize: 12, marginTop: 4, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 4 }} onClick={copyText}>העתק טקסט</button></div>}
+      {sendMode ? <div style={{ marginTop: 12 }}><div className="hint" style={{ marginBottom: 6 }}>הורידו את קובץ ההזמנה (כפתור למעלה) ושלחו לספק בנפרד. כאן רק מסמנים שנשלח.</div><label className="field"><span>צפי הגעה (לא חובה)</span><input type="date" value={expected} onChange={(e) => setExpected(e.target.value)} /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-primary full" onClick={send}>אישור שליחה</button><button className="btn-ghost sm" onClick={() => setSendMode(false)}>ביטול</button></div></div>
+        : recv ? <div style={{ display: "flex", gap: 8, marginTop: 12 }}><button className="btn-primary full" onClick={doReceive}>אישור קליטה למלאי</button><button className="btn-ghost sm" onClick={() => setRecv(null)}>ביטול</button></div>
+        : <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+          {order.status === "draft" && <><button className="btn-primary sm" onClick={() => setSendMode(true)}>שליחה לספק</button><button className="btn-ghost sm" onClick={onEdit}><PenLine size={14} /> עריכה</button><ConfirmBtn className="btn-danger sm" label="מחיקה" onConfirm={async () => { await delPpeOrder(); }} /></>}
+          {order.status === "sent" && <><button className="btn-primary sm" onClick={startRecv}>קבלת סחורה</button><ConfirmBtn className="btn-danger sm" label="ביטול הזמנה" onConfirm={cancel} /></>}
+        </div>}
+      <div style={{ height: 24 }} />
+    </div></div>);
+}
+
+function PpeOrders({ orders, items, config, session, savePpeOrder, delPpeOrder, savePpeItem, savePpe, embedded }) {
+  const [form, setForm] = useState(null), [openId, setOpenId] = useState(null);
+  const open = openId ? (orders || []).find((o) => o.id === openId) : null;
+  const all = (orders || []).slice();
+  const live = all.filter((o) => o.status === "draft" || o.status === "sent").sort((a, b) => b.createdAt - a.createdAt);
+  const done = all.filter((o) => o.status === "received" || o.status === "cancelled").sort((a, b) => (b.closedAt || b.createdAt) - (a.closedAt || a.createdAt));
+  const fromDeficit = () => { const lines = []; (items || []).filter((x) => x.active !== false).forEach((it) => { ppeNetDeficits(it, orders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setForm({ lines }); };
+  const Card = ({ o }) => { const st = PPE_ORDER_ST[o.status] || PPE_ORDER_ST.draft; const q = ppeOrderQty(o), rr = ppeOrderRecv(o); return <button className="task-row" onClick={() => setOpenId(o.id)} style={{ borderInlineStartColor: st.color }}>
+    <div className="task-row-main"><div className="task-row-t">{o.supplier || "ללא ספק"} · {(o.lines || []).length} פריטים</div><div className="task-row-sub">{q} יח׳{o.status === "sent" && rr > 0 ? ` · נקלטו ${rr}/${q}` : ""} · נוצר {fmtDate(o.createdAt)}{o.expectedAt ? ` · צפי ${fmtDate(o.expectedAt)}` : ""}</div></div>
+    <div className="task-row-side"><span className="badge sm" style={{ background: st.color + "22", color: st.color }}>{st.label}</span></div>
+  </button>; };
+  return (<>
+    {!embedded && <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle><button className="btn-primary sm" onClick={fromDeficit}><Plus size={15} /> צור הזמנת רכש</button></div>}
+    {live.length === 0 ? <Empty text="אין הזמנות פתוחות" Icon={Package} sub="«הזמנה» ליצירה ידנית או «מהחוסרים» למילוי לפי מלאי נמוך" /> : <div className="task-list">{live.map((o) => <Card key={o.id} o={o} />)}</div>}
+    {done.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>היסטוריית הזמנות</SectionTitle><div className="task-list">{done.slice(0, 30).map((o) => <Card key={o.id} o={o} />)}</div></div>}
+    {form && <Overlay persistent onClose={() => setForm(null)}><PpeOrderForm order={form} items={items} session={session} config={config} onCancel={() => setForm(null)} onSave={async (o) => { await savePpeOrder(o); setForm(null); }} /></Overlay>}
+    {open && <Overlay onClose={() => setOpenId(null)}><PpeOrderCard order={open} items={items} session={session} savePpeOrder={savePpeOrder} delPpeOrder={async () => { await delPpeOrder(open.id); setOpenId(null); }} savePpeItem={savePpeItem} savePpe={savePpe} onEdit={() => { setForm(open); setOpenId(null); }} onClose={() => setOpenId(null)} /></Overlay>}
+  </>);
+}
+
+const monthRange = (y, m) => [new Date(y, m, 1).getTime(), new Date(y, m + 1, 1).getTime()];
+const monthLabelOf = (y, m) => HE_MONTHS[m] + " " + y;
+function MonthPicker({ y, m, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [vy, setVy] = useState(y);
+  useEffect(() => { if (open) setVy(y); }, [open]);
+  const go = (dm) => { let Y = y, M = m + dm; if (M < 0) { M = 11; Y--; } else if (M > 11) { M = 0; Y++; } onChange(Y, M); };
+  const _now = new Date(); const isFuture = (Y, M) => (Y > _now.getFullYear() || (Y === _now.getFullYear() && M > _now.getMonth()));
+  return (<div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 2 }}>
+    <button className="icon-btn" title="חודש הבא" disabled={isFuture(y, m + 1)} onClick={() => { if (!isFuture(y, m + 1)) go(1); }}><ChevronLeft size={18} /></button>
+    <button className="btn-ghost sm" onClick={() => setOpen((o) => !o)} style={{ minWidth: 112, fontWeight: 700, justifyContent: "center" }}>{HE_MONTHS[m]} {y}</button>
+    <button className="icon-btn" title="חודש קודם" onClick={() => go(-1)}><ChevronLeft size={18} style={{ transform: "scaleX(-1)" }} /></button>
+    {open && <><div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 49 }} /><div style={{ position: "absolute", top: "115%", insetInlineEnd: 0, zIndex: 50, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", width: 232 }}>
+      <div className="row-between" style={{ marginBottom: 8 }}><button className="icon-btn" title="שנה הבאה" disabled={vy >= _now.getFullYear()} onClick={() => { if (vy < _now.getFullYear()) setVy(vy + 1); }}><ChevronLeft size={16} /></button><b>{vy}</b><button className="icon-btn" title="שנה קודמת" onClick={() => setVy(vy - 1)}><ChevronLeft size={16} style={{ transform: "scaleX(-1)" }} /></button></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>{HE_MONTHS.map((nm, i) => { const fut = isFuture(vy, i); return <button key={i} className={"chip" + (vy === y && i === m ? " on" : "")} disabled={fut} style={fut ? { opacity: 0.4 } : {}} onClick={() => { if (!fut) { onChange(vy, i); setOpen(false); } }}>{nm.slice(0, 4)}</button>; })}</div>
+    </div></>}
+  </div>);
+}
+
+function PpeHub(p) {
+  const { ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, users, config, session, savePpe, delPpe, savePpeItem, delPpeItem, saveNorm, delNorm, savePpeReq, delPpeReq, savePpeOrder, delPpeOrder, saveUser, saveConfig } = p;
+  const lvl = permLevel(session, "ppe");
+  const isFull = permRank(lvl) >= permRank("full");
+  const deptScope = isFull ? null : (userDepts(session).length ? userDepts(session) : ["__none__"]);
+  const pendN = (ppeReqs || []).filter((r) => r.status === "pending").length;
+  const ordersN = (ppeOrders || []).filter((o) => o.status === "draft" || o.status === "sent").length;
+  const [sub, setSub] = useState("dash");
+  const [orderForm, setOrderForm] = useState(null);
+  const _nd = new Date();
+  const [mY, setMY] = useState(_nd.getFullYear());
+  const [mM, setMM] = useState(_nd.getMonth());
+  const [mStart, mEnd] = monthRange(mY, mM);
+  const mLabel = monthLabelOf(mY, mM);
+  const openOrder = () => { const lines = []; (ppeItems || []).filter((x) => x.active !== false).forEach((it) => { ppeNetDeficits(it, ppeOrders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setOrderForm({ lines }); };
+  if (!isFull) return <PpeRequester ppe={ppe} items={ppeItems} norms={ppeNorms} reqs={ppeReqs} users={users} config={config} session={session} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} deptScope={deptScope} />;
+  const tab = sub;
+  return (<>
+    <div className="seg-tabs" style={{ flexWrap: "wrap", marginBottom: 14 }}><button className={sub === "dash" ? "on" : ""} onClick={() => setSub("dash")}>לוח מלאי</button><button className={sub === "log" ? "on" : ""} onClick={() => setSub("log")}>תנועות מלאי</button><button className={sub === "catalog" ? "on" : ""} onClick={() => setSub("catalog")}>קטלוג</button><button className={sub === "settings" ? "on" : ""} onClick={() => setSub("settings")}>הגדרות</button></div>
+    {(tab === "dash" || tab === "log") && <div className="row-between" style={{ marginBottom: 10, alignItems: "center" }}><span className="hint">נתונים לחודש</span><MonthPicker y={mY} m={mM} onChange={(Y, M) => { setMY(Y); setMM(M); }} /></div>}
+    {tab === "dash" ? <>{pendN > 0 && <PpeRequests ppe={ppe} reqs={ppeReqs} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} compact />}<PpeDashboard items={ppeItems} ppe={ppe} config={config} pend={pendN} onPend={undefined} onCreateOrder={openOrder} onCatalog={() => setSub("catalog")} onMovements={() => setSub("log")} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} /></>
+      : tab === "catalog" ? <PpeCatalog items={ppeItems} ppe={ppe} session={session} savePpe={savePpe} onSave={savePpeItem} onDelete={delPpeItem} />
+      : tab === "settings" ? <><PpeNorms items={ppeItems} norms={ppeNorms} config={config} onSave={saveNorm} onDelete={delNorm} /><div style={{ height: 18 }} /><PpeClawbackSettings config={config} onSave={saveConfig} /><div style={{ height: 18 }} /><PpeSignTemplate config={config} onSave={saveConfig} /></>
+      : <PpeLog ppe={ppe} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} deptScope={deptScope} canIssue={true} canExit={true} reqMode={false} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} />}
+    {orderForm && <Overlay persistent onClose={() => setOrderForm(null)}><PpeOrderForm order={orderForm} items={ppeItems} session={session} config={config} onCancel={() => setOrderForm(null)} onSave={async (o) => { await savePpeOrder(o); setOrderForm(null); }} /></Overlay>}
+  </>);
+}
+
 function AdminApp(p) {
-  const { session, config, fleet, tickets, pm, insp, presence, zones, rounds, complaints, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
-  const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null);
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints);
+  const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
+  const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null);
+  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
+  const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
   const nav = [
     { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
+    { id: "tasks", Icon: ClipboardList, label: "מטלות" },
+    { id: "ppe", Icon: HardHat, label: "ביגוד עובדים" },
     { id: "assets", Icon: Truck, label: "כלים ותחזוקה" },
     { id: "insights", Icon: BarChart3, label: "אנליטיקה" },
-    { id: "cleaning", Icon: Sparkles, label: "ניקיון" },
+    { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" },
     { id: "team", Icon: Users, label: "צוות ומשתמשים" },
+    { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" },
     { id: "activity", Icon: Clock, label: "יומן פעילות" },
     { id: "settings", Icon: Settings, label: "הגדרות" },
   ].map((n) => ({ ...n, active: tab === n.id, onClick: () => setTab(n.id) }));
@@ -2078,13 +4010,16 @@ function AdminApp(p) {
         <TopBar title="ניהול אחזקה" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
           extra={<select className="mob-tab desk-hide" value={tab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
-          {tab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} />}
+          {tab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
           {tab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} config={config} onOpen={openTicket} initial={tFilter} /></>}
-          {tab === "assets" && <AssetsHub {...p} />}
-          {tab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} />}
+          {tab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
+          {tab === "tasks" && <ManageHub {...p} />}
+          {tab === "ppe" && <PpeHub {...p} />}
+          {tab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
           {tab === "cleaning" && <CleaningAdmin {...p} />}
           {tab === "team" && <SettingsPanel {...p} only="users" />}
           {tab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
+          {tab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} />}
           {tab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
@@ -2092,7 +4027,7 @@ function AdminApp(p) {
       <AIFab onClick={() => setShowAI(true)} />
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); setTab(go === "cleaning" ? "cleaning" : go === "pm" || go === "fleet" ? "assets" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "pm" || go === "fleet" ? "assets" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
@@ -2123,9 +4058,11 @@ function computeInsights(tickets, fleet, pm, config) {
   if (pmOver.length >= 3) out.push({ sev: "warn", text: `${pmOver.length} טיפולים תקופתיים באיחור.`, go: "pm" });
   return out.slice(0, 6);
 }
-function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter }) {
+function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints }) {
   const [cfgOpen, setCfgOpen] = useState(false);
-  const [dashTrack, setDashTrack] = useState("all");
+  const [dashTrackLocal, setDashTrackLocal] = useState("all");
+  const dashTrack = setCtx ? (ctx || "all") : dashTrackLocal;
+  const setDashTrack = setCtx || setDashTrackLocal;
   const isTransport = (t) => t.track === "transport" || (!t.track && t.forkliftId);
   const tickets = dashTrack === "all" ? allTickets : dashTrack === "transport" ? allTickets.filter(isTransport) : allTickets.filter((t) => !isTransport(t));
   const flt = (f) => onFilter ? onFilter(dashTrack !== "all" ? { ...f, track: dashTrack } : f) : setTab("tickets");
@@ -2143,9 +4080,10 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const lastInsp = {}; (insp || []).forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
   const inspDue = fleet.filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
   const monthCost = tickets.filter((t) => t.closure && Date.now() - t.closure.signedAt < 30 * 86400000).reduce((a, t) => a + (t.closure.costAmount || 0), 0);
-  const insights = computeInsights(allTickets, fleet, pm, config);
+  const insights = computeInsights(tickets, dashTrack === "facility" ? [] : fleet, dashTrack === "facility" ? [] : pm, config);
   // Единая дедуплицированная очередь действий: каждая заявка попадает один раз, с НАИВЫСШИМ применимым приоритетом.
   const attnRules = [
+    { test: (t) => needsHandler(t, users, fleet), tag: "ללא מטפל פעיל — נדרש שיבוץ", color: "#7F1D1D" },
     { test: (t) => isOpen(t) && t.downtimeType === "critical" && !t.assignee, tag: "השבתה קריטית · ללא טכנאי", color: "#B91C1C" },
     { test: (t) => isOpen(t) && t.downtimeType === "critical", tag: "השבתה קריטית", color: "#DC2626" },
     { test: (t) => isOverdue(t), tag: "חריגת SLA", color: "#DC2626" },
@@ -2158,7 +4096,30 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   for (const r of attnRules) for (const t of open) { if (seen.has(t.id)) continue; if (r.test(t)) { seen.add(t.id); attention.push({ t, tag: r.tag, color: r.color }); } }
   const attnShown = attention.slice(0, 10);
   const toggle = (id) => saveConfig({ ...config, widgets: { ...w, [id]: !w[id] } });
+  const _now = Date.now();
+  const lowPpe = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
+  const ppeReqPend = (ppeReqs || []).filter((r) => r.status === "pending" || r.status === "worker_sign");
+  const ordRecv = (ppeOrders || []).filter((o) => o.status === "sent");
+  const tasksOverdue = (tasks || []).filter((t) => t.dueAt && t.dueAt < _now && t.status !== "done" && t.status !== "cancelled");
+  const complOpen = (complaints || []).filter((c) => c.status === "open" || c.status === "pending");
+  const attn = [
+    critEsc.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות קריטיות שהוסלמו", n: critEsc.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
+    (critNow.length - critEsc.length) > 0 ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critNow.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
+    tasksOverdue.length ? { sev: 2, Icon: ClipboardList, text: "משימות באיחור", n: tasksOverdue.length, go: () => setTab("tasks") } : null,
+    waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin" }) : setTab("tickets") } : null,
+    waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user" }) : setTab("tickets") } : null,
+    ppeReqPend.length ? { sev: 1, Icon: HardHat, text: "בקשות ביגוד ממתינות", n: ppeReqPend.length, go: () => setTab("ppe") } : null,
+    lowPpe.length ? { sev: 1, Icon: HardHat, text: "פריטי ביגוד מתחת למינימום", n: lowPpe.length, go: () => setTab("ppe") } : null,
+    complOpen.length ? { sev: 1, Icon: AlertTriangle, text: "תלונות פתוחות", n: complOpen.length, go: () => setTab("cleaning") } : null,
+    expDocs.length ? { sev: 1, Icon: Truck, text: "מסמכי כלים פגי/קרובי תוקף", n: expDocs.length, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") } : null,
+    ordRecv.length ? { sev: 0, Icon: Package, text: "הזמנות רכש לקליטה", n: ordRecv.length, go: () => setTab("ppe") } : null,
+    pmSoon.length ? { sev: 0, Icon: Truck, text: "תחזוקות מתוכננות קרובות", n: pmSoon.length, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") } : null,
+    inspDue.length ? { sev: 0, Icon: Truck, text: "כלים שטרם סוקרו החודש", n: inspDue.length, go: () => onAsset ? onAsset({ tab: "insp" }) : setTab("assets") } : null,
+  ].filter(Boolean).sort((a, b) => b.sev - a.sev);
+  
   return (<>
+    <div style={{ marginBottom: 16 }}><SectionTitle><Bell size={15} /> דורש טיפול</SectionTitle>{attn.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>הכל תחת שליטה — אין פריטים שדורשים טיפול דחוף כעת.</div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10, marginTop: 8 }}>{attn.map((a, i) => { const col = a.sev === 2 ? "#DC2626" : a.sev === 1 ? "#D97706" : "#0D9488"; const AIcon = a.Icon; return <button key={i} onClick={a.go} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "start", border: "1px solid var(--border)", borderInlineStartColor: col, borderInlineStartWidth: 3, borderRadius: 10, padding: "10px 12px", background: "var(--surface)", cursor: "pointer" }}><AIcon size={18} color={col} /><span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{a.text}</span><span style={{ fontWeight: 800, fontSize: 18, color: col }}>{a.n}</span></button>; })}</div>}</div>
+    
     <div className="row-between"><div className="seg-tabs s3" style={{ maxWidth: 320, marginBottom: 0 }}><button className={dashTrack === "all" ? "on" : ""} onClick={() => setDashTrack("all")}>הכל</button><button className={dashTrack === "facility" ? "on" : ""} onClick={() => setDashTrack("facility")}>מבנה</button><button className={dashTrack === "transport" ? "on" : ""} onClick={() => setDashTrack("transport")}>שינוע</button></div><button className="btn-ghost sm" onClick={() => setCfgOpen((v) => !v)}><SlidersHorizontal size={15} /> התאמת לוח</button></div>
     {cfgOpen && <div className="panel" style={{ marginBottom: 12 }}><div className="wtoggles">{WIDGETS.map((x) => <button key={x.id} className={"wtoggle" + (w[x.id] ? " on" : "")} onClick={() => toggle(x.id)}>{w[x.id] ? <Eye size={14} /> : <EyeOff size={14} />} {x.label}</button>)}</div></div>}
     {attnShown.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש את תשומת לבך{attention.length > attnShown.length ? ` · ${attention.length}` : ""}</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{attnShown.map(({ t, tag, color }) => <button key={t.id + tag} className="attn-row" onClick={() => onOpen(t.id)}><span className="attn-dot" style={{ background: color }} /><span className="attn-main"><span className="attn-subj">#{ticketNo(t)} · {t.subject}</span><span className="attn-meta">{t.asset || catOf(t).label}</span></span><span className="attn-tag" style={{ color, background: color + "1a" }}>{tag}</span></button>)}</div></>}
@@ -2178,10 +4139,10 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     </div></>}
     {w.docs && dashTrack !== "facility" && <><SectionTitle><FileText size={15} /> מסמכי כלי שינוע פגי-תוקף (30 ימים){expDocs.length ? ` · ${expDocs.length}` : ""}</SectionTitle>
       {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
-        : <div className="cards">{expDocs.map(({ f, s }) => <div key={f.id} className="doc-line"><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><button className="btn-ghost sm" onClick={() => setTab("assets")}><PenLine size={13} /> לעדכן</button></div>)}</div>}</>}
+        : <div className="cards">{expDocs.map(({ f, s }) => <div key={f.id} className="doc-line"><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><button className="btn-ghost sm" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><PenLine size={13} /> לעדכן</button></div>)}</div>}</>}
     {w.insp && dashTrack !== "facility" && <><SectionTitle><ClipboardCheck size={15} /> בקרת כלים לביצוע (חודשי)</SectionTitle>
-      {inspDue.length === 0 ? <div className="note">כל כלי השינוע סוקרו החודש.</div> : <div className="note" style={{ borderColor: "#FCD34D", cursor: "pointer" }} onClick={() => setTab("assets")}>{inspDue.length} כלים ממתינים לבקרה חודשית. גשו ללשונית "בקרת כלים".</div>}</>}
-    {w.pm && pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים קרובים</SectionTitle><div className="pm-mini">{pmSoon.slice(0, 5).map((x) => { const d = daysLeft(x.nextDue); const f = fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId); return <div key={x.id} className="pm-mini-item" style={{ cursor: "pointer" }} onClick={() => setTab("assets")}><span className="dot-lg" style={{ background: pmColor(d) }} /><span className="pm-mini-t">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="pm-mini-d" style={{ color: pmColor(d) }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></div>; })}</div></>}
+      {inspDue.length === 0 ? <div className="note">כל כלי השינוע סוקרו החודש.</div> : <div className="note" style={{ borderColor: "#FCD34D", cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "insp" }) : setTab("assets")}>{inspDue.length} כלים ממתינים לבקרה חודשית. גשו ללשונית "בקרת כלים".</div>}</>}
+    {w.pm && dashTrack !== "facility" && pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים קרובים</SectionTitle><div className="pm-mini">{pmSoon.slice(0, 5).map((x) => { const d = daysLeft(x.nextDue); const f = fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId); return <div key={x.id} className="pm-mini-item" style={{ cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span className="dot-lg" style={{ background: pmColor(d) }} /><span className="pm-mini-t">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="pm-mini-d" style={{ color: pmColor(d) }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></div>; })}</div></>}
     {w.presence && <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle><div className="panel">{(users || []).filter((u) => u.role === "tech" && u.active !== false).length === 0 ? <div className="note" style={{ margin: 0 }}>אין טכנאים מוגדרים.</div> : (users || []).filter((u) => u.role === "tech" && u.active !== false).map((u) => { const pr = presenceOf(presence, u.id); return <div key={u.id} className="presence-row"><span className={"presence-dot" + (pr.onShift ? " on" : "")} /><span className="presence-name">{u.name}{u.supplier ? <span className="presence-sup"> · {u.supplier}</span> : ""}</span><span className="presence-stat">{pr.onShift ? lastSeenText(pr.lastSeen) || "במשמרת" : "לא במשמרת"}</span></div>; })}</div></>}
     {w.costs && <><SectionTitle><DollarSign size={15} /> עלויות 30 ימים אחרונים</SectionTitle><div className="panel"><div className="big-stat">{ils(monthCost)}</div></div></>}
     <div style={{ height: 8 }} />
@@ -2191,13 +4152,13 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
 /* ---------- Admin tickets ---------- */
 function ReportView({ html, count, onClose }) {
   const ref = useRef(null);
-  return (<Overlay onClose={onClose}><div className="rep-wrap"><div className="rep-head"><div className="rep-title">תצוגה מקדימה{count != null ? ` — ${count}` : ""}</div><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost sm" onClick={() => { try { ref.current.contentWindow.focus(); ref.current.contentWindow.print(); } catch (e) {} }}><Printer size={14} /> הדפס</button><button className="icon-btn" onClick={onClose}><X size={20} /></button></div></div><iframe ref={ref} title="report" srcDoc={html} className="rep-frame" /></div></Overlay>);
+  return (<Overlay onClose={onClose}><div className="rep-wrap"><div className="rep-head"><div className="rep-title">תצוגה מקדימה{count != null ? ` — ${count}` : ""}</div><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost sm" onClick={() => { try { ref.current.contentWindow.focus(); ref.current.contentWindow.print(); } catch (e) {} }}><Printer size={14} /> הדפס</button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div><iframe ref={ref} title="report" srcDoc={html} className="rep-frame" /></div></Overlay>);
 }
 function AdminTickets({ tickets, onOpen, initial, fleet, config }) {
-  const [q, setQ] = useState(""), [track, setTrack] = useState("all"), [st, setSt] = useState("open"), [pr, setPr] = useState("all"), [cat, setCat] = useState("all"), [costF, setCostF] = useState("all"), [period, setPeriod] = useState("all"), [report, setReport] = useState(null), [unitType, setUnitType] = useState("all");
+  const [q, setQ] = useState(""), [track, setTrack] = useState("all"), [st, setSt] = useState("open"), [pr, setPr] = useState("all"), [cat, setCat] = useState("all"), [costF, setCostF] = useState("all"), [period, setPeriod] = useState("all"), [report, setReport] = useState(null), [unitType, setUnitType] = useState("all"), [focus, setFocus] = useState(initial?.focus || null);
   const PERIODS = [["all", "כל הזמן"], ["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"]];
   const from = period === "all" ? 0 : Date.now() - ({ week: 7, month: 30, quarter: 90, year: 365 }[period]) * 86400000;
-  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setQ(""); } }, [initial?._t]);
+  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setPeriod(initial.period ?? "all"); setUnitType(initial.unitType ?? "all"); setCat(initial.cat ?? "all"); setCostF("all"); setFocus(initial.focus ?? null); setQ(""); } }, [initial?._t]);
   const f = tickets.filter((t) => {
     if (st === "open") { if (!isOpen(t)) return false; }
     else if (st === "closed") { if (isOpen(t)) return false; }
@@ -2209,6 +4170,12 @@ function AdminTickets({ tickets, onOpen, initial, fleet, config }) {
     if (costF === "with" && !t.closure?.costAmount) return false;
     if (costF === "none" && t.closure?.costAmount) return false;
     if (period !== "all" && t.createdAt < from) return false;
+    if (focus) {
+      if (focus.forkliftId && t.forkliftId !== focus.forkliftId) return false;
+      if (focus.supplier && (t.closure?.costSupplier || "") !== focus.supplier) return false;
+      if (focus.waitReason && t.waitingReason !== focus.waitReason) return false;
+      if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
+    }
     if (q.trim()) { const s = `${ticketNo(t)} ${t.subject} ${t.description} ${t.asset || ""} ${t.assignee || ""} ${t.createdBy?.name}`.toLowerCase(); if (!s.includes(q.toLowerCase())) return false; }
     return true;
   });
@@ -2231,11 +4198,12 @@ function AdminTickets({ tickets, onOpen, initial, fleet, config }) {
   };
   const exportXlsx = () => {
     const rows = list.map((t) => ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "קטגוריה": catOf(t).label, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "עלות (₪)": t.closure?.costAmount || 0 }));
-    try { const ws = XLSX.utils.json_to_sheet(rows); ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map(() => ({ wch: 14 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "קריאות"); if (downloadXlsx(wb, `קריאות_${new Date().toISOString().slice(0, 10)}.xlsx`)) return; } catch (e) {}
+    try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map(() => ({ wch: 14 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "קריאות"); if (downloadXlsx(wb, `קריאות_${new Date().toISOString().slice(0, 10)}.xlsx`)) return; } catch (e) {}
     setReport(buildHtml());
   };
   return (<>
     <div className="seg-tabs s3" style={{ marginBottom: 10 }}>{[["all", "הכל"], ["facility", "מבנה"], ["transport", "שינוע"]].map(([id, lbl]) => <button key={id} className={track === id ? "on" : ""} onClick={() => { setTrack(id); setCat("all"); setUnitType("all"); }}>{lbl}</button>)}</div>
+    {focus && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{focus.label}</b></span><button onClick={() => setFocus(null)} title="הסר סינון"><X size={15} /></button></div>}
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, נושא, כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="filter-row">
       <select value={st} onChange={(e) => setSt(e.target.value)}><option value="open">פתוחות</option><option value="closed">סגורות</option><option value="all">הכל</option>{STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
@@ -2257,9 +4225,11 @@ function AdminTickets({ tickets, onOpen, initial, fleet, config }) {
 
 /* ============================================================ FLEET */
 function FleetModule(p) {
-  const { fleet, config, tickets, insp, saveFleet, delFleet, session, saveConfig } = p;
+  const { fleet, config, tickets, insp, saveFleet, delFleet, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units");
+  useEffect(() => { if (p.openFleetId) { setFtab("units"); setOpenId(p.openFleetId); } }, [p.navT]);
   const [type, setType] = useState("all"), [sup, setSup] = useState("all"), [doc, setDoc] = useState("all"), [dept, setDept] = useState("all"), [hyd, setHyd] = useState("all"), [q, setQ] = useState("");
+  const [groupBy, setGroupBy] = useState("none"), [collapsed, setCollapsed] = useState({});
   const suppliers = [...new Set(fleet.map((f) => f.supplier).filter(Boolean))];
   const types = [...new Set(fleet.map((f) => unitTypeName(f, config)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
   const depts = config.departments || [];
@@ -2283,9 +4253,19 @@ function FleetModule(p) {
       </select>
     </label>
   );
+  const renderRow = (f) => { const s = docStatus(f, config); const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
+    <span className="ft-code">{f.code}</span>
+    <span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}{resolveHydraulics(f, config) && <span className="hyd-badge">תסקיר</span>}</span>
+    <span className="ft-sup">{f.supplier || "—"}</span>
+    <span className="ft-doc"><span className="dot-lg" style={{ background: s.color }} />{s.label}{s.d != null && s.d <= 30 && s.d >= 0 && <span style={{ color: "#CA8A04", fontWeight: 700, marginInlineStart: 4 }}>{s.d}י׳</span>}</span>
+  </button>; };
+  const STATUS_ORDER = ["מושבת", "מסמך פג תוקף", "מסמך קרוב לפקיעה", "תקין"];
+  const groupKeyOf = (f) => { if (groupBy === "type") return unitTypeName(f, config) || "אחר"; if (groupBy === "supplier") return f.supplier || "ללא ספק"; if (unitBlock(f, tickets, config)) return "מושבת"; const s = docStatus(f, config); return s.d == null ? "תקין" : s.d < 0 ? "מסמך פג תוקף" : s.d <= 30 ? "מסמך קרוב לפקיעה" : "תקין"; };
+  const groups = (() => { if (groupBy === "none") return null; const m = new Map(); rows.forEach((f) => { const k = groupKeyOf(f); if (!m.has(k)) m.set(k, []); m.get(k).push(f); }); let arr = [...m.entries()].map(([k, items]) => ({ k, items, blocked: items.filter((f) => unitBlock(f, tickets, config)).length })); if (groupBy === "status") arr.sort((a, b) => STATUS_ORDER.indexOf(a.k) - STATUS_ORDER.indexOf(b.k)); else arr.sort((a, b) => b.items.length - a.items.length || a.k.localeCompare(b.k, "he")); return arr; })();
+  const GROUP_OPTS = [["none", "ללא"], ["type", "סוג"], ["supplier", "ספק"], ["status", "סטטוס"]];
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 360, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי</button></div>
-    {ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} config={config} saveFleet={saveFleet} saveConfig={saveConfig} /> : <>
+    {ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
     <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div>
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
@@ -2297,21 +4277,21 @@ function FleetModule(p) {
     </div>
     <div className="fleet-results-bar">
       <span className="fleet-count">{rows.length} כלים{rows.length !== fleet.length ? ` מתוך ${fleet.length}` : ""}</span>
+      <div className="group-seg"><span className="group-lbl">קבץ לפי</span>{GROUP_OPTS.map(([id, lbl]) => <button key={id} className={groupBy === id ? "on" : ""} onClick={() => setGroupBy(id)}>{lbl}</button>)}</div>
       {hasFilter && <button className="repeat-link" onClick={resetFilters}>נקה פילטרים</button>}
     </div>
     {rows.length === 0 ? <Empty text={fleet.length ? "אין תוצאות לפילטר הנוכחי" : "הפארק ריק"} sub={fleet.length ? "נסו לנקות את הפילטרים" : "הוסיפו כלי שינוע ראשון"} />
+      : groups ? <div className="fleet-groups">{groups.map((g) => { const open = !collapsed[g.k]; return <div key={g.k} className="fgroup">
+          <button className="fgroup-head" onClick={() => setCollapsed((c) => ({ ...c, [g.k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{g.k}</span><span className="fgroup-count">{g.items.length}</span>{g.blocked > 0 && <span className="fgroup-blk"><ShieldAlert size={11} /> {g.blocked} מושבתים</span>}</button>
+          {open && <div className="ftable"><div className="ftable-head"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>{g.items.map(renderRow)}</div>}
+        </div>; })}</div>
       : <div className="ftable">
           <div className="ftable-head"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>
-          {rows.map((f) => { const s = docStatus(f, config); return <button key={f.id} className="ftable-row" onClick={() => setOpenId(f.id)}>
-            <span className="ft-code">{f.code}</span>
-            <span className="ft-model"><b>{unitDesc(f, config)}</b>{resolveHydraulics(f, config) && <span className="hyd-badge">תסקיר</span>}</span>
-            <span className="ft-sup">{f.supplier || "—"}</span>
-            <span className="ft-doc"><span className="dot-lg" style={{ background: s.color }} />{s.label}{s.d != null && s.d <= 30 && s.d >= 0 && <span style={{ color: "#CA8A04", fontWeight: 700, marginInlineStart: 4 }}>{s.d}י׳</span>}</span>
-          </button>; })}
+          {rows.map(renderRow)}
         </div>}
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
   </>);
 }
 function FleetForm({ item, config, onCancel, onSave }) {
@@ -2326,7 +4306,7 @@ function FleetForm({ item, config, onCancel, onSave }) {
   const pickType = (id) => { const nt = vts.find((v) => v.id === id); setTypeId(id); setF((s) => ({ ...s, type: (nt?.models || []).filter(Boolean)[0] || "" })); };
   const showLicense = vts ? !!curType?.license : true;
   const save = () => { if (!f.code.trim()) return setErr("נא להזין מספר/מזהה כלי"); onSave({ id: item.id || uid(), ...f, dept: f.depts[0] || "", code: f.code.trim(), createdAt: item.createdAt || Date.now() }); };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">{item.id ? "עריכת כלי" : "כלי שינוע חדש"}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{item.id ? "עריכת כלי" : "כלי שינוע חדש"}</div></div>
     <div className="body">
       <label className="field"><span>מספר / מזהה פנימי *</span><input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="מלגזה 14" /></label>
       {vts ? <>
@@ -2346,15 +4326,18 @@ function FleetForm({ item, config, onCancel, onSave }) {
       <button className="btn-primary full" onClick={save}>שמירה</button><div style={{ height: 24 }} />
     </div></div>);
 }
-function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, canDocs = true, canTickets = true }) {
+function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, onReturnService, onBlock, canDocs = true, canTickets = true }) {
   const f = fleet; if (!f) return null;
+  const [blocking, setBlocking] = useState(false), [blkReason, setBlkReason] = useState("");
+  const blk = unitBlock(f, tickets, config);
   const related = tickets.filter((t) => t.forkliftId === f.id).sort((a, b) => b.createdAt - a.createdAt);
   const inspections = insp.filter((i) => i.fleetId === f.id).sort((a, b) => b.at - a.at);
   const dt = related.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }}><PenLine size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }}><PenLine size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top"><span className="badge" style={{ background: TRACKS.transport.color + "22", color: TRACKS.transport.color }}>{unitTypeName(f, config) || "כלי שינוע"}</span>{resolveHydraulics(f, config) && <span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>תסקיר</span>}</div>
       <h2 className="detail-subj">{unitDesc(f, config) || f.code}</h2>
+      {blk && <div className="blk-banner" style={{ borderColor: blk.level.color, background: blk.level.color + "14", color: blk.level.color }}><ShieldAlert size={20} /><div className="blk-b-txt"><b>כלי מושבת — אין להשתמש</b><span>{blk.level.label}{blk.count > 1 ? ` · ${blk.count} קריאות חוסמות` : ""}</span></div>{onReturnService && <ConfirmBtn className="blk-return" icon={<RefreshCw size={14} />} label="החזר לשירות" onConfirm={onReturnService} />}</div>}
       <div className="meta-grid">
         <Meta Icon={Truck} label="סוג" value={unitTypeName(f, config) || "—"} />
         <Meta Icon={Cog} label="דגם" value={unitModelCode(f) || "—"} />
@@ -2376,6 +4359,11 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, ca
       <SectionTitle><ListChecks size={15} /> קריאות לכלי זה ({related.length})</SectionTitle>
       {related.length === 0 ? <div className="note">אין קריאות.</div> : <div className="cards">{related.slice(0, 8).map((t) => <div key={t.id} className="mini-ticket"><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">{t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></div>)}</div>}
       {related.length >= 3 && <div className="repeat-warn"><RefreshCw size={14} /> כלי זה נפתחו עליו {related.length} קריאות — שקלו טיפול שורש.</div>}</>}
+      {!blk && onBlock && (blocking ? <div className="blk-set-panel">
+        <div className="blk-set-h"><ShieldAlert size={16} color="#B91C1C" /> השבתת הכלי — חובה לציין סיבה</div>
+        <textarea rows={3} autoFocus value={blkReason} onChange={(e) => setBlkReason(e.target.value)} placeholder="מה התקלה / מדוע אסור להשתמש בכלי?" />
+        <div className="row2"><button className="btn-ghost" onClick={() => { setBlocking(false); setBlkReason(""); }}>ביטול</button><button className="btn-danger" disabled={!blkReason.trim()} onClick={async () => { await onBlock(blkReason.trim()); setBlocking(false); setBlkReason(""); }}><ShieldAlert size={15} /> השבת כלי</button></div>
+      </div> : <button className="btn-ghost full blk-set" style={{ marginTop: 14 }} onClick={() => setBlocking(true)}><ShieldAlert size={15} /> השבת כלי — אין להשתמש</button>)}
       {onDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} label="מחיקת כלי" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
@@ -2386,6 +4374,7 @@ function InspectionsModule(p) {
   const { fleet, templates, insp, saveTpl, delTpl, saveInsp, saveTicket, session, config } = p;
   const [sub, setSub] = useState("run"), [tplEdit, setTplEdit] = useState(null), [run, setRun] = useState(null), [detail, setDetail] = useState(null);
   const [tplId, setTplId] = useState("all"), [mode, setMode] = useState("todo");
+  const [igrp, setIgrp] = useState("none"), [icoll, setIcoll] = useState({});
   const lastInsp = {}; insp.forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
   const matchFleet = (f) => { if (tplId === "all") return true; const tpl = templates.find((t) => t.id === tplId); if (!tpl) return true; return tpl.target === "all" || (tpl.target === "hydraulic") === resolveHydraulics(f, config); };
   const pool = fleet.filter(matchFleet);
@@ -2402,8 +4391,16 @@ function InspectionsModule(p) {
       <div className="seg-tabs" style={{ maxWidth: 320 }}><button className={mode === "todo" ? "on" : ""} onClick={() => setMode("todo")}>לביצוע{due.length ? ` (${due.length})` : ""}</button><button className={mode === "hist" ? "on" : ""} onClick={() => setMode("hist")}>היסטוריה</button></div>
       {mode === "todo" ? (
         due.length === 0 ? <Empty text="אין כלים שממתינים לבקרה" Icon={ClipboardCheck} sub={tplId === "all" ? "" : "לפי השאלון שנבחר"} />
-          : <div className="cards">{due.map((f) => { const last = lastInsp[f.id]; return <button key={f.id} className="tcard" onClick={() => setRun({ fleet: f, tplId: tplId !== "all" ? tplId : (config.typeMeta?.[f.type]?.inspTpl || null) })} style={{ borderInlineStartColor: "#EA580C" }}><div className="tcard-icon" style={{ background: "var(--surface-2)" }}><Truck size={20} color={TRACKS.transport.color} /></div><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{unitLabel(f, config)}</span></div><div className="tcard-sub">{resolveHydraulics(f, config) ? "תסקיר · " : ""}{f.type}{fleetDepts(f).length ? " · " + fleetDepts(f).join(", ") : ""}</div><div className="tcard-badges"><span className="badge sm" style={{ color: "#EA580C", background: "var(--surface-2)" }}>{last ? "נסקר " + fmtDate(last) : "טרם נסקר"}</span><span className="badge sm ovd">לביצוע</span></div></div></button>; })}
-            {ok.length > 0 && <div className="note">{ok.length} כלים נוספים תקינים (נסקרו ב-30 הימים האחרונים) — ראו "היסטוריה".</div>}</div>
+          : (() => {
+            const dueCard = (f) => { const last = lastInsp[f.id]; return <button key={f.id} className="tcard" onClick={() => setRun({ fleet: f, tplId: tplId !== "all" ? tplId : (config.typeMeta?.[f.type]?.inspTpl || null) })} style={{ borderInlineStartColor: "#EA580C" }}><div className="tcard-icon" style={{ background: "var(--surface-2)" }}><Truck size={20} color={TRACKS.transport.color} /></div><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{unitLabel(f, config)}</span></div><div className="tcard-sub">{resolveHydraulics(f, config) ? "תסקיר · " : ""}{f.type}{fleetDepts(f).length ? " · " + fleetDepts(f).join(", ") : ""}</div><div className="tcard-badges"><span className="badge sm" style={{ color: "#EA580C", background: "var(--surface-2)" }}>{last ? "נסקר " + fmtDate(last) : "טרם נסקר"}</span><span className="badge sm ovd">לביצוע</span></div></div></button>; };
+            const igKey = (f) => igrp === "type" ? (unitTypeName(f, config) || f.type || "אחר") : (fleetDepts(f)[0] || "ללא מחלקה");
+            const ftr = <>{ok.length > 0 && <div className="note">{ok.length} כלים נוספים תקינים (נסקרו ב-30 הימים האחרונים) — ראו "היסטוריה".</div>}</>;
+            if (igrp === "none") return <><div className="insp-grp-bar"><span className="group-lbl">קבץ לפי</span><div className="group-seg">{[["none", "ללא"], ["type", "סוג"], ["dept", "מחלקה"]].map(([id, lbl]) => <button key={id} className={igrp === id ? "on" : ""} onClick={() => setIgrp(id)}>{lbl}</button>)}</div></div><div className="cards">{due.map(dueCard)}{ftr}</div></>;
+            const m = new Map(); due.forEach((f) => { const k = igKey(f); if (!m.has(k)) m.set(k, []); m.get(k).push(f); });
+            const arr = [...m.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "he"));
+            return <><div className="insp-grp-bar"><span className="group-lbl">קבץ לפי</span><div className="group-seg">{[["none", "ללא"], ["type", "סוג"], ["dept", "מחלקה"]].map(([id, lbl]) => <button key={id} className={igrp === id ? "on" : ""} onClick={() => setIgrp(id)}>{lbl}</button>)}</div></div>
+              <div className="fleet-groups">{arr.map(([k, items]) => { const open = !icoll[k]; return <div key={k} className="fgroup"><button className="fgroup-head" onClick={() => setIcoll((c) => ({ ...c, [k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{k}</span><span className="fgroup-count">{items.length}</span></button>{open && <div className="cards">{items.map(dueCard)}</div>}</div>; })}{ftr}</div></>;
+          })()
       ) : (
         <InspHistory pool={pool} insp={insp} templates={templates} config={config} onRun={(f) => setRun({ fleet: f, tplId: tplId !== "all" ? tplId : (config.typeMeta?.[f.type]?.inspTpl || null) })} onView={(i) => setDetail(i)} />
       )}
@@ -2436,7 +4433,7 @@ function InspHistory({ pool, insp, templates, onRun, onView, config }) {
   const nextDue = (at) => at + NEXT_DAYS * 86400000;
   const exportXlsx = async () => {
     const data = report.map((r) => ({ "תאריך בדיקה": fmtDate(r.i.at), "כלי": r.f ? r.f.code : "", "סוג": r.f ? unitTypeName(r.f, config) : "", "דגם": r.f?.type || "", "שאלון": tplName(r.i.templateId), "תוצאה": r.i.passed ? "תקין" : `${r.i.problems.length} ממצאים`, "ממצאים": (r.i.problems || []).join(" · "), "נבדק ע״י": r.i.by || "", "בדיקה הבאה": fmtDate(nextDue(r.i.at)) }));
-    const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "דוח בקרות"); downloadXlsx(wb, "inspection-report.xlsx");
+    const ws = XLSX.utils.json_to_sheet(rowsSafe(data)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "דוח בקרות"); downloadXlsx(wb, "inspection-report.xlsx");
   };
   const exportPdf = () => {
     const rowsHtml = report.map((r) => `<tr><td>${fmtDate(r.i.at)}</td><td>${r.f ? esc(r.f.code) : ""} ${esc(r.f?.type || "")}</td><td>${esc(tplName(r.i.templateId))}</td><td style="color:${r.i.passed ? "#16A34A" : "#DC2626"}">${r.i.passed ? "תקין" : (r.i.problems.length + " ממצאים")}</td><td>${esc((r.i.problems || []).join(" · "))}</td><td>${esc(r.i.by || "")}</td><td>${fmtDate(nextDue(r.i.at))}</td></tr>`).join("");
@@ -2478,7 +4475,7 @@ function InspHistory({ pool, insp, templates, onRun, onView, config }) {
 function InspDetail({ rec, fleet, templates, onClose }) {
   const f = fleet.find((x) => x.id === rec.fleetId);
   const tpl = templates.find((t) => t.id === rec.templateId);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onClose}><X size={22} /></button><div className="form-title">בקרה · {f ? f.code : "כלי"}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">בקרה · {f ? f.code : "כלי"}</div></div>
     <div className="body">
       <div className="insp-sum"><span className="badge" style={{ background: (rec.passed ? "#16A34A" : "#DC2626") + "22", color: rec.passed ? "#16A34A" : "#DC2626" }}>{rec.passed ? "תקין" : `${rec.problems?.length || 0} ממצאים`}</span><span className="tcard-sub" style={{ margin: 0 }}>{fmtDate(rec.at)} · {rec.by}</span></div>
       {tpl && <div className="hint" style={{ marginBottom: 10 }}>שאלון: {tpl.name}</div>}
@@ -2491,7 +4488,7 @@ function InspDetail({ rec, fleet, templates, onClose }) {
 function TemplateForm({ tpl, onCancel, onSave, onDelete }) {
   const [name, setName] = useState(tpl.name || ""), [target, setTarget] = useState(tpl.target || "hydraulic"), [items, setItems] = useState((tpl.items || []).join("\n")), [err, setErr] = useState("");
   const save = () => { const it = items.split("\n").map((s) => s.trim()).filter(Boolean); if (!name.trim()) return setErr("נא להזין שם"); if (!it.length) return setErr("נא להוסיף סעיפים"); onSave({ id: tpl.id || uid(), name: name.trim(), target, items: it }); };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">{tpl.id ? "עריכת שאלון" : "שאלון בקרה חדש"}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{tpl.id ? "עריכת שאלון" : "שאלון בקרה חדש"}</div></div>
     <div className="body">
       <label className="field"><span>שם השאלון *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: סיקור חודשי — מלגזה הידראולית" /></label>
       <label className="field"><span>מתאים לכלים</span><select value={target} onChange={(e) => setTarget(e.target.value)}><option value="hydraulic">כלים עם תסקיר</option><option value="ground">כלים ללא תסקיר</option><option value="all">כל הכלים</option></select></label>
@@ -2507,6 +4504,7 @@ function InspectionRun({ fleet, templates, forcedTemplateId, session, config, on
   const [tplId, setTplId] = useState(forcedTemplateId || match[0]?.id || "");
   const tpl = templates.find((t) => t.id === tplId);
   const [res, setRes] = useState({});
+  const [sev, setSev] = useState("minor");
   const set = (i, ok) => setRes((s) => ({ ...s, [i]: { ...s[i], ok } }));
   const note = (i, n) => setRes((s) => ({ ...s, [i]: { ...s[i], note: n } }));
   const problems = tpl ? tpl.items.map((it, i) => ({ it, i })).filter(({ i }) => res[i]?.ok === false) : [];
@@ -2519,17 +4517,19 @@ function InspectionRun({ fleet, templates, forcedTemplateId, session, config, on
     if (!passed) {
       const tid = uid();
       record.ticketId = tid;
-      ticket = { id: tid, track: "transport", subject: `ממצאי סיקור · ${fleet.code}`, category: "transport", priority: "medium", zone: "רחבת מלגזות", asset: fleet.code, forkliftId: fleet.id, downtimeType: "minor", description: "נפתח אוטומטית מסיקור חודשי. ממצאים:\n• " + probTexts.join("\n• "), status: "new", assignee: "", wearType: null, downtimeStart: now, downtimeEnd: null, createdBy: { name: session.name, role: session.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: fleet.id, priority: "medium" }, config, [fleet]) * 3600000, hasPhoto: false, closure: null, sourceInspectionId: record.id, log: [{ at: now, by: session.name, byRole: session.role, text: "נפתח אוטומטית מסיקור", kind: "open" }] };
+      const lvl = dtOf(sev, config);
+      ticket = { id: tid, track: "transport", subject: `ממצאי סיקור · ${fleet.code}`, category: "transport", priority: lvl.prio || "medium", zone: "רחבת מלגזות", asset: fleet.code, forkliftId: fleet.id, downtimeType: sev, description: "נפתח אוטומטית מסיקור חודשי. ממצאים:\n• " + probTexts.join("\n• "), status: "new", assignee: "", wearType: null, downtimeStart: now, downtimeEnd: null, createdBy: { name: session.name, role: session.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: fleet.id, priority: lvl.prio || "medium" }, config, [fleet]) * 3600000, hasPhoto: false, closure: null, sourceInspectionId: record.id, log: [{ at: now, by: session.name, byRole: session.role, text: "נפתח אוטומטית מסיקור", kind: "open" }] };
     }
     onFinish(record, ticket);
   };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onClose}><X size={22} /></button><div className="form-title">בקרת כלי · {fleet.code}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">בקרת כלי · {fleet.code}</div></div>
     <div className="body">
       {match.length === 0 ? <div className="note" style={{ borderColor: "#FCD34D" }}>אין שאלון מתאים לכלי זה. צרו שאלון בלשונית "שאלונים".</div> : <>
         {forcedTemplateId ? <div className="detail-caption" style={{ color: TRACKS.transport.color }}><ClipboardList size={14} /> {tpl?.name}</div> : <label className="field"><span>שאלון</span><select value={tplId} onChange={(e) => setTplId(e.target.value)}>{match.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>}
         <SectionTitle>סעיפי בדיקה</SectionTitle>
         {tpl?.items.map((it, i) => <div key={i} className="insp-item"><div className="insp-row"><span className="insp-name">{it}</span><div className="insp-btns"><button className={"ins-ok" + (res[i]?.ok === true ? " on" : "")} onClick={() => set(i, true)}><Check size={16} /></button><button className={"ins-bad" + (res[i]?.ok === false ? " on" : "")} onClick={() => set(i, false)}><X size={16} /></button></div></div>{res[i]?.ok === false && <input className="insp-note" value={res[i]?.note || ""} onChange={(e) => note(i, e.target.value)} placeholder="תיאור הממצא…" />}</div>)}
-        {problems.length > 0 && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2" }}>{problems.length} ממצאים — עם סיום הסיקור תיפתח אוטומטית קריאת טיפול לטכנאי.</div>}
+        {problems.length > 0 && <><div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2" }}>{problems.length} ממצאים — עם סיום הסיקור תיפתח אוטומטית קריאת טיפול לטכנאי.</div>
+        <div className="field"><span>מצב הכלי בעקבות הממצאים *</span><div className="dt-list">{dtLevels(config).map((d) => <button key={d.id} type="button" className={"dt-pick" + (sev === d.id ? " on" : "")} onClick={() => setSev(d.id)} style={sev === d.id ? { borderColor: d.color, background: d.color + "14" } : {}}><span className="dt-dot" style={{ background: d.color }} /><div><div className="dt-name">{d.label}{d.oos ? " · מושבת" : ""}</div><div className="dt-desc">{d.desc}</div></div></button>)}</div></div></>}
         <button className="btn-primary full" style={{ marginTop: 14 }} onClick={finish} disabled={!allChecked}>{allChecked ? "סיום סיקור" + (problems.length ? " ופתיחת קריאה" : "") : "השלימו את כל הסעיפים"}</button>
       </>}
       <div style={{ height: 24 }} />
@@ -2585,7 +4585,7 @@ function PMHistory({ pm, fleet, onOpen, config }) {
   filtered.sort((a, b) => sort === "date_asc" ? a.at - b.at : b.at - a.at);
   const exportXlsx = async () => {
     const data = filtered.map((r) => ({ "תאריך": fmtDate(r.at), "כלי": r.f ? r.f.code : "", "סוג": r.f ? unitTypeName(r.f, config) : "", "דגם": r.f?.type || "", "תוצאה": r.type === "missed" ? "לא הגיע" : "בוצע", "עבודות המשך": r.hadPaid ? "כן" : "", "בוצע ע״י": r.by || "", "הערה": r.paidNote || "" }));
-    const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "היסטוריית טיפולים"); downloadXlsx(wb, "pm-history.xlsx");
+    const ws = XLSX.utils.json_to_sheet(rowsSafe(data)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "היסטוריית טיפולים"); downloadXlsx(wb, "pm-history.xlsx");
   };
   const exportPdf = () => {
     const rowsHtml = filtered.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${r.f ? esc(r.f.code) : ""} ${esc(r.f?.type || "")}</td><td>${r.type === "missed" ? "לא הגיע" : "בוצע"}</td><td>${r.hadPaid ? "כן" : ""}</td><td>${esc(r.by || "")}</td><td>${esc(r.paidNote || "")}</td></tr>`).join("");
@@ -2707,21 +4707,29 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
     {overdue.length > 0 && <><SectionTitle><AlertTriangle size={15} /> באיחור</SectionTitle><div className="cards">{overdue.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); return <div key={x.id} className="pm-card" onClick={() => onOpen(x)}><span className="pm-bar" style={{ background: "#DC2626" }} /><div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span></div><div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)} · באיחור {-d} ימים{fleetDepts(f).length ? <> · {fleetDepts(f).join(", ")}</> : null}</div></div></div>; })}</div></>}
   </div>);
 }
+function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "— בחרו כלי —" }) {
+  const [open, setOpen] = useState(false), [uq, setUq] = useState("");
+  const pool = (fleet || []).filter((f) => !filter || filter(f));
+  const groups = useMemo(() => { const m = new Map(); pool.filter((f) => { const hay = `${f.code} ${unitTypeName(f, config)} ${f.type || ""} ${fleetDepts(f).join(" ")}`.toLowerCase(); return !uq.trim() || hay.includes(uq.toLowerCase()); }).forEach((f) => { const t = unitTypeName(f, config) || f.type || "אחר"; if (!m.has(t)) m.set(t, []); m.get(t).push(f); }); return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "he")); }, [pool, config, uq]);
+  const sel = (fleet || []).find((f) => f.id === value);
+  return (<>
+    <button type="button" className="unit-pick-btn" onClick={() => setOpen((o) => !o)}>{sel ? <span>{sel.code} · {unitDesc(sel, config)}</span> : <span className="muted-txt">{placeholder}</span>}<ChevronLeft size={16} style={{ transform: open ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
+    {open && <div className="unit-pick">
+      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus placeholder="חיפוש לפי מספר / סוג…" value={uq} onChange={(e) => setUq(e.target.value)} /></div>
+      <div className="unit-pick-list">{groups.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו כלים</div> : groups.map(([t, units]) => <div key={t}><div className="unit-pick-grp">{t} <span className="upg-count">{units.length}</span></div>{units.map((f) => <button key={f.id} type="button" className={"unit-pick-row" + (f.id === value ? " on" : "")} onClick={() => { onChange(f.id); setOpen(false); setUq(""); }}><b>{f.code}</b><span className="upr-desc">{unitDesc(f, config)}{fleetDepts(f).length ? ` · ${fleetDepts(f).join(", ")}` : ""}</span></button>)}</div>)}</div>
+    </div>}
+  </>);
+}
 function PMForm({ task, fleet, config, onCancel, onSave }) {
-  const [forkliftId, setFork] = useState(task.forkliftId || task.equipmentId || ""), [date, setDate] = useState(task.nextDue ? tsToDate(task.nextDue) : tsToDate(toWorkday(Date.now()))), [active, setActive] = useState(task.active !== false), [pick, setPick] = useState(false), [uq, setUq] = useState(""), [err, setErr] = useState("");
-  const unitGroups = useMemo(() => { const m = new Map(); (fleet || []).filter((f) => { const hay = `${f.code} ${unitTypeName(f, config)} ${f.type || ""} ${fleetDepts(f).join(" ")}`.toLowerCase(); return !uq.trim() || hay.includes(uq.toLowerCase()); }).forEach((f) => { const t = unitTypeName(f, config) || f.type || "אחר"; if (!m.has(t)) m.set(t, []); m.get(t).push(f); }); return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "he")); }, [fleet, config, uq]);
+  const [forkliftId, setFork] = useState(task.forkliftId || task.equipmentId || ""), [date, setDate] = useState(task.nextDue ? tsToDate(task.nextDue) : tsToDate(toWorkday(Date.now()))), [active, setActive] = useState(task.active !== false), [err, setErr] = useState("");
   const selFleet = fleet.find((f) => f.id === forkliftId);
   const freq = selFleet ? pmFreqForType(selFleet.type, config) : "monthly";
   const save = () => { if (!forkliftId) return setErr("נא לבחור כלי"); const ts = dateToTs(date); if (!ts) return setErr("נא לבחור תאריך"); const now = Date.now(); onSave({ id: task.id || uid(), forkliftId, frequency: freq, nextDue: toWorkday(ts), active, createdAt: task.createdAt || now, lastDone: task.lastDone || null, history: task.history || [] }); };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">{task.id ? "עריכת שיבוץ" : "שיבוץ טיפול תקופתי"}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{task.id ? "עריכת שיבוץ" : "שיבוץ טיפול תקופתי"}</div></div>
     <div className="body">
       <div className="note">בחרו כלי ומועד הטיפול הבא. התדירות והמועדים העתידיים נקבעים אוטומטית לפי סוג הכלי (נקבע בהגדרות → כלי שינוע).</div>
       <div className="field" style={{ marginTop: 12 }}><span>כלי *</span>
-        <button type="button" className="unit-pick-btn" onClick={() => setPick((p) => !p)}>{selFleet ? <span>{selFleet.code} · {unitDesc(selFleet, config)}</span> : <span className="muted-txt">— בחרו כלי —</span>}<ChevronLeft size={16} style={{ transform: pick ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
-        {pick && <div className="unit-pick">
-          <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus placeholder="חיפוש לפי מספר / סוג…" value={uq} onChange={(e) => setUq(e.target.value)} /></div>
-          <div className="unit-pick-list">{unitGroups.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו כלים</div> : unitGroups.map(([t, units]) => <div key={t}><div className="unit-pick-grp">{t} <span className="upg-count">{units.length}</span></div>{units.map((f) => <button key={f.id} type="button" className={"unit-pick-row" + (f.id === forkliftId ? " on" : "")} onClick={() => { setFork(f.id); setPick(false); setUq(""); setErr(""); }}><b>{f.code}</b><span className="upr-desc">{unitDesc(f, config)}{fleetDepts(f).length ? ` · ${fleetDepts(f).join(", ")}` : ""}</span></button>)}</div>)}</div>
-        </div>}
+        <UnitPicker fleet={fleet} config={config} value={forkliftId} onChange={(id) => { setFork(id); setErr(""); }} />
       </div>
       <label className="field"><span>מועד הטיפול הבא *</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><div className="hint">ימי עבודה: ראשון–חמישי. תאריך שיחול בשישי/שבת יוזז ליום העבודה הקרוב.</div></label>
       {selFleet && <div className="note" style={{ borderColor: "var(--primary)" }}><CalendarClock size={13} /> תדירות לפי סוג {selFleet.type}: <b>{freqOf(freq).label}</b> · הטיפול הבא יחושב אוטומטית כל {freqOf(freq).days} ימים.</div>}
@@ -2746,11 +4754,11 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
         id: ticketId, track: "transport", subject: `עבודות המשך מטיפול תקופתי · ${f ? f.code : ""}`,
         category: "transport", priority: "medium", zone: "רחבת מלגזות", asset: f ? f.code : "",
         forkliftId: task.forkliftId || task.equipmentId || null, downtimeType: "minor", wearType: fuWear,
-        downtimeStart: now, downtimeEnd: null, waitingReason: waiting ? (fuWaitReason || "parts") : null,
+        downtimeStart: now, downtimeEnd: null, waitingReason: waiting ? (fuWaitReason || "parts") : null, waitBall: waiting ? reasonBall(config, fuWaitReason || "parts") : null, pauseSince: (waiting && reasonPauses(config, fuWaitReason || "parts")) ? now : null, pauseAccumMs: 0,
         description: "נפתח אוטומטית מטיפול תקופתי — נדרשות עבודות המשך." + (paidNote ? "\n" + paidNote : ""),
         status: fuStatus, assignee: session.name, routedTech: true, createdBy: { name: session.name, role: session.role }, createdAt: now, updatedAt: now,
         dueAt: now + slaForTicket({ track: "transport", forkliftId: task.forkliftId || task.equipmentId, priority: "medium" }, config, fleet) * 3600000, hasPhoto: false, closure: null, sourcePmId: task.id,
-        log: [{ at: now, by: session.name, byRole: session.role, kind: "open", text: `נפתח מטיפול תקופתי — עבודות המשך${fuWear ? " · סיווג: " + (WEAR.find((w) => w.id === fuWear)?.label || "") : ""} · ${waiting ? "ממתין · " + waitReasonLabel(fuWaitReason || "parts") : "בעבודה"}` }],
+        log: [{ at: now, by: session.name, byRole: session.role, kind: "open", text: `נפתח מטיפול תקופתי — עבודות המשך${fuWear ? " · סיווג: " + (WEAR.find((w) => w.id === fuWear)?.label || "") : ""} · ${waiting ? "ממתין · " + waitReasonLabel(fuWaitReason || "parts", config) : "בעבודה"}` }],
       });
     }
     onSave({ ...task, lastDone: now, nextDue: toWorkday(now + freqOf(task.frequency).days * 86400000), history: [...(task.history || []), { type: "done", at: now, by: session.name, hadPaid: !!followUp, paidNote: paidNote.trim(), ticketId }] });
@@ -2761,7 +4769,7 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
     onSave({ ...task, nextDue: nextWorkdayFrom(task.nextDue), history: [...(task.history || []), { type: "missed", at: now, by: session.name }] });
     onClose();
   };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">טיפול תקופתי</div>{canManage && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }}><PenLine size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">טיפול תקופתי</div>{canManage && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }}><PenLine size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top"><span className="badge" style={{ color: pmColor(d), background: "var(--surface-2)" }}>{d < 0 ? `באיחור ${-d} י׳` : d === 0 ? "היום" : `בעוד ${d} ימים`}</span><span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{freqOf(task.frequency).label}</span></div>
       <h2 className="detail-subj">{f ? `${unitLabel(f, config)}` : "כלי לא ידוע"}</h2>
@@ -2783,7 +4791,7 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
             <button className={"pr-pick" + (fuStatus === "in_progress" ? " on" : "")} onClick={() => { setFuStatus("in_progress"); setFuWaitReason(null); }} style={fuStatus === "in_progress" ? { background: stOf("in_progress").color, color: "#fff", borderColor: stOf("in_progress").color } : {}}>בעבודה</button>
           </div>
           <div className="hint" style={{ marginTop: 8 }}>או נפתח כבר בהמתנה — בחר סיבה:</div>
-          <div className="pr-row">{TECH_WAIT_REASONS.map((r) => <button key={r.id} className={"pr-pick" + (fuStatus === "waiting" && fuWaitReason === r.id ? " on" : "")} onClick={() => { setFuStatus("waiting"); setFuWaitReason(r.id); }} style={fuStatus === "waiting" && fuWaitReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <div className="pr-row">{reasonsForRole(config, session.role).map((r) => <button key={r.id} className={"pr-pick" + (fuStatus === "waiting" && fuWaitReason === r.id ? " on" : "")} onClick={() => { setFuStatus("waiting"); setFuWaitReason(r.id); }} style={fuStatus === "waiting" && fuWaitReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
           <label className="field" style={{ marginTop: 10 }}><span>פירוט (אופציונלי)</span><textarea rows={2} value={paidNote} onChange={(e) => setPaidNote(e.target.value)} placeholder="מה בוצע / מה הוחלף / מה נדרש" /></label>
         </div>}
         <button className="btn-close full" style={{ marginTop: 10 }} onClick={markDone}><CheckCircle2 size={16} /> {followUp ? "בוצע — ופתח קריאת המשך" : "בוצע"}</button>
@@ -2801,8 +4809,13 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
 }
 
 /* ============================================================ ANALYTICS */
-function Analytics({ tickets: allTickets, fleet, pm, config }) {
-  const [atab, setAtab] = useState("all");
+function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setCtx }) {
+  const [atabLocal, setAtabLocal] = useState("all");
+  const ctxToAtab = (c) => c === "facility" ? "maint" : c === "transport" ? "fleet" : "all";
+  const atabToCtx = (a) => a === "maint" ? "facility" : a === "fleet" ? "transport" : "all";
+  const atab = setCtx ? ctxToAtab(ctx || "all") : atabLocal;
+  const setAtab = setCtx ? ((a) => setCtx(atabToCtx(a))) : setAtabLocal;
+  const drill = (focus, extra = {}) => onFilter && onFilter({ st: "all", ...extra, focus });
   const [report, setReport] = useState(null);
   const [period, setPeriod] = useState("month");
   const PERIODS = [["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"], ["all", "הכול"]];
@@ -2852,6 +4865,11 @@ function Analytics({ tickets: allTickets, fleet, pm, config }) {
   const waitReasonArr = Object.entries(waitReason).sort((a, b) => b[1] - a[1]);
   const maxWait = Math.max(1, ...waitReasonArr.map(([, n]) => n));
   const equipWaitTotal = allTickets.reduce((a, t) => a + (t.equipWaitMs || 0) + (t.waitingReason === "no_equipment" && t.equipWaitSince ? Date.now() - t.equipWaitSince : 0), 0);
+  const pausedTotal = allTickets.reduce((a, t) => a + pausedMs(t), 0);
+  const D90 = 90 * 86400000;
+  const unitStats = (fleet || []).map((f) => { const rel = allTickets.filter((t) => t.forkliftId === f.id); const c90 = rel.filter((t) => Date.now() - t.createdAt <= D90).length; const cost = rel.reduce((a, t) => a + (t.closure?.costAmount || 0), 0); return { f, c90, total: rel.length, cost }; }).filter((x) => x.c90 >= 2 || x.cost > 0).sort((a, b) => b.c90 - a.c90 || b.cost - a.cost).slice(0, 8);
+  const returnsCount = allTickets.filter((t) => t.returned).length;
+  const maxUnitC = Math.max(1, ...unitStats.map((u) => u.c90));
   const bySup = {}; withCost.forEach((t) => { const s = t.closure.costSupplier || "—"; bySup[s] = (bySup[s] || 0) + t.closure.costAmount; });
   const supArr = Object.entries(bySup).sort((a, b) => b[1] - a[1]); const maxSup = Math.max(1, ...supArr.map(([, v]) => v));
   const techLoad = countBy(tickets.filter(isOpen).filter((t) => t.assignee), (t) => t.assignee);
@@ -2882,7 +4900,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config }) {
         "המתנה לחלקים": waitedParts(t) ? "כן" : "", "חריגת SLA": isOverdue(t) ? "כן" : "",
       }));
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(rows);
+      const ws = XLSX.utils.json_to_sheet(rowsSafe(rows));
       ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map(() => ({ wch: 14 }));
       XLSX.utils.book_append_sheet(wb, ws, "קריאות");
       const sum = [
@@ -2894,13 +4912,13 @@ function Analytics({ tickets: allTickets, fleet, pm, config }) {
         { "מדד": "השבתה מצטברת (שע׳)", "ערך": Math.round(totalDowntime / 3600000) },
         { "מדד": "טיפול תקופתי — תוכננו", "ערך": pmPlanned }, { "מדד": "טיפול תקופתי — בוצעו", "ערך": pmDone }, { "מדד": "טיפול תקופתי — לא הגיעו", "ערך": pmMissed }, { "מדד": "עמידה בטיפולים (%)", "ערך": pmRate }, { "מדד": "מתוכם עם עבודות בתשלום", "ערך": pmPaid },
       ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sum), "סיכום");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(sum)), "סיכום");
       if (pmHist.length) {
         const pmRows = pmHist.sort((a, b) => b.at - a.at).map((h) => ({
           "כלי": h.code, "פעולה": h.type === "missed" ? "לא הגיע" : "בוצע", "תאריך": fmtDate(h.at), "ע״י": h.by,
           "עבודות בתשלום": h.hadPaid ? "כן" : "", "הערה": h.paidNote || "",
         }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pmRows), "טיפולים תקופתיים");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(pmRows)), "טיפולים תקופתיים");
       }
       downloadXlsx(wb, `דוח_אחזקה_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (e) { alert("ייצוא ל-Excel נכשל בסביבת ההדגמה. נסו דפדפן אחר או הגרסה עם שרת."); }
@@ -2918,7 +4936,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config }) {
       table{width:100%;border-collapse:collapse;font-size:11px}
       th,td{border:1px solid #E2E7ED;padding:5px 7px;text-align:right}th{background:#F4F6F9}
       .foot{margin-top:16px;font-size:10px;color:#94A3B8}</style></head>
-      <body><h1>דוח אחזקה — ${m}</h1><div class="sub">${config?.companyName ? esc(config.companyName) + (config?.siteName ? " · " + esc(config.siteName) : "") + " · " : ""}${PERIOD_LBL[period]} · הופק ${new Date().toLocaleString("he-IL")}</div>
+      <body><h1>דוח אחזקה — ${m}</h1><div class="sub">${config?.companyName ? esc(config.companyName) + (config?.siteName ? " · " + esc(config.siteName) : "") + " · " : ""}${PERIOD_LBL[period]} · הופק ${fmtDate(Date.now())} ${fmtTime(Date.now())}</div>
       <div class="kpis">
         <div class="k"><div class="kn">${ils(totalCost)}</div><div class="kl">עלות אחזקה כוללת</div></div>
         <div class="k"><div class="kn">${ils(pmTicketCost)}</div><div class="kl">מתוכן טיפול תקופתי</div></div>
@@ -2950,7 +4968,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config }) {
       {recurList.length > 0 && <div className="panel"><div className="ins-h"><AlertTriangle size={14} color="#DC2626" /> אקטיבים עם תקלות חוזרות ({REPEAT_MIN}+ בתקופה)</div>{recurList.map((r, i) => <div key={i} className="ins-row"><span className="ins-name">{r.name}</span><span className="ins-val" style={{ color: "#DC2626" }}>{r.n} קריאות</span></div>)}</div>}
       {longList.length > 0 && <div className="panel"><div className="ins-h"><Clock size={14} color="#B45309" /> טיפולים ארוכים משמעותית מ-SLA</div>{longList.map((x, i) => <div key={i} className="ins-row"><span className="ins-name">{x.t.asset || x.t.subject}</span><span className="ins-val" style={{ color: "#B45309" }}>×{x.ratio.toFixed(1)} מ-SLA</span></div>)}</div>}
       {costCatArr.length > 0 && <><div className="ins-h" style={{ marginTop: 14 }}><DollarSign size={14} color="#16A34A" /> {costCatTitle}</div><div className="panel">{costCatArr.map(([c, v]) => <Bar key={c} label={c} value={v} max={maxCostCat} money color="#16A34A" />)}</div></>}
-      {costAssetArr.length > 0 && <><div className="ins-h" style={{ marginTop: 14 }}><DollarSign size={14} color="#0D9488" /> עלות לפי אקטיב</div><div className="panel">{costAssetArr.map(([c, v]) => <Bar key={c} label={c} value={v} max={maxCostAsset} money color="#0D9488" />)}</div></>}
+      {costAssetArr.length > 0 && <><div className="ins-h" style={{ marginTop: 14 }}><DollarSign size={14} color="#0D9488" /> עלות לפי אקטיב</div><div className="panel">{costAssetArr.map(([c, v]) => { const ff = (fleet || []).find((x) => x.code === c); return <Bar key={c} label={c} value={v} max={maxCostAsset} money color="#0D9488" onClick={onFilter ? () => drill(ff ? { label: `כלי ${c}`, forkliftId: ff.id } : { label: c, assetKey: c }, ff ? { track: "transport", period } : { period }) : undefined} />; })}</div></>}
     </>}
     {atab !== "fleet" && (<>
       <SectionTitle><Building2 size={15} /> אחזקת מבנה — עלות וקריאות לפי קטגוריה</SectionTitle>
@@ -2963,14 +4981,17 @@ function Analytics({ tickets: allTickets, fleet, pm, config }) {
     {showFleet && <><SectionTitle><Gauge size={15} /> השבתת כלי שינוע</SectionTitle>
     <div className="panel"><div className="row-stats"><div><div className="rs-num">{fmtDur(totalDowntime)}</div><div className="rs-lbl">השבתה מצטברת</div></div><div><div className="rs-num">{mtbf ? fmtDur(mtbf) : "—"}</div><div className="rs-lbl">זמן ממוצע בין תקלות</div></div></div></div>
     <SectionTitle>כלים בעייתיים (מספר קריאות)</SectionTitle>
-    {unitArr.length === 0 ? <div className="note">אין נתונים.</div> : <div className="panel">{unitArr.slice(0, 8).map((x) => <Bar key={x.f.id} label={`${unitLabel(x.f, config)}`} value={x.n} max={maxUnit} suffix={x.dt ? ` · ${fmtDur(x.dt)}` : ""} color={TRACKS.transport.color} />)}</div>}
+    {unitArr.length === 0 ? <div className="note">אין נתונים.</div> : <div className="panel">{unitArr.slice(0, 8).map((x) => <Bar key={x.f.id} label={`${unitLabel(x.f, config)}`} value={x.n} max={maxUnit} suffix={x.dt ? ` · ${fmtDur(x.dt)}` : ""} color={TRACKS.transport.color} onClick={onFilter ? () => drill({ label: `כלי ${unitLabel(x.f, config)}`, forkliftId: x.f.id }, { track: "transport", period }) : undefined} />)}</div>}
     <SectionTitle>סיבת תקלה (שינוע)</SectionTitle>
     <div className="panel">{WEAR.map((wr) => <Bar key={wr.id} label={wr.label} value={wear[wr.id] || 0} max={Math.max(1, ...WEAR.map((x) => wear[x.id] || 0))} color={wr.id === "natural" ? "#16A34A" : "#DC2626"} />)}</div></>}
     <SectionTitle>השבתה לפי סיבת המתנה</SectionTitle>
-    {equipWaitTotal > 0 && <div className="note" style={{ borderColor: "#FED7AA", marginBottom: 8 }}><Truck size={13} /> זמן השבתה מצטבר בשל אי-קבלת כלי מהמנהל: <b>{fmtDur(equipWaitTotal)}</b></div>}
-    {waitReasonArr.length === 0 ? <div className="note">אין כרגע קריאות בהמתנה.</div> : <div className="panel">{waitReasonArr.map(([id, n]) => <Bar key={id} label={waitReasonLabel(id)} value={n} max={maxWait} color="#B45309" />)}</div>}
+    {showFleet && equipWaitTotal > 0 && <div className="note" style={{ borderColor: "#FED7AA", marginBottom: 8 }}><Truck size={13} /> זמן השבתה מצטבר בשל אי-קבלת כלי מהמנהל: <b>{fmtDur(equipWaitTotal)}</b></div>}
+    {pausedTotal > 0 && <div className="note" style={{ borderColor: "#DDD6FE", marginBottom: 8 }}><CalendarClock size={13} /> זמן המתנה שלא נספר ל-SLA (המתנה לגורם חיצוני): <b>{fmtDur(pausedTotal)}</b></div>}
+    {returnsCount > 0 && <div className="note" style={{ borderColor: "#FECACA", marginBottom: 8 }}><RefreshCw size={13} /> קריאות שהוחזרו לתיקון (לא טופלו בפעם הראשונה): <b>{returnsCount}</b></div>}
+    {showFleet && unitStats.length > 0 && <><SectionTitle><Truck size={15} /> כלים בעייתיים — תקלות ועלות</SectionTitle><div className="panel">{unitStats.map((u) => <div key={u.f.id} className={"kpi-unit-row" + (onFilter ? " bar-click" : "")} onClick={onFilter ? () => drill({ label: `כלי ${u.f.code}`, forkliftId: u.f.id }, { track: "transport", period: "quarter" }) : undefined} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: "1px solid var(--line)" }}><span style={{ fontWeight: 700, minWidth: 64 }}>{u.f.code}</span><div style={{ flex: 1 }}><div style={{ height: 8, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: (u.c90 / maxUnitC * 100) + "%", height: "100%", background: u.c90 >= 3 ? "#DC2626" : "#EA580C" }} /></div></div><span style={{ fontSize: 12.5, color: "var(--muted)", minWidth: 92, textAlign: "left" }}>{u.c90} ב-90 ימים</span><span style={{ fontWeight: 700, minWidth: 70, textAlign: "left" }}>{u.cost ? ils(u.cost) : "—"}</span>{onFilter && <ChevronLeft size={14} style={{ color: "var(--muted)" }} />}</div>)}<div className="hint" style={{ marginTop: 6 }}>מבוסס על קריאות שינוע 90 הימים האחרונים והעלות המצטברת. כלי עם 3+ תקלות מסומן אדום — מועמד לבחינת החלפה.</div></div></>}
+    {waitReasonArr.length === 0 ? <div className="note">אין כרגע קריאות בהמתנה.</div> : <div className="panel">{waitReasonArr.map(([id, n]) => <Bar key={id} label={waitReasonLabel(id, config)} value={n} max={maxWait} color="#B45309" onClick={onFilter ? () => drill({ label: `סיבת המתנה · ${waitReasonLabel(id, config)}`, waitReason: id }, { st: "waiting" }) : undefined} />)}</div>}
     <SectionTitle>עלויות לפי ספק</SectionTitle>
-    {supArr.length === 0 ? <div className="note">טרם נרשמו עלויות.</div> : <div className="panel">{supArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxSup} money color="#16A34A" />)}</div>}
+    {supArr.length === 0 ? <div className="note">טרם נרשמו עלויות.</div> : <div className="panel">{supArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxSup} money color="#16A34A" onClick={onFilter ? () => drill({ label: `ספק · ${s}`, supplier: s }, { period }) : undefined} />)}</div>}
     <SectionTitle>עומס טכנאים</SectionTitle>
     {techArr.length === 0 ? <div className="note">אין שיוכים פעילים.</div> : <div className="panel">{techArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxTech} color="#2563EB" />)}</div>}
     {showFleet && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים — תכנון מול ביצוע</SectionTitle>
@@ -2986,9 +5007,11 @@ function Analytics({ tickets: allTickets, fleet, pm, config }) {
     {report && <ReportView html={report} onClose={() => setReport(null)} />}
   </>);
 }
-function Bar({ label, value, max, suffix, color, money }) {
+function Bar({ label, value, max, suffix, color, money, onClick }) {
   const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0;
-  return (<div className="bar-row"><div className="bar-top"><span className="bar-lbl">{label}</span><span className="bar-val">{money ? ils(value) : value}{suffix || ""}</span></div><div className="bar-track"><div className="bar-fill" style={{ width: pct + "%", background: color || "var(--primary)" }} /></div></div>);
+  const inner = (<><div className="bar-top"><span className="bar-lbl">{label}</span><span className="bar-val">{money ? ils(value) : value}{suffix || ""}</span></div><div className="bar-track"><div className="bar-fill" style={{ width: pct + "%", background: color || "var(--primary)" }} /></div></>);
+  if (onClick) return <button className="bar-row bar-click" onClick={onClick}>{inner}<ChevronLeft size={14} className="bar-chev" /></button>;
+  return <div className="bar-row">{inner}</div>;
 }
 
 // Аналитика по обращениям работников (нижний канал). dept=null → полная (админ); dept задан → срез по департаменту (менеджер, та же логика что в visibleTickets).
@@ -3050,18 +5073,117 @@ function WorkerReportsAnalytics({ tickets, dept = null, depts = null }) {
 
 /* ============================================================ SETTINGS */
 const SLA3 = (o) => ({ high: o?.high ?? 4, medium: o?.medium ?? 24, low: o?.low ?? 72 });
+function UserTree({ list, departments, onPick, expandAll, shifts }) {
+  const [open, setOpen] = useState({});
+  const isOpen = (k) => expandAll || open[k];
+  const toggle = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
+  const mgrDepts = (u) => userDepts(u);
+  const admins = list.filter((u) => u.role === "admin");
+  const techs = list.filter((u) => u.role === "tech");
+  const allDepts = [...new Set([...(departments || []), ...list.filter((u) => u.role !== "admin" && u.role !== "tech").flatMap((u) => u.role === "user" ? mgrDepts(u) : [u.dept]).filter(Boolean)])];
+  const unassigned = list.filter((u) => u.role !== "admin" && u.role !== "tech" && (u.role === "user" ? mgrDepts(u).length === 0 : !(u.dept || "")));
+  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; return <button className="tcard" onClick={() => onPick(u)} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14 }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : u.role === "worker" ? `מס׳ ${u.workerNo || "—"}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></button>; };
+  const Group = ({ k, title, count, color, children }) => <div style={{ marginBottom: 10 }}><button onClick={() => toggle(k)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", borderInlineStartWidth: 4, borderInlineStartColor: color || "var(--border)", background: "var(--surface-2)", cursor: "pointer", textAlign: "start" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>{title}<span className="badge sm" style={{ background: "var(--surface)", color: "var(--muted)" }}>{count}</span></span><ChevronLeft size={16} style={{ transform: isOpen(k) ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></button>{isOpen(k) && <div style={{ marginTop: 6, paddingInlineStart: 6 }}>{children}</div>}</div>;
+  const Col = ({ title, color, people }) => <div style={{ flex: "1 1 220px", minWidth: 200 }}><div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: color || "inherit", marginBottom: 6 }}>{color ? <span style={{ width: 8, height: 8, borderRadius: 4, background: color }} /> : null}{title}<span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{people.length}</span></div><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{people.length === 0 ? <div className="hint" style={{ paddingInlineStart: 6 }}>אין עובדים</div> : people}</div></div>;
+  if (list.length === 0) return <div className="note">לא נמצאו משתמשים</div>;
+  return (<div style={{ marginTop: 4 }}>
+    {admins.length > 0 && <Group k="_admin" title="הנהלה" count={admins.length} color="#7C3AED"><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{admins.map((u) => <PersonRow key={u.id} u={u} lead />)}</div></Group>}
+    {allDepts.map((d) => {
+      const mgrs = list.filter((u) => u.role === "user" && mgrDepts(u).includes(d));
+      const workers = list.filter((u) => (u.role === "worker" || u.role === "cleaner") && (u.dept || "") === d);
+      if (mgrs.length + workers.length === 0) return null;
+      const noShiftWk = workers.filter((u) => !u.shift);
+      const noShiftMgrs = mgrs.filter((u) => !u.shift);
+      return <Group key={d} k={"d:" + d} title={d} count={mgrs.length + workers.length} color="#0D9488">
+        {noShiftMgrs.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 10 }}>{noShiftMgrs.map((u) => <PersonRow key={"m" + u.id} u={u} lead />)}</div>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>{(shifts || DRIVER_SHIFTS).map((sh) => { const cm = mgrs.filter((u) => u.shift === sh.id); const cw = workers.filter((u) => u.shift === sh.id); const people = [...cm.map((u) => <PersonRow key={"m" + u.id} u={u} lead />), ...cw.map((u) => <PersonRow key={u.id} u={u} />)]; return <Col key={sh.id} title={sh.label} color={sh.color} people={people} />; })}</div>
+        {noShiftWk.length > 0 && <div style={{ marginTop: 10 }}><div className="hint" style={{ marginBottom: 4 }}>ללא משמרת ({noShiftWk.length})</div><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{noShiftWk.map((u) => <PersonRow key={u.id} u={u} />)}</div></div>}
+      </Group>;
+    })}
+    {techs.length > 0 && (() => { const sups = [...new Set(techs.map((u) => u.supplier || "").filter(Boolean))]; const internal = techs.filter((u) => !u.supplier); return <Group k="_tech" title="טכנאים" count={techs.length} color="#D97706"><div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>{sups.map((sp) => <Col key={sp} title={sp} people={techs.filter((u) => u.supplier === sp).map((u) => <PersonRow key={u.id} u={u} />)} />)}{internal.length > 0 && <Col title="פנימי" people={internal.map((u) => <PersonRow key={u.id} u={u} />)} />}</div></Group>; })()}
+    {unassigned.length > 0 && <Group k="_un" title="לא משויך" count={unassigned.length} color="var(--muted)"><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{unassigned.map((u) => <PersonRow key={u.id} u={u} />)}</div></Group>}
+  </div>);
+}
+function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete }) {
+  const meta = supMeta(config, name);
+  const [tab, setTab] = useState("details");
+  const [ind, setInd] = useState(meta.industries || []);
+  const [hp, setHp] = useState(meta.hp || "");
+  const [address, setAddress] = useState(meta.address || "");
+  const [notes, setNotes] = useState(meta.notes || "");
+  const [contacts, setContacts] = useState((meta.contacts || []).map((c) => ({ ...c })));
+  const [saved, setSaved] = useState(false);
+  const [nm, setNm] = useState(name);
+  const [cd, setCd] = useState(false);
+  const toggleInd = (id) => setInd((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
+  const addContact = () => setContacts((c) => [...c, { id: uid(), name: "", phone: "", email: "", role: "" }]);
+  const updContact = (i, patch) => setContacts((c) => c.map((x, j) => j === i ? { ...x, ...patch } : x));
+  const delContact = (i) => setContacts((c) => c.filter((_, j) => j !== i));
+  const saveMeta = () => { const m = { ...(config.supplierMeta || {}) }; m[name] = { industries: ind, hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) }; saveConfig({ ...config, supplierMeta: m }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const relOrders = (orders || []).filter((o) => o.supplier === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const relFleet = (fleet || []).filter((f) => f.supplier === name);
+  const stLbl = (st) => st === "draft" ? "טיוטה" : st === "sent" ? "נשלחה" : st === "received" ? "התקבלה" : st || "—";
+  const Tab = ({ id, label, n }) => <button onClick={() => setTab(id)} className="btn-ghost sm" style={{ fontWeight: tab === id ? 800 : 500, borderBottom: tab === id ? "2px solid #EA580C" : "2px solid transparent", borderRadius: 0 }}>{label}{n != null ? ` (${n})` : ""}</button>;
+  return (<div>
+    <button className="btn-ghost sm" onClick={onBack} style={{ marginBottom: 8 }}><ChevronLeft size={15} /> חזרה לרשימה</button>
+    <SectionTitle><Building2 size={16} /> {name}</SectionTitle>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 10px" }}>{ind.length === 0 ? <span className="hint">ללא תחום</span> : ind.map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id)}</span>)}</div>
+    <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 14, flexWrap: "wrap" }}><Tab id="details" label="פרטים" /><Tab id="activity" label="הזמנות וכלים" n={relOrders.length + relFleet.length} /><Tab id="invoices" label="חשבוניות" /></div>
+    {tab === "details" && <div>
+      <label className="field"><span>שם הספק</span><div style={{ display: "flex", gap: 8 }}><input value={nm} onChange={(e) => setNm(e.target.value)} style={{ flex: 1 }} />{nm.trim() && nm.trim() !== name && onRename && <button className="btn-ghost sm" onClick={() => onRename(name, nm)}>שנה שם</button>}</div></label>
+      <div className="field"><span>תחום / מודול</span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>{SUP_INDUSTRIES.map((x) => <button key={x.id} type="button" onClick={() => toggleInd(x.id)} className={"chip" + (ind.includes(x.id) ? " on" : "")}>{x.label}</button>)}</div></div>
+      <label className="field"><span>ח.פ. / מספר עוסק</span><input value={hp} onChange={(e) => setHp(e.target.value)} placeholder="לדוגמה: 514123456" /></label>
+      <label className="field"><span>כתובת</span><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="רחוב, עיר" /></label>
+      <div className="field"><div className="row-between"><span>אנשי קשר</span><button className="btn-ghost sm" onClick={addContact}><Plus size={14} /> איש קשר</button></div>
+        {contacts.length === 0 ? <div className="hint">אפשר להוסיף שם וטלפון בלבד (פרטי), או מספר אנשי קשר עם תפקיד (חברה).</div> : <div className="task-list">{contacts.map((c, i) => <div key={c.id || i} className="task-row" style={{ cursor: "default" }}><div className="task-row-main" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><input value={c.name} onChange={(e) => updContact(i, { name: e.target.value })} placeholder="שם" style={{ flex: "1 1 110px" }} /><input value={c.phone} onChange={(e) => updContact(i, { phone: e.target.value })} placeholder="טלפון" style={{ flex: "1 1 110px" }} /><input value={c.email || ""} onChange={(e) => updContact(i, { email: e.target.value })} placeholder="אימייל (לא חובה)" style={{ flex: "1 1 110px" }} /><input value={c.role} onChange={(e) => updContact(i, { role: e.target.value })} placeholder="תפקיד (לא חובה)" style={{ flex: "1 1 110px" }} /></div><div className="task-row-side"><button className="btn-ghost sm" onClick={() => delContact(i)}><X size={14} /></button></div></div>)}</div>}
+      </div>
+      <label className="field"><span>הערות</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></label>
+      <button className="btn-primary full" onClick={saveMeta}>{saved ? "נשמר ✓" : "שמירה"}</button>
+      {onDelete && (!cd ? <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C" }} onClick={() => setCd(true)}><Trash2 size={14} /> מחיקת ספק</button> : <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C", fontWeight: 800 }} onClick={() => onDelete(name)}>לחצו שוב לאישור מחיקה</button>)}
+    </div>}
+    {tab === "activity" && <div>
+      <SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle>
+      {relOrders.length === 0 ? <div className="hint" style={{ marginBottom: 12 }}>אין הזמנות לספק זה.</div> : <div className="task-list" style={{ marginBottom: 12 }}>{relOrders.map((o) => <div key={o.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{(o.lines || []).length} פריטים · {stLbl(o.status)}</div><div className="task-row-sub">{o.note || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(o.createdAt)}</span></div></div>)}</div>}
+      <SectionTitle><Truck size={15} /> כלים / ליסינג</SectionTitle>
+      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => <div key={f.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {f.type}</div><div className="task-row-sub">{f.notes || "—"}</div></div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}</div></div>)}</div>}
+    </div>}
+    {tab === "invoices" && <div className="hint" style={{ padding: 18, textAlign: "center" }}>ניהול חשבוניות יתווסף עם מודול התקציב.</div>}
+  </div>);
+}
+
+function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder }) {
+  const [sel, setSel] = useState(null);
+  const [q, setQ] = useState("");
+  const [adding, setAdding] = useState("");
+  const names = config.suppliers || [];
+  const renameSup = async (oldN, newN) => { newN = (newN || "").trim(); if (!newN || newN === oldN) return; const names2 = names.map((x) => x === oldN ? newN : x); const meta2 = { ...(config.supplierMeta || {}) }; if (meta2[oldN]) { meta2[newN] = meta2[oldN]; delete meta2[oldN]; } saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }); for (const f of (fleet || [])) if (f.supplier === oldN && saveFleet) await saveFleet({ ...f, supplier: newN }); for (const u of (users || [])) if (u.supplier === oldN && saveUser) await saveUser({ ...u, supplier: newN }); for (const o of (orders || [])) if (o.supplier === oldN && savePpeOrder) await savePpeOrder({ ...o, supplier: newN }); setSel(newN); };
+  const delSup = (n) => { const names2 = names.filter((x) => x !== n); const meta2 = { ...(config.supplierMeta || {}) }; delete meta2[n]; saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }); setSel(null); };
+  const add = () => { const n = adding.trim(); if (!n) return; if (!names.includes(n)) saveConfig({ ...config, suppliers: [...names, n] }); setAdding(""); setSel(n); };
+  if (sel && names.includes(sel)) return <div style={{ padding: 4 }}><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} onBack={() => setSel(null)} onRename={renameSup} onDelete={delSup} /></div>;
+  const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
+  return (<div style={{ padding: 4 }}>
+    <SectionTitle><Building2 size={16} /> ספקים / קבלנים</SectionTitle>
+    <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש ספק" style={{ flex: "1 1 160px" }} /><input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="ספק חדש" style={{ flex: "1 1 140px" }} /><button className="btn-primary sm" onClick={add}><Plus size={15} /> הוסף</button></div>
+    {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>{shown.map((n) => { const m = supMeta(config, n); const oN = (orders || []).filter((o) => o.supplier === n).length; const fN = (fleet || []).filter((f) => f.supplier === n).length; return <button key={n} onClick={() => setSel(n)} style={{ textAlign: "start", border: "1px solid var(--border)", borderRadius: 12, padding: 14, background: "var(--surface)", cursor: "pointer" }}><div style={{ fontWeight: 800, marginBottom: 6 }}>{n}</div><div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8, minHeight: 20 }}>{(m.industries || []).length === 0 ? <span className="hint">ללא תחום</span> : (m.industries || []).map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id)}</span>)}</div><div className="hint">{oN} הזמנות · {fN} כלים{m.contacts && m.contacts.length ? ` · ${m.contacts.length} אנשי קשר` : ""}</div></button>; })}</div>}
+  </div>);
+}
+
 function SettingsPanel(p) {
-  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, session, templates, fleet, tickets, loadDemo, clearDemo, getBackup, importBackup } = p;
+  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, loadDemo, clearDemo, getBackup, importBackup } = p;
   const [demoBusy, setDemoBusy] = useState(""), [showDev, setShowDev] = useState(false), [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
-  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [openType, setOpenType] = useState(null);
+  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [openType, setOpenType] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null);
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
-  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftDef, setShiftDef] = useState(config.defaultShiftEnd || "16:30");
-  const [shifts, setShifts] = useState(config.shifts?.length ? config.shifts.map((s) => ({ ...s })) : [{ id: "sh_main", name: "משמרת ראשית", end: config.defaultShiftEnd || "16:30" }]);
+  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftDef, setShiftDef] = useState(config.defaultShiftEnd || "16:30"), [startDef, setStartDef] = useState(config.defaultShiftStart || "07:30"), [lateG, setLateG] = useState(config.lateGraceMin ?? 10), [earlyG, setEarlyG] = useState(config.earlyGraceMin ?? 10);
+  const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
+  const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
+  const [taskMeta, setTaskMeta] = useState(() => { const m = config.taskStatusMeta || {}; return TASK_STATUS.reduce((a, s) => { a[s.id] = { label: m[s.id]?.label || s.label, color: m[s.id]?.color || s.color }; return a; }, {}); });
+  const [shifts, setShifts] = useState(config.shifts?.length ? config.shifts.map((s) => ({ ...s })) : [{ id: "sh_main", name: "משמרת ראשית", start: config.defaultShiftStart || "07:30", end: config.defaultShiftEnd || "16:30" }]);
+  const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
   const [tw, setTw] = useState({ ...(config.techWidgets || {}) }), [mw, setMw] = useState({ ...(config.mgrWidgets || {}) });
   const [regMsg, setRegMsg] = useState("");
   const [typeMsg, setTypeMsg] = useState("");
   const mkRows = (arr) => (arr || []).map((s, i) => ({ id: "r" + i + "_" + s, name: s, _orig: s }));
-  const [depts, setDepts] = useState(mkRows(config.departments)), [sups, setSups] = useState(mkRows(config.suppliers)), [zones, setZones] = useState(mkRows(config.zones));
+  const [depts, setDepts] = useState(mkRows(config.departments)), [zones, setZones] = useState(mkRows(config.zones));
   const [cats, setCats] = useState((config.categories || CATEGORIES).map((c) => ({ id: c.id, label: c.label, ...SLA3(config.catSla?.[c.id]) })));
   const [vtypes, setVtypes] = useState((config.vehicleTypes && config.vehicleTypes.length) ? config.vehicleTypes.map((v) => ({ ...v, models: [...(v.models || [])] })) : buildVehicleTypes(config, fleet));
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
@@ -3077,29 +5199,25 @@ function SettingsPanel(p) {
   const runImport = async () => { if (!pendImport) return; setImpBusy(true); try { await importBackup(pendImport.data); setPendImport(null); setImpMsg("השחזור הושלם ✓"); } catch (er) { setImpMsg("השחזור נכשל"); } finally { setImpBusy(false); } };
   // целостность данных: сколько записей ссылается на элемент справочника
   const deptUse = (d) => users.filter((u) => u.dept === d).length + (fleet || []).filter((f) => (f.depts || []).includes(d) || f.dept === d).length + (tickets || []).filter((t) => t.reportedBy?.dept === d).length;
-  const supUse = (s) => (fleet || []).filter((f) => f.supplier === s).length + users.filter((u) => u.supplier === s).length;
   const zoneUse = (z) => (fleet || []).filter((f) => f.zone === z).length + (tickets || []).filter((t) => t.zone === z).length;
-  const saveGeneral = async () => { const cleanShifts = shifts.filter((s) => (s.name || "").trim()).map((s) => ({ id: s.id, name: s.name.trim(), end: s.end || "16:30" })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: cleanShifts, defaultShiftEnd: (cleanShifts[0]?.end) || shiftDef || "16:30" }); flash(); };
+  const saveGeneral = async () => { const cleanShifts = shifts.filter((s) => (s.name || "").trim()).map((s) => ({ id: s.id, name: s.name.trim(), start: s.start || "07:30", end: s.end || "16:30" })); const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: cleanShifts, workShifts: wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" })), defaultShiftStart: (cleanShifts[0]?.start) || startDef || "07:30", defaultShiftEnd: (cleanShifts[0]?.end) || shiftDef || "16:30", lateGraceMin: Math.max(0, Number(lateG) || 0), earlyGraceMin: Math.max(0, Number(earlyG) || 0), waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME, taskStatusMeta: taskMeta }); flash(); };
   const saveUsersCfg = async () => { await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw }); flash(); };
   const saveRegistries = async () => {
     setRegMsg("");
     const renames = (rows) => rows.filter((r) => r._orig && r.name.trim() && r._orig !== r.name.trim());
     const emptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
-    if (emptied(depts, deptUse) || emptied(sups, supUse) || emptied(zones, zoneUse)) { setRegMsg("לא ניתן לרוקן שם של פריט שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return; }
+    if (emptied(depts, deptUse) || emptied(zones, zoneUse)) { setRegMsg("לא ניתן לרוקן שם של פריט שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return; }
     try {
       for (const r of renames(depts)) { const o = r._orig, n = r.name.trim();
         for (const u of users) if (u.dept === o) await saveUser({ ...u, dept: n });
         for (const f of (fleet || [])) { let ch = false; const nf = { ...f }; if (Array.isArray(f.depts) && f.depts.includes(o)) { nf.depts = f.depts.map((d) => d === o ? n : d); ch = true; } if (f.dept === o) { nf.dept = n; ch = true; } if (ch) await saveFleet(nf); }
         for (const t of (tickets || [])) if (t.reportedBy?.dept === o) await saveTicket({ ...t, reportedBy: { ...t.reportedBy, dept: n } }); }
-      for (const r of renames(sups)) { const o = r._orig, n = r.name.trim();
-        for (const f of (fleet || [])) if (f.supplier === o) await saveFleet({ ...f, supplier: n });
-        for (const u of users) if (u.supplier === o) await saveUser({ ...u, supplier: n }); }
       for (const r of renames(zones)) { const o = r._orig, n = r.name.trim();
         for (const f of (fleet || [])) if (f.zone === o) await saveFleet({ ...f, zone: n });
         for (const t of (tickets || [])) if (t.zone === o) await saveTicket({ ...t, zone: n }); }
       const clean = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
-      await saveConfig({ ...config, departments: clean(depts), suppliers: clean(sups), zones: clean(zones) });
-      setDepts((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); setSups((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() })));
+      await saveConfig({ ...config, departments: clean(depts), zones: clean(zones) });
+      setDepts((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() })));
       flash();
     } catch (e) { setRegMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
   };
@@ -3120,7 +5238,8 @@ function SettingsPanel(p) {
       </div></div>); })}</div>
     <button className="btn-ghost full" onClick={() => setRows((s) => [...s, { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: "" }])}><Plus size={15} /> {addLabel}</button>
   </>);
-  const ulist = users.filter((u) => (urole === "all" || u.role === urole) && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim())));
+  const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim())));
+  const restoreWorker = async (w) => { await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); setArcView(null); };
   return (<div className="settings-wrap">
     {!p.only && <div className="seg-tabs s4"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "reg" ? "on" : ""} onClick={() => setTab("reg")}>רישומים</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button><button className={tab === "fleet" ? "on" : ""} onClick={() => setTab("fleet")}>סוגי כלים</button></div>}
 
@@ -3131,8 +5250,45 @@ function SettingsPanel(p) {
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
       <SectionTitle><Clock size={15} /> משמרות</SectionTitle>
       <div className="hint" style={{ marginBottom: 6 }}>הגדירו משמרות (שם + שעת סיום). לכל טכנאי משויכת משמרת — ובסיומה מתבצעת יציאה אוטומטית. המשמרת הראשונה היא ברירת המחדל לטכנאים חדשים.</div>
-      {shifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.name} placeholder="שם המשמרת (בוקר / ערב)" onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /><input type="time" value={s.end} style={{ maxWidth: 120 }} onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, end: e.target.value } : x))} /><button className="reg-del" onClick={() => setShifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={shifts.length <= 1}><Trash2 size={15} /></button></div>)}
-      <button className="btn-ghost sm" onClick={() => setShifts((a) => [...a, { id: "sh" + Date.now().toString(36), name: "", end: "16:30" }])}><Plus size={14} /> משמרת</button>
+      {shifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.name} placeholder="שם המשמרת (בוקר / ערב)" onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /><input type="time" value={s.start || "07:30"} title="תחילה" style={{ maxWidth: 110 }} onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, start: e.target.value } : x))} /><input type="time" value={s.end} title="סיום" style={{ maxWidth: 110 }} onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, end: e.target.value } : x))} /><button className="reg-del" onClick={() => setShifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={shifts.length <= 1}><Trash2 size={15} /></button></div>)}
+      <button className="btn-ghost sm" onClick={() => setShifts((a) => [...a, { id: "sh" + Date.now().toString(36), name: "", start: "07:30", end: "16:30" }])}><Plus size={14} /> משמרת</button>
+      <SectionTitle><Clock size={15} /> משמרות עבודה (בוקר/לילה)</SectionTitle>
+      <div className="hint" style={{ marginBottom: 6 }}>משמרות לשיוך עובדים ולעמודות בעץ המחלקות. ברירת מחדל: בוקר / לילה — ניתן להוסיף עוד.</div>
+      {wshifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.label || ""} placeholder="שם המשמרת" onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /><input type="color" value={s.color || "#64748B"} title="צבע" style={{ width: 44, height: 34, padding: 0, border: "none", background: "none" }} onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, color: e.target.value } : x))} /><button className="reg-del" onClick={() => setWshifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={wshifts.length <= 1}><Trash2 size={15} /></button></div>)}
+      <button className="btn-ghost sm" onClick={() => setWshifts((a) => [...a, { id: "ws" + Date.now().toString(36), label: "", color: "#64748B" }])}><Plus size={14} /> משמרת</button>
+      <div className="field-row" style={{ marginTop: 12 }}><label className="field"><span>סבילות איחור לתחילה (דקות)</span><input type="number" min="0" value={lateG} onChange={(e) => setLateG(e.target.value)} /></label><label className="field"><span>סבילות סיום מוקדם (דקות)</span><input type="number" min="0" value={earlyG} onChange={(e) => setEarlyG(e.target.value)} /></label></div>
+      <div className="hint">כניסת טכנאי למערכת = תחילת משמרת. איחור מעבר לסבילות וסיום מוקדם מעבר לסבילות נספרים כהשבתה ומתריעים למנהל.</div>
+      <SectionTitle>סיבות המתנה</SectionTitle>
+      <div className="hint" style={{ marginBottom: 8 }}>לכל סיבה: מי מחזיק את הכדור בזמן ההמתנה · מי רשאי לבחור אותה · האם עוצרת את שעון ה-SLA. «לא התקבל הכלי» היא סיבה מערכתית ואינה ניתנת למחיקה.</div>
+      {wreasons.map((r, i) => <div key={r.id || i} className="reg-row" style={{ marginBottom: 6, gap: 6, flexWrap: "wrap" }}>
+        <input className="reg-name" value={r.label} placeholder="שם הסיבה" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+        <select value={r.ball || "executor"} title="מי מחזיק את הכדור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, ball: e.target.value } : x))}><option value="executor">כדור: המבצע</option><option value="manager">כדור: מנהל</option><option value="admin">כדור: מנהל מערכת</option></select>
+        <select value={r.setters || "both"} title="מי רשאי לבחור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, setters: e.target.value } : x))}><option value="both">בוחר: שניהם</option><option value="tech">בוחר: טכנאי</option><option value="manager">בוחר: מנהל</option></select>
+        <label className="chk-line" style={{ margin: 0 }}><input type="checkbox" checked={!!r.pauseSla} onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, pauseSla: e.target.checked } : x))} /> עוצר SLA</label>
+        <button className="reg-del" disabled={r.id === "no_equipment"} onClick={() => setWreasons((a) => r.id === "no_equipment" ? a : a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
+      </div>)}
+      <button className="btn-ghost sm" onClick={() => setWreasons((a) => [...a, { id: "wr" + Date.now().toString(36), label: "", ball: "executor", pauseSla: false, setters: "both" }])}><Plus size={14} /> סיבת המתנה</button>
+      <SectionTitle><ShieldAlert size={15} /> מצב כלי שינוע — רמות חומרה</SectionTitle>
+      <div className="hint" style={{ marginBottom: 8 }}>נבחרות בעת פתיחת קריאת שינוע ובסיום בקרת כלי. «מוציא מכלל שימוש» = הכלי מסומן «מושבת» בכל המסכים (פארק, נהגים, התראות) עד לסגירת הקריאה או החזרה לשירות.</div>
+      {dlevels.map((d, i) => <div key={d.id || i} className="dt-edit-row">
+        <div className="dt-edit-line">
+          <input className="reg-name" value={d.label} placeholder="שם הרמה" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+          <input className="reg-name dt-desc-in" value={d.desc || ""} placeholder="תיאור קצר (מוצג בבחירה)" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))} />
+          <button className="reg-del" onClick={() => setDlevels((a) => a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
+        </div>
+        <div className="dt-edit-line">
+          <div className="pal">{DT_PALETTE.map((c) => <button key={c} type="button" className={"pal-sw" + (d.color === c ? " on" : "")} style={{ background: c }} title={c} onClick={() => setDlevels((a) => a.map((x, j) => j === i ? { ...x, color: c } : x))} />)}</div>
+          <select value={d.prio || "medium"} title="עדיפות ברירת מחדל" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, prio: e.target.value } : x))}><option value="low">עדיפות: נמוכה</option><option value="medium">עדיפות: בינונית</option><option value="high">עדיפות: גבוהה</option></select>
+          <label className="chk-line" style={{ margin: 0 }}><input type="checkbox" checked={!!d.oos} onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, oos: e.target.checked } : x))} /> מוציא מכלל שימוש</label>
+        </div>
+      </div>)}
+      <button className="btn-ghost sm" onClick={() => setDlevels((a) => [...a, { id: "dt" + Date.now().toString(36), label: "", desc: "", color: "#CA8A04", prio: "medium", oos: false }])}><Plus size={14} /> רמת חומרה</button>
+      <SectionTitle><ClipboardList size={15} /> סטטוסים של מטלות</SectionTitle>
+      <div className="hint" style={{ marginBottom: 8 }}>אפשר לשנות שם וצבע לכל סטטוס. חמשת הסטטוסים קבועים כי הם נושאים משמעות (הושלם/בוטל = סגור).</div>
+      {TASK_STATUS.map((s) => <div key={s.id} className="dt-edit-row"><div className="dt-edit-line">
+        <input className="reg-name" value={taskMeta[s.id]?.label || ""} placeholder={s.label} onChange={(e) => setTaskMeta((m) => ({ ...m, [s.id]: { ...m[s.id], label: e.target.value } }))} />
+        <div className="pal">{DT_PALETTE.map((c) => <button key={c} type="button" className={"pal-sw" + ((taskMeta[s.id]?.color || s.color) === c ? " on" : "")} style={{ background: c }} title={c} onClick={() => setTaskMeta((m) => ({ ...m, [s.id]: { ...m[s.id], color: c } }))} />)}</div>
+      </div></div>)}
       <SectionTitle>התראות וספי זמן — מסמכים (ימים)</SectionTitle>
       <div className="sla-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
         <label className="sla-cell"><span style={{ color: "#CA8A04" }}>צהוב</span><input type="number" value={warn.yellow} onChange={(e) => setWarn((s) => ({ ...s, yellow: Number(e.target.value) }))} /></label>
@@ -3141,9 +5297,6 @@ function SettingsPanel(p) {
       </div>
       <SectionTitle>השבתה קריטית — סף התראה (שעות)</SectionTitle>
       <label className="sla-cell" style={{ maxWidth: 160 }}><span style={{ color: "#DC2626" }}>שעות עד הסלמה</span><input type="number" value={escH} onChange={(e) => setEscH(e.target.value)} /></label>
-      <SectionTitle><Bell size={15} /> התראות פעילות</SectionTitle>
-      <div className="hint" style={{ marginBottom: 8 }}>סוגי התראות שהמערכת תציג ותצלצל עליהם. כיבוי משבית את הסוג לכל התפקידים.</div>
-      <div className="wtoggles">{NOTIFY_DEFS.map(([k, l]) => <button key={k} className={"wtoggle" + (notify[k] !== false ? " on" : "")} onClick={() => setNotify((s) => ({ ...s, [k]: s[k] === false ? true : false }))}>{notify[k] !== false ? <Eye size={14} /> : <EyeOff size={14} />} {l}</button>)}</div>
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveGeneral}>{saved ? "נשמר ✓" : "שמירת הגדרות"}</button>
       <div className="note">גרסת הדגמה. הנתונים משותפים בין המשתמשים. ה-PIN אינו אבטחה אמיתית — לגרסת ייצור נדרש שרת.</div>
       <SectionTitle><FileText size={15} /> גיבוי ושחזור</SectionTitle>
@@ -3169,8 +5322,6 @@ function SettingsPanel(p) {
       <div className="hint" style={{ marginBottom: 10 }}>רישומים משותפים למערכת. שינוי שם של פריט «בשימוש» יתעדכן אוטומטית בכל הרשומות המקושרות בעת השמירה. מחיקה חסומה כל עוד הפריט בשימוש — כדי למחוק, שחררו תחילה את הרשומות.</div>
       <SectionTitle>מחלקות</SectionTitle>
       {regEditor(depts, setDepts, deptUse, "מחלקה", "שם מחלקה")}
-      <SectionTitle>ספקים / קבלנים</SectionTitle>
-      {regEditor(sups, setSups, supUse, "ספק", "שם ספק")}
       <SectionTitle>אזורים</SectionTitle>
       {regEditor(zones, setZones, zoneUse, "אזור", "שם אזור")}
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveRegistries}>{saved ? "נשמר ✓" : "שמירת רישומים"}</button>
@@ -3205,20 +5356,19 @@ function SettingsPanel(p) {
 
     {tab === "users" && (<>
       <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle><button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button></div>
-      <div className="u-filters"><input className="u-search" value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / מס׳ עובד / דוא״ל" /><select value={urole} onChange={(e) => setUrole(e.target.value)}><option value="all">כל התפקידים</option>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-      <div className="cards">{ulist.map((u) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; return <button key={u.id} className="tcard" onClick={() => setUEdit(u)} style={{ borderInlineStartColor: u.active ? "#16A34A" : "var(--muted)" }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "tech" ? (u.techScope === "facility" ? `מבנה · ${(u.techCats || []).length} קטגוריות` : (u.supplier || "צי — כל הכלים")) : u.role === "worker" ? `מס׳ ${u.workerNo || "—"} · ${u.dept || "—"}` : (u.dept || "—")} · {u.active ? "פעיל" : "מושבת"}</div></div></button>; })}</div>
-      {ulist.length === 0 && <div className="note">לא נמצאו משתמשים</div>}
-      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} onCancel={() => setUEdit(null)} onSave={async (u) => { await saveUser(u); setUEdit(null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
-      <SectionTitle>בלוקים שמוצגים לטכנאי</SectionTitle>
-      <div className="wtoggles">{TW_DEFS.map(([k, l]) => <button key={k} className={"wtoggle" + (tw[k] !== false ? " on" : "")} onClick={() => setTw((s) => ({ ...s, [k]: s[k] === false ? true : false }))}>{tw[k] !== false ? <Eye size={14} /> : <EyeOff size={14} />} {l}</button>)}</div>
-      <SectionTitle>בלוקים שמוצגים למנהל מחלקה</SectionTitle>
-      <div className="wtoggles">{MW_DEFS.map(([k, l]) => <button key={k} className={"wtoggle" + (mw[k] !== false ? " on" : "")} onClick={() => setMw((s) => ({ ...s, [k]: s[k] === false ? true : false }))}>{mw[k] !== false ? <Eye size={14} /> : <EyeOff size={14} />} {l}</button>)}</div>
-      <button className="btn-primary full" style={{ marginTop: 14 }} onClick={saveUsersCfg}>{saved ? "נשמר ✓" : "שמירת הרשאות תצוגה"}</button>
+      <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / מס׳ עובד / דוא״ל" /></div>
+      <UserTree list={ulist} departments={config.departments} onPick={setUEdit} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
+      {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
+      {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
+      {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={restoreWorker} /></Overlay>}
+      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { await saveUser(u); if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want) await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }); } } setUEdit(null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
     </>)}
   </div>);
 }
-function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, onCancel, onSave, onDelete }) {
-  const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [fleetDocs, setFleetDocs] = useState(!!user.fleetDocs), [fleetTickets, setFleetTickets] = useState(!!user.fleetTickets), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [active, setActive] = useState(user.active !== false), [err, setErr] = useState("");
+function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, onCancel, onSave, onDelete, onArchive }) {
+  const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [fleetDocs, setFleetDocs] = useState(!!user.fleetDocs), [fleetTickets, setFleetTickets] = useState(!!user.fleetTickets), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [ppeFull, setPpeFull] = useState((user.perms && user.perms.ppe) === "full"), [err, setErr] = useState("");
+  const [shift, setShift] = useState(user.shift || "");
+  const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
@@ -3231,34 +5381,45 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
-    onSave({ id: user.id || uid(), name: name.trim(), role,
+    onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), role,
       email: (role === "tech" || role === "worker" || role === "cleaner") ? "" : email.trim().toLowerCase(), password: (role === "tech" || role === "worker" || role === "cleaner") ? "" : password,
       pin: (role === "tech" || role === "worker" || role === "cleaner") ? pin.trim() : "",
       workerNo: (role === "worker" || role === "cleaner") ? workerNo.trim() : "",
-      dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: role === "tech" ? shiftId : "", shiftEnd: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? config.shifts.find((s) => s.id === shiftId).end : shiftEnd) : "",
+      dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: role === "tech" ? shiftId : "", shiftStart: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? (config.shifts.find((s) => s.id === shiftId).start || "") : shiftStart) : "", shiftEnd: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? config.shifts.find((s) => s.id === shiftId).end : shiftEnd) : "",
       techScope: role === "tech" ? techScope : undefined,
       techCats: (role === "tech" && techScope === "facility") ? techCats : [],
-      fleetDocs: role === "user" ? fleetDocs : false, fleetTickets: role === "user" ? fleetTickets : false, mgrZones: role === "user" ? mgrZones : [],
-      active, createdAt: user.createdAt || Date.now() });
+      fleetDocs: role === "user" ? fleetDocs : false, fleetTickets: role === "user" ? fleetTickets : false, mgrZones: role === "user" ? mgrZones : [], perms: role === "user" ? { ppe: ppeFull ? "full" : "request" } : (user.perms || undefined),
+      shift: role !== "admin" ? shift : "",
+      reportsTo: role === "user" ? reportsTo : "",
+      active, createdAt: user.createdAt || Date.now(),
+      employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
+      contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
   };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
       {!lockRole && <label className="field"><span>תפקיד</span><select value={role} onChange={(e) => setRole(e.target.value)}>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>}
+      {role !== "admin" && <label className="field"><span>משמרת</span><select value={shift} onChange={(e) => setShift(e.target.value)}><option value="">ללא משמרת</option>{workShiftsOf(config).map((sh) => <option key={sh.id} value={sh.id}>{sh.label}</option>)}</select></label>}
       {role === "user" && (lockDept
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
+          <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
           <div style={{ marginTop: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>הרשאות פארק כלי שינוע</span>
             <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={fleetDocs} onChange={(e) => setFleetDocs(e.target.checked)} /> רואה מסמכים ותוקף של הכלים</label>
+            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={ppeFull} onChange={(e) => setPpeFull(e.target.checked)} /> גישה מלאה למודול ביגוד עובדים (כמו מנהל מערכת)</label><div className="hint" style={{ marginTop: 2 }}>מסומן — גישת HR מלאה (כל המחלקות, קטלוג, דרישות, קיזוז, הנפקה ישירה ואישור בקשות). לא מסומן — המנהל שולח «בקשת הנפקה» לעובדיו בלבד, ללא ניפוק ישיר מהמלאי.</div>
             <label className="chk-line"><input type="checkbox" checked={fleetTickets} onChange={(e) => setFleetTickets(e.target.checked)} /> רואה היסטוריית קריאות על הכלים שלו</label>
             <div className="hint">המנהל תמיד רואה את כלי מחלקותיו ויכול לנהל נהגים. שתי ההרשאות לעיל כבויות כברירת מחדל.</div>
           </div></div>)}
       {role === "user" && zones && (zones.length === 0
-        ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין זוני ניקיון להצמדה. הגדירו זונות תחת «ניקיון».</div>
-        : <div className="field"><span>זוני ניקיון של המחלקה (המנהל יראה את מצב הניקיון והדיווחים בהם)</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (mgrZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z.id)} onChange={() => setMgrZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div></div>)}
+        ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
+        : <div className="field"><span>אזורי ניקיון של המחלקה (המנהל יראה את מצב הניקיון והדיווחים בהם)</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (mgrZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z.id)} onChange={() => setMgrZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div></div>)}
+      {role === "cleaner" && zones && (zones.length === 0
+        ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון. הגדירו אזורים תחת «ניקיון».</div>
+        : <div className="field"><span>אזורי הניקיון באחריותו</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (cleanZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={cleanZones.includes(z.id)} onChange={() => setCleanZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div><div className="hint">אותה הגדרה כמו «עובד אחראי» בעריכת האזור — נשמרת לשני הכיוונים. אזור משויך לעובד אחד.</div></div>)}
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
         : <label className="field"><span>מחלקה (משויך אליה)</span><select value={dept} onChange={(e) => setDept(e.target.value)}>{config.departments.map((d) => <option key={d}>{d}</option>)}</select><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></label>)}
+      {(role === "worker" || role === "cleaner") && <div className="field"><span>שיוך תעסוקתי (לחישוב חיוב ציוד מגן)</span><div className="seg-tabs s2" style={{ maxWidth: 260 }}><button className={employmentType === "direct" ? "on" : ""} onClick={() => setEmploymentType("direct")}>ישיר (חברה)</button><button className={employmentType === "contractor" ? "on" : ""} onClick={() => setEmploymentType("contractor")}>דרך קבלן</button></div>{employmentType === "contractor" && <input style={{ marginTop: 8 }} value={contractorName} onChange={(e) => setContractorName(e.target.value)} placeholder="שם הקבלן (לא חובה)" />}<div className="hint">עובד דרך קבלן משלם מחיר מלא על ציוד; עובד ישיר — לפי מדיניות המחלקה.</div></div>}
       {role === "tech" ? (<>
         <label className="field"><span>קוד כניסה לטכנאי *</span><input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 4821" /><div className="hint">הטכנאי (קבלן חיצוני) נכנס עם קוד זה בלבד — דרך כפתור «כניסת טכנאי» במסך הכניסה.</div></label>
         <div className="field"><span>פרופיל טכנאי</span><div className="pr-row">
@@ -3268,8 +5429,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
         {techScope === "facility" && <div className="field"><span>קטגוריות מבנה (בחרו לפחות אחת) *</span><div className="cat-grid">{(config.categories || CATEGORIES).map((c) => { const on = techCats.includes(c.id); const m = catMeta(c.id); return <button key={c.id} className={"cat-pick" + (on ? " on" : "")} onClick={() => setTechCats((s) => on ? s.filter((x) => x !== c.id) : [...s, c.id])} style={on ? { borderColor: m.color, background: m.color + "1f" } : {}}><m.Icon size={19} color={m.color} /><span>{c.label}</span></button>; })}</div></div>}
         {techScope === "transport" && <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— כל הצי (ללא שיוך) —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select><div className="hint">אם נבחר ספק — הטכנאי יראה רק כלים של אותו ספק.</div></label>}
         {config.shifts?.length
-          ? <label className="field"><span>משמרת (יציאה אוטומטית בסיומה)</span><select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>{config.shifts.map((s) => <option key={s.id} value={s.id}>{s.name} · עד {s.end}</option>)}</select></label>
-          : <label className="field"><span>שעת סיום משמרת (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label>}
+          ? <label className="field"><span>משמרת (כניסה=תחילה, יציאה אוטומטית בסיום)</span><select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>{config.shifts.map((s) => <option key={s.id} value={s.id}>{s.name} · {s.start || "—"}–{s.end}</option>)}</select></label>
+          : <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>}
       </>) : (role === "worker" || role === "cleaner") ? (<>
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
         <label className="field"><span>קוד כניסה *</span><input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">העובד נכנס עם מספר העובד והקוד הזה — דרך «כניסת עובד» במסך הכניסה. אין צורך בדוא״ל.</div></label>
@@ -3281,14 +5442,15 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
       <div className="hint" style={{ marginTop: -4 }}>בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו (למשל עובד שעזב).</div>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>שמירה</button>
-      {canDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
+      {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><HardHat size={15} /> עזיבת עובד / החזרת ציוד</button>}
+      {canDelete && !(onArchive && ["worker", "cleaner", "tech"].includes(role)) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
 }
 
 /* ============================================================ TICKET FORM */
 function TicketForm(p) {
-  const { config, session, fleet, tickets, users, onCreate, onCancel, onOpenTicket, prefill } = p;
+  const { config, session, fleet, tickets, users, saveUser, onCreate, onCancel, onOpenTicket, prefill } = p;
   const isAdmin = session.role === "admin";
   const [track, setTrack] = useState(prefill?.track || null);
   const [subject, setSubject] = useState(prefill?.subject || "");
@@ -3298,6 +5460,9 @@ function TicketForm(p) {
   const [asset, setAsset] = useState(prefill?.asset || "");
   const [forkliftId, setForkliftId] = useState(prefill?.forkliftId || "");
   const [downtimeType, setDowntimeType] = useState(prefill?.downtimeType || "");
+  const [incShift, setIncShift] = useState(prefill?.incidentShift || "");
+  const [driverInv, setDriverInv] = useState(prefill?.driverInvolved || "");
+  const [driverInvId, setDriverInvId] = useState(prefill?.driverInvolvedId || "");
   const [description, setDescription] = useState(prefill?.description || "");
   const [assignTo, setAssignTo] = useState("self");
   useEffect(() => { if (assignTo.startsWith("tech:")) { const id = assignTo.slice(5); const ok = (users || []).some((u) => u.id === id && u.role === "tech" && (u.techCats || []).includes(category)); if (!ok) setAssignTo("self"); } }, [category]);
@@ -3333,7 +5498,7 @@ function TicketForm(p) {
   };
   const buildTicket = () => {
     const id = uid(); const now = Date.now();
-    const pr = track === "transport" ? dtOf(downtimeType).prio : priority;
+    const pr = track === "transport" ? dtOf(downtimeType, config).prio : priority;
     const hrs = (isAdmin && slaOn) ? (Number(slaH) || DEFAULT_SLA[pr]) : slaForTicket({ track, forkliftId, category, priority: pr }, config, fleet);
     let assignee = "", routedTech = track === "transport" || undefined, mgrExec = undefined, routeText;
     if (track === "transport") routeText = "הקריאה נפתחה והועברה לטכנאים";
@@ -3345,7 +5510,7 @@ function TicketForm(p) {
       id, track, subject: subject.trim(), category: track === "transport" ? "transport" : category, categoryLabel: track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === category)?.label || ""), priority: pr, zone,
       asset: track === "transport" ? (fleet.find((f) => f.id === forkliftId)?.code || "") : asset.trim(),
       forkliftId: track === "transport" ? forkliftId : null, downtimeType: track === "transport" ? downtimeType : null,
-      wearType: null, downtimeStart: track === "transport" ? now : null, downtimeEnd: null,
+      wearType: null, downtimeStart: track === "transport" ? now : null, downtimeEnd: null, driverInvolved: track === "transport" ? driverInv.trim() : "", driverInvolvedId: track === "transport" ? driverInvId : "", incidentShift: track === "transport" ? incShift : "",
       description: description.trim(), status: "new", assignee,
       routedTech, mgrExec,
       byAdmin: isAdmin || undefined, slaHoursOverride: (isAdmin && slaOn) ? Number(slaH) : undefined,
@@ -3370,7 +5535,7 @@ function TicketForm(p) {
     try { await finalize(t); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); }
   };
   const proceedAnyway = async () => { const t = pendingT; setDupes(null); setPendingT(null); busyRef.current = true; setBusy(true); try { await finalize(t); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); } };
-  if (!track) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onCancel}><X size={22} /></button><div className="form-title">פתיחת קריאה</div></div>
+  if (!track) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">פתיחת קריאה</div></div>
     <div className="body"><div className="track-q">על מה הקריאה?</div>
       {Object.values(TRACKS).map((tr) => <button key={tr.id} className="track-pick" onClick={() => setTrack(tr.id)} style={{ borderColor: tr.color }}><span className="track-ic" style={{ background: tr.color + "22", color: tr.color }}><tr.Icon size={24} /></span><div><div className="track-name">{tr.label}</div><div className="track-desc">{tr.id === "transport" ? "מלגזות וכלי שינוע — מועבר לטכנאי" : "מבנה, חשמל, אינסטלציה, IT ועוד"}</div></div><ChevronLeft size={18} className="role-chev" /></button>)}
     </div></div>);
@@ -3379,8 +5544,12 @@ function TicketForm(p) {
     <div className="body">
       <label className="field"><span>נושא *</span><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={track === "transport" ? "לדוגמה: רעש חריג בהרמה" : "לדוגמה: תאורה לא עובדת ברציף 3"} /></label>
       {track === "transport" ? (<>
-        <label className="field"><span>כלי שינוע *</span><select value={forkliftId} onChange={(e) => setForkliftId(e.target.value)}><option value="">— בחרו כלי —</option>{fleet.map((f) => <option key={f.id} value={f.id}>{unitLabel(f, config)}</option>)}</select></label>
-        <div className="field"><span>מצב הכלי *</span><div className="dt-list">{DOWNTIME.map((d) => <button key={d.id} className={"dt-pick" + (downtimeType === d.id ? " on" : "")} onClick={() => setDowntimeType(d.id)} style={downtimeType === d.id ? { borderColor: d.color, background: d.color + "14" } : {}}><span className="dt-dot" style={{ background: d.color }} /><div><div className="dt-name">{d.label}</div><div className="dt-desc">{d.desc}</div></div></button>)}</div></div>
+        <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={fleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} /></div>
+        {forkliftId && (<>
+        <div className="field"><span>משמרת האירוע</span><select value={incShift} onChange={(e) => setIncShift(e.target.value)}><option value="">— בחר —</option>{workShiftsOf(config).map((sh) => <option key={sh.id} value={sh.id}>{sh.label}</option>)}</select></div>
+        <UserPicker users={users} config={config} saveUser={saveUser} value={driverInvId} onChange={(u) => { setDriverInvId(u ? u.id : ""); setDriverInv(u ? u.name : ""); }} label="נהג מעורב (לדו״ח נזקים)" lockRole="worker" suggestName={(() => { const fk = fleet.find((f) => f.id === forkliftId); return (incShift && fk && fk.drivers && fk.drivers[incShift] && fk.drivers[incShift].name) || ""; })()} hint="חפשו לפי שם או מספר. לא קיים? אפשר ליצור כאן." />
+        </>)}
+        <div className="field"><span>מצב הכלי *</span><div className="dt-list">{dtLevels(config).map((d) => <button key={d.id} className={"dt-pick" + (downtimeType === d.id ? " on" : "")} onClick={() => setDowntimeType(d.id)} style={downtimeType === d.id ? { borderColor: d.color, background: d.color + "14" } : {}}><span className="dt-dot" style={{ background: d.color }} /><div><div className="dt-name">{d.label}{d.oos ? " · מושבת" : ""}</div><div className="dt-desc">{d.desc}</div></div></button>)}</div></div>
       </>) : (<>
         <div className="field"><span>קטגוריה *</span><div className="cat-grid">{(config.categories || CATEGORIES).map((c) => { const m = catMeta(c.id); return <button key={c.id} className={"cat-pick" + (category === c.id ? " on" : "")} onClick={() => setCategory(c.id)} style={category === c.id ? { borderColor: m.color, background: m.color + "1f" } : {}}><m.Icon size={19} color={m.color} /><span>{c.label}</span></button>; })}</div></div>
         <div className="field"><span>עדיפות *</span><div className="pr-row">{PRIORITIES.map((x) => <button key={x.id} className={"pr-pick" + (priority === x.id ? " on" : "")} onClick={() => setPriority(x.id)} style={priority === x.id ? { background: x.color, color: "#fff", borderColor: x.color } : {}}>{x.label}</button>)}</div></div>
@@ -3388,6 +5557,7 @@ function TicketForm(p) {
         <label className="field"><span>ציוד (אופציונלי)</span><input value={asset} onChange={(e) => setAsset(e.target.value)} /></label>
       </>)}
       <label className="field"><span>תיאור התקלה *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
+      {track === "transport" && forkliftId && eligibleTechs({ track: "transport", forkliftId }, users, fleet).length === 0 && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2", marginTop: 0 }}><AlertTriangle size={13} /> אין כרגע טכנאי שינוע פעיל שיכול לקבל קריאה זו. אפשר להמשיך — הקריאה תסומן «ללא מטפל» ומנהל המערכת יקבל התראה לשיבוץ ידני.</div>}
       {isAdmin && <div className="admin-route">
         <div className="ar-title"><ShieldCheck size={14} /> פתיחה כמנהל</div>
         {track === "facility" && (() => {
@@ -3428,7 +5598,7 @@ function TicketForm(p) {
 function TicketDetail(p) {
   const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, tickets } = p;
   const role = session.role;
-  const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false);
+  const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const afterRef = useRef(null);
   useEffect(() => { let on = true; if (ticket?.hasPhoto) store.get(`photo:${ticket.id}`, true).then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto]);
   useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) store.get(`photo:after:${ticket.id}`, true).then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto]);
@@ -3438,16 +5608,18 @@ function TicketDetail(p) {
   const track = ticket.track || (ticket.forkliftId ? "transport" : "facility");
   const c = catOf(ticket), pr = prOf(ticket.priority), s = stOf(ticket.status), tr = TRACKS[track] || TRACKS.facility;
   const e = (text, kind) => entryFor(session, text, kind);
-  const upd = (patch, text, kind) => onUpdate({ ...ticket, ...patch, updatedAt: Date.now(), log: [...(ticket.log || []), e(text, kind)] });
-  const take = () => {
-    // Если заявка ждала получения техники — накапливаем время ожидания для аналитики SLA
+  const upd = (patch, text, kind, pauseAt) => onUpdate({ ...ticket, ...patch, ...pausePatch(ticket, patch, config, pauseAt || Date.now()), updatedAt: Date.now(), log: [...(ticket.log || []), e(text, kind)] });
+  const take = (pivotTs) => {
+    // Если заявка ждала получения техники — точка разворота: ожидание транспорта кончается ТУТ и ремонт возобновляется ОТСЮДА.
     const wasWaitingEquip = ticket.status === "waiting" && ticket.waitingReason === "no_equipment" && ticket.equipWaitSince;
-    const addWait = wasWaitingEquip ? (Date.now() - ticket.equipWaitSince) : 0;
-    upd({ assignee: session.name, status: "in_progress", waitingReason: null, equipWaitSince: null, equipWaitMs: (ticket.equipWaitMs || 0) + addWait }, wasWaitingEquip ? `הכלי התקבל — הטכנאי קיבל לטיפול (המתנה לכלי: ${fmtDur(addWait)})` : "הטכנאי קיבל את הקריאה לטיפול", "accept");
+    const pivot = wasWaitingEquip && pivotTs ? Math.min(Date.now(), Math.max(ticket.equipWaitSince, pivotTs)) : Date.now();
+    const addWait = wasWaitingEquip ? (pivot - ticket.equipWaitSince) : 0;
+    const backNote = (wasWaitingEquip && pivotTs && Math.abs(Date.now() - pivotTs) > 60000) ? ` · התקבל ב-${fmtDate(pivot)} ${fmtTime(pivot)}` : "";
+    upd({ assignee: session.name, status: "in_progress", waitingReason: null, equipWaitSince: null, equipWaitMs: (ticket.equipWaitMs || 0) + addWait }, wasWaitingEquip ? `הכלי התקבל — הטכנאי קיבל לטיפול (המתנה לכלי: ${fmtDur(addWait)})${backNote}` : "הטכנאי קיבל את הקריאה לטיפול", "accept", pivot);
   };
-  const noEquipment = () => upd({ status: "waiting", waitingReason: "no_equipment", assignee: ticket.assignee || session.name, equipWaitSince: Date.now() }, "הטכנאי דיווח: הכלי לא התקבל — ממתין לקבלת הכלי מהמנהל", "waiting");
+  const noEquipment = () => upd({ status: "waiting", waitingReason: "no_equipment", waitBall: "manager", assignee: ticket.assignee || session.name, equipWaitSince: Date.now() }, "הטכנאי דיווח: הכלי לא התקבל — ממתין לקבלת הכלי מהמנהל", "waiting");
   const setStatus = (ns) => upd(ns === "waiting" ? { status: ns } : { status: ns, waitingReason: null }, `סטטוס: ${stOf(ns).label}`);
-  const setWaiting = (reason) => onUpdate({ ...ticket, status: "waiting", waitingReason: reason, updatedAt: Date.now(), log: [...(ticket.log || []), e(`ממתין · ${waitReasonLabel(reason)}`, "waiting")] });
+  const setWaiting = (reason) => onUpdate({ ...ticket, status: "waiting", waitingReason: reason, waitBall: reasonBall(config, reason), ...pausePatch(ticket, { status: "waiting", waitingReason: reason }, config), updatedAt: Date.now(), log: [...(ticket.log || []), e(`ממתין · ${waitReasonLabel(reason, config)}`, "waiting")] });
   const setWear = (wt) => upd({ wearType: wt }, `סיווג: ${WEAR.find((x) => x.id === wt).label}`, "classify");
   const finishTech = async () => { if (afterPhoto && !ticket.hasAfterPhoto) { try { await store.set(`photo:after:${ticket.id}`, afterPhoto, true); } catch (e) {} } upd({ status: "pending_user", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto }, "הטיפול הסתיים — הועבר לאישור הפותח" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
   const takeMgr = () => upd({ status: "in_progress", waitingReason: null }, "המנהל קיבל את הקריאה לטיפול", "accept");
@@ -3516,7 +5688,8 @@ function TicketDetail(p) {
         <Meta Icon={Clock} label="נפתח" value={`${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`} />
         <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || "טרם שויך"} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
-        {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason)} />}
+        {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
+        {pausedMs(ticket) > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(pausedMs(ticket))} />}
         {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <div className="meta"><AlertTriangle size={15} color={r.color} /><div><div className="meta-lbl">רמת סיכון</div><div className="meta-val" style={{ color: r.color, fontWeight: 700 }}>{r.label}</div></div></div> : null; })()}
       </div>
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>
@@ -3537,10 +5710,11 @@ function TicketDetail(p) {
         {ticket.status === "waiting" && ticket.waitingReason === "no_equipment" ? (
           <div className="equip-wait">
             <div className="equip-wait-msg"><AlertTriangle size={16} /> דיווחת שהכלי לא התקבל. ההמתנה נרשמת ({fmtDur((ticket.equipWaitMs || 0) + (ticket.equipWaitSince ? Date.now() - ticket.equipWaitSince : 0))}).</div>
-            <button className="btn-primary full" style={{ marginTop: 10 }} onClick={take}><HardHat size={16} /> הכלי התקבל — קבל לטיפול</button>
+            <label className="field" style={{ marginTop: 10 }}><span>מתי הכלי התקבל בפועל? (ריק = עכשיו)</span><input type="datetime-local" value={recvAt} onChange={(e) => setRecvAt(e.target.value)} /></label>
+            <button className="btn-primary full" style={{ marginTop: 8 }} onClick={() => take(recvAt ? new Date(recvAt).getTime() : Date.now())}><HardHat size={16} /> הכלי התקבל — קבל לטיפול</button>
           </div>
         ) : !ticket.assignee ? (<>
-          <button className="btn-primary full" style={{ marginTop: 14 }} onClick={take}><HardHat size={16} /> קבל לטיפול</button>
+          <button className="btn-primary full" style={{ marginTop: 14 }} onClick={() => take()}><HardHat size={16} /> קבל לטיפול</button>
           {track === "transport" && <button className="btn-ghost full" style={{ marginTop: 8 }} onClick={noEquipment}><Truck size={15} /> לא קיבלתי את הכלי</button>}
         </>) : ticket.assignee === session.name && ticket.status !== "pending_user" && ticket.status !== "pending_admin" && (<>
           {track === "transport" && <><SectionTitle>סיווג מקור התקלה</SectionTitle>
@@ -3548,7 +5722,7 @@ function TicketDetail(p) {
           <SectionTitle>סטטוס</SectionTitle>
           <div className="status-seg"><button className={"seg" + (ticket.status === "in_progress" ? " on" : "")} onClick={() => setStatus("in_progress")} style={ticket.status === "in_progress" ? { background: stOf("in_progress").color, color: "#fff", borderColor: stOf("in_progress").color } : {}}>בעבודה</button></div>
           <div className="hint" style={{ marginTop: 8 }}>תקוע? סמן מה חוסם:</div>
-          <div className="pr-row">{TECH_WAIT_REASONS.map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <div className="pr-row">{reasonsForRole(config, session.role).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
           <SectionTitle>תמונת ביצוע (אופציונלי)</SectionTitle>
           <input ref={afterRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(ev) => grabAfter(ev.target.files?.[0])} />
           {afterPhoto ? <div className="photo-prev"><img src={afterPhoto} alt="" /><button className="photo-x" onClick={() => setAfterPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => afterRef.current?.click()}><Camera size={20} /> צירוף תמונת ביצוע</button>}
@@ -3565,7 +5739,7 @@ function TicketDetail(p) {
           <SectionTitle>סטטוס</SectionTitle>
           <div className="status-seg"><button className={"seg" + (ticket.status === "in_progress" ? " on" : "")} onClick={() => setStatus("in_progress")} style={ticket.status === "in_progress" ? { background: stOf("in_progress").color, color: "#fff", borderColor: stOf("in_progress").color } : {}}>בעבודה</button></div>
           <div className="hint" style={{ marginTop: 8 }}>תקוע? סמן מה חוסם:</div>
-          <div className="pr-row">{TECH_WAIT_REASONS.map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <div className="pr-row">{reasonsForRole(config, session.role).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
           <SectionTitle>תמונת ביצוע (אופציונלי)</SectionTitle>
           <input ref={afterRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(ev) => grabAfter(ev.target.files?.[0])} />
           {afterPhoto ? <div className="photo-prev"><img src={afterPhoto} alt="" /><button className="photo-x" onClick={() => setAfterPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => afterRef.current?.click()}><Camera size={20} /> צירוף תמונת ביצוע</button>}
@@ -3634,7 +5808,7 @@ function TicketDetail(p) {
 }
 
 function CloseModal({ ticket, config, session, onCancel, onClose }) {
-  const [step, setStep] = useState(1), [amount, setAmount] = useState(""), [supplier, setSupplier] = useState(config.suppliers[0] || ""), [note, setNote] = useState(""), [realDt, setRealDt] = useState(""), [quality, setQuality] = useState("resolved");
+  const [step, setStep] = useState(1), [busy, setBusy] = useState(false), [amount, setAmount] = useState(""), [supplier, setSupplier] = useState(config.suppliers[0] || ""), [note, setNote] = useState(""), [realDt, setRealDt] = useState(""), [quality, setQuality] = useState("resolved");
   const QUALITY = [
     { id: "resolved", label: "טופל לחלוטין", color: "#16A34A" },
     { id: "temporary", label: "פתרון זמני", color: "#CA8A04" },
@@ -3642,10 +5816,10 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
     { id: "purchase_needed", label: "נדרשת רכש/החלפה", color: "#7C3AED" },
     { id: "external_needed", label: "נדרש קבלן חוץ", color: "#0EA5E9" },
   ];
-  const finish = () => { const closedAt = realDt ? new Date(realDt).getTime() : null; onClose({ costAmount: Number(amount) || 0, costSupplier: supplier, costNote: note.trim(), closedAt, quality, estimatedFutureCost: null /* budget placeholder */ }); };
+  const finish = () => { if (busy) return; setBusy(true); const closedAt = realDt ? new Date(realDt).getTime() : null; onClose({ costAmount: Number(amount) || 0, costSupplier: supplier, costNote: note.trim(), closedAt, quality, estimatedFutureCost: null /* budget placeholder */ }); };
   const qItem = QUALITY.find((x) => x.id === quality) || QUALITY[0];
   return (<div className="ovl-backdrop modal2" onClick={onCancel}><div className="modal2-panel" onClick={(e) => e.stopPropagation()}>
-    <div className="modal2-head"><div className="form-title">{step === 1 ? "איכות הסגירה" : step === 2 ? "עלויות" : "אישור סגירה"}</div><button className="icon-btn" onClick={onCancel}><X size={20} /></button></div>
+    <div className="modal2-head"><div className="form-title">{step === 1 ? "איכות הסגירה" : step === 2 ? "עלויות" : "אישור סגירה"}</div><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={20} /></button></div>
     <div className="modal2-body">
       {step === 1 && (<>
         <div className="hint" style={{ marginBottom: 10 }}>כיצד הוסדרה הבעיה? (ישפיע על אנליטיקה ותובנות)</div>
@@ -3664,7 +5838,7 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
         <div className="sign-row"><span>עלות:</span><b>{ils(Number(amount) || 0)}</b></div>
         <div className="sign-row"><span>איכות סגירה:</span><b style={{ color: qItem.color }}>{qItem.label}</b></div>
         <label className="field"><span>מועד סגירה בפועל (אופציונלי)</span><input type="datetime-local" value={realDt} onChange={(e) => setRealDt(e.target.value)} /><div className="hint">ריק = מועד סיום ע״י הטכנאי.</div></label>
-        <div className="row2"><button className="btn-ghost" onClick={() => setStep(2)}>חזרה</button><button className="btn-primary" onClick={finish}><CheckCircle2 size={16} /> סגירה ואישור</button></div>
+        <div className="row2"><button className="btn-ghost" onClick={() => setStep(2)}>חזרה</button><button className="btn-primary" onClick={finish} disabled={busy}><CheckCircle2 size={16} /> סגירה ואישור</button></div>
       </>)}
     </div>
   </div></div>);
@@ -3690,7 +5864,7 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
   };
   const quick = session.role === "admin" ? ["מה בחריגת SLA?", "אילו מסמכים פגי-תוקף?", "סכם עלויות"] : session.role === "tech" ? ["מה ממתין לי?", "מה הכי דחוף?"] : ["מה הסטטוס של הקריאות שלי?"];
   return (<div className="ovl-backdrop ai-back" onClick={onClose}><div className="ai-panel" onClick={(e) => e.stopPropagation()}>
-    <div className="ai-head"><div className="ai-title"><span className="ai-orb"><Sparkles size={16} /></span> עוזר AI</div><button className="icon-btn" onClick={onClose}><X size={20} /></button></div>
+    <div className="ai-head"><div className="ai-title"><span className="ai-orb"><Sparkles size={16} /></span> עוזר AI</div><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div>
     <div className="ai-msgs">{msgs.map((m, i) => <div key={i} className={"ai-msg " + m.role}>{m.content}</div>)}{busy && <div className="ai-msg assistant"><span className="spinner sm dark" /> חושב…</div>}<div ref={endRef} /></div>
     {msgs.length <= 1 && <div className="ai-quick">{quick.map((q) => <button key={q} onClick={() => send(q)}>{q}</button>)}</div>}
     <div className="ai-input"><input value={input} onChange={(e) => setInput(e.target.value)} placeholder="שאלו אותי…" onKeyDown={(e) => e.key === "Enter" && send()} disabled={busy} /><button className="btn-primary" onClick={() => send()} disabled={busy}><Send size={16} /></button></div>
@@ -3747,7 +5921,7 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
   const list = notif.events.slice(0, 60);
   const grouped = prefs.group ? NOTIF_KINDS.map((k) => [k, list.filter((e) => e.kind === k.kind)]).filter(([, arr]) => arr.length) : null;
   return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" onClick={(e) => e.stopPropagation()}>
-    <div className="notif-head"><div className="notif-title"><Bell size={18} /> התראות</div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה"><SlidersHorizontal size={18} /></button><button className="icon-btn" onClick={onClose}><X size={20} /></button></div></div>
+    <div className="notif-head"><div className="notif-title"><Bell size={18} /> התראות</div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
     {list.length > 0 && <button className="notif-markall" onClick={markAll}><Check size={14} /> {marked ? "סומן הכל כנקרא ✓" : "סמן הכל כנקרא"}</button>}
     {settings && <div className="notif-settings">
       <div className="ns-row"><span className="ns-lbl">מיון</span><div className="seg-tabs s2 mini"><button className={prefs.sort === "newest" ? "on" : ""} onClick={() => setPrefs({ sort: "newest" })}>חדש→ישן</button><button className={prefs.sort === "oldest" ? "on" : ""} onClick={() => setPrefs({ sort: "oldest" })}>ישן→חדש</button></div></div>
@@ -3782,13 +5956,15 @@ function TicketCard({ t, admin, onClick, fleet, config }) {
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
       <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{admin && t.assignee && <> · <Wrench size={11} /> {t.assignee}</>}{!t.assignee && t.track === "transport" && isOpen(t) && <> · <span style={{ color: "#2563EB" }}>ממתינה לקבלה</span></>}</div>
       <SlaBar t={t} />
+      {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div style={{ color: b.color, fontSize: 11.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, margin: "3px 0 1px" }}><b.Icon size={12} /> אצל: {b.label} · כבר {fmtDur(Date.now() - since)}</div>; })()}
       <div className="tcard-badges">
         <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>
+        {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
         {risk && risk.level !== "green" && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
         {t.byAdmin && <span className="badge sm" style={{ color: "#7C3AED", background: "#EDE9FE" }}><ShieldCheck size={11} /> מנהל</span>}
         {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
         {isOverdue(t) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
-        {t.status === "waiting" && t.waitingReason && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>{waitReasonLabel(t.waitingReason)}</span>}
+        {t.status === "waiting" && t.waitingReason && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>{waitReasonLabel(t.waitingReason, config)}</span>}
         {t.closure && <span className="badge sm" style={{ color: "#047857", background: "#D1FAE5" }}>{ils(t.closure.costAmount || 0)}</span>}
         <span className="tcard-time">{timeAgo(t.createdAt)}</span>
       </div>
@@ -4077,12 +6253,132 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .flt-field{display:flex;flex-direction:column;gap:3px;min-width:110px;flex:1;}
 .flt-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
 .flt-field select{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;}
-.fleet-results-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:13px;}
+.fleet-results-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;}
 .fleet-count{color:var(--muted);font-weight:600;}
+.group-seg{display:inline-flex;align-items:center;gap:4px;margin-inline-start:auto;}
+.group-lbl{color:var(--muted);font-size:12px;margin-inline-end:2px;}
+.insp-grp-bar{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+.insp-grp-bar .group-seg{margin-inline-start:0;}
+.dt-edit-row{border:1px solid var(--line);border-radius:11px;padding:9px 10px;margin-bottom:8px;background:var(--surface);}
+.dt-edit-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.dt-edit-line + .dt-edit-line{margin-top:8px;}
+.dt-desc-in{flex:2;min-width:160px;color:var(--muted);}
+.group-seg button{background:var(--surface-2);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;}
+.group-seg button.on{background:var(--primary);border-color:var(--primary);color:#fff;}
+.fleet-groups{display:flex;flex-direction:column;gap:10px;}
+.fgroup-head{display:flex;align-items:center;gap:8px;width:100%;text-align:right;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:9px 12px;cursor:pointer;color:var(--ink);margin-bottom:6px;}
+.fgroup-chev{color:var(--muted);transition:transform .15s;flex:none;}
+.fgroup-name{font-weight:700;font-size:13.5px;}
+.fgroup-count{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:700;color:var(--muted);}
+.fgroup-blk{display:inline-flex;align-items:center;gap:3px;margin-inline-start:auto;background:#FEE2E2;color:#B91C1C;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;}
+.task-list{display:flex;flex-direction:column;gap:6px;}
+.task-row{display:flex;align-items:center;gap:9px;width:100%;text-align:right;background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid var(--muted);border-radius:11px;padding:9px 11px;cursor:pointer;color:var(--ink);}
+.task-row:hover{background:var(--surface-2);}
+.task-row.ovd{background:linear-gradient(90deg,rgba(220,38,38,0.05),transparent 60%);}
+.tr-pri{width:9px;height:9px;border-radius:50%;flex:none;}
+.task-row-main{flex:1;min-width:0;}
+.task-row-t{font-weight:600;font-size:13.5px;line-height:1.25;}
+.task-row-desc{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.mtask-groups{display:flex;flex-direction:column;gap:12px;}
+.mtask-group{display:flex;flex-direction:column;gap:6px;}
+.mtask-gh{font-size:12px;font-weight:700;color:var(--muted);padding:0 2px;}
+.task-row-sub{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:11.5px;color:var(--muted);margin-top:3px;}
+.tr-to{font-weight:600;color:var(--ink);}
+.tr-mtg{display:inline-flex;align-items:center;gap:3px;background:rgba(124,58,237,0.1);color:#7C3AED;border-radius:6px;padding:1px 7px;font-weight:600;}
+.tr-cat{background:var(--surface-2);border-radius:6px;padding:1px 7px;}
+.tr-wait{color:#B45309;}
+.task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
+.task-due{font-size:11px;color:var(--muted);white-space:nowrap;}
+.tk-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.detail-desc{font-size:14px;line-height:1.55;color:var(--ink);white-space:pre-wrap;margin:4px 0 8px;}
+.meta-cell{display:flex;flex-direction:column;}
+.meta-l{font-size:11.5px;color:var(--muted);}
+.meta-v{font-size:13.5px;font-weight:600;margin-top:1px;}
+.cmt-box{display:flex;gap:8px;align-items:center;margin-top:10px;}
+.cmt-box input{flex:1;}
+.ppk-box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--line);display:inline-block;flex-shrink:0;}
+.kpi-strip{display:flex;gap:8px;margin-bottom:14px;}
+.kpi-mini{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 8px;text-align:center;}
+.kpi-mini-v{display:block;font-family:var(--font-head);font-weight:700;font-size:22px;line-height:1;}
+.kpi-mini-l{display:block;font-size:11px;color:var(--muted);margin-top:4px;}
+.hdr-btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.imp-map{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}
+.imp-prev{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:11px;padding:8px;background:var(--surface);}
+.imp-row{padding:7px 9px;border-radius:8px;background:var(--surface-2);}
+.imp-t{font-weight:600;font-size:13px;}
+.imp-meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.dup-tag{display:inline-block;background:#FEE2E2;color:#B91C1C;border-radius:6px;padding:1px 6px;font-size:10.5px;font-weight:700;margin-inline-end:6px;}
+.qchips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;}
+.more-toggle{background:none;border:none;color:var(--accent,#2563EB);font-size:13px;font-weight:600;cursor:pointer;padding:6px 2px;margin:2px 0;}
+.more-fields{border-top:1px dashed var(--line);margin-top:6px;padding-top:8px;}
+.topic-edit{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+.topic-edit input{flex:1;}
+.topic-list{display:flex;flex-direction:column;gap:6px;}
+.topic-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-2);border-radius:9px;padding:8px 11px;}
+.topic-t{font-size:13px;font-weight:600;flex:1;min-width:0;}
+.topic-seg{display:flex;gap:4px;flex:none;}
+.topic-seg button{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:4px 11px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;}
+.topic-seg .tok.on{background:#16A34A;border-color:#16A34A;color:#fff;}
+.topic-seg .tiss.on{background:#DC2626;border-color:#DC2626;color:#fff;}
+.link-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+.mlink.clk{cursor:pointer;}
+.mlink.clk:hover{filter:brightness(0.96);text-decoration:underline;}
+.mtask-item{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;}
+.mtask-item .task-row{flex:1;min-width:0;}
+.mt-done{flex:none;width:42px;border:1px solid var(--line);background:var(--surface);border-radius:10px;color:#16A34A;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.mt-done:hover{background:#DCFCE7;border-color:#16A34A;}
+.done-box{flex-basis:100%;display:flex;gap:6px;align-items:center;}
+.done-box input{flex:1;}
+.issue-box{background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:9px;margin-top:6px;display:flex;flex-direction:column;gap:7px;}
+.issue-box input{width:100%;}
+.topic-wrap{display:flex;flex-direction:column;}
+.mlink{display:inline-flex;align-items:center;gap:5px;background:rgba(124,58,237,0.1);color:#7C3AED;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:600;}
+.mlink.src{background:rgba(37,99,235,0.1);color:#2563EB;}
+.mlink-x{background:none;border:none;color:inherit;font-size:15px;line-height:1;cursor:pointer;padding:0 0 0 2px;opacity:0.7;}
+.mlink-x:hover{opacity:1;}
+.link-panel{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px;margin-top:6px;display:flex;flex-direction:column;gap:8px;}
+.mlink-tag{display:inline-block;background:rgba(124,58,237,0.12);color:#7C3AED;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-inline-end:6px;}
+.seg-tabs.s2{display:grid;grid-template-columns:1fr 1fr;}
+.act-tag{display:inline-block;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-inline-end:6px;}
+.act-tag.new{background:#DCFCE7;color:#15803D;}
+.act-tag.update{background:#DBEAFE;color:#1D4ED8;}
+.act-tag.nochange{background:var(--surface-2);color:var(--muted);}
+.quick-cap{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:9px;margin-bottom:8px;display:flex;flex-direction:column;gap:7px;}
+.qc-line{display:flex;gap:7px;align-items:center;}
+.qc-loc{flex:0 0 38%;}
+.qc-title{flex:1;}
+.qc-pp{flex:1;min-width:0;}
+.tr-loc{background:rgba(2,132,199,0.1);color:#0369A1;border-radius:6px;padding:1px 7px;cursor:pointer;}
+.tr-loc:hover{background:rgba(2,132,199,0.2);}
+.tag-bar{display:flex;align-items:center;gap:8px;background:rgba(2,132,199,0.08);border:1px solid rgba(2,132,199,0.25);color:#0369A1;border-radius:9px;padding:7px 11px;font-size:12.5px;margin:6px 0;}
+.tag-bar b{font-weight:700;}
+.tag-bar button{margin-inline-start:auto;background:none;border:none;color:#0369A1;font-size:15px;cursor:pointer;line-height:1;}
+.qchip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+.qchip.on{background:var(--ink);color:var(--surface);border-color:var(--ink);}
+.qchip.danger.on{background:#DC2626;border-color:#DC2626;color:#fff;}
+.more-wrap{position:relative;display:inline-block;}
+.more-back{position:fixed;inset:0;z-index:30;}
+.more-menu{position:absolute;top:calc(100% + 4px);inset-inline-end:0;z-index:31;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.16);padding:6px;min-width:190px;display:flex;flex-direction:column;gap:2px;}
+.more-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:right;background:none;border:none;padding:9px 11px;border-radius:8px;font-size:13px;color:var(--ink);cursor:pointer;}
+.more-menu button:hover{background:var(--surface-2);}
 .hyd-badge{font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;border-radius:5px;padding:1px 5px;margin-inline-start:5px;}
 .ftable-head{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
 .ftable-row{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;}
 .ftable-row:hover{background:var(--surface-2);}
+.ftable-row.blocked{border-inline-start:4px solid var(--muted);background:linear-gradient(90deg,rgba(220,38,38,0.06),transparent 60%);}
+.blk-chip{display:inline-flex;align-items:center;gap:3px;color:#fff;font-size:10px;font-weight:800;border-radius:999px;padding:2px 8px;margin-inline-start:6px;letter-spacing:.2px;vertical-align:middle;}
+.blk-banner{display:flex;align-items:center;gap:11px;border:1.5px solid;border-radius:13px;padding:12px 14px;margin:10px 0 4px;}
+.blk-banner .blk-b-txt{display:flex;flex-direction:column;line-height:1.35;}
+.blk-banner .blk-b-txt b{font-size:14px;}.blk-banner .blk-b-txt span{font-size:11.5px;opacity:.85;}
+.blk-return{margin-inline-start:auto;background:var(--surface);border:1.5px solid currentColor;color:inherit;font-weight:700;border-radius:10px;padding:8px 13px;font-size:12px;white-space:nowrap;}
+.blk-set{color:#B91C1C;border-color:#FCA5A5;}
+.blk-set-panel{margin-top:14px;border:1.5px solid #FCA5A5;background:#FEF2F2;border-radius:12px;padding:12px;}
+.blk-set-h{display:flex;align-items:center;gap:6px;font-weight:700;color:#B91C1C;font-size:13.5px;margin-bottom:8px;}
+.blk-set-panel textarea{width:100%;margin-bottom:8px;}
+.drv-unit.blocked{box-shadow:inset 0 0 0 1.5px rgba(220,38,38,0.4);}
+.pal{display:flex;gap:4px;flex-wrap:wrap;}
+.pal-sw{width:20px;height:20px;border-radius:6px;border:2px solid transparent;cursor:pointer;padding:0;}
+.pal-sw.on{border-color:var(--ink);box-shadow:0 0 0 1.5px var(--surface) inset;}
 .ft-code{font-weight:700;}.ft-model{font-size:11.5px;color:var(--muted);}.ft-model b{color:var(--ink);font-size:12.5px;font-weight:600;}
 .ft-sup{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ft-doc{display:flex;align-items:center;gap:6px;font-weight:600;}
@@ -4111,6 +6407,13 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .avatar.sm{width:36px;height:36px;font-size:14px;}
 
 .bar-row{margin-bottom:13px;}.bar-row:last-child{margin-bottom:0;}
+.bar-click{display:block;width:100%;text-align:right;background:none;border:none;padding:4px 6px;margin:0 -6px 9px;border-radius:9px;color:inherit;cursor:pointer;position:relative;}
+.bar-click:hover{background:var(--surface-2);}
+.bar-click .bar-chev{position:absolute;inset-inline-start:6px;top:6px;color:var(--muted);opacity:.6;}
+.kpi-unit-row.bar-click{display:flex;cursor:pointer;border-radius:9px;}
+.focus-banner{display:flex;align-items:center;gap:8px;background:var(--primary-soft,rgba(37,99,235,0.1));border:1.5px solid var(--primary);color:var(--primary);border-radius:11px;padding:8px 12px;margin-bottom:10px;font-size:13px;}
+.focus-banner span{flex:1;}
+.focus-banner button{background:var(--surface);border:1px solid currentColor;color:inherit;border-radius:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
 .bar-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;gap:10px;}
 .bar-lbl{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.bar-val{font-weight:700;flex-shrink:0;}
 .bar-track{height:9px;border-radius:999px;background:var(--surface-2);overflow:hidden;}
@@ -4461,6 +6764,7 @@ button.notif-perm:hover{background:#D1FAE5;}
   .side-logout:hover{background:#ffffff12;color:#fff;}
   .topbar,.bottom-nav,.fab{display:none;}
   .content,.content.with-nav{max-width:1180px;padding:28px 40px 44px;margin:0 auto;}
+  .settings-wrap{max-width:none;}
   .kpi-grid{grid-template-columns:repeat(4,1fr);gap:14px;}
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
   .meta-grid{grid-template-columns:repeat(3,1fr);}
