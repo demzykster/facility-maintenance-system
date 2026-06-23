@@ -12,18 +12,19 @@ Completed:
 - `npm test` passes.
 - `npm run build` passes.
 
-## Next Practical Step - Audit Dependencies
+## Current Practical Step - Audit Dependencies
 
 Current `npm audit` findings:
 
-- `esbuild`: low severity, development server advisory, fix available through npm.
 - `xlsx`: high severity advisories, direct dependency, no npm automatic fix available.
 
 Important context:
 
+- The previous `esbuild` low severity advisory was removed by updating Vite from 7 to 8 in branch `codex/audit-dependencies`.
 - `xlsx` is used for Excel/CSV import and many Excel exports in `src/ClaudeMaintenanceApp.jsx`.
 - `npm view xlsx version` currently returns `0.18.5`, which is already the latest npm release.
 - Do not replace `xlsx` casually; this affects business import/export flows.
+- Branch `codex/audit-dependencies` also caps Excel/CSV task imports at 5 MB as a small mitigation.
 
 Recommended next branch:
 
@@ -31,10 +32,8 @@ Recommended next branch:
 git checkout -b codex/audit-dependencies
 ```
 
-Suggested work:
+Remaining suggested work:
 
-- Run `npm audit` and record exact advisories.
-- Apply the safe `esbuild`/toolchain fix only if it does not cause unwanted dependency churn.
 - For `xlsx`, compare options:
   - keep current library temporarily and document risk;
   - move to a maintained SheetJS source if available and license/business constraints are acceptable;

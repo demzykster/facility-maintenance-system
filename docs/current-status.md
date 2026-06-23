@@ -10,7 +10,7 @@ This file is the handoff point for any new Codex or Claude session.
 - Branch: `main`
 - Baseline tag: `pre-production-model`
 - Current baseline commit: `e908ec7 sync artifact into vite shell`
-- Current main commit: `1ff178e Merge pull request #3 from demzykster/codex/storage-contract-test`
+- Current main commit: `cc00063 Merge pull request #4 from demzykster/codex/update-phase2-handoff`
 
 The GitHub repository is now the source of truth. The old artifact/chat file is no longer the source of truth.
 
@@ -51,12 +51,13 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 
 - Production bundle is about 1.4 MB. This is expected for the current monolith and is not a blocker.
 - `npm audit` currently reports:
-  - `esbuild` low severity advisory in the development toolchain; `npm audit fix` is available.
   - `xlsx` high severity advisories; `xlsx@0.18.5` is the latest npm release and npm reports no automatic fix.
+- The previous `esbuild` low severity audit finding was removed by updating the Vite toolchain in branch `codex/audit-dependencies`.
+- Excel/CSV task import is capped at 5 MB in branch `codex/audit-dependencies` as a small mitigation while the `xlsx` replacement/upgrade decision remains open.
 - The public Vercel deployment is still demo/staging. It uses browser-local storage, not Supabase or a production database.
 
 ## Current Position
 
 Phase 2 basics are now complete.
 
-Next practical work should address the `npm audit` findings and decide what to do with `xlsx` before starting Supabase, Railway, production database, Auth/RLS, or modular split work.
+Next practical work should decide what to do with `xlsx` before starting Supabase, Railway, production database, Auth/RLS, or modular split work.
