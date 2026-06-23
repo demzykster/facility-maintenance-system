@@ -1679,16 +1679,16 @@ function UserApp(p) {
                 const atAdmin = openT.filter((t) => ballIn(t) === "admin");
                 if (openT.length === 0) return <Empty text="אין קריאות פתוחות" Icon={ListChecks} sub="פתחו קריאה חדשה בלחיצה על הכפתור" />;
                 return <>
-                  {workerReports.length > 0 && <><SectionTitle><UserPlus size={15} color="#EA580C" /> דיווחי עובדים לבדיקה ({workerReports.length})</SectionTitle><div className="cards">{sortByImportance(workerReports).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
-                  {needEquip.length > 0 && <><SectionTitle><Truck size={15} color="#DC2626" /> יש להעביר כלי לטכנאי ({needEquip.length})</SectionTitle><div className="cards">{sortByImportance(needEquip).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
-                  {awaiting.length > 0 && <><SectionTitle><CheckCircle2 size={15} color="#0D9488" /> ממתינות לאישורך ({awaiting.length})</SectionTitle><div className="cards">{sortByImportance(awaiting).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {workerReports.length > 0 && <><SectionTitle><UserPlus size={15} color="#EA580C" /> דיווחי עובדים לבדיקה ({workerReports.length})</SectionTitle><div className="cards">{sortByImportance(workerReports).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {needEquip.length > 0 && <><SectionTitle><Truck size={15} color="#DC2626" /> יש להעביר כלי לטכנאי ({needEquip.length})</SectionTitle><div className="cards">{sortByImportance(needEquip).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {awaiting.length > 0 && <><SectionTitle><CheckCircle2 size={15} color="#0D9488" /> ממתינות לאישורך ({awaiting.length})</SectionTitle><div className="cards">{sortByImportance(awaiting).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                   <SectionTitle><Wrench size={15} /> בטיפול הטכנאי ({atTech.length})</SectionTitle>
-                  {atTech.length === 0 ? <div className="note">אין קריאות בטיפול.</div> : <div className="cards">{sortByImportance(atTech).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => openTicket(t.id)} />)}</div>}
-                  {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#4F46E5" /> אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {atTech.length === 0 ? <div className="note">אין קריאות בטיפול.</div> : <div className="cards">{sortByImportance(atTech).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>}
+                  {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#4F46E5" /> אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                 </>;
               }
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
-              return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => openTicket(t.id)} />)}</div>;
+              return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
           </>) : view === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : view === "tasks" ? (<ManageHub {...p} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלים ותחזוקה</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
@@ -4029,7 +4029,7 @@ function AdminApp(p) {
           extra={<select className="mob-tab desk-hide" value={tab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
           {tab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
-          {tab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} config={config} onOpen={openTicket} initial={tFilter} /></>}
+          {tab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} /></>}
           {tab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {tab === "tasks" && <ManageHub {...p} />}
           {tab === "ppe" && <PpeHub {...p} />}
@@ -4129,10 +4129,10 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     ppeReqPend.length ? { sev: 1, Icon: HardHat, text: "בקשות ביגוד ממתינות", n: ppeReqPend.length, go: () => setTab("ppe") } : null,
     lowPpe.length ? { sev: 1, Icon: HardHat, text: "פריטי ביגוד מתחת למינימום", n: lowPpe.length, go: () => setTab("ppe") } : null,
     complOpen.length ? { sev: 1, Icon: AlertTriangle, text: "תלונות פתוחות", n: complOpen.length, go: () => setTab("cleaning") } : null,
-    expDocs.length ? { sev: 1, Icon: Truck, text: "מסמכי כלים פגי/קרובי תוקף", n: expDocs.length, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") } : null,
+    dashTrack !== "facility" && expDocs.length ? { sev: 1, Icon: Truck, text: "מסמכי כלים פגי/קרובי תוקף", n: expDocs.length, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") } : null,
     ordRecv.length ? { sev: 0, Icon: Package, text: "הזמנות רכש לקליטה", n: ordRecv.length, go: () => setTab("ppe") } : null,
-    pmSoon.length ? { sev: 0, Icon: Truck, text: "תחזוקות מתוכננות קרובות", n: pmSoon.length, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") } : null,
-    inspDue.length ? { sev: 0, Icon: Truck, text: "כלים שטרם סוקרו החודש", n: inspDue.length, go: () => onAsset ? onAsset({ tab: "insp" }) : setTab("assets") } : null,
+    dashTrack !== "facility" && pmSoon.length ? { sev: 0, Icon: Truck, text: "תחזוקות מתוכננות קרובות", n: pmSoon.length, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") } : null,
+    dashTrack !== "facility" && inspDue.length ? { sev: 0, Icon: Truck, text: "כלים שטרם סוקרו החודש", n: inspDue.length, go: () => onAsset ? onAsset({ tab: "insp" }) : setTab("assets") } : null,
   ].filter(Boolean).sort((a, b) => b.sev - a.sev);
   
   return (<>
@@ -4172,7 +4172,7 @@ function ReportView({ html, count, onClose }) {
   const ref = useRef(null);
   return (<Overlay onClose={onClose}><div className="rep-wrap"><div className="rep-head"><div className="rep-title">תצוגה מקדימה{count != null ? ` — ${count}` : ""}</div><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost sm" onClick={() => { try { ref.current.contentWindow.focus(); ref.current.contentWindow.print(); } catch (e) {} }}><Printer size={14} /> הדפס</button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div><iframe ref={ref} title="report" srcDoc={html} className="rep-frame" /></div></Overlay>);
 }
-function AdminTickets({ tickets, onOpen, initial, fleet, config }) {
+function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
   const [q, setQ] = useState(""), [track, setTrack] = useState("all"), [st, setSt] = useState("open"), [pr, setPr] = useState("all"), [cat, setCat] = useState("all"), [costF, setCostF] = useState("all"), [period, setPeriod] = useState("all"), [report, setReport] = useState(null), [unitType, setUnitType] = useState("all"), [focus, setFocus] = useState(initial?.focus || null);
   const PERIODS = [["all", "כל הזמן"], ["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"]];
   const from = period === "all" ? 0 : Date.now() - ({ week: 7, month: 30, quarter: 90, year: 365 }[period]) * 86400000;
@@ -4235,8 +4235,8 @@ function AdminTickets({ tickets, onOpen, initial, fleet, config }) {
     <div className="export-bar"><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={() => setReport(buildHtml())}><Printer size={15} /> דוח / הדפסה</button></div>
     <div className="count-line">{list.length} קריאות · ממוינות לפי דחיפות</div>
     {list.length === 0 ? <Empty text="לא נמצאו קריאות" Icon={ListChecks} />
-      : grouped ? <>{G.map((g) => { const items = list.filter(g.test); if (!items.length) return null; return <div key={g.key}><SectionTitle><g.Icon size={15} color={g.color} /> {g.label} ({items.length})</SectionTitle><div className="cards">{items.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => onOpen(t.id)} />)}</div></div>; })}</>
-      : <div className="cards">{list.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} config={config} onClick={() => onOpen(t.id)} />)}</div>}
+      : grouped ? <>{G.map((g) => { const items = list.filter(g.test); if (!items.length) return null; return <div key={g.key}><SectionTitle><g.Icon size={15} color={g.color} /> {g.label} ({items.length})</SectionTitle><div className="cards">{items.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div></div>; })}</>
+      : <div className="cards">{list.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div>}
     {report && <ReportView html={report} count={`${list.length} קריאות`} onClose={() => setReport(null)} />}
   </>);
 }
@@ -5971,11 +5971,12 @@ function SlaBar({ t, big }) {
   const label = done ? (t.status === "done" ? "טופל" : "בוטל") : remain > 0 ? `נותרו ${fmtDur(remain)}` : `חריגה ${fmtDur(-remain)}`;
   return (<div className={"sla" + (big ? " big" : "")}><div className="sla-track"><div className="sla-fill" style={{ width: (done ? 100 : pct) + "%", background: color }} /></div>{big && <div className="sla-lbl" style={{ color }}>{label}</div>}</div>);
 }
-function TicketCard({ t, admin, onClick, fleet, config }) {
+function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const c = catOf(t), pr = prOf(t.priority), s = stOf(t.status), tr = TRACKS[t.track];
   const risk = (admin && fleet && config) ? computeRisk(t, fleet, config) : null;
   const waitingForTechAcceptance = !t.assignee && t.track === "transport" && t.status === "new" && ballIn(t) === "tech";
-  return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: pr.color }}>
+  const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
+  return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
     <div className="tcard-icon" style={{ background: c.color + "22" }}><c.Icon size={20} color={c.color} /></div>
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
@@ -5985,6 +5986,7 @@ function TicketCard({ t, admin, onClick, fleet, config }) {
       <div className="tcard-badges">
         <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
+        {missingHandler && <span className="badge sm" style={{ color: "#7F1D1D", background: "#FEE2E2" }}><AlertTriangle size={11} /> ללא מטפל פעיל</span>}
         {risk && risk.level !== "green" && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
         {t.byAdmin && <span className="badge sm" style={{ color: "#7C3AED", background: "#EDE9FE" }}><ShieldCheck size={11} /> מנהל</span>}
         {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
