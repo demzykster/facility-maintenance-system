@@ -117,7 +117,7 @@ const STATUSES = [
   { id: "rework", label: "הוחזר לעובד", color: "#0891B2", bg: "#CFFAFE" },
   { id: "new", label: "חדשה", color: "#2563EB", bg: "#DBEAFE" },
   { id: "in_progress", label: "בטיפול", color: "#D97706", bg: "#FEF3C7" },
-  { id: "waiting", label: "ממתינה לחלקים", color: "#7C3AED", bg: "#EDE9FE" },
+  { id: "waiting", label: "בהמתנה", color: "#7C3AED", bg: "#EDE9FE" },
   { id: "pending_user", label: "ממתינה לאישור הפותח", color: "#0D9488", bg: "#CCFBF1" },
   { id: "pending_admin", label: "ממתינה לסגירה", color: "#4F46E5", bg: "#E0E7FF" },
   { id: "done", label: "נסגרה", color: "#16A34A", bg: "#DCFCE7" },
@@ -708,6 +708,7 @@ const WAIT_REASONS = [
 const wReasons = (cfg) => (cfg && Array.isArray(cfg.waitReasons) && cfg.waitReasons.length) ? cfg.waitReasons : WAIT_REASONS;
 const wReasonOf = (cfg, id) => wReasons(cfg).find((r) => r.id === id) || WAIT_REASONS.find((r) => r.id === id) || null;
 const waitReasonLabel = (id, cfg) => (wReasonOf(cfg, id)?.label || "ממתינה");
+const ticketWaitReasonLabel = (t, cfg) => (t?.status === "waiting" && t.waitingReason) ? waitReasonLabel(t.waitingReason, cfg) : "";
 const reasonBall = (cfg, id) => (wReasonOf(cfg, id)?.ball || "executor");
 // Причины, которые роль может ВЫСТАВЛЯТЬ (один список, фильтр по setters). no_equipment ставится отдельной кнопкой техника.
 const reasonsForRole = (cfg, role) => wReasons(cfg).filter((r) => r.id !== "no_equipment" && (r.setters === "both" || (role === "tech" ? r.setters === "tech" : r.setters === "manager"))).map((r) => (r.id === "manager_decision" && r.label === "ממתינה להחלטת מנהל") ? { ...r, label: "צריך עזרה / החלטה" } : r);
@@ -774,7 +775,7 @@ function assetHealth(f, tickets, insp, config) {
   return { score, level, color: colors[level], label: labels[level], rec, count90: last90.length, mttr, cost90 };
 }
 
-const waitedParts = (t) => t.status === "waiting" || (t.log || []).some((l) => l.text && l.text.includes(WAIT_LABEL));
+const waitedParts = (t) => t.waitingReason === "parts" || !!(t.statusMs && t.statusMs["waiting:parts"]) || (t.log || []).some((l) => l.text && l.text.includes(WAIT_LABEL));
 const isCriticalEscalated = (t, cfg) => t.track === "transport" && t.downtimeType === "critical" && !t.assignee && isOpen(t) && (Date.now() - t.createdAt) > (cfg?.escalateCriticalHours ?? 2) * 3600000;
 const HE_STOP = new Set("של את עם על אם כי או גם לא יש אין זה זו הוא היא הם הן אני אתה אנחנו עד אל כל כך מה מי כמו בין אחר אחרי לפני תחת ליד מן אבל אז רק עוד כבר היה היתה להיות יותר פחות מאוד".split(/\s+/));
 const normToken = (w) => (w || "").replace(/[^\u0590-\u05FFa-zA-Z0-9]/g, "");
@@ -928,7 +929,7 @@ function buildAIContext(session, tickets, pm, fleet, cfg) {
   const open = tickets.filter(isOpen);
   const L = [`תפקיד: ${ROLE_LABEL[session.role]}`];
   L.push(`קריאות בתחום ראייתך: סה"כ ${tickets.length}, פתוחות ${open.length}, חריגת SLA ${tickets.filter(isOverdue).length}.`);
-  open.slice(0, 16).forEach((t) => L.push(`#${ticketNo(t)}|${TRACKS[t.track]?.short}|${catOf(t).label}|${prOf(t.priority).label}|${stOf(t.status).label}|${t.assignee || "ללא"}|${t.subject}`));
+  open.slice(0, 16).forEach((t) => L.push(`#${ticketNo(t)}|${TRACKS[t.track]?.short}|${catOf(t).label}|${prOf(t.priority).label}|${stOf(t.status).label}${ticketWaitReasonLabel(t, cfg) ? " · " + ticketWaitReasonLabel(t, cfg) : ""}|${t.assignee || "ללא"}|${t.subject}`));
   if (session.role === "admin") {
     const exp = (fleet || []).map((f) => ({ f, s: docStatus(f, cfg) })).filter((x) => x.s.d != null && x.s.d <= 30);
     if (exp.length) { L.push("מסמכי כלי שינוע פגי-תוקף קרוב:"); exp.slice(0, 10).forEach((x) => L.push(`- ${unitLabel(x.f, cfg)}: ${x.s.label}`)); }
@@ -4210,11 +4211,11 @@ function AdminTickets({ tickets, onOpen, initial, fleet, config }) {
   const catOpts = [...new Map(catSource.map((t) => [catOf(t).id, catOf(t).label])).entries()].sort((a, b) => a[1].localeCompare(b[1], "he"));
   const typeOpts = [...new Set(tickets.filter((t) => trackOf(t) === "transport").map((t) => { const ff = (fleet || []).find((x) => x.id === t.forkliftId); return unitTypeName(ff, config); }).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
   const buildHtml = () => {
-    const rowsHtml = list.slice(0, 400).map((t) => `<tr><td>${ticketNo(t)}</td><td>${trLabel(t)}</td><td>${esc(t.subject)}</td><td>${esc(catOf(t).label)}</td><td>${prOf(t.priority).label}</td><td>${stOf(t.status).label}</td><td>${esc(t.asset || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`).join("");
-    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}רשימת קריאות</h2><div class="sub">${list.length} קריאות · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
+    const rowsHtml = list.slice(0, 400).map((t) => `<tr><td>${ticketNo(t)}</td><td>${trLabel(t)}</td><td>${esc(t.subject)}</td><td>${esc(catOf(t).label)}</td><td>${prOf(t.priority).label}</td><td>${stOf(t.status).label}</td><td>${esc(ticketWaitReasonLabel(t, config) || "—")}</td><td>${esc(t.asset || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`).join("");
+    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}רשימת קריאות</h2><div class="sub">${list.length} קריאות · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>סיבת המתנה</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
   };
   const exportXlsx = () => {
-    const rows = list.map((t) => ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "קטגוריה": catOf(t).label, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "עלות (₪)": t.closure?.costAmount || 0 }));
+    const rows = list.map((t) => ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "קטגוריה": catOf(t).label, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה": ticketWaitReasonLabel(t, config), "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "עלות (₪)": t.closure?.costAmount || 0 }));
     try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map(() => ({ wch: 14 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "קריאות"); if (downloadXlsx(wb, `קריאות_${new Date().toISOString().slice(0, 10)}.xlsx`)) return; } catch (e) {}
     setReport(buildHtml());
   };
@@ -4909,7 +4910,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     try {
       const rows = tickets.map((t) => ({
         "מספר": ticketNo(t), "מסלול": TRACKS[t.track]?.label || (t.forkliftId ? "שינוע" : "מבנה"),
-        "נושא": t.subject, "קטגוריה": catOf(t).label, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label,
+        "נושא": t.subject, "קטגוריה": catOf(t).label, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה": ticketWaitReasonLabel(t, config),
         "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "אחראי": t.assignee || "", "פותח": t.createdBy?.name || "",
         "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "",
         "עלות (₪)": t.closure?.costAmount || 0, "ספק": t.closure?.costSupplier || "",
@@ -4943,7 +4944,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
 
   const exportPdf = () => {
     const m = new Date().toLocaleDateString("he-IL", { month: "long", year: "numeric" });
-    const rowsHtml = tickets.slice(0, 200).map((t) => `<tr><td>${ticketNo(t)}</td><td>${(TRACKS[t.track]?.short) || "—"}</td><td>${esc(t.subject)}</td><td>${stOf(t.status).label}</td><td>${esc(t.assignee || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`).join("");
+    const rowsHtml = tickets.slice(0, 200).map((t) => `<tr><td>${ticketNo(t)}</td><td>${(TRACKS[t.track]?.short) || "—"}</td><td>${esc(t.subject)}</td><td>${stOf(t.status).label}</td><td>${esc(ticketWaitReasonLabel(t, config) || "—")}</td><td>${esc(t.assignee || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`).join("");
     const html = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>דוח אחזקה</title>
       <style>@page{margin:18mm}body{font-family:Arial,Helvetica,sans-serif;color:#16202E;direction:rtl}
       h1{font-size:20px;margin:0 0 2px}.sub{color:#64748B;font-size:12px;margin-bottom:18px}
@@ -4962,7 +4963,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
         <div class="k"><div class="kn">${stuckParts.length}</div><div class="kl">המתנה לחלקים</div></div>
         <div class="k"><div class="kn">${fmtDur(totalDowntime)}</div><div class="kl">השבתה מצטברת</div></div>
       </div>
-      <table><thead><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>סטטוס</th><th>אחראי</th><th>נפתח</th><th>עלות</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+      <table><thead><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>סטטוס</th><th>סיבת המתנה</th><th>אחראי</th><th>נפתח</th><th>עלות</th></tr></thead><tbody>${rowsHtml}</tbody></table>
       <div class="foot">הופק ממערכת אחזקה · גרסת הדגמה</div></body></html>`;
     setReport(html);
   };
