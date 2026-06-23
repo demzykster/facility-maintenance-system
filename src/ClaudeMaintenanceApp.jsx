@@ -2853,6 +2853,7 @@ function TaskImportWizard({ users, session, meetings, existing, defaultMeetingId
   const pickSheet = (name, allSheets) => { const aoa = (allSheets || sheets)[name] || []; const { headers: hdr, rows: rws } = aoaToRows(aoa); setSheetName(name); setHeaders(hdr); setRows(rws); setMap({ title: detectCol("title", hdr), responsible: detectCol("responsible", hdr), due: detectCol("due", hdr), priority: detectCol("priority", hdr), status: detectCol("status", hdr), category: detectCol("category", hdr), desc: detectCol("desc", hdr), note: detectCol("note", hdr) }); };
   const onFile = (e) => {
     const file = e.target.files?.[0]; if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 5MB."); e.target.value = ""; return; }
     const rd = new FileReader();
     rd.onload = (ev) => { try {
       const wb = XLSX.read(new Uint8Array(ev.target.result), { type: "array", cellDates: true });
