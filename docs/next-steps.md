@@ -25,6 +25,10 @@ Important context:
 - `npm view xlsx version` currently returns `0.18.5`, which is already the latest npm release.
 - Do not replace `xlsx` casually; this affects business import/export flows.
 - Branch `codex/audit-dependencies` also caps Excel/CSV task imports at 5 MB as a small mitigation.
+- Branch `codex/replace-task-import-xlsx` replaces task file import with:
+  - `read-excel-file` for `.xlsx`;
+  - `papaparse` for `.csv`.
+- After that branch, `xlsx` remains in use for export/report generation only.
 
 Recommended next branch:
 
@@ -35,9 +39,9 @@ git checkout -b codex/audit-dependencies
 Remaining suggested work:
 
 - For `xlsx`, compare options:
-  - keep current library temporarily and document risk;
-  - move to a maintained SheetJS source if available and license/business constraints are acceptable;
-  - replace import/export library later behind focused tests.
+  - keep current export library temporarily and document risk;
+  - move exports to `write-excel-file` or another maintained writer behind focused tests;
+  - move to a maintained SheetJS source if available and license/business constraints are acceptable.
 - Add/update docs with the chosen decision.
 
 DoD:
