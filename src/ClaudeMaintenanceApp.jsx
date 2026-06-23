@@ -4088,7 +4088,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const open = tickets.filter(isOpen), breach = tickets.filter(isOverdue);
   const transOpen = open.filter(isTransport);
   const facilityOpen = open.filter((t) => !isTransport(t));
-  const waitParts = open.filter((t) => t.status === "waiting");
+  const waitParts = open.filter(waitedParts);
   const waitUser = open.filter((t) => t.status === "pending_user");
   const waitAdmin = open.filter((t) => t.status === "pending_admin");
   const critNow = open.filter((t) => t.track === "transport" && t.downtimeType === "critical");
@@ -4151,7 +4151,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     </div>
     <div className="queue-row">
       <button className="queue-chip" onClick={() => flt({ st: "open", pr: "high" })}><span className="q-num" style={{ color: "#7C3AED" }}>{open.filter((t) => prOf(t.priority).id === "high").length}</span><span className="q-lbl">דחופות</span></button>
-      <button className="queue-chip" onClick={() => flt({ st: "waiting" })}><span className="q-num" style={{ color: "#7C3AED" }}>{waitParts.length}</span><span className="q-lbl">ממתינות לחלקים</span></button>
+      <button className="queue-chip" onClick={() => flt({ st: "waiting", focus: { waitReason: "parts", label: "ממתינות לחלקים" } })}><span className="q-num" style={{ color: "#7C3AED" }}>{waitParts.length}</span><span className="q-lbl">ממתינות לחלקים</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "pending_user" })}><span className="q-num" style={{ color: "#0D9488" }}>{waitUser.length}</span><span className="q-lbl">לאישור מנהל מחלקה</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "pending_admin" })}><span className="q-num" style={{ color: "#4F46E5" }}>{waitAdmin.length}</span><span className="q-lbl">לסגירה על ידך</span></button>
     </div></>}
@@ -5621,7 +5621,9 @@ function TicketDetail(p) {
   useEffect(() => { let on = true; if (ticket?.hasPhoto) store.get(`photo:${ticket.id}`, true).then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto]);
   useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) store.get(`photo:after:${ticket.id}`, true).then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto]);
   const grabAfter = (file) => { if (!file) return; const r = new FileReader(); r.onload = (ev) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const cv = document.createElement("canvas"); cv.width = width; cv.height = height; cv.getContext("2d").drawImage(img, 0, 0, width, height); setAfterPhoto(cv.toDataURL("image/jpeg", 0.6)); }; img.src = ev.target.result; }; r.readAsDataURL(file); };
+  const exactRelated = useMemo(() => ticket?.forkliftId ? tickets.filter((t) => t.id !== ticket.id && t.forkliftId === ticket.forkliftId).sort((a, b) => b.createdAt - a.createdAt) : [], [ticket, tickets]);
   const related = useMemo(() => ticket ? similarTickets(ticket, tickets, { days: 30 }).map((x) => x.t) : [], [ticket, tickets]);
+  const similarRelated = useMemo(() => related.filter((t) => !exactRelated.some((x) => x.id === t.id)), [related, exactRelated]);
   if (!ticket) return null;
   const track = ticket.track || (ticket.forkliftId ? "transport" : "facility");
   const c = catOf(ticket), pr = prOf(ticket.priority), s = stOf(ticket.status), tr = TRACKS[track] || TRACKS.facility;
@@ -5713,7 +5715,11 @@ function TicketDetail(p) {
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>
       {photo && <><SectionTitle>תמונה</SectionTitle><img className="detail-photo" src={photo} alt="" /></>}
       {afterPhoto && <><SectionTitle><CheckCircle2 size={15} /> תמונת ביצוע</SectionTitle><img className="detail-photo" src={afterPhoto} alt="" /></>}
-      {track === "transport" ? (related.length > 0 && <><SectionTitle><ListChecks size={15} /> קריאות לכלי זה ({related.length})</SectionTitle><div className="cards">{related.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>{related.length >= 3 && <div className="repeat-warn"><RefreshCw size={14} /> על כלי זה נפתחו {related.length} קריאות — שקלו טיפול שורש.</div>}</>)
+      {track === "transport" ? (<>
+        {exactRelated.length > 0 && <><SectionTitle><ListChecks size={15} /> קריאות לכלי זה ({exactRelated.length})</SectionTitle><div className="cards">{exactRelated.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>{exactRelated.length >= 3 && <div className="repeat-warn"><RefreshCw size={14} /> על כלי זה נפתחו {exactRelated.length} קריאות — שקלו טיפול שורש.</div>}</>}
+        <button className="btn-ghost full" style={{ marginTop: 12 }} onClick={() => setShowSim((v) => !v)}><Search size={15} /> {showSim ? "הסתר קריאות דומות" : `הצג קריאות דומות${similarRelated.length ? " (" + similarRelated.length + ")" : ""}`}</button>
+        {showSim && (similarRelated.length === 0 ? <div className="note">לא נמצאו קריאות דומות.</div> : <div className="cards" style={{ marginTop: 10 }}>{similarRelated.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>)}
+      </>)
         : (<><button className="btn-ghost full" style={{ marginTop: 12 }} onClick={() => setShowSim((v) => !v)}><Search size={15} /> {showSim ? "הסתר קריאות דומות" : `הצג קריאות דומות${related.length ? " (" + related.length + ")" : ""}`}</button>
           {showSim && (related.length === 0 ? <div className="note">לא נמצאו קריאות דומות.</div> : <div className="cards" style={{ marginTop: 10 }}>{related.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>)}</>)}
       {ticket.closure && <><SectionTitle><DollarSign size={15} /> סגירה</SectionTitle><div className="close-box">
@@ -5968,11 +5974,12 @@ function SlaBar({ t, big }) {
 function TicketCard({ t, admin, onClick, fleet, config }) {
   const c = catOf(t), pr = prOf(t.priority), s = stOf(t.status), tr = TRACKS[t.track];
   const risk = (admin && fleet && config) ? computeRisk(t, fleet, config) : null;
+  const waitingForTechAcceptance = !t.assignee && t.track === "transport" && t.status === "new" && ballIn(t) === "tech";
   return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: pr.color }}>
     <div className="tcard-icon" style={{ background: c.color + "22" }}><c.Icon size={20} color={c.color} /></div>
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
-      <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{admin && t.assignee && <> · <Wrench size={11} /> {t.assignee}</>}{!t.assignee && t.track === "transport" && isOpen(t) && <> · <span style={{ color: "#2563EB" }}>ממתינה לקבלה</span></>}</div>
+      <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{admin && t.assignee && <> · <Wrench size={11} /> {t.assignee}</>}{waitingForTechAcceptance && <> · <span style={{ color: "#2563EB" }}>ממתינה לקבלה</span></>}</div>
       <SlaBar t={t} />
       {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div style={{ color: b.color, fontSize: 11.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, margin: "3px 0 1px" }}><b.Icon size={12} /> אצל: {b.label} · כבר {fmtDur(Date.now() - since)}</div>; })()}
       <div className="tcard-badges">
