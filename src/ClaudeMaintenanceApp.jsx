@@ -5391,7 +5391,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
       fleetDocs: role === "user" ? fleetDocs : false, fleetTickets: role === "user" ? fleetTickets : false, mgrZones: role === "user" ? mgrZones : [], perms: role === "user" ? { ppe: ppeFull ? "full" : "request" } : (user.perms || undefined),
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
-      active, createdAt: user.createdAt || Date.now(),
+      active,
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
   };
