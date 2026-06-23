@@ -7,6 +7,8 @@ import {
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck} from "lucide-react";
+import readExcelFile from "read-excel-file/browser";
+import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
 /* ============================================================
@@ -308,6 +310,22 @@ const matchUserByName = (name, users) => { const n = String(name || "").trim().t
 const HEADER_KEYS = ["נושא", "משימה", "פירוט", "תיאור", "יעד", "תאריך", "מצב", "סטטוס", "אחרא", "הערה", "עדיפות", "priority", "status", "title", "task", "due", "date", "כותרת"];
 const detectHeaderRow = (aoa) => { let best = 0, bestScore = -1; for (let i = 0; i < Math.min(aoa.length, 10); i++) { const cells = (aoa[i] || []).map((c) => String(c == null ? "" : c).toLowerCase()); if (cells.filter((c) => c.trim()).length < 2) continue; const score = cells.filter((c) => HEADER_KEYS.some((k) => c.includes(k))).length; if (score > bestScore) { bestScore = score; best = i; } } return best; };
 const aoaToRows = (aoa) => { const hi = detectHeaderRow(aoa); const hdr = (aoa[hi] || []).map((c, idx) => String(c == null ? "" : c).trim() || `עמודה ${idx + 1}`); const rows = aoa.slice(hi + 1).map((r) => { const o = {}; hdr.forEach((h, idx) => { o[h] = r[idx] == null ? "" : r[idx]; }); return o; }).filter((o) => Object.values(o).some((v) => String(v).trim())); return { headers: hdr, rows }; };
+const parseCsvFile = (file) => new Promise((resolve, reject) => {
+  Papa.parse(file, {
+    skipEmptyLines: false,
+    complete: (res) => resolve({ "CSV": res.data || [] }),
+    error: reject
+  });
+});
+const parseTaskImportFile = async (file) => {
+  const name = file.name || "";
+  if (/\.csv$/i.test(name)) return parseCsvFile(file);
+  if (!/\.xlsx$/i.test(name)) throw new Error("unsupported");
+  const sheets = await readExcelFile(file);
+  const all = {};
+  (sheets || []).forEach(({ sheet, data }, index) => { all[sheet || `Sheet ${index + 1}`] = data || []; });
+  return all;
+};
 const XL_DUE = (v) => { const s = String(v == null ? "" : v).trim(); if (!s) return { mode: "deferred", dueAt: null }; if (/שוטף|שגרת|קבוע|ongoing|routine/i.test(s)) return { mode: "permanent", dueAt: null }; if (/מיידי|immediate|דחוף/i.test(s)) return { mode: "deferred", dueAt: null, urgent: true }; if (/tbd|לקבוע|טרם|בהמשך/i.test(s)) return { mode: "deferred", dueAt: null }; const d = XL_DATE(v); return d ? { mode: "deadline", dueAt: d } : { mode: "deferred", dueAt: null }; };
 const normTitle = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
 // Разбор «дерева истории»: одна ячейка вида «вступление. DD/MM - текст, DD/MM - текст, …» → {lead, entries:[{at,text}]}.
@@ -2851,19 +2869,17 @@ function TaskImportWizard({ users, session, meetings, existing, defaultMeetingId
   const [stage, setStage] = useState("pick");
   const [sheets, setSheets] = useState({}), [sheetName, setSheetName] = useState(""), [rows, setRows] = useState([]), [headers, setHeaders] = useState([]), [map, setMap] = useState({}), [mtgId, setMtgId] = useState(defaultMeetingId || ""), [mode, setMode] = useState("create"), [err, setErr] = useState("");
   const pickSheet = (name, allSheets) => { const aoa = (allSheets || sheets)[name] || []; const { headers: hdr, rows: rws } = aoaToRows(aoa); setSheetName(name); setHeaders(hdr); setRows(rws); setMap({ title: detectCol("title", hdr), responsible: detectCol("responsible", hdr), due: detectCol("due", hdr), priority: detectCol("priority", hdr), status: detectCol("status", hdr), category: detectCol("category", hdr), desc: detectCol("desc", hdr), note: detectCol("note", hdr) }); };
-  const onFile = (e) => {
+  const onFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     if (file.size > 5 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 5MB."); e.target.value = ""; return; }
-    const rd = new FileReader();
-    rd.onload = (ev) => { try {
-      const wb = XLSX.read(new Uint8Array(ev.target.result), { type: "array", cellDates: true });
-      const all = {}; wb.SheetNames.forEach((n) => { all[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "" }); });
-      if (!wb.SheetNames.length) { setErr("הקובץ ריק"); return; }
-      const named = wb.SheetNames.find((n) => /סטטוס|סטאטוס|status|משימ|מטל/i.test(n));
-      const best = named || wb.SheetNames.map((n) => { const { rows: r } = aoaToRows(all[n]); return { n, score: r.length }; }).sort((a, b) => b.score - a.score)[0].n;
+    try {
+      const all = await parseTaskImportFile(file);
+      const sheetNames = Object.keys(all);
+      if (!sheetNames.length) { setErr("הקובץ ריק"); return; }
+      const named = sheetNames.find((n) => /סטטוס|סטאטוס|status|משימ|מטל|csv/i.test(n));
+      const best = named || sheetNames.map((n) => { const { rows: r } = aoaToRows(all[n]); return { n, score: r.length }; }).sort((a, b) => b.score - a.score)[0].n;
       setSheets(all); pickSheet(best, all); setStage("map"); setErr("");
-    } catch (x) { setErr("שגיאה בקריאת הקובץ. ודאו שזה Excel/CSV תקין."); } };
-    rd.readAsArrayBuffer(file);
+    } catch (x) { setErr("שגיאה בקריאת הקובץ. ודאו שזה קובץ XLSX/CSV תקין."); }
   };
   // TODO (дедуп на будущее): считать дублем только при совпадении статуса — закрытая и открытая задача с одним названием НЕ дубль.
   const preview = useMemo(() => {
@@ -2917,7 +2933,7 @@ function TaskImportWizard({ users, session, meetings, existing, defaultMeetingId
     <div className="body">
       {stage === "pick" ? <>
         <div className="note">בחרו קובץ Excel/CSV (למשל סיכום פגישה). המערכת תזהה אוטומטית את שורת הכותרות ואת העמודות — גם אם יש שורות כותרת מעל. תוצג תצוגה מקדימה לאישור, וכפילויות יסומנו.</div>
-        <label className="btn-primary full" style={{ marginTop: 14, cursor: "pointer", justifyContent: "center" }}><FileSpreadsheet size={16} /> בחירת קובץ<input type="file" accept=".xlsx,.xls,.csv" onChange={onFile} style={{ display: "none" }} /></label>
+        <label className="btn-primary full" style={{ marginTop: 14, cursor: "pointer", justifyContent: "center" }}><FileSpreadsheet size={16} /> בחירת קובץ<input type="file" accept=".xlsx,.csv" onChange={onFile} style={{ display: "none" }} /></label>
         {err && <div className="err">{err}</div>}
       </> : <>
         {Object.keys(sheets).length > 1 && <label className="field"><span>גיליון</span><select value={sheetName} onChange={(e) => pickSheet(e.target.value)}>{Object.keys(sheets).map((n) => <option key={n} value={n}>{n}</option>)}</select></label>}

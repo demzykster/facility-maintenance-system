@@ -54,10 +54,12 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
   - `xlsx` high severity advisories; `xlsx@0.18.5` is the latest npm release and npm reports no automatic fix.
 - The previous `esbuild` low severity audit finding was removed by updating the Vite toolchain in branch `codex/audit-dependencies`.
 - Excel/CSV task import is capped at 5 MB in branch `codex/audit-dependencies` as a small mitigation while the `xlsx` replacement/upgrade decision remains open.
+- Branch `codex/replace-task-import-xlsx` moves task file import away from `xlsx` to `read-excel-file` for `.xlsx` and `papaparse` for `.csv`.
+- After that branch, `xlsx` remains only for Excel export/report generation paths.
 - The public Vercel deployment is still demo/staging. It uses browser-local storage, not Supabase or a production database.
 
 ## Current Position
 
 Phase 2 basics are now complete.
 
-Next practical work should decide what to do with `xlsx` before starting Supabase, Railway, production database, Auth/RLS, or modular split work.
+Next practical work should decide whether and how to replace `xlsx` in export/report generation paths before starting Supabase, Railway, production database, Auth/RLS, or modular split work.
