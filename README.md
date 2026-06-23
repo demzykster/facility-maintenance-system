@@ -30,3 +30,11 @@ The build output is written to `dist/`.
 - Password: `1234`
 
 Demo data is stored in the browser through the local `window.storage` shim backed by `localStorage`.
+
+## Project Continuity
+
+For handoff to another PC, Codex session, or Claude session, start with:
+
+- [Current status](docs/current-status.md)
+- [Next steps](docs/next-steps.md)
+- [Collaboration model](docs/collaboration-model.md)
