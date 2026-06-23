@@ -10,7 +10,7 @@ This file is the handoff point for any new Codex or Claude session.
 - Branch: `main`
 - Baseline tag: `pre-production-model`
 - Current baseline commit: `e908ec7 sync artifact into vite shell`
-- Previous commit: `16f132c pre-sync local vite state`
+- Current main commit: `1ff178e Merge pull request #3 from demzykster/codex/storage-contract-test`
 
 The GitHub repository is now the source of truth. The old artifact/chat file is no longer the source of truth.
 
@@ -37,13 +37,26 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 - Tag `pre-production-model` pushed.
 - README contains local run and build commands.
 
+### Phase 2 - Stabilization
+
+- Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
+- Vitest was added through PR #2.
+- `npm test` is available and currently runs 2 passing test files.
+- Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
+- Verification passed on `main`:
+  - `npm test`;
+  - `npm run build`.
+
 ## Known Warnings
 
-- `src/ClaudeMaintenanceApp.jsx` has a duplicate object key warning near line 5394: `createdAt`.
-- Production bundle is about 1.4 MB. This is expected for the current monolith and is not a Phase 2 blocker.
+- Production bundle is about 1.4 MB. This is expected for the current monolith and is not a blocker.
+- `npm audit` currently reports:
+  - `esbuild` low severity advisory in the development toolchain; `npm audit fix` is available.
+  - `xlsx` high severity advisories; `xlsx@0.18.5` is the latest npm release and npm reports no automatic fix.
+- The public Vercel deployment is still demo/staging. It uses browser-local storage, not Supabase or a production database.
 
 ## Current Position
 
-The next phase is Phase 2 - Stabilization.
+Phase 2 basics are now complete.
 
-Do not start Supabase, Railway, Vercel production deployment, or modular split until Phase 2 basics are complete, unless the owner explicitly changes the priority.
+Next practical work should address the `npm audit` findings and decide what to do with `xlsx` before starting Supabase, Railway, production database, Auth/RLS, or modular split work.
