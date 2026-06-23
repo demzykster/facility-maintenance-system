@@ -1,92 +1,53 @@
 # Next Steps
 
-## Phase 2 - Stabilization
+## Current Position
 
-Goal: make the current GitHub baseline cleaner, reproducible, and safer before backend/database work.
+Phase 2 stabilization basics are complete on `main`.
 
-## Step 1 - Fix Duplicate `createdAt`
+Completed:
 
-Branch:
-
-```powershell
-git checkout -b codex/fix-duplicate-createdat
-```
-
-Target file:
-
-```text
-src/ClaudeMaintenanceApp.jsx
-```
-
-Current warning:
-
-```text
-Duplicate key "createdAt" in object literal
-```
-
-Relevant current fragment:
-
-```jsx
-onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), role,
-  ...
-  reportsTo: role === "user" ? reportsTo : "",
-  active, createdAt: user.createdAt || Date.now(),
-  employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
-```
-
-Expected minimal fix:
-
-```jsx
-  reportsTo: role === "user" ? reportsTo : "",
-  active,
-  employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
-```
-
-DoD:
-
+- PR #1 fixed duplicate `createdAt`.
+- PR #2 added Vitest skeleton.
+- PR #3 added a storage adapter contract harness test.
+- `npm test` passes.
 - `npm run build` passes.
-- Duplicate `createdAt` warning is gone.
-- Bundle-size warning may remain.
-- No UI or behavior changes intended.
 
-## Step 2 - Vitest Skeleton
+## Next Practical Step - Audit Dependencies
 
-Branch:
+Current `npm audit` findings:
+
+- `esbuild`: low severity, development server advisory, fix available through npm.
+- `xlsx`: high severity advisories, direct dependency, no npm automatic fix available.
+
+Important context:
+
+- `xlsx` is used for Excel/CSV import and many Excel exports in `src/ClaudeMaintenanceApp.jsx`.
+- `npm view xlsx version` currently returns `0.18.5`, which is already the latest npm release.
+- Do not replace `xlsx` casually; this affects business import/export flows.
+
+Recommended next branch:
 
 ```powershell
-git checkout -b codex/vitest-skeleton
+git checkout -b codex/audit-dependencies
 ```
 
-Tasks:
+Suggested work:
 
-- Install `vitest`.
-- Add scripts:
-  - `test`: `vitest run`
-  - optionally `test:watch`: `vitest`
-- Add one small smoke test.
-
-DoD:
-
-- `npm test` runs and passes.
-- `npm run build` still passes.
-
-## Step 3 - Storage Contract Harness Test
-
-Do not extract the real `store` from the monolith yet. That belongs to a later modular split phase.
-
-For Phase 2, test the storage adapter contract through a small harness:
-
-- `get(key, shared)` returns `{ value }` or `null`.
-- `set(key, value, shared)` returns a non-`undefined` success value.
-- `delete(key, shared)` returns a non-`undefined` success value.
-- `list(prefix, shared)` returns `{ keys: [...] }`.
+- Run `npm audit` and record exact advisories.
+- Apply the safe `esbuild`/toolchain fix only if it does not cause unwanted dependency churn.
+- For `xlsx`, compare options:
+  - keep current library temporarily and document risk;
+  - move to a maintained SheetJS source if available and license/business constraints are acceptable;
+  - replace import/export library later behind focused tests.
+- Add/update docs with the chosen decision.
 
 DoD:
 
-- The contract is documented in executable test form.
-- No modular split yet.
+- `npm test` passes.
+- `npm run build` passes.
+- Any dependency changes are small and explained in the PR.
 
-## Not In Phase 2
+## Still Not Next
 
 - No Supabase.
 - No Railway.
