@@ -4076,8 +4076,9 @@ function computeInsights(tickets, fleet, pm, config) {
   if (pmOver.length >= 3) out.push({ sev: "warn", text: `${pmOver.length} טיפולים תקופתיים באיחור.`, go: "pm" });
   return out.slice(0, 6);
 }
-function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints }) {
+function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo }) {
   const [cfgOpen, setCfgOpen] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(false);
   const [dashTrackLocal, setDashTrackLocal] = useState("all");
   const dashTrack = setCtx ? (ctx || "all") : dashTrackLocal;
   const setDashTrack = setCtx || setDashTrackLocal;
@@ -4120,6 +4121,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const ordRecv = (ppeOrders || []).filter((o) => o.status === "sent");
   const tasksOverdue = (tasks || []).filter((t) => t.dueAt && t.dueAt < _now && t.status !== "done" && t.status !== "cancelled");
   const complOpen = (complaints || []).filter((c) => c.status === "open" || c.status === "pending");
+  const isEmptyDemo = !demoActive && allTickets.length === 0 && fleet.length === 0 && (pm || []).length === 0 && (ppeItems || []).length === 0 && (zones || []).length === 0 && (complaints || []).length === 0;
   const attn = [
     critEsc.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות קריטיות שהוסלמו", n: critEsc.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
     (critNow.length - critEsc.length) > 0 ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critNow.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
@@ -4136,6 +4138,13 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   ].filter(Boolean).sort((a, b) => b.sev - a.sev);
   
   return (<>
+    {isEmptyDemo && loadDemo && <div className="empty-demo">
+      <div className="empty-demo-main">
+        <div className="empty-demo-title">המערכת ריקה כרגע</div>
+        <div className="empty-demo-text">טענו נתוני דמו כדי לראות קריאות, כלים, טיפולים, ניקיון וביגוד עובדים בסביבת ההדגמה.</div>
+      </div>
+      <button className="btn-primary sm" disabled={demoBusy} onClick={async () => { setDemoBusy(true); try { await loadDemo(); } finally { setDemoBusy(false); } }}>{demoBusy ? "טוען…" : "טען נתוני דמו"}</button>
+    </div>}
     <div style={{ marginBottom: 16 }}><SectionTitle><Bell size={15} /> דורש טיפול</SectionTitle>{attn.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>הכל תחת שליטה — אין פריטים שדורשים טיפול דחוף כעת.</div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10, marginTop: 8 }}>{attn.map((a, i) => { const col = a.sev === 2 ? "#DC2626" : a.sev === 1 ? "#D97706" : "#0D9488"; const AIcon = a.Icon; return <button key={i} onClick={a.go} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "start", border: "1px solid var(--border)", borderInlineStartColor: col, borderInlineStartWidth: 3, borderRadius: 10, padding: "10px 12px", background: "var(--surface)", cursor: "pointer" }}><AIcon size={18} color={col} /><span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{a.text}</span><span style={{ fontWeight: 800, fontSize: 18, color: col }}>{a.n}</span></button>; })}</div>}</div>
     
     <div className="row-between"><div className="seg-tabs s3" style={{ maxWidth: 320, marginBottom: 0 }}><button className={dashTrack === "all" ? "on" : ""} onClick={() => setDashTrack("all")}>הכל</button><button className={dashTrack === "facility" ? "on" : ""} onClick={() => setDashTrack("facility")}>מבנה</button><button className={dashTrack === "transport" ? "on" : ""} onClick={() => setDashTrack("transport")}>שינוע</button></div><button className="btn-ghost sm" onClick={() => setCfgOpen((v) => !v)}><SlidersHorizontal size={15} /> התאמת לוח</button></div>
@@ -6211,6 +6220,13 @@ a{color:inherit;}
 .health-rec{display:flex;align-items:flex-start;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink);}
 .demo-badge{display:inline-block;font-size:10.5px;font-weight:700;color:#B45309;background:#FEF3C7;border-radius:6px;padding:2px 7px;margin-inline-start:8px;vertical-align:middle;}
 .app-dark .demo-badge{background:#3a2e10;color:#fcd34d;}
+.empty-demo{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+.empty-demo-main{min-width:0;}
+.empty-demo-title{font-size:14px;font-weight:800;color:#1D4ED8;margin-bottom:3px;}
+.empty-demo-text{font-size:12.5px;color:#1E3A8A;line-height:1.45;}
+.app-dark .empty-demo{background:#0f1f35;border-color:#1d4ed8;}
+.app-dark .empty-demo-title{color:#93C5FD;}
+.app-dark .empty-demo-text{color:#BFDBFE;}
 .budget-placeholder{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px;margin:8px 0;}
 .equip-wait{background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:13px;margin-top:14px;}
 .fu-box{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:4px 13px 13px;margin-top:10px;}
