@@ -14,6 +14,20 @@ This file is the handoff point for any new Codex or Claude session.
 
 The GitHub repository is now the source of truth. The old artifact/chat file is no longer the source of truth.
 
+## Session Sync Rule
+
+Before answering project-status questions or starting work, every Codex/Claude session must synchronize with GitHub:
+
+- fetch/prune remote state;
+- inspect latest `origin/main`;
+- inspect open PRs if available;
+- inspect remote branches as well as PRs.
+- always read `docs/active-work.md` first for the exact active-work ledger, even if `main` looks clean.
+
+A clean `main` and no open PRs do not prove there is no active work. A pushed branch without PR is still active work and must be checked.
+
+If `main`, PRs, remote branches, and docs disagree, start with `PROBLEM / ПРОБЛЕМА:` and resolve the synchronization issue before product work.
+
 ## Completed
 
 ### Phase 0.5 - Sync

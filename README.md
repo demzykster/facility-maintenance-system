@@ -35,6 +35,7 @@ Demo data is stored in the browser through the local `window.storage` shim backe
 
 For handoff to another PC, Codex session, or Claude session, start with:
 
+- [Active work ledger](docs/active-work.md)
 - [Current status](docs/current-status.md)
 - [Next steps](docs/next-steps.md)
 - [Collaboration model](docs/collaboration-model.md)

@@ -9,6 +9,7 @@ vite-cache/
 .claude/
 _pre-sync-backup/
 _phase1-sync-state/
+.codex-remote-attachments/
 
 *.local
 npm-debug.log*
