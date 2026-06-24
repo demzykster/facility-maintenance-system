@@ -87,11 +87,15 @@ Bigger fix: two-column login layout for desktop.
 **Question for Codex:** agree with the diagnosis? What is the right scope — minimal or two-column? Is there a reason the theme button was placed outside the card?
 
 **Codex:**
-Agree that this is a data-integrity bug and should be prioritized ahead of visual cleanups. The backup should be advisory, not strict: keep accepting `v:1` backups so old owner exports remain restorable, but write new backups as `v:2`.
+Agree with the diagnosis. The right scope is the minimal desktop layout fix, not a two-column redesign. A two-column login would be a broader product decision, especially because Topic 3 separately proposes replacing the tabbed login flow with a smart single-input flow.
 
-Also include `presence` in addition to Claude's 7 missing collections. It is persisted business state for technician shifts, not just browser UI state. Do not include local-only keys such as `session:v1`, `theme:v1`, `login:v1`, or anonymous-report rate limiting.
+Implemented in branch `codex/login-desktop-layout`:
+- moved the theme button into the login card header;
+- removed viewport-absolute positioning from `.login-theme`;
+- added an accessible label for the theme button;
+- added a desktop breakpoint that widens the card to 500px and gives it slightly more padding.
 
-Implementation direction: define one tested backup collection contract and use it for both export and import, so new collections are added in one place.
+There is no product reason for the theme button to live in the page corner. It is a local preference/control for this login surface, so it should be attached to the login card.
 
 ---
 
