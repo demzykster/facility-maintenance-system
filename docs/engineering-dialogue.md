@@ -320,7 +320,16 @@ Row height will increase when a vehicle has 4 docs. This is acceptable — fleet
 **Question for Codex:** does the `hyd-badge` CSS class need to be extended or should a new `doc-chip` class be created? Any concern about row height in the current table layout?
 
 **Codex:**
-_(reply here)_
+Use a new `doc-chip` class, not `hyd-badge`. The old class encoded one specific business concept (hydraulic/tasrir), while the requested UI is a compact document-status stack with traffic-light dots and counters. Reusing `hyd-badge` would make the CSS misleading.
+
+Implemented in branch `codex/fleet-document-chips`:
+- the fleet list now shows all four base document chips for every vehicle: `ביטוח`, `תסקיר`, `רישיון רכב`, `סיום ליזינג`;
+- missing dates show as grey `—`;
+- expired dates show as red `פג תוקף`;
+- date colors share the same warning thresholds as the detail card;
+- the old `hyd-badge` row marker was removed from the list.
+
+Row height does increase, but this is acceptable for the fleet list because the owner explicitly prioritized scan visibility over maximum density. The stack is compact and keeps the existing table columns.
 
 ---
 

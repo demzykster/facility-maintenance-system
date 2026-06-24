@@ -861,6 +861,16 @@ function docStatus(fleet, cfg) {
   else if (min <= w.yellow) { color = "#CA8A04"; label = `${min} ימים`; }
   return { d: min, color, label, which };
 }
+function docWarnColor(days, cfg) {
+  const w = cfg?.docWarn || DEFAULT_CONFIG.docWarn;
+  if (days == null) return "var(--muted)";
+  if (days < 0) return "#DC2626";
+  if (days <= w.red) return "#DC2626";
+  if (days <= w.orange) return "#EA580C";
+  if (days <= w.yellow) return "#CA8A04";
+  return "#16A34A";
+}
+const docDaysLabel = (days) => days == null ? "—" : days < 0 ? "פג תוקף" : `${days} י׳`;
 
 // Владелец заявки = тот, кто её открыл. Сверяем по id (имя ненадёжно при совпадениях).
 // На будущее: сюда же добавится логика «подчинённых менеджера», когда понадобится.
@@ -4351,11 +4361,12 @@ function FleetModule(p) {
       </select>
     </label>
   );
-  const renderRow = (f) => { const s = docStatus(f, config); const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
+  const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const col = docWarnColor(dl, config); return <span key={d.id} className="doc-chip"><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{d.label}</span><span className="doc-chip-days" style={{ color: col }}>{docDaysLabel(dl)}</span></span>; };
+  const renderRow = (f) => { const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
     <span className="ft-code">{f.code}</span>
-    <span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}{resolveHydraulics(f, config) && <span className="hyd-badge">תסקיר</span>}</span>
+    <span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span>
     <span className="ft-sup">{f.supplier || "—"}</span>
-    <span className="ft-doc"><span className="dot-lg" style={{ background: s.color }} />{s.label}{s.d != null && s.d <= 30 && s.d >= 0 && <span style={{ color: "#CA8A04", fontWeight: 700, marginInlineStart: 4 }}>{s.d}י׳</span>}</span>
+    <span className="ft-doc"><span className="doc-chip-stack">{DOC_DEFS.map((d) => docChip(f, d))}</span></span>
   </button>; };
   const STATUS_ORDER = ["מושבת", "מסמך פג תוקף", "מסמך קרוב לפקיעה", "תקין"];
   const groupKeyOf = (f) => { if (groupBy === "type") return unitTypeName(f, config) || "אחר"; if (groupBy === "supplier") return f.supplier || "ללא ספק"; if (unitBlock(f, tickets, config)) return "מושבת"; const s = docStatus(f, config); return s.d == null ? "תקין" : s.d < 0 ? "מסמך פג תוקף" : s.d <= 30 ? "מסמך קרוב לפקיעה" : "תקין"; };
@@ -4450,7 +4461,7 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, on
         <div className="health-rec"><Sparkles size={13} /> {h.rec}</div>
       </div>); })()}
       {canDocs && <><SectionTitle><FileText size={15} /> מסמכים</SectionTitle>
-      <div className="panel">{DOC_DEFS.map((d) => { const doc = f.docs?.[d.id]; const ts = dateToTs(doc?.date); const dl = ts ? daysLeft(ts) : null; const col = dl == null ? "var(--muted)" : dl < 0 ? "#DC2626" : dl <= config.docWarn.red ? "#DC2626" : dl <= config.docWarn.orange ? "#EA580C" : dl <= config.docWarn.yellow ? "#CA8A04" : "#16A34A"; return <div key={d.id} className="doc-view"><span className="dot-lg" style={{ background: col }} /><span className="doc-name">{d.label}</span><span className="doc-date" style={{ color: col }}>{doc?.date ? fmtDate(ts) : "—"}{dl != null && (dl < 0 ? " · פג" : ` · ${dl} י׳`)}</span>{doc?.link && <a href={doc.link} target="_blank" rel="noreferrer" className="doc-link" onClick={(e) => e.stopPropagation()}><ExternalLink size={15} /></a>}</div>; })}</div></>}
+      <div className="panel">{DOC_DEFS.map((d) => { const doc = f.docs?.[d.id]; const ts = dateToTs(doc?.date); const dl = ts ? daysLeft(ts) : null; const col = docWarnColor(dl, config); return <div key={d.id} className="doc-view"><span className="dot-lg" style={{ background: col }} /><span className="doc-name">{d.label}</span><span className="doc-date" style={{ color: col }}>{doc?.date ? fmtDate(ts) : "—"}{dl != null && (dl < 0 ? " · פג" : ` · ${dl} י׳`)}</span>{doc?.link && <a href={doc.link} target="_blank" rel="noreferrer" className="doc-link" onClick={(e) => e.stopPropagation()}><ExternalLink size={15} /></a>}</div>; })}</div></>}
       {unitNote(f, config) && <><SectionTitle>הערות</SectionTitle><div className="desc-box">{unitNote(f, config)}</div></>}
       {canTickets && <><SectionTitle><ClipboardCheck size={15} /> היסטוריית סיקורים ({inspections.length})</SectionTitle>
       {inspections.length === 0 ? <div className="note">טרם בוצעו סיקורים.</div> : <div className="timeline">{inspections.slice(0, 6).map((i) => <div className="tl-item" key={i.id}><div className="tl-dot" style={{ background: i.passed ? "#16A34A" : "#DC2626" }} /><div className="tl-body"><div className="tl-text">{i.passed ? "תקין" : `נמצאו ${i.problems.length} ממצאים`}</div><div className="tl-meta">{i.by} · {fmtDate(i.at)}</div></div></div>)}</div>}
@@ -6514,11 +6525,15 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .more-menu{position:absolute;top:calc(100% + 4px);inset-inline-end:0;z-index:31;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.16);padding:6px;min-width:190px;display:flex;flex-direction:column;gap:2px;}
 .more-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:right;background:none;border:none;padding:9px 11px;border-radius:8px;font-size:13px;color:var(--ink);cursor:pointer;}
 .more-menu button:hover{background:var(--surface-2);}
-.hyd-badge{font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;border-radius:5px;padding:1px 5px;}
 .ftable-head{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
 .ftable-row{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;}
 .ftable-row:hover{background:var(--surface-2);}
 .ftable-row.blocked{border-inline-start:4px solid var(--muted);background:linear-gradient(90deg,rgba(220,38,38,0.06),transparent 60%);}
+.doc-chip-stack{display:grid;grid-template-columns:1fr;gap:4px;align-items:start;}
+.doc-chip{display:grid;grid-template-columns:8px minmax(70px,1fr) minmax(42px,auto);align-items:center;gap:6px;line-height:1.2;font-size:11.5px;color:var(--muted);}
+.doc-chip-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+.doc-chip-name{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.doc-chip-days{font-weight:800;white-space:nowrap;text-align:left;}
 .blk-chip{display:inline-flex;align-items:center;gap:3px;color:#fff;font-size:10px;font-weight:800;border-radius:999px;padding:2px 8px;margin-inline-start:6px;letter-spacing:.2px;vertical-align:middle;}
 .blk-banner{display:flex;align-items:center;gap:11px;border:1.5px solid;border-radius:13px;padding:12px 14px;margin:10px 0 4px;}
 .blk-banner .blk-b-txt{display:flex;flex-direction:column;line-height:1.35;}

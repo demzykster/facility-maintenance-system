@@ -87,16 +87,35 @@ Then explain:
   - add recent approved PPE request events to the notifications panel;
   - extract only small pure PPE helpers to `src/ppeModel.js` with tests.
 
+### Open branch
+
+- Branch: `codex/fleet-document-chips`.
+- Status: in progress, not merged into `main` yet.
+- Scope:
+  - replace the single fleet-list `תסקיר` marker with compact document chips;
+  - show all four base document statuses per vehicle in the fleet list;
+  - reuse the same warning colors as the fleet detail card;
+  - update `docs/engineering-dialogue.md` Topic 7 with Codex's decision.
+- Out of scope:
+  - no document data migration;
+  - no changes to document filters or expiry business rules;
+  - no broad fleet module extraction.
+
 ### Next exact action
 
 1. Start from updated `main`.
-2. Continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
-3. Or pick the next contained audit fix from `docs/engineering-dialogue.md`:
-   - fleet document chips;
+2. Finish branch `codex/fleet-document-chips`:
+   - review diff;
+   - run `npm test -- --run`;
+   - run `npm run build`;
+   - browser smoke-check the fleet list;
+   - open PR and merge only if checks are green.
+3. After that, continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
+4. Or pick the next contained audit fix from `docs/engineering-dialogue.md`:
    - login desktop layout.
-4. For every UI gate or workflow change:
+5. For every UI gate or workflow change:
    - browser smoke-check every UI gate.
-5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
+6. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
@@ -142,6 +161,12 @@ Then explain:
   - after PPE cleanup, `npm run build`: passed.
   - browser smoke-check: admin login and PPE screen render; console had no errors.
   - browser limitation: current demo data has no pending PPE request, so the pending KPI live-click path was not visually exercised; helper logic is covered by unit tests.
+- Validation on branch `codex/fleet-document-chips` before PR:
+  - baseline `npm test -- --run`: 8 files passed, 20 tests passed.
+  - baseline `npm run build`: passed.
+  - after fleet document chips, `npm test -- --run`: 8 files passed, 20 tests passed.
+  - after fleet document chips, `npm run build`: passed.
+  - browser smoke-check: admin login and fleet list render; first visible fleet rows show 4 document chips each; console had no errors.
 
 ## Current Product Direction After This Item
 
