@@ -67,16 +67,21 @@ Then explain:
 - Active work ledger was refreshed after PR #32 through PR #33.
 - Active work ledger was synced with current remote branch state through PR #34.
 - Claude's engineering-dialogue audit file was imported into `main` through PR #36, without the unrelated `package-lock.json` diff from the Claude branch.
+- Backup/restore coverage work is in progress on branch `codex/backup-restore-all-collections`.
+  - Adds a tested backup collection contract.
+  - Includes tasks, meetings, PPE collections, and technician presence in backup/export.
+  - Leaves local browser-only keys out of backup.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Continue with small permission-gating PRs:
+2. Finish and merge `codex/backup-restore-all-collections`.
+3. Continue with small permission-gating PRs:
    - make `suppliers:view` read-only or require `suppliers:manage` for supplier mutations;
    - consider splitting `settings:manage` and future `settings:full` actions;
    - browser smoke-check every UI gate.
-3. Keep worker onboarding as the next related area, using `workerAccess: manage`.
-4. Update this ledger again after any merged PR, open branch, paused work, or handoff.
+4. Keep worker onboarding as the next related area, using `workerAccess: manage`.
+5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
@@ -92,6 +97,13 @@ Then explain:
 - If a session touches code after this, it must rerun:
   - `npm test -- --run`
   - `npm run build`
+- Validation on branch `codex/backup-restore-all-collections` before PR:
+  - baseline `npm test -- --run`: 6 files passed, 14 tests passed.
+  - baseline `npm run build`: passed.
+  - after backup contract change, `npm test -- --run`: 7 files passed, 16 tests passed.
+  - after backup contract change, `npm run build`: passed.
+  - browser smoke-check: admin login and Settings screen still render; export backup button click did not crash the app and console had no errors.
+  - browser limitation: the in-app browser did not surface the blob download event, so downloaded-file contents are covered by the unit test instead.
 
 ## Current Product Direction After This Item
 

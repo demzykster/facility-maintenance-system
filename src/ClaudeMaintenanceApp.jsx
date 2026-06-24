@@ -10,6 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
 import { USER_PERMISSION_MODULES, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 
 /* ============================================================
@@ -1360,15 +1361,20 @@ export default function App() {
       if (t.hasPhoto) { try { const p = await store.get(`photo:${t.id}`, true); if (p) photos[`photo:${t.id}`] = p; } catch {} }
       if (t.hasAfterPhoto) { try { const p = await store.get(`photo:after:${t.id}`, true); if (p) photos[`photo:after:${t.id}`] = p; } catch {} }
     }
-    return { __app: "maintenance-cmms", v: 1, exportedAt: Date.now(), config, users, fleet, tickets, pm, insp, templates, zones, rounds, complaints, absences, photos };
+    return buildBackupPayload({
+      config,
+      collections: {
+        users, fleet, tickets, pm, insp, templates, presence, zones, rounds, complaints, absences,
+        tasks, meetings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders,
+      },
+      photos,
+    });
   };
   const importBackup = async (data) => {
-    if (!data || data.__app !== "maintenance-cmms") throw new Error("invalid");
+    if (!data || data.__app !== BACKUP_APP_ID) throw new Error("invalid");
     if (data.config && typeof data.config === "object") await store.set("config:v1", JSON.stringify(data.config), true);
     const writeColl = async (pre, arr) => { for (const x of (Array.isArray(arr) ? arr : [])) if (x && x.id) await store.set(`${pre}${x.id}`, JSON.stringify(x), true); };
-    await writeColl("user:", data.users); await writeColl("fleet:", data.fleet); await writeColl("ticket:", data.tickets);
-    await writeColl("pm:", data.pm); await writeColl("insp:", data.insp); await writeColl("itpl:", data.templates);
-    await writeColl("czone:", data.zones); await writeColl("cround:", data.rounds); await writeColl("ccomplaint:", data.complaints); await writeColl("cabsence:", data.absences);
+    for (const { key, prefix } of BACKUP_COLLECTIONS) await writeColl(prefix, data[key]);
     if (data.photos && typeof data.photos === "object") { for (const [k, v] of Object.entries(data.photos)) { if (typeof v === "string" && (k.startsWith("photo:"))) { try { await store.set(k, v, true); } catch {} } } }
     await reloadAll();
   };
