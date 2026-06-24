@@ -86,36 +86,22 @@ Then explain:
   - clarify pending PPE request status as "ממתינה לאישור מנהל";
   - add recent approved PPE request events to the notifications panel;
   - extract only small pure PPE helpers to `src/ppeModel.js` with tests.
-
-### Open branch
-
-- Branch: `codex/fleet-document-chips`.
-- Status: in progress, not merged into `main` yet.
-- Scope:
+- Active work ledger was refreshed after PR #42 through PR #43.
+- Fleet document chips were fixed through PR #44.
   - replace the single fleet-list `תסקיר` marker with compact document chips;
   - show all four base document statuses per vehicle in the fleet list;
   - reuse the same warning colors as the fleet detail card;
   - update `docs/engineering-dialogue.md` Topic 7 with Codex's decision.
-- Out of scope:
-  - no document data migration;
-  - no changes to document filters or expiry business rules;
-  - no broad fleet module extraction.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Finish branch `codex/fleet-document-chips`:
-   - review diff;
-   - run `npm test -- --run`;
-   - run `npm run build`;
-   - browser smoke-check the fleet list;
-   - open PR and merge only if checks are green.
-3. After that, continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
-4. Or pick the next contained audit fix from `docs/engineering-dialogue.md`:
+2. Continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
+3. Or pick the next contained audit fix from `docs/engineering-dialogue.md`:
    - login desktop layout.
-5. For every UI gate or workflow change:
+4. For every UI gate or workflow change:
    - browser smoke-check every UI gate.
-6. Update this ledger again after any merged PR, open branch, paused work, or handoff.
+5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
