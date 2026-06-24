@@ -99,13 +99,33 @@ Then explain:
   - add a restrained desktop breakpoint for login-card width and padding;
   - update `docs/engineering-dialogue.md` Topic 2 with Codex's decision.
 
+### Open branch
+
+- Branch: `codex/seed-worker-activation-link`.
+- Status: in progress, not merged into `main` yet.
+- Scope:
+  - extract small worker-access helper logic to `src/workerAccessModel.js`;
+  - seed an activation token automatically for new worker/cleaner forms when `workerAccess:manage` is available;
+  - keep existing rule that activation links can only be copied after the worker record is saved;
+  - add unit coverage for activation seeding.
+- Out of scope:
+  - no backend/Auth/RLS work;
+  - no server-side activation tokens;
+  - no smart login redesign.
+
 ### Next exact action
 
 1. Start from updated `main`.
-2. Continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
-3. For every UI gate or workflow change:
+2. Finish branch `codex/seed-worker-activation-link`:
+   - review diff;
+   - run `npm test -- --run`;
+   - run `npm run build`;
+   - browser smoke-check worker form under admin;
+   - open PR and merge only if checks are green.
+3. After that, continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
+4. For every UI gate or workflow change:
    - browser smoke-check every UI gate.
-4. Update this ledger again after any merged PR, open branch, paused work, or handoff.
+5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
@@ -163,6 +183,12 @@ Then explain:
   - after login layout fix, `npm test -- --run`: 8 files passed, 20 tests passed.
   - after login layout fix, `npm run build`: passed.
   - browser smoke-check: desktop login card is 500px wide with static theme button inside the card; mobile 390px viewport has no horizontal overflow; console had no errors.
+- Validation on branch `codex/seed-worker-activation-link` before PR:
+  - baseline `npm test -- --run`: 8 files passed, 20 tests passed.
+  - baseline `npm run build`: passed.
+  - after activation seed change, `npm test -- --run`: 8 files passed, 21 tests passed.
+  - after activation seed change, `npm run build`: passed.
+  - browser smoke-check: admin user form switches to worker role and immediately shows pending activation; temporary-code field is not shown; console had no errors.
 
 ## Current Product Direction After This Item
 

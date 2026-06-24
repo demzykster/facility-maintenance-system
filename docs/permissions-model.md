@@ -104,6 +104,8 @@ Preferred future flow:
 
 Editing a worker profile without `workerAccess: manage` must preserve existing login fields (`pin`, `activationToken`, and `activationStatus`) instead of changing or clearing them. Worker profile management and worker login management are related but separate permissions.
 
+Current demo implementation seeds an activation token automatically for new worker/cleaner forms when the editor has `workerAccess: manage`. The link is still copied only after the worker record is saved, because unsaved records do not exist in storage yet.
+
 The worker active/inactive state should be handled by lifecycle actions such as "worker left" and restore-from-archive, not by a generic "active user" checkbox in the worker form.
 
 ## UI Direction
