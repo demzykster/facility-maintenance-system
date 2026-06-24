@@ -1,24 +1,5 @@
 import { describe, expect, it } from "vitest";
-
-const PERM_LEVELS = ["none", "view", "request", "manage", "full"];
-
-function permRank(level) {
-  const index = PERM_LEVELS.indexOf(level);
-  return index < 0 ? 0 : index;
-}
-
-function normalizePerms(user) {
-  const perms = { ...(user?.perms || {}) };
-  if (!perms.fleetDocs && user?.fleetDocs) perms.fleetDocs = "view";
-  if (!perms.fleetTickets && user?.fleetTickets) perms.fleetTickets = "view";
-  return perms;
-}
-
-function permLevel(user, module) {
-  if (!user) return "none";
-  if (user.role === "admin") return "full";
-  return normalizePerms(user)[module] || "none";
-}
+import { normalizePerms, permLevel, permRank } from "../src/permissionModel.js";
 
 describe("permission migration bridge", () => {
   it("maps legacy fleet flags into module permissions", () => {

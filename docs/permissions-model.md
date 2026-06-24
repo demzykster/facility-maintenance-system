@@ -108,6 +108,12 @@ The worker active/inactive state should be handled by lifecycle actions such as 
 
 The user form should eventually show one permissions editor instead of separate scattered permission toggles.
 
+Current implementation note:
+
+- Permission levels, role defaults, legacy migration, and the user permission editor module list live in `src/permissionModel.js`.
+- `src/ClaudeMaintenanceApp.jsx` imports that model instead of defining permission modules inline.
+- `tests/permissionsMigration.test.js` and `tests/permissionEditorModules.test.js` cover the current migration bridge and editor module contract.
+
 Possible grouping:
 
 ```text
@@ -122,4 +128,3 @@ For each module, show only meaningful levels.
 ## Backend Note
 
 In the current frontend demo, permissions are UI/business-logic checks only. In production, the same permission model must be enforced server-side with Auth/RLS/Audit.
-

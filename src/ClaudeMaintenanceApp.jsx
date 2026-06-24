@@ -10,6 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { USER_PERMISSION_MODULES, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -453,17 +454,6 @@ const driverOf = (f, cat) => unitDrivers(f)[cat] || null;
 const driverActive = (d) => !!(d && (!d.status || d.status === "active"));
 const driverPending = (d) => !!(d && (d.status === "pending_add" || d.status === "pending_move"));
 const driverOwned = (d, session) => !!(d && session && (session.role === "admin" || d.addedByUid === session.id));
-const PERM_LEVELS = ["none", "view", "request", "manage", "full"];
-const permRank = (l) => { const i = PERM_LEVELS.indexOf(l); return i < 0 ? 0 : i; };
-const ROLE_PERM_DEFAULT = { admin: { ppe: "full" }, user: { ppe: "view" }, tech: { ppe: "view" }, worker: { ppe: "none" }, cleaner: { ppe: "none" } };
-const normalizePerms = (u) => {
-  const p = { ...(u?.perms || {}) };
-  if (!p.fleetDocs && u?.fleetDocs) p.fleetDocs = "view";
-  if (!p.fleetTickets && u?.fleetTickets) p.fleetTickets = "view";
-  return p;
-};
-const cleanPerms = (p) => Object.fromEntries(Object.entries(p || {}).filter(([, v]) => v && v !== "none"));
-const permLevel = (session, mod) => { if (!session) return "none"; if (session.role === "admin") return "full"; const p = normalizePerms(session)[mod]; if (p) return p; const d = ROLE_PERM_DEFAULT[session.role]; return (d && d[mod]) || "none"; };
 const canFleetDocs = (session) => permRank(permLevel(session, "fleetDocs")) >= permRank("view");
 const canFleetTickets = (session) => permRank(permLevel(session, "fleetTickets")) >= permRank("view");
 const canManageWorkerAccess = (session) => permRank(permLevel(session, "workerAccess")) >= permRank("manage");
@@ -5495,10 +5485,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
           <div style={{ marginTop: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>הרשאות אישיות</span>
-            <PermSelect mod="fleetDocs" label="מסמכי ותוקף כלי שינוע" levels={["none", "view"]} hint="צפייה במסמכים ותאריכי תוקף של כלי המחלקות שלו." />
-            <PermSelect mod="fleetTickets" label="היסטוריית קריאות על כלים" levels={["none", "view"]} hint="צפייה בקריאות עבר על כלי המחלקות שלו." />
-            <PermSelect mod="ppe" label="ביגוד עובדים" levels={["none", "request", "manage", "full"]} hint="בקשה — שליחת בקשות בלבד. ניהול — טיפול בבקשות. מלא — קטלוג, ניפוק, קיזוז ודוחות. גישת HR ניתנת דרך הרשאות, לא דרך תפקיד נפרד." />
-            <PermSelect mod="workerAccess" label="הפעלת כניסה לעובדים" levels={["none", "manage"]} hint="ניהול עתידי של קישור הפעלה ואיפוס קוד אישי לעובדי המחלקות שלו." />
+            {USER_PERMISSION_MODULES.map((m) => <PermSelect key={m.mod} {...m} />)}
             <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
           </div></div>)}
       {role === "user" && zones && (zones.length === 0
