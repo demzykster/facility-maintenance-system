@@ -112,7 +112,8 @@ Current implementation note:
 
 - Permission levels, role defaults, legacy migration, and the user permission editor module list live in `src/permissionModel.js`.
 - `src/ClaudeMaintenanceApp.jsx` imports that model instead of defining permission modules inline.
-- `tests/permissionsMigration.test.js` and `tests/permissionEditorModules.test.js` cover the current migration bridge and editor module contract.
+- UI gates should use `hasPermission`, `canView`, `canRequest`, `canManage`, or `canFull` from `src/permissionModel.js`, not ad hoc level comparisons.
+- `tests/permissionsMigration.test.js`, `tests/permissionEditorModules.test.js`, and `tests/permissionCapabilities.test.js` cover the current migration bridge, editor module contract, and capability helpers.
 
 Possible grouping:
 
