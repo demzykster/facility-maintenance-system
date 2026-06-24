@@ -41,18 +41,43 @@ npm test -- --run
 npm run build
 ```
 
+## Mandatory Sync Protocol
+
+Before answering "what is left?", "is everything OK?", or starting work, every Codex/Claude session must synchronize through GitHub:
+
+```bash
+git fetch origin --prune
+git status --short --branch
+git log --oneline --decorate -10 origin/main
+git branch -r
+```
+
+Also check open PRs if the session/tool can access GitHub PRs.
+
+Important lesson: no open PR does not mean no open work. A pushed branch without PR is still active work and must be inspected.
+
+If `main`, remote branches, PRs, and docs disagree, start with:
+
+```text
+ПРОБЛЕМА:
+```
+
+Then explain what is out of sync, why it is risky, and the safe options.
+
 ## Current Open Work
 
-There is a cleanup branch already pushed to GitHub:
+Repository cleanup was merged into `main` through PR #16. A later PR #17 also changed PPE permission copy.
+
+There is still a follow-up branch pushed to GitHub:
 
 - Branch: `codex/repo-cleanup-docs`
-- Commit: `21be078 chore: clean repository root`
+- Latest branch commit before this update: `8796e68 docs: clarify autonomy guardrails`
 - Purpose:
-  - move historical/reference files from root into `docs/archive/`;
-  - move local helper launch files into `tools/`;
-  - update `docs/current-status.md` with repository hygiene notes.
+  - clarify that autonomy never overrides the agreed strategy;
+  - require `ПРОБЛЕМА:` when work conflicts with strategy or is blocked;
+  - add mandatory sync checks so another session sees remote branches, not only `main` and open PRs.
 
-Validation already run on this branch:
+Validation already run earlier on this branch before the docs-only follow-up:
 
 - `npm test`: 4 files passed, 8 tests passed.
 - `npm run build`: passed.
@@ -62,8 +87,8 @@ Next action:
 
 1. Check whether a PR from `codex/repo-cleanup-docs` into `main` already exists.
 2. If not, open that PR.
-3. Review that only file moves, `README.md`, and `docs/current-status.md`/handoff docs changed.
-4. Merge only if the diff is clean and checks pass.
+3. Review that the diff is only documentation / repository hygiene.
+4. Merge only if the diff is clean.
 5. After merge, sync local `main`.
 
 PR creation link:
@@ -150,12 +175,15 @@ Clone/sync the repo, install dependencies, and read:
 
 Important current state:
 - main is the source of truth.
-- There is a pushed cleanup branch: codex/repo-cleanup-docs, commit 21be078.
-- That branch moves archive/reference files out of root and updates handoff/status docs.
-- If no PR exists, open PR codex/repo-cleanup-docs -> main and review before merge.
-- After cleanup PR is handled, continue small audit/permissions/onboarding work.
+- PR #16 already merged repository cleanup/handoff into main.
+- PR #17 already merged PPE permission label copy into main.
+- There may still be a pushed follow-up branch: codex/repo-cleanup-docs.
+- Do not assume "no open PR" means no open work. Check remote branches.
+- If codex/repo-cleanup-docs exists and is not merged, open/review PR codex/repo-cleanup-docs -> main.
+- After sync/handoff PRs are handled, continue small audit/permissions/onboarding work.
 
 Rules:
+- First run git fetch origin --prune and inspect origin/main, open PRs, and remote branches.
 - Do not commit directly to main unless explicitly told.
 - Use small branches/PRs.
 - Autonomy does not allow leaving the current strategy. If blocked, start with ПРОБЛЕМА: and explain the safe options.

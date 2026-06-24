@@ -31,6 +31,21 @@ This project can be worked on by the owner, Codex, and Claude. GitHub is the sha
 - Changes should be made through branches and commits.
 - After GitHub baseline, do not transfer whole application files by chat unless explicitly needed for recovery.
 
+## Session Sync Protocol
+
+Every Codex or Claude session must synchronize through GitHub before answering project-status questions or starting work. Do not rely on chat memory.
+
+Required checks:
+
+- Fetch/prune remote state.
+- Check current branch and local working tree.
+- Check latest `origin/main`.
+- Check open PRs if the tool/session can access them.
+- Check remote branches, not only open PRs. A pushed branch without PR is still active work.
+- Read `docs/current-status.md`, `docs/next-steps.md`, `docs/collaboration-model.md`, and `docs/handoff-for-next-codex.md`.
+
+If `main`, open PRs, remote branches, or docs disagree, treat that as a synchronization problem before doing product work.
+
 ## Rules
 
 - Work from the latest `main` unless using a feature branch.
