@@ -6000,7 +6000,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
       <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{showSubAssignee && <> · <Wrench size={11} /> {t.assignee}</>}</div>
-      <SlaBar t={t} />
+      {isOpen(t) && <SlaBar t={t} />}
       {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div className="tcard-owner" style={{ color: b.color }}><b.Icon size={12} /> שלב: {b.label} · {fmtDur(Date.now() - since)}</div>; })()}
       <div className="tcard-badges">
         <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>
