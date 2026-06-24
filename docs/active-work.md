@@ -67,17 +67,19 @@ Then explain:
 - Active work ledger was refreshed after PR #32 through PR #33.
 - Active work ledger was synced with current remote branch state through PR #34.
 - Claude's engineering-dialogue audit file was imported into `main` through PR #36, without the unrelated `package-lock.json` diff from the Claude branch.
-- Backup/restore coverage work is in progress on branch `codex/backup-restore-all-collections`.
+- Backup/restore coverage was fixed through PR #37.
   - Adds a tested backup collection contract.
   - Includes tasks, meetings, PPE collections, and technician presence in backup/export.
   - Leaves local browser-only keys out of backup.
+- Supplier read-only/manage split is in progress on branch `codex/suppliers-manage-permission`.
+  - `suppliers:view` keeps the supplier screen visible.
+  - `suppliers:manage` is required for adding, renaming, editing, and deleting supplier records.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Finish and merge `codex/backup-restore-all-collections`.
+2. Finish and merge `codex/suppliers-manage-permission`.
 3. Continue with small permission-gating PRs:
-   - make `suppliers:view` read-only or require `suppliers:manage` for supplier mutations;
    - consider splitting `settings:manage` and future `settings:full` actions;
    - browser smoke-check every UI gate.
 4. Keep worker onboarding as the next related area, using `workerAccess: manage`.
@@ -104,6 +106,12 @@ Then explain:
   - after backup contract change, `npm run build`: passed.
   - browser smoke-check: admin login and Settings screen still render; export backup button click did not crash the app and console had no errors.
   - browser limitation: the in-app browser did not surface the blob download event, so downloaded-file contents are covered by the unit test instead.
+- Validation on branch `codex/suppliers-manage-permission` before PR:
+  - baseline `npm test -- --run`: 7 files passed, 16 tests passed.
+  - baseline `npm run build`: passed.
+  - after suppliers permission split, `npm test -- --run`: 7 files passed, 16 tests passed.
+  - after suppliers permission split, `npm run build`: passed.
+  - browser smoke-check: admin login, supplier list, and supplier detail still render; admin add/save/delete controls are visible and console had no errors.
 
 ## Current Product Direction After This Item
 

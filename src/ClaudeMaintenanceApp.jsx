@@ -463,6 +463,7 @@ const canManageUsers = (session) => canManage(session, "users");
 const canRequestPpe = (session) => canRequest(session, "ppe");
 const canViewAnalytics = (session) => canView(session, "analytics");
 const canViewSuppliers = (session) => canView(session, "suppliers");
+const canManageSuppliers = (session) => canManage(session, "suppliers");
 const canManageSettings = (session) => canManage(session, "settings");
 const canViewAudit = (session) => canView(session, "audit");
 const workerLoginStateText = (u) => {
@@ -4062,6 +4063,7 @@ function AdminApp(p) {
   const mayManageUsers = canManageUsers(session);
   const mayViewAnalytics = canViewAnalytics(session);
   const mayViewSuppliers = canViewSuppliers(session);
+  const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
   const mayViewAudit = canViewAudit(session);
   const blockedTab = {
@@ -4102,7 +4104,7 @@ function AdminApp(p) {
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
           {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
           {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
-          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} />}
+          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />}
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
@@ -5198,7 +5200,7 @@ function UserTree({ list, departments, onPick, expandAll, shifts }) {
     {unassigned.length > 0 && <Group k="_un" title="לא משויך" count={unassigned.length} color="var(--muted)"><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{unassigned.map((u) => <PersonRow key={u.id} u={u} />)}</div></Group>}
   </div>);
 }
-function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete }) {
+function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete, canManage }) {
   const meta = supMeta(config, name);
   const [tab, setTab] = useState("details");
   const [ind, setInd] = useState(meta.industries || []);
@@ -5209,10 +5211,10 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
   const [saved, setSaved] = useState(false);
   const [nm, setNm] = useState(name);
   const [cd, setCd] = useState(false);
-  const toggleInd = (id) => setInd((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
-  const addContact = () => setContacts((c) => [...c, { id: uid(), name: "", phone: "", email: "", role: "" }]);
-  const updContact = (i, patch) => setContacts((c) => c.map((x, j) => j === i ? { ...x, ...patch } : x));
-  const delContact = (i) => setContacts((c) => c.filter((_, j) => j !== i));
+  const toggleInd = (id) => canManage && setInd((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
+  const addContact = () => canManage && setContacts((c) => [...c, { id: uid(), name: "", phone: "", email: "", role: "" }]);
+  const updContact = (i, patch) => canManage && setContacts((c) => c.map((x, j) => j === i ? { ...x, ...patch } : x));
+  const delContact = (i) => canManage && setContacts((c) => c.filter((_, j) => j !== i));
   const saveMeta = () => { const m = { ...(config.supplierMeta || {}) }; m[name] = { industries: ind, hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) }; saveConfig({ ...config, supplierMeta: m }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
   const relOrders = (orders || []).filter((o) => o.supplier === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const relFleet = (fleet || []).filter((f) => f.supplier === name);
@@ -5224,16 +5226,16 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 10px" }}>{ind.length === 0 ? <span className="hint">ללא תחום</span> : ind.map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id)}</span>)}</div>
     <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 14, flexWrap: "wrap" }}><Tab id="details" label="פרטים" /><Tab id="activity" label="הזמנות וכלים" n={relOrders.length + relFleet.length} /><Tab id="invoices" label="חשבוניות" /></div>
     {tab === "details" && <div>
-      <label className="field"><span>שם הספק</span><div style={{ display: "flex", gap: 8 }}><input value={nm} onChange={(e) => setNm(e.target.value)} style={{ flex: 1 }} />{nm.trim() && nm.trim() !== name && onRename && <button className="btn-ghost sm" onClick={() => onRename(name, nm)}>שנה שם</button>}</div></label>
-      <div className="field"><span>תחום / מודול</span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>{SUP_INDUSTRIES.map((x) => <button key={x.id} type="button" onClick={() => toggleInd(x.id)} className={"chip" + (ind.includes(x.id) ? " on" : "")}>{x.label}</button>)}</div></div>
-      <label className="field"><span>ח.פ. / מספר עוסק</span><input value={hp} onChange={(e) => setHp(e.target.value)} placeholder="לדוגמה: 514123456" /></label>
-      <label className="field"><span>כתובת</span><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="רחוב, עיר" /></label>
-      <div className="field"><div className="row-between"><span>אנשי קשר</span><button className="btn-ghost sm" onClick={addContact}><Plus size={14} /> איש קשר</button></div>
-        {contacts.length === 0 ? <div className="hint">אפשר להוסיף שם וטלפון בלבד (פרטי), או מספר אנשי קשר עם תפקיד (חברה).</div> : <div className="task-list">{contacts.map((c, i) => <div key={c.id || i} className="task-row" style={{ cursor: "default" }}><div className="task-row-main" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><input value={c.name} onChange={(e) => updContact(i, { name: e.target.value })} placeholder="שם" style={{ flex: "1 1 110px" }} /><input value={c.phone} onChange={(e) => updContact(i, { phone: e.target.value })} placeholder="טלפון" style={{ flex: "1 1 110px" }} /><input value={c.email || ""} onChange={(e) => updContact(i, { email: e.target.value })} placeholder="אימייל (לא חובה)" style={{ flex: "1 1 110px" }} /><input value={c.role} onChange={(e) => updContact(i, { role: e.target.value })} placeholder="תפקיד (לא חובה)" style={{ flex: "1 1 110px" }} /></div><div className="task-row-side"><button className="btn-ghost sm" onClick={() => delContact(i)}><X size={14} /></button></div></div>)}</div>}
+      <label className="field"><span>שם הספק</span><div style={{ display: "flex", gap: 8 }}><input value={nm} onChange={(e) => setNm(e.target.value)} readOnly={!canManage} style={{ flex: 1 }} />{canManage && nm.trim() && nm.trim() !== name && onRename && <button className="btn-ghost sm" onClick={() => onRename(name, nm)}>שנה שם</button>}</div></label>
+      <div className="field"><span>תחום / מודול</span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>{SUP_INDUSTRIES.map((x) => <button key={x.id} type="button" onClick={() => toggleInd(x.id)} disabled={!canManage} className={"chip" + (ind.includes(x.id) ? " on" : "")}>{x.label}</button>)}</div></div>
+      <label className="field"><span>ח.פ. / מספר עוסק</span><input value={hp} onChange={(e) => setHp(e.target.value)} readOnly={!canManage} placeholder="לדוגמה: 514123456" /></label>
+      <label className="field"><span>כתובת</span><input value={address} onChange={(e) => setAddress(e.target.value)} readOnly={!canManage} placeholder="רחוב, עיר" /></label>
+      <div className="field"><div className="row-between"><span>אנשי קשר</span>{canManage && <button className="btn-ghost sm" onClick={addContact}><Plus size={14} /> איש קשר</button>}</div>
+        {contacts.length === 0 ? <div className="hint">{canManage ? "אפשר להוסיף שם וטלפון בלבד (פרטי), או מספר אנשי קשר עם תפקיד (חברה)." : "אין אנשי קשר שמורים."}</div> : <div className="task-list">{contacts.map((c, i) => <div key={c.id || i} className="task-row" style={{ cursor: "default" }}><div className="task-row-main" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><input value={c.name} onChange={(e) => updContact(i, { name: e.target.value })} readOnly={!canManage} placeholder="שם" style={{ flex: "1 1 110px" }} /><input value={c.phone} onChange={(e) => updContact(i, { phone: e.target.value })} readOnly={!canManage} placeholder="טלפון" style={{ flex: "1 1 110px" }} /><input value={c.email || ""} onChange={(e) => updContact(i, { email: e.target.value })} readOnly={!canManage} placeholder="אימייל (לא חובה)" style={{ flex: "1 1 110px" }} /><input value={c.role} onChange={(e) => updContact(i, { role: e.target.value })} readOnly={!canManage} placeholder="תפקיד (לא חובה)" style={{ flex: "1 1 110px" }} /></div>{canManage && <div className="task-row-side"><button className="btn-ghost sm" onClick={() => delContact(i)}><X size={14} /></button></div>}</div>)}</div>}
       </div>
-      <label className="field"><span>הערות</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></label>
-      <button className="btn-primary full" onClick={saveMeta}>{saved ? "נשמר ✓" : "שמירה"}</button>
-      {onDelete && (!cd ? <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C" }} onClick={() => setCd(true)}><Trash2 size={14} /> מחיקת ספק</button> : <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C", fontWeight: 800 }} onClick={() => onDelete(name)}>לחצו שוב לאישור מחיקה</button>)}
+      <label className="field"><span>הערות</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} readOnly={!canManage} rows={2} /></label>
+      {canManage && <button className="btn-primary full" onClick={saveMeta}>{saved ? "נשמר ✓" : "שמירה"}</button>}
+      {canManage && onDelete && (!cd ? <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C" }} onClick={() => setCd(true)}><Trash2 size={14} /> מחיקת ספק</button> : <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C", fontWeight: 800 }} onClick={() => onDelete(name)}>לחצו שוב לאישור מחיקה</button>)}
     </div>}
     {tab === "activity" && <div>
       <SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle>
@@ -5245,7 +5247,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
   </div>);
 }
 
-function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder }) {
+function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, canManage }) {
   const [sel, setSel] = useState(null);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState("");
@@ -5253,11 +5255,11 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
   const renameSup = async (oldN, newN) => { newN = (newN || "").trim(); if (!newN || newN === oldN) return; const names2 = names.map((x) => x === oldN ? newN : x); const meta2 = { ...(config.supplierMeta || {}) }; if (meta2[oldN]) { meta2[newN] = meta2[oldN]; delete meta2[oldN]; } saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }); for (const f of (fleet || [])) if (f.supplier === oldN && saveFleet) await saveFleet({ ...f, supplier: newN }); for (const u of (users || [])) if (u.supplier === oldN && saveUser) await saveUser({ ...u, supplier: newN }); for (const o of (orders || [])) if (o.supplier === oldN && savePpeOrder) await savePpeOrder({ ...o, supplier: newN }); setSel(newN); };
   const delSup = (n) => { const names2 = names.filter((x) => x !== n); const meta2 = { ...(config.supplierMeta || {}) }; delete meta2[n]; saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }); setSel(null); };
   const add = () => { const n = adding.trim(); if (!n) return; if (!names.includes(n)) saveConfig({ ...config, suppliers: [...names, n] }); setAdding(""); setSel(n); };
-  if (sel && names.includes(sel)) return <div style={{ padding: 4 }}><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} onBack={() => setSel(null)} onRename={renameSup} onDelete={delSup} /></div>;
+  if (sel && names.includes(sel)) return <div style={{ padding: 4 }}><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} canManage={canManage} /></div>;
   const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
   return (<div style={{ padding: 4 }}>
     <SectionTitle><Building2 size={16} /> ספקים / קבלנים</SectionTitle>
-    <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש ספק" style={{ flex: "1 1 160px" }} /><input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="ספק חדש" style={{ flex: "1 1 140px" }} /><button className="btn-primary sm" onClick={add}><Plus size={15} /> הוסף</button></div>
+    <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש ספק" style={{ flex: "1 1 160px" }} />{canManage && <><input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="ספק חדש" style={{ flex: "1 1 140px" }} /><button className="btn-primary sm" onClick={add}><Plus size={15} /> הוסף</button></>}</div>
     {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>{shown.map((n) => { const m = supMeta(config, n); const oN = (orders || []).filter((o) => o.supplier === n).length; const fN = (fleet || []).filter((f) => f.supplier === n).length; return <button key={n} onClick={() => setSel(n)} style={{ textAlign: "start", border: "1px solid var(--border)", borderRadius: 12, padding: 14, background: "var(--surface)", cursor: "pointer" }}><div style={{ fontWeight: 800, marginBottom: 6 }}>{n}</div><div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8, minHeight: 20 }}>{(m.industries || []).length === 0 ? <span className="hint">ללא תחום</span> : (m.industries || []).map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id)}</span>)}</div><div className="hint">{oN} הזמנות · {fN} כלים{m.contacts && m.contacts.length ? ` · ${m.contacts.length} אנשי קשר` : ""}</div></button>; })}</div>}
   </div>);
 }

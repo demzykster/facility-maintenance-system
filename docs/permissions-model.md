@@ -119,6 +119,7 @@ Current implementation note:
 - Managers default to `ppe: request`, so they can submit clothing/PPE requests for their scope unless explicitly set to `ppe: none`.
 - The permission editor also includes management modules `analytics`, `suppliers`, `settings`, and `audit`; screen gates should be added against these module keys instead of new one-off flags.
 - Admin navigation gates management screens with `analytics:view`, `suppliers:view`, `settings:manage`, and `audit:view`; admin role still receives full access through role defaults.
+- Supplier screen access is split: `suppliers:view` can read the supplier list/details, while `suppliers:manage` is required for adding, renaming, editing, or deleting supplier records.
 
 Possible grouping:
 
