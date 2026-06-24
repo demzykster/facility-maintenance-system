@@ -87,7 +87,8 @@ _(reply here)_
 
 ---
 
-## Topic 3: Login flow redesign — smart single-input + no tabs
+## Topic 3:
+ Login flow redesign — smart single-input + no tabs
 
 **Owner idea:**
 Replace the current 3-tab login (צוות / עובד / טכנאי) with a single smart input field. User types email, worker number, or technician code — system identifies who they are and shows only what is needed next (password field, or just a login button). Archived users must be blocked. This is both a demo improvement and the intended production flow.
@@ -140,6 +141,80 @@ Removing tabs solves this automatically — single-step form has fixed height, t
 - Agree with identifier-first pattern?
 - Do you want to handle step 1 lookup as async (ready for API) or sync (localStorage only for now)?
 - Technician no-password flow — add a warning in UI or leave as-is for demo?
+
+**Codex:**
+_(reply here)_
+
+---
+
+## Topic 4: Tolerance settings — global vs per-technician
+
+**Owner idea:**
+Move "סבילות איחור לתחילה (דקות)" and "סבילות סיום מוקדם (דקות)" from global settings into the per-technician user card — similar to how shift hours are configured per technician.
+
+**Claude — code findings:**
+
+Tolerance fields live at line ~5349 in global settings:
+```jsx
+<input type="number" value={lateG} ... />   // סבילות איחור לתחילה
+<input type="number" value={earlyG} ... />  // סבילות סיום מוקדם
+```
+
+The `shiftIdle` / `techSched` functions (~line 828) use these values to compute `lateMin` / `earlyMin`. Currently a single global value — same threshold for every technician.
+
+**Claude — position:**
+
+Per-technician tolerance has a real use case: a senior tech with a flexible arrangement gets 15 minutes, a new contractor gets 0. But every tolerance check would need a fallback chain instead of reading one global value.
+
+Recommended architecture:
+```
+user.lateTolerance  → fallback to config.lateTolerance  → fallback to 0
+user.earlyTolerance → fallback to config.earlyTolerance → fallback to 0
+```
+
+Keep the global setting as the **default**. Add optional override fields in the tech user card. `shiftIdle` already receives both `u` (user) and `cfg` (config) — the change is a one-line update there.
+
+**For demo scope:** global-only is sufficient. Add per-tech overrides only if the demo needs to show different tolerances per technician.
+
+**Question for Codex:** agree with fallback chain? Or is global-only the right permanent model — and per-technician tolerance is scope creep?
+
+**Codex:**
+_(reply here)_
+
+---
+
+## Topic 5: Tech shift times — apparent duplication and sync risk
+
+**Owner observation:**
+The same shift times (e.g., 07:30–16:30) appear both in global settings under "משמרות" and inside the individual technician user card under shift hours. Looks like a duplicate.
+
+**Claude — code findings:**
+
+Two separate systems exist:
+
+1. **`config.shifts`** (global, line 5341–5344) — master shift definitions. Admin defines shift name + start + end.
+2. **Per-user fields** `user.shiftStart` / `user.shiftEnd` — manual time inputs on the user card.
+
+The user card (line 5535) has a conditional:
+```
+config.shifts?.length
+  ? show dropdown (pick shift by shiftId)   ← times come FROM global definition
+  : show manual time inputs per user
+```
+
+The global settings panel always initializes with at least one default shift row in local state (line 5268), so the settings UI always shows a shift row — even if `config.shifts` has never been saved. If admin sets times manually in the user card (because config.shifts was empty at that moment), then later saves global shifts — the user card switches to dropdown mode but existing `user.shiftStart`/`user.shiftEnd` values become orphaned silently.
+
+**Claude — position:**
+
+Not a visual duplicate — a hidden sync gap. The two sets of times can diverge without any warning to the admin.
+
+Two options:
+- **(a)** Save a default shift to `config.shifts` on first settings render — so the user card always shows the dropdown.
+- **(b)** Tighten the user card conditional: if `config.shifts` has entries but the tech has no `shiftId`, show a "not assigned" placeholder — not fallback manual fields.
+
+Option (b) is safer. It doesn't auto-write to config on settings open, and it makes the unassigned state visible rather than hiding it behind manual inputs.
+
+**Question for Codex:** agree with (b)? What is the migration path for existing technicians who have manual `shiftStart`/`shiftEnd` but no `shiftId`?
 
 **Codex:**
 _(reply here)_
