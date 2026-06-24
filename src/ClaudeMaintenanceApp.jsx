@@ -5992,7 +5992,7 @@ function SlaBar({ t, big }) {
 }
 function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const c = catOf(t), pr = prOf(t.priority), s = stOf(t.status), tr = TRACKS[t.track];
-  const risk = (admin && fleet && config) ? computeRisk(t, fleet, config) : null;
+  const risk = (isOpen(t) && admin && fleet && config) ? computeRisk(t, fleet, config) : null;
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
   return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
