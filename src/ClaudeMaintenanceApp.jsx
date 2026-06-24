@@ -11,7 +11,7 @@ import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
-import { USER_PERMISSION_MODULES, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
+import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -465,6 +465,7 @@ const canViewAnalytics = (session) => canView(session, "analytics");
 const canViewSuppliers = (session) => canView(session, "suppliers");
 const canManageSuppliers = (session) => canManage(session, "suppliers");
 const canManageSettings = (session) => canManage(session, "settings");
+const canFullSettings = (session) => canFull(session, "settings");
 const canViewAudit = (session) => canView(session, "audit");
 const workerLoginStateText = (u) => {
   if (!u || (u.role !== "worker" && u.role !== "cleaner")) return "";
@@ -5266,6 +5267,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
 
 function SettingsPanel(p) {
   const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, loadDemo, clearDemo, getBackup, importBackup } = p;
+  const mayFullSettings = canFullSettings(session);
   const [demoBusy, setDemoBusy] = useState(""), [showDev, setShowDev] = useState(false), [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [openType, setOpenType] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null);
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
@@ -5397,6 +5399,7 @@ function SettingsPanel(p) {
       <label className="sla-cell" style={{ maxWidth: 160 }}><span style={{ color: "#DC2626" }}>שעות עד הסלמה</span><input type="number" value={escH} onChange={(e) => setEscH(e.target.value)} /></label>
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveGeneral}>{saved ? "נשמר ✓" : "שמירת הגדרות"}</button>
       <div className="note">גרסת הדגמה. הנתונים משותפים בין המשתמשים. ה-PIN אינו אבטחה אמיתית — לגרסת ייצור נדרש שרת.</div>
+      {mayFullSettings && <>
       <SectionTitle><FileText size={15} /> גיבוי ושחזור</SectionTitle>
       <div className="hint" style={{ marginBottom: 10 }}>ייצוא של כל הנתונים לקובץ JSON. שחזור ממזג לפי מזהה — מעדכן רשומות קיימות ומוסיף חדשות, ולא מוחק נתונים.</div>
       <button className="btn-ghost full" onClick={doExport}><FileText size={15} /> ייצוא גיבוי (JSON)</button>
@@ -5413,6 +5416,7 @@ function SettingsPanel(p) {
         <button className="btn-primary full" disabled={!!demoBusy} onClick={async () => { setDemoBusy("load"); try { await loadDemo(); } finally { setDemoBusy(""); } }}>{demoBusy === "load" ? "טוען…" : "טען נתוני דמו"}</button>
         <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label={demoBusy === "clear" ? "מוחק…" : "מחק נתוני דמו"} onConfirm={async () => { setDemoBusy("clear"); try { await clearDemo(); } finally { setDemoBusy(""); } }} />
       </div>)}
+      </>}
       <div style={{ height: 20 }} />
     </>)}
 

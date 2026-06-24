@@ -120,6 +120,7 @@ Current implementation note:
 - The permission editor also includes management modules `analytics`, `suppliers`, `settings`, and `audit`; screen gates should be added against these module keys instead of new one-off flags.
 - Admin navigation gates management screens with `analytics:view`, `suppliers:view`, `settings:manage`, and `audit:view`; admin role still receives full access through role defaults.
 - Supplier screen access is split: `suppliers:view` can read the supplier list/details, while `suppliers:manage` is required for adding, renaming, editing, or deleting supplier records.
+- Settings screen access is split: `settings:manage` can edit ordinary configuration, while `settings:full` is required for sensitive system actions such as backup/restore and demo data load/clear controls.
 
 Possible grouping:
 
