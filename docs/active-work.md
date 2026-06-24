@@ -8,6 +8,8 @@ Every Codex or Claude session that starts, pauses, or hands off work must read t
 
 Do not rely on chat memory. Do not rely only on `main`. Do not rely only on open PRs. Remote branches can contain active work even when there is no PR.
 
+The exact current `main` commit must always be verified with `git fetch origin --prune` and `git log -1 origin/main`. A ledger-only PR can only record the last synchronized state it was prepared from; the later merge commit itself may be one commit newer.
+
 If anything is inconsistent, start with:
 
 ```text
@@ -25,7 +27,7 @@ Then explain:
 ### Permissions / onboarding stabilization
 
 - Status: active, continuing in small PRs.
-- Current `main` as of this ledger update: `6da6618 Merge pull request #33 from demzykster/codex/update-ledger-after-nav-gates`.
+- Last synchronized `main` before this ledger entry: `f073c98 docs: sync active ledger after pr33 (#34)`.
 - No open PRs were present when this ledger was updated.
 - Purpose:
   - keep moving access control into one `perms` model;
@@ -63,6 +65,7 @@ Then explain:
   - `audit:view`;
   - admin behavior remains unchanged through role defaults.
 - Active work ledger was refreshed after PR #32 through PR #33.
+- Active work ledger was synced with current remote branch state through PR #34.
 
 ### Next exact action
 
