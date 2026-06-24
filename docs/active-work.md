@@ -74,14 +74,17 @@ Then explain:
 - Supplier read-only/manage split was fixed through PR #38.
   - `suppliers:view` keeps the supplier screen visible.
   - `suppliers:manage` is required for adding, renaming, editing, and deleting supplier records.
-- Settings sensitive-action split is in progress on branch `codex/settings-full-sensitive-actions`.
+- Settings sensitive-action split was fixed through PR #39.
   - `settings:manage` keeps ordinary settings editable.
   - `settings:full` is required for backup/restore and demo data load/clear controls.
+- Worker login-field gating is in progress on branch `codex/gate-worker-login-fields`.
+  - worker profile edits without `workerAccess:manage` preserve existing login fields.
+  - activation/reset/temp-code controls remain under `workerAccess:manage`.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Finish and merge `codex/settings-full-sensitive-actions`.
+2. Finish and merge `codex/gate-worker-login-fields`.
 3. Continue with small permission-gating PRs:
    - continue worker onboarding / activation controls under `workerAccess: manage`;
    - browser smoke-check every UI gate.
@@ -119,6 +122,12 @@ Then explain:
   - `npm test -- --run`: 7 files passed, 16 tests passed.
   - `npm run build`: passed.
   - browser smoke-check: admin login and Settings screen still render; admin with `settings:full` sees backup/export, restore, and dev controls; console had no errors.
+- Validation on branch `codex/gate-worker-login-fields` before PR:
+  - baseline `npm test -- --run`: 7 files passed, 16 tests passed.
+  - baseline `npm run build`: passed.
+  - after worker login-field gating, `npm test -- --run`: 7 files passed, 17 tests passed.
+  - after worker login-field gating, `npm run build`: passed.
+  - browser smoke-check: admin login, user-management screen, worker group, and worker edit form still render; admin sees activation/temp-code controls; console had no errors.
 
 ## Current Product Direction After This Item
 
