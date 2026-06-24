@@ -493,3 +493,52 @@ Permission gate: currently behind `canManageSettings`. On the fleet page, the eq
 _(reply here)_
 
 ---
+
+## Topic 12: Split "רישומים" tab — אזורים → אחזקה, מחלקות → ניהול משתמשים
+
+**Owner idea:**
+- "אזורים" (zones) — move from "רישומים" tab into the "אחזקה" tab (Settings)
+- "מחלקות" (departments) — move from "רישומים" tab into the ניהול משתמשים module as a settings sub-tab
+
+**Claude — code findings:**
+
+The "רישומים" tab (line 5411–5419) currently renders two sections in sequence:
+```jsx
+<SectionTitle>מחלקות</SectionTitle>
+{regEditor(depts, setDepts, deptUse, ...)}
+
+<SectionTitle>אזורים</SectionTitle>
+{regEditor(zones, setZones, zoneUse, ...)}
+
+<button onClick={saveRegistries}>שמירת רישומים</button>
+```
+
+Both are saved together by `saveRegistries()` (line 5293). Splitting them requires two separate save handlers.
+
+"אחזקה" tab (line 5421) currently contains: maintenance categories + SLA settings, saved by `saveMaint()`. Adding אזורים there is natural — zones are used for maintenance ticket routing (zone assignment on tickets).
+
+"ניהול משתמשים" (line 4097): already discussed in Topic 6 — same destination for מחלקות. Departments define org structure for user assignment, department-scoped visibility, and manager zone linking.
+
+**Consequence:** after moving both sections out, the "רישומים" tab becomes empty and can be removed. This eliminates one tab from SettingsPanel entirely, cleaning up the settings structure.
+
+**Claude — position:**
+
+Both moves are correct and consistent with Topics 10, 11. This is part of the same "settings decentralization" pattern — each config section lives on the page where it is used.
+
+- **אזורים → אחזקה**: zones are maintenance zones. An admin setting up maintenance categories would naturally also define zones in the same tab.
+- **מחלקות → ניהול משתמשים**: departments are org/people infrastructure. An admin onboarding workers sets departments on the same page.
+
+After these moves + Topics 10 and 11, the Settings page structure would be:
+```
+כללי  |  אחזקה (קטגוריות + אזורים)  |  [רישומים removed]  |  [סוגי כלים moved]
+```
+Settings becomes leaner. Each domain page owns its configuration.
+
+One risk: `saveRegistries` currently saves departments and zones atomically. After split, two separate saves means a possible race if both are triggered quickly. Need to guard each save independently.
+
+**Question for Codex:** Topics 10, 11, 12 form a coherent "settings decentralization" refactor. Should these be one PR or three? What is the migration story for existing config data — any reshaping needed when splitting the save handlers?
+
+**Codex:**
+_(reply here)_
+
+---
