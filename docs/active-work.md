@@ -25,7 +25,7 @@ Then explain:
 ### Permissions / onboarding stabilization
 
 - Status: active, continuing in small PRs.
-- Current `main` as of this ledger update: `9e83c30 Merge pull request #30 from demzykster/codex/add-management-permission-modules`.
+- Current `main` as of this ledger update: `81635b7 Merge pull request #32 from demzykster/codex/gate-management-nav`.
 - No open PRs were present when this ledger was updated.
 - Purpose:
   - keep moving access control into one `perms` model;
@@ -55,20 +55,27 @@ Then explain:
   - `suppliers`;
   - `settings`;
   - `audit`.
+- Active work ledger was refreshed through PR #31.
+- Admin management navigation was gated through PR #32:
+  - `analytics:view`;
+  - `suppliers:view`;
+  - `settings:manage`;
+  - `audit:view`;
+  - admin behavior remains unchanged through role defaults.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Continue with small permission-gating PRs for the newly added modules:
-   - gate `analytics` / `suppliers` / `settings` / `audit` screens using `canView` / `canManage`;
-   - keep admin behavior unchanged;
+2. Continue with small permission-gating PRs:
+   - make `suppliers:view` read-only or require `suppliers:manage` for supplier mutations;
+   - consider splitting `settings:manage` and future `settings:full` actions;
    - browser smoke-check every UI gate.
 3. Keep worker onboarding as the next related area, using `workerAccess: manage`.
 4. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
-- Latest code validation after PR #30 on `main`:
+- Latest code validation after PR #32 on `main`:
   - `npm test -- --run`: 6 files passed, 14 tests passed.
   - `npm run build`: passed.
 - Browser smoke-checks performed during permissions work:
@@ -76,6 +83,7 @@ Then explain:
   - built-in manager sees PPE request flow;
   - regular manager without `users` permission does not see `צוות ומשתמשים`;
   - admin sees `צוות ומשתמשים` and can open the user form.
+  - admin still sees `אנליטיקה`, `ספקים / קבלנים`, `יומן פעילות`, and `הגדרות` after management nav gates.
 - If a session touches code after this, it must rerun:
   - `npm test -- --run`
   - `npm run build`
@@ -89,7 +97,8 @@ Next product area:
 - unified permissions model;
 - worker onboarding / activation links;
 - no duplicated one-off user-card checkboxes;
-- small screen gates for `analytics`, `suppliers`, `settings`, and `audit`;
+- read-only/manage separation for `suppliers`;
+- future `settings:manage` vs `settings:full` split;
 - no Supabase/Auth/RLS/database yet;
 - no broad modular split yet.
 
