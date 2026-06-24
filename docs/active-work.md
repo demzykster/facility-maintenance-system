@@ -77,18 +77,20 @@ Then explain:
 - Settings sensitive-action split was fixed through PR #39.
   - `settings:manage` keeps ordinary settings editable.
   - `settings:full` is required for backup/restore and demo data load/clear controls.
-- Worker login-field gating is in progress on branch `codex/gate-worker-login-fields`.
+- Worker login-field gating was fixed through PR #40.
   - worker profile edits without `workerAccess:manage` preserve existing login fields.
   - activation/reset/temp-code controls remain under `workerAccess:manage`.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Finish and merge `codex/gate-worker-login-fields`.
-3. Continue with small permission-gating PRs:
-   - continue worker onboarding / activation controls under `workerAccess: manage`;
+2. Continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
+3. Or pick the next contained audit fix from `docs/engineering-dialogue.md`:
+   - PPE pending counter/status/notification cleanup;
+   - fleet document chips;
+   - login desktop layout.
+4. For every UI gate or workflow change:
    - browser smoke-check every UI gate.
-4. Keep worker onboarding as the next related area, using `workerAccess: manage`.
 5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
