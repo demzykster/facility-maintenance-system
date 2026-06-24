@@ -118,6 +118,7 @@ Current implementation note:
 - The `צוות ומשתמשים` screen is gated by `users`: `view` shows the team tree read-only, while `manage` enables creating, editing, archiving, and restoring users.
 - Managers default to `ppe: request`, so they can submit clothing/PPE requests for their scope unless explicitly set to `ppe: none`.
 - The permission editor also includes management modules `analytics`, `suppliers`, `settings`, and `audit`; screen gates should be added against these module keys instead of new one-off flags.
+- Admin navigation gates management screens with `analytics:view`, `suppliers:view`, `settings:manage`, and `audit:view`; admin role still receives full access through role defaults.
 
 Possible grouping:
 

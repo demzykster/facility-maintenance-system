@@ -460,6 +460,10 @@ const canManageWorkerAccess = (session) => canManage(session, "workerAccess");
 const canViewUsers = (session) => canView(session, "users");
 const canManageUsers = (session) => canManage(session, "users");
 const canRequestPpe = (session) => canRequest(session, "ppe");
+const canViewAnalytics = (session) => canView(session, "analytics");
+const canViewSuppliers = (session) => canView(session, "suppliers");
+const canManageSettings = (session) => canManage(session, "settings");
+const canViewAudit = (session) => canView(session, "audit");
 const workerLoginStateText = (u) => {
   if (!u || (u.role !== "worker" && u.role !== "cleaner")) return "";
   if (u.activationToken && u.activationStatus === "pending") return "ממתין להפעלה";
@@ -4050,19 +4054,30 @@ function AdminApp(p) {
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
-  const activeTab = tab === "team" && !mayViewUsers ? "dash" : tab;
+  const mayViewAnalytics = canViewAnalytics(session);
+  const mayViewSuppliers = canViewSuppliers(session);
+  const mayManageSettings = canManageSettings(session);
+  const mayViewAudit = canViewAudit(session);
+  const blockedTab = {
+    insights: !mayViewAnalytics,
+    team: !mayViewUsers,
+    suppliers: !mayViewSuppliers,
+    activity: !mayViewAudit,
+    settings: !mayManageSettings
+  };
+  const activeTab = blockedTab[tab] ? "dash" : tab;
   const nav = [
     { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
     { id: "tasks", Icon: ClipboardList, label: "מטלות" },
     { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" },
     { id: "assets", Icon: Truck, label: "כלים ותחזוקה" },
-    { id: "insights", Icon: BarChart3, label: "אנליטיקה" },
+    mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה" } : null,
     { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" },
     mayViewUsers ? { id: "team", Icon: Users, label: "צוות ומשתמשים" } : null,
-    { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" },
-    { id: "activity", Icon: Clock, label: "יומן פעילות" },
-    { id: "settings", Icon: Settings, label: "הגדרות" },
+    mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" } : null,
+    mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות" } : null,
+    mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות" } : null,
   ].filter(Boolean).map((n) => ({ ...n, active: activeTab === n.id, onClick: () => setTab(n.id) }));
   const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
