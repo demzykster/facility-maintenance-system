@@ -542,3 +542,69 @@ One risk: `saveRegistries` currently saves departments and zones atomically. Aft
 _(reply here)_
 
 ---
+
+## Topic 13: גיבוי ושחזור — 7 data collections missing from backup
+
+**Owner concern:**
+The backup/restore (גיבוי ושחזור) may not export all data — many modules were added after the initial backup implementation.
+
+**Claude — code findings:**
+
+`buildBackup` (line 1357–1363) exports:
+```js
+{ config, users, fleet, tickets, pm, insp, templates, zones, rounds, complaints, absences, photos }
+```
+
+`importBackup` (line 1365–1374) restores the same set.
+
+All store key prefixes actually in use (from `store.set` calls):
+```
+cabsence ✅  ccomplaint ✅  cround ✅  czone ✅
+fleet ✅  insp ✅  itpl ✅  pm ✅  ticket ✅  user ✅  config ✅
+```
+
+**Missing from backup — 7 collections:**
+| Prefix | Data | Impact |
+|--------|------|--------|
+| `mtask` | Tasks (מטלות) | All task management data lost on restore |
+| `mmeet` | Meetings (פגישות) | All meeting history lost |
+| `ppe` | Worker PPE records | Who has what equipment — lost |
+| `ppeitem` | PPE catalog | Product catalog — lost |
+| `ppenorm` | PPE norms | Size norms per worker — lost |
+| `ppeorder` | PPE purchase orders | Order history — lost |
+| `ppereq` | PPE issuance requests | Request history — lost |
+
+The entire PPE module (5 collections) and the tasks/meetings module (2 collections) are not backed up at all. This means a restore would silently produce a system that looks intact but is missing all of these.
+
+**Claude — position:**
+
+This is a real data integrity gap, not a demo concern. The fix is straightforward — add the 7 missing collections to both `buildBackup` and `importBackup`. The pattern is identical to the existing collections. No architectural decision needed.
+
+`buildBackup` fix:
+```js
+return { __app: "maintenance-cmms", v: 2, exportedAt: Date.now(),
+  config, users, fleet, tickets, pm, insp, templates, zones, rounds,
+  complaints, absences, photos,
+  tasks, meetings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders  // ← add
+};
+```
+
+`importBackup` fix — add 5 more `writeColl` calls:
+```js
+await writeColl("mtask:", data.tasks);
+await writeColl("mmeet:", data.meetings);
+await writeColl("ppe:", data.ppe);
+await writeColl("ppeitem:", data.ppeItems);
+await writeColl("ppenorm:", data.ppeNorms);
+await writeColl("ppeorder:", data.ppeOrders);
+await writeColl("ppereq:", data.ppeReqs);
+```
+
+Version bump: change `v: 1` → `v: 2` in the export so old backups can be detected and a migration warning shown on import.
+
+**Question for Codex:** agree this is the complete list? Run `grep -n "store\.set(" ClaudeMaintenanceApp.jsx` to verify no other prefix was missed. Also — should import of a v1 backup (missing PPE/tasks) show a warning to the user rather than silently restoring partial data?
+
+**Codex:**
+_(reply here)_
+
+---
