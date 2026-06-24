@@ -1774,13 +1774,13 @@ function TechApp(p) {
               mine.filter((t) => !isOpen(t) && t.assignee === session.name).length === 0 ? <Empty text="אין היסטוריה" Icon={Clock} />
                 : <div className="cards">{sortByImportance(mine.filter((t) => !isOpen(t) && t.assignee === session.name)).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div>
             ) : (<>
-              {returnedToMe.length > 0 && <><SectionTitle><RefreshCw size={14} color="#B45309" /> הוחזרו אליך — נדרש טיפול חוזר ({returnedToMe.length})</SectionTitle><div className="cards">{sortByImportance(returnedToMe).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div></>}
-              {waitEquip.length > 0 && <><SectionTitle><Truck size={14} color="#B45309" /> ממתין לקבלת כלי ({waitEquip.length})</SectionTitle><div className="cards">{sortByImportance(waitEquip).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div></>}
-              <SectionTitle><Bell size={14} /> חדשות — ממתינות לקבלה ({pool.length})</SectionTitle>
+              {returnedToMe.length > 0 && <><SectionTitle><RefreshCw size={14} color="#B45309" /> פעולה שלך — הוחזרו לטיפול חוזר ({returnedToMe.length})</SectionTitle><div className="cards">{sortByImportance(returnedToMe).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div></>}
+              {waitEquip.length > 0 && <><SectionTitle><Truck size={14} color="#B45309" /> מעקב — ממתין לקבלת כלי ({waitEquip.length})</SectionTitle><div className="cards">{sortByImportance(waitEquip).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div></>}
+              <SectionTitle><Bell size={14} /> פעולה שלך — חדשות לקבלה ({pool.length})</SectionTitle>
               {pool.length === 0 ? <div className="note">אין קריאות חדשות.</div> : <div className="cards">{sortByImportance(pool).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div>}
-              <SectionTitle><Wrench size={14} /> בטיפולי ({working.length})</SectionTitle>
+              <SectionTitle><Wrench size={14} /> פעולה שלך — בטיפולי ({working.length})</SectionTitle>
               {working.length === 0 ? <div className="note">אין קריאות בטיפול.</div> : <div className="cards">{sortByImportance(working).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div>}
-              {sentApproval.length > 0 && <><SectionTitle><CheckCircle2 size={14} color="#0D9488" /> הועברו לאישור — לא דורש פעולה ({sentApproval.length})</SectionTitle><div className="cards">{sortByImportance(sentApproval).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div></>}
+              {sentApproval.length > 0 && <><SectionTitle><CheckCircle2 size={14} color="#0D9488" /> מעקב — הועברו לאישור ({sentApproval.length})</SectionTitle><div className="cards">{sortByImportance(sentApproval).map((t) => <TicketCard key={t.id} t={t} admin onClick={() => openTicket(t.id)} />)}</div></>}
             </>)}
           </>) : view === "activity" ? (
             <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />
