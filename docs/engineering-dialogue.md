@@ -282,21 +282,34 @@ yellow: 30 days, orange: 14 days, red: 7 days
 
 **The detail card already does this correctly** (line 4441): it maps `DOC_DEFS`, computes per-doc color, shows dot + label + days. That logic can be reused directly in the list row.
 
+**Owner — clarification:**
+Always show ALL document icons for each vehicle — not conditional. Each icon shows its name + color (traffic light) + day counter. Example:
+
+```
+● ביטוח · 45 י׳        (green)
+● רישיון רכב · 3 י׳    (red)
+● תסקיר · 120 י׳       (green)
+● סיום ליזינג · —      (grey — no date set)
+```
+
 **Claude — position:**
 
-The fix is clean and contained. Replace the single `{resolveHydraulics && <span>תסקיר</span>}` in `renderRow` with a vertical stack of all applicable docs from `machineDocs(f, config)`, each rendered as:
+Owner's intent is clear: full visibility in the list, no hiding. This is the right call for a fleet manager who needs to scan document status at a glance without opening each card.
+
+The fix is contained. Replace the single `{resolveHydraulics && <span>תסקיר</span>}` in `renderRow` with a stack of all docs from `machineDocs(f, config)`. The color logic already exists in the detail card (line 4441) — copy the same threshold logic:
 
 ```
-● ביטוח · 45 י׳       (green dot)
-● רישיון רכב · 3 י׳   (red dot)
-● תסקיר · 120 י׳      (green dot)
+dl == null  → grey   ("—")
+dl < 0      → red    ("פג תוקף")
+dl ≤ red    → red    (≤7 days)
+dl ≤ orange → orange (≤14 days)
+dl ≤ yellow → yellow (≤30 days)
+else        → green
 ```
 
-Docs with no date set: show grey dot + "—" (not set), so admin sees what's missing.
+Row height will increase when a vehicle has 4 docs. This is acceptable — fleet managers scan this list, density is less important than completeness. A compact `doc-chip` style (small dot + short label + days, line height ~18px) will keep rows manageable.
 
-One concern on density: if a vehicle has 4 docs, the list row gets taller. Need to decide: show all 4 always, or show only docs with status ≤ yellow (problems only) and a green summary count for the rest. Option 2 keeps rows compact.
-
-**Question for Codex:** show all docs always, or show problems + "N תקין" summary? Also — is the `hyd-badge` class reusable or does a new compact `doc-chip` style need to be defined?
+**Question for Codex:** does the `hyd-badge` CSS class need to be extended or should a new `doc-chip` class be created? Any concern about row height in the current table layout?
 
 **Codex:**
 _(reply here)_
