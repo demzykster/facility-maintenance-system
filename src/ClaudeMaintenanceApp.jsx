@@ -371,8 +371,10 @@ const userDepts = (u) => (u && u.depts && u.depts.length) ? u.depts : (u && u.de
 const ticketNo = (t) => (t && t.num) ? `${tkLetter(t)}-${String(t.num).padStart(3, "0")}` : (t ? `${tkLetter(t)}-${String(t.id || "").slice(-4).toUpperCase()}` : "—");
 const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
-const fmtDur = (ms) => { const h = Math.round(ms / 3600000); if (h < 1) return "פחות משעה"; if (h < 48) return `${h} שע׳`; return `${Math.round(h / 24)} ימים`; };
-const timeAgo = (ts) => { const s = (Date.now() - ts) / 1000; if (s < 60) return "כעת"; const m = s / 60; if (m < 60) return `לפני ${Math.floor(m)} ד׳`; const h = m / 60; if (h < 24) return `לפני ${Math.floor(h)} שע׳`; const d = h / 24; if (d < 30) return `לפני ${Math.floor(d)} ימים`; return fmtDate(ts); };
+const dayCountLabel = (n) => Number(n) === 1 ? "יום אחד" : `${n} ימים`;
+const countLabel = (n, one, many) => `${n} ${Number(n) === 1 ? one : many}`;
+const fmtDur = (ms) => { const h = Math.round(ms / 3600000); if (h < 1) return "פחות משעה"; if (h < 48) return `${h} שע׳`; return dayCountLabel(Math.round(h / 24)); };
+const timeAgo = (ts) => { const s = (Date.now() - ts) / 1000; if (s < 60) return "כעת"; const m = s / 60; if (m < 60) return `לפני ${Math.floor(m)} ד׳`; const h = m / 60; if (h < 24) return `לפני ${Math.floor(h)} שע׳`; const d = h / 24; if (d < 30) return `לפני ${dayCountLabel(Math.floor(d))}`; return fmtDate(ts); };
 const pausedMs = (t, now = Date.now()) => (t.pauseAccumMs || 0) + (t.pauseSince ? Math.max(0, now - t.pauseSince) : 0);
 const isOverdue = (t) => t.dueAt && (Date.now() - pausedMs(t)) > t.dueAt && t.status !== "done" && t.status !== "cancelled";
 // "Гидравлика" теперь означает «мачта/подъём → требует תסקיר» (флаг типа tasrir, легаси: hydraulics).
@@ -2051,7 +2053,7 @@ function ProblemUnitsPanel({ fleet, tickets, insp, config, onOpen }) {
     <div className="cards">{list.slice(0, 8).map(({ f, h, reasons }) => <button key={f.id} className="prob-row" onClick={() => onOpen && onOpen(f.id)}>
       <span className="prob-dot" style={{ background: h.color }} />
       <span className="prob-main"><span className="prob-code">{f.code} · {unitDesc(f, config)}</span><span className="prob-reasons">{reasons.length ? reasons.map(([c, n]) => `${c} (${n})`).join(" · ") : "ללא פירוט סיבות"}</span></span>
-      <span className="prob-stat"><b style={{ color: h.color }}>{h.count90}</b> קריאות · {h.label}</span>
+      <span className="prob-stat"><b style={{ color: h.color }}>{h.count90}</b> {h.count90 === 1 ? "קריאה" : "קריאות"} · {h.label}</span>
     </button>)}</div>
   </div>);
 }
@@ -2613,7 +2615,7 @@ function DamageReport({ tickets, fleet, config, saveTicket }) {
   const since = Date.now() - days * 86400000;
   const fleetOf = (t) => (fleet || []).find((f) => f.id === t.forkliftId) || {};
   const rows = (tickets || []).filter((t) => t.track === "transport" && (t.createdAt || 0) >= since && (t.closure || t.downtimeStart || t.statusMs)).sort((a, b) => (b.downtimeStart || b.createdAt || 0) - (a.downtimeStart || a.createdAt || 0));
-  const fmtDur = (ms) => { if (!ms) return "—"; const d = ms / 86400000; if (d >= 1) return (Math.round(d * 10) / 10) + " ימים"; const h = ms / 3600000; if (h >= 1) return (Math.round(h * 10) / 10) + " שעות"; return Math.max(1, Math.round(ms / 60000)) + " ד׳"; };
+  const fmtDur = (ms) => { if (!ms) return "—"; const d = ms / 86400000; if (d >= 1) { const v = Math.round(d * 10) / 10; return Number(v) === 1 ? "יום אחד" : `${v} ימים`; } const h = ms / 3600000; if (h >= 1) return (Math.round(h * 10) / 10) + " שעות"; return Math.max(1, Math.round(ms / 60000)) + " ד׳"; };
   const stName = (k) => k.startsWith("waiting:") ? ("המתנה · " + waitReasonLabel(k.slice(8), config)) : ((stOf(k) || {}).label || k);
   const parts = (t) => Object.entries(t.statusMs || {}).filter(([k, v]) => v > 30000 && k !== "new" && k !== "done" && k !== "cancelled").sort((a, b) => b[1] - a[1]);
   const totalDown = (t) => { const p = parts(t); if (p.length) return p.reduce((a, [, v]) => a + v, 0); return downtimeMs(t); };
@@ -3760,15 +3762,15 @@ function PpeDashboard({ items, ppe, config, pend, onPend, onCreateOrder, onCatal
     <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
       <Kpi v={active.length} l="פריטים בקטלוג" Ic={Package} onClick={onCatalog} />
       {pend ? <Kpi v={pend} l="בקשות ממתינות" c="#B45309" Ic={ClipboardList} onClick={onPend} /> : null}
-      <Kpi v={low.length} l="מתחת למינימום" c={low.length ? "#DC2626" : null} Ic={AlertTriangle} on={flt === "low"} onClick={low.length ? (() => setFlt(flt === "low" ? null : "low")) : null} />
+      <Kpi v={low.length} l="חוסרים לפי מידה" c={low.length ? "#DC2626" : null} Ic={AlertTriangle} on={flt === "low"} onClick={low.length ? (() => setFlt(flt === "low" ? null : "low")) : null} />
       <Kpi v={out.length} l="אזל מהמלאי" c={out.length ? "#DC2626" : null} Ic={PackageX} on={flt === "out"} onClick={out.length ? (() => setFlt(flt === "out" ? null : "out")) : null} />
       <Kpi v={c30count} l={"הנפקות · " + mLabel} Ic={PackageCheck} onClick={onMovements} />
       <Kpi v={ils(charge30)} l={"חיוב עובדים · " + mLabel} Ic={Coins} onClick={onMovements} />
       <Kpi v={flagged30} l={"חריגות הנפקה · " + mLabel} c={flagged30 ? "#B45309" : null} Ic={AlertTriangle} onClick={onMovements} />
     </div>
-    {fltItems && <div style={{ ...cardBase, marginTop: 12 }}><div className="row-between" style={{ marginBottom: 4 }}><b>{flt === "low" ? "מתחת למינימום" : "אזל מהמלאי"} ({fltItems.length})</b><button className="btn-ghost sm" onClick={() => setFlt(null)}>סגור</button></div>{fltItems.map((it) => <ItemRow key={it.id} it={it} />)}</div>}
-    {reorder.length > 0 && <div style={{ marginTop: 22 }}><div className="row-between"><SectionTitle><AlertTriangle size={15} /> להזמנה — מתחת למינימום</SectionTitle></div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>{reorder.map(({ it, need, defs }) => { const IconC = ppeCatIcon(it.category); return <div key={it.id} style={{ ...cardBase, borderInlineStart: "4px solid #DC2626" }}><div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><IconC size={18} color="#DC2626" />{it.name}</div><div style={{ marginTop: 6, fontSize: 13, color: "var(--muted)" }}>במלאי {ppeTotalStock(it)} · מינימום {ppeMinTotal(it)}</div><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>{ppeSizes(it).map((sz) => { const sl = ppeLowSize(it, sz); const m = ppeMinOf(it, sz); return <span key={sz} style={{ padding: "2px 8px", borderRadius: 6, background: sl ? "#FEE2E2" : "var(--surface-2)", color: sl ? "#B91C1C" : "inherit", fontSize: 12 }}>{szLbl(sz)}: <b>{ppeStockOf(it, sz)}</b>{m ? `/${m}` : ""}</span>; })}</div><div style={{ marginTop: 8, display: "inline-block", background: "#FEE2E2", color: "#B91C1C", borderRadius: 8, padding: "2px 10px", fontWeight: 700, fontSize: 13 }}>חסר {need} ({defs.length} מידות)</div></div>; })}</div></div>}
-    <div style={{ marginTop: 22 }}><div className="row-between"><SectionTitle><Package size={15} /> מלאי לפי קטגוריה</SectionTitle>{onCreateOrder && <button className="btn-primary sm" onClick={onCreateOrder}><Plus size={15} /> צור הזמנת רכש</button>}</div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>{Object.entries(cats).map(([c, list]) => { const IconC = ppeCatIcon(c); const tot = list.reduce((s2, x) => s2 + ppeTotalStock(x), 0); const minSum = list.reduce((s2, x) => s2 + ppeMinTotal(x), 0); const lowN = list.filter((x) => ppeLow(x)).length; const pct = minSum > 0 ? Math.min(100, Math.round(tot / minSum * 100)) : 100; const ratio = minSum > 0 ? tot / minSum : 99; const col = lowN > 0 ? "#DC2626" : (ratio < 1.3 ? "#D97706" : "#0D9488"); const isOpen = !!open[c]; return <div key={c} style={{ ...cardBase, cursor: "pointer", gridColumn: isOpen ? "1 / -1" : "auto" }} onClick={() => setOpen((o) => ({ ...o, [c]: !o[c] }))}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><IconC size={18} color={col} />{ppeCatLabel(c)}</div><span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>{list.length} פריטים <ChevronLeft size={14} style={{ transform: isOpen ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></span></div><div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 6 }}><span style={{ fontSize: 24, fontWeight: 800 }}>{tot}</span><span style={{ fontSize: 12, color: "var(--muted)" }}>במלאי{minSum ? ` · מינ׳ ${minSum}` : ""}</span></div><div style={{ marginTop: 8, height: 6, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: col }} /></div>{lowN > 0 && <div style={{ marginTop: 6, fontSize: 12, color: "#DC2626" }}>{lowN} פריטים מתחת למינימום</div>}{isOpen && <div style={{ marginTop: 10, borderTop: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>{list.map((it) => <ItemRow key={it.id} it={it} />)}</div>}</div>; })}</div></div>
+    {fltItems && <div style={{ ...cardBase, marginTop: 12 }}><div className="row-between" style={{ marginBottom: 4 }}><b>{flt === "low" ? "חוסרים לפי מידה" : "אזל מהמלאי"} ({fltItems.length})</b><button className="btn-ghost sm" onClick={() => setFlt(null)}>סגור</button></div>{fltItems.map((it) => <ItemRow key={it.id} it={it} />)}</div>}
+    {reorder.length > 0 && <div style={{ marginTop: 22 }}><div className="row-between"><SectionTitle><AlertTriangle size={15} /> להזמנה — חוסרים לפי מידה</SectionTitle></div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>{reorder.map(({ it, need, defs }) => { const IconC = ppeCatIcon(it.category); return <div key={it.id} style={{ ...cardBase, borderInlineStart: "4px solid #DC2626" }}><div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><IconC size={18} color="#DC2626" />{it.name}</div><div style={{ marginTop: 6, fontSize: 13, color: "var(--muted)" }}>במלאי {ppeTotalStock(it)} · מינימום כולל {ppeMinTotal(it)}</div><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>{ppeSizes(it).map((sz) => { const sl = ppeLowSize(it, sz); const m = ppeMinOf(it, sz); return <span key={sz} style={{ padding: "2px 8px", borderRadius: 6, background: sl ? "#FEE2E2" : "var(--surface-2)", color: sl ? "#B91C1C" : "inherit", fontSize: 12 }}>{szLbl(sz)}: <b>{ppeStockOf(it, sz)}</b>{m ? `/${m}` : ""}</span>; })}</div><div style={{ marginTop: 8, display: "inline-block", background: "#FEE2E2", color: "#B91C1C", borderRadius: 8, padding: "2px 10px", fontWeight: 700, fontSize: 13 }}>חסר {need} ({countLabel(defs.length, "מידה", "מידות")})</div></div>; })}</div></div>}
+    <div style={{ marginTop: 22 }}><div className="row-between"><SectionTitle><Package size={15} /> מלאי לפי קטגוריה</SectionTitle>{onCreateOrder && <button className="btn-primary sm" onClick={onCreateOrder}><Plus size={15} /> צור הזמנת רכש</button>}</div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>{Object.entries(cats).map(([c, list]) => { const IconC = ppeCatIcon(c); const tot = list.reduce((s2, x) => s2 + ppeTotalStock(x), 0); const minSum = list.reduce((s2, x) => s2 + ppeMinTotal(x), 0); const lowN = list.filter((x) => ppeLow(x)).length; const pct = minSum > 0 ? Math.min(100, Math.round(tot / minSum * 100)) : 100; const ratio = minSum > 0 ? tot / minSum : 99; const col = lowN > 0 ? "#DC2626" : (ratio < 1.3 ? "#D97706" : "#0D9488"); const isOpen = !!open[c]; return <div key={c} style={{ ...cardBase, cursor: "pointer", gridColumn: isOpen ? "1 / -1" : "auto" }} onClick={() => setOpen((o) => ({ ...o, [c]: !o[c] }))}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><IconC size={18} color={col} />{ppeCatLabel(c)}</div><span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>{list.length} פריטים <ChevronLeft size={14} style={{ transform: isOpen ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></span></div><div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 6 }}><span style={{ fontSize: 24, fontWeight: 800 }}>{tot}</span><span style={{ fontSize: 12, color: "var(--muted)" }}>במלאי{minSum ? ` · מינ׳ ${minSum}` : ""}</span></div><div style={{ marginTop: 8, height: 6, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: col }} /></div>{lowN > 0 && <div style={{ marginTop: 6, fontSize: 12, color: "#DC2626" }}>{lowN} פריטים עם חוסר במידה</div>}{isOpen && <div style={{ marginTop: 10, borderTop: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>{list.map((it) => <ItemRow key={it.id} it={it} />)}</div>}</div>; })}</div></div>
     
     {recs.length > 0 && <div style={{ marginTop: 22 }}><SectionTitle>המלצות מלאי</SectionTitle><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12, marginTop: 8 }}>{recs.map((r) => <div key={r.it.id} style={{ ...cardBase, borderInlineStart: "4px solid " + (r.kind === "up" ? "#B45309" : "var(--muted)") }}><div style={{ fontWeight: 700 }}>{r.it.name}</div><div style={{ marginTop: 4, fontSize: 13, color: "var(--muted)" }}>{r.text}</div></div>)}</div></div>}
     <div style={{ height: 24 }} />
@@ -4129,7 +4131,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin" }) : setTab("tickets") } : null,
     waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user" }) : setTab("tickets") } : null,
     ppeReqPend.length ? { sev: 1, Icon: HardHat, text: "בקשות ביגוד ממתינות", n: ppeReqPend.length, go: () => setTab("ppe") } : null,
-    lowPpe.length ? { sev: 1, Icon: HardHat, text: "פריטי ביגוד מתחת למינימום", n: lowPpe.length, go: () => setTab("ppe") } : null,
+    lowPpe.length ? { sev: 1, Icon: HardHat, text: "חוסרי ביגוד לפי מידה", n: lowPpe.length, go: () => setTab("ppe") } : null,
     complOpen.length ? { sev: 1, Icon: AlertTriangle, text: "תלונות פתוחות", n: complOpen.length, go: () => setTab("cleaning") } : null,
     dashTrack !== "facility" && expDocs.length ? { sev: 1, Icon: Truck, text: "מסמכי כלים פגי/קרובי תוקף", n: expDocs.length, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") } : null,
     ordRecv.length ? { sev: 0, Icon: Package, text: "הזמנות רכש לקליטה", n: ordRecv.length, go: () => setTab("ppe") } : null,
@@ -4847,6 +4849,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const [period, setPeriod] = useState("month");
   const PERIODS = [["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"], ["all", "הכול"]];
   const PERIOD_LBL = { week: "השבוע האחרון", month: "החודש האחרון", quarter: "הרבעון האחרון", year: "השנה האחרונה", all: "כל הזמן" };
+  const PERIOD_PREP = { week: "בשבוע האחרון", month: "בחודש האחרון", quarter: "ברבעון האחרון", year: "בשנה האחרונה", all: "בכל הזמן" };
   const from = period === "all" ? 0 : Date.now() - ({ week: 7, month: 30, quarter: 90, year: 365 }[period]) * 86400000;
   const inP = (ts) => period === "all" || (!!ts && ts >= from);
   const isT = (t) => t.track === "transport" || (!t.track && t.forkliftId);
@@ -4981,7 +4984,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     <div className="seg-tabs s3"><button className={atab === "all" ? "on" : ""} onClick={() => setAtab("all")}>הכל</button><button className={atab === "maint" ? "on" : ""} onClick={() => setAtab("maint")}>אחזקה</button><button className={atab === "fleet" ? "on" : ""} onClick={() => setAtab("fleet")}>כלי שינוע</button></div>
     <div className="wtoggles" style={{ marginBottom: 12 }}>{PERIODS.map(([k, l]) => <button key={k} className={"wtoggle" + (period === k ? " on" : "")} onClick={() => setPeriod(k)}>{l}</button>)}</div>
     {tickets.length === 0 && closedP.length === 0 && pmPlanned === 0
-      ? <div className="note" style={{ textAlign: "center", padding: "18px 14px" }}>אין פעילות ב{PERIOD_LBL[period]}. נסו טווח רחב יותר.</div>
+      ? <div className="note" style={{ textAlign: "center", padding: "18px 14px" }}>אין פעילות {PERIOD_PREP[period]}. נסו טווח רחב יותר.</div>
       : null}
     <div className="export-bar"><button className="btn-ghost sm" onClick={exportExcel}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={exportPdf}><Printer size={15} /> דוח חודשי (PDF)</button></div>
     <div className="kpi-grid">
@@ -5022,7 +5025,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     <SectionTitle>עומס טכנאים</SectionTitle>
     {techArr.length === 0 ? <div className="note">אין שיוכים פעילים.</div> : <div className="panel">{techArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxTech} color="#2563EB" />)}</div>}
     {showFleet && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים — תכנון מול ביצוע</SectionTitle>
-    {pmPlanned === 0 ? <div className="note">לא תוכננו טיפולים ב{PERIOD_LBL[period]}.</div> : <div className="panel"><div className="row-stats">
+    {pmPlanned === 0 ? <div className="note">לא תוכננו טיפולים {PERIOD_PREP[period]}.</div> : <div className="panel"><div className="row-stats">
       <div><div className="rs-num">{pmPlanned}</div><div className="rs-lbl">תוכננו</div></div>
       <div><div className="rs-num" style={{ color: "#16A34A" }}>{pmDone}</div><div className="rs-lbl">בוצעו</div></div>
       <div><div className="rs-num" style={{ color: "#CA8A04" }}>{pmMissed}</div><div className="rs-lbl">לא הגיעו</div></div>
@@ -6404,7 +6407,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .more-menu{position:absolute;top:calc(100% + 4px);inset-inline-end:0;z-index:31;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.16);padding:6px;min-width:190px;display:flex;flex-direction:column;gap:2px;}
 .more-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:right;background:none;border:none;padding:9px 11px;border-radius:8px;font-size:13px;color:var(--ink);cursor:pointer;}
 .more-menu button:hover{background:var(--surface-2);}
-.hyd-badge{font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;border-radius:5px;padding:1px 5px;margin-inline-start:5px;}
+.hyd-badge{font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;border-radius:5px;padding:1px 5px;}
 .ftable-head{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
 .ftable-row{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;}
 .ftable-row:hover{background:var(--surface-2);}
@@ -6422,7 +6425,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .pal{display:flex;gap:4px;flex-wrap:wrap;}
 .pal-sw{width:20px;height:20px;border-radius:6px;border:2px solid transparent;cursor:pointer;padding:0;}
 .pal-sw.on{border-color:var(--ink);box-shadow:0 0 0 1.5px var(--surface) inset;}
-.ft-code{font-weight:700;}.ft-model{font-size:11.5px;color:var(--muted);}.ft-model b{color:var(--ink);font-size:12.5px;font-weight:600;}
+.ft-code{font-weight:700;}.ft-model{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;}.ft-model b{color:var(--ink);font-size:12.5px;font-weight:600;}
 .ft-sup{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ft-doc{display:flex;align-items:center;gap:6px;font-weight:600;}
 .doc-edit{margin-bottom:12px;}
