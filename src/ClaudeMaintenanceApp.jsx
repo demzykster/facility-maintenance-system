@@ -10,7 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { USER_PERMISSION_MODULES, canManage, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
+import { USER_PERMISSION_MODULES, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -459,6 +459,7 @@ const canFleetTickets = (session) => canView(session, "fleetTickets");
 const canManageWorkerAccess = (session) => canManage(session, "workerAccess");
 const canViewUsers = (session) => canView(session, "users");
 const canManageUsers = (session) => canManage(session, "users");
+const canRequestPpe = (session) => canRequest(session, "ppe");
 const workerLoginStateText = (u) => {
   if (!u || (u.role !== "worker" && u.role !== "cleaner")) return "";
   if (u.activationToken && u.activationStatus === "pending") return "ממתין להפעלה";
@@ -4026,6 +4027,7 @@ function PpeHub(p) {
   const [mStart, mEnd] = monthRange(mY, mM);
   const mLabel = monthLabelOf(mY, mM);
   const openOrder = () => { const lines = []; (ppeItems || []).filter((x) => x.active !== false).forEach((it) => { ppeNetDeficits(it, ppeOrders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setOrderForm({ lines }); };
+  if (!canRequestPpe(session)) return <div className="note">אין הרשאה לבקשת או ניהול ביגוד עובדים.</div>;
   if (!isFull) return <PpeRequester ppe={ppe} items={ppeItems} norms={ppeNorms} reqs={ppeReqs} users={users} config={config} session={session} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} deptScope={deptScope} />;
   const tab = sub;
   return (<>

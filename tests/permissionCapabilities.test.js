@@ -21,6 +21,11 @@ describe("permission capability helpers", () => {
     expect(canView({ role: "worker" }, "ppe")).toBe(false);
   });
 
+  it("lets managers request PPE by default and blocks explicit none", () => {
+    expect(canRequest({ role: "user" }, "ppe")).toBe(true);
+    expect(canRequest({ role: "user", perms: { ppe: "none" } }, "ppe")).toBe(false);
+  });
+
   it("treats user management as a normal permission module", () => {
     const hrManager = { role: "user", perms: { users: "manage" } };
     const basicManager = { role: "user", perms: {} };

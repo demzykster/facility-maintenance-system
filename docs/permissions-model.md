@@ -116,6 +116,7 @@ Current implementation note:
 - `tests/permissionsMigration.test.js`, `tests/permissionEditorModules.test.js`, and `tests/permissionCapabilities.test.js` cover the current migration bridge, editor module contract, and capability helpers.
 - The user permission editor now includes `users` as a module separate from `workerAccess`, so HR-like access can be expressed without creating an HR role or another one-off checkbox.
 - The `צוות ומשתמשים` screen is gated by `users`: `view` shows the team tree read-only, while `manage` enables creating, editing, archiving, and restoring users.
+- Managers default to `ppe: request`, so they can submit clothing/PPE requests for their scope unless explicitly set to `ppe: none`.
 
 Possible grouping:
 

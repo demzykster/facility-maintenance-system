@@ -2,7 +2,7 @@ export const PERM_LEVELS = ["none", "view", "request", "manage", "full"];
 
 export const ROLE_PERM_DEFAULT = {
   admin: { ppe: "full" },
-  user: { ppe: "view" },
+  user: { ppe: "request" },
   tech: { ppe: "view" },
   worker: { ppe: "none" },
   cleaner: { ppe: "none" }
