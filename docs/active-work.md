@@ -71,6 +71,16 @@ Next product area:
 - no Supabase/Auth/RLS/database yet;
 - no broad modular split yet.
 
+## Checked Remote Branches
+
+### `origin/claude/clever-ride-z11u7y`
+
+- Status: checked, not active product work.
+- Latest commit: `a8bd0f2 chore: update package-lock.json libc fields (npm version diff)`.
+- Diff vs `origin/main`: `package-lock.json` only, removing optional package `libc` fields.
+- Decision: do not merge as product work. This looks like an npm/platform lockfile normalization difference and is not part of the audit / permissions / onboarding direction.
+- Safe cleanup option: delete the remote branch later as repository housekeeping after owner confirmation.
+
 ## Handoff Back Rule
 
 When handing work back to another session:
