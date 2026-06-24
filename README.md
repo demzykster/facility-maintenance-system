@@ -38,3 +38,4 @@ For handoff to another PC, Codex session, or Claude session, start with:
 - [Current status](docs/current-status.md)
 - [Next steps](docs/next-steps.md)
 - [Collaboration model](docs/collaboration-model.md)
+- [Handoff for next Codex session](docs/handoff-for-next-codex.md)

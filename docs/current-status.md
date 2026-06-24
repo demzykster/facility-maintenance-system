@@ -10,7 +10,7 @@ This file is the handoff point for any new Codex or Claude session.
 - Branch: `main`
 - Baseline tag: `pre-production-model`
 - Current baseline commit: `e908ec7 sync artifact into vite shell`
-- Current main commit: `bb4890b reduce closed ticket card risk noise`
+- Current main commit: check GitHub `main` or `git log --oneline -1` before starting work.
 
 The GitHub repository is now the source of truth. The old artifact/chat file is no longer the source of truth.
 
@@ -41,7 +41,7 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 
 - Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
 - Vitest was added through PR #2.
-- `npm test` is available and currently runs 2 passing test files.
+- `npm test` is available and currently runs 4 passing test files.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
 - Ticket-card audit passes reduced noise for closed tickets:
   - closed/cancelled tickets no longer show an SLA progress bar;
@@ -49,6 +49,13 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 - Verification passed on `main`:
   - `npm test`;
   - `npm run build`.
+
+### Repository Hygiene
+
+- Root project files are reserved for app/config/package/readme files.
+- Historical reference documents are kept under `docs/archive/`.
+- Local helper launch files are kept under `tools/`.
+- New docs should go under `docs/` unless they are root-level project entry points such as `README.md`.
 
 ## Known Warnings
 
