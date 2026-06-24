@@ -4013,7 +4013,7 @@ function AdminApp(p) {
     { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
     { id: "tasks", Icon: ClipboardList, label: "מטלות" },
-    { id: "ppe", Icon: HardHat, label: "ביגוד עובדים" },
+    { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" },
     { id: "assets", Icon: Truck, label: "כלים ותחזוקה" },
     { id: "insights", Icon: BarChart3, label: "אנליטיקה" },
     { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" },
@@ -4022,7 +4022,7 @@ function AdminApp(p) {
     { id: "activity", Icon: Clock, label: "יומן פעילות" },
     { id: "settings", Icon: Settings, label: "הגדרות" },
   ].map((n) => ({ ...n, active: tab === n.id, onClick: () => setTab(n.id) }));
-  const mobileNav = nav.filter((n) => ["dash", "tickets", "fleet", "analytics"].includes(n.id));
+  const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
@@ -4130,8 +4130,8 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     tasksOverdue.length ? { sev: 2, Icon: ClipboardList, text: "משימות באיחור", n: tasksOverdue.length, go: () => setTab("tasks") } : null,
     waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin" }) : setTab("tickets") } : null,
     waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user" }) : setTab("tickets") } : null,
-    ppeReqPend.length ? { sev: 1, Icon: HardHat, text: "בקשות ביגוד ממתינות", n: ppeReqPend.length, go: () => setTab("ppe") } : null,
-    lowPpe.length ? { sev: 1, Icon: HardHat, text: "חוסרי ביגוד לפי מידה", n: lowPpe.length, go: () => setTab("ppe") } : null,
+    ppeReqPend.length ? { sev: 1, Icon: Shirt, text: "בקשות ביגוד ממתינות", n: ppeReqPend.length, go: () => setTab("ppe") } : null,
+    lowPpe.length ? { sev: 1, Icon: Shirt, text: "חוסרי ביגוד לפי מידה", n: lowPpe.length, go: () => setTab("ppe") } : null,
     complOpen.length ? { sev: 1, Icon: AlertTriangle, text: "תלונות פתוחות", n: complOpen.length, go: () => setTab("cleaning") } : null,
     dashTrack !== "facility" && expDocs.length ? { sev: 1, Icon: Truck, text: "מסמכי כלים פגי/קרובי תוקף", n: expDocs.length, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") } : null,
     ordRecv.length ? { sev: 0, Icon: Package, text: "הזמנות רכש לקליטה", n: ordRecv.length, go: () => setTab("ppe") } : null,
