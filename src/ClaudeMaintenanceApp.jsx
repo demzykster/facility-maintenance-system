@@ -10,7 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { USER_PERMISSION_MODULES, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
+import { USER_PERMISSION_MODULES, canManage, canView, cleanPerms, normalizePerms, permLevel } from "./permissionModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -454,9 +454,9 @@ const driverOf = (f, cat) => unitDrivers(f)[cat] || null;
 const driverActive = (d) => !!(d && (!d.status || d.status === "active"));
 const driverPending = (d) => !!(d && (d.status === "pending_add" || d.status === "pending_move"));
 const driverOwned = (d, session) => !!(d && session && (session.role === "admin" || d.addedByUid === session.id));
-const canFleetDocs = (session) => permRank(permLevel(session, "fleetDocs")) >= permRank("view");
-const canFleetTickets = (session) => permRank(permLevel(session, "fleetTickets")) >= permRank("view");
-const canManageWorkerAccess = (session) => permRank(permLevel(session, "workerAccess")) >= permRank("manage");
+const canFleetDocs = (session) => canView(session, "fleetDocs");
+const canFleetTickets = (session) => canView(session, "fleetTickets");
+const canManageWorkerAccess = (session) => canManage(session, "workerAccess");
 const workerLoginStateText = (u) => {
   if (!u || (u.role !== "worker" && u.role !== "cleaner")) return "";
   if (u.activationToken && u.activationStatus === "pending") return "ממתין להפעלה";

@@ -37,3 +37,9 @@ export const permLevel = (session, mod) => {
   const defaults = ROLE_PERM_DEFAULT[session.role];
   return (defaults && defaults[mod]) || "none";
 };
+
+export const hasPermission = (session, mod, minLevel = "view") => permRank(permLevel(session, mod)) >= permRank(minLevel);
+export const canView = (session, mod) => hasPermission(session, mod, "view");
+export const canRequest = (session, mod) => hasPermission(session, mod, "request");
+export const canManage = (session, mod) => hasPermission(session, mod, "manage");
+export const canFull = (session, mod) => hasPermission(session, mod, "full");
