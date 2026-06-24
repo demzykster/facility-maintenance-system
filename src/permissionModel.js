@@ -13,7 +13,11 @@ export const USER_PERMISSION_MODULES = [
   { mod: "fleetTickets", label: "היסטוריית קריאות על כלים", levels: ["none", "view"], hint: "צפייה בקריאות עבר על כלי המחלקות שלו." },
   { mod: "ppe", label: "ביגוד עובדים", levels: ["none", "request", "manage", "full"], hint: "בקשה — שליחת בקשות בלבד. ניהול — טיפול בבקשות. מלא — קטלוג, ניפוק, קיזוז ודוחות. גישת HR ניתנת דרך הרשאות, לא דרך תפקיד נפרד." },
   { mod: "workerAccess", label: "הפעלת כניסה לעובדים", levels: ["none", "manage"], hint: "ניהול עתידי של קישור הפעלה ואיפוס קוד אישי לעובדי המחלקות שלו." },
-  { mod: "users", label: "ניהול משתמשים ועובדים", levels: ["none", "view", "manage"], hint: "צפייה או ניהול משתמשים ועובדים במודול צוות ומשתמשים. הרשאת הפעלת כניסה לעובדים נשארת נפרדת." }
+  { mod: "users", label: "ניהול משתמשים ועובדים", levels: ["none", "view", "manage"], hint: "צפייה או ניהול משתמשים ועובדים במודול צוות ומשתמשים. הרשאת הפעלת כניסה לעובדים נשארת נפרדת." },
+  { mod: "analytics", label: "אנליטיקה ודוחות", levels: ["none", "view"], hint: "צפייה בלוחות אנליטיקה ותובנות מערכת." },
+  { mod: "suppliers", label: "ספקים וקבלנים", levels: ["none", "view", "manage"], hint: "צפייה או ניהול ספקים, אנשי קשר והקשרים לכלים/הזמנות." },
+  { mod: "settings", label: "הגדרות מערכת", levels: ["none", "manage", "full"], hint: "ניהול הגדרות, רישומים, SLA וסוגי כלים. מלא שמור לפעולות מערכת רגישות יותר בעתיד." },
+  { mod: "audit", label: "יומן פעילות", levels: ["none", "view"], hint: "צפייה ביומן הפעילות והיסטוריית פעולות." }
 ];
 
 export const permRank = (level) => {
