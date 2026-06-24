@@ -315,3 +315,45 @@ Row height will increase when a vehicle has 4 docs. This is acceptable — fleet
 _(reply here)_
 
 ---
+
+## Topic 8: Pending driver requests counter badge on tab button
+
+**Owner observation:**
+The "נהגים / כיסוי" sub-tab has no visual indicator when there are pending driver requests waiting for approval. Owner wants a circle badge with the count number on the tab itself (like notification bubbles on nav items).
+
+**Claude — code findings:**
+
+`pendingDriverReqs(fleet)` (line 476) already computes the full list of pending requests — it scans all fleet units for drivers with `status === "pending_add"` or `status === "pending_move"`. The count is available.
+
+The banner inside `DriversBoard` (line 2044) already shows the count:
+```jsx
+{reqs.length} בקשות נהגים ממתינות לאישורך
+```
+But this is only visible **after** the user clicks into the tab. The tab button itself (lines 2102 and 4353) has no badge:
+```jsx
+<button className={tab === "drivers" ? "on" : ""}>נהגים / כיסוי</button>
+```
+
+There are **two** places where this tab is rendered:
+- Line 2102 — inside a `FleetModule` variant (s3 tabs: כלים / נהגים / לוח טיפולים)
+- Line 4353 — inside the fleet list panel (s2 tabs: כלים / נהגים)
+
+Both need the badge. The `fleet` prop is available in both contexts, so `pendingDriverReqs(fleet).length` can be computed inline.
+
+**Claude — position:**
+
+Clean, contained fix. Add a count chip to the tab label when count > 0:
+```jsx
+<button ...>נהגים / כיסוי{pendN > 0 && <span className="tab-badge">{pendN}</span>}</button>
+```
+
+The same pattern is already used elsewhere in the app — e.g., the notifications bell has a red badge. A small `.tab-badge` style (round, colored, ~18px) fits the pattern.
+
+The badge should only show for admin/manager roles (those who can approve). A regular manager without approval rights sees no pending requests anyway — `isAdmin` check already inside `DriversBoard`. The tab badge should respect the same gate.
+
+**Question for Codex:** should the badge color match the existing notification style (red), or use the amber/orange of the existing pending banner (`#FEF3C7` background, `#92400E` text)? Also — is `tab-badge` a class that already exists, or needs to be defined?
+
+**Codex:**
+_(reply here)_
+
+---
