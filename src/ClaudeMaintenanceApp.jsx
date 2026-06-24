@@ -1652,7 +1652,7 @@ function UserApp(p) {
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
   const openTicket = (id) => setOverlay({ type: "detail", id });
-  const needAct = mine.filter((t) => t.status === "pending_user").length;
+  const needAct = mine.filter((t) => isOpen(t) && (ballIn(t) === "manager" || (isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework")))).length;
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme}
@@ -1662,10 +1662,10 @@ function UserApp(p) {
         <TopBar title={view === "activity" ? "יומן פעילות" : view === "dept" ? "המחלקה שלי" : "הקריאות שלי"} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
           {view === "tickets" ? (<>
-            {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {needAct} קריאות ממתינות לאישורך</div>}
+            {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {needAct} קריאות דורשות פעולה שלך</div>}
             <div className="stat-strip">
               <div className="stat-box"><div className="stat-num">{mine.filter(isOpen).length}</div><div className="stat-lbl">פתוחות</div></div>
-              <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>{needAct}</div><div className="stat-lbl">לאישורך</div></div>
+              <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>{needAct}</div><div className="stat-lbl">דורשות פעולה</div></div>
               <div className="stat-box"><div className="stat-num">{mine.length}</div><div className="stat-lbl">סה״כ</div></div>
             </div>
             {(() => { const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false); return <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle>{techs.length === 0 ? <div className="note" style={{ marginBottom: 12 }}>אין טכנאים מוגדרים.</div> : <div className="tech-strip">{techs.map((u) => { const pr = presenceOf(presence, u.id); return <span key={u.id} className="tech-chip"><span className={"presence-dot" + (pr.onShift ? " on" : "")} />{u.name}{u.supplier ? <span className="tech-chip-sup"> · {u.supplier}</span> : ""}<span className="tech-chip-stat">{pr.onShift ? (lastSeenText(pr.lastSeen) || "במשמרת") : "לא במשמרת"}{(() => { const z = shiftIdle(pr, u, config); return z.lateMin > 0 ? " · איחר " + z.lateMin + " ד׳" : z.earlyMin > 0 ? " · מוקדם " + z.earlyMin + " ד׳" : ""; })()}</span></span>; })}</div>}</>; })()}
@@ -1681,12 +1681,12 @@ function UserApp(p) {
                 const atAdmin = openT.filter((t) => ballIn(t) === "admin");
                 if (openT.length === 0) return <Empty text="אין קריאות פתוחות" Icon={ListChecks} sub="פתחו קריאה חדשה בלחיצה על הכפתור" />;
                 return <>
-                  {workerReports.length > 0 && <><SectionTitle><UserPlus size={15} color="#EA580C" /> דיווחי עובדים לבדיקה ({workerReports.length})</SectionTitle><div className="cards">{sortByImportance(workerReports).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
-                  {needEquip.length > 0 && <><SectionTitle><Truck size={15} color="#DC2626" /> יש להעביר כלי לטכנאי ({needEquip.length})</SectionTitle><div className="cards">{sortByImportance(needEquip).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
-                  {awaiting.length > 0 && <><SectionTitle><CheckCircle2 size={15} color="#0D9488" /> ממתינות לאישורך ({awaiting.length})</SectionTitle><div className="cards">{sortByImportance(awaiting).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
-                  <SectionTitle><Wrench size={15} /> בטיפול הטכנאי ({atTech.length})</SectionTitle>
+                  {workerReports.length > 0 && <><SectionTitle><UserPlus size={15} color="#EA580C" /> פעולה שלך — דיווחי עובדים לבדיקה ({workerReports.length})</SectionTitle><div className="cards">{sortByImportance(workerReports).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {needEquip.length > 0 && <><SectionTitle><Truck size={15} color="#DC2626" /> פעולה שלך — יש להעביר כלי לטכנאי ({needEquip.length})</SectionTitle><div className="cards">{sortByImportance(needEquip).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {awaiting.length > 0 && <><SectionTitle><CheckCircle2 size={15} color="#0D9488" /> פעולה שלך — ממתינות לאישורך ({awaiting.length})</SectionTitle><div className="cards">{sortByImportance(awaiting).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  <SectionTitle><Wrench size={15} /> מעקב — בטיפול הטכנאי ({atTech.length})</SectionTitle>
                   {atTech.length === 0 ? <div className="note">אין קריאות בטיפול.</div> : <div className="cards">{sortByImportance(atTech).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>}
-                  {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#4F46E5" /> אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#4F46E5" /> מעקב — אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                 </>;
               }
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
