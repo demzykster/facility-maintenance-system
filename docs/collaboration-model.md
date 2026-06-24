@@ -42,11 +42,11 @@ Required checks:
 - Check latest `origin/main`.
 - Check open PRs if the tool/session can access them.
 - Check remote branches, not only open PRs. A pushed branch without PR is still active work.
-- Read `docs/active-work.md`, `docs/current-status.md`, `docs/next-steps.md`, `docs/collaboration-model.md`, and `docs/handoff-for-next-codex.md`.
+- Always read `docs/active-work.md` first, even if `main` looks clean and there are no open PRs. Then read `docs/current-status.md`, `docs/next-steps.md`, `docs/collaboration-model.md`, and `docs/handoff-for-next-codex.md`.
 
 If `main`, open PRs, remote branches, or docs disagree, treat that as a synchronization problem before doing product work.
 
-For unfinished work, `docs/active-work.md` is the exact handoff ledger. It must say what is open, where the last session stopped, what remains, what checks passed, and how to hand the work back.
+`docs/active-work.md` is the exact handoff ledger for every session. It must say whether anything is open, where the last session stopped, what remains, what checks passed, and how to hand the work back.
 
 ## Rules
 

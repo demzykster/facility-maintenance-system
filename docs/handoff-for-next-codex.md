@@ -34,7 +34,7 @@ git log --oneline --decorate -10 origin/main
 git branch -r
 ```
 
-Read these files in order:
+Read these files in order. `docs/active-work.md` is mandatory for every session, even if `main` looks clean and there are no open PRs:
 
 - `docs/active-work.md`
 - `docs/current-status.md`
@@ -52,9 +52,9 @@ npm run build
 
 ## Mirror Handoff Rule
 
-For unfinished work, `docs/active-work.md` is the exact ledger. It must tell the next session:
+`docs/active-work.md` is the exact ledger for every session. It must tell the next session:
 
-- what is open;
+- whether anything is open;
 - which branch and commit contain the work;
 - what was already done;
 - what exact action is next;
@@ -144,7 +144,7 @@ Then read:
 Important:
 - main is the source of truth, but remote branches can contain active work.
 - Do not assume "no open PR" means no open work.
-- docs/active-work.md is the exact unfinished-work ledger.
+- docs/active-work.md is the first required file and the exact active-work ledger.
 - If docs, main, PRs, or remote branches disagree, start with PROBLEM / ПРОБЛЕМА: and explain the safe options.
 
 Rules:

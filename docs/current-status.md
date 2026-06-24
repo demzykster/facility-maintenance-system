@@ -22,7 +22,7 @@ Before answering project-status questions or starting work, every Codex/Claude s
 - inspect latest `origin/main`;
 - inspect open PRs if available;
 - inspect remote branches as well as PRs.
-- read `docs/active-work.md` for the exact unfinished-work ledger.
+- always read `docs/active-work.md` first for the exact active-work ledger, even if `main` looks clean.
 
 A clean `main` and no open PRs do not prove there is no active work. A pushed branch without PR is still active work and must be checked.
 
