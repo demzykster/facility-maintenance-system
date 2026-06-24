@@ -5399,6 +5399,12 @@ function SettingsPanel(p) {
         <button className="btn-ghost full" style={{ marginTop: 8 }} onClick={() => setPendImport(null)}>ביטול</button>
       </div>}
       {impMsg && <div className="note" style={{ color: impMsg.includes("✓") ? "#16A34A" : "#DC2626" }}>{impMsg}</div>}
+      <button className="dev-toggle" onClick={() => setShowDev((v) => !v)}>{showDev ? <EyeOff size={14} /> : <Eye size={14} />} פיתוח ובדיקות</button>
+      {showDev && (<div className="dev-box">
+        <div className="hint" style={{ marginBottom: 10 }}>טעינת כלים, קריאות וטיפולים לדוגמה. הנתונים מסומנים כדמו — מחיקה תסיר רק אותם, ולא נתונים שהוזנו ידנית.</div>
+        <button className="btn-primary full" disabled={!!demoBusy} onClick={async () => { setDemoBusy("load"); try { await loadDemo(); } finally { setDemoBusy(""); } }}>{demoBusy === "load" ? "טוען…" : "טען נתוני דמו"}</button>
+        <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label={demoBusy === "clear" ? "מוחק…" : "מחק נתוני דמו"} onConfirm={async () => { setDemoBusy("clear"); try { await clearDemo(); } finally { setDemoBusy(""); } }} />
+      </div>)}
       <div style={{ height: 20 }} />
     </>)}
 
