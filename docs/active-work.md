@@ -24,10 +24,10 @@ Then explain:
 
 ### Sync protocol follow-up
 
-- Status: open branch, not yet confirmed merged into `main`.
+- Status: closed.
 - Branch: `codex/repo-cleanup-docs`
-- Latest branch commit: check `origin/codex/repo-cleanup-docs` with `git log --oneline origin/codex/repo-cleanup-docs -5`.
-- Base at time of writing: `origin/main` at `9e45131`
+- Merged through PR #18.
+- Main commit after merge: `73169db Merge pull request #18 from demzykster/codex/repo-cleanup-docs`
 - Purpose:
   - make Codex/Claude sessions check remote branches as well as `main` and PRs;
   - define the rule that autonomy never overrides strategy;
@@ -40,16 +40,14 @@ Then explain:
 - PPE permission label clarification was merged into `main` through PR #17.
 - This follow-up branch was rebased on top of the fresh `origin/main`.
 - The branch was force-pushed with lease so the remote branch now points to the updated history.
+- Sync protocol follow-up was reviewed and merged into `main` through PR #18.
 
 ### Next exact action
 
-1. Fetch remote state.
-2. Check whether `codex/repo-cleanup-docs` is already merged.
-3. If not merged, open/review PR `codex/repo-cleanup-docs` -> `main`.
-4. Confirm the diff is only docs / `.gitignore`.
-5. Merge only if clean.
-6. After merge, sync local `main`.
-7. Update this file: either mark this item closed, or replace it with the next active item.
+1. Continue small audit / permissions / onboarding work.
+2. Start from updated `main`.
+3. Keep changes small and reversible.
+4. Update this ledger again if a branch is left open, a PR is waiting, or work is paused mid-task.
 
 ### Validation
 
