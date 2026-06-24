@@ -25,7 +25,7 @@ Then explain:
 ### Permissions / onboarding stabilization
 
 - Status: active, continuing in small PRs.
-- Current `main` as of this ledger update: `81635b7 Merge pull request #32 from demzykster/codex/gate-management-nav`.
+- Current `main` as of this ledger update: `6da6618 Merge pull request #33 from demzykster/codex/update-ledger-after-nav-gates`.
 - No open PRs were present when this ledger was updated.
 - Purpose:
   - keep moving access control into one `perms` model;
@@ -62,6 +62,7 @@ Then explain:
   - `settings:manage`;
   - `audit:view`;
   - admin behavior remains unchanged through role defaults.
+- Active work ledger was refreshed after PR #32 through PR #33.
 
 ### Next exact action
 
@@ -106,11 +107,18 @@ Next product area:
 
 ### `origin/claude/clever-ride-z11u7y`
 
-- Status: checked, not active product work.
-- Latest commit: `a8bd0f2 chore: update package-lock.json libc fields (npm version diff)`.
-- Diff vs `origin/main`: `package-lock.json` only, removing optional package `libc` fields.
-- Decision: do not merge as product work. This looks like an npm/platform lockfile normalization difference and is not part of the audit / permissions / onboarding direction.
-- Safe cleanup option: delete the remote branch later as repository housekeeping after owner confirmation.
+- Status: checked, not merged into `main`.
+- Latest commit: `9eab459 docs: add Topics 13-15 to engineering dialogue`.
+- Diff vs `origin/main`:
+  - adds `docs/engineering-dialogue.md`;
+  - modifies `package-lock.json` by removing optional package `libc` fields.
+- Decision: do not merge the whole branch as product work. The engineering-dialogue doc may be useful and should be reviewed or imported separately if desired. The `package-lock.json` diff still looks like npm/platform lockfile normalization noise and should not be merged unless explicitly approved.
+- Safe option: if the dialogue doc is wanted, copy only `docs/engineering-dialogue.md` into a focused docs PR and leave `package-lock.json` unchanged.
+
+### Older `origin/codex/*` branches
+
+- Status: checked against `origin/main`.
+- Decision: all currently visible older `origin/codex/*` branches are already merged into `main`; they are repository housekeeping only.
 
 ## Handoff Back Rule
 
