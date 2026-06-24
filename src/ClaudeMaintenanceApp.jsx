@@ -1649,9 +1649,11 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
   };
   return (
     <div className="login-bg">
-      <button className="login-theme" onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
       <div className="login-card">
-        <div className="brand"><div className="brand-mark"><Wrench size={22} /></div><div><div className="brand-title">{config?.companyName?.trim() || "אחזקה"}</div><div className="brand-sub">{config?.companyName?.trim() ? ("מערכת אחזקה" + (config.siteName?.trim() ? " · " + config.siteName.trim() : "")) : "מערכת ניהול קריאות ותחזוקה"}</div></div></div>
+        <div className="login-card-head">
+          <div className="brand"><div className="brand-mark"><Wrench size={22} /></div><div><div className="brand-title">{config?.companyName?.trim() || "אחזקה"}</div><div className="brand-sub">{config?.companyName?.trim() ? ("מערכת אחזקה" + (config.siteName?.trim() ? " · " + config.siteName.trim() : "")) : "מערכת ניהול קריאות ותחזוקה"}</div></div></div>
+          <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
+        </div>
         {activationToken ? (<>
           <div className="login-q">הפעלת כניסה לעובד</div>
           {activationUser ? <div className="hint" style={{ marginBottom: 10 }}>שלום {activationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד {activationUser.workerNo || "—"}.</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
@@ -6161,9 +6163,11 @@ a{color:inherit;}
 @keyframes rise{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
 
 .login-bg{min-height:100vh;background:linear-gradient(160deg,#16202E,#243447);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;}
-.login-theme{position:absolute;top:18px;left:18px;width:40px;height:40px;border-radius:11px;color:#94A3B8;background:#ffffff14;display:flex;align-items:center;justify-content:center;}
 .login-card{background:var(--surface);color:var(--ink);border-radius:20px;padding:26px 22px;width:100%;max-width:390px;box-shadow:0 20px 50px rgba(0,0,0,.35);animation:rise .5s ease;}
-.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
+.login-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;}
+.login-theme{width:40px;height:40px;border-radius:11px;color:var(--muted);background:var(--surface-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.login-theme:hover{border-color:var(--primary);color:var(--primary);}
+.brand{display:flex;align-items:center;gap:12px;min-width:0;}
 .brand-mark{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(234,88,12,.35);flex-shrink:0;}
 .brand-mark.sm{width:38px;height:38px;border-radius:11px;}
 .brand-title{font-family:var(--font-head);font-weight:700;font-size:24px;line-height:1;}
@@ -6178,6 +6182,7 @@ a{color:inherit;}
 .back-link{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:14px;margin-bottom:10px;}
 .login-alt{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:12px;padding:11px;border:1.5px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);font-weight:600;font-size:13.5px;}
 .login-foot{text-align:center;color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.5;}
+@media (min-width:900px){.login-bg{padding:36px;}.login-card{max-width:500px;padding:30px 30px 28px;}.login-q{font-size:17px;}}
 
 .field{display:block;margin-bottom:15px;}
 .field>span{display:block;font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:6px;}
