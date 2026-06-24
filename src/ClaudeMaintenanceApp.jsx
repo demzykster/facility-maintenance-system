@@ -671,7 +671,7 @@ const ballHolder = (t) => {
   const who = ballIn(t);
   if (who === "admin") return { key: "admin", label: "מנהל המערכת", Icon: ShieldCheck, color: "#4F46E5" };
   if (who === "manager") return { key: "manager", label: (t.status === "waiting" && t.waitingReason === "no_equipment") ? "מנהל מחלקה · להעביר כלי" : (t.status === "pending_manager" ? "מנהל מחלקה · לאישור דיווח" : (t.status === "pending_user" ? "מנהל מחלקה · לאישור ביצוע" : "מנהל מחלקה")), Icon: User, color: "#0D9488" };
-  if (who === "tech") return { key: "tech", label: t.assignee ? ("טכנאי · " + t.assignee) : "צוות טכני · ממתין לקבלה", Icon: Wrench, color: "#D97706" };
+  if (who === "tech") return { key: "tech", label: t.assignee ? (t.assignee === "טכנאי" ? "טכנאי מטפל" : "טכנאי · " + t.assignee) : "צוות טכני · ממתין לקבלה", Icon: Wrench, color: "#D97706" };
   return null; // none — סגורה/בוטלה/הוחזרה לעובד
 };
 // Есть ли активный техник, который МОЖЕТ принять заявку (по типу/поставщику/категории). Пусто → заявка «без принимающего».
@@ -5994,13 +5994,14 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const c = catOf(t), pr = prOf(t.priority), s = stOf(t.status), tr = TRACKS[t.track];
   const risk = (admin && fleet && config) ? computeRisk(t, fleet, config) : null;
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
+  const showSubAssignee = admin && t.assignee && !isOpen(t);
   return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
     <div className="tcard-icon" style={{ background: c.color + "22" }}><c.Icon size={20} color={c.color} /></div>
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
-      <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{admin && t.assignee && <> · <Wrench size={11} /> {t.assignee}</>}</div>
+      <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{showSubAssignee && <> · <Wrench size={11} /> {t.assignee}</>}</div>
       <SlaBar t={t} />
-      {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div style={{ color: b.color, fontSize: 11.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, margin: "3px 0 1px" }}><b.Icon size={12} /> אצל: {b.label} · כבר {fmtDur(Date.now() - since)}</div>; })()}
+      {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div className="tcard-owner" style={{ color: b.color }}><b.Icon size={12} /> שלב: {b.label} · {fmtDur(Date.now() - since)}</div>; })()}
       <div className="tcard-badges">
         <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
@@ -6136,6 +6137,8 @@ a{color:inherit;}
 .tcard-sub{display:flex;align-items:center;gap:4px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin:4px 0 7px;}
 .tcard-sub svg{flex-shrink:0;}
 .track-tag{display:inline-flex;align-items:center;gap:3px;font-weight:600;}
+.tcard-owner{display:flex;align-items:center;gap:4px;margin:4px 0 1px;font-size:11.5px;font-weight:600;opacity:.82;}
+.tcard-owner svg{flex-shrink:0;}
 .tcard-badges{display:flex;align-items:center;gap:7px;margin-top:7px;}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}
