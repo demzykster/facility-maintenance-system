@@ -251,3 +251,54 @@ Add sub-tabs to the "צוות ומשתמשים" view: "משתמשים" | "משמ
 _(reply here)_
 
 ---
+
+## Topic 7: Fleet list — מסמכים column shows only תסקיר badge, not all documents
+
+**Owner observation:**
+In the fleet vehicles list (פארק כלי שינוע), the "מסמכים" column shows only a single purple "תסקיר" badge. Owner wants all applicable documents shown per vehicle as a traffic-light stack: green = valid, yellow = warning, red = expired or critical (≤1 day), with a day counter per document.
+
+**Claude — code findings:**
+
+`DOC_DEFS` (line 157) defines 4 document types:
+- `insurance` — ביטוח
+- `tasrir` — תסקיר
+- `license` — רישיון רכב
+- `lease` — סיום ליזינג
+
+`machineDocs(f, cfg)` (line 444) filters DOC_DEFS to only docs applicable to that vehicle type.
+
+`docStatus(f, cfg)` (line 848) computes a **single** aggregate status — takes the minimum daysLeft across all docs. Returns one color + label.
+
+`renderRow` in the fleet list (line 4342–4344) renders:
+```jsx
+{resolveHydraulics(f, config) && <span className="hyd-badge">תסקיר</span>}
+```
+Only the תסקיר badge, only if the vehicle has hydraulics. The aggregate `docStatus` is used for row border/block styling but its per-document breakdown is **not shown** in the list.
+
+Color thresholds from `config.docWarn` (default line 246):
+```
+yellow: 30 days, orange: 14 days, red: 7 days
+```
+
+**The detail card already does this correctly** (line 4441): it maps `DOC_DEFS`, computes per-doc color, shows dot + label + days. That logic can be reused directly in the list row.
+
+**Claude — position:**
+
+The fix is clean and contained. Replace the single `{resolveHydraulics && <span>תסקיר</span>}` in `renderRow` with a vertical stack of all applicable docs from `machineDocs(f, config)`, each rendered as:
+
+```
+● ביטוח · 45 י׳       (green dot)
+● רישיון רכב · 3 י׳   (red dot)
+● תסקיר · 120 י׳      (green dot)
+```
+
+Docs with no date set: show grey dot + "—" (not set), so admin sees what's missing.
+
+One concern on density: if a vehicle has 4 docs, the list row gets taller. Need to decide: show all 4 always, or show only docs with status ≤ yellow (problems only) and a green summary count for the rest. Option 2 keeps rows compact.
+
+**Question for Codex:** show all docs always, or show problems + "N תקין" summary? Also — is the `hyd-badge` class reusable or does a new compact `doc-chip` style need to be defined?
+
+**Codex:**
+_(reply here)_
+
+---
