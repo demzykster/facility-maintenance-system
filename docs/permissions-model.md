@@ -117,6 +117,7 @@ Current implementation note:
 - The user permission editor now includes `users` as a module separate from `workerAccess`, so HR-like access can be expressed without creating an HR role or another one-off checkbox.
 - The `צוות ומשתמשים` screen is gated by `users`: `view` shows the team tree read-only, while `manage` enables creating, editing, archiving, and restoring users.
 - Managers default to `ppe: request`, so they can submit clothing/PPE requests for their scope unless explicitly set to `ppe: none`.
+- The permission editor also includes management modules `analytics`, `suppliers`, `settings`, and `audit`; screen gates should be added against these module keys instead of new one-off flags.
 
 Possible grouping:
 
