@@ -5993,13 +5993,12 @@ function SlaBar({ t, big }) {
 function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const c = catOf(t), pr = prOf(t.priority), s = stOf(t.status), tr = TRACKS[t.track];
   const risk = (admin && fleet && config) ? computeRisk(t, fleet, config) : null;
-  const waitingForTechAcceptance = !t.assignee && t.track === "transport" && t.status === "new" && ballIn(t) === "tech";
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
     <div className="tcard-icon" style={{ background: c.color + "22" }}><c.Icon size={20} color={c.color} /></div>
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
-      <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{admin && t.assignee && <> · <Wrench size={11} /> {t.assignee}</>}{waitingForTechAcceptance && <> · <span style={{ color: "#2563EB" }}>ממתינה לקבלה</span></>}</div>
+      <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{admin && t.assignee && <> · <Wrench size={11} /> {t.assignee}</>}</div>
       <SlaBar t={t} />
       {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div style={{ color: b.color, fontSize: 11.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, margin: "3px 0 1px" }}><b.Icon size={12} /> אצל: {b.label} · כבר {fmtDur(Date.now() - since)}</div>; })()}
       <div className="tcard-badges">
