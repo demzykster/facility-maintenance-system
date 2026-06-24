@@ -457,6 +457,8 @@ const driverOwned = (d, session) => !!(d && session && (session.role === "admin"
 const canFleetDocs = (session) => canView(session, "fleetDocs");
 const canFleetTickets = (session) => canView(session, "fleetTickets");
 const canManageWorkerAccess = (session) => canManage(session, "workerAccess");
+const canViewUsers = (session) => canView(session, "users");
+const canManageUsers = (session) => canManage(session, "users");
 const workerLoginStateText = (u) => {
   if (!u || (u.role !== "worker" && u.role !== "cleaner")) return "";
   if (u.activationToken && u.activationStatus === "pending") return "ממתין להפעלה";
@@ -4044,6 +4046,9 @@ function AdminApp(p) {
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
+  const mayViewUsers = canViewUsers(session);
+  const mayManageUsers = canManageUsers(session);
+  const activeTab = tab === "team" && !mayViewUsers ? "dash" : tab;
   const nav = [
     { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
@@ -4052,30 +4057,30 @@ function AdminApp(p) {
     { id: "assets", Icon: Truck, label: "כלים ותחזוקה" },
     { id: "insights", Icon: BarChart3, label: "אנליטיקה" },
     { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" },
-    { id: "team", Icon: Users, label: "צוות ומשתמשים" },
+    mayViewUsers ? { id: "team", Icon: Users, label: "צוות ומשתמשים" } : null,
     { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" },
     { id: "activity", Icon: Clock, label: "יומן פעילות" },
     { id: "settings", Icon: Settings, label: "הגדרות" },
-  ].map((n) => ({ ...n, active: tab === n.id, onClick: () => setTab(n.id) }));
+  ].filter(Boolean).map((n) => ({ ...n, active: activeTab === n.id, onClick: () => setTab(n.id) }));
   const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
         <TopBar title="ניהול אחזקה" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
-          extra={<select className="mob-tab desk-hide" value={tab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
+          extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
-          {tab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
-          {tab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} /></>}
-          {tab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
-          {tab === "tasks" && <ManageHub {...p} />}
-          {tab === "ppe" && <PpeHub {...p} />}
-          {tab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
-          {tab === "cleaning" && <CleaningAdmin {...p} />}
-          {tab === "team" && <SettingsPanel {...p} only="users" />}
-          {tab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
-          {tab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} />}
-          {tab === "settings" && <SettingsPanel {...p} />}
+          {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
+          {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} /></>}
+          {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
+          {activeTab === "tasks" && <ManageHub {...p} />}
+          {activeTab === "ppe" && <PpeHub {...p} />}
+          {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
+          {activeTab === "cleaning" && <CleaningAdmin {...p} />}
+          {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
+          {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
+          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} />}
+          {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
       <nav className="bottom-nav">{mobileNav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
@@ -5142,12 +5147,13 @@ function UserTree({ list, departments, onPick, expandAll, shifts }) {
   const [open, setOpen] = useState({});
   const isOpen = (k) => expandAll || open[k];
   const toggle = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
+  const pickable = typeof onPick === "function";
   const mgrDepts = (u) => userDepts(u);
   const admins = list.filter((u) => u.role === "admin");
   const techs = list.filter((u) => u.role === "tech");
   const allDepts = [...new Set([...(departments || []), ...list.filter((u) => u.role !== "admin" && u.role !== "tech").flatMap((u) => u.role === "user" ? mgrDepts(u) : [u.dept]).filter(Boolean)])];
   const unassigned = list.filter((u) => u.role !== "admin" && u.role !== "tech" && (u.role === "user" ? mgrDepts(u).length === 0 : !(u.dept || "")));
-  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; return <button className="tcard" onClick={() => onPick(u)} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14 }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : (u.role === "worker" || u.role === "cleaner") ? `מס׳ ${u.workerNo || "—"} · ${workerLoginStateText(u)}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></button>; };
+  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; return <button className="tcard" onClick={() => pickable && onPick(u)} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14, cursor: pickable ? "pointer" : "default" }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : (u.role === "worker" || u.role === "cleaner") ? `מס׳ ${u.workerNo || "—"} · ${workerLoginStateText(u)}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></button>; };
   const Group = ({ k, title, count, color, children }) => <div style={{ marginBottom: 10 }}><button onClick={() => toggle(k)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", borderInlineStartWidth: 4, borderInlineStartColor: color || "var(--border)", background: "var(--surface-2)", cursor: "pointer", textAlign: "start" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>{title}<span className="badge sm" style={{ background: "var(--surface)", color: "var(--muted)" }}>{count}</span></span><ChevronLeft size={16} style={{ transform: isOpen(k) ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></button>{isOpen(k) && <div style={{ marginTop: 6, paddingInlineStart: 6 }}>{children}</div>}</div>;
   const Col = ({ title, color, people }) => <div style={{ flex: "1 1 220px", minWidth: 200 }}><div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: color || "inherit", marginBottom: 6 }}>{color ? <span style={{ width: 8, height: 8, borderRadius: 4, background: color }} /> : null}{title}<span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{people.length}</span></div><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{people.length === 0 ? <div className="hint" style={{ paddingInlineStart: 6 }}>אין עובדים</div> : people}</div></div>;
   if (list.length === 0) return <div className="note">לא נמצאו משתמשים</div>;
@@ -5289,6 +5295,8 @@ function SettingsPanel(p) {
   const saveMaint = async () => { const list = cats.filter((c) => c.label.trim()); await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}) }); flash(); };
   const saveFleetTypes = async () => { setTypeMsg(""); const list = vtypes.filter((t) => (t.name || "").trim()); const newModels = new Set(); list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); })); const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type)); if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${orphan.length} כלים משויכים לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; } await saveConfig({ ...config, ...flattenVehicleTypes(list) }); flash(); };
   const adminCount = users.filter((u) => u.role === "admin" && u.active).length;
+  const mayViewUsers = p.only === "users" ? canViewUsers(session) : true;
+  const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
   const TW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"], ["presence", "כפתור משמרת"]];
   const MW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"]];
   const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["doc", "תוקף מסמכים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"]];
@@ -5419,13 +5427,14 @@ function SettingsPanel(p) {
       {typeMsg && <div className="note" style={{ color: "#DC2626" }}>{typeMsg}</div>}
     </>)}
 
-    {tab === "users" && (<>
-      <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle><button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button></div>
+    {tab === "users" && (!mayViewUsers ? <div className="note">אין הרשאה לצפייה בניהול משתמשים.</div> : <>
+      <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button>}</div>
+      {!mayManageUsers && <div className="hint" style={{ marginTop: 4 }}>יש לך הרשאת צפייה בלבד. יצירה, עריכה ושחזור עובדים דורשים הרשאת ניהול משתמשים.</div>}
       <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / מס׳ עובד / דוא״ל" /></div>
-      <UserTree list={ulist} departments={config.departments} onPick={setUEdit} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
+      <UserTree list={ulist} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
-      {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={restoreWorker} /></Overlay>}
+      {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { await saveUser(u); if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want) await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }); } } setUEdit(null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
     </>)}
   </div>);
