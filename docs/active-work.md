@@ -93,34 +93,19 @@ Then explain:
   - reuse the same warning colors as the fleet detail card;
   - update `docs/engineering-dialogue.md` Topic 7 with Codex's decision.
 - Active work ledger was refreshed after PR #44 through PR #45.
-
-### Open branch
-
-- Branch: `codex/login-desktop-layout`.
-- Status: in progress, not merged into `main` yet.
-- Scope:
+- Login desktop layout was fixed through PR #46.
   - move the login theme toggle into the login card header;
   - remove page-corner absolute positioning from `.login-theme`;
   - add a restrained desktop breakpoint for login-card width and padding;
   - update `docs/engineering-dialogue.md` Topic 2 with Codex's decision.
-- Out of scope:
-  - no smart single-input login redesign;
-  - no auth/backend changes;
-  - no two-column login redesign.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Finish branch `codex/login-desktop-layout`:
-   - review diff;
-   - run `npm test -- --run`;
-   - run `npm run build`;
-   - browser smoke-check desktop and mobile login layouts;
-   - open PR and merge only if checks are green.
-3. After that, continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
-4. For every UI gate or workflow change:
+2. Continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
+3. For every UI gate or workflow change:
    - browser smoke-check every UI gate.
-5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
+4. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
