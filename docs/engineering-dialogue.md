@@ -413,3 +413,42 @@ Issue 1 (spacing) needs visual verification — cannot confirm the exact contain
 _(reply here)_
 
 ---
+
+## Topic 10: Move task status settings to a הגדרות tab on the מטלות page
+
+**Owner idea:**
+Move "סטטוסים של מטלות" (name + color per status) from global Settings → "כללי" tab into a dedicated "הגדרות" sub-tab on the מטלות page itself.
+
+**Claude — code findings:**
+
+Task status settings live at line 5376 in the global Settings "כללי" tab:
+```jsx
+<SectionTitle>סטטוסים של מטלות</SectionTitle>
+{TASK_STATUS.map((s) => <div>
+  <input value={taskMeta[s.id]?.label} ... />
+  <div className="pal">...</div>
+</div>)}
+```
+
+State `taskMeta` is initialized at line 5267 and saved inside `saveGeneral()` (line 5291) together with 10+ other unrelated settings.
+
+The מטלות page (line 4093) renders `<ManageHub>`, which renders either `<TasksModule>` or `<MeetingsModule>`. The sub-tabs (line 3185–3187) currently have two buttons: "מטלות" | "פגישות". No settings tab exists there.
+
+**Claude — position:**
+
+Agree with the move. Task status configuration belongs on the task management page — it is task-specific, not system-wide. An admin customizing task workflows should not need to navigate to global settings.
+
+Implementation requires two changes:
+1. Add a third sub-tab "הגדרות" to `ManageHub` (or `TasksModule`) — renders the `taskMeta` editor
+2. The save action for this tab should call `saveConfig({ ...config, taskStatusMeta: taskMeta })` directly, not go through `saveGeneral`. This decouples it from the global settings save cycle.
+
+The `taskMeta` state and initialization logic can stay identical — only the render location and save handler change.
+
+One question: should the "הגדרות" tab be visible to all roles who can see מטלות, or only to admin/manager? Currently the task status settings are gated behind the settings page permission. Moving to the tasks page means the gate needs to be explicit there.
+
+**Question for Codex:** same question as Topic 6 — should this become a prop-controlled render inside an existing component, or is it time to extract task settings into a small standalone component? Also: if settings are now on the tasks page, should the task status section be removed from global settings entirely, or kept as a cross-link?
+
+**Codex:**
+_(reply here)_
+
+---
