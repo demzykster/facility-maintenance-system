@@ -1,16 +1,5 @@
 import { describe, expect, it } from "vitest";
-
-function workerLoginStateText(user) {
-  if (!user || (user.role !== "worker" && user.role !== "cleaner")) return "";
-  if (user.activationToken && user.activationStatus === "pending") return "pending activation";
-  if (user.activationStatus === "activated") return "activated";
-  if (user.pin) return "temporary code";
-  return "no access";
-}
-
-function canCopyActivationLink(user, canManageWorkerAccess) {
-  return !!user.id && !!user.activationToken && !!canManageWorkerAccess;
-}
+import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "../src/workerAccessModel.js";
 
 function createActivationLink(user, token) {
   return {
@@ -46,27 +35,35 @@ describe("worker activation rules", () => {
     const unsavedWorker = createActivationLink({ role: "worker", workerNo: "4010" }, "token-1");
     const savedWorker = { ...unsavedWorker, id: "user-4010" };
 
-    expect(canCopyActivationLink(unsavedWorker, true)).toBe(false);
-    expect(canCopyActivationLink(savedWorker, false)).toBe(false);
-    expect(canCopyActivationLink(savedWorker, true)).toBe(true);
+    expect(canCopyActivationLink(unsavedWorker, unsavedWorker.activationToken, true)).toBe(false);
+    expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, false)).toBe(false);
+    expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, true)).toBe(true);
   });
 
   it("tracks pending, activated, temporary-code, and no-access states", () => {
-    expect(workerLoginStateText({ role: "worker", activationToken: "t", activationStatus: "pending" })).toBe("pending activation");
-    expect(workerLoginStateText({ role: "worker", activationStatus: "activated", pin: "9876" })).toBe("activated");
-    expect(workerLoginStateText({ role: "worker", pin: "1234" })).toBe("temporary code");
-    expect(workerLoginStateText({ role: "worker" })).toBe("no access");
+    expect(workerLoginStateText({ role: "worker", activationToken: "t", activationStatus: "pending" })).toBe("ממתין להפעלה");
+    expect(workerLoginStateText({ role: "worker", activationStatus: "activated", pin: "9876" })).toBe("הופעל");
+    expect(workerLoginStateText({ role: "worker", pin: "1234" })).toBe("קוד זמני");
+    expect(workerLoginStateText({ role: "worker" })).toBe("אין כניסה");
   });
 
   it("resets an activated worker by creating a new pending activation link", () => {
     const activated = activateWorker({ id: "user-1", role: "worker", workerNo: "4010" }, "9876");
     const reset = createActivationLink(activated, "token-2");
 
-    expect(workerLoginStateText(activated)).toBe("activated");
+    expect(workerLoginStateText(activated)).toBe("הופעל");
     expect(reset.pin).toBe("");
     expect(reset.activationToken).toBe("token-2");
     expect(reset.activationStatus).toBe("pending");
-    expect(workerLoginStateText(reset)).toBe("pending activation");
+    expect(workerLoginStateText(reset)).toBe("ממתין להפעלה");
+  });
+
+  it("seeds activation state for new workers when worker-access permission is available", () => {
+    expect(shouldSeedWorkerActivation({ role: "worker" }, "worker", true)).toBe(true);
+    expect(shouldSeedWorkerActivation({ role: "cleaner" }, "cleaner", true)).toBe(true);
+    expect(shouldSeedWorkerActivation({ role: "worker", pin: "1234" }, "worker", true)).toBe(false);
+    expect(shouldSeedWorkerActivation({ id: "user-1", role: "worker" }, "worker", true)).toBe(false);
+    expect(shouldSeedWorkerActivation({ role: "worker" }, "worker", false)).toBe(false);
   });
 
   it("preserves worker login fields when the editor lacks worker access permission", () => {
