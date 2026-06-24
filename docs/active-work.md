@@ -22,18 +22,15 @@ Then explain:
 
 ## Current Active Item
 
-### Sync protocol follow-up
+### Permissions / onboarding stabilization
 
-- Status: closed.
-- Branch: `codex/repo-cleanup-docs`
-- Merged through PR #18.
-- Main commit after merge: `73169db Merge pull request #18 from demzykster/codex/repo-cleanup-docs`
-- Follow-up close commit: `e0fce13 Merge pull request #19 from demzykster/codex/close-active-sync-ledger`
+- Status: active, continuing in small PRs.
+- Current `main` as of this ledger update: `9e83c30 Merge pull request #30 from demzykster/codex/add-management-permission-modules`.
+- No open PRs were present when this ledger was updated.
 - Purpose:
-  - make Codex/Claude sessions check remote branches as well as `main` and PRs;
-  - define the rule that autonomy never overrides strategy;
-  - define `PROBLEM:` as the required blocker marker;
-  - ignore `.codex-remote-attachments/`.
+  - keep moving access control into one `perms` model;
+  - avoid new one-off user-card checkboxes;
+  - prepare worker onboarding / activation controls without starting backend/Auth/RLS work.
 
 ### What was already done
 
@@ -41,20 +38,44 @@ Then explain:
 - PPE permission label clarification was merged into `main` through PR #17.
 - Sync protocol follow-up was reviewed and merged into `main` through PR #18.
 - Active ledger was closed correctly through PR #19.
+- The `PROBLEM:` marker was standardized through PR #20.
+- Stale non-product remote branch documentation was merged through PR #21.
+- `PRODUCT.md` and ticket-card noise cleanup were merged through PR #22.
+- Waiting-status badge cleanup was merged through PR #23.
+- Centralized permission model was introduced through PR #24.
+- Permission capability helpers were added through PR #25.
+- `users` was added to the permission editor through PR #26.
+- The `צוות ומשתמשים` screen was gated by `users` permission through PR #27.
+- PPE blank-screen hotfix restored the missing `permRank` import through PR #28.
+- PPE request permission was enforced through PR #29:
+  - managers default to `ppe: request`;
+  - explicit `ppe: none` blocks the PPE request flow.
+- Management permission modules were added through PR #30:
+  - `analytics`;
+  - `suppliers`;
+  - `settings`;
+  - `audit`.
 
 ### Next exact action
 
-1. Continue small audit / permissions / onboarding work.
-2. Start from updated `main`.
-3. Keep changes small and reversible.
-4. Update this ledger again if a branch is left open, a PR is waiting, or work is paused mid-task.
+1. Start from updated `main`.
+2. Continue with small permission-gating PRs for the newly added modules:
+   - gate `analytics` / `suppliers` / `settings` / `audit` screens using `canView` / `canManage`;
+   - keep admin behavior unchanged;
+   - browser smoke-check every UI gate.
+3. Keep worker onboarding as the next related area, using `workerAccess: manage`.
+4. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
-- This item was docs / `.gitignore` only.
-- Previous code validation on this line of work:
-  - `npm test`: 4 files passed, 8 tests passed.
+- Latest code validation after PR #30 on `main`:
+  - `npm test -- --run`: 6 files passed, 14 tests passed.
   - `npm run build`: passed.
+- Browser smoke-checks performed during permissions work:
+  - admin sees full PPE inventory dashboard;
+  - built-in manager sees PPE request flow;
+  - regular manager without `users` permission does not see `צוות ומשתמשים`;
+  - admin sees `צוות ומשתמשים` and can open the user form.
 - If a session touches code after this, it must rerun:
   - `npm test -- --run`
   - `npm run build`
@@ -68,6 +89,7 @@ Next product area:
 - unified permissions model;
 - worker onboarding / activation links;
 - no duplicated one-off user-card checkboxes;
+- small screen gates for `analytics`, `suppliers`, `settings`, and `audit`;
 - no Supabase/Auth/RLS/database yet;
 - no broad modular split yet.
 
