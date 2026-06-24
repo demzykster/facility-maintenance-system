@@ -10,7 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { USER_PERMISSION_MODULES, canManage, canView, cleanPerms, normalizePerms, permLevel } from "./permissionModel.js";
+import { USER_PERMISSION_MODULES, canManage, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
