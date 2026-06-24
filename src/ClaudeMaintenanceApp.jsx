@@ -5450,6 +5450,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
   const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
   const activationLink = activationToken ? `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(activationToken)}` : "";
+  const canCopyActivationLink = !!user.id && !!activationToken && canWorkerAccess;
   const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
   const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
     const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
@@ -5524,7 +5525,9 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
         <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{activationToken ? "ממתין להפעלה: שלחו לעובד את הקישור והוא יגדיר קוד אישי בעצמו." : pin.trim() ? "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהעובד יחליף אותו בקוד אישי." : "טרם הוגדר קוד כניסה. צרו קישור הפעלה או הזינו קוד זמני."}</div></div>
         {canWorkerAccess ? <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); }}>צור קישור הפעלה</button> : <div className="hint">יצירת קישור הפעלה דורשת הרשאת הפעלת כניסה לעובדים.</div>}
-        {activationToken && canWorkerAccess && <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> העתק קישור</button><div className="hint">הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>}
+        {activationToken && canWorkerAccess && (canCopyActivationLink
+          ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> העתק קישור</button><div className="hint">הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>
+          : <div className="hint">הקישור ייווצר לאחר שמירת העובד. לחצו שמירה, פתחו שוב את העובד ואז העתיקו את הקישור.</div>)}
         <label className="field"><span>קוד כניסה זמני{activationToken ? "" : " *"}</span><input value={pin} onChange={(e) => { setPin(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהעובד יגדיר קוד בעצמו.</div></label>
       </>) : (<>
         <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
