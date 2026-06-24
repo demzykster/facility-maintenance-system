@@ -42,16 +42,18 @@ Required checks:
 - Check latest `origin/main`.
 - Check open PRs if the tool/session can access them.
 - Check remote branches, not only open PRs. A pushed branch without PR is still active work.
-- Read `docs/current-status.md`, `docs/next-steps.md`, `docs/collaboration-model.md`, and `docs/handoff-for-next-codex.md`.
+- Read `docs/active-work.md`, `docs/current-status.md`, `docs/next-steps.md`, `docs/collaboration-model.md`, and `docs/handoff-for-next-codex.md`.
 
 If `main`, open PRs, remote branches, or docs disagree, treat that as a synchronization problem before doing product work.
+
+For unfinished work, `docs/active-work.md` is the exact handoff ledger. It must say what is open, where the last session stopped, what remains, what checks passed, and how to hand the work back.
 
 ## Rules
 
 - Work from the latest `main` unless using a feature branch.
 - Keep each change small.
 - Autonomy never overrides the agreed strategy. Even if the owner says "move freely", "do it yourself", or "do not wait for me", Codex and Claude must stay inside the current roadmap, current phase, and documented guardrails.
-- If the requested action conflicts with the strategy or a blocker prevents safe work, start the response with `ПРОБЛЕМА:` and explain what blocks the work, why it is risky, and the safe options.
+- If the requested action conflicts with the strategy or a blocker prevents safe work, start the response with `PROBLEM / ПРОБЛЕМА:` and explain what blocks the work, why it is risky, and the safe options.
 - Run `npm run build` before calling a code change done.
 - Run `npm test` once tests exist.
 - Do not push directly to production services.
@@ -69,17 +71,19 @@ GitHub source of truth:
 https://github.com/demzykster/facility-maintenance-system
 
 Read these files first:
+- docs/active-work.md
 - docs/current-status.md
 - docs/next-steps.md
 - docs/collaboration-model.md
+- docs/handoff-for-next-codex.md
 
 Current phase:
-Phase 2 - Stabilization.
+Phase 2 - Stabilization / audit / permissions-onboarding, unless docs/active-work.md says an earlier handoff item is still open.
 
 Rules:
 - Do not replace the whole ClaudeMaintenanceApp.jsx file.
 - Use small diff/patch changes against Git.
-- Autonomy does not allow leaving the current strategy; if blocked, write `ПРОБЛЕМА:` and explain the safe options.
-- No Supabase, modular split, or UI changes unless explicitly requested.
-- First target: fix duplicate createdAt warning, then build, then Vitest skeleton.
+- Autonomy does not allow leaving the current strategy.
+- If blocked, write PROBLEM / ПРОБЛЕМА: and explain the safe options.
+- No Supabase, modular split, or production database unless the roadmap says that phase has started.
 ```
