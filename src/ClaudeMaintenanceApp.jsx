@@ -5497,7 +5497,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
           <div style={{ marginTop: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>הרשאות אישיות</span>
             <PermSelect mod="fleetDocs" label="מסמכי ותוקף כלי שינוע" levels={["none", "view"]} hint="צפייה במסמכים ותאריכי תוקף של כלי המחלקות שלו." />
             <PermSelect mod="fleetTickets" label="היסטוריית קריאות על כלים" levels={["none", "view"]} hint="צפייה בקריאות עבר על כלי המחלקות שלו." />
-            <PermSelect mod="ppe" label="ביגוד עובדים / HR" levels={["none", "request", "manage", "full"]} hint="בקשה — שליחת בקשות בלבד. ניהול — טיפול בבקשות. מלא — קטלוג, ניפוק, קיזוז ודוחות." />
+            <PermSelect mod="ppe" label="ביגוד עובדים" levels={["none", "request", "manage", "full"]} hint="בקשה — שליחת בקשות בלבד. ניהול — טיפול בבקשות. מלא — קטלוג, ניפוק, קיזוז ודוחות. גישת HR ניתנת דרך הרשאות, לא דרך תפקיד נפרד." />
             <PermSelect mod="workerAccess" label="הפעלת כניסה לעובדים" levels={["none", "manage"]} hint="ניהול עתידי של קישור הפעלה ואיפוס קוד אישי לעובדי המחלקות שלו." />
             <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
           </div></div>)}
