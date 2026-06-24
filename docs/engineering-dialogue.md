@@ -542,3 +542,108 @@ One risk: `saveRegistries` currently saves departments and zones atomically. Aft
 _(reply here)_
 
 ---
+
+## Topic 13: Backup/restore — 7 collections missing
+
+**Owner observation:**
+"גיבוי ושחזור" — check that it exports the ENTIRE database. Not urgent for demo, but must be correct at launch.
+
+**Claude — code findings:**
+
+`buildBackup` (line 1357) currently exports:
+```
+config, users, fleet, tickets, pm, insp, templates, zones, rounds, complaints, absences, photos
+```
+
+`importBackup` (line 1374) writes the same list via `writeColl`.
+
+A full audit of `store.set(...)` calls across the file reveals 7 additional collections that are never included:
+
+| key | module |
+|---|---|
+| `mtask` | maintenance tasks |
+| `mmeet` | maintenance meetings |
+| `ppe` | PPE inventory |
+| `ppeitem` | PPE item catalog |
+| `ppenorm` | PPE norms |
+| `ppeorder` | PPE orders |
+| `ppereq` | PPE requests |
+
+These 7 collections are silently dropped on every backup. A restore from backup would lose all PPE data and all maintenance tasks/meetings.
+
+**Claude — position:**
+
+This is a data integrity bug, not a UX issue. Severity: high — silent data loss on restore, no warning to user.
+
+Fix is mechanical: add the 7 keys to both `buildBackup` return object and `importBackup` `writeColl` calls. Also recommend bumping the backup format version from `v:1` to `v:2` so older backups can be detected and a warning shown ("this backup is missing PPE and maintenance tasks — restore anyway?").
+
+No schema migration needed since each collection is just an array stored as-is.
+
+**Question for Codex:** should the backup format version check be strict (refuse v:1) or advisory (warn + restore)? And is there any other store key we might have missed — should we add a runtime assertion that `Object.keys(buildBackup())` equals `Object.keys(store.getAll())`?
+
+**Codex:**
+_(reply here)_
+
+---
+
+## Topic 14: Rename nav item "כלים ותחזוקה" → "כלי שינוע"
+
+**Owner idea:**
+Rename the navigation item "כלים ותחזוקה" to "כלי שינוע".
+
+**Claude — code findings:**
+
+The label appears in two places:
+
+1. Main nav array (line 4074):
+```jsx
+{ id: "assets", Icon: Truck, label: "כלים ותחזוקה" }
+```
+
+2. Manager page sub-tab button (line 2102 area — the "כלים ונהגים / כיסוי" section header or a tab button referencing this label).
+
+The rename is purely cosmetic — no logic depends on the label string, only the `id: "assets"` key is used for routing.
+
+**Claude — position:**
+
+Agree. "כלי שינוע" (transport vehicles/means of transport) is more precise than "כלים ותחזוקה" (tools and maintenance) — it distinguishes this module from general maintenance. Two-line change, zero risk.
+
+One consistency check needed: search for any hardcoded string "כלים ותחזוקה" elsewhere (breadcrumbs, tooltips, help text, permission labels) to ensure nothing is missed.
+
+**Question for Codex:** are there any accessibility or i18n concerns with changing a nav label that users may have bookmarked or screen-reader users may have memorized?
+
+**Codex:**
+_(reply here)_
+
+---
+
+## Topic 15: Remove "פיתוח ובדיקות" section from Settings page
+
+**Owner idea:**
+Remove the "פיתוח ובדיקות" (dev & testing) spoiler with demo load/clear buttons from the Settings page. The demo data loader was moved to the main/home screen.
+
+**Claude — code findings:**
+
+Lines 5402–5408 in SettingsPanel render a collapsible spoiler:
+```jsx
+<details>
+  <summary>פיתוח ובדיקות</summary>
+  <button onClick={loadDemo}>טען נתוני דמו</button>
+  <button onClick={clearAll}>נקה הכל</button>
+</details>
+```
+
+The `loadDemo` and `clearAll` handlers are defined in the same component. If the demo loader was already added to the home screen, these handlers may be duplicated there.
+
+**Claude — position:**
+
+Agree with removal. Dev-only controls in a production settings page are a liability: a manager could accidentally wipe all data by clicking "נקה הכל". Once the home screen version is confirmed working, this section should be deleted entirely — not hidden behind a feature flag, deleted.
+
+Before deleting: verify `clearAll` is also available from the home screen path, so no capability is lost.
+
+**Question for Codex:** should `loadDemo` / `clearAll` be moved to a dedicated "developer mode" that requires an activation gesture (e.g., tap version number 5 times), or is home-screen placement with a confirmation dialog sufficient?
+
+**Codex:**
+_(reply here)_
+
+---
