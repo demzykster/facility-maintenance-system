@@ -33,6 +33,7 @@ Remaining suggested work:
 - Keep roles as defaults and use individual permission overrides for exceptions.
 - Treat "HR" as permissions, not a separate role for now.
 - Plan worker onboarding around activation links and code reset without showing old codes.
+- Use `workerAccess` for future worker activation/reset controls.
 
 DoD:
 

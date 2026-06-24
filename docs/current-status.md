@@ -66,3 +66,9 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 Phase 2 basics are now complete.
 
 Next practical work should define and implement a unified permissions model before adding more one-off user-card checkboxes or worker onboarding controls.
+
+Current permissions work:
+
+- `docs/permissions-model.md` defines the guardrail.
+- The user form has started moving old manager toggles into a single `perms` editor.
+- `workerAccess` is the planned permission for worker activation/reset flows.
