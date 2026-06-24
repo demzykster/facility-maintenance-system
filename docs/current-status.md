@@ -73,3 +73,4 @@ Current permissions work:
 - The user form has started moving old manager toggles into a single `perms` editor.
 - `workerAccess` is the planned permission for worker activation/reset flows.
 - Worker/cleaner lists now show login state (`pending activation`, `temporary code`, `activated`, `no access`).
+- Activated worker personal codes are hidden from managers; reset is done by generating a new activation link.
