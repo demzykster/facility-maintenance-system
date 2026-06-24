@@ -6059,6 +6059,7 @@ function SlaBar({ t, big }) {
 function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const c = catOf(t), pr = prOf(t.priority), s = stOf(t.status), tr = TRACKS[t.track];
   const risk = (isOpen(t) && admin && fleet && config) ? computeRisk(t, fleet, config) : null;
+  const showRiskBadge = risk && (risk.level === "orange" || risk.level === "red");
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
   return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
@@ -6072,7 +6073,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
         <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
         {missingHandler && <span className="badge sm" style={{ color: "#7F1D1D", background: "#FEE2E2" }}><AlertTriangle size={11} /> ללא מטפל פעיל</span>}
-        {risk && risk.level !== "green" && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
+        {showRiskBadge && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
         {t.byAdmin && <span className="badge sm" style={{ color: "#7C3AED", background: "#EDE9FE" }}><ShieldCheck size={11} /> מנהל</span>}
         {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
         {isOverdue(t) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
