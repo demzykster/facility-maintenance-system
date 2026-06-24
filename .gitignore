@@ -6,6 +6,7 @@ vite-cache/
 *.tsbuildinfo
 .npm-cache/
 .tools/
+.claude/
 _pre-sync-backup/
 _phase1-sync-state/
 
