@@ -26,7 +26,7 @@ Before answering project-status questions or starting work, every Codex/Claude s
 
 A clean `main` and no open PRs do not prove there is no active work. A pushed branch without PR is still active work and must be checked.
 
-If `main`, PRs, remote branches, and docs disagree, start with `PROBLEM / ПРОБЛЕМА:` and resolve the synchronization issue before product work.
+If `main`, PRs, remote branches, and docs disagree, start with `PROBLEM:` and resolve the synchronization issue before product work.
 
 ## Completed
 
