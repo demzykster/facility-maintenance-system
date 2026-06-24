@@ -12,43 +12,43 @@ Completed:
 - `npm test` passes.
 - `npm run build` passes.
 
-## Current Practical Step - Audit Dependencies
+## Current Practical Step - Permissions Model
 
-Current `npm audit` findings:
+The next product step is to avoid duplicate user settings by moving toward a unified permissions model.
 
-- `xlsx`: high severity advisories, direct dependency, no npm automatic fix available.
+Read:
 
-Important context:
-
-- The previous `esbuild` low severity advisory was removed by updating Vite from 7 to 8 in branch `codex/audit-dependencies`.
-- `xlsx` is used for Excel/CSV import and many Excel exports in `src/ClaudeMaintenanceApp.jsx`.
-- `npm view xlsx version` currently returns `0.18.5`, which is already the latest npm release.
-- Do not replace `xlsx` casually; this affects business import/export flows.
-- Branch `codex/audit-dependencies` also caps Excel/CSV task imports at 5 MB as a small mitigation.
-- Branch `codex/replace-task-import-xlsx` replaces task file import with:
-  - `read-excel-file` for `.xlsx`;
-  - `papaparse` for `.csv`.
-- After that branch, `xlsx` remains in use for export/report generation only.
+- `docs/permissions-model.md`
 
 Recommended next branch:
 
 ```powershell
-git checkout -b codex/audit-dependencies
+git checkout -b codex/permissions-model
 ```
 
 Remaining suggested work:
 
-- For `xlsx`, compare options:
-  - keep current export library temporarily and document risk;
-  - move exports to `write-excel-file` or another maintained writer behind focused tests;
-  - move to a maintained SheetJS source if available and license/business constraints are acceptable.
-- Add/update docs with the chosen decision.
+- Replace scattered user-form permission toggles with one permissions concept.
+- Do not create duplicate settings for PPE, fleet docs, fleet tickets, worker activation, or future modules.
+- Keep roles as defaults and use individual permission overrides for exceptions.
+- Treat "HR" as permissions, not a separate role for now.
+- Plan worker onboarding around activation links and code reset without showing old codes.
+- Use `workerAccess` for future worker activation/reset controls.
+- Keep worker lifecycle in one place: worker/cleaner forms should not show a separate `active` checkbox when the "worker left / equipment return" flow exists.
+- Treat the current worker code field as a temporary bridge until activation-link onboarding is implemented.
+- The current activation-link flow is a frontend demo/staging flow; production must move activation tokens server-side.
+- Creation/copy of worker activation links is gated by `workerAccess: manage` (admin has this through role defaults).
 
 DoD:
 
 - `npm test` passes.
 - `npm run build` passes.
-- Any dependency changes are small and explained in the PR.
+- Any UI change is small and does not change Supabase/Auth/RLS/backend behavior.
+- Existing behavior remains understandable for admin, manager, technician, worker, and cleaner.
+
+## Later - Audit Dependencies
+
+`npm audit` still reports `xlsx` high severity advisories with no npm automatic fix. Do not replace `xlsx` casually; this affects business import/export flows. Handle it in a focused dependency phase after the permissions/onboarding direction is clear.
 
 ## Still Not Next
 

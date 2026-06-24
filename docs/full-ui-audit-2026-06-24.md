@@ -9,10 +9,12 @@ Scope: admin and manager demo flows, Hebrew UI, dashboard, tickets, fleet, analy
 - `12dbe04` - reduced cleaning dashboard duplication by replacing separate missed/due top lists with one action section.
 - `d24b286` - removed duplicate "waiting for acceptance" text from ticket cards; status and owner-step rows remain visible.
 - `eecaf16` - replaced generic hard-hat icons inside PPE/equipment sections with clothing/equipment icons, keeping hard-hat for technicians and head-protection category.
+- Ticket-card pass: medium risk is no longer shown as a separate card badge; high and critical risk remain visible, while full risk details remain inside the ticket detail view.
+- Ticket-card pass: waiting cards with a specific waiting reason show the reason instead of a separate generic "waiting" badge.
 
 ## Current Findings
 
-- Ticket cards are still dense. They now avoid one duplicate status phrase, but the card still carries status, SLA, risk, ball-holder, downtime and time labels. Next pass should decide which labels are primary vs secondary.
+- Ticket cards are still dense. They now avoid one duplicate status phrase, suppress medium-risk card badges, and reduce waiting-status duplication, but the card still carries SLA, ball-holder, downtime and time labels. Next pass should decide which labels are primary vs secondary.
 - Cleaning "today" view is now less duplicated at the top. The full daily overview still repeats the same zones below by design, as a control list.
 - Settings are not currently duplicated as code: `צוות ומשתמשים` opens users only, while `הגדרות` opens global settings. PPE has its own domain settings inside the PPE hub. This is acceptable for now, but a later information-architecture pass should document the site map.
 - Vercel remains demo/staging. No password protection was added because the owner explicitly chose to keep it open for now.

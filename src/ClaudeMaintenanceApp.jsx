@@ -10,6 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { USER_PERMISSION_MODULES, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -453,12 +454,23 @@ const driverOf = (f, cat) => unitDrivers(f)[cat] || null;
 const driverActive = (d) => !!(d && (!d.status || d.status === "active"));
 const driverPending = (d) => !!(d && (d.status === "pending_add" || d.status === "pending_move"));
 const driverOwned = (d, session) => !!(d && session && (session.role === "admin" || d.addedByUid === session.id));
-const canFleetDocs = (session) => !!(session && (session.role === "admin" || session.fleetDocs));
-const canFleetTickets = (session) => !!(session && (session.role === "admin" || session.fleetTickets));
-const PERM_LEVELS = ["none", "view", "request", "manage", "full"];
-const permRank = (l) => { const i = PERM_LEVELS.indexOf(l); return i < 0 ? 0 : i; };
-const ROLE_PERM_DEFAULT = { admin: { ppe: "full" }, user: { ppe: "view" }, tech: { ppe: "view" }, worker: { ppe: "none" }, cleaner: { ppe: "none" } };
-const permLevel = (session, mod) => { if (!session) return "none"; if (session.role === "admin") return "full"; const p = session.perms && session.perms[mod]; if (p) return p; const d = ROLE_PERM_DEFAULT[session.role]; return (d && d[mod]) || "none"; };
+const canFleetDocs = (session) => canView(session, "fleetDocs");
+const canFleetTickets = (session) => canView(session, "fleetTickets");
+const canManageWorkerAccess = (session) => canManage(session, "workerAccess");
+const canViewUsers = (session) => canView(session, "users");
+const canManageUsers = (session) => canManage(session, "users");
+const canRequestPpe = (session) => canRequest(session, "ppe");
+const canViewAnalytics = (session) => canView(session, "analytics");
+const canViewSuppliers = (session) => canView(session, "suppliers");
+const canManageSettings = (session) => canManage(session, "settings");
+const canViewAudit = (session) => canView(session, "audit");
+const workerLoginStateText = (u) => {
+  if (!u || (u.role !== "worker" && u.role !== "cleaner")) return "";
+  if (u.activationToken && u.activationStatus === "pending") return "ממתין להפעלה";
+  if (u.activationStatus === "activated") return "הופעל";
+  if (u.pin) return "קוד זמני";
+  return "אין כניסה";
+};
 const fleetForSession = (session, fleet) => { if (!session || session.role === "admin") return fleet || []; const md = userDepts(session); if (!md.length) return fleet || []; return (fleet || []).filter((f) => fleetDepts(f).some((d) => md.includes(d))); };
 const pushDriverEvent = (cfg, evt) => ({ ...cfg, driverEvents: [{ id: uid(), at: Date.now(), ...evt }, ...((cfg.driverEvents || []).slice(0, 299))] });
 const pendingDriverReqs = (fleet) => { const out = []; (fleet || []).forEach((f) => DRIVER_SHIFTS.forEach((s) => { const d = driverOf(f, s.id); if (driverPending(d)) out.push({ unit: f, cat: s.id, driver: d }); })); return out.sort((a, b) => (b.driver.reqAt || 0) - (a.driver.reqAt || 0)); };
@@ -1247,7 +1259,7 @@ export default function App() {
     : actAs === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: firstTech.shiftId || "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", techScope: "transport", techCats: [] })
     : actAs === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })
     : actAs === "cleaner" ? (firstCleaner ? { id: firstCleaner.id, name: firstCleaner.name, role: "cleaner" } : { ...session, role: "cleaner" })
-    : (firstMgr ? { id: firstMgr.id, name: firstMgr.name, role: "user", dept: firstMgr.dept || config.departments[0] || "", depts: userDepts(firstMgr).length ? userDepts(firstMgr) : [config.departments[0] || ""], email: firstMgr.email || "", fleetDocs: !!firstMgr.fleetDocs, fleetTickets: !!firstMgr.fleetTickets, mgrZones: firstMgr.mgrZones || [], shift: firstMgr.shift || "", perms: firstMgr.perms || undefined } : { ...session, role: "user", dept: session.dept || config.departments[0] || "", mgrZones: session.mgrZones || [] });
+    : (firstMgr ? { id: firstMgr.id, name: firstMgr.name, role: "user", dept: firstMgr.dept || config.departments[0] || "", depts: userDepts(firstMgr).length ? userDepts(firstMgr) : [config.departments[0] || ""], email: firstMgr.email || "", mgrZones: firstMgr.mgrZones || [], shift: firstMgr.shift || "", perms: normalizePerms(firstMgr) } : { ...session, role: "user", dept: session.dept || config.departments[0] || "", mgrZones: session.mgrZones || [] });
   const effLogout = impersonating ? (async () => setActAs(null)) : logout;
   // В режиме симуляции пишем присутствие под личностью имперсонируемого техника — чтобы статус был сквозным (видно и админу, и менеджеру).
   const effSetShift = !impersonating ? setShift : (async (on) => {
@@ -1385,7 +1397,7 @@ export default function App() {
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} />
+        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -1567,12 +1579,26 @@ function PublicReport({ zones, onSubmit, onClose }) {
   </div></div>);
 }
 
-function Login({ users, config, onLogin, theme, toggleTheme, zones, onAnonReport }) {
+function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport }) {
   const [mode, setMode] = useState("user"), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [code, setCode] = useState(""), [workerNo, setWorkerNo] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false);
+  const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
+  const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
+  const activationUser = activationToken ? active.find((u) => (u.role === "worker" || u.role === "cleaner") && u.activationToken === activationToken && u.activationStatus === "pending") : null;
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); if (d.email) setEmail(d.email); if (d.workerNo) setWorkerNo(d.workerNo); if (d.mode) setMode(d.mode); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
-  const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.shiftId || "", techScope: u.techScope || "transport", techCats: u.techCats || [], fleetDocs: !!u.fleetDocs, fleetTickets: !!u.fleetTickets, mgrZones: u.mgrZones || [], shift: u.shift || "", perms: u.perms || undefined });
+  const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.shiftId || "", techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
+  const activateWorker = async () => {
+    if (!activationUser) return setErr("קישור ההפעלה אינו תקין או שכבר נוצל");
+    if (!saveUser) return setErr("לא ניתן להשלים הפעלה בסביבה זו");
+    if (actCode.trim().length < 4) return setErr("בחרו קוד אישי בן 4 ספרות לפחות");
+    if (actCode.trim() !== actConfirm.trim()) return setErr("הקודים אינם זהים");
+    const u = { ...activationUser, pin: actCode.trim(), activationToken: "", activationStatus: "activated", activatedAt: Date.now() };
+    await saveUser(u);
+    try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
+    remember_save({ workerNo: u.workerNo || "", mode: "worker" });
+    finish(u);
+  };
   const dfltDept = config?.departments?.[0] || "";
   const submitUser = () => {
     const b = BUILTIN_LOGINS.find((x) => (x.role === "admin" || x.role === "user") && x.email.toLowerCase() === email.trim().toLowerCase() && x.password === password);
@@ -1605,6 +1631,14 @@ function Login({ users, config, onLogin, theme, toggleTheme, zones, onAnonReport
       <button className="login-theme" onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
       <div className="login-card">
         <div className="brand"><div className="brand-mark"><Wrench size={22} /></div><div><div className="brand-title">{config?.companyName?.trim() || "אחזקה"}</div><div className="brand-sub">{config?.companyName?.trim() ? ("מערכת אחזקה" + (config.siteName?.trim() ? " · " + config.siteName.trim() : "")) : "מערכת ניהול קריאות ותחזוקה"}</div></div></div>
+        {activationToken ? (<>
+          <div className="login-q">הפעלת כניסה לעובד</div>
+          {activationUser ? <div className="hint" style={{ marginBottom: 10 }}>שלום {activationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד {activationUser.workerNo || "—"}.</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
+          <label className="field"><span>קוד אישי חדש</span><input value={actCode} onChange={(e) => { setActCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" disabled={!activationUser} /></label>
+          <label className="field"><span>אישור קוד</span><input value={actConfirm} onChange={(e) => { setActConfirm(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && activateWorker()} disabled={!activationUser} /></label>
+          {err && <div className="err">{err}</div>}
+          <button className="btn-primary full" onClick={activateWorker} disabled={!activationUser}>שמירה וכניסה</button>
+        </>) : (<>
         <div className="seg-tabs s3" style={{ marginBottom: 16 }}>
           <button className={mode === "user" ? "on" : ""} onClick={() => { setMode("user"); setErr(""); }}>צוות</button>
           <button className={mode === "worker" ? "on" : ""} onClick={() => { setMode("worker"); setErr(""); }}>עובד</button>
@@ -1634,6 +1668,7 @@ function Login({ users, config, onLogin, theme, toggleTheme, zones, onAnonReport
         <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה (תמיד פעילה): {mode === "user" ? "vadim@chemipal.co.il · סיסמה 1234" : mode === "worker" ? "מספר עובד 1042 · קוד 1234" : "קוד 1234"}</div>
         <div className="login-foot">גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
+        </>)}
       </div>
       {pub && <PublicReport zones={zones} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
     </div>
@@ -1700,7 +1735,7 @@ function UserApp(p) {
               : deptTab === "team" ? <>
                 <div className="row-between"><SectionTitle><Users size={15} /> עובדי המחלקה{session.dept ? ` · ${session.dept}` : ""}</SectionTitle><button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> הוסף עובד</button></div>
                 <div className="note">העובדים מדווחים תקלות שמגיעות אליך לבדיקה. הם נכנסים עם מספר עובד + קוד שתגדירו כאן.</div>
-                {deptWorkers.length === 0 ? <Empty text="אין עובדים במחלקה" Icon={Users} sub="הוסיפו עובד בלחיצה על «הוסף עובד»" /> : <div className="cards">{deptWorkers.map((u) => <button key={u.id} className="tcard" onClick={() => setUEdit(u)} style={{ borderInlineStartColor: u.active ? "#16A34A" : "var(--muted)" }}><span className="avatar"><User size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>עובד</span></div><div className="tcard-sub">מס׳ עובד {u.workerNo || "—"} · {u.active ? "פעיל" : "מושבת"}</div></div></button>)}</div>}
+                {deptWorkers.length === 0 ? <Empty text="אין עובדים במחלקה" Icon={Users} sub="הוסיפו עובד בלחיצה על «הוסף עובד»" /> : <div className="cards">{deptWorkers.map((u) => <button key={u.id} className="tcard" onClick={() => setUEdit(u)} style={{ borderInlineStartColor: u.active ? "#16A34A" : "var(--muted)" }}><span className="avatar"><User size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>עובד</span></div><div className="tcard-sub">מס׳ עובד {u.workerNo || "—"} · {u.active ? "פעיל" : "מושבת"} · {workerLoginStateText(u)}</div></div></button>)}</div>}
               </>
               : <ManagerFleet {...p} />}
           </>)}
@@ -1712,7 +1747,7 @@ function UserApp(p) {
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
-      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} onCancel={() => setUEdit(null)} onSave={async (u) => { await saveUser(u); setUEdit(null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
+      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { await saveUser(u); setUEdit(null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
@@ -3294,7 +3329,7 @@ function PpeRestock({ item, onCancel, onSave, session, onLog }) {
       <button className="btn-primary full" onClick={save}>עדכון מלאי</button><div style={{ height: 24 }} /></div></div>);
 }
 
-function UserPicker({ users, config, saveUser, value, onChange, label, pool, lockRole, hint, suggestName }) {
+function UserPicker({ users, config, saveUser, value, onChange, label, pool, lockRole, hint, suggestName, canManageWorkerAccess: canWorkerAccess = false }) {
   const list = (pool || users || []);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
@@ -3312,7 +3347,7 @@ function UserPicker({ users, config, saveUser, value, onChange, label, pool, loc
       {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא «{q.trim()}» במערכת.</div>}
       {saveUser && <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור חדש"}</button>}
     </div> : (hint ? <div className="hint">{hint}</div> : null)}
-    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole={lockRole || "worker"} onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u); setCreating(false); setQ(""); }} /></Overlay>}
+    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole={lockRole || "worker"} canManageWorkerAccess={canWorkerAccess} onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u); setCreating(false); setQ(""); }} /></Overlay>}
   </div>);
 }
 
@@ -3385,7 +3420,7 @@ function PpeWorkerPicker({ users, config, session, saveUser, value, onChange, de
       {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא עובד «{q.trim()}» במערכת.</div>}
       <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור עובד חדש"}</button>
     </div> : <div className="hint">הקלידו מספר עובד — המערכת תאתר אותו. לא קיים? תוכלו ליצור אותו כאן (חיפוש לפי מספר מונע כפילות).</div>}
-    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole="worker" onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u.id); setCreating(false); setQ(""); }} /></Overlay>}
+    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole="worker" canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u.id); setCreating(false); setQ(""); }} /></Overlay>}
   </div>);
 }
 
@@ -3996,6 +4031,7 @@ function PpeHub(p) {
   const [mStart, mEnd] = monthRange(mY, mM);
   const mLabel = monthLabelOf(mY, mM);
   const openOrder = () => { const lines = []; (ppeItems || []).filter((x) => x.active !== false).forEach((it) => { ppeNetDeficits(it, ppeOrders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setOrderForm({ lines }); };
+  if (!canRequestPpe(session)) return <div className="note">אין הרשאה לבקשת או ניהול ביגוד עובדים.</div>;
   if (!isFull) return <PpeRequester ppe={ppe} items={ppeItems} norms={ppeNorms} reqs={ppeReqs} users={users} config={config} session={session} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} deptScope={deptScope} />;
   const tab = sub;
   return (<>
@@ -4016,38 +4052,52 @@ function AdminApp(p) {
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
+  const mayViewUsers = canViewUsers(session);
+  const mayManageUsers = canManageUsers(session);
+  const mayViewAnalytics = canViewAnalytics(session);
+  const mayViewSuppliers = canViewSuppliers(session);
+  const mayManageSettings = canManageSettings(session);
+  const mayViewAudit = canViewAudit(session);
+  const blockedTab = {
+    insights: !mayViewAnalytics,
+    team: !mayViewUsers,
+    suppliers: !mayViewSuppliers,
+    activity: !mayViewAudit,
+    settings: !mayManageSettings
+  };
+  const activeTab = blockedTab[tab] ? "dash" : tab;
   const nav = [
     { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
     { id: "tasks", Icon: ClipboardList, label: "מטלות" },
     { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" },
     { id: "assets", Icon: Truck, label: "כלים ותחזוקה" },
-    { id: "insights", Icon: BarChart3, label: "אנליטיקה" },
+    mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה" } : null,
     { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" },
-    { id: "team", Icon: Users, label: "צוות ומשתמשים" },
-    { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" },
-    { id: "activity", Icon: Clock, label: "יומן פעילות" },
-    { id: "settings", Icon: Settings, label: "הגדרות" },
-  ].map((n) => ({ ...n, active: tab === n.id, onClick: () => setTab(n.id) }));
+    mayViewUsers ? { id: "team", Icon: Users, label: "צוות ומשתמשים" } : null,
+    mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" } : null,
+    mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות" } : null,
+    mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות" } : null,
+  ].filter(Boolean).map((n) => ({ ...n, active: activeTab === n.id, onClick: () => setTab(n.id) }));
   const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
         <TopBar title="ניהול אחזקה" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
-          extra={<select className="mob-tab desk-hide" value={tab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
+          extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
-          {tab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
-          {tab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} /></>}
-          {tab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
-          {tab === "tasks" && <ManageHub {...p} />}
-          {tab === "ppe" && <PpeHub {...p} />}
-          {tab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
-          {tab === "cleaning" && <CleaningAdmin {...p} />}
-          {tab === "team" && <SettingsPanel {...p} only="users" />}
-          {tab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
-          {tab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} />}
-          {tab === "settings" && <SettingsPanel {...p} />}
+          {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
+          {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} /></>}
+          {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
+          {activeTab === "tasks" && <ManageHub {...p} />}
+          {activeTab === "ppe" && <PpeHub {...p} />}
+          {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
+          {activeTab === "cleaning" && <CleaningAdmin {...p} />}
+          {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
+          {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
+          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} />}
+          {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
       <nav className="bottom-nav">{mobileNav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
@@ -5114,12 +5164,13 @@ function UserTree({ list, departments, onPick, expandAll, shifts }) {
   const [open, setOpen] = useState({});
   const isOpen = (k) => expandAll || open[k];
   const toggle = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
+  const pickable = typeof onPick === "function";
   const mgrDepts = (u) => userDepts(u);
   const admins = list.filter((u) => u.role === "admin");
   const techs = list.filter((u) => u.role === "tech");
   const allDepts = [...new Set([...(departments || []), ...list.filter((u) => u.role !== "admin" && u.role !== "tech").flatMap((u) => u.role === "user" ? mgrDepts(u) : [u.dept]).filter(Boolean)])];
   const unassigned = list.filter((u) => u.role !== "admin" && u.role !== "tech" && (u.role === "user" ? mgrDepts(u).length === 0 : !(u.dept || "")));
-  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; return <button className="tcard" onClick={() => onPick(u)} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14 }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : u.role === "worker" ? `מס׳ ${u.workerNo || "—"}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></button>; };
+  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; return <button className="tcard" onClick={() => pickable && onPick(u)} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14, cursor: pickable ? "pointer" : "default" }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : (u.role === "worker" || u.role === "cleaner") ? `מס׳ ${u.workerNo || "—"} · ${workerLoginStateText(u)}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></button>; };
   const Group = ({ k, title, count, color, children }) => <div style={{ marginBottom: 10 }}><button onClick={() => toggle(k)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", borderInlineStartWidth: 4, borderInlineStartColor: color || "var(--border)", background: "var(--surface-2)", cursor: "pointer", textAlign: "start" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>{title}<span className="badge sm" style={{ background: "var(--surface)", color: "var(--muted)" }}>{count}</span></span><ChevronLeft size={16} style={{ transform: isOpen(k) ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></button>{isOpen(k) && <div style={{ marginTop: 6, paddingInlineStart: 6 }}>{children}</div>}</div>;
   const Col = ({ title, color, people }) => <div style={{ flex: "1 1 220px", minWidth: 200 }}><div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: color || "inherit", marginBottom: 6 }}>{color ? <span style={{ width: 8, height: 8, borderRadius: 4, background: color }} /> : null}{title}<span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{people.length}</span></div><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{people.length === 0 ? <div className="hint" style={{ paddingInlineStart: 6 }}>אין עובדים</div> : people}</div></div>;
   if (list.length === 0) return <div className="note">לא נמצאו משתמשים</div>;
@@ -5261,6 +5312,8 @@ function SettingsPanel(p) {
   const saveMaint = async () => { const list = cats.filter((c) => c.label.trim()); await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}) }); flash(); };
   const saveFleetTypes = async () => { setTypeMsg(""); const list = vtypes.filter((t) => (t.name || "").trim()); const newModels = new Set(); list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); })); const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type)); if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${orphan.length} כלים משויכים לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; } await saveConfig({ ...config, ...flattenVehicleTypes(list) }); flash(); };
   const adminCount = users.filter((u) => u.role === "admin" && u.active).length;
+  const mayViewUsers = p.only === "users" ? canViewUsers(session) : true;
+  const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
   const TW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"], ["presence", "כפתור משמרת"]];
   const MW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"]];
   const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["doc", "תוקף מסמכים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"]];
@@ -5391,33 +5444,47 @@ function SettingsPanel(p) {
       {typeMsg && <div className="note" style={{ color: "#DC2626" }}>{typeMsg}</div>}
     </>)}
 
-    {tab === "users" && (<>
-      <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle><button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button></div>
+    {tab === "users" && (!mayViewUsers ? <div className="note">אין הרשאה לצפייה בניהול משתמשים.</div> : <>
+      <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button>}</div>
+      {!mayManageUsers && <div className="hint" style={{ marginTop: 4 }}>יש לך הרשאת צפייה בלבד. יצירה, עריכה ושחזור עובדים דורשים הרשאת ניהול משתמשים.</div>}
       <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / מס׳ עובד / דוא״ל" /></div>
-      <UserTree list={ulist} departments={config.departments} onPick={setUEdit} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
+      <UserTree list={ulist} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
-      {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={restoreWorker} /></Overlay>}
-      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { await saveUser(u); if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want) await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }); } } setUEdit(null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
+      {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} /></Overlay>}
+      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { await saveUser(u); if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want) await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }); } } setUEdit(null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
     </>)}
   </div>);
 }
-function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, onCancel, onSave, onDelete, onArchive }) {
-  const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [fleetDocs, setFleetDocs] = useState(!!user.fleetDocs), [fleetTickets, setFleetTickets] = useState(!!user.fleetTickets), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [ppeFull, setPpeFull] = useState((user.perms && user.perms.ppe) === "full"), [err, setErr] = useState("");
+function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, canManageWorkerAccess: canWorkerAccess = false, onCancel, onSave, onDelete, onArchive }) {
+  const initialPerms = normalizePerms(user);
+  if ((user.role || lockRole || "user") === "user" && !initialPerms.ppe) initialPerms.ppe = "request";
+  const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
+  const [activationToken, setActivationToken] = useState(user.activationToken || "");
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
+  const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
+  const activationLink = activationToken ? `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(activationToken)}` : "";
+  const canCopyActivationLink = !!user.id && !!activationToken && canWorkerAccess;
+  const workerCodeActivated = (role === "worker" || role === "cleaner") && user.activationStatus === "activated" && !activationToken;
+  const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
+  const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
+    const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
+    return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
+  };
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
     if (role === "tech") {
       if (!pin.trim()) return setErr("נא להזין קוד כניסה לטכנאי");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
-    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (!pin.trim()) return setErr("נא להזין קוד כניסה"); }
+    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (!pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה"); }
     else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (!password.trim()) return setErr("נא להזין סיסמה"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
+    const nextPerms = role === "user" ? cleanPerms(perms) : cleanPerms(user.perms);
     onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), role,
       email: (role === "tech" || role === "worker" || role === "cleaner") ? "" : email.trim().toLowerCase(), password: (role === "tech" || role === "worker" || role === "cleaner") ? "" : password,
       pin: (role === "tech" || role === "worker" || role === "cleaner") ? pin.trim() : "",
@@ -5425,10 +5492,12 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
       dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: role === "tech" ? shiftId : "", shiftStart: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? (config.shifts.find((s) => s.id === shiftId).start || "") : shiftStart) : "", shiftEnd: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? config.shifts.find((s) => s.id === shiftId).end : shiftEnd) : "",
       techScope: role === "tech" ? techScope : undefined,
       techCats: (role === "tech" && techScope === "facility") ? techCats : [],
-      fleetDocs: role === "user" ? fleetDocs : false, fleetTickets: role === "user" ? fleetTickets : false, mgrZones: role === "user" ? mgrZones : [], perms: role === "user" ? { ppe: ppeFull ? "full" : "request" } : (user.perms || undefined),
+      mgrZones: role === "user" ? mgrZones : [], perms: Object.keys(nextPerms).length ? nextPerms : undefined,
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
       active,
+      activationToken: (role === "worker" || role === "cleaner") ? activationToken : "",
+      activationStatus: (role === "worker" || role === "cleaner") ? (activationToken ? "pending" : (user.activationStatus || "")) : "",
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
   };
@@ -5441,11 +5510,9 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
-          <div style={{ marginTop: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>הרשאות פארק כלי שינוע</span>
-            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={fleetDocs} onChange={(e) => setFleetDocs(e.target.checked)} /> רואה מסמכים ותוקף של הכלים</label>
-            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={ppeFull} onChange={(e) => setPpeFull(e.target.checked)} /> גישה מלאה למודול ביגוד עובדים (כמו מנהל מערכת)</label><div className="hint" style={{ marginTop: 2 }}>מסומן — גישת HR מלאה (כל המחלקות, קטלוג, דרישות, קיזוז, הנפקה ישירה ואישור בקשות). לא מסומן — המנהל שולח «בקשת הנפקה» לעובדיו בלבד, ללא ניפוק ישיר מהמלאי.</div>
-            <label className="chk-line"><input type="checkbox" checked={fleetTickets} onChange={(e) => setFleetTickets(e.target.checked)} /> רואה היסטוריית קריאות על הכלים שלו</label>
-            <div className="hint">המנהל תמיד רואה את כלי מחלקותיו ויכול לנהל נהגים. שתי ההרשאות לעיל כבויות כברירת מחדל.</div>
+          <div style={{ marginTop: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>הרשאות אישיות</span>
+            {USER_PERMISSION_MODULES.map((m) => <PermSelect key={m.mod} {...m} />)}
+            <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
           </div></div>)}
       {role === "user" && zones && (zones.length === 0
         ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
@@ -5470,13 +5537,25 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
           : <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>}
       </>) : (role === "worker" || role === "cleaner") ? (<>
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
-        <label className="field"><span>קוד כניסה *</span><input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">העובד נכנס עם מספר העובד והקוד הזה — דרך «כניסת עובד» במסך הכניסה. אין צורך בדוא״ל.</div></label>
+        <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{activationToken ? "ממתין להפעלה: שלחו לעובד את הקישור והוא יגדיר קוד אישי בעצמו." : workerCodeActivated ? "הופעל: העובד הגדיר קוד אישי. הקוד אינו מוצג למנהלים." : pin.trim() ? "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהעובד יחליף אותו בקוד אישי." : "טרם הוגדר קוד כניסה. צרו קישור הפעלה או הזינו קוד זמני."}</div></div>
+        {canWorkerAccess ? <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); }}>{workerCodeActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button> : <div className="hint">יצירת קישור הפעלה דורשת הרשאת הפעלת כניסה לעובדים.</div>}
+        {activationToken && canWorkerAccess && (canCopyActivationLink
+          ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> העתק קישור</button><div className="hint">הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>
+          : <div className="hint">הקישור ייווצר לאחר שמירת העובד. לחצו שמירה, פתחו שוב את העובד ואז העתיקו את הקישור.</div>)}
+        {!workerCodeActivated && !activationToken && <label className="field"><span>קוד כניסה זמני *</span><input value={pin} onChange={(e) => { setPin(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהעובד יגדיר קוד בעצמו.</div></label>}
+        {workerCodeActivated && <div className="hint">לא מציגים קוד אישי קיים. אם העובד שכח את הקוד, צרו קישור איפוס ושלחו אותו מחדש.</div>}
       </>) : (<>
         <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
         <label className="field"><span>סיסמה *</span><input value={password} onChange={(e) => setPassword(e.target.value)} type="text" placeholder="סיסמה שתמסרו למשתמש" /><div className="hint">אתם קובעים את הסיסמה ומוסרים אותה למשתמש. ניתן לשנות בכל עת.</div></label>
       </>)}
-      <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> משתמש פעיל</label>
-      <div className="hint" style={{ marginTop: -4 }}>בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו (למשל עובד שעזב).</div>
+      {(role === "worker" || role === "cleaner") ? (
+        <div className="hint" style={{ marginTop: 0 }}>סטטוס עובד מנוהל דרך פעולת עזיבת עובד / החזרת ציוד, כדי לא להחזיק שתי הגדרות מקבילות.</div>
+      ) : (
+        <>
+          <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> משתמש פעיל</label>
+          <div className="hint" style={{ marginTop: -4 }}>בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו.</div>
+        </>
+      )}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>שמירה</button>
       {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><HardHat size={15} /> עזיבת עובד / החזרת ציוד</button>}
@@ -5992,7 +6071,9 @@ function SlaBar({ t, big }) {
 }
 function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const c = catOf(t), pr = prOf(t.priority), s = stOf(t.status), tr = TRACKS[t.track];
-  const risk = (admin && fleet && config) ? computeRisk(t, fleet, config) : null;
+  const risk = (isOpen(t) && admin && fleet && config) ? computeRisk(t, fleet, config) : null;
+  const showRiskBadge = risk && (risk.level === "orange" || risk.level === "red");
+  const showStatusBadge = !(t.status === "waiting" && t.waitingReason);
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
   return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
@@ -6000,13 +6081,13 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
       <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{showSubAssignee && <> · <Wrench size={11} /> {t.assignee}</>}</div>
-      <SlaBar t={t} />
+      {isOpen(t) && <SlaBar t={t} />}
       {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div className="tcard-owner" style={{ color: b.color }}><b.Icon size={12} /> שלב: {b.label} · {fmtDur(Date.now() - since)}</div>; })()}
       <div className="tcard-badges">
-        <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>
+        {showStatusBadge && <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>}
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
         {missingHandler && <span className="badge sm" style={{ color: "#7F1D1D", background: "#FEE2E2" }}><AlertTriangle size={11} /> ללא מטפל פעיל</span>}
-        {risk && risk.level !== "green" && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
+        {showRiskBadge && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
         {t.byAdmin && <span className="badge sm" style={{ color: "#7C3AED", background: "#EDE9FE" }}><ShieldCheck size={11} /> מנהל</span>}
         {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
         {isOverdue(t) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
