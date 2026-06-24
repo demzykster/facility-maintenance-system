@@ -20,4 +20,14 @@ describe("permission capability helpers", () => {
     expect(hasPermission(null, "ppe", "view")).toBe(false);
     expect(canView({ role: "worker" }, "ppe")).toBe(false);
   });
+
+  it("treats user management as a normal permission module", () => {
+    const hrManager = { role: "user", perms: { users: "manage" } };
+    const basicManager = { role: "user", perms: {} };
+
+    expect(canView(hrManager, "users")).toBe(true);
+    expect(canManage(hrManager, "users")).toBe(true);
+    expect(canView(basicManager, "users")).toBe(false);
+    expect(canManage(basicManager, "users")).toBe(false);
+  });
 });
