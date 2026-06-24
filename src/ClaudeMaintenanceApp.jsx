@@ -5491,7 +5491,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       if (!pin.trim()) return setErr("נא להזין קוד כניסה לטכנאי");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
-    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (!pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה"); }
+    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (canWorkerAccess && !pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה"); }
     else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (!password.trim()) return setErr("נא להזין סיסמה"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
@@ -5499,7 +5499,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const nextPerms = role === "user" ? cleanPerms(perms) : cleanPerms(user.perms);
     onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), role,
       email: (role === "tech" || role === "worker" || role === "cleaner") ? "" : email.trim().toLowerCase(), password: (role === "tech" || role === "worker" || role === "cleaner") ? "" : password,
-      pin: (role === "tech" || role === "worker" || role === "cleaner") ? pin.trim() : "",
+      pin: role === "tech" ? pin.trim() : ((role === "worker" || role === "cleaner") ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : ""),
       workerNo: (role === "worker" || role === "cleaner") ? workerNo.trim() : "",
       dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: role === "tech" ? shiftId : "", shiftStart: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? (config.shifts.find((s) => s.id === shiftId).start || "") : shiftStart) : "", shiftEnd: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? config.shifts.find((s) => s.id === shiftId).end : shiftEnd) : "",
       techScope: role === "tech" ? techScope : undefined,
@@ -5508,8 +5508,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
       active,
-      activationToken: (role === "worker" || role === "cleaner") ? activationToken : "",
-      activationStatus: (role === "worker" || role === "cleaner") ? (activationToken ? "pending" : (user.activationStatus || "")) : "",
+      activationToken: (role === "worker" || role === "cleaner") ? (canWorkerAccess ? activationToken : (user.activationToken || "")) : "",
+      activationStatus: (role === "worker" || role === "cleaner") ? (canWorkerAccess ? (activationToken ? "pending" : (user.activationStatus || "")) : (user.activationStatus || "")) : "",
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
   };
@@ -5550,12 +5550,14 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       </>) : (role === "worker" || role === "cleaner") ? (<>
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
         <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{activationToken ? "ממתין להפעלה: שלחו לעובד את הקישור והוא יגדיר קוד אישי בעצמו." : workerCodeActivated ? "הופעל: העובד הגדיר קוד אישי. הקוד אינו מוצג למנהלים." : pin.trim() ? "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהעובד יחליף אותו בקוד אישי." : "טרם הוגדר קוד כניסה. צרו קישור הפעלה או הזינו קוד זמני."}</div></div>
-        {canWorkerAccess ? <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); }}>{workerCodeActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button> : <div className="hint">יצירת קישור הפעלה דורשת הרשאת הפעלת כניסה לעובדים.</div>}
-        {activationToken && canWorkerAccess && (canCopyActivationLink
-          ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> העתק קישור</button><div className="hint">הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>
-          : <div className="hint">הקישור ייווצר לאחר שמירת העובד. לחצו שמירה, פתחו שוב את העובד ואז העתיקו את הקישור.</div>)}
-        {!workerCodeActivated && !activationToken && <label className="field"><span>קוד כניסה זמני *</span><input value={pin} onChange={(e) => { setPin(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהעובד יגדיר קוד בעצמו.</div></label>}
-        {workerCodeActivated && <div className="hint">לא מציגים קוד אישי קיים. אם העובד שכח את הקוד, צרו קישור איפוס ושלחו אותו מחדש.</div>}
+        {canWorkerAccess ? <>
+          <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); }}>{workerCodeActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
+          {activationToken && (canCopyActivationLink
+            ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> העתק קישור</button><div className="hint">הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>
+            : <div className="hint">הקישור ייווצר לאחר שמירת העובד. לחצו שמירה, פתחו שוב את העובד ואז העתיקו את הקישור.</div>)}
+          {!workerCodeActivated && !activationToken && <label className="field"><span>קוד כניסה זמני *</span><input value={pin} onChange={(e) => { setPin(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהעובד יגדיר קוד בעצמו.</div></label>}
+          {workerCodeActivated && <div className="hint">לא מציגים קוד אישי קיים. אם העובד שכח את הקוד, צרו קישור איפוס ושלחו אותו מחדש.</div>}
+        </> : <div className="hint">ניהול קוד כניסה או קישור הפעלה דורש הרשאת הפעלת כניסה לעובדים. שמירת פרטי העובד לא תשנה את הגדרת הכניסה הקיימת.</div>}
       </>) : (<>
         <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
         <label className="field"><span>סיסמה *</span><input value={password} onChange={(e) => setPassword(e.target.value)} type="text" placeholder="סיסמה שתמסרו למשתמש" /><div className="hint">אתם קובעים את הסיסמה ומוסרים אותה למשתמש. ניתן לשנות בכל עת.</div></label>

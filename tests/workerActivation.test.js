@@ -31,6 +31,16 @@ function activateWorker(user, newCode, now = 1_000) {
   };
 }
 
+function applyWorkerLoginFields(originalUser, draft, canManageWorkerAccess) {
+  return {
+    pin: canManageWorkerAccess ? (draft.pin || "") : (originalUser.pin || ""),
+    activationToken: canManageWorkerAccess ? (draft.activationToken || "") : (originalUser.activationToken || ""),
+    activationStatus: canManageWorkerAccess
+      ? (draft.activationToken ? "pending" : (originalUser.activationStatus || ""))
+      : (originalUser.activationStatus || "")
+  };
+}
+
 describe("worker activation rules", () => {
   it("does not allow copying activation links before the worker is saved", () => {
     const unsavedWorker = createActivationLink({ role: "worker", workerNo: "4010" }, "token-1");
@@ -57,5 +67,27 @@ describe("worker activation rules", () => {
     expect(reset.activationToken).toBe("token-2");
     expect(reset.activationStatus).toBe("pending");
     expect(workerLoginStateText(reset)).toBe("pending activation");
+  });
+
+  it("preserves worker login fields when the editor lacks worker access permission", () => {
+    const original = {
+      id: "user-1",
+      role: "worker",
+      pin: "1234",
+      activationToken: "",
+      activationStatus: "activated"
+    };
+    const attempted = { pin: "9999", activationToken: "new-token" };
+
+    expect(applyWorkerLoginFields(original, attempted, false)).toEqual({
+      pin: "1234",
+      activationToken: "",
+      activationStatus: "activated"
+    });
+    expect(applyWorkerLoginFields(original, attempted, true)).toEqual({
+      pin: "9999",
+      activationToken: "new-token",
+      activationStatus: "pending"
+    });
   });
 });
