@@ -10,7 +10,7 @@ This file is the handoff point for any new Codex or Claude session.
 - Branch: `main`
 - Baseline tag: `pre-production-model`
 - Current baseline commit: `e908ec7 sync artifact into vite shell`
-- Current main commit: `cc00063 Merge pull request #4 from demzykster/codex/update-phase2-handoff`
+- Current main commit: `bb4890b reduce closed ticket card risk noise`
 
 The GitHub repository is now the source of truth. The old artifact/chat file is no longer the source of truth.
 
@@ -43,6 +43,9 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 - Vitest was added through PR #2.
 - `npm test` is available and currently runs 2 passing test files.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
+- Ticket-card audit passes reduced noise for closed tickets:
+  - closed/cancelled tickets no longer show an SLA progress bar;
+  - closed/cancelled tickets no longer show risk badges.
 - Verification passed on `main`:
   - `npm test`;
   - `npm run build`.
@@ -62,4 +65,4 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 
 Phase 2 basics are now complete.
 
-Next practical work should decide whether and how to replace `xlsx` in export/report generation paths before starting Supabase, Railway, production database, Auth/RLS, or modular split work.
+Next practical work should define and implement a unified permissions model before adding more one-off user-card checkboxes or worker onboarding controls.
