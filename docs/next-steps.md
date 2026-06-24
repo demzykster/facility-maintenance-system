@@ -36,6 +36,7 @@ Remaining suggested work:
 - Use `workerAccess` for future worker activation/reset controls.
 - Keep worker lifecycle in one place: worker/cleaner forms should not show a separate `active` checkbox when the "worker left / equipment return" flow exists.
 - Treat the current worker code field as a temporary bridge until activation-link onboarding is implemented.
+- The current activation-link flow is a frontend demo/staging flow; production must move activation tokens server-side.
 
 DoD:
 

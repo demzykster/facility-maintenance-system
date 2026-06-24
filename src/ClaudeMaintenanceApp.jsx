@@ -1392,7 +1392,7 @@ export default function App() {
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} />
+        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -1574,12 +1574,26 @@ function PublicReport({ zones, onSubmit, onClose }) {
   </div></div>);
 }
 
-function Login({ users, config, onLogin, theme, toggleTheme, zones, onAnonReport }) {
+function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport }) {
   const [mode, setMode] = useState("user"), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [code, setCode] = useState(""), [workerNo, setWorkerNo] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false);
+  const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
+  const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
+  const activationUser = activationToken ? active.find((u) => (u.role === "worker" || u.role === "cleaner") && u.activationToken === activationToken && u.activationStatus === "pending") : null;
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); if (d.email) setEmail(d.email); if (d.workerNo) setWorkerNo(d.workerNo); if (d.mode) setMode(d.mode); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
   const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.shiftId || "", techScope: u.techScope || "transport", techCats: u.techCats || [], fleetDocs: !!u.fleetDocs, fleetTickets: !!u.fleetTickets, mgrZones: u.mgrZones || [], shift: u.shift || "", perms: u.perms || undefined });
+  const activateWorker = async () => {
+    if (!activationUser) return setErr("קישור ההפעלה אינו תקין או שכבר נוצל");
+    if (!saveUser) return setErr("לא ניתן להשלים הפעלה בסביבה זו");
+    if (actCode.trim().length < 4) return setErr("בחרו קוד אישי בן 4 ספרות לפחות");
+    if (actCode.trim() !== actConfirm.trim()) return setErr("הקודים אינם זהים");
+    const u = { ...activationUser, pin: actCode.trim(), activationToken: "", activationStatus: "activated", activatedAt: Date.now() };
+    await saveUser(u);
+    try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
+    remember_save({ workerNo: u.workerNo || "", mode: "worker" });
+    finish(u);
+  };
   const dfltDept = config?.departments?.[0] || "";
   const submitUser = () => {
     const b = BUILTIN_LOGINS.find((x) => (x.role === "admin" || x.role === "user") && x.email.toLowerCase() === email.trim().toLowerCase() && x.password === password);
@@ -1612,6 +1626,14 @@ function Login({ users, config, onLogin, theme, toggleTheme, zones, onAnonReport
       <button className="login-theme" onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
       <div className="login-card">
         <div className="brand"><div className="brand-mark"><Wrench size={22} /></div><div><div className="brand-title">{config?.companyName?.trim() || "אחזקה"}</div><div className="brand-sub">{config?.companyName?.trim() ? ("מערכת אחזקה" + (config.siteName?.trim() ? " · " + config.siteName.trim() : "")) : "מערכת ניהול קריאות ותחזוקה"}</div></div></div>
+        {activationToken ? (<>
+          <div className="login-q">הפעלת כניסה לעובד</div>
+          {activationUser ? <div className="hint" style={{ marginBottom: 10 }}>שלום {activationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד {activationUser.workerNo || "—"}.</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
+          <label className="field"><span>קוד אישי חדש</span><input value={actCode} onChange={(e) => { setActCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" disabled={!activationUser} /></label>
+          <label className="field"><span>אישור קוד</span><input value={actConfirm} onChange={(e) => { setActConfirm(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && activateWorker()} disabled={!activationUser} /></label>
+          {err && <div className="err">{err}</div>}
+          <button className="btn-primary full" onClick={activateWorker} disabled={!activationUser}>שמירה וכניסה</button>
+        </>) : (<>
         <div className="seg-tabs s3" style={{ marginBottom: 16 }}>
           <button className={mode === "user" ? "on" : ""} onClick={() => { setMode("user"); setErr(""); }}>צוות</button>
           <button className={mode === "worker" ? "on" : ""} onClick={() => { setMode("worker"); setErr(""); }}>עובד</button>
@@ -1641,6 +1663,7 @@ function Login({ users, config, onLogin, theme, toggleTheme, zones, onAnonReport
         <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה (תמיד פעילה): {mode === "user" ? "vadim@chemipal.co.il · סיסמה 1234" : mode === "worker" ? "מספר עובד 1042 · קוד 1234" : "קוד 1234"}</div>
         <div className="login-foot">גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
+        </>)}
       </div>
       {pub && <PublicReport zones={zones} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
     </div>
@@ -5415,8 +5438,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
   const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
+  const [activationToken, setActivationToken] = useState(user.activationToken || "");
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
   const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
+  const activationLink = activationToken ? `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(activationToken)}` : "";
+  const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
   const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
     const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
     return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
@@ -5427,7 +5453,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
       if (!pin.trim()) return setErr("נא להזין קוד כניסה לטכנאי");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
-    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (!pin.trim()) return setErr("נא להזין קוד כניסה"); }
+    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (!pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה"); }
     else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (!password.trim()) return setErr("נא להזין סיסמה"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
@@ -5444,6 +5470,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
       active,
+      activationToken: (role === "worker" || role === "cleaner") ? activationToken : "",
+      activationStatus: (role === "worker" || role === "cleaner") ? (activationToken ? "pending" : (user.activationStatus || "")) : "",
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
   };
@@ -5486,8 +5514,10 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
           : <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>}
       </>) : (role === "worker" || role === "cleaner") ? (<>
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
-        <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pin.trim() ? "פעיל עם קוד זמני. בהמשך יוחלף בקישור הפעלה שבו העובד יגדיר קוד בעצמו." : "טרם הוגדר קוד כניסה. בשלב הבא יופיע כאן קישור הפעלה להעתקה."}</div></div>
-        <label className="field"><span>קוד כניסה זמני *</span><input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">שלב ביניים עד קישור הפעלה: העובד נכנס עם מספר העובד והקוד הזה. אין צורך בדוא״ל, ולא מציגים קוד ישן אחרי שנעבור לאיפוס/הפעלה.</div></label>
+        <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{activationToken ? "ממתין להפעלה: שלחו לעובד את הקישור והוא יגדיר קוד אישי בעצמו." : pin.trim() ? "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהעובד יחליף אותו בקוד אישי." : "טרם הוגדר קוד כניסה. צרו קישור הפעלה או הזינו קוד זמני."}</div></div>
+        <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); }}>צור קישור הפעלה</button>
+        {activationToken && <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> העתק קישור</button><div className="hint">הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>}
+        <label className="field"><span>קוד כניסה זמני{activationToken ? "" : " *"}</span><input value={pin} onChange={(e) => { setPin(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהעובד יגדיר קוד בעצמו.</div></label>
       </>) : (<>
         <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
         <label className="field"><span>סיסמה *</span><input value={password} onChange={(e) => setPassword(e.target.value)} type="text" placeholder="סיסמה שתמסרו למשתמש" /><div className="hint">אתם קובעים את הסיסמה ומוסרים אותה למשתמש. ניתן לשנות בכל עת.</div></label>
