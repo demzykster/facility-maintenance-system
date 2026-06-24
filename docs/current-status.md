@@ -76,3 +76,4 @@ Current permissions work:
 - Activated worker personal codes are hidden from managers; reset is done by generating a new activation link.
 - Worker activation rules now have a Vitest harness covering unsaved-link copy, status labels, activation, and reset.
 - New user saves write module permissions through `perms`; legacy `fleetDocs/fleetTickets` flags are read only as a migration bridge.
+- Legacy permission migration into `perms` is covered by a Vitest harness.
