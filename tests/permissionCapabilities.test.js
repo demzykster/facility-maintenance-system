@@ -39,6 +39,7 @@ describe("permission capability helpers", () => {
   it("supports management module permissions without role-specific checks", () => {
     const analyst = { role: "user", perms: { analytics: "view", suppliers: "manage", audit: "view" } };
     const supplierViewer = { role: "user", perms: { suppliers: "view" } };
+    const settingsManager = { role: "user", perms: { settings: "manage" } };
 
     expect(canView(analyst, "analytics")).toBe(true);
     expect(canManage(analyst, "analytics")).toBe(false);
@@ -47,6 +48,7 @@ describe("permission capability helpers", () => {
     expect(canView(supplierViewer, "suppliers")).toBe(true);
     expect(canManage(supplierViewer, "suppliers")).toBe(false);
     expect(canView(analyst, "audit")).toBe(true);
-    expect(canManage(analyst, "settings")).toBe(false);
+    expect(canManage(settingsManager, "settings")).toBe(true);
+    expect(canFull(settingsManager, "settings")).toBe(false);
   });
 });

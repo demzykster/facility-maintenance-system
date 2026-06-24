@@ -71,16 +71,19 @@ Then explain:
   - Adds a tested backup collection contract.
   - Includes tasks, meetings, PPE collections, and technician presence in backup/export.
   - Leaves local browser-only keys out of backup.
-- Supplier read-only/manage split is in progress on branch `codex/suppliers-manage-permission`.
+- Supplier read-only/manage split was fixed through PR #38.
   - `suppliers:view` keeps the supplier screen visible.
   - `suppliers:manage` is required for adding, renaming, editing, and deleting supplier records.
+- Settings sensitive-action split is in progress on branch `codex/settings-full-sensitive-actions`.
+  - `settings:manage` keeps ordinary settings editable.
+  - `settings:full` is required for backup/restore and demo data load/clear controls.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Finish and merge `codex/suppliers-manage-permission`.
+2. Finish and merge `codex/settings-full-sensitive-actions`.
 3. Continue with small permission-gating PRs:
-   - consider splitting `settings:manage` and future `settings:full` actions;
+   - continue worker onboarding / activation controls under `workerAccess: manage`;
    - browser smoke-check every UI gate.
 4. Keep worker onboarding as the next related area, using `workerAccess: manage`.
 5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
@@ -112,6 +115,10 @@ Then explain:
   - after suppliers permission split, `npm test -- --run`: 7 files passed, 16 tests passed.
   - after suppliers permission split, `npm run build`: passed.
   - browser smoke-check: admin login, supplier list, and supplier detail still render; admin add/save/delete controls are visible and console had no errors.
+- Validation on branch `codex/settings-full-sensitive-actions` before PR:
+  - `npm test -- --run`: 7 files passed, 16 tests passed.
+  - `npm run build`: passed.
+  - browser smoke-check: admin login and Settings screen still render; admin with `settings:full` sees backup/export, restore, and dev controls; console had no errors.
 
 ## Current Product Direction After This Item
 
