@@ -357,3 +357,59 @@ The badge should only show for admin/manager roles (those who can approve). A re
 _(reply here)_
 
 ---
+
+## Topic 9: PPE module (ביגוד עובדים) — four issues in the issuance flow
+
+**Owner observations (from screenshots of the PPE / לוח מלאי screen):**
+1. Two blocks are visually merged — too little spacing between them
+2. The "בקשות ממתינות" counter card appears in the dashboard but is not clickable / does nothing
+3. Status label "ממתינה" is uninformative — it does not say who has the ball or who is waiting
+4. After a request is approved and dispensed, no notification appears — the event is missing from the notifications panel
+
+---
+
+**Claude — code findings:**
+
+**Issue 1 — spacing:**
+Visual gap between the "בקשות הנפקה" action card and the stats row below. No code root cause identified without seeing exact CSS — likely a missing `margin-bottom` or `gap` on one of the container elements in `PpeDashboard`. Needs visual inspection to confirm exact element.
+
+**Issue 2 — "בקשות ממתינות" counter not clickable:**
+Line 4024: `pendN` is computed correctly.
+Line 4040: `<PpeDashboard ... pend={pendN} onPend={undefined} .../>` — the `onPend` handler is explicitly set to `undefined`. The dashboard card renders the number but has no click action because the parent never passes a handler. A one-line fix: pass `onPend={() => setSub("log")}` or navigate to the pending requests view.
+
+**Issue 3 — "ממתינה" status label:**
+Line 3842 in the `chip()` function:
+```jsx
+// current:
+: <span>ממתינה</span>
+
+// should be:
+: <span>ממתינה לאישור מנהל</span>
+```
+The status `"pending"` means the request is waiting for the PPE manager to approve and dispense. The worker who submitted sees "ממתינה" — it is unclear to them who has the ball. Three other statuses already have this pattern correctly: "ממתינה לחתימת העובד", "אושרה והונפקה", "נדחתה". The "pending" case is the only one missing the "who" suffix.
+
+**Issue 4 — approved event missing from notifications:**
+Line 4179: `ppeReqPend` filters for `status === "pending" || status === "worker_sign"`. After approval (`status === "approved"`), the item drops from `ppeReqPend` and disappears from the dashboard counter — correct.
+
+But in `buildEvents` (~line 1017), there is **no handler for approved PPE events**. The notification panel only receives events that are pushed into the events array during `buildEvents`. PPE approvals are never pushed there.
+
+The history (line 3885) inside the PPE module itself shows "אושרה והונפקה" — but this is only visible if you navigate into the PPE module. The main notifications panel remains silent.
+
+Fix: add a PPE approval event in `buildEvents`:
+```js
+ppeReqs.filter(r => r.status === "approved" && isRecent(r.decidedAt))
+  .forEach(r => ev.push({ kind: "confirm", title: "בקשת ביגוד אושרה והונפקה", body: `${r.workerName} · ${lineTxt(r)}` }))
+```
+
+**Claude — position:**
+
+All four are real bugs or UX gaps. Issues 2 and 3 are one-line fixes. Issue 4 requires deciding: should the approval event go to the notifications panel, to a dedicated PPE activity feed, or both? The existing pattern for other approvals (ticket closures, driver requests) all go to the notifications panel — PPE should follow the same pattern.
+
+Issue 1 (spacing) needs visual verification — cannot confirm the exact container from code alone.
+
+**Question for Codex:** for issue 4, should approved PPE events expire after some time window (e.g., only show if `decidedAt` is within last 24h), or persist until the notification is dismissed? Other events use a recency filter — PPE should match that.
+
+**Codex:**
+_(reply here)_
+
+---
