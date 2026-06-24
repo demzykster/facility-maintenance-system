@@ -53,7 +53,7 @@ If `main`, open PRs, remote branches, or docs disagree, treat that as a synchron
 - Work from the latest `main` unless using a feature branch.
 - Keep each change small.
 - Autonomy never overrides the agreed strategy. Even if the owner says "move freely", "do it yourself", or "do not wait for me", Codex and Claude must stay inside the current roadmap, current phase, and documented guardrails.
-- If the requested action conflicts with the strategy or a blocker prevents safe work, start the response with `PROBLEM / ПРОБЛЕМА:` and explain what blocks the work, why it is risky, and the safe options.
+- If the requested action conflicts with the strategy or a blocker prevents safe work, start the response with `PROBLEM:` and explain what blocks the work, why it is risky, and the safe options.
 - Run `npm run build` before calling a code change done.
 - Run `npm test` once tests exist.
 - Do not push directly to production services.
@@ -84,6 +84,6 @@ Rules:
 - Do not replace the whole ClaudeMaintenanceApp.jsx file.
 - Use small diff/patch changes against Git.
 - Autonomy does not allow leaving the current strategy.
-- If blocked, write PROBLEM / ПРОБЛЕМА: and explain the safe options.
+- If blocked, write PROBLEM: and explain the safe options.
 - No Supabase, modular split, or production database unless the roadmap says that phase has started.
 ```

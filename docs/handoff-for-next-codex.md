@@ -66,7 +66,7 @@ No open PR does not mean no open work. A pushed branch without PR is still activ
 If `main`, remote branches, PRs, and docs disagree, start with:
 
 ```text
-PROBLEM / ПРОБЛЕМА:
+PROBLEM:
 ```
 
 Then explain what is out of sync, why it is risky, and the safe options.
@@ -76,7 +76,7 @@ Then explain what is out of sync, why it is risky, and the safe options.
 - Do not commit directly to `main` unless the owner explicitly asks for an emergency direct commit.
 - Use small branches and PRs.
 - Autonomy never overrides the agreed strategy. If the owner says "move freely", "do it yourself", or similar, continue only inside the current roadmap, current phase, and documented guardrails.
-- If something conflicts with the strategy or blocks safe work, start the message with `PROBLEM / ПРОБЛЕМА:` and explain the blocker, the risk, and the safe options.
+- If something conflicts with the strategy or blocks safe work, start the message with `PROBLEM:` and explain the blocker, the risk, and the safe options.
 - Do not replace `src/ClaudeMaintenanceApp.jsx` as a whole file.
 - Do not start Supabase/Auth/RLS/Railway or a production database yet.
 - Do not do broad modular split yet.
@@ -145,7 +145,7 @@ Important:
 - main is the source of truth, but remote branches can contain active work.
 - Do not assume "no open PR" means no open work.
 - docs/active-work.md is the first required file and the exact active-work ledger.
-- If docs, main, PRs, or remote branches disagree, start with PROBLEM / ПРОБЛЕМА: and explain the safe options.
+- If docs, main, PRs, or remote branches disagree, start with PROBLEM: and explain the safe options.
 
 Rules:
 - Do not commit directly to main unless explicitly told.

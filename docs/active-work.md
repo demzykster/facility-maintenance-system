@@ -1,17 +1,17 @@
 # Active Work Ledger
 
-This file is the exact handoff point for unfinished work. It is not a strategy document. It answers: what is open right now, where did the previous session stop, what must the next session do, and how should the work be handed back.
+This file is the exact handoff point for every session. It is not a strategy document. It answers: what is open right now, where the previous session stopped, what must the next session do, and how the work should be handed back.
 
 ## Required Rule
 
-Every Codex or Claude session that starts, pauses, or hands off unfinished work must update this file when the active state changes.
+Every Codex or Claude session that starts, pauses, or hands off work must read this file first and update it when the active state changes.
 
 Do not rely on chat memory. Do not rely only on `main`. Do not rely only on open PRs. Remote branches can contain active work even when there is no PR.
 
 If anything is inconsistent, start with:
 
 ```text
-PROBLEM / ПРОБЛЕМА:
+PROBLEM:
 ```
 
 Then explain:
@@ -28,19 +28,19 @@ Then explain:
 - Branch: `codex/repo-cleanup-docs`
 - Merged through PR #18.
 - Main commit after merge: `73169db Merge pull request #18 from demzykster/codex/repo-cleanup-docs`
+- Follow-up close commit: `e0fce13 Merge pull request #19 from demzykster/codex/close-active-sync-ledger`
 - Purpose:
   - make Codex/Claude sessions check remote branches as well as `main` and PRs;
   - define the rule that autonomy never overrides strategy;
-  - define `PROBLEM / ПРОБЛЕМА:` as the required blocker marker;
+  - define `PROBLEM:` as the required blocker marker;
   - ignore `.codex-remote-attachments/`.
 
 ### What was already done
 
 - Repository cleanup and first handoff docs were merged into `main` through PR #16.
 - PPE permission label clarification was merged into `main` through PR #17.
-- This follow-up branch was rebased on top of the fresh `origin/main`.
-- The branch was force-pushed with lease so the remote branch now points to the updated history.
 - Sync protocol follow-up was reviewed and merged into `main` through PR #18.
+- Active ledger was closed correctly through PR #19.
 
 ### Next exact action
 
@@ -51,7 +51,7 @@ Then explain:
 
 ### Validation
 
-- This is docs / `.gitignore` only.
+- This item was docs / `.gitignore` only.
 - Previous code validation on this line of work:
   - `npm test`: 4 files passed, 8 tests passed.
   - `npm run build`: passed.
@@ -61,7 +61,7 @@ Then explain:
 
 ## Current Product Direction After This Item
 
-Continue small audit / permissions / onboarding work only after the sync protocol item is resolved.
+Continue small audit / permissions / onboarding work.
 
 Next product area:
 
@@ -80,4 +80,4 @@ When handing work back to another session:
 - state whether it is merged into `main`;
 - state what exact action is next;
 - state what checks passed or were not run;
-- state any known blocker using `PROBLEM / ПРОБЛЕМА:`.
+- state any known blocker using `PROBLEM:`.
