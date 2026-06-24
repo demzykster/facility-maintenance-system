@@ -832,7 +832,7 @@ const isShiftWorkday = () => WORK_WEEK.includes(new Date().getDay());
 // Плановое отсутствие: есть ли у пользователя отгул, покрывающий день dk (ISO YYYY-MM-DD).
 const isAbsentOn = (userId, absences, dk) => { const d = dk || todayKey(); return (absences || []).some((a) => a.userId === userId && a.from && a.from <= d && (a.to || a.from) >= d); };
 const shiftIdle = (rec, u, cfg) => {
-  const sc = techSched(u, cfg); const lg = (cfg?.lateGraceMin ?? 10) * 60000, eg = (cfg?.earlyGraceMin ?? 10) * 60000;
+  const sc = techSched(u, cfg); const lg = ((u?.lateTolerance != null ? u.lateTolerance : cfg?.lateGraceMin) ?? 10) * 60000, eg = ((u?.earlyTolerance != null ? u.earlyTolerance : cfg?.earlyGraceMin) ?? 10) * 60000;
   const sTs = todayAtHM(sc.start), eTs = todayAtHM(sc.end);
   const since = (rec && rec.day === todayKey()) ? rec.since : null;
   const endedAt = (rec && rec.day === todayKey()) ? rec.endedAt : null;
@@ -5346,8 +5346,8 @@ function SettingsPanel(p) {
       <div className="hint" style={{ marginBottom: 6 }}>משמרות לשיוך עובדים ולעמודות בעץ המחלקות. ברירת מחדל: בוקר / לילה — ניתן להוסיף עוד.</div>
       {wshifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.label || ""} placeholder="שם המשמרת" onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /><input type="color" value={s.color || "#64748B"} title="צבע" style={{ width: 44, height: 34, padding: 0, border: "none", background: "none" }} onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, color: e.target.value } : x))} /><button className="reg-del" onClick={() => setWshifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={wshifts.length <= 1}><Trash2 size={15} /></button></div>)}
       <button className="btn-ghost sm" onClick={() => setWshifts((a) => [...a, { id: "ws" + Date.now().toString(36), label: "", color: "#64748B" }])}><Plus size={14} /> משמרת</button>
-      <div className="field-row" style={{ marginTop: 12 }}><label className="field"><span>סבילות איחור לתחילה (דקות)</span><input type="number" min="0" value={lateG} onChange={(e) => setLateG(e.target.value)} /></label><label className="field"><span>סבילות סיום מוקדם (דקות)</span><input type="number" min="0" value={earlyG} onChange={(e) => setEarlyG(e.target.value)} /></label></div>
-      <div className="hint">כניסת טכנאי למערכת = תחילת משמרת. איחור מעבר לסבילות וסיום מוקדם מעבר לסבילות נספרים כהשבתה ומתריעים למנהל.</div>
+      <div className="field-row" style={{ marginTop: 12 }}><label className="field"><span>סבילות איחור לתחילה — ברירת מחדל (דקות)</span><input type="number" min="0" value={lateG} onChange={(e) => setLateG(e.target.value)} /></label><label className="field"><span>סבילות סיום מוקדם — ברירת מחדל (דקות)</span><input type="number" min="0" value={earlyG} onChange={(e) => setEarlyG(e.target.value)} /></label></div>
+      <div className="hint">ערך ברירת מחדל לכל הטכנאים. ניתן לקבוע סבילות שונה לכל טכנאי בנפרד בכרטיס המשתמש שלו.</div>
       <SectionTitle>סיבות המתנה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>לכל סיבה: מי מחזיק את הכדור בזמן ההמתנה · מי רשאי לבחור אותה · האם עוצרת את שעון ה-SLA. «לא התקבל הכלי» היא סיבה מערכתית ואינה ניתנת למחיקה.</div>
       {wreasons.map((r, i) => <div key={r.id || i} className="reg-row" style={{ marginBottom: 6, gap: 6, flexWrap: "wrap" }}>
@@ -5460,6 +5460,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const initialPerms = normalizePerms(user);
   if ((user.role || lockRole || "user") === "user" && !initialPerms.ppe) initialPerms.ppe = "request";
   const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
+  const [lateTol, setLateTol] = useState(user.lateTolerance != null ? user.lateTolerance : "");
+  const [earlyTol, setEarlyTol] = useState(user.earlyTolerance != null ? user.earlyTolerance : "");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const [activationToken, setActivationToken] = useState(user.activationToken || "");
@@ -5492,6 +5494,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: role === "tech" ? shiftId : "", shiftStart: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? (config.shifts.find((s) => s.id === shiftId).start || "") : shiftStart) : "", shiftEnd: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? config.shifts.find((s) => s.id === shiftId).end : shiftEnd) : "",
       techScope: role === "tech" ? techScope : undefined,
       techCats: (role === "tech" && techScope === "facility") ? techCats : [],
+      lateTolerance: role === "tech" && lateTol !== "" ? Math.max(0, Number(lateTol)) : undefined,
+      earlyTolerance: role === "tech" && earlyTol !== "" ? Math.max(0, Number(earlyTol)) : undefined,
       mgrZones: role === "user" ? mgrZones : [], perms: Object.keys(nextPerms).length ? nextPerms : undefined,
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
@@ -5535,6 +5539,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         {config.shifts?.length
           ? <label className="field"><span>משמרת (כניסה=תחילה, יציאה אוטומטית בסיום)</span><select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>{config.shifts.map((s) => <option key={s.id} value={s.id}>{s.name} · {s.start || "—"}–{s.end}</option>)}</select></label>
           : <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>}
+        <div className="field-row" style={{ marginTop: 8 }}><label className="field"><span>סבילות איחור לתחילה (דקות)</span><input type="number" min="0" value={lateTol} placeholder={`ברירת מחדל: ${config.lateGraceMin ?? 10}`} onChange={(e) => setLateTol(e.target.value)} /></label><label className="field"><span>סבילות סיום מוקדם (דקות)</span><input type="number" min="0" value={earlyTol} placeholder={`ברירת מחדל: ${config.earlyGraceMin ?? 10}`} onChange={(e) => setEarlyTol(e.target.value)} /></label></div>
+        <div className="hint">ריק = ערך ברירת מחדל מהגדרות המערכת.</div>
       </>) : (role === "worker" || role === "cleaner") ? (<>
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
         <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{activationToken ? "ממתין להפעלה: שלחו לעובד את הקישור והוא יגדיר קוד אישי בעצמו." : workerCodeActivated ? "הופעל: העובד הגדיר קוד אישי. הקוד אינו מוצג למנהלים." : pin.trim() ? "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהעובד יחליף אותו בקוד אישי." : "טרם הוגדר קוד כניסה. צרו קישור הפעלה או הזינו קוד זמני."}</div></div>
