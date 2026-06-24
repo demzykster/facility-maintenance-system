@@ -114,6 +114,7 @@ Current implementation note:
 - `src/ClaudeMaintenanceApp.jsx` imports that model instead of defining permission modules inline.
 - UI gates should use `hasPermission`, `canView`, `canRequest`, `canManage`, or `canFull` from `src/permissionModel.js`, not ad hoc level comparisons.
 - `tests/permissionsMigration.test.js`, `tests/permissionEditorModules.test.js`, and `tests/permissionCapabilities.test.js` cover the current migration bridge, editor module contract, and capability helpers.
+- The user permission editor now includes `users` as a module separate from `workerAccess`, so HR-like access can be expressed without creating an HR role or another one-off checkbox.
 
 Possible grouping:
 

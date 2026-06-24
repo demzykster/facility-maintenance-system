@@ -6,7 +6,7 @@ describe("user permission editor modules", () => {
     const keys = USER_PERMISSION_MODULES.map((m) => m.mod);
 
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(["fleetDocs", "fleetTickets", "ppe", "workerAccess"]);
+    expect(keys).toEqual(["fleetDocs", "fleetTickets", "ppe", "workerAccess", "users"]);
 
     for (const mod of USER_PERMISSION_MODULES) {
       expect(mod.levels[0]).toBe("none");
