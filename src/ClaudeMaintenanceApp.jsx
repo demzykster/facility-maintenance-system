@@ -1728,7 +1728,7 @@ function UserApp(p) {
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
           </>) : view === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : view === "tasks" ? (<ManageHub {...p} />) : (<>
-            <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלים ותחזוקה</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
+            <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
               : deptTab === "cleaning" ? <ManagerCleaning session={session} zones={zones} rounds={rounds} complaints={complaints} fileComplaint={fileComplaint} resolveComplaint={resolveComplaint} />
@@ -4071,7 +4071,7 @@ function AdminApp(p) {
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
     { id: "tasks", Icon: ClipboardList, label: "מטלות" },
     { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" },
-    { id: "assets", Icon: Truck, label: "כלים ותחזוקה" },
+    { id: "assets", Icon: Truck, label: "כלי שינוע" },
     mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה" } : null,
     { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" },
     mayViewUsers ? { id: "team", Icon: Users, label: "צוות ומשתמשים" } : null,
