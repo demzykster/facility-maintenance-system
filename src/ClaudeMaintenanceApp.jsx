@@ -453,12 +453,19 @@ const driverOf = (f, cat) => unitDrivers(f)[cat] || null;
 const driverActive = (d) => !!(d && (!d.status || d.status === "active"));
 const driverPending = (d) => !!(d && (d.status === "pending_add" || d.status === "pending_move"));
 const driverOwned = (d, session) => !!(d && session && (session.role === "admin" || d.addedByUid === session.id));
-const canFleetDocs = (session) => !!(session && (session.role === "admin" || session.fleetDocs));
-const canFleetTickets = (session) => !!(session && (session.role === "admin" || session.fleetTickets));
 const PERM_LEVELS = ["none", "view", "request", "manage", "full"];
 const permRank = (l) => { const i = PERM_LEVELS.indexOf(l); return i < 0 ? 0 : i; };
 const ROLE_PERM_DEFAULT = { admin: { ppe: "full" }, user: { ppe: "view" }, tech: { ppe: "view" }, worker: { ppe: "none" }, cleaner: { ppe: "none" } };
-const permLevel = (session, mod) => { if (!session) return "none"; if (session.role === "admin") return "full"; const p = session.perms && session.perms[mod]; if (p) return p; const d = ROLE_PERM_DEFAULT[session.role]; return (d && d[mod]) || "none"; };
+const normalizePerms = (u) => {
+  const p = { ...(u?.perms || {}) };
+  if (!p.fleetDocs && u?.fleetDocs) p.fleetDocs = "view";
+  if (!p.fleetTickets && u?.fleetTickets) p.fleetTickets = "view";
+  return p;
+};
+const cleanPerms = (p) => Object.fromEntries(Object.entries(p || {}).filter(([, v]) => v && v !== "none"));
+const permLevel = (session, mod) => { if (!session) return "none"; if (session.role === "admin") return "full"; const p = normalizePerms(session)[mod]; if (p) return p; const d = ROLE_PERM_DEFAULT[session.role]; return (d && d[mod]) || "none"; };
+const canFleetDocs = (session) => permRank(permLevel(session, "fleetDocs")) >= permRank("view");
+const canFleetTickets = (session) => permRank(permLevel(session, "fleetTickets")) >= permRank("view");
 const fleetForSession = (session, fleet) => { if (!session || session.role === "admin") return fleet || []; const md = userDepts(session); if (!md.length) return fleet || []; return (fleet || []).filter((f) => fleetDepts(f).some((d) => md.includes(d))); };
 const pushDriverEvent = (cfg, evt) => ({ ...cfg, driverEvents: [{ id: uid(), at: Date.now(), ...evt }, ...((cfg.driverEvents || []).slice(0, 299))] });
 const pendingDriverReqs = (fleet) => { const out = []; (fleet || []).forEach((f) => DRIVER_SHIFTS.forEach((s) => { const d = driverOf(f, s.id); if (driverPending(d)) out.push({ unit: f, cat: s.id, driver: d }); })); return out.sort((a, b) => (b.driver.reqAt || 0) - (a.driver.reqAt || 0)); };
@@ -5403,10 +5410,17 @@ function SettingsPanel(p) {
   </div>);
 }
 function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, onCancel, onSave, onDelete, onArchive }) {
-  const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [fleetDocs, setFleetDocs] = useState(!!user.fleetDocs), [fleetTickets, setFleetTickets] = useState(!!user.fleetTickets), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [ppeFull, setPpeFull] = useState((user.perms && user.perms.ppe) === "full"), [err, setErr] = useState("");
+  const initialPerms = normalizePerms(user);
+  if ((user.role || lockRole || "user") === "user" && !initialPerms.ppe) initialPerms.ppe = "request";
+  const [name, setName] = useState(user.name || ""), [role, setRole] = useState(user.role || lockRole || "user"), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [shiftId, setShiftId] = useState(user.shiftId || (config.shifts?.[0]?.id || "")), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
+  const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
+  const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
+    const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
+    return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
+  };
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
     if (role === "tech") {
@@ -5418,6 +5432,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
+    const nextPerms = role === "user" ? cleanPerms(perms) : cleanPerms(user.perms);
     onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), role,
       email: (role === "tech" || role === "worker" || role === "cleaner") ? "" : email.trim().toLowerCase(), password: (role === "tech" || role === "worker" || role === "cleaner") ? "" : password,
       pin: (role === "tech" || role === "worker" || role === "cleaner") ? pin.trim() : "",
@@ -5425,7 +5440,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
       dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: role === "tech" ? shiftId : "", shiftStart: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? (config.shifts.find((s) => s.id === shiftId).start || "") : shiftStart) : "", shiftEnd: role === "tech" ? ((config.shifts?.length && config.shifts.find((s) => s.id === shiftId)) ? config.shifts.find((s) => s.id === shiftId).end : shiftEnd) : "",
       techScope: role === "tech" ? techScope : undefined,
       techCats: (role === "tech" && techScope === "facility") ? techCats : [],
-      fleetDocs: role === "user" ? fleetDocs : false, fleetTickets: role === "user" ? fleetTickets : false, mgrZones: role === "user" ? mgrZones : [], perms: role === "user" ? { ppe: ppeFull ? "full" : "request" } : (user.perms || undefined),
+      fleetDocs: role === "user" ? permRank(nextPerms.fleetDocs) >= permRank("view") : false, fleetTickets: role === "user" ? permRank(nextPerms.fleetTickets) >= permRank("view") : false, mgrZones: role === "user" ? mgrZones : [], perms: Object.keys(nextPerms).length ? nextPerms : undefined,
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
       active,
@@ -5441,11 +5456,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
-          <div style={{ marginTop: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>הרשאות פארק כלי שינוע</span>
-            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={fleetDocs} onChange={(e) => setFleetDocs(e.target.checked)} /> רואה מסמכים ותוקף של הכלים</label>
-            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={ppeFull} onChange={(e) => setPpeFull(e.target.checked)} /> גישה מלאה למודול ביגוד עובדים (כמו מנהל מערכת)</label><div className="hint" style={{ marginTop: 2 }}>מסומן — גישת HR מלאה (כל המחלקות, קטלוג, דרישות, קיזוז, הנפקה ישירה ואישור בקשות). לא מסומן — המנהל שולח «בקשת הנפקה» לעובדיו בלבד, ללא ניפוק ישיר מהמלאי.</div>
-            <label className="chk-line"><input type="checkbox" checked={fleetTickets} onChange={(e) => setFleetTickets(e.target.checked)} /> רואה היסטוריית קריאות על הכלים שלו</label>
-            <div className="hint">המנהל תמיד רואה את כלי מחלקותיו ויכול לנהל נהגים. שתי ההרשאות לעיל כבויות כברירת מחדל.</div>
+          <div style={{ marginTop: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>הרשאות אישיות</span>
+            <PermSelect mod="fleetDocs" label="מסמכי ותוקף כלי שינוע" levels={["none", "view"]} hint="צפייה במסמכים ותאריכי תוקף של כלי המחלקות שלו." />
+            <PermSelect mod="fleetTickets" label="היסטוריית קריאות על כלים" levels={["none", "view"]} hint="צפייה בקריאות עבר על כלי המחלקות שלו." />
+            <PermSelect mod="ppe" label="ביגוד עובדים / HR" levels={["none", "request", "manage", "full"]} hint="בקשה — שליחת בקשות בלבד. ניהול — טיפול בבקשות. מלא — קטלוג, ניפוק, קיזוז ודוחות." />
+            <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
           </div></div>)}
       {role === "user" && zones && (zones.length === 0
         ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
