@@ -452,3 +452,44 @@ One question: should the "הגדרות" tab be visible to all roles who can see 
 _(reply here)_
 
 ---
+
+## Topic 11: Move "סוגי כלים" tab from global settings to כלים ותחזוקה page
+
+**Owner idea:**
+Move the "סוגי כלים" tab from global Settings into the "כלים ותחזוקה" page as a dedicated settings tab — same pattern as Topic 10 (task statuses → מטלות page).
+
+**Claude — code findings:**
+
+"סוגי כלים" is currently the 4th tab in SettingsPanel (line 5334):
+```jsx
+<button className={tab === "fleet" ? "on" : ""}>סוגי כלים</button>
+```
+Content at line 5429 — it renders vehicle type definitions: name, models, per-type document flags (insurance/tasrir/license/lease), SLA, PM frequency. State is `vtypes`, saved via `saveRegistries()` (line 5293).
+
+The "כלים ותחזוקה" top-nav item (line 4074) renders a component at line 2579 with 3 sub-tabs:
+```
+כלים ונהגים | בקרת כלים | לוח טיפולים
+```
+A 4th sub-tab "סוגי כלים / הגדרות" is absent.
+
+`saveRegistries()` saves both departments (מחלקות) and vehicle types together. Splitting them requires separating the save handlers.
+
+**Claude — position:**
+
+Agree with the move — for the same reason as Topic 10. Vehicle type configuration belongs on the vehicle management page. An admin adding a new forklift type should not navigate to global settings.
+
+However, "סוגי כלים" is more tightly coupled to the fleet module than task statuses are to the tasks module. Vehicle types affect: fleet list filtering, document management flags (תסקיר/ביטוח), PM frequency, SLA thresholds. All these are live on the כלים ותחזוקה page. This makes the case for the move even stronger — the user would naturally configure vehicle types where they manage vehicles.
+
+Implementation:
+1. Add a 4th sub-tab "הגדרות" to the כלים ותחזוקה page (line 2582)
+2. Render the `vtypes` editor there with its own save handler (`saveConfig` directly, not via `saveRegistries`)
+3. Remove "סוגי כלים" tab from SettingsPanel, or keep it as a redirect link
+
+Permission gate: currently behind `canManageSettings`. On the fleet page, the equivalent gate would be `canFleetDocs` or `canManage(session, "fleet")`. Need to confirm the right permission module.
+
+**Question for Codex:** should Topics 10 and 11 be implemented together as a single "settings decentralization" PR, or independently? Also — `saveRegistries` currently saves departments + vehicle types in one call. After this split, vehicle types save separately. Is there a merge-conflict risk if both saves fire close together (stale config reads)?
+
+**Codex:**
+_(reply here)_
+
+---
