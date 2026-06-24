@@ -5491,8 +5491,14 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, o
         <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
         <label className="field"><span>סיסמה *</span><input value={password} onChange={(e) => setPassword(e.target.value)} type="text" placeholder="סיסמה שתמסרו למשתמש" /><div className="hint">אתם קובעים את הסיסמה ומוסרים אותה למשתמש. ניתן לשנות בכל עת.</div></label>
       </>)}
-      <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> משתמש פעיל</label>
-      <div className="hint" style={{ marginTop: -4 }}>בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו (למשל עובד שעזב).</div>
+      {(role === "worker" || role === "cleaner") ? (
+        <div className="hint" style={{ marginTop: 0 }}>סטטוס עובד מנוהל דרך פעולת עזיבת עובד / החזרת ציוד, כדי לא להחזיק שתי הגדרות מקבילות.</div>
+      ) : (
+        <>
+          <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> משתמש פעיל</label>
+          <div className="hint" style={{ marginTop: -4 }}>בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו.</div>
+        </>
+      )}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>שמירה</button>
       {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><HardHat size={15} /> עזיבת עובד / החזרת ציוד</button>}

@@ -34,6 +34,7 @@ Remaining suggested work:
 - Treat "HR" as permissions, not a separate role for now.
 - Plan worker onboarding around activation links and code reset without showing old codes.
 - Use `workerAccess` for future worker activation/reset controls.
+- Keep worker lifecycle in one place: worker/cleaner forms should not show a separate `active` checkbox when the "worker left / equipment return" flow exists.
 
 DoD:
 
