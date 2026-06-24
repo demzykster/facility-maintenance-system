@@ -80,18 +80,38 @@ Then explain:
 - Worker login-field gating was fixed through PR #40.
   - worker profile edits without `workerAccess:manage` preserve existing login fields.
   - activation/reset/temp-code controls remain under `workerAccess:manage`.
+- Active work ledger was refreshed after PR #40 through PR #41.
+
+### Open branch
+
+- Branch: `codex/ppe-pending-ux-cleanup`.
+- Status: in progress, not merged into `main` yet.
+- Scope:
+  - make the PPE "בקשות ממתינות" dashboard KPI actionable;
+  - clarify pending PPE request status as "ממתינה לאישור מנהל";
+  - add recent approved PPE request events to the notifications panel;
+  - extract only small pure PPE helpers to `src/ppeModel.js` with tests.
+- Out of scope:
+  - no broad PPE module extraction;
+  - no Supabase/Auth/RLS/database work;
+  - no visual spacing fix for the pending block unless a reproducible pending PPE screen is available.
 
 ### Next exact action
 
 1. Start from updated `main`.
-2. Continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
-3. Or pick the next contained audit fix from `docs/engineering-dialogue.md`:
-   - PPE pending counter/status/notification cleanup;
+2. Finish branch `codex/ppe-pending-ux-cleanup`:
+   - review diff;
+   - run `npm test -- --run`;
+   - run `npm run build`;
+   - browser smoke-check PPE screen;
+   - open PR and merge only if checks are green.
+3. After that, continue worker onboarding / activation UX in small PRs, still under `workerAccess:manage`.
+4. Or pick the next contained audit fix from `docs/engineering-dialogue.md`:
    - fleet document chips;
    - login desktop layout.
-4. For every UI gate or workflow change:
+5. For every UI gate or workflow change:
    - browser smoke-check every UI gate.
-5. Update this ledger again after any merged PR, open branch, paused work, or handoff.
+6. Update this ledger again after any merged PR, open branch, paused work, or handoff.
 
 ### Validation
 
@@ -130,6 +150,13 @@ Then explain:
   - after worker login-field gating, `npm test -- --run`: 7 files passed, 17 tests passed.
   - after worker login-field gating, `npm run build`: passed.
   - browser smoke-check: admin login, user-management screen, worker group, and worker edit form still render; admin sees activation/temp-code controls; console had no errors.
+- Validation on branch `codex/ppe-pending-ux-cleanup` before PR:
+  - baseline `npm test -- --run`: 7 files passed, 17 tests passed.
+  - baseline `npm run build`: passed.
+  - after PPE cleanup, `npm test -- --run`: 8 files passed, 20 tests passed.
+  - after PPE cleanup, `npm run build`: passed.
+  - browser smoke-check: admin login and PPE screen render; console had no errors.
+  - browser limitation: current demo data has no pending PPE request, so the pending KPI live-click path was not visually exercised; helper logic is covered by unit tests.
 
 ## Current Product Direction After This Item
 

@@ -12,6 +12,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
+import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "./ppeModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -969,12 +970,13 @@ const NOTIF_KINDS = [
   { kind: "pm", label: "טיפולים תקופתיים" },
   { kind: "doc", label: "מסמכים ורישוי" },
   { kind: "driver", label: "נהגים ושיבוצים" },
+  { kind: "ppe", label: "ביגוד עובדים" },
   { kind: "cleaning", label: "ניקיון וסבבים" },
   { kind: "back", label: "סיום משמרת / החזרות" },
 ];
 const NOTIF_KIND_LABEL = (k) => (NOTIF_KINDS.find((x) => x.kind === k) || {}).label || k;
 const DEFAULT_NOTIF_PREFS = { sort: "newest", group: false, hidden: {} };
-function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = []) {
+function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = []) {
   const ev = []; const vis = visibleTickets(session, tickets, fleet);
   (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "escalate", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "pm", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "pm", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
   (meetings || []).forEach((m) => { if (m.status !== "planned") return; if (!(m.ownerId === session.id || (m.participantIds || []).includes(session.id))) return; const dt = m.at - Date.now(); if (dt > -3600000 && dt < 24 * 3600000) ev.push({ key: "mtg-" + m.id, at: m.at, kind: "pm", go: "tasks", title: `פגישה קרובה · ${m.title}`, body: `${fmtDate(m.at)} ${fmtTime(m.at)}` }); });
@@ -1018,6 +1020,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
     tickets.filter((t) => needsHandler(t, users, fleet)).forEach((t) => ev.push({ key: "orphan-" + t.id, at: t.createdAt, ticketId: t.id, kind: "escalate", go: "tickets", title: `קריאה ללא מטפל · #${ticketNo(t)}`, body: `${t.subject} — ${t.assignee ? "המטפל אינו פעיל עוד" : "אין טכנאי פעיל לקבל"}. נדרש שיבוץ.` }));
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי קרוב", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
     pendingDriverReqs(fleet).forEach(({ unit, cat, driver }) => ev.push({ key: "drvreq-" + unit.id + cat, at: driver.reqAt || Date.now(), kind: "driver", go: "fleet", title: driver.status === "pending_add" ? "בקשת הוספת נהג — ממתין לאישורך" : "בקשת העברת נהג — ממתין לאישורך", body: `${driver.name} · ${unit.code} (${driverShiftMeta(cat).label})${driver.status === "pending_move" && driver.moveTo ? ` → ${driver.moveTo.unitCode}` : ""}${driver.needsChip ? " · צריך להנפיק צ׳יפ" : ""} · מ-${driver.addedByName || "מנהל"}` }));
+    ev.push(...buildPpeApprovedEvents(ppeReqs));
     shiftEvents("team");
     { const nowTs = Date.now(); (zones || []).filter((z) => z.active !== false).forEach((z) => { const absent = isAbsentOn(z.cleanerId, absences); zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => { if (status === "missed") ev.push({ key: `clmiss-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) + (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: absent ? "סבב ניקיון — נדרש כיסוי (העובד בחופשה)" : "סבב ניקיון פוספס", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}${z.cleanerName ? " · " + z.cleanerName : ""}` }); }); }); }
     (complaints || []).filter((c) => c.status === "pending").forEach((c) => ev.push({ key: "cmpp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: "דיווח ממתין לאישורך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""} · ${c.reportedByRole === "anonymous" ? "אנונימי" : c.reportedByName}` }));
@@ -1043,7 +1046,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
   }
   return ev.sort((a, b) => b.at - a.at);
 }
-function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = []) {
+function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = []) {
   const skey = `seen:${session.role}:${session.name}`;
   const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
   const [lastSeen, setLastSeen] = useState(null), [toast, setToast] = useState(null);
@@ -1052,7 +1055,7 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   useEffect(() => { store.get(skey, false).then((v) => setLastSeen(v ? Number(v) : 0)); }, [skey]);
   useEffect(() => { store.get(pkey, false).then((v) => { if (v) try { const p = JSON.parse(v); setPrefsState({ ...DEFAULT_NOTIF_PREFS, ...p, hidden: p.hidden || {} }); } catch (e) {} }); }, [pkey]);
   const setPrefs = (patch) => setPrefsState((p) => { const np = { ...p, ...patch }; store.set(pkey, JSON.stringify(np), false); return np; });
-  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings]);
+  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
   const unread = lastSeen == null ? 0 : visible.filter((e) => e.at > lastSeen).length;
@@ -1689,7 +1692,7 @@ function UserApp(p) {
   const [view, setView] = useState("tickets");
   const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip");
   const goNotif = (go) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); } };
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings);
+  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
   const myPm = useMemo(() => pmVisible(session, pm, fleet), [pm, fleet, session]);
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
@@ -3847,8 +3850,8 @@ function PpeRequester({ ppe, items, norms, reqs, users, config, session, saveUse
     const req = { id: uid(), status: (r0.awaitWorkerSign ? "worker_sign" : "pending"), awaitWorkerSign: !!r0.awaitWorkerSign, workerId: r0.workerId, workerName: r0.workerName, workerNo: r0.workerNo || "", dept: r0.dept || "", lines: arr.map((r) => ({ itemId: r.itemId, itemName: r.itemName, category: r.category, size: r.size, qty: r.qty, workerCharge: r.workerCharge || 0, chargeReason: r.chargeReason || "", clawbackEligible: !!r.clawbackEligible, unitCost: r.unitCost || 0 })), note: (r0.note || "").trim(), signature: r0.signature || "", by: { id: session.id, name: session.name }, at: Date.now() };
     savePpeReq(req); setForm(false);
   };
-  const chip = (r) => r.status === "approved" ? <span className="badge sm" style={{ background: "#DCFCE7", color: "#166534" }}>אושרה והונפקה</span> : r.status === "rejected" ? <span className="badge sm" style={{ background: "#FEE2E2", color: "#B91C1C" }}>נדחתה</span> : r.status === "worker_sign" ? <span className="badge sm" style={{ background: "#FEF9C3", color: "#854D0E" }}>ממתינה לחתימת העובד</span> : <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>ממתינה</span>;
-  const lineTxt = (r) => r.lines.map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ");
+  const chip = (r) => r.status === "approved" ? <span className="badge sm" style={{ background: "#DCFCE7", color: "#166534" }}>{ppeRequestStatusLabel(r.status)}</span> : r.status === "rejected" ? <span className="badge sm" style={{ background: "#FEE2E2", color: "#B91C1C" }}>{ppeRequestStatusLabel(r.status)}</span> : r.status === "worker_sign" ? <span className="badge sm" style={{ background: "#FEF9C3", color: "#854D0E" }}>{ppeRequestStatusLabel(r.status)}</span> : <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>{ppeRequestStatusLabel(r.status)}</span>;
+  const lineTxt = ppeRequestLineSummary;
   const Card = ({ r }) => <div className="task-row" style={{ borderInlineStartColor: r.status === "approved" ? "#0D9488" : r.status === "rejected" ? "#DC2626" : "#D97706", cursor: "default" }}>
     <div className="task-row-main"><div className="task-row-t">{r.workerName}{r.workerNo ? ` · מס׳ ${r.workerNo}` : ""}</div><div className="task-row-sub">{lineTxt(r)}</div>{r.status === "rejected" && r.rejectReason && <div className="task-row-sub" style={{ color: "#B91C1C" }}>סיבת דחייה: {r.rejectReason}</div>}</div>
     <div className="task-row-side"><span className="task-due">{fmtDate(r.at)}</span>{chip(r)}{(r.status === "pending" || r.status === "worker_sign") && <button className="btn-ghost sm" onClick={() => delPpeReq(r.id)}>ביטול</button>}</div>
@@ -4045,7 +4048,7 @@ function PpeHub(p) {
   return (<>
     <div className="seg-tabs" style={{ flexWrap: "wrap", marginBottom: 14 }}><button className={sub === "dash" ? "on" : ""} onClick={() => setSub("dash")}>לוח מלאי</button><button className={sub === "log" ? "on" : ""} onClick={() => setSub("log")}>תנועות מלאי</button><button className={sub === "catalog" ? "on" : ""} onClick={() => setSub("catalog")}>קטלוג</button><button className={sub === "settings" ? "on" : ""} onClick={() => setSub("settings")}>הגדרות</button></div>
     {(tab === "dash" || tab === "log") && <div className="row-between" style={{ marginBottom: 10, alignItems: "center" }}><span className="hint">נתונים לחודש</span><MonthPicker y={mY} m={mM} onChange={(Y, M) => { setMY(Y); setMM(M); }} /></div>}
-    {tab === "dash" ? <>{pendN > 0 && <PpeRequests ppe={ppe} reqs={ppeReqs} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} compact />}<PpeDashboard items={ppeItems} ppe={ppe} config={config} pend={pendN} onPend={undefined} onCreateOrder={openOrder} onCatalog={() => setSub("catalog")} onMovements={() => setSub("log")} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} /></>
+    {tab === "dash" ? <>{pendN > 0 && <PpeRequests ppe={ppe} reqs={ppeReqs} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} compact />}<PpeDashboard items={ppeItems} ppe={ppe} config={config} pend={pendN} onPend={() => window.scrollTo({ top: 0, behavior: "smooth" })} onCreateOrder={openOrder} onCatalog={() => setSub("catalog")} onMovements={() => setSub("log")} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} /></>
       : tab === "catalog" ? <PpeCatalog items={ppeItems} ppe={ppe} session={session} savePpe={savePpe} onSave={savePpeItem} onDelete={delPpeItem} />
       : tab === "settings" ? <><PpeNorms items={ppeItems} norms={ppeNorms} config={config} onSave={saveNorm} onDelete={delNorm} /><div style={{ height: 18 }} /><PpeClawbackSettings config={config} onSave={saveConfig} /><div style={{ height: 18 }} /><PpeSignTemplate config={config} onSave={saveConfig} /></>
       : <PpeLog ppe={ppe} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} deptScope={deptScope} canIssue={true} canExit={true} reqMode={false} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} />}
@@ -4056,7 +4059,7 @@ function PpeHub(p) {
 function AdminApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
   const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null);
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings);
+  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
@@ -4113,7 +4116,7 @@ function AdminApp(p) {
       <AIFab onClick={() => setShowAI(true)} />
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "pm" || go === "fleet" ? "assets" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "ppe" ? "ppe" : go === "pm" || go === "fleet" ? "assets" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
