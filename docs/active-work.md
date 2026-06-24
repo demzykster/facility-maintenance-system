@@ -66,6 +66,7 @@ Then explain:
   - admin behavior remains unchanged through role defaults.
 - Active work ledger was refreshed after PR #32 through PR #33.
 - Active work ledger was synced with current remote branch state through PR #34.
+- Claude's engineering-dialogue audit file was imported into `main` through PR #36, without the unrelated `package-lock.json` diff from the Claude branch.
 
 ### Next exact action
 
@@ -110,13 +111,12 @@ Next product area:
 
 ### `origin/claude/clever-ride-z11u7y`
 
-- Status: checked, not merged into `main`.
+- Status: checked, partially imported.
 - Latest commit: `9eab459 docs: add Topics 13-15 to engineering dialogue`.
 - Diff vs `origin/main`:
-  - adds `docs/engineering-dialogue.md`;
-  - modifies `package-lock.json` by removing optional package `libc` fields.
-- Decision: do not merge the whole branch as product work. The engineering-dialogue doc may be useful and should be reviewed or imported separately if desired. The `package-lock.json` diff still looks like npm/platform lockfile normalization noise and should not be merged unless explicitly approved.
-- Safe option: if the dialogue doc is wanted, copy only `docs/engineering-dialogue.md` into a focused docs PR and leave `package-lock.json` unchanged.
+  - `docs/engineering-dialogue.md` was imported separately;
+  - remaining diff is the `package-lock.json` npm/platform normalization noise.
+- Decision: do not merge the whole branch as product work. The `package-lock.json` diff should not be merged unless explicitly approved.
 
 ### Older `origin/codex/*` branches
 
