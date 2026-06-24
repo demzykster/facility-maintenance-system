@@ -35,6 +35,8 @@ This project can be worked on by the owner, Codex, and Claude. GitHub is the sha
 
 - Work from the latest `main` unless using a feature branch.
 - Keep each change small.
+- Autonomy never overrides the agreed strategy. Even if the owner says "move freely", "do it yourself", or "do not wait for me", Codex and Claude must stay inside the current roadmap, current phase, and documented guardrails.
+- If the requested action conflicts with the strategy or a blocker prevents safe work, start the response with `ПРОБЛЕМА:` and explain what blocks the work, why it is risky, and the safe options.
 - Run `npm run build` before calling a code change done.
 - Run `npm test` once tests exist.
 - Do not push directly to production services.
@@ -62,6 +64,7 @@ Phase 2 - Stabilization.
 Rules:
 - Do not replace the whole ClaudeMaintenanceApp.jsx file.
 - Use small diff/patch changes against Git.
+- Autonomy does not allow leaving the current strategy; if blocked, write `ПРОБЛЕМА:` and explain the safe options.
 - No Supabase, modular split, or UI changes unless explicitly requested.
 - First target: fix duplicate createdAt warning, then build, then Vitest skeleton.
 ```

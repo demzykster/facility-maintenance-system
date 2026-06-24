@@ -93,6 +93,8 @@ Guardrail:
 
 - Do not commit directly to `main` unless the owner explicitly asks for an emergency direct commit.
 - Use small branches and PRs.
+- Autonomy never overrides the agreed strategy. If the owner says "move freely", "do it yourself", or similar, continue only inside the current roadmap, current phase, and documented guardrails.
+- If something conflicts with the strategy or blocks safe work, start the message with `ПРОБЛЕМА:` and explain the blocker, the risk, and the safe options.
 - Do not replace `src/ClaudeMaintenanceApp.jsx` as a whole file.
 - Do not start Supabase/Auth/RLS/Railway or a production database yet.
 - Do not do broad modular split yet.
@@ -156,6 +158,7 @@ Important current state:
 Rules:
 - Do not commit directly to main unless explicitly told.
 - Use small branches/PRs.
+- Autonomy does not allow leaving the current strategy. If blocked, start with ПРОБЛЕМА: and explain the safe options.
 - Do not replace src/ClaudeMaintenanceApp.jsx as a whole file.
 - Do not start Supabase/Auth/RLS/Railway/database work.
 - Do not do broad modular split.
