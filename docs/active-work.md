@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Notification list visibility
+### Personal permissions clarity
 
-- Status: active branch `codex/notification-show-all`.
-- Last synchronized `main` before this entry: `057798e fix: separate task notifications (#104)`.
+- Status: active branch `codex/clarify-personal-permissions`.
+- Last synchronized `main` before this entry: `ad719f2 fix: reveal hidden notification overflow (#105)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - make the notification panel transparent when more than 60 events exist;
-  - add a visible show-more/show-less control instead of silently hiding older notifications;
-  - keep notification generation and routing unchanged.
+  - clarify that role is the base access profile;
+  - clarify that personal permissions can represent an additional responsibility for the same person;
+  - avoid introducing access templates until the business model is clearer.
 
 ### Latest Completed Work
 
+- PR #105: notification overflow is now explicit.
+  - The notification panel keeps the compact 60-item collapsed view but can show hidden older notifications via a show-more control.
+  - Current demo data has 55 notifications after aggregation, so the control appears only when needed.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #104: task and meeting notifications were separated.
   - Added a dedicated `מטלות ופגישות` notification kind.
   - Task/meeting reminders no longer appear under maintenance treatments or generic escalations.
@@ -174,6 +178,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/clarify-personal-permissions`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: local app rendered at `http://127.0.0.1:5188/`; admin/team screen remained accessible; the change is a copy-only clarification in the existing user permission foldout.
 
 Branch `codex/notification-show-all`:
 
