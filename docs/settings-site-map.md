@@ -19,7 +19,7 @@ Purpose: define where configuration belongs before moving settings between scree
 | Vehicle types (`סוגי כלים`) | `הגדרות` -> `סוגי כלים` | `כלי שינוע` -> settings sub-tab | Fleet data. Split save handling from shared registries before removal. |
 | Maintenance categories | `הגדרות` -> `אחזקה` | Stay in `הגדרות` -> `אחזקה` | Correct global maintenance configuration home. |
 | Maintenance zones | `הגדרות` -> `רישומים` | `הגדרות` -> `אחזקה` | Zone routing belongs with maintenance settings. |
-| Departments (`מחלקות`) | `הגדרות` -> `רישומים` | Stay global for now | Cross-cutting data used by users, tickets, and fleet. Add links from people/fleet pages if needed. |
+| Departments (`מחלקות`) | `הגדרות` -> `רישומים` | `צוות ומשתמשים` -> settings sub-tab | Owner decision: department editing belongs next to people/workforce management. Preserve cross-module rename propagation. |
 | Suppliers | `הגדרות` -> `רישומים` and supplier module | Supplier module / global registry decision pending | Do not move until supplier ownership is reviewed. |
 | PPE norms and clawback | `ביגוד עובדים` -> `הגדרות` | Stay in PPE module | Already module-local and expected by users. |
 | Backup/restore | `הגדרות` | Stay in `הגדרות` with `settings:full` | Sensitive system action, not a module setting. |
@@ -29,11 +29,11 @@ Purpose: define where configuration belongs before moving settings between scree
 1. Move task statuses to `מטלות` settings.
 2. Move vehicle types to `כלי שינוע` settings.
 3. Move worker shifts to `צוות ומשתמשים`.
-4. Move maintenance zones into `אחזקה`.
-5. Re-evaluate whether the remaining `רישומים` tab still has a clear purpose.
+4. Move departments to `צוות ומשתמשים`.
+5. Move maintenance zones into `אחזקה`.
+6. Remove `רישומים` only when it has no remaining editable content.
 
 ## Do Not Move Yet
 
-- Departments: keep global until the site map review proves a better home.
 - Suppliers: review supplier module ownership first.
 - Backup/restore and other sensitive system actions: keep in global settings.
