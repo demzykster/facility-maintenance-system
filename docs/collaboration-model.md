@@ -42,7 +42,8 @@ Required checks:
 - Check latest `origin/main`.
 - Check open PRs if the tool/session can access them.
 - Check remote branches, not only open PRs. A pushed branch without PR is still active work.
-- Always read `docs/active-work.md` first, even if `main` looks clean and there are no open PRs. Then read `docs/current-status.md`, `docs/next-steps.md`, `docs/collaboration-model.md`, and `docs/handoff-for-next-codex.md`.
+- Always read `docs/active-work.md` first, even if `main` looks clean and there are no open PRs.
+- After `docs/active-work.md`, read only the docs needed for the current task. Use `docs/handoff-for-next-codex.md` for restart rules, `docs/backlog.md` for active task planning, and area docs such as `docs/permissions-model.md` or `docs/engineering-dialogue.md` only when the task touches that area.
 
 If `main`, open PRs, remote branches, or docs disagree, treat that as a synchronization problem before doing product work.
 
@@ -72,10 +73,13 @@ https://github.com/demzykster/facility-maintenance-system
 
 Read these files first:
 - docs/active-work.md
-- docs/current-status.md
-- docs/next-steps.md
-- docs/collaboration-model.md
-- docs/handoff-for-next-codex.md
+
+Then read only the extra docs needed for the task:
+- docs/handoff-for-next-codex.md for restart rules
+- docs/backlog.md for active task planning, once it exists
+- docs/permissions-model.md for user permissions/onboarding
+- docs/engineering-dialogue.md for audit topics
+- docs/current-status.md / docs/next-steps.md for phase or roadmap questions
 
 Current phase:
 Phase 2 - Stabilization / audit / permissions-onboarding, unless docs/active-work.md says an earlier handoff item is still open.
