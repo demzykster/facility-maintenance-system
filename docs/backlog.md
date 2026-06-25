@@ -58,7 +58,7 @@ Remaining:
 
 ### User-management permission reachability
 
-Status: in progress on branch `codex/expose-user-management-permission`.
+Status: done in PR #91.
 
 Goal:
 - A non-admin manager/HR-like user with `users:view` should have a visible path to `צוות ומשתמשים`.
@@ -68,6 +68,7 @@ Goal:
 Implementation so far:
 - The manager shell shows `צוות ומשתמשים` only when `canViewUsers(session)` is true.
 - The screen reuses the existing `SettingsPanel only="users"` and passes `canManageUsers(session)` for edit controls.
+- The full admin dashboard and unrelated modules remain hidden from non-admin managers.
 
 ### Worker activation follow-up
 
