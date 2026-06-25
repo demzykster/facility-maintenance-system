@@ -241,6 +241,7 @@ const WIDGETS = [
   { id: "insp", label: "בקרת כלים לביצוע" }, { id: "pm", label: "תחזוקה מונעת" }, { id: "presence", label: "נוכחות טכנאים" }, { id: "costs", label: "עלויות החודש" },
 ];
 const DEFAULT_CONFIG = {
+  companyName: "CMMS CDSL", siteName: "ניהול תחזוקה, ציוד, משימות ותפעול",
   departments: ["נפחי", "גלרייה", "מחסן", "קבלה", "החזרות", "הפצה", "שיגור", "בקרי איכות", "אחזקה", "ניקיון"],
   zones: ["אזור קבלת סחורה", "אזור משלוחים", "מחסן ראשי", "אזור קירור", "רחבת מלגזות", "רציפי טעינה", "משרדים", "חניון", "כללי"],
   suppliers: ["טויוטה", "במת הרמה", "קידמה", "Still", "קבלן חשמל א.ב.", "שירות מזגנים בע״מ", "ספק חלקים", "פנימי"],
@@ -255,7 +256,7 @@ const DEFAULT_CONFIG = {
   techWidgets: { tickets: true, pm: true, sla: true, presence: true },
   mgrWidgets: { tickets: true, pm: true, sla: true },
   notify: { new: true, confirm: true, back: true, ready: true, escalate: true, sla: true, doc: true, pm: true, upd: true },
-  companyName: "", siteName: "", defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
+  defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
   vehicleTypes: [], modelSupplier: {}, modelType: {}, shifts: [], workShifts: [],
 };
 
@@ -1647,7 +1648,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     <div className="login-bg">
       <div className="login-card">
         <div className="login-card-head">
-          <div className="brand"><div className="brand-mark"><Wrench size={22} /></div><div><div className="brand-title">{config?.companyName?.trim() || "אחזקה"}</div><div className="brand-sub">{config?.companyName?.trim() ? ("מערכת אחזקה" + (config.siteName?.trim() ? " · " + config.siteName.trim() : "")) : "מערכת ניהול קריאות ותחזוקה"}</div></div></div>
+          <div className="brand"><div className="brand-mark"><Wrench size={22} /></div><div><div className="brand-title">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
           <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
         {activationToken ? (<>
@@ -4113,7 +4114,7 @@ function AdminApp(p) {
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
-        <TopBar title="ניהול אחזקה" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
+        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
           extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
@@ -6083,7 +6084,7 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
 /* ============================================================ SHARED UI */
 function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, theme, toggleTheme }) {
   return (<aside className="sidebar">
-    <div className="side-brand"><div className="brand-mark sm"><Wrench size={18} /></div><div><div className="brand-title sm">{config?.companyName?.trim() || "אחזקה"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול קריאות ותחזוקה"}</div></div></div>
+    <div className="side-brand"><div className="brand-mark sm"><Wrench size={18} /></div><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
     {primary && <button className="side-newbtn" onClick={primary.onClick}><Plus size={18} /> {primary.label}</button>}
     <div className="side-nav">{nav.map((n) => <button key={n.id} className={"side-item" + (n.active ? " on" : "")} onClick={n.onClick}><n.Icon size={19} /><span>{n.label}</span></button>)}<button className="side-item" onClick={onBell}><Bell size={19} /><span>התראות</span>{notif?.unread > 0 && <span className="side-badge">{notif.unread}</span>}</button></div>
     <div className="side-foot">
