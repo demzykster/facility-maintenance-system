@@ -23,15 +23,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active branch `codex/expose-user-management-permission`.
-- Last synchronized `main` before this entry: `bdc2219 docs: close ticket card ledger (#90)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `0c70dae expose user-management permission in manager shell (#91)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - make the existing `users:view/manage` permission reachable from the manager shell;
-  - keep the team/user-management screen gated by the unified permission model.
+  - close the ledger after PR #91;
+  - continue future work from `docs/backlog.md`.
 
 ### Latest Completed Work
 
+- PR #91: user-management permission was made reachable from the manager shell.
+  - Managers with `users:view` now see `צוות ומשתמשים`.
+  - The screen reuses the existing people/settings UI and keeps edit controls gated by `users:manage`.
+  - The full admin dashboard and unrelated management modules are not exposed by this permission.
 - PR #89: ticket-card status hierarchy was refined.
   - Ticket cards now separate primary ownership/status from secondary metadata.
   - Created time and closure cost moved out of the high-priority badge row.
@@ -161,11 +165,6 @@ Topic #14 validation before PR #53:
 - Browser smoke-check: admin login showed `כלי שינוע`, the old `כלים ותחזוקה` label was not visible, and no console errors were captured.
 
 Current branch validation:
-
-- Branch `codex/expose-user-management-permission`:
-  - `npm test -- --run`: passed, 12 files / 37 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: default manager without `users:view` does not see `צוות ומשתמשים`; admin user editor still exposes the `ניהול משתמשים ועובדים` permission selector.
 
 - Branch `codex/refine-ticket-cards-manager-view`:
   - `npm test -- --run`: passed, 12 files / 37 tests.
