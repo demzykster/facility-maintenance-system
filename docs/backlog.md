@@ -140,7 +140,7 @@ Ship as multiple small PRs, not one refactor.
 
 ### Topic 15 — remove Settings dev/test section
 
-Status: done in branch `codex/remove-settings-dev-section`.
+Status: done in PR #55.
 
 Goal:
 - Remove `פיתוח ובדיקות` from Settings if demo load/clear controls are confirmed available elsewhere.
@@ -154,7 +154,7 @@ Implementation:
 
 ### Topic 8 — pending driver requests badge
 
-Status: open, small.
+Status: done in branch `codex/driver-requests-tab-badge`.
 
 Goal:
 - Show a count badge on `נהגים / כיסוי` tabs when pending driver requests exist.
@@ -163,6 +163,7 @@ Implementation notes:
 - `pendingDriverReqs(fleet)` already exists.
 - There are two tab render sites to update.
 - Badge should follow the same visibility gate as approval rights.
+- Implemented as an admin-only red count badge on both `נהגים / כיסוי` tab render sites.
 
 ### Topic 14 — rename navigation
 
@@ -175,7 +176,7 @@ Pre-check:
 - Search all hardcoded occurrences and avoid changing unrelated explanatory text where "maintenance" is actually intended.
 
 Next small product candidates:
-- Topic 8, pending driver requests badge.
+- Choose the next small isolated item from Settings/site-map cleanup, PPE issuance issues, or worker onboarding polish.
 
 ## Tickets / Dashboard / Manager View
 

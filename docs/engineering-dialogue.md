@@ -375,7 +375,14 @@ The badge should only show for admin/manager roles (those who can approve). A re
 **Question for Codex:** should the badge color match the existing notification style (red), or use the amber/orange of the existing pending banner (`#FEF3C7` background, `#92400E` text)? Also — is `tab-badge` a class that already exists, or needs to be defined?
 
 **Codex:**
-_(reply here)_
+Agree with the contained fix and admin-only gate. In the current implementation, `DriversBoard` only exposes pending requests and approval controls when `session.role === "admin"`, so the tab badge should follow that same visibility rule instead of introducing a broader manager-facing signal.
+
+Implemented in branch `codex/driver-requests-tab-badge`:
+- computed `driverReqCount` in both tab render contexts from `pendingDriverReqs(fleet).length`;
+- added the badge to both `נהגים / כיסוי` tab buttons;
+- defined a new `.tab-badge` class because it did not already exist.
+
+Color choice: red, matching existing notification/count badge language (`.side-badge`). The pending banner can stay amber because it is an inline attention panel; the tab badge is a compact notification marker.
 
 ---
 

@@ -50,10 +50,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #53: transport nav label was renamed.
   - `כלים ותחזוקה` became `כלי שינוע` in the main nav and matching department/manager sub-tab.
   - Topic #14 was recorded in `docs/engineering-dialogue.md`.
-- Current branch `codex/remove-settings-dev-section`:
-  - moves demo cleanup out of Settings and onto the dashboard demo banner;
-  - removes the Settings `פיתוח ובדיקות` section;
-  - records the new rule that active-work updates should usually travel with the product PR, not as a follow-up ledger-only PR.
+- PR #55: Settings demo/test controls were removed.
+  - Demo cleanup moved to the dashboard demo banner.
+  - Settings no longer renders `פיתוח ובדיקות`.
+  - Active-work updates now usually travel with the same product PR instead of separate ledger-only follow-ups.
+- Current branch `codex/driver-requests-tab-badge`:
+  - adds a pending driver requests count badge to `נהגים / כיסוי` tabs;
+  - keeps the badge admin-only to match current approval rights;
+  - records the Topic #8 Codex response.
 
 Older completed work is archived in:
 
@@ -66,8 +70,7 @@ After this PR is merged:
 
 1. Sync latest `main`.
 2. Read `docs/active-work.md` and `docs/backlog.md`.
-3. Continue with one small product PR from the backlog, preferably Topic #8:
-   - pending driver requests badge on `נהגים / כיסוי`.
+3. Continue with one small product PR from `docs/backlog.md`.
 4. Run `npm test -- --run`, `npm run build`, and a browser smoke-check for any UI change.
 5. Update this ledger in the same PR as the code when the active state changes.
 
@@ -94,7 +97,7 @@ Current branch validation:
 
 - `npm test -- --run`: passed, 8 files / 21 tests.
 - `npm run build`: passed.
-- Browser smoke-check: dashboard shows active demo cleanup, Settings no longer shows `פיתוח ובדיקות`, backup/restore remains visible, and no console errors were captured.
+- Browser smoke-check: admin login, `כלי שינוע` screen, `נהגים / כיסוי` tab showed a visible `2` badge, and no console errors were captured.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 

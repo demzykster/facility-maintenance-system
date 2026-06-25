@@ -2115,8 +2115,9 @@ function ManagerFleet(p) {
   const scoped = useMemo(() => fleetForSession(session, fleet).slice().sort((a, b) => (a.code > b.code ? 1 : -1)), [session, fleet]);
   const myPm = useMemo(() => pmVisible(session, p.pm, fleet), [p.pm, fleet, session]);
   const showDocs = canFleetDocs(session), showTickets = canFleetTickets(session);
+  const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
   return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
+    <div className="seg-tabs s3" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
     {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
       : tab === "pm" ? <><div className="note" style={{ marginBottom: 10 }}>טיפולים תקופתיים לכלי המחלקה. יש להוציא את הכלי לטכנאי במועד; הטכנאי יעדכן ביצוע.</div><PMSchedule items={myPm} fleet={fleet} onOpen={(x) => setPmView(x)} config={config} /></>
       : <>
@@ -4338,6 +4339,7 @@ function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
 function FleetModule(p) {
   const { fleet, config, tickets, insp, saveFleet, delFleet, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units");
+  const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
   useEffect(() => { if (p.openFleetId) { setFtab("units"); setOpenId(p.openFleetId); } }, [p.navT]);
   const [type, setType] = useState("all"), [sup, setSup] = useState("all"), [doc, setDoc] = useState("all"), [dept, setDept] = useState("all"), [hyd, setHyd] = useState("all"), [q, setQ] = useState("");
   const [groupBy, setGroupBy] = useState("none"), [collapsed, setCollapsed] = useState({});
@@ -4376,7 +4378,7 @@ function FleetModule(p) {
   const groups = (() => { if (groupBy === "none") return null; const m = new Map(); rows.forEach((f) => { const k = groupKeyOf(f); if (!m.has(k)) m.set(k, []); m.get(k).push(f); }); let arr = [...m.entries()].map(([k, items]) => ({ k, items, blocked: items.filter((f) => unitBlock(f, tickets, config)).length })); if (groupBy === "status") arr.sort((a, b) => STATUS_ORDER.indexOf(a.k) - STATUS_ORDER.indexOf(b.k)); else arr.sort((a, b) => b.items.length - a.items.length || a.k.localeCompare(b.k, "he")); return arr; })();
   const GROUP_OPTS = [["none", "ללא"], ["type", "סוג"], ["supplier", "ספק"], ["status", "סטטוס"]];
   return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 360, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי</button></div>
+    <div className="seg-tabs s3" style={{ maxWidth: 360, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button></div>
     {ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
     <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div>
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
@@ -6715,6 +6717,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .ni-group-n{font-size:10px;font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:1px 7px;}
 .ni-title{font-weight:600;font-size:13.5px;}.ni-text{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}.ni-time{font-size:11px;color:var(--muted);margin-top:3px;}
 .side-badge{margin-inline-start:auto;background:#EF4444;color:#fff;min-width:20px;height:20px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;}
+.tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#EF4444;color:#fff;font-size:11px;font-weight:800;line-height:1;margin-inline-start:6px;}
 
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--slate);color:#fff;border-radius:13px;padding:13px 16px;display:flex;gap:11px;align-items:flex-start;max-width:90%;width:360px;box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:80;animation:rise .3s ease;cursor:pointer;}
 .toast-title{font-weight:600;font-size:13.5px;}.toast-body{font-size:12.5px;color:#CBD5E1;margin-top:2px;line-height:1.4;}
