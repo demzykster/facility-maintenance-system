@@ -23,15 +23,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `85ba05b Merge pull request #61 from demzykster/codex/technician-tolerance-model`.
+- Status: active docs branch `codex/document-individual-tech-shifts`.
+- Last synchronized `main` before this entry: `18702ed Merge pull request #62 from demzykster/codex/close-tolerance-ledger`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - continue backlog-driven work from `docs/backlog.md`;
-  - keep the ledger accurate after PR #61.
+  - record the owner decision that technician shifts are individual profile settings;
+  - prevent future work from creating a global technician shift list.
 
 ### Latest Completed Work
 
+- PR #62: active ledger was closed after PR #61.
+  - Topic #4 helper foundation was marked done.
+  - The active branch was reset to no active product branch.
 - PR #60: handoff backlog guidance was updated.
   - Removed completed starter suggestions from `docs/handoff-for-next-codex.md`.
   - Added the rule that active-work updates travel with the same code PR.
@@ -80,9 +83,10 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Sync latest `main`.
-2. Continue with the next smallest item from `docs/backlog.md`.
-3. Update this ledger in the same PR as the code when the active state changes.
+1. Open/merge this docs-only PR if the diff is clean.
+2. Sync latest `main`.
+3. Continue with the next smallest item from `docs/backlog.md`.
+4. Update this ledger in the same PR as the code when the active state changes.
 
 ## Last Validation
 
@@ -105,6 +109,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- `codex/document-individual-tech-shifts`: docs-only, `git diff --check` passed.
 - PR #61:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
