@@ -58,9 +58,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `נהגים / כיסוי` now shows an admin-only count badge when driver requests wait for approval.
   - Topic #8 was recorded in `docs/engineering-dialogue.md`.
 - Current branch `codex/worker-activation-copy-saved-token`:
-  - prevents copying a worker activation link unless the token is already saved on that worker record;
-  - adds focused coverage for unsaved reset-token copy;
-  - updates worker onboarding docs.
+- PR #57: worker activation link copy was hardened.
+  - Copying now requires the activation token to already be saved on the worker record.
+  - Newly generated reset links must be saved before they can be copied.
+- Current branch `codex/settings-site-map-doc`:
+  - adds `docs/settings-site-map.md`;
+  - marks the Settings site-map backlog item done;
+  - prepares future settings moves without changing UI code.
 
 Older completed work is archived in:
 
@@ -98,9 +102,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- `npm test -- --run`: passed, 8 files / 21 tests.
-- `npm run build`: passed.
-- Browser smoke-check: admin login, `צוות ומשתמשים`, new worker form showed activation status and the save-first hint, did not show `העתק קישור` before save, and no console errors were captured.
+- Docs-only change. Test/build skipped.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 
