@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Move fleet type settings
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `bc8d6ba feat: move task status settings to tasks`.
+- Status: branch `codex/move-fleet-type-settings` in progress.
+- Last synchronized `main` before this entry: `4316090 docs: close task status settings ledger`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - continue backlog-driven work from `docs/backlog.md`;
-  - keep the ledger accurate after PR #68.
+  - start Topic #11 from `docs/backlog.md`;
+  - move vehicle type configuration from global Settings to the Fleet module;
+  - preserve the existing vehicle type config shape.
 
 ### Latest Completed Work
 
@@ -91,9 +92,11 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Sync latest `main`.
-2. Continue with the next smallest item from `docs/backlog.md`.
-3. Update this ledger in the same PR as the code when the active state changes.
+1. Finish branch `codex/move-fleet-type-settings`.
+2. Run `npm test -- --run`.
+3. Run `npm run build`.
+4. Browser smoke-check Fleet -> Settings and global Settings.
+5. Open and merge one small PR if validation passes.
 
 ## Last Validation
 
@@ -116,6 +119,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/move-fleet-type-settings`:
+  - `npm test -- --run`: passed, 9 files / 25 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin login, Fleet -> Settings showed vehicle type editor; global Settings no longer showed vehicle type tab/editor; browser console errors: none.
 - Branch `codex/move-task-status-settings`:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.

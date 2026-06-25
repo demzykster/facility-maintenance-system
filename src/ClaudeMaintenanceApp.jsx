@@ -4354,9 +4354,40 @@ function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
 }
 
 /* ============================================================ FLEET */
+function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
+  const [saved, setSaved] = useState(false), [typeMsg, setTypeMsg] = useState(""), [openType, setOpenType] = useState(null);
+  const [vtypes, setVtypes] = useState((config.vehicleTypes && config.vehicleTypes.length) ? config.vehicleTypes.map((v) => ({ ...v, models: [...(v.models || [])] })) : buildVehicleTypes(config, fleet));
+  const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
+  const save = async () => {
+    setTypeMsg("");
+    const list = vtypes.filter((t) => (t.name || "").trim());
+    const newModels = new Set();
+    list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); }));
+    const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type));
+    if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${orphan.length} כלים משויכים לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; }
+    await saveConfig({ ...config, ...flattenVehicleTypes(list) });
+    setSaved(true); setTimeout(() => setSaved(false), 1800);
+  };
+  return (<div className="settings-wrap">
+    <SectionTitle>סוגי כלי שינוע</SectionTitle>
+    <div className="hint" style={{ marginBottom: 8 }}>«סוג» מגדיר ספק, SLA, מסמכים, תדירות טיפול ושאלון — ותחתיו הדגמים השייכים אליו. הכול נשמר בלחיצה על «שמירה».</div>
+    {vtypes.map((t, i) => { const op = openType === i; const docFlags = [["insurance", "מנוהל ביטוח"], ["tasrir", "מנוהל תסקיר"], ["license", "מנוהל רישיון רכב"], ["lease", "מנוהל ליזינג"]]; return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}{(t.models || []).length ? <span className="reg-count">{t.models.length} {t.models.length === 1 ? "דגם" : "דגמים"}</span> : null}</span>}<button className="reg-edit" onClick={() => setOpenType(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setVtypes((s) => s.filter((_, j) => j !== i)); if (op) setOpenType(null); }}><Trash2 size={15} /></button></div>{op && <>
+      <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>זמני יעד SLA (שעות):</div>{slaRow(t, (k, v) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}
+      <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>מסמכים שמנוהלים לסוג זה:</div>{docFlags.map(([k, lbl]) => <label key={k} className="chk-line"><input type="checkbox" checked={!!t[k]} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: e.target.checked } : x))} /> {lbl}</label>)}
+      <label className="field" style={{ marginTop: 8 }}><span>תדירות טיפול תקופתי</span><select value={t.pmFreq || "monthly"} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, pmFreq: e.target.value } : x))}>{FREQS.map((fr) => <option key={fr.id} value={fr.id}>{fr.label}</option>)}</select></label>
+      <label className="field" style={{ marginTop: 8 }}><span>שאלון בקרה ברירת מחדל</span><select value={t.inspTpl || ""} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, inspTpl: e.target.value } : x))}><option value="">— ללא —</option>{(templates || []).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}</select></label>
+      <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>דגמים בסוג זה:</div>{(t.models || []).map((m, mi) => <div key={mi} className="reg-row" style={{ marginBottom: 6 }}><input className="reg-name" value={m} placeholder="דגם" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.map((mm, k) => k === mi ? e.target.value : mm) } : x))} /><button className="reg-del" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.filter((_, k) => k !== mi) } : x))}><Trash2 size={15} /></button></div>)}
+      <button className="btn-ghost sm" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: [...(x.models || []), ""] } : x))}><Plus size={14} /> דגם</button>
+    </>}</div>; })}
+    <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
+    <button className="btn-primary full" style={{ marginTop: 16 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת הגדרות כלי שינוע"}</button>
+    {typeMsg && <div className="note" style={{ color: "#DC2626" }}>{typeMsg}</div>}
+  </div>);
+}
 function FleetModule(p) {
   const { fleet, config, tickets, insp, saveFleet, delFleet, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units");
+  const canEditSettings = canManageSettings(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
   useEffect(() => { if (p.openFleetId) { setFtab("units"); setOpenId(p.openFleetId); } }, [p.navT]);
   const [type, setType] = useState("all"), [sup, setSup] = useState("all"), [doc, setDoc] = useState("all"), [dept, setDept] = useState("all"), [hyd, setHyd] = useState("all"), [q, setQ] = useState("");
@@ -4396,8 +4427,8 @@ function FleetModule(p) {
   const groups = (() => { if (groupBy === "none") return null; const m = new Map(); rows.forEach((f) => { const k = groupKeyOf(f); if (!m.has(k)) m.set(k, []); m.get(k).push(f); }); let arr = [...m.entries()].map(([k, items]) => ({ k, items, blocked: items.filter((f) => unitBlock(f, tickets, config)).length })); if (groupBy === "status") arr.sort((a, b) => STATUS_ORDER.indexOf(a.k) - STATUS_ORDER.indexOf(b.k)); else arr.sort((a, b) => b.items.length - a.items.length || a.k.localeCompare(b.k, "he")); return arr; })();
   const GROUP_OPTS = [["none", "ללא"], ["type", "סוג"], ["supplier", "ספק"], ["status", "סטטוס"]];
   return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 360, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button></div>
-    {ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
+    <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
+    {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} templates={p.templates} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
     <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div>
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
@@ -5306,7 +5337,7 @@ function SettingsPanel(p) {
   const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
-  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [openType, setOpenType] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null);
+  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null);
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
   const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftDef, setShiftDef] = useState(config.defaultShiftEnd || "16:30"), [startDef, setStartDef] = useState(config.defaultShiftStart || "07:30"), [lateG, setLateG] = useState(config.lateGraceMin ?? 10), [earlyG, setEarlyG] = useState(config.earlyGraceMin ?? 10);
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
@@ -5315,11 +5346,9 @@ function SettingsPanel(p) {
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
   const [tw, setTw] = useState({ ...(config.techWidgets || {}) }), [mw, setMw] = useState({ ...(config.mgrWidgets || {}) });
   const [regMsg, setRegMsg] = useState("");
-  const [typeMsg, setTypeMsg] = useState("");
   const mkRows = (arr) => (arr || []).map((s, i) => ({ id: "r" + i + "_" + s, name: s, _orig: s }));
   const [depts, setDepts] = useState(mkRows(config.departments)), [zones, setZones] = useState(mkRows(config.zones));
   const [cats, setCats] = useState((config.categories || CATEGORIES).map((c) => ({ id: c.id, label: c.label, ...SLA3(config.catSla?.[c.id]) })));
-  const [vtypes, setVtypes] = useState((config.vehicleTypes && config.vehicleTypes.length) ? config.vehicleTypes.map((v) => ({ ...v, models: [...(v.models || [])] })) : buildVehicleTypes(config, fleet));
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
   const doExport = async () => { try { const data = await getBackup(); downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `backup_${new Date().toISOString().slice(0, 10)}.json`); } catch (e) {} };
   const onPickBackup = async (e) => {
@@ -5356,7 +5385,6 @@ function SettingsPanel(p) {
     } catch (e) { setRegMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
   };
   const saveMaint = async () => { const list = cats.filter((c) => c.label.trim()); await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}) }); flash(); };
-  const saveFleetTypes = async () => { setTypeMsg(""); const list = vtypes.filter((t) => (t.name || "").trim()); const newModels = new Set(); list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); })); const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type)); if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${orphan.length} כלים משויכים לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; } await saveConfig({ ...config, ...flattenVehicleTypes(list) }); flash(); };
   const adminCount = users.filter((u) => u.role === "admin" && u.active).length;
   const mayViewUsers = p.only === "users" ? canViewUsers(session) : true;
   const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
@@ -5377,7 +5405,7 @@ function SettingsPanel(p) {
   const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim())));
   const restoreWorker = async (w) => { await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); setArcView(null); };
   return (<div className="settings-wrap">
-    {!p.only && <div className="seg-tabs s4"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "reg" ? "on" : ""} onClick={() => setTab("reg")}>רישומים</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button><button className={tab === "fleet" ? "on" : ""} onClick={() => setTab("fleet")}>סוגי כלים</button></div>}
+    {!p.only && <div className="seg-tabs s3"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "reg" ? "on" : ""} onClick={() => setTab("reg")}>רישומים</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button></div>}
 
     {tab === "general" && (<>
       <SectionTitle><Building2 size={15} /> חברה ואתר</SectionTitle>
@@ -5462,23 +5490,6 @@ function SettingsPanel(p) {
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveMaint}>{saved ? "נשמר ✓" : "שמירת הגדרות אחזקה"}</button>
     </>)}
 
-    {tab === "fleet" && (<>
-      <SectionTitle>סוגי כלי שינוע</SectionTitle>
-      <div className="hint" style={{ marginBottom: 8 }}>«סוג» מגדיר ספק, SLA, מסמכים, תדירות טיפול ושאלון — ותחתיו הדגמים (שם יצרן) השייכים אליו. ניתן לאחד דגמים תחת סוג אחד. הכול נשמר בלחיצה על «שמירה».</div>
-      {vtypes.map((t, i) => { const op = openType === i; const docFlags = [["insurance", "מנוהל ביטוח"], ["tasrir", "מנוהל תסקיר"], ["license", "מנוהל רישיון רכב"], ["lease", "מנוהל ליזינג"]]; return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג (לדוגמה: מלגזת היגש)" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}{(t.models || []).length ? <span className="reg-count">{t.models.length} {t.models.length === 1 ? "דגם" : "דגמים"}</span> : null}</span>}<button className="reg-edit" onClick={() => setOpenType(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setVtypes((s) => s.filter((_, j) => j !== i)); if (op) setOpenType(null); }}><Trash2 size={15} /></button></div>{op && <>
-        <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>זמני יעד SLA (שעות):</div>
-        {slaRow(t, (k, v) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}
-        <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>מסמכים שמנוהלים לסוג זה (יופיע בכרטיס הכלי):</div>{docFlags.map(([k, lbl]) => <label key={k} className="chk-line"><input type="checkbox" checked={!!t[k]} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: e.target.checked } : x))} /> {lbl}</label>)}
-        <label className="field" style={{ marginTop: 8 }}><span>תדירות טיפול תקופתי</span><select value={t.pmFreq || "monthly"} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, pmFreq: e.target.value } : x))}>{FREQS.map((fr) => <option key={fr.id} value={fr.id}>{fr.label}</option>)}</select></label>
-        <label className="field" style={{ marginTop: 8 }}><span>שאלון בקרה ברירת מחדל</span><select value={t.inspTpl || ""} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, inspTpl: e.target.value } : x))}><option value="">— ללא —</option>{(templates || []).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}</select></label>
-        <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>דגמים בסוג זה (שם יצרן — מופיע לזיהוי הכלי):</div>
-        {(t.models || []).map((m, mi) => <div key={mi} className="reg-row" style={{ marginBottom: 6 }}><input className="reg-name" value={m} placeholder="דגם" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.map((mm, k) => k === mi ? e.target.value : mm) } : x))} /><button className="reg-del" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.filter((_, k) => k !== mi) } : x))}><Trash2 size={15} /></button></div>)}
-        <button className="btn-ghost sm" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: [...(x.models || []), ""] } : x))}><Plus size={14} /> דגם</button>
-      </>}</div>; })}
-      <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
-      <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveFleetTypes}>{saved ? "נשמר ✓" : "שמירת הגדרות כלי שינוע"}</button>
-      {typeMsg && <div className="note" style={{ color: "#DC2626" }}>{typeMsg}</div>}
-    </>)}
 
     {tab === "users" && (!mayViewUsers ? <div className="note">אין הרשאה לצפייה בניהול משתמשים.</div> : <>
       <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button>}</div>
