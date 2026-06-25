@@ -43,14 +43,14 @@ Always read first:
 
 Then read only what the current task needs:
 
-- `docs/backlog.md` — working task list, once it exists.
-- `docs/current-status.md` — project phase/status questions.
-- `docs/next-steps.md` — roadmap/phase questions.
-- `docs/collaboration-model.md` — collaboration or handoff questions.
-- `docs/permissions-model.md` — user permissions, roles, worker onboarding, module access.
-- `docs/full-ui-audit-2026-06-24.md` — UI audit follow-up.
-- `docs/engineering-dialogue.md` — Claude/Codex topic decisions and open audit topics.
-- `docs/archive/progress-log.md` and `docs/archive/validation-log.md` — historical lookup only.
+- `docs/backlog.md` - working task list.
+- `docs/current-status.md` - project phase/status questions.
+- `docs/next-steps.md` - roadmap/phase questions.
+- `docs/collaboration-model.md` - collaboration or handoff questions.
+- `docs/permissions-model.md` - user permissions, roles, worker onboarding, module access.
+- `docs/full-ui-audit-2026-06-24.md` - UI audit follow-up.
+- `docs/engineering-dialogue.md` - Claude/Codex topic decisions and open audit topics.
+- `docs/archive/progress-log.md` and `docs/archive/validation-log.md` - historical lookup only.
 
 ## Core Rules
 
@@ -62,6 +62,7 @@ Then read only what the current task needs:
 - Do not start Supabase/Auth/RLS/Railway/database work.
 - Do not do a broad modular split yet.
 - Keep changes small and reversible.
+- Update `docs/active-work.md` in the same commit as the code, not as a separate PR.
 - After any code change, run:
   - `npm test -- --run`
   - `npm run build`
@@ -105,12 +106,7 @@ Planning requirements:
 
 After backlog exists, work from it with one atomic PR per change. If a product-code diff is more than about 100 lines, split it.
 
-Suggested small starters from current docs:
-
-- Topic #14 — rename nav `כלים ותחזוקה` to `כלי שינוע`.
-- Topic #15 — remove `פיתוח ובדיקות` from Settings if the home-screen demo controls are confirmed.
-- Topic #8 — pending driver requests badge.
-- Worker onboarding UI follow-up if backlog verification finds a gap.
+Check `docs/backlog.md` for the current smallest open item.
 
 ## Baseline Checks
 
