@@ -82,7 +82,7 @@ Remaining:
 
 ### Topic 5 — technician individual shift settings
 
-Status: implementation in progress.
+Status: profile edit path done in PR #64; legacy cleanup remains.
 
 Goal:
 - Keep each technician shift as an individual setting in that technician's profile.

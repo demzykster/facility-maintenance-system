@@ -23,13 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active branch `codex/individual-tech-shift-ui`.
-- Last synchronized `main` before this entry: `741c52b Merge pull request #63 from demzykster/codex/document-individual-tech-shifts`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `e830fc1 Merge pull request #64 from demzykster/codex/individual-tech-shift-ui`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - apply the owner decision that technician shifts are individual profile settings;
-  - remove the global-shift selector from technician profile editing;
-  - save technician `shiftStart`/`shiftEnd` directly and clear legacy `shiftId`.
+  - continue backlog-driven work from `docs/backlog.md`;
+  - keep the ledger accurate after PR #64.
 
 ### Latest Completed Work
 
@@ -84,11 +83,9 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Run `npm test -- --run`.
-2. Run `npm run build`.
-3. Browser smoke-check the technician user form.
-4. Open PR for `codex/individual-tech-shift-ui`.
-5. After merge, sync `main` and close this ledger item.
+1. Sync latest `main`.
+2. Continue with the next smallest item from `docs/backlog.md`.
+3. Update this ledger in the same PR as the code when the active state changes.
 
 ## Last Validation
 
@@ -111,7 +108,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- `codex/individual-tech-shift-ui`:
+- PR #64:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
   - Browser smoke-check: admin login, team/users, technician form; individual start/end time fields were visible and the global technician shift selector was not visible.
@@ -157,3 +154,7 @@ When handing work back:
 - PR #63: technician shifts were documented as individual-only.
   - The backlog now forbids a global technician shift list.
   - Technician `shiftStart`/`shiftEnd` are the intended source of truth.
+- PR #64: technician shift editing now uses individual profile times.
+  - Technician profile editing shows direct start/end time fields.
+  - Saving a technician clears legacy `shiftId`.
+  - Technician schedule calculation ignores global `config.shifts`.
