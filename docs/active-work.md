@@ -23,13 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active product branch `codex/rename-product-brand`.
-- Last synchronized `main` before this entry: `c97e11c docs: close login identifier ledger (#86)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `10acaee chore: rename visible product brand (#87)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - rename the visible product brand to `CMMS CDSL`;
-  - make the visible description broader than a ticket/request system;
-  - leave technical package/repository names unchanged.
+  - close the ledger after PR #87;
+  - continue future work from `docs/backlog.md`.
 
 ### Latest Completed Work
 
@@ -72,6 +71,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Role tabs were replaced with one identifier field.
   - Staff users continue with password, workers/cleaners with PIN, and technicians with the current demo code-only flow.
   - Worker activation link flow was kept unchanged.
+- PR #87: visible product brand was renamed to `CMMS CDSL`.
+  - Login, sidebar, browser title, and README were updated.
+  - The default app description now says it manages maintenance, equipment, tasks, and operations.
+  - Technical package/repository names were left unchanged.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
