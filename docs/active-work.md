@@ -23,12 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `10acaee chore: rename visible product brand (#87)`.
+- Status: active branch `codex/refine-ticket-cards-manager-view`.
+- Last synchronized `main` before this entry: `db92ffa docs: close brand rename ledger (#88)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - close the ledger after PR #87;
-  - continue future work from `docs/backlog.md`.
+  - reduce ticket-card noise by separating primary ownership/status from secondary metadata;
+  - check manager-view clarity without changing ticket workflow logic.
 
 ### Latest Completed Work
 
@@ -157,6 +157,11 @@ Topic #14 validation before PR #53:
 - Browser smoke-check: admin login showed `כלי שינוע`, the old `כלים ותחזוקה` label was not visible, and no console errors were captured.
 
 Current branch validation:
+
+- Branch `codex/refine-ticket-cards-manager-view`:
+  - `npm test -- --run`: passed, 12 files / 37 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin ticket list and manager ticket list rendered with the new `אצל:` ownership/status line; no visible app errors.
 
 - Branch `codex/rename-product-brand`:
   - `npm test -- --run`: passed, 12 files / 37 tests.

@@ -303,7 +303,7 @@ Remaining:
 
 ### Ticket-card second pass
 
-Status: open, audit/design.
+Status: done in branch `codex/refine-ticket-cards-manager-view`.
 
 Goal:
 - Reduce card noise further by deciding which labels are primary vs secondary.
@@ -312,12 +312,21 @@ Goal:
 Source:
 - `docs/full-ui-audit-2026-06-24.md`
 
+Implementation so far:
+- Ticket cards now separate primary ownership/status from secondary metadata.
+- Created time and closure cost moved out of the high-priority badge row.
+- Manager view already separates action sections from tracking sections, so this pass avoids workflow changes.
+
 ### Manager view audit
 
-Status: open, audit/design.
+Status: checked in branch `codex/refine-ticket-cards-manager-view`.
 
 Goal:
 - Verify whether "open" sections should hide items owned by admin/tech or show them as read-only tracking.
+
+Result:
+- The manager open-ticket screen already separates action sections from `מעקב` sections.
+- No workflow filtering change was made in this pass.
 
 ## PPE / Clothing
 

@@ -6164,13 +6164,24 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const showStatusBadge = !(t.status === "waiting" && t.waitingReason);
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
+  const holder = isOpen(t) ? ballHolder(t) : null;
+  const stateSince = t.updatedAt || t.createdAt;
+  const meta = [
+    tr ? <span key="track" className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span> : null,
+    t.track === "transport" ? t.asset : t.zone,
+    showSubAssignee ? <span key="assignee"><Wrench size={11} /> {t.assignee}</span> : null,
+    timeAgo(t.createdAt),
+    t.closure ? ils(t.closure.costAmount || 0) : null
+  ].filter(Boolean);
   return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
     <div className="tcard-icon" style={{ background: c.color + "22" }}><c.Icon size={20} color={c.color} /></div>
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
-      <div className="tcard-sub">{tr && <span className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span>} · {t.track === "transport" ? t.asset : t.zone}{showSubAssignee && <> · <Wrench size={11} /> {t.assignee}</>}</div>
+      <div className="tcard-sub">{meta.map((x, i) => <React.Fragment key={i}>{i > 0 && <span className="sep">·</span>}{x}</React.Fragment>)}</div>
+      {holder
+        ? <div className="tcard-state" style={{ color: holder.color }}><holder.Icon size={12} /> אצל: {holder.label} · {fmtDur(Date.now() - stateSince)}</div>
+        : <div className="tcard-state" style={{ color: s.color }}>סטטוס: {s.label}</div>}
       {isOpen(t) && <SlaBar t={t} />}
-      {isOpen(t) && (() => { const b = ballHolder(t); if (!b) return null; const since = t.updatedAt || t.createdAt; return <div className="tcard-owner" style={{ color: b.color }}><b.Icon size={12} /> שלב: {b.label} · {fmtDur(Date.now() - since)}</div>; })()}
       <div className="tcard-badges">
         {showStatusBadge && <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>}
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
@@ -6180,8 +6191,6 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
         {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
         {isOverdue(t) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
         {t.status === "waiting" && t.waitingReason && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>{waitReasonLabel(t.waitingReason, config)}</span>}
-        {t.closure && <span className="badge sm" style={{ color: "#047857", background: "#D1FAE5" }}>{ils(t.closure.costAmount || 0)}</span>}
-        <span className="tcard-time">{timeAgo(t.createdAt)}</span>
       </div>
     </div>
   </button>);
@@ -6308,9 +6317,10 @@ a{color:inherit;}
 .tcard-no{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0;}
 .tcard-sub{display:flex;align-items:center;gap:4px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin:4px 0 7px;}
 .tcard-sub svg{flex-shrink:0;}
+.tcard-sub .sep{color:var(--line);}
 .track-tag{display:inline-flex;align-items:center;gap:3px;font-weight:600;}
-.tcard-owner{display:flex;align-items:center;gap:4px;margin:4px 0 1px;font-size:11.5px;font-weight:600;opacity:.82;}
-.tcard-owner svg{flex-shrink:0;}
+.tcard-state{display:flex;align-items:center;gap:4px;margin:3px 0 1px;font-size:12px;font-weight:700;}
+.tcard-state svg{flex-shrink:0;}
 .tcard-badges{display:flex;align-items:center;gap:7px;margin-top:7px;}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}
