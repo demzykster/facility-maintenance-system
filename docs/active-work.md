@@ -23,15 +23,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active branch `codex/refine-ticket-cards-manager-view`.
-- Last synchronized `main` before this entry: `db92ffa docs: close brand rename ledger (#88)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `7fa26d7 refine ticket card status hierarchy (#89)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - reduce ticket-card noise by separating primary ownership/status from secondary metadata;
-  - check manager-view clarity without changing ticket workflow logic.
+  - close the ledger after PR #89;
+  - continue future work from `docs/backlog.md`.
 
 ### Latest Completed Work
 
+- PR #89: ticket-card status hierarchy was refined.
+  - Ticket cards now separate primary ownership/status from secondary metadata.
+  - Created time and closure cost moved out of the high-priority badge row.
+  - Manager ticket sections were smoke-checked as action vs tracking without workflow changes.
 - PR #70: vehicle type settings moved to the Fleet module.
   - Added a Fleet -> Settings sub-tab for vehicle type configuration.
   - Removed vehicle type editing from global Settings.
