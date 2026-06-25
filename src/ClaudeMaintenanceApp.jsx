@@ -1031,7 +1031,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
     pendingDriverReqs(fleet).forEach(({ unit, cat, driver }) => ev.push({ key: "drvreq-" + unit.id + cat, at: driver.reqAt || Date.now(), kind: "driver", go: "fleet", title: driver.status === "pending_add" ? "בקשת הוספת נהג — ממתין לאישורך" : "בקשת העברת נהג — ממתין לאישורך", body: `${driver.name} · ${unit.code} (${driverShiftMeta(cat).label})${driver.status === "pending_move" && driver.moveTo ? ` → ${driver.moveTo.unitCode}` : ""}${driver.needsChip ? " · צריך להנפיק צ׳יפ" : ""} · מ-${driver.addedByName || "מנהל"}` }));
     { const lastInsp = {}; (insp || []).forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
       const due = (fleet || []).filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
-      if (due.length) ev.push({ key: "inspdue-admin", at: Date.now(), kind: "doc", go: "fleet", title: "בקרת כלים חודשית חסרה", body: `${due.length} כלים ממתינים לבקרה חודשית` }); }
+      if (due.length) ev.push({ key: "inspdue-admin", at: Date.now(), kind: "doc", go: "insp", title: "בקרת כלים חודשית חסרה", body: `${due.length} כלים ממתינים לבקרה חודשית` }); }
     { const pend = (ppeReqs || []).filter((r) => r.status === "pending" || r.status === "worker_sign");
       if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", title: "בקשות ביגוד ממתינות", body: `${pend.length} בקשות לאישור או חתימת עובד` }); }
     { const low = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
@@ -4148,7 +4148,7 @@ function AdminApp(p) {
       <AIFab onClick={() => setShowAI(true)} />
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "ppe" ? "ppe" : go === "pm" || go === "fleet" ? "assets" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "ppe" ? "ppe" : go === "pm" || go === "fleet" ? "assets" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>

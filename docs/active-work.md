@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Personal permissions clarity
+### Inspection notification deep-link
 
-- Status: active branch `codex/clarify-personal-permissions`.
-- Last synchronized `main` before this entry: `ad719f2 fix: reveal hidden notification overflow (#105)`.
+- Status: active branch `codex/notification-inspection-deeplink`.
+- Last synchronized `main` before this entry: `2122354 docs: clarify personal permissions (#106)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - clarify that role is the base access profile;
-  - clarify that personal permissions can represent an additional responsibility for the same person;
-  - avoid introducing access templates until the business model is clearer.
+  - make the monthly vehicle inspection notification open the Fleet inspection tab directly;
+  - keep other notification routing unchanged;
+  - improve click-through usefulness without changing inspection data.
 
 ### Latest Completed Work
 
+- PR #106: personal permission copy was clarified.
+  - The user form now explains that role is the base access profile.
+  - Personal permissions are described as additional module responsibilities for the same person.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #105: notification overflow is now explicit.
   - The notification panel keeps the compact 60-item collapsed view but can show hidden older notifications via a show-more control.
   - Current demo data has 55 notifications after aggregation, so the control appears only when needed.
@@ -178,6 +182,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/notification-inspection-deeplink`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests after restarting a hung first test process.
+- `npm run build`: passed.
+- Browser smoke-check: local app rendered at `http://127.0.0.1:5188/`; clicking the monthly vehicle inspection notification opened `כלי שינוע` -> `בקרת כלים` -> `בקרה` with `לביצוע (79)` visible.
 
 Branch `codex/clarify-personal-permissions`:
 
