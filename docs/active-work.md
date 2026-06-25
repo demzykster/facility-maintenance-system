@@ -23,15 +23,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active branch `codex/collapse-user-permissions-form`.
-- Last synchronized `main` before this entry: `943d21c docs: close user management permission ledger (#92)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `0ff24ae collapse user permission controls (#93)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - reduce user-form length by collapsing personal permissions;
-  - fix checkbox-pill layout jumping when responsibility departments are selected.
+  - close the ledger after PR #93;
+  - continue future work from `docs/backlog.md`.
 
 ### Latest Completed Work
 
+- PR #93: user-form permission controls were collapsed.
+  - Personal permissions now sit under the `הרשאות אישיות` foldout.
+  - Selected responsibility chips keep stable width/row layout instead of jumping.
 - PR #91: user-management permission was made reachable from the manager shell.
   - Managers with `users:view` now see `צוות ומשתמשים`.
   - The screen reuses the existing people/settings UI and keeps edit controls gated by `users:manage`.
@@ -165,11 +168,6 @@ Topic #14 validation before PR #53:
 - Browser smoke-check: admin login showed `כלי שינוע`, the old `כלים ותחזוקה` label was not visible, and no console errors were captured.
 
 Current branch validation:
-
-- Branch `codex/collapse-user-permissions-form`:
-  - `npm test -- --run`: passed, 12 files / 37 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: manager user form renders `הרשאות אישיות` as a closed foldout; selecting responsibility department chips keeps chip widths/rows stable.
 
 - Branch `codex/refine-ticket-cards-manager-view`:
   - `npm test -- --run`: passed, 12 files / 37 tests.

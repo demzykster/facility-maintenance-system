@@ -72,7 +72,7 @@ Implementation so far:
 
 ### User-form permissions UX
 
-Status: in progress on branch `codex/collapse-user-permissions-form`.
+Status: done in PR #93.
 
 Goal:
 - Keep advanced personal permissions available without making every manager form very long.
