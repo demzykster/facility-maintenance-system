@@ -21,17 +21,20 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Document Vercel skip rule
+### Backlog-driven product work
 
-- Status: active branch `codex/document-vercel-skip`.
-- Last synchronized `main` before this entry: `6071e0c Merge pull request #99 from demzykster/codex/clarify-wait-reasons-settings`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `42c7962 Merge pull request #101 from demzykster/codex/document-vercel-skip`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - document the new `[skip vercel]` rule for docs-only and ledger-only PRs;
-  - prevent unnecessary Vercel deployments from spending the Hobby plan build quota.
+  - close the ledger after PR #101;
+  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
 
 ### Latest Completed Work
 
+- PR #101: Vercel skip rule was documented.
+  - Vercel project settings now skip builds when the commit message contains `[skip vercel]` or `[skip deploy]`.
+  - Docs-only and ledger-only PRs should include `[skip vercel]` in the commit message and PR title when no preview deployment is needed.
 - PR #99: wait-reason settings were clarified.
   - `סיבות המתנה` now uses compact columns for reason, current owner, allowed setter, and SLA handling.
   - Repeated `כדור:` / `בוחר:` labels were replaced with clearer Hebrew labels.
