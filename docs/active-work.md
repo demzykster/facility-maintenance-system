@@ -36,6 +36,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Added a Fleet -> Settings sub-tab for vehicle type configuration.
   - Removed vehicle type editing from global Settings.
   - Kept the existing vehicle type config shape and settings-manage gate.
+- Current branch `codex/move-zones-to-maint-settings`:
+  - moves maintenance zones from global Registries to Maintenance settings;
+  - keeps departments in `רישומים`;
+  - does not remove the `רישומים` tab.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -79,7 +83,6 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #56: pending driver requests tab badge was added.
   - `נהגים / כיסוי` now shows an admin-only count badge when driver requests wait for approval.
   - Topic #8 was recorded in `docs/engineering-dialogue.md`.
-- Current branch `codex/worker-activation-copy-saved-token`:
 - PR #57: worker activation link copy was hardened.
   - Copying now requires the activation token to already be saved on the worker record.
   - Newly generated reset links must be saved before they can be copied.
@@ -120,18 +123,9 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- Branch `codex/move-fleet-type-settings`:
-  - `npm test -- --run`: passed, 9 files / 25 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: admin login, Fleet -> Settings showed vehicle type editor; global Settings no longer showed vehicle type tab/editor; browser console errors: none.
-- Branch `codex/move-task-status-settings`:
-  - `npm test -- --run`: passed, 9 files / 25 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: admin login, Tasks -> Settings showed task status editor; global Settings no longer showed task status editor; browser console errors: none.
-- Branch `codex/ignore-legacy-tech-shiftid`:
-  - `npm test -- --run`: passed, 9 files / 25 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: not run; no visual UI behavior changed.
+- `npm test -- --run`: passed, 9 files / 25 tests.
+- `npm run build`: passed.
+- Browser smoke-check: admin login, Settings -> `רישומים` showed departments without zones; Settings -> `אחזקה` showed maintenance categories and zones; browser console errors: none.
 - PR #64:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.

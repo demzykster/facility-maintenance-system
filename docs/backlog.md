@@ -172,7 +172,7 @@ Implementation:
 
 ### Topic 12 — split registries
 
-Status: open, medium/large.
+Status: in progress, medium/large.
 
 Goal:
 - Move zones toward maintenance settings.
@@ -180,6 +180,11 @@ Goal:
 - Remove `רישומים` only after both sections have safe homes and save handlers.
 
 Ship as multiple small PRs, not one refactor.
+
+Implementation so far:
+- Branch `codex/move-zones-to-maint-settings` moves zones into Maintenance settings.
+- Departments stay in `רישומים` for now, per `docs/settings-site-map.md`.
+- The `רישומים` tab is not removed in this step.
 
 ### Topic 15 — remove Settings dev/test section
 
