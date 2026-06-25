@@ -55,6 +55,7 @@ If `main`, open PRs, remote branches, or docs disagree, treat that as a synchron
 - Keep each change small.
 - Update `docs/active-work.md` in the same PR as the code whenever the active state changes. Do not create a separate ledger-only PR after every product PR unless there is no code change, work pauses mid-branch, or the ledger is misleading enough to block the next session.
 - Update `docs/backlog.md`, `docs/engineering-dialogue.md`, and archive docs only when their content actually changes, not automatically after every PR.
+- For docs-only or ledger-only PRs that do not need a Vercel preview, include `[skip vercel]` in the commit message and PR title. Vercel is configured to skip builds when the commit message contains `[skip vercel]` or `[skip deploy]`.
 - Autonomy never overrides the agreed strategy. Even if the owner says "move freely", "do it yourself", or "do not wait for me", Codex and Claude must stay inside the current roadmap, current phase, and documented guardrails.
 - If the requested action conflicts with the strategy or a blocker prevents safe work, start the response with `PROBLEM:` and explain what blocks the work, why it is risky, and the safe options.
 - Run `npm run build` before calling a code change done.

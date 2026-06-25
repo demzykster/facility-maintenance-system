@@ -21,14 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Document Vercel skip rule
 
-- Status: no active product branch.
+- Status: active branch `codex/document-vercel-skip`.
 - Last synchronized `main` before this entry: `6071e0c Merge pull request #99 from demzykster/codex/clarify-wait-reasons-settings`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - close the ledger after PR #99;
-  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
+  - document the new `[skip vercel]` rule for docs-only and ledger-only PRs;
+  - prevent unnecessary Vercel deployments from spending the Hobby plan build quota.
 
 ### Latest Completed Work
 
