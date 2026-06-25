@@ -236,6 +236,24 @@ Next small product candidates:
 
 ## Tickets / Dashboard / Manager View
 
+### Transport duplicate check
+
+Status: in progress on branch `codex/refine-transport-duplicate-check`.
+
+Goal:
+- When opening a transport ticket, check duplicate risk against the selected transport unit only.
+- If an open ticket exists for that unit, show it as a likely duplicate and let the user open it or continue anyway.
+- If no open ticket exists, show recent closed tickets for that same unit as history, not as a blocking duplicate.
+- Do not compare against unrelated transport units or facility tickets by broad text similarity.
+
+Implementation so far:
+- Added a pure `transportDuplicateReview` helper and unit tests.
+- Wired the transport ticket creation modal to use this review result instead of broad keyword similarity.
+
+Related follow-up:
+- Ticket Excel/export should become a lifecycle report, not a current-state-only row dump.
+- Important fields include description, source classification, waiting/status durations, return/rework reasons, closure note, and closure quality.
+
 ### Ticket-card second pass
 
 Status: open, audit/design.
