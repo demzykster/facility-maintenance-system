@@ -23,12 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `be31c79 feat: enrich ticket lifecycle export (#81)`.
+- Status: active product branch `codex/enrich-ticket-list-export`.
+- Last synchronized `main` before this entry: `99a8d4d docs: close ticket lifecycle export ledger (#82)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - close the ledger after PR #81;
-  - continue future work from `docs/backlog.md`.
+  - extend the regular ticket-list Excel/print export with the same lifecycle fields added to Analytics;
+  - keep current wait reason separate from historical waiting/status durations;
+  - reuse the existing lifecycle export helper instead of adding a second calculation path.
 
 ### Latest Completed Work
 
@@ -143,6 +144,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/enrich-ticket-list-export`:
+  - `npm test -- --run`: passed, 11 files / 31 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin login; regular `קריאות` screen opened; `ייצוא ל-Excel` clicked with no console errors; `דוח / הדפסה` opened preview and the iframe contained `תיאור התקלה`, `סיבת המתנה נוכחית`, and `פירוט זמני המתנה`.
 - Branch `codex/enrich-ticket-lifecycle-export`:
   - `npm test -- --run`: passed, 11 files / 31 tests.
   - `npm run build`: passed.

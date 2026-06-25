@@ -273,7 +273,20 @@ Implementation:
 
 Remaining:
 - None for the Analytics lifecycle export pass.
-- The regular ticket-list Excel/print export can be reviewed separately if it needs the same lifecycle fields.
+- Regular ticket-list Excel/print export lifecycle fields are in progress on branch `codex/enrich-ticket-list-export`.
+
+### Regular ticket-list Excel/print lifecycle export
+
+Status: in progress on branch `codex/enrich-ticket-list-export`.
+
+Goal:
+- Make the regular ticket-list export consistent with Analytics export.
+- Avoid a misleading empty current wait reason on closed tickets by also exposing historical wait/status durations.
+- Reuse the existing lifecycle helper so export logic does not fork.
+
+Implementation so far:
+- Regular ticket-list Excel export now adds description, source classification, current wait reason, waiting/status duration summaries, equipment wait time, return reason, closure note, and closure quality.
+- Regular ticket-list print/report preview now includes description, current wait reason, and historical waiting duration.
 
 ### Ticket-card second pass
 
