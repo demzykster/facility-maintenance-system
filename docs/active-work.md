@@ -21,16 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Handoff token-load cleanup
+### Backlog-driven product work
 
-- Status: active in branch `codex/reduce-handoff-token-load`.
-- Last synchronized `main` before this entry: `99e6db6 docs: update codex handoff instructions (#50)`.
+- Status: backlog prepared in branch `codex/create-backlog-plan`; after merge, continue from `docs/backlog.md`.
+- Last synchronized `main` before this entry: `3504e43 docs: reduce handoff token load (#51)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - keep `docs/active-work.md` short enough to read every session;
-  - move old progress and validation history to `docs/archive/`;
-  - remove duplicated startup prompt text from the handoff;
-  - keep all guardrails intact.
+  - use `docs/backlog.md` as the grouped working task list;
+  - keep product PRs small and backlog-driven;
+  - start with the smallest isolated product change.
 
 ### Latest Completed Work
 
@@ -42,6 +41,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #50: Codex handoff instructions were updated.
   - `docs/engineering-dialogue.md` was added to the planning read path.
   - A required planning/backlog step was added before new product code work.
+- PR #51: handoff token load was reduced.
+  - `docs/active-work.md` and `docs/handoff-for-next-codex.md` were shortened.
+  - Historical progress and validation moved to `docs/archive/`.
 
 Older completed work is archived in:
 
@@ -50,21 +52,14 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-After this docs cleanup is merged:
+After `docs/backlog.md` is merged:
 
 1. Sync latest `main`.
-2. Read `docs/active-work.md`.
-3. If `docs/backlog.md` does not exist yet, create it from:
-   - `docs/handoff-for-next-codex.md`;
-   - `docs/engineering-dialogue.md`;
-   - `docs/full-ui-audit-2026-06-24.md`;
-   - `docs/permissions-model.md`.
-4. Verify worker activation UI wiring before writing the backlog:
-   - copy activation link button after saving a worker;
-   - reset/new activation link button;
-   - worker login status in the user list.
-5. Merge `docs/backlog.md` through its own docs-only PR.
-6. Then continue small audit / permissions / onboarding product work from the backlog.
+2. Read `docs/active-work.md` and `docs/backlog.md`.
+3. Start with a very small product PR from the backlog, preferably Topic #14:
+   - rename the transport nav label from `כלים ותחזוקה` to `כלי שינוע`.
+4. Run `npm test -- --run`, `npm run build`, and a browser smoke-check for any UI change.
+5. Update this ledger after merge.
 
 ## Last Validation
 
@@ -73,6 +68,11 @@ Latest validation on `main` before this docs cleanup:
 - `npm test -- --run`: passed, 8 files / 21 tests.
 - `npm run build`: passed.
 - Build warning: production bundle is still large because the app is currently a monolith.
+
+Backlog planning verification on branch `codex/create-backlog-plan`:
+
+- Code check: worker activation status, create/reset button, and saved-worker copy-link control are wired in `src/ClaudeMaintenanceApp.jsx`.
+- Browser smoke-check: admin login, team screen, department worker list, and worker edit form rendered; worker login state and create-link controls were visible; no console errors were captured.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 
