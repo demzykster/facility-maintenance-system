@@ -4324,13 +4324,29 @@ function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
   const catSource = tickets.filter((t) => track === "all" || trackOf(t) === track);
   const catOpts = [...new Map(catSource.map((t) => [catOf(t).id, catOf(t).label])).entries()].sort((a, b) => a[1].localeCompare(b[1], "he"));
   const typeOpts = [...new Set(tickets.filter((t) => trackOf(t) === "transport").map((t) => { const ff = (fleet || []).find((x) => x.id === t.forkliftId); return unitTypeName(ff, config); }).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+  const lifecycleOptions = () => {
+    const exportNow = Date.now();
+    return {
+      now: exportNow,
+      isOpen,
+      statusLabel: (id) => stOf(id).label,
+      waitReasonLabel: (id) => waitReasonLabel(id, config),
+      wearLabel: (id) => WEAR.find((w) => w.id === id)?.label || id,
+      durationText: fmtDur
+    };
+  };
   const buildHtml = () => {
-    const rowsHtml = list.slice(0, 400).map((t) => `<tr><td>${ticketNo(t)}</td><td>${trLabel(t)}</td><td>${esc(t.subject)}</td><td>${esc(catOf(t).label)}</td><td>${prOf(t.priority).label}</td><td>${stOf(t.status).label}</td><td>${esc(ticketWaitReasonLabel(t, config) || "—")}</td><td>${esc(t.asset || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`).join("");
-    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}רשימת קריאות</h2><div class="sub">${list.length} קריאות · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>סיבת המתנה</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
+    const options = lifecycleOptions();
+    const rowsHtml = list.slice(0, 400).map((t) => {
+      const life = ticketLifecycleSummary(t, options);
+      return `<tr><td>${ticketNo(t)}</td><td>${trLabel(t)}</td><td>${esc(t.subject)}</td><td>${esc(life.description || "—")}</td><td>${esc(catOf(t).label)}</td><td>${prOf(t.priority).label}</td><td>${stOf(t.status).label}</td><td>${esc(ticketWaitReasonLabel(t, config) || "—")}</td><td>${esc(life.waitingDurations || "—")}</td><td>${esc(t.asset || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`;
+    }).join("");
+    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right;vertical-align:top}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}רשימת קריאות</h2><div class="sub">${list.length} קריאות · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>תיאור התקלה</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>סיבת המתנה נוכחית</th><th>פירוט זמני המתנה</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
   };
   const exportXlsx = () => {
-    const rows = list.map((t) => ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "קטגוריה": catOf(t).label, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה": ticketWaitReasonLabel(t, config), "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "עלות (₪)": t.closure?.costAmount || 0 }));
-    try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map(() => ({ wch: 14 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "קריאות"); if (downloadXlsx(wb, `קריאות_${new Date().toISOString().slice(0, 10)}.xlsx`)) return; } catch (e) {}
+    const options = lifecycleOptions();
+    const rows = list.map((t) => { const life = ticketLifecycleSummary(t, options); return ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config), "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait, "פירוט זמני סטטוס": life.statusDurations, "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason, "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "עלות (₪)": t.closure?.costAmount || 0 }); });
+    try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]); ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map((key) => ({ wch: wideCols.has(key) ? 30 : 14 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "קריאות"); if (downloadXlsx(wb, `קריאות_${new Date().toISOString().slice(0, 10)}.xlsx`)) return; } catch (e) {}
     setReport(buildHtml());
   };
   return (<>
