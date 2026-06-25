@@ -21,18 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Move shift tolerance to team settings
+### Backlog-driven product work
 
-- Status: active branch `codex/move-shift-grace-to-team-settings`.
-- Last synchronized `main` before this entry: `aed8e3d Merge pull request #96 from demzykster/codex/close-settings-filter-ledger`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `8cc957b Merge pull request #97 from demzykster/codex/move-shift-grace-to-team-settings`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - move `סבילות משמרת (דקות)` out of global Settings;
-  - place it in `צוות ומשתמשים` -> `הגדרות`, next to worker shift settings;
-  - keep the existing stored fields `lateGraceMin` and `earlyGraceMin` unchanged by writing the same value to both.
+  - close the ledger after PR #97;
+  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
 
 ### Latest Completed Work
 
+- PR #97: shift tolerance moved to team settings.
+  - `סבילות משמרת (דקות)` moved from global Settings to `צוות ומשתמשים` -> `הגדרות`.
+  - The setting now sits next to worker shift settings and departments.
+  - Existing storage remains unchanged: the same value is written to `lateGraceMin` and `earlyGraceMin`.
 - PR #95: settings shift tolerance and ticket drill-down filters were cleaned up.
   - Removed the misleading global technician shift list from global Settings.
   - Replaced separate late/early tolerance fields with one `סבילות משמרת (דקות)` value that writes both existing config fields.
