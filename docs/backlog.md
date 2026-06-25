@@ -157,7 +157,7 @@ Implementation:
 
 ### Topic 11 — move vehicle type settings to Fleet
 
-Status: in progress.
+Status: done in PR #70.
 
 Goal:
 - Move `סוגי כלים` from global Settings to a Fleet/`כלי שינוע` settings sub-tab.
@@ -165,8 +165,8 @@ Goal:
 
 Ship separately from Topic 10 and Topic 12.
 
-Implementation in progress:
-- Vehicle type editing is moving from global Settings to a Fleet module settings sub-tab.
+Implementation:
+- Vehicle type editing moved from global Settings to a Fleet module settings sub-tab.
 - The existing vehicle type config shape remains unchanged.
 - Editing remains gated by settings management permission for this pass.
 
