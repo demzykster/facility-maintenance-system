@@ -23,12 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active docs branch `codex/document-individual-tech-shifts`.
-- Last synchronized `main` before this entry: `18702ed Merge pull request #62 from demzykster/codex/close-tolerance-ledger`.
+- Status: active branch `codex/individual-tech-shift-ui`.
+- Last synchronized `main` before this entry: `741c52b Merge pull request #63 from demzykster/codex/document-individual-tech-shifts`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - record the owner decision that technician shifts are individual profile settings;
-  - prevent future work from creating a global technician shift list.
+  - apply the owner decision that technician shifts are individual profile settings;
+  - remove the global-shift selector from technician profile editing;
+  - save technician `shiftStart`/`shiftEnd` directly and clear legacy `shiftId`.
 
 ### Latest Completed Work
 
@@ -83,10 +84,11 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Open/merge this docs-only PR if the diff is clean.
-2. Sync latest `main`.
-3. Continue with the next smallest item from `docs/backlog.md`.
-4. Update this ledger in the same PR as the code when the active state changes.
+1. Run `npm test -- --run`.
+2. Run `npm run build`.
+3. Browser smoke-check the technician user form.
+4. Open PR for `codex/individual-tech-shift-ui`.
+5. After merge, sync `main` and close this ledger item.
 
 ## Last Validation
 
@@ -109,7 +111,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- `codex/document-individual-tech-shifts`: docs-only, `git diff --check` passed.
+- `codex/individual-tech-shift-ui`:
+  - `npm test -- --run`: passed, 9 files / 25 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin login, team/users, technician form; individual start/end time fields were visible and the global technician shift selector was not visible.
 - PR #61:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
@@ -149,3 +154,6 @@ When handing work back:
 - state the next exact action;
 - state which checks passed or were not run;
 - state blockers using `PROBLEM:`.
+- PR #63: technician shifts were documented as individual-only.
+  - The backlog now forbids a global technician shift list.
+  - Technician `shiftStart`/`shiftEnd` are the intended source of truth.
