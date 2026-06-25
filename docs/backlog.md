@@ -28,7 +28,7 @@ Status: wired, with one known UX limitation.
 
 ### Topic 3 — identifier-first login
 
-Status: open, medium/large.
+Status: in progress on branch `codex/login-identifier-ui`.
 
 Goal:
 - Replace role tabs with one identifier-first flow.
@@ -45,9 +45,10 @@ Notes:
 - Technician code-only login is a known demo security weakness. Do not overbuild production auth in this phase.
 
 Implementation so far:
-- Branch `codex/login-identifier-model` adds a pure `resolveIdentifier` helper and unit tests.
+- PR #84 added a pure `resolveIdentifier` helper and unit tests.
 - The helper resolves email, worker number, and technician code, and returns `archived` before any password/PIN check.
-- Login UI is not changed in this first PR.
+- Branch `codex/login-identifier-ui` replaces the role-tab login UI with one identifier field and a conditional password/PIN step.
+- Worker activation link flow remains unchanged.
 
 ## User Management / Permissions / Worker Onboarding
 

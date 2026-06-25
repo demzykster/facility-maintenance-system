@@ -1,7 +1,7 @@
 const norm = (value) => String(value || "").trim();
 const normEmail = (value) => norm(value).toLowerCase();
 
-const activeState = (user) => user?.active === false ? "archived" : "active";
+const activeState = (user) => (user?.active === false || user?.status === "archived") ? "archived" : "active";
 
 const authForRole = (role) => {
   if (role === "tech") return "none";

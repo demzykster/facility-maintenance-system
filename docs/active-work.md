@@ -23,13 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active product branch `codex/login-identifier-model`.
-- Last synchronized `main` before this entry: `b5a39df feat: enrich regular ticket export (#83)`.
+- Status: active product branch `codex/login-identifier-ui`.
+- Last synchronized `main` before this entry: `9ad0204 feat: add login identifier resolver (#84)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - start Topic 3 with a pure/tested identifier resolver before changing the login UI;
-  - resolve email, worker number, and technician code consistently;
-  - block archived users before the password/PIN step.
+  - replace role-tab login with the identifier-first flow built on `resolveIdentifier`;
+  - keep worker activation flow unchanged;
+  - preserve current demo behavior while making archived-user blocking explicit.
 
 ### Latest Completed Work
 
@@ -65,6 +65,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Regular `קריאות` Excel export now includes description, source classification, current wait reason, wait/status duration summaries, equipment wait, return/rework reason, closure note, and closure quality.
   - Regular print/report preview now includes description, current wait reason, and historical waiting duration.
   - It reuses the same lifecycle summary helper as Analytics.
+- PR #84: login identifier resolver foundation was added.
+  - Added pure `resolveIdentifier` with tests for email, worker number, technician code, archived users, and demo built-ins.
+  - Login UI was not changed in that PR.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -148,6 +151,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/login-identifier-ui`:
+  - `npm test -- --run`: passed, 12 files / 37 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: identifier-first login screen rendered; admin email + password login worked; worker number + PIN login worked; technician code-only login worked; no login errors were shown.
 - Branch `codex/login-identifier-model`:
   - `npm test -- --run`: passed, 12 files / 37 tests.
   - `npm run build`: passed.
