@@ -23,12 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `eba8b2d feat: move departments to team settings (#77)`.
+- Status: active product branch `codex/refine-transport-duplicate-check`.
+- Last synchronized `main` before this entry: `2b8c5a5 docs: close departments settings ledger (#78)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - close the ledger after PR #77;
-  - continue future work from `docs/backlog.md`.
+  - refine duplicate detection when opening transport tickets;
+  - only open tickets on the same selected transport unit should block as likely duplicates;
+  - when no open ticket exists, show recent closed tickets for the same unit as history only.
 
 ### Latest Completed Work
 
@@ -135,6 +136,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/refine-transport-duplicate-check`:
+  - `npm test -- --run`: passed, 10 files / 28 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin login; transport ticket form opened; selecting a specific transport unit with an open ticket showed `קיימת קריאה פתוחה לכלי הזה`; old generic similar-ticket warning copy was not shown; no console errors were captured.
 - No active product branch after PR #77 merge.
 - Branch `codex/move-departments-to-team-settings`:
   - `npm test -- --run`: passed, 9 files / 25 tests.

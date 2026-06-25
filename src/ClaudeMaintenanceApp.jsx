@@ -14,6 +14,7 @@ import { BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupM
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
+import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -5635,7 +5636,7 @@ function TicketForm(p) {
   const [assignTo, setAssignTo] = useState("self");
   useEffect(() => { if (assignTo.startsWith("tech:")) { const id = assignTo.slice(5); const ok = (users || []).some((u) => u.id === id && u.role === "tech" && (u.techCats || []).includes(category)); if (!ok) setAssignTo("self"); } }, [category]);
   const [slaOn, setSlaOn] = useState(false), [slaH, setSlaH] = useState(8);
-  const [dupes, setDupes] = useState(null), [pendingT, setPendingT] = useState(null);
+  const [dupeReview, setDupeReview] = useState(null), [pendingT, setPendingT] = useState(null);
   const [photo, setPhoto] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [aiBusy, setAiBusy] = useState(false), [aiNote, setAiNote] = useState("");
   const busyRef = useRef(false), fileRef = useRef(null);
   const handlePhoto = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
@@ -5697,12 +5698,12 @@ function TicketForm(p) {
     if (!description.trim()) return setErr("נא לתאר את התקלה");
     setErr("");
     const t = buildTicket();
-    const sim = similarTickets(t, tickets || [], { days: 7 });
-    if (sim.length > 0) { setPendingT(t); setDupes(sim.map((x) => x.t)); return; }
+    const review = transportDuplicateReview(t, tickets || []);
+    if (review.mode !== "none") { setPendingT(t); setDupeReview(review); return; }
     busyRef.current = true; setBusy(true);
     try { await finalize(t); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); }
   };
-  const proceedAnyway = async () => { const t = pendingT; setDupes(null); setPendingT(null); busyRef.current = true; setBusy(true); try { await finalize(t); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); } };
+  const proceedAnyway = async () => { const t = pendingT; setDupeReview(null); setPendingT(null); busyRef.current = true; setBusy(true); try { await finalize(t); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); } };
   if (!track) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">פתיחת קריאה</div></div>
     <div className="body"><div className="track-q">על מה הקריאה?</div>
       {Object.values(TRACKS).map((tr) => <button key={tr.id} className="track-pick" onClick={() => setTrack(tr.id)} style={{ borderColor: tr.color }}><span className="track-ic" style={{ background: tr.color + "22", color: tr.color }}><tr.Icon size={24} /></span><div><div className="track-name">{tr.label}</div><div className="track-desc">{tr.id === "transport" ? "מלגזות וכלי שינוע — מועבר לטכנאי" : "מבנה, חשמל, אינסטלציה, IT ועוד"}</div></div><ChevronLeft size={18} className="role-chev" /></button>)}
@@ -5751,12 +5752,12 @@ function TicketForm(p) {
       <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? <><span className="spinner sm" /> שולח…</> : <><Send size={16} /> שליחת הקריאה</>}</button>
       <div style={{ height: 24 }} />
     </div>
-    {dupes && <div className="ovl-backdrop modal2" onClick={() => { setDupes(null); setPendingT(null); }}><div className="modal2-panel" onClick={(e) => e.stopPropagation()}>
-      <div className="modal2-head"><div className="form-title"><AlertTriangle size={16} style={{ verticalAlign: "-2px", color: "#EA580C" }} /> ייתכן שכבר קיימת קריאה דומה</div><button className="icon-btn" onClick={() => { setDupes(null); setPendingT(null); }}><X size={20} /></button></div>
+    {dupeReview && <div className="ovl-backdrop modal2" onClick={() => { setDupeReview(null); setPendingT(null); }}><div className="modal2-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="modal2-head"><div className="form-title"><AlertTriangle size={16} style={{ verticalAlign: "-2px", color: "#EA580C" }} /> {dupeReview.mode === "open" ? "קיימת קריאה פתוחה לכלי הזה" : "קריאות קודמות לכלי הזה"}</div><button className="icon-btn" onClick={() => { setDupeReview(null); setPendingT(null); }}><X size={20} /></button></div>
       <div className="modal2-body">
-        <div className="note" style={{ marginTop: 0 }}>נמצאו {dupes.length} קריאות דומות שנפתחו לאחרונה. בדקו לפני פתיחת קריאה חדשה כדי למנוע כפילויות.</div>
-        <div className="timeline" style={{ marginTop: 12 }}>{[...dupes].sort((a, b) => (isOpen(b) ? 1 : 0) - (isOpen(a) ? 1 : 0)).slice(0, 6).map((t) => <div className={"tl-item" + (isOpen(t) ? " dup-open" : "")} key={t.id}><div className="tl-dot" style={{ background: isOpen(t) ? stOf(t.status).color : "#16A34A" }} /><div className="tl-body"><div className="tl-text">#{ticketNo(t)} · {t.subject}{isOpen(t) && <span className="dup-tag">עדיין פתוחה</span>}</div><div className="tl-meta">{stOf(t.status).label} · נפתחה {fmtDate(t.createdAt)} ע״י {t.createdBy?.name}{!isOpen(t) && t.closure ? ` · נסגרה ${fmtDate(t.closure.signedAt)}` : ""}</div>{onOpenTicket && <button className="repeat-link" onClick={() => { setDupes(null); setPendingT(null); onCancel(); onOpenTicket(t.id); }}>מעבר לקריאה</button>}</div></div>)}</div>
-        <div className="row2" style={{ marginTop: 14 }}><button className="btn-ghost" onClick={() => { setDupes(null); setPendingT(null); }}>חזרה לעריכה</button><button className="btn-primary" onClick={proceedAnyway}>פתח קריאה חדשה בכל זאת</button></div>
+        <div className="note" style={{ marginTop: 0 }}>{dupeReview.mode === "open" ? "נמצאה קריאה פתוחה על אותו כלי שינוע. בדקו אם נכון להמשיך באותה קריאה לפני פתיחת חדשה." : "לא נמצאה קריאה פתוחה על הכלי. אלו הקריאות האחרונות שנסגרו על אותו כלי, לצורך בדיקת היסטוריה."}</div>
+        <div className="timeline" style={{ marginTop: 12 }}>{dupeReview.tickets.slice(0, 6).map((t) => <div className={"tl-item" + (isOpen(t) ? " dup-open" : "")} key={t.id}><div className="tl-dot" style={{ background: isOpen(t) ? stOf(t.status).color : "#16A34A" }} /><div className="tl-body"><div className="tl-text">#{ticketNo(t)} · {t.subject}{isOpen(t) && <span className="dup-tag">עדיין פתוחה</span>}</div><div className="tl-meta">{stOf(t.status).label} · נפתחה {fmtDate(t.createdAt)} ע״י {t.createdBy?.name}{!isOpen(t) && t.closure ? ` · נסגרה ${fmtDate(t.closure.signedAt)}` : ""}</div>{onOpenTicket && <button className="repeat-link" onClick={() => { setDupeReview(null); setPendingT(null); onCancel(); onOpenTicket(t.id); }}>מעבר לקריאה</button>}</div></div>)}</div>
+        <div className="row2" style={{ marginTop: 14 }}><button className="btn-ghost" onClick={() => { setDupeReview(null); setPendingT(null); }}>חזרה לעריכה</button><button className="btn-primary" onClick={proceedAnyway}>{dupeReview.mode === "open" ? "פתח קריאה חדשה בכל זאת" : "פתח קריאה חדשה"}</button></div>
       </div>
     </div></div>}
     </div>);
