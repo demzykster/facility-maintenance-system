@@ -44,6 +44,11 @@ Suggested PR sequence:
 Notes:
 - Technician code-only login is a known demo security weakness. Do not overbuild production auth in this phase.
 
+Implementation so far:
+- Branch `codex/login-identifier-model` adds a pure `resolveIdentifier` helper and unit tests.
+- The helper resolves email, worker number, and technician code, and returns `archived` before any password/PIN check.
+- Login UI is not changed in this first PR.
+
 ## User Management / Permissions / Worker Onboarding
 
 ### Worker activation follow-up
@@ -273,20 +278,23 @@ Implementation:
 
 Remaining:
 - None for the Analytics lifecycle export pass.
-- Regular ticket-list Excel/print export lifecycle fields are in progress on branch `codex/enrich-ticket-list-export`.
+- Regular ticket-list Excel/print export lifecycle fields were completed in PR #83.
 
 ### Regular ticket-list Excel/print lifecycle export
 
-Status: in progress on branch `codex/enrich-ticket-list-export`.
+Status: done in PR #83.
 
 Goal:
 - Make the regular ticket-list export consistent with Analytics export.
 - Avoid a misleading empty current wait reason on closed tickets by also exposing historical wait/status durations.
 - Reuse the existing lifecycle helper so export logic does not fork.
 
-Implementation so far:
+Implementation:
 - Regular ticket-list Excel export now adds description, source classification, current wait reason, waiting/status duration summaries, equipment wait time, return reason, closure note, and closure quality.
 - Regular ticket-list print/report preview now includes description, current wait reason, and historical waiting duration.
+
+Remaining:
+- None for the regular ticket-list export pass.
 
 ### Ticket-card second pass
 
