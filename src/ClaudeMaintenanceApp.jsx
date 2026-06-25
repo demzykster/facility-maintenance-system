@@ -15,6 +15,7 @@ import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, clean
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
+import { ticketLifecycleRows, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -5055,19 +5056,46 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const hasInsights = recurList.length || longList.length || costCatArr.length || costAssetArr.length;
   const exportExcel = () => {
     try {
-      const rows = tickets.map((t) => ({
+      const exportNow = Date.now();
+      const lifecycleOptions = {
+        now: exportNow,
+        isOpen,
+        statusLabel: (id) => stOf(id).label,
+        waitReasonLabel: (id) => waitReasonLabel(id, config),
+        wearLabel: (id) => WEAR.find((w) => w.id === id)?.label || id,
+        durationText: fmtDur
+      };
+      const rows = tickets.map((t) => {
+        const life = ticketLifecycleSummary(t, lifecycleOptions);
+        return ({
         "מספר": ticketNo(t), "מסלול": TRACKS[t.track]?.label || (t.forkliftId ? "שינוע" : "מבנה"),
-        "נושא": t.subject, "קטגוריה": catOf(t).label, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה": ticketWaitReasonLabel(t, config),
+        "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass,
+        "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config),
         "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "אחראי": t.assignee || "", "פותח": t.createdBy?.name || "",
         "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "",
         "עלות (₪)": t.closure?.costAmount || 0, "ספק": t.closure?.costSupplier || "",
         "השבתה (שע׳)": t.track === "transport" ? Math.round(downtimeMs(t) / 3600000) : "",
-        "המתנה לחלקים": waitedParts(t) ? "כן" : "", "חריגת SLA": isOverdue(t) ? "כן" : "",
-      }));
+        "המתנה לחלקים": waitedParts(t) ? "כן" : "", "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait,
+        "פירוט זמני סטטוס": life.statusDurations, "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason,
+        "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "חריגת SLA": isOverdue(t) ? "כן" : "",
+      });
+      });
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(rowsSafe(rows));
-      ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map(() => ({ wch: 14 }));
+      const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]);
+      ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map((key) => ({ wch: wideCols.has(key) ? 30 : 14 }));
       XLSX.utils.book_append_sheet(wb, ws, "קריאות");
+      const lifecycleRows = tickets.flatMap((t) => ticketLifecycleRows(t, lifecycleOptions).map((row) => ({
+        "מספר": ticketNo(t), "מסלול": TRACKS[t.track]?.label || (t.forkliftId ? "שינוע" : "מבנה"), "נושא": t.subject,
+        "סוג שורה": row.kind === "waiting" ? "המתנה" : "סטטוס",
+        "סטטוס/סיבה": row.kind === "waiting" ? waitReasonLabel(row.reason, config) : stOf(row.key).label,
+        "משך": fmtDur(row.ms), "משך (שעות)": Math.round(row.ms / 360000) / 10
+      })));
+      if (lifecycleRows.length) {
+        const lifeWs = XLSX.utils.json_to_sheet(rowsSafe(lifecycleRows));
+        lifeWs["!cols"] = Object.keys(lifecycleRows[0] || { a: 1 }).map((key) => ({ wch: key === "נושא" ? 28 : 14 }));
+        XLSX.utils.book_append_sheet(wb, lifeWs, "מחזור חיים");
+      }
       const sum = [
         { "מדד": "תקופה", "ערך": PERIOD_LBL[period] },
         { "מדד": "עלות אחזקה כוללת (קריאות)", "ערך": totalCost }, { "מדד": "מתוכן טיפול תקופתי", "ערך": pmTicketCost },

@@ -23,12 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `94f50d7 fix: scope transport duplicate checks to selected unit (#79)`.
+- Status: active product branch `codex/enrich-ticket-lifecycle-export`.
+- Last synchronized `main` before this entry: `60eca97 docs: close transport duplicate ledger (#80)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - close the ledger after PR #79;
-  - continue future work from `docs/backlog.md`.
+  - enrich the Analytics ticket Excel export from current-state rows into lifecycle-aware reporting;
+  - preserve the current-state wait reason but add historical waiting/status durations;
+  - include fault description, source classification, return/rework reason, closure note, and closure quality.
 
 ### Latest Completed Work
 
@@ -139,6 +140,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/enrich-ticket-lifecycle-export`:
+  - `npm test -- --run`: passed, 11 files / 31 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin login; Analytics opened; `ייצוא ל-Excel` clicked with no console errors captured. The in-app browser did not surface a download event for the XLSX path, so workbook structure is covered by unit tests and build validation.
 - No active product branch after PR #79 merge.
 - Branch `codex/refine-transport-duplicate-check`:
   - `npm test -- --run`: passed, 10 files / 28 tests.
