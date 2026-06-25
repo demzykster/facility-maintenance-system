@@ -21,18 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Clarify wait reasons settings
+### Backlog-driven product work
 
-- Status: active branch `codex/clarify-wait-reasons-settings`.
-- Last synchronized `main` before this entry: `e30cbf7 Merge pull request #98 from demzykster/codex/close-shift-grace-ledger`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `6071e0c Merge pull request #99 from demzykster/codex/clarify-wait-reasons-settings`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - make `סיבות המתנה` easier to understand and less noisy;
-  - keep the existing wait-reason data model and SLA behavior unchanged;
-  - improve the settings layout before deeper status/stage analytics work.
+  - close the ledger after PR #99;
+  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
 
 ### Latest Completed Work
 
+- PR #99: wait-reason settings were clarified.
+  - `סיבות המתנה` now uses compact columns for reason, current owner, allowed setter, and SLA handling.
+  - Repeated `כדור:` / `בוחר:` labels were replaced with clearer Hebrew labels.
+  - Existing wait-reason data model and SLA behavior were not changed.
 - PR #97: shift tolerance moved to team settings.
   - `סבילות משמרת (דקות)` moved from global Settings to `צוות ומשתמשים` -> `הגדרות`.
   - The setting now sits next to worker shift settings and departments.
