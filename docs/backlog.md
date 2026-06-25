@@ -101,7 +101,7 @@ Suggested PR sequence:
 
 ### Settings site map
 
-Status: done in branch `codex/settings-site-map-doc`.
+Status: done in PR #58.
 
 Goal:
 - Document where settings belong before moving sections.
