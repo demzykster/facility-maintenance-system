@@ -42,10 +42,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - The `רישומים` tab was not removed.
 - PR #74: people settings plan was updated.
   - Owner decision recorded: `משמרות עבודה` and `מחלקות` should move to `צוות ומשתמשים`.
-- Current branch `codex/move-worker-shifts-to-team`:
-  - moves `משמרות עבודה (בוקר/לילה)` from global Settings to `צוות ומשתמשים`;
-  - adds a team-page sub-tab for worker shifts;
-  - does not move departments yet.
+- PR #75: worker shifts moved to Team/User Management.
+  - `משמרות עבודה (בוקר/לילה)` moved from global Settings to `צוות ומשתמשים`.
+  - The team page now has `משתמשים` / `משמרות עבודה` sub-tabs.
+  - Departments are still pending for a separate PR.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -129,9 +129,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- `npm test -- --run`: passed, 9 files / 25 tests.
-- `npm run build`: passed.
-- Browser smoke-check: admin login, global Settings no longer showed `משמרות עבודה`; `צוות ומשתמשים` showed `משתמשים` / `משמרות עבודה` sub-tabs; worker-shifts tab showed morning/night shift editor and save button; browser console errors: none.
+- No active product branch after PR #75 merge.
 - PR #64:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
