@@ -5430,6 +5430,8 @@ function SettingsPanel(p) {
   const TW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"], ["presence", "כפתור משמרת"]];
   const MW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"]];
   const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["doc", "תוקף מסמכים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"]];
+  const WAIT_BALL_OPTIONS = [["executor", "המבצע"], ["manager", "מנהל המחלקה"], ["admin", "מנהל מערכת"]];
+  const WAIT_SETTER_OPTIONS = [["both", "טכנאי + מנהל"], ["tech", "טכנאי בלבד"], ["manager", "מנהל בלבד"]];
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
   // редактор справочника с защитой от рассинхрона: используемые элементы заблокированы для правки/удаления
   const regEditor = (rows, setRows, usage, addLabel, oneLabel) => (<>
@@ -5452,14 +5454,19 @@ function SettingsPanel(p) {
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
       <SectionTitle>סיבות המתנה</SectionTitle>
-      <div className="hint" style={{ marginBottom: 8 }}>לכל סיבה: מי מחזיק את הכדור בזמן ההמתנה · מי רשאי לבחור אותה · האם עוצרת את שעון ה-SLA. «לא התקבל הכלי» היא סיבה מערכתית ואינה ניתנת למחיקה.</div>
-      {wreasons.map((r, i) => <div key={r.id || i} className="reg-row" style={{ marginBottom: 6, gap: 6, flexWrap: "wrap" }}>
-        <input className="reg-name" value={r.label} placeholder="שם הסיבה" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
-        <select value={r.ball || "executor"} title="מי מחזיק את הכדור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, ball: e.target.value } : x))}><option value="executor">כדור: המבצע</option><option value="manager">כדור: מנהל</option><option value="admin">כדור: מנהל מערכת</option></select>
-        <select value={r.setters || "both"} title="מי רשאי לבחור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, setters: e.target.value } : x))}><option value="both">בוחר: שניהם</option><option value="tech">בוחר: טכנאי</option><option value="manager">בוחר: מנהל</option></select>
-        <label className="chk-line" style={{ margin: 0 }}><input type="checkbox" checked={!!r.pauseSla} onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, pauseSla: e.target.checked } : x))} /> עוצר SLA</label>
-        <button className="reg-del" disabled={r.id === "no_equipment"} onClick={() => setWreasons((a) => r.id === "no_equipment" ? a : a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
-      </div>)}
+      <div className="hint" style={{ marginBottom: 8 }}>סיבה נבחרת כאשר קריאה נעצרת באמצע טיפול. היא קובעת מי צריך לפעול עכשיו, מי רשאי לבחור אותה, והאם הזמן הזה לא נספר ב-SLA. היסטוריית ההמתנה נשמרת לדוחות ולאנליטיקה.</div>
+      <div style={{ display: "grid", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
+        <div className="hint" style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(100px, .8fr) 42px", gap: 6, padding: "0 8px", fontWeight: 800 }}>
+          <span>סיבה</span><span>אצל מי</span><span>מי בוחר</span><span>SLA</span><span />
+        </div>
+        {wreasons.map((r, i) => <div key={r.id || i} className="reg-row" style={{ marginBottom: 0, gap: 6, display: "grid", gridTemplateColumns: "minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(100px, .8fr) 42px" }}>
+          <input className="reg-name" value={r.label} placeholder="שם הסיבה" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+          <select value={r.ball || "executor"} title="מי מחזיק את הכדור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, ball: e.target.value } : x))}>{WAIT_BALL_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+          <select value={r.setters || "both"} title="מי רשאי לבחור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, setters: e.target.value } : x))}>{WAIT_SETTER_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+          <label className="chk-line" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={!!r.pauseSla} onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, pauseSla: e.target.checked } : x))} /> לא נספר</label>
+          <button className="reg-del" disabled={r.id === "no_equipment"} title={r.id === "no_equipment" ? "סיבה מערכתית" : "מחק"} onClick={() => setWreasons((a) => r.id === "no_equipment" ? a : a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
+        </div>)}
+      </div>
       <button className="btn-ghost sm" onClick={() => setWreasons((a) => [...a, { id: "wr" + Date.now().toString(36), label: "", ball: "executor", pauseSla: false, setters: "both" }])}><Plus size={14} /> סיבת המתנה</button>
       <SectionTitle><ShieldAlert size={15} /> מצב כלי שינוע — רמות חומרה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>נבחרות בעת פתיחת קריאת שינוע ובסיום בקרת כלי. «מוציא מכלל שימוש» = הכלי מסומן «מושבת» בכל המסכים (פארק, נהגים, התראות) עד לסגירת הקריאה או החזרה לשירות.</div>

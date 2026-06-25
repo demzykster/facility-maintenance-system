@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Clarify wait reasons settings
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `8cc957b Merge pull request #97 from demzykster/codex/move-shift-grace-to-team-settings`.
+- Status: active branch `codex/clarify-wait-reasons-settings`.
+- Last synchronized `main` before this entry: `e30cbf7 Merge pull request #98 from demzykster/codex/close-shift-grace-ledger`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - close the ledger after PR #97;
-  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
+  - make `סיבות המתנה` easier to understand and less noisy;
+  - keep the existing wait-reason data model and SLA behavior unchanged;
+  - improve the settings layout before deeper status/stage analytics work.
 
 ### Latest Completed Work
 
@@ -158,6 +159,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/clarify-wait-reasons-settings`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: global Settings renders `סיבות המתנה` with compact columns `סיבה`, `אצל מי`, `מי בוחר`, and `SLA`; old repeated `כדור:` / `בוחר:` labels are not visible; no browser console errors were captured.
 
 Branch `codex/move-shift-grace-to-team-settings`:
 
