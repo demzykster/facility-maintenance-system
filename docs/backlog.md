@@ -111,7 +111,7 @@ Remaining:
 
 ### Topic 6 — move worker shifts to user management
 
-Status: in progress, medium.
+Status: done in PR #77.
 
 Goal:
 - Move `משמרות עבודה (בוקר/לילה)` from global Settings to `צוות ומשתמשים`.
@@ -125,7 +125,10 @@ Suggested PR sequence:
 
 Implementation so far:
 - PR #75 moved `משמרות עבודה (בוקר/לילה)` into `צוות ומשתמשים`.
-- Branch `codex/move-departments-to-team-settings` moves `מחלקות` into the same `הגדרות` sub-tab and removes the empty global `רישומים` tab.
+- PR #77 moved `מחלקות` into the same `הגדרות` sub-tab and removed the empty global `רישומים` tab.
+
+Remaining:
+- None for Topic 6.
 
 ## Settings / Information Architecture
 
