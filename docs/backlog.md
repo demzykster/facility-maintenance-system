@@ -63,7 +63,7 @@ Implementation:
 
 ### Topic 4 — per-technician tolerance overrides
 
-Status: open, medium.
+Status: foundation helper in progress.
 
 Goal:
 - Keep global late/early tolerance as default.
@@ -72,6 +72,13 @@ Goal:
 Suggested architecture:
 - `user.lateTolerance` -> `config.lateTolerance` -> `0`
 - `user.earlyTolerance` -> `config.earlyTolerance` -> `0`
+
+Implementation so far:
+- `src/technicianToleranceModel.js` defines the fallback contract.
+- `tests/technicianToleranceModel.test.js` covers user override, global fallback, explicit zero, and invalid values.
+
+Remaining:
+- Wire the helper into the technician scheduling/SLA path only after the exact UI/business placement is chosen.
 
 ### Topic 5 — technician shift assignment sync gap
 
