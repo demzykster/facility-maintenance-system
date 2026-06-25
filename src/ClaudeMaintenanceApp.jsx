@@ -3074,6 +3074,23 @@ function TasksModule(p) {
     {openMeetingId && meetings.find((x) => x.id === openMeetingId) && <Overlay persistent onClose={() => setOpenMeetingId(null)}><MeetingCard meeting={meetings.find((x) => x.id === openMeetingId)} users={users} tasks={tasks} session={session} onClose={() => setOpenMeetingId(null)} onSave={saveMeeting} onSaveTask={saveTask} onNewTask={(mtg) => { setOpenMeetingId(null); setEdit({ meetingId: mtg.id, responsibleIds: [], participantIds: mtg.participantIds || [], origin: "meeting" }); }} onOpenTask={(tid) => { setOpenMeetingId(null); setOpenId(tid); }} /></Overlay>}
   </>);
 }
+function TaskStatusSettings({ config, saveConfig }) {
+  const [saved, setSaved] = useState(false);
+  const [taskMeta, setTaskMeta] = useState(() => { const m = config.taskStatusMeta || {}; return TASK_STATUS.reduce((a, s) => { a[s.id] = { label: m[s.id]?.label || s.label, color: m[s.id]?.color || s.color }; return a; }, {}); });
+  const save = async () => {
+    await saveConfig({ ...config, taskStatusMeta: taskMeta });
+    setSaved(true); setTimeout(() => setSaved(false), 1800);
+  };
+  return (<div className="settings-wrap">
+    <SectionTitle><ClipboardList size={15} /> סטטוסים של מטלות</SectionTitle>
+    <div className="hint" style={{ marginBottom: 8 }}>אפשר לשנות שם וצבע לכל סטטוס. חמשת הסטטוסים קבועים כי הם נושאים משמעות (הושלם/בוטל = סגור).</div>
+    {TASK_STATUS.map((s) => <div key={s.id} className="dt-edit-row"><div className="dt-edit-line">
+      <input className="reg-name" value={taskMeta[s.id]?.label || ""} placeholder={s.label} onChange={(e) => setTaskMeta((m) => ({ ...m, [s.id]: { ...m[s.id], label: e.target.value } }))} />
+      <div className="pal">{DT_PALETTE.map((c) => <button key={c} type="button" className={"pal-sw" + ((taskMeta[s.id]?.color || s.color) === c ? " on" : "")} style={{ background: c }} title={c} onClick={() => setTaskMeta((m) => ({ ...m, [s.id]: { ...m[s.id], color: c } }))} />)}</div>
+    </div></div>)}
+    <button className="btn-primary full" style={{ marginTop: 16 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת הגדרות מטלות"}</button>
+  </div>);
+}
 function MeetingForm({ meeting, users, session, onCancel, onSave }) {
   const init = meeting.at ? new Date(meeting.at) : null;
   const [f, setF] = useState({ title: meeting.title || "", type: meeting.type || "boss", purpose: meeting.purpose || "", date: meeting.at ? tsToDate(meeting.at) : tsToDate(Date.now()), time: init ? `${String(init.getHours()).padStart(2, "0")}:${String(init.getMinutes()).padStart(2, "0")}` : "09:00", participantIds: meeting.participantIds || [], agenda: meeting.agenda || "", recur: meeting.recur || "" });
@@ -3201,9 +3218,10 @@ function MeetingsModule(p) {
 }
 function ManageHub(p) {
   const [sub, setSub] = useState("tasks");
+  const canEditSettings = canManageSettings(p.session);
   return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 360, marginBottom: 14 }}><button className={sub === "tasks" ? "on" : ""} onClick={() => setSub("tasks")}>מטלות</button><button className={sub === "meetings" ? "on" : ""} onClick={() => setSub("meetings")}>פגישות</button></div>
-    {sub === "meetings" ? <MeetingsModule {...p} /> : <TasksModule {...p} />}
+    <div className="seg-tabs s3" style={{ maxWidth: 420, marginBottom: 14 }}><button className={sub === "tasks" ? "on" : ""} onClick={() => setSub("tasks")}>מטלות</button><button className={sub === "meetings" ? "on" : ""} onClick={() => setSub("meetings")}>פגישות</button>{canEditSettings && <button className={sub === "settings" ? "on" : ""} onClick={() => setSub("settings")}>הגדרות</button>}</div>
+    {sub === "settings" && canEditSettings ? <TaskStatusSettings config={p.config} saveConfig={p.saveConfig} /> : sub === "meetings" ? <MeetingsModule {...p} /> : <TasksModule {...p} />}
   </>);
 }
 /* ============================================================ PPE · בגדי עבודה ומגן (Stage 1) */
@@ -5293,7 +5311,6 @@ function SettingsPanel(p) {
   const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftDef, setShiftDef] = useState(config.defaultShiftEnd || "16:30"), [startDef, setStartDef] = useState(config.defaultShiftStart || "07:30"), [lateG, setLateG] = useState(config.lateGraceMin ?? 10), [earlyG, setEarlyG] = useState(config.earlyGraceMin ?? 10);
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
-  const [taskMeta, setTaskMeta] = useState(() => { const m = config.taskStatusMeta || {}; return TASK_STATUS.reduce((a, s) => { a[s.id] = { label: m[s.id]?.label || s.label, color: m[s.id]?.color || s.color }; return a; }, {}); });
   const [shifts, setShifts] = useState(config.shifts?.length ? config.shifts.map((s) => ({ ...s })) : [{ id: "sh_main", name: "משמרת ראשית", start: config.defaultShiftStart || "07:30", end: config.defaultShiftEnd || "16:30" }]);
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
   const [tw, setTw] = useState({ ...(config.techWidgets || {}) }), [mw, setMw] = useState({ ...(config.mgrWidgets || {}) });
@@ -5317,7 +5334,7 @@ function SettingsPanel(p) {
   // целостность данных: сколько записей ссылается на элемент справочника
   const deptUse = (d) => users.filter((u) => u.dept === d).length + (fleet || []).filter((f) => (f.depts || []).includes(d) || f.dept === d).length + (tickets || []).filter((t) => t.reportedBy?.dept === d).length;
   const zoneUse = (z) => (fleet || []).filter((f) => f.zone === z).length + (tickets || []).filter((t) => t.zone === z).length;
-  const saveGeneral = async () => { const cleanShifts = shifts.filter((s) => (s.name || "").trim()).map((s) => ({ id: s.id, name: s.name.trim(), start: s.start || "07:30", end: s.end || "16:30" })); const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: cleanShifts, workShifts: wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" })), defaultShiftStart: (cleanShifts[0]?.start) || startDef || "07:30", defaultShiftEnd: (cleanShifts[0]?.end) || shiftDef || "16:30", lateGraceMin: Math.max(0, Number(lateG) || 0), earlyGraceMin: Math.max(0, Number(earlyG) || 0), waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME, taskStatusMeta: taskMeta }); flash(); };
+  const saveGeneral = async () => { const cleanShifts = shifts.filter((s) => (s.name || "").trim()).map((s) => ({ id: s.id, name: s.name.trim(), start: s.start || "07:30", end: s.end || "16:30" })); const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: cleanShifts, workShifts: wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" })), defaultShiftStart: (cleanShifts[0]?.start) || startDef || "07:30", defaultShiftEnd: (cleanShifts[0]?.end) || shiftDef || "16:30", lateGraceMin: Math.max(0, Number(lateG) || 0), earlyGraceMin: Math.max(0, Number(earlyG) || 0), waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
   const saveUsersCfg = async () => { await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw }); flash(); };
   const saveRegistries = async () => {
     setRegMsg("");
@@ -5402,12 +5419,6 @@ function SettingsPanel(p) {
         </div>
       </div>)}
       <button className="btn-ghost sm" onClick={() => setDlevels((a) => [...a, { id: "dt" + Date.now().toString(36), label: "", desc: "", color: "#CA8A04", prio: "medium", oos: false }])}><Plus size={14} /> רמת חומרה</button>
-      <SectionTitle><ClipboardList size={15} /> סטטוסים של מטלות</SectionTitle>
-      <div className="hint" style={{ marginBottom: 8 }}>אפשר לשנות שם וצבע לכל סטטוס. חמשת הסטטוסים קבועים כי הם נושאים משמעות (הושלם/בוטל = סגור).</div>
-      {TASK_STATUS.map((s) => <div key={s.id} className="dt-edit-row"><div className="dt-edit-line">
-        <input className="reg-name" value={taskMeta[s.id]?.label || ""} placeholder={s.label} onChange={(e) => setTaskMeta((m) => ({ ...m, [s.id]: { ...m[s.id], label: e.target.value } }))} />
-        <div className="pal">{DT_PALETTE.map((c) => <button key={c} type="button" className={"pal-sw" + ((taskMeta[s.id]?.color || s.color) === c ? " on" : "")} style={{ background: c }} title={c} onClick={() => setTaskMeta((m) => ({ ...m, [s.id]: { ...m[s.id], color: c } }))} />)}</div>
-      </div></div>)}
       <SectionTitle>התראות וספי זמן — מסמכים (ימים)</SectionTitle>
       <div className="sla-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
         <label className="sla-cell"><span style={{ color: "#CA8A04" }}>צהוב</span><input type="number" value={warn.yellow} onChange={(e) => setWarn((s) => ({ ...s, yellow: Number(e.target.value) }))} /></label>
