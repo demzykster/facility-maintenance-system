@@ -21,18 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Move fleet type settings
+### Backlog-driven product work
 
-- Status: branch `codex/move-fleet-type-settings` in progress.
-- Last synchronized `main` before this entry: `4316090 docs: close task status settings ledger`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `237e4fc feat: move fleet type settings to fleet`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - start Topic #11 from `docs/backlog.md`;
-  - move vehicle type configuration from global Settings to the Fleet module;
-  - preserve the existing vehicle type config shape.
+  - continue backlog-driven work from `docs/backlog.md`;
+  - keep the ledger accurate after PR #70.
 
 ### Latest Completed Work
 
+- PR #70: vehicle type settings moved to the Fleet module.
+  - Added a Fleet -> Settings sub-tab for vehicle type configuration.
+  - Removed vehicle type editing from global Settings.
+  - Kept the existing vehicle type config shape and settings-manage gate.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -92,11 +95,9 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Finish branch `codex/move-fleet-type-settings`.
-2. Run `npm test -- --run`.
-3. Run `npm run build`.
-4. Browser smoke-check Fleet -> Settings and global Settings.
-5. Open and merge one small PR if validation passes.
+1. Sync latest `main`.
+2. Continue with the next smallest item from `docs/backlog.md`.
+3. Update this ledger in the same PR as the code when the active state changes.
 
 ## Last Validation
 
