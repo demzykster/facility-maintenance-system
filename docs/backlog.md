@@ -115,12 +115,13 @@ Status: open, medium.
 
 Goal:
 - Move `משמרות עבודה (בוקר/לילה)` from global Settings to `צוות ומשתמשים`.
-- Keep departments in global registries for now or move only after a separate site-map decision.
+- Move `מחלקות` into `צוות ומשתמשים` as a separate settings sub-tab per owner decision.
 
 Suggested PR sequence:
 1. Add team-page sub-tabs: users / worker shifts.
 2. Move only worker-shift editor.
-3. Add a link/hint from team page to department registries if needed.
+3. Move departments into a separate team-page settings sub-tab.
+4. Remove `רישומים` only after it has no remaining editable content.
 
 ## Settings / Information Architecture
 
@@ -183,8 +184,8 @@ Ship as multiple small PRs, not one refactor.
 
 Implementation so far:
 - PR #72 moved zones into Maintenance settings.
-- Departments stay in `רישומים` for now, per `docs/settings-site-map.md`.
-- The `רישומים` tab is not removed in this step.
+- Departments should move into `צוות ומשתמשים`, per owner decision.
+- The `רישומים` tab should not be removed until departments have a safe new home.
 
 ### Topic 15 — remove Settings dev/test section
 

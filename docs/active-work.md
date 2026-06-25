@@ -40,6 +40,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Maintenance zones moved from global `רישומים` into `אחזקה`.
   - Departments stayed in `רישומים`.
   - The `רישומים` tab was not removed.
+- Current branch `codex/update-people-settings-plan`:
+  - updates the site map after owner clarification;
+  - records that `משמרות עבודה` and `מחלקות` should move to `צוות ומשתמשים`;
+  - does not change app code.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -123,7 +127,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- No active product branch after PR #72 merge.
+- Docs-only branch `codex/update-people-settings-plan`; test/build skipped.
 - PR #64:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
