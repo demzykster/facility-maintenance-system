@@ -56,6 +56,19 @@ Remaining:
 
 ## User Management / Permissions / Worker Onboarding
 
+### User-management permission reachability
+
+Status: in progress on branch `codex/expose-user-management-permission`.
+
+Goal:
+- A non-admin manager/HR-like user with `users:view` should have a visible path to `צוות ומשתמשים`.
+- `users:view` should keep the screen read-only, while `users:manage` enables management actions.
+- Do not expose the full admin dashboard or unrelated modules just because a user can view/manage people.
+
+Implementation so far:
+- The manager shell shows `צוות ומשתמשים` only when `canViewUsers(session)` is true.
+- The screen reuses the existing `SettingsPanel only="users"` and passes `canManageUsers(session)` for edit controls.
+
 ### Worker activation follow-up
 
 Status: done in branch `codex/worker-activation-copy-saved-token`.

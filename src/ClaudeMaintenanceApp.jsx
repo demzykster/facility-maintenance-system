@@ -1698,13 +1698,16 @@ function UserApp(p) {
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const needAct = mine.filter((t) => isOpen(t) && (ballIn(t) === "manager" || (isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework")))).length;
+  const mayViewUsers = canViewUsers(session);
+  const mayManageUsers = canManageUsers(session);
+  const pageTitle = view === "activity" ? "יומן פעילות" : view === "teamAdmin" ? "צוות ומשתמשים" : view === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
-        nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: view === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: view === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: view === "dept", onClick: () => setView("dept") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
+        nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: view === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: view === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: view === "dept", onClick: () => setView("dept") }, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: view === "teamAdmin", onClick: () => setView("teamAdmin") } : null, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }].filter(Boolean)} />
       <div className="main-col">
-        <TopBar title={view === "activity" ? "יומן פעילות" : view === "dept" ? "המחלקה שלי" : "הקריאות שלי"} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
+        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
           {view === "tickets" ? (<>
             {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {needAct} קריאות דורשות פעולה שלך</div>}
@@ -1737,7 +1740,7 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : view === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : view === "tasks" ? (<ManageHub {...p} />) : (<>
+          </>) : view === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : view === "tasks" ? (<ManageHub {...p} />) : view === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
