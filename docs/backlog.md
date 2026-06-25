@@ -48,7 +48,7 @@ Notes:
 
 ### Worker activation follow-up
 
-Status: open, small/medium.
+Status: done in branch `codex/worker-activation-copy-saved-token`.
 
 Goal:
 - Decide whether the saved/reopen requirement for copying an activation link needs a clearer post-save path.
@@ -56,6 +56,10 @@ Goal:
 
 Suggested first PR:
 - Add a clearer post-save hint or a focused test around the saved-worker copy path if the owner finds the current flow confusing.
+
+Implementation:
+- Copying an activation link now requires the form token to match the token already saved on the worker record.
+- Newly generated reset links must be saved before they can be copied.
 
 ### Topic 4 — per-technician tolerance overrides
 
@@ -154,7 +158,7 @@ Implementation:
 
 ### Topic 8 — pending driver requests badge
 
-Status: done in branch `codex/driver-requests-tab-badge`.
+Status: done in PR #56.
 
 Goal:
 - Show a count badge on `נהגים / כיסוי` tabs when pending driver requests exist.
