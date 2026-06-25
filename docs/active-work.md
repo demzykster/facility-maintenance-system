@@ -23,13 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active product branch `codex/login-identifier-ui`.
-- Last synchronized `main` before this entry: `9ad0204 feat: add login identifier resolver (#84)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `ab378c7 feat: switch login to identifier flow (#85)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - replace role-tab login with the identifier-first flow built on `resolveIdentifier`;
-  - keep worker activation flow unchanged;
-  - preserve current demo behavior while making archived-user blocking explicit.
+  - close the ledger after PR #85;
+  - continue future work from `docs/backlog.md`.
 
 ### Latest Completed Work
 
@@ -68,6 +67,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #84: login identifier resolver foundation was added.
   - Added pure `resolveIdentifier` with tests for email, worker number, technician code, archived users, and demo built-ins.
   - Login UI was not changed in that PR.
+- PR #85: login switched to identifier-first flow.
+  - Role tabs were replaced with one identifier field.
+  - Staff users continue with password, workers/cleaners with PIN, and technicians with the current demo code-only flow.
+  - Worker activation link flow was kept unchanged.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.

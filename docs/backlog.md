@@ -28,7 +28,7 @@ Status: wired, with one known UX limitation.
 
 ### Topic 3 — identifier-first login
 
-Status: in progress on branch `codex/login-identifier-ui`.
+Status: done in PRs #84 and #85.
 
 Goal:
 - Replace role tabs with one identifier-first flow.
@@ -44,11 +44,15 @@ Suggested PR sequence:
 Notes:
 - Technician code-only login is a known demo security weakness. Do not overbuild production auth in this phase.
 
-Implementation so far:
+Implementation:
 - PR #84 added a pure `resolveIdentifier` helper and unit tests.
 - The helper resolves email, worker number, and technician code, and returns `archived` before any password/PIN check.
-- Branch `codex/login-identifier-ui` replaces the role-tab login UI with one identifier field and a conditional password/PIN step.
+- PR #85 replaced the role-tab login UI with one identifier field and a conditional password/PIN step.
 - Worker activation link flow remains unchanged.
+
+Remaining:
+- None for the current identifier-first demo login pass.
+- Production authentication remains out of scope until Supabase/Auth/RLS/database work is explicitly started.
 
 ## User Management / Permissions / Worker Onboarding
 
