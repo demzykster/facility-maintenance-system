@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Move shift tolerance to team settings
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `e830f6b Merge pull request #95 from demzykster/codex/settings-and-ticket-filter-cleanup`.
+- Status: active branch `codex/move-shift-grace-to-team-settings`.
+- Last synchronized `main` before this entry: `aed8e3d Merge pull request #96 from demzykster/codex/close-settings-filter-ledger`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - close the ledger after PR #95;
-  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
+  - move `סבילות משמרת (דקות)` out of global Settings;
+  - place it in `צוות ומשתמשים` -> `הגדרות`, next to worker shift settings;
+  - keep the existing stored fields `lateGraceMin` and `earlyGraceMin` unchanged by writing the same value to both.
 
 ### Latest Completed Work
 
@@ -154,6 +155,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/move-shift-grace-to-team-settings`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: global Settings no longer shows `סבילות משמרת (דקות)`; `צוות ומשתמשים` -> `הגדרות` shows worker shifts, `סבילות משמרת (דקות)`, and departments together; the tolerance value loaded from existing config as `10`.
 
 Branch `codex/settings-and-ticket-filter-cleanup`:
 
