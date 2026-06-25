@@ -4083,6 +4083,7 @@ function AdminApp(p) {
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
+  const clearTicketFilter = () => setTFilter(null);
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
@@ -4111,17 +4112,17 @@ function AdminApp(p) {
     mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" } : null,
     mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות" } : null,
     mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות" } : null,
-  ].filter(Boolean).map((n) => ({ ...n, active: activeTab === n.id, onClick: () => setTab(n.id) }));
+  ].filter(Boolean).map((n) => ({ ...n, active: activeTab === n.id, onClick: () => { if (n.id === "tickets") clearTicketFilter(); setTab(n.id); } }));
   const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
-          extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => setTab(e.target.value)}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
+          extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => { if (e.target.value === "tickets") clearTicketFilter(); setTab(e.target.value); }}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
-          {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} /></>}
+          {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} />}
           {activeTab === "ppe" && <PpeHub {...p} />}
@@ -4280,11 +4281,12 @@ function ReportView({ html, count, onClose }) {
   const ref = useRef(null);
   return (<Overlay onClose={onClose}><div className="rep-wrap"><div className="rep-head"><div className="rep-title">תצוגה מקדימה{count != null ? ` — ${count}` : ""}</div><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost sm" onClick={() => { try { ref.current.contentWindow.focus(); ref.current.contentWindow.print(); } catch (e) {} }}><Printer size={14} /> הדפס</button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div><iframe ref={ref} title="report" srcDoc={html} className="rep-frame" /></div></Overlay>);
 }
-function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
+function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, users, config }) {
   const [q, setQ] = useState(""), [track, setTrack] = useState("all"), [st, setSt] = useState("open"), [pr, setPr] = useState("all"), [cat, setCat] = useState("all"), [costF, setCostF] = useState("all"), [period, setPeriod] = useState("all"), [report, setReport] = useState(null), [unitType, setUnitType] = useState("all"), [focus, setFocus] = useState(initial?.focus || null);
   const PERIODS = [["all", "כל הזמן"], ["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"]];
   const from = period === "all" ? 0 : Date.now() - ({ week: 7, month: 30, quarter: 90, year: 365 }[period]) * 86400000;
-  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setPeriod(initial.period ?? "all"); setUnitType(initial.unitType ?? "all"); setCat(initial.cat ?? "all"); setCostF("all"); setFocus(initial.focus ?? null); setQ(""); } }, [initial?._t]);
+  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setPeriod(initial.period ?? "all"); setUnitType(initial.unitType ?? "all"); setCat(initial.cat ?? "all"); setCostF("all"); setFocus(initial.focus ?? null); setQ(""); onInitialConsumed?.(); } }, [initial?._t]);
+  const resetFilters = () => { setQ(""); setTrack("all"); setSt("open"); setPr("all"); setCat("all"); setCostF("all"); setPeriod("all"); setUnitType("all"); setFocus(null); onInitialConsumed?.(); };
   const f = tickets.filter((t) => {
     if (st === "open") { if (!isOpen(t)) return false; }
     else if (st === "closed") { if (isOpen(t)) return false; }
@@ -4318,6 +4320,7 @@ function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
   const catSource = tickets.filter((t) => track === "all" || trackOf(t) === track);
   const catOpts = [...new Map(catSource.map((t) => [catOf(t).id, catOf(t).label])).entries()].sort((a, b) => a[1].localeCompare(b[1], "he"));
   const typeOpts = [...new Set(tickets.filter((t) => trackOf(t) === "transport").map((t) => { const ff = (fleet || []).find((x) => x.id === t.forkliftId); return unitTypeName(ff, config); }).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+  const hasFilters = !!(q.trim() || track !== "all" || st !== "open" || pr !== "all" || cat !== "all" || costF !== "all" || period !== "all" || unitType !== "all" || focus);
   const lifecycleOptions = () => {
     const exportNow = Date.now();
     return {
@@ -4345,7 +4348,7 @@ function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
   };
   return (<>
     <div className="seg-tabs s3" style={{ marginBottom: 10 }}>{[["all", "הכל"], ["facility", "מבנה"], ["transport", "שינוע"]].map(([id, lbl]) => <button key={id} className={track === id ? "on" : ""} onClick={() => { setTrack(id); setCat("all"); setUnitType("all"); }}>{lbl}</button>)}</div>
-    {focus && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{focus.label}</b></span><button onClick={() => setFocus(null)} title="הסר סינון"><X size={15} /></button></div>}
+    {focus && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{focus.label}</b></span><button onClick={() => { setFocus(null); onInitialConsumed?.(); }} title="הסר סינון"><X size={15} /></button></div>}
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, נושא, כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="filter-row">
       <select value={st} onChange={(e) => setSt(e.target.value)}><option value="open">פתוחות</option><option value="closed">סגורות</option><option value="all">הכל</option>{STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
@@ -4356,7 +4359,7 @@ function AdminTickets({ tickets, onOpen, initial, fleet, users, config }) {
       <select value={costF} onChange={(e) => setCostF(e.target.value)}><option value="all">עלות</option><option value="with">עם עלות</option><option value="none">ללא עלות</option></select>
     </div>
     <div className="wtoggles" style={{ marginBottom: 10 }}>{PERIODS.map(([k, l]) => <button key={k} className={"wtoggle" + (period === k ? " on" : "")} onClick={() => setPeriod(k)}>{l}</button>)}</div>
-    <div className="export-bar"><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={() => setReport(buildHtml())}><Printer size={15} /> דוח / הדפסה</button></div>
+    <div className="export-bar"><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={() => setReport(buildHtml())}><Printer size={15} /> דוח / הדפסה</button>{hasFilters && <button className="btn-ghost sm" onClick={resetFilters}><X size={15} /> נקה כל הסינונים</button>}</div>
     <div className="count-line">{list.length} קריאות · ממוינות לפי דחיפות</div>
     {list.length === 0 ? <Empty text="לא נמצאו קריאות" Icon={ListChecks} />
       : grouped ? <>{G.map((g) => { const items = list.filter(g.test); if (!items.length) return null; return <div key={g.key}><SectionTitle><g.Icon size={15} color={g.color} /> {g.label} ({items.length})</SectionTitle><div className="cards">{items.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div></div>; })}</>
@@ -5378,10 +5381,9 @@ function SettingsPanel(p) {
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
-  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftDef, setShiftDef] = useState(config.defaultShiftEnd || "16:30"), [startDef, setStartDef] = useState(config.defaultShiftStart || "07:30"), [lateG, setLateG] = useState(config.lateGraceMin ?? 10), [earlyG, setEarlyG] = useState(config.earlyGraceMin ?? 10);
+  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
-  const [shifts, setShifts] = useState(config.shifts?.length ? config.shifts.map((s) => ({ ...s })) : [{ id: "sh_main", name: "משמרת ראשית", start: config.defaultShiftStart || "07:30", end: config.defaultShiftEnd || "16:30" }]);
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
   const [tw, setTw] = useState({ ...(config.techWidgets || {}) }), [mw, setMw] = useState({ ...(config.mgrWidgets || {}) });
   const [maintMsg, setMaintMsg] = useState("");
@@ -5406,7 +5408,7 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
-  const saveGeneral = async () => { const cleanShifts = shifts.filter((s) => (s.name || "").trim()).map((s) => ({ id: s.id, name: s.name.trim(), start: s.start || "07:30", end: s.end || "16:30" })); const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: cleanShifts, defaultShiftStart: (cleanShifts[0]?.start) || startDef || "07:30", defaultShiftEnd: (cleanShifts[0]?.end) || shiftDef || "16:30", lateGraceMin: Math.max(0, Number(lateG) || 0), earlyGraceMin: Math.max(0, Number(earlyG) || 0), waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); const grace = Math.max(0, Number(shiftGrace) || 0); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: [], lateGraceMin: grace, earlyGraceMin: grace, waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
   const saveUsersCfg = async () => {
     setUserCfgMsg("");
     if (registryEmptied(depts, deptUse)) { setUserCfgMsg("לא ניתן לרוקן שם של מחלקה שנמצאת בשימוש — שנו שם או שחררו את הרשומות"); return; }
@@ -5448,12 +5450,9 @@ function SettingsPanel(p) {
       <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => setCoName(e.target.value)} placeholder="לדוגמה: כימיפל בע״מ" /></label>
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
-      <SectionTitle><Clock size={15} /> משמרות</SectionTitle>
-      <div className="hint" style={{ marginBottom: 6 }}>הגדירו משמרות (שם + שעת סיום). לכל טכנאי משויכת משמרת — ובסיומה מתבצעת יציאה אוטומטית. המשמרת הראשונה היא ברירת המחדל לטכנאים חדשים.</div>
-      {shifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.name} placeholder="שם המשמרת (בוקר / ערב)" onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /><input type="time" value={s.start || "07:30"} title="תחילה" style={{ maxWidth: 110 }} onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, start: e.target.value } : x))} /><input type="time" value={s.end} title="סיום" style={{ maxWidth: 110 }} onChange={(e) => setShifts((a) => a.map((x, j) => j === i ? { ...x, end: e.target.value } : x))} /><button className="reg-del" onClick={() => setShifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={shifts.length <= 1}><Trash2 size={15} /></button></div>)}
-      <button className="btn-ghost sm" onClick={() => setShifts((a) => [...a, { id: "sh" + Date.now().toString(36), name: "", start: "07:30", end: "16:30" }])}><Plus size={14} /> משמרת</button>
-      <div className="field-row" style={{ marginTop: 12 }}><label className="field"><span>סבילות איחור לתחילה (דקות)</span><input type="number" min="0" value={lateG} onChange={(e) => setLateG(e.target.value)} /></label><label className="field"><span>סבילות סיום מוקדם (דקות)</span><input type="number" min="0" value={earlyG} onChange={(e) => setEarlyG(e.target.value)} /></label></div>
-      <div className="hint">כניסת טכנאי למערכת = תחילת משמרת. איחור מעבר לסבילות וסיום מוקדם מעבר לסבילות נספרים כהשבתה ומתריעים למנהל.</div>
+      <SectionTitle><Clock size={15} /> סבילות משמרת טכנאים</SectionTitle>
+      <label className="field"><span>סבילות משמרת (דקות)</span><input type="number" min="0" value={shiftGrace} onChange={(e) => setShiftGrace(e.target.value)} /></label>
+      <div className="hint">אותו מרווח משמש גם לאיחור בתחילת משמרת וגם ליציאה מוקדמת. שעות המשמרת עצמן נקבעות בכרטיס הטכנאי תחת «צוות ומשתמשים».</div>
       <SectionTitle>סיבות המתנה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>לכל סיבה: מי מחזיק את הכדור בזמן ההמתנה · מי רשאי לבחור אותה · האם עוצרת את שעון ה-SLA. «לא התקבל הכלי» היא סיבה מערכתית ואינה ניתנת למחיקה.</div>
       {wreasons.map((r, i) => <div key={r.id || i} className="reg-row" style={{ marginBottom: 6, gap: 6, flexWrap: "wrap" }}>
