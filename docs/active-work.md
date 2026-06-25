@@ -54,10 +54,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Demo cleanup moved to the dashboard demo banner.
   - Settings no longer renders `פיתוח ובדיקות`.
   - Active-work updates now usually travel with the same product PR instead of separate ledger-only follow-ups.
-- Current branch `codex/driver-requests-tab-badge`:
-  - adds a pending driver requests count badge to `נהגים / כיסוי` tabs;
-  - keeps the badge admin-only to match current approval rights;
-  - records the Topic #8 Codex response.
+- PR #56: pending driver requests tab badge was added.
+  - `נהגים / כיסוי` now shows an admin-only count badge when driver requests wait for approval.
+  - Topic #8 was recorded in `docs/engineering-dialogue.md`.
+- Current branch `codex/worker-activation-copy-saved-token`:
+  - prevents copying a worker activation link unless the token is already saved on that worker record;
+  - adds focused coverage for unsaved reset-token copy;
+  - updates worker onboarding docs.
 
 Older completed work is archived in:
 
@@ -97,7 +100,7 @@ Current branch validation:
 
 - `npm test -- --run`: passed, 8 files / 21 tests.
 - `npm run build`: passed.
-- Browser smoke-check: admin login, `כלי שינוע` screen, `נהגים / כיסוי` tab showed a visible `2` badge, and no console errors were captured.
+- Browser smoke-check: admin login, `צוות ומשתמשים`, new worker form showed activation status and the save-first hint, did not show `העתק קישור` before save, and no console errors were captured.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 

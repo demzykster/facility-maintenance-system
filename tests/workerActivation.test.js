@@ -38,6 +38,7 @@ describe("worker activation rules", () => {
     expect(canCopyActivationLink(unsavedWorker, unsavedWorker.activationToken, true)).toBe(false);
     expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, false)).toBe(false);
     expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, true)).toBe(true);
+    expect(canCopyActivationLink(savedWorker, "token-not-saved-yet", true)).toBe(false);
   });
 
   it("tracks pending, activated, temporary-code, and no-access states", () => {

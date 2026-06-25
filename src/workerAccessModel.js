@@ -9,7 +9,7 @@ export function workerLoginStateText(user) {
 }
 
 export function canCopyActivationLink(user, activationToken, canManageWorkerAccess) {
-  return !!user?.id && !!activationToken && !!canManageWorkerAccess;
+  return !!user?.id && !!activationToken && activationToken === user.activationToken && !!canManageWorkerAccess;
 }
 
 export function shouldSeedWorkerActivation(user, role, canManageWorkerAccess) {
