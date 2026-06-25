@@ -4148,7 +4148,7 @@ function AdminApp(p) {
       <AIFab onClick={() => setShowAI(true)} />
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "ppe" ? "ppe" : go === "pm" || go === "fleet" ? "assets" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "ppe" ? "ppe" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>

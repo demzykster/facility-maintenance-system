@@ -21,18 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Inspection notification deep-link
+### Asset notification deep-links
 
-- Status: active branch `codex/notification-inspection-deeplink`.
-- Last synchronized `main` before this entry: `2122354 docs: clarify personal permissions (#106)`.
+- Status: active branch `codex/notification-asset-deeplinks`.
+- Last synchronized `main` before this entry: `53d4fd1 fix: deep-link inspection notifications (#107)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - make the monthly vehicle inspection notification open the Fleet inspection tab directly;
-  - keep other notification routing unchanged;
-  - improve click-through usefulness without changing inspection data.
+  - make PM notifications open the Fleet periodic-maintenance tab directly;
+  - make fleet/document/driver notifications open the Fleet units/drivers tab directly;
+  - keep notification generation unchanged.
 
 ### Latest Completed Work
 
+- PR #107: monthly inspection notifications now deep-link to vehicle checks.
+  - Clicking `בקרת כלים חודשית חסרה` opens `כלי שינוע` -> `בקרת כלים` -> `בקרה`.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #106: personal permission copy was clarified.
   - The user form now explains that role is the base access profile.
   - Personal permissions are described as additional module responsibilities for the same person.
@@ -182,6 +185,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/notification-asset-deeplinks`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: local app rendered at `http://127.0.0.1:5188/`; clicking a periodic-maintenance notification opened `כלי שינוע` -> `לוח טיפולים` with PM content visible.
 
 Branch `codex/notification-inspection-deeplink`:
 
