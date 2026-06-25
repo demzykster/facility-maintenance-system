@@ -21,18 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Move task status settings
+### Backlog-driven product work
 
-- Status: branch `codex/move-task-status-settings` in progress.
-- Last synchronized `main` before this entry: `62cd6cb docs: close technician shift id ledger`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `bc8d6ba feat: move task status settings to tasks`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - start Topic #10 from `docs/backlog.md`;
-  - move task status configuration from global Settings to the Tasks module;
-  - preserve `config.taskStatusMeta` without changing the data shape.
+  - continue backlog-driven work from `docs/backlog.md`;
+  - keep the ledger accurate after PR #68.
 
 ### Latest Completed Work
 
+- PR #68: task status settings moved to the Tasks module.
+  - Added a Tasks -> Settings sub-tab for task status labels/colors.
+  - Removed task status editing from global Settings.
+  - Kept the existing `config.taskStatusMeta` data shape and settings-manage gate.
 - PR #66: legacy technician `shiftId` was ignored in runtime session logic.
   - Technician login no longer carries `shiftId` into the active session.
   - Admin impersonation as technician no longer carries `shiftId`.
@@ -88,11 +91,9 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Finish branch `codex/move-task-status-settings`.
-2. Run `npm test -- --run`.
-3. Run `npm run build`.
-4. Browser smoke-check the Tasks settings tab and global Settings.
-5. Open and merge one small PR if validation passes.
+1. Sync latest `main`.
+2. Continue with the next smallest item from `docs/backlog.md`.
+3. Update this ledger in the same PR as the code when the active state changes.
 
 ## Last Validation
 
