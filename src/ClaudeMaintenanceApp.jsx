@@ -6143,14 +6143,15 @@ function Overlay({ children, onClose, persistent }) {
 function AIFab({ onClick }) { return <button className="ai-fab" onClick={onClick}><Sparkles size={22} /></button>; }
 function NotifPanel({ notif, onClose, onOpen, onGo }) {
   useEffect(() => { notif.markRead(); }, []);
-  const [settings, setSettings] = useState(false), [marked, setMarked] = useState(false), [perm, setPerm] = useState("");
+  const [settings, setSettings] = useState(false), [marked, setMarked] = useState(false), [perm, setPerm] = useState(""), [showAll, setShowAll] = useState(false);
   const markAll = () => { notif.markRead(); setMarked(true); setTimeout(() => setMarked(false), 1600); };
   const askPerm = () => { try { const r = Notification.requestPermission(); if (r && r.then) r.then((res) => setPerm(res || "denied")).catch(() => setPerm("blocked")); else setPerm(typeof r === "string" ? r : "blocked"); } catch (e) { setPerm("blocked"); } };
   const canAsk = typeof window !== "undefined" && "Notification" in window && Notification.permission === "default";
   const { prefs, setPrefs } = notif;
   const click = (ev) => { if (ev.ticketId) onOpen && onOpen(ev.ticketId); else if (ev.go && onGo) onGo(ev.go); };
   const item = (ev) => <button key={ev.key} className={"notif-item" + (ev.ticketId || ev.go ? " clk" : "")} onClick={() => click(ev)}><div className={"ni-dot " + ev.kind} /><div className="ni-body"><div className="ni-title">{ev.title}</div><div className="ni-text">{ev.body}</div><div className="ni-time">{timeAgo(ev.at)}</div></div>{(ev.ticketId || ev.go) && <ChevronLeft size={15} className="ni-go" />}</button>;
-  const list = notif.events.slice(0, 60);
+  const hiddenCount = Math.max(0, notif.events.length - 60);
+  const list = showAll ? notif.events : notif.events.slice(0, 60);
   const grouped = prefs.group ? NOTIF_KINDS.map((k) => [k, list.filter((e) => e.kind === k.kind)]).filter(([, arr]) => arr.length) : null;
   return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" onClick={(e) => e.stopPropagation()}>
     <div className="notif-head"><div className="notif-title"><Bell size={18} /> התראות</div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
@@ -6167,6 +6168,7 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
     <div className="notif-list">{list.length === 0 ? <div className="empty sm"><Bell size={28} /><div className="empty-t">אין התראות</div></div>
       : grouped ? grouped.map(([k, arr]) => <div key={k.kind} className="ni-group"><div className="ni-group-h"><span className={"ni-dot " + k.kind} /> {k.label} <span className="ni-group-n">{arr.length}</span></div>{arr.map(item)}</div>)
       : list.map(item)}</div>
+    {hiddenCount > 0 && <button className="notif-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "הצג פחות" : `הצג עוד ${hiddenCount} התראות`}</button>}
   </div></div>);
 }
 function Toast({ t, onClose }) { return <div className="toast" onClick={onClose}><Bell size={18} style={{ flexShrink: 0, marginTop: 1 }} /><div><div className="toast-title">{t.title}</div><div className="toast-body">{t.body}</div></div></div>; }
@@ -6783,6 +6785,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .pub-done-t{font-size:19px;font-weight:800;margin:12px 0 4px;}
 .pub-done-s{font-size:13px;color:var(--muted);margin-bottom:18px;}
 .notif-list{overflow-y:auto;padding:8px;}
+.notif-more{border-top:1px solid var(--border);padding:11px 14px;background:var(--surface);font-weight:800;color:var(--primary);width:100%;}
+.notif-more:hover{background:var(--surface-2);}
 .notif-item{display:flex;gap:11px;width:100%;text-align:right;padding:11px;border-radius:11px;color:var(--ink);}
 .notif-item:hover{background:var(--surface-2);}
 .ni-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0;background:var(--muted);}

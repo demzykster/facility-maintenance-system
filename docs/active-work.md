@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Notification task/meeting category
+### Notification list visibility
 
-- Status: active branch `codex/notification-task-meeting-category`.
-- Last synchronized `main` before this entry: `edf1094 fix: fill notification process gaps (#103)`.
+- Status: active branch `codex/notification-show-all`.
+- Last synchronized `main` before this entry: `057798e fix: separate task notifications (#104)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - stop management tasks and meetings from appearing under maintenance-treatment or escalation categories;
-  - add a dedicated `מטלות ופגישות` notification category;
-  - keep clicks routed to the existing Tasks module without changing task data.
+  - make the notification panel transparent when more than 60 events exist;
+  - add a visible show-more/show-less control instead of silently hiding older notifications;
+  - keep notification generation and routing unchanged.
 
 ### Latest Completed Work
 
+- PR #104: task and meeting notifications were separated.
+  - Added a dedicated `מטלות ופגישות` notification kind.
+  - Task/meeting reminders no longer appear under maintenance treatments or generic escalations.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #103: notification process coverage was improved.
   - Added aggregated admin notifications for monthly vehicle inspections, pending PPE requests, PPE stock shortages, and PPE orders waiting receipt.
   - Updated notification category labels/settings for vehicle checks, driver, PPE, and cleaning.
@@ -170,6 +174,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/notification-show-all`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: local app rendered at `http://127.0.0.1:5188/`; notification panel opened and rendered 55 current demo notifications without errors; the new show-more control is available when event count exceeds the 60-item collapsed limit.
 
 Branch `codex/notification-task-meeting-category`:
 
