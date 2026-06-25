@@ -51,4 +51,22 @@ describe("permission capability helpers", () => {
     expect(canManage(settingsManager, "settings")).toBe(true);
     expect(canFull(settingsManager, "settings")).toBe(false);
   });
+
+  it("supports one manager with several operational responsibilities", () => {
+    const hrAndOpsManager = {
+      role: "user",
+      perms: {
+        users: "manage",
+        workerAccess: "manage",
+        ppe: "full",
+        analytics: "view"
+      }
+    };
+
+    expect(canManage(hrAndOpsManager, "users")).toBe(true);
+    expect(canManage(hrAndOpsManager, "workerAccess")).toBe(true);
+    expect(canFull(hrAndOpsManager, "ppe")).toBe(true);
+    expect(canView(hrAndOpsManager, "analytics")).toBe(true);
+    expect(canManage(hrAndOpsManager, "analytics")).toBe(false);
+  });
 });

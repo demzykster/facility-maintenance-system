@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Asset notification deep-links
+### Multi-responsibility permissions contract
 
-- Status: active branch `codex/notification-asset-deeplinks`.
-- Last synchronized `main` before this entry: `53d4fd1 fix: deep-link inspection notifications (#107)`.
+- Status: active branch `codex/test-multi-responsibility-permissions`.
+- Last synchronized `main` before this entry: `1cb7805 fix: deep-link asset notifications (#108)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - make PM notifications open the Fleet periodic-maintenance tab directly;
-  - make fleet/document/driver notifications open the Fleet units/drivers tab directly;
-  - keep notification generation unchanged.
+  - lock down the current permission model for one person with several responsibilities;
+  - prove that a manager can receive HR/worker-access/PPE/analytics capabilities through module permissions;
+  - avoid adding role templates before the business model is clearer.
 
 ### Latest Completed Work
 
+- PR #108: asset notifications now deep-link to the relevant Fleet sub-tabs.
+  - PM notifications open `כלי שינוע` -> `לוח טיפולים`.
+  - Fleet/document/driver notifications open `כלי שינוע` -> `כלים ונהגים`.
+  - Vercel preview was green before merge.
 - PR #107: monthly inspection notifications now deep-link to vehicle checks.
   - Clicking `בקרת כלים חודשית חסרה` opens `כלי שינוע` -> `בקרת כלים` -> `בקרה`.
   - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
@@ -185,6 +189,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/test-multi-responsibility-permissions`:
+
+- `npm test -- --run`: passed, 12 files / 38 tests.
+- `npm run build`: passed.
+- Browser smoke-check: not required for test-only permission contract; no product UI code changed.
 
 Branch `codex/notification-asset-deeplinks`:
 
