@@ -141,7 +141,7 @@ Implementation:
 
 ### Topic 10 — move task status settings to Tasks
 
-Status: open, medium.
+Status: in progress.
 
 Goal:
 - Move `סטטוסים של מטלות` from global Settings to a settings sub-tab on `מטלות`.
@@ -149,6 +149,11 @@ Goal:
 - Gate editing explicitly, likely through settings/manage or a future tasks-manage permission.
 
 Ship separately from Topics 11 and 12.
+
+Implementation in progress:
+- Task status editing is moving from global Settings to a Tasks module settings sub-tab.
+- The stored config shape remains `config.taskStatusMeta`.
+- Editing remains gated by settings management permission for this pass.
 
 ### Topic 11 — move vehicle type settings to Fleet
 

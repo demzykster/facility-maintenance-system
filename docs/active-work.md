@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Move task status settings
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `856c3df fix: ignore legacy technician shift id`.
+- Status: branch `codex/move-task-status-settings` in progress.
+- Last synchronized `main` before this entry: `62cd6cb docs: close technician shift id ledger`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - continue backlog-driven work from `docs/backlog.md`;
-  - keep the ledger accurate after PR #66.
+  - start Topic #10 from `docs/backlog.md`;
+  - move task status configuration from global Settings to the Tasks module;
+  - preserve `config.taskStatusMeta` without changing the data shape.
 
 ### Latest Completed Work
 
@@ -87,9 +88,11 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Sync latest `main`.
-2. Continue with the next smallest item from `docs/backlog.md`.
-3. Update this ledger in the same PR as the code when the active state changes.
+1. Finish branch `codex/move-task-status-settings`.
+2. Run `npm test -- --run`.
+3. Run `npm run build`.
+4. Browser smoke-check the Tasks settings tab and global Settings.
+5. Open and merge one small PR if validation passes.
 
 ## Last Validation
 
@@ -112,6 +115,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/move-task-status-settings`:
+  - `npm test -- --run`: passed, 9 files / 25 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin login, Tasks -> Settings showed task status editor; global Settings no longer showed task status editor; browser console errors: none.
 - Branch `codex/ignore-legacy-tech-shiftid`:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
