@@ -82,7 +82,7 @@ Remaining:
 
 ### Topic 5 — technician individual shift settings
 
-Status: direction clarified, open.
+Status: implementation in progress.
 
 Goal:
 - Keep each technician shift as an individual setting in that technician's profile.
@@ -98,6 +98,14 @@ Suggested direction:
 - Treat `shiftStart` and `shiftEnd` on the technician user record as the source of truth.
 - Remove or ignore technician `shiftId` UI paths after checking existing data compatibility.
 - Preserve existing manual times as the migration fallback.
+
+Implementation in progress:
+- Technician profile editing now shows individual start/end time fields instead of a global shift selector.
+- Saving a technician writes direct `shiftStart`/`shiftEnd` values and clears legacy `shiftId`.
+- Technician schedule calculation ignores global `config.shifts`.
+
+Remaining:
+- Verify whether old demo/legacy `shiftId` values need a one-time cleanup or can safely remain ignored.
 
 ### Topic 6 — move worker shifts to user management
 
