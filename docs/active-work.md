@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Settings and ticket filter cleanup
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `0ff24ae collapse user permission controls (#93)`.
+- Status: active branch `codex/settings-and-ticket-filter-cleanup`.
+- Last synchronized `main` before this entry: `7072d8f docs: close permissions form ux ledger (#94)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - close the ledger after PR #93;
-  - continue future work from `docs/backlog.md`.
+  - remove the misleading global technician shift list from global settings;
+  - combine technician late/early tolerance into one shift grace value;
+  - make dashboard/analytics drill-down filters in `קריאות` one-time and clearable.
 
 ### Latest Completed Work
 
@@ -144,11 +145,17 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Sync latest `main`.
-2. Continue with the next smallest item from `docs/backlog.md`.
-3. Update this ledger in the same PR as the code when the active state changes.
+1. Finish branch `codex/settings-and-ticket-filter-cleanup`.
+2. Run `npm test -- --run`, `npm run build`, and browser smoke-check settings plus ticket drill-down reset.
+3. Open PR into `main` if checks pass.
 
 ## Last Validation
+
+Branch `codex/settings-and-ticket-filter-cleanup`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: global Settings shows one `סבילות משמרת (דקות)` field; old late/early tolerance fields and the global technician shift list are not visible; dashboard `ממתינות לחלקים` drill-down opens filtered tickets with a focus banner and `נקה כל הסינונים`; manual return to `קריאות` does not reapply the drill-down; clearing all filters removes the banner and returns to normal open tickets; no browser console errors were captured.
 
 Latest validation on `main` before this docs cleanup:
 
