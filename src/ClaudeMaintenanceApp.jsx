@@ -5408,7 +5408,7 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); const grace = Math.max(0, Number(shiftGrace) || 0); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: [], lateGraceMin: grace, earlyGraceMin: grace, waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
   const saveUsersCfg = async () => {
     setUserCfgMsg("");
     if (registryEmptied(depts, deptUse)) { setUserCfgMsg("לא ניתן לרוקן שם של מחלקה שנמצאת בשימוש — שנו שם או שחררו את הרשומות"); return; }
@@ -5417,7 +5417,8 @@ function SettingsPanel(p) {
         for (const u of users) if (u.dept === o) await saveUser({ ...u, dept: n });
         for (const f of (fleet || [])) { let ch = false; const nf = { ...f }; if (Array.isArray(f.depts) && f.depts.includes(o)) { nf.depts = f.depts.map((d) => d === o ? n : d); ch = true; } if (f.dept === o) { nf.dept = n; ch = true; } if (ch) await saveFleet(nf); }
         for (const t of (tickets || [])) if (t.reportedBy?.dept === o) await saveTicket({ ...t, reportedBy: { ...t.reportedBy, dept: n } }); }
-      await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw, workShifts: cleanWorkShifts(), departments: cleanRegistry(depts) });
+      const grace = Math.max(0, Number(shiftGrace) || 0);
+      await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw, workShifts: cleanWorkShifts(), departments: cleanRegistry(depts), lateGraceMin: grace, earlyGraceMin: grace });
       setDepts((s) => s.map((r) => ({ ...r, _orig: r.name.trim() })));
       flash();
     } catch (e) { setUserCfgMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
@@ -5450,9 +5451,6 @@ function SettingsPanel(p) {
       <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => setCoName(e.target.value)} placeholder="לדוגמה: כימיפל בע״מ" /></label>
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
-      <SectionTitle><Clock size={15} /> סבילות משמרת טכנאים</SectionTitle>
-      <label className="field"><span>סבילות משמרת (דקות)</span><input type="number" min="0" value={shiftGrace} onChange={(e) => setShiftGrace(e.target.value)} /></label>
-      <div className="hint">אותו מרווח משמש גם לאיחור בתחילת משמרת וגם ליציאה מוקדמת. שעות המשמרת עצמן נקבעות בכרטיס הטכנאי תחת «צוות ומשתמשים».</div>
       <SectionTitle>סיבות המתנה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>לכל סיבה: מי מחזיק את הכדור בזמן ההמתנה · מי רשאי לבחור אותה · האם עוצרת את שעון ה-SLA. «לא התקבל הכלי» היא סיבה מערכתית ואינה ניתנת למחיקה.</div>
       {wreasons.map((r, i) => <div key={r.id || i} className="reg-row" style={{ marginBottom: 6, gap: 6, flexWrap: "wrap" }}>
@@ -5523,6 +5521,10 @@ function SettingsPanel(p) {
       <div className="hint" style={{ marginBottom: 6 }}>משמרות לשיוך עובדים ולעמודות בעץ המחלקות. ברירת מחדל: בוקר / לילה — ניתן להוסיף עוד.</div>
       {wshifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.label || ""} placeholder="שם המשמרת" onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /><input type="color" value={s.color || "#64748B"} title="צבע" style={{ width: 44, height: 34, padding: 0, border: "none", background: "none" }} onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, color: e.target.value } : x))} /><button className="reg-del" onClick={() => setWshifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={wshifts.length <= 1}><Trash2 size={15} /></button></div>)}
       <button className="btn-ghost sm" onClick={() => setWshifts((a) => [...a, { id: "ws" + Date.now().toString(36), label: "", color: "#64748B" }])}><Plus size={14} /> משמרת</button>
+      <div className="note" style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, alignItems: "center" }}>
+        <label className="field" style={{ margin: 0 }}><span>סבילות משמרת (דקות)</span><input type="number" min="0" value={shiftGrace} onChange={(e) => setShiftGrace(e.target.value)} /></label>
+        <div className="hint" style={{ margin: 0 }}>מרווח אחיד לאיחור בתחילת משמרת וליציאה מוקדמת. שעות המשמרת של טכנאי נקבעות בכרטיס הטכנאי עצמו.</div>
+      </div>
       <SectionTitle>מחלקות</SectionTitle>
       <div className="hint" style={{ marginBottom: 10 }}>שינוי שם של מחלקה בשימוש יתעדכן אוטומטית בכל המשתמשים, הכלים והקריאות המקושרים בעת השמירה. מחיקה חסומה כל עוד המחלקה בשימוש.</div>
       {regEditor(depts, setDepts, deptUse, "מחלקה", "שם מחלקה")}
