@@ -16,6 +16,7 @@ import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } 
 import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { ticketLifecycleRows, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
+import { resolveIdentifier } from "./loginIdentifierModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -1597,12 +1598,12 @@ function PublicReport({ zones, onSubmit, onClose }) {
 }
 
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport }) {
-  const [mode, setMode] = useState("user"), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [code, setCode] = useState(""), [workerNo, setWorkerNo] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false);
+  const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false);
   const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
   const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
   const activationUser = activationToken ? active.find((u) => (u.role === "worker" || u.role === "cleaner") && u.activationToken === activationToken && u.activationStatus === "pending") : null;
-  useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); if (d.email) setEmail(d.email); if (d.workerNo) setWorkerNo(d.workerNo); if (d.mode) setMode(d.mode); } catch {} }); }, []);
+  useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
   const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
   const activateWorker = async () => {
@@ -1617,31 +1618,30 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     finish(u);
   };
   const dfltDept = config?.departments?.[0] || "";
-  const submitUser = () => {
-    const b = BUILTIN_LOGINS.find((x) => (x.role === "admin" || x.role === "user") && x.email.toLowerCase() === email.trim().toLowerCase() && x.password === password);
-    if (b) { remember_save({ email: email.trim(), mode: "user" }); return finish({ ...b, dept: b.dept || dfltDept }); }
-    const u = active.find((x) => x.role !== "tech" && x.role !== "worker" && (x.email || "").toLowerCase() === email.trim().toLowerCase());
-    if (!u) return setErr("לא נמצא משתמש עם דוא״ל זה");
-    if (u.password !== password) return setErr("הסיסמה שגויה");
-    remember_save({ email: email.trim(), mode: "user" });
-    finish(u);
+  const withDefaultDept = (u) => ({ ...u, dept: u.dept || ((u.role === "user" || u.role === "worker") ? dfltDept : "") });
+  const rememberLogin = (u, idType) => {
+    if (idType === "email") return remember_save({ email: u.email || identifier.trim(), mode: "user" });
+    if (idType === "workerNo") return remember_save({ workerNo: u.workerNo || identifier.trim(), mode: "worker" });
+    return remember_save({ mode: "tech" });
   };
-  const submitTech = () => {
-    if (code.trim() === "1234") { remember_save({ mode: "tech" }); return finish(BUILTIN_LOGINS.find((x) => x.role === "tech")); }
-    const u = active.find((x) => x.role === "tech" && x.pin === code.trim());
-    if (!u) return setErr("קוד טכנאי שגוי");
-    remember_save({ mode: "tech" });
-    finish(u);
+  const submitIdentifier = () => {
+    const res = resolveIdentifier(identifier, users, BUILTIN_LOGINS);
+    if (res.status === "empty") return setErr("הזינו דוא״ל, מספר עובד או קוד טכנאי");
+    if (res.status === "archived") return setErr("המשתמש אינו פעיל. פנו למנהל המערכת");
+    if (res.status === "not_found") return setErr("לא נמצא משתמש מתאים");
+    if (res.auth === "none") { rememberLogin(res.user, res.identifierType); return finish(withDefaultDept(res.user)); }
+    setResolved(res);
+    setPassword("");
+    setCode("");
+    setErr("");
   };
-  const submitWorker = () => {
-    const bw = BUILTIN_LOGINS.find((x) => x.role === "worker");
-    if (workerNo.trim() === bw.workerNo && code.trim() === bw.pin) { remember_save({ workerNo: bw.workerNo, mode: "worker" }); return finish({ ...bw, dept: bw.dept || dfltDept }); }
-    const bc = BUILTIN_LOGINS.find((x) => x.role === "cleaner");
-    if (bc && workerNo.trim() === bc.workerNo && code.trim() === bc.pin) { remember_save({ workerNo: bc.workerNo, mode: "worker" }); return finish({ ...bc, dept: bc.dept || dfltDept }); }
-    const u = active.find((x) => (x.role === "worker" || x.role === "cleaner") && String(x.workerNo || "").trim() === workerNo.trim() && (x.pin || "") === code.trim());
-    if (!u) return setErr("מספר עובד או קוד שגויים");
-    remember_save({ workerNo: workerNo.trim(), mode: "worker" });
-    finish(u);
+  const submitSecret = () => {
+    if (!resolved) return submitIdentifier();
+    const u = resolved.user;
+    if (resolved.auth === "password" && (u.password || "") !== password) return setErr("הסיסמה שגויה");
+    if (resolved.auth === "pin" && (u.pin || "") !== code.trim()) return setErr("הקוד שגוי");
+    rememberLogin(u, resolved.identifierType);
+    finish(withDefaultDept(u));
   };
   return (
     <div className="login-bg">
@@ -1658,33 +1658,23 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={activateWorker} disabled={!activationUser}>שמירה וכניסה</button>
         </>) : (<>
-        <div className="seg-tabs s3" style={{ marginBottom: 16 }}>
-          <button className={mode === "user" ? "on" : ""} onClick={() => { setMode("user"); setErr(""); }}>צוות</button>
-          <button className={mode === "worker" ? "on" : ""} onClick={() => { setMode("worker"); setErr(""); }}>עובד</button>
-          <button className={mode === "tech" ? "on" : ""} onClick={() => { setMode("tech"); setErr(""); }}>טכנאי</button>
-        </div>
-        {mode === "user" ? (<>
-          <div className="login-q">כניסת צוות — דוא״ל וסיסמה</div>
-          <label className="field"><span>דוא״ל</span><input value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" onKeyDown={(e) => e.key === "Enter" && submitUser()} autoFocus /></label>
-          <label className="field"><span>סיסמה</span><input value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="••••••" onKeyDown={(e) => e.key === "Enter" && submitUser()} /></label>
+        {!resolved ? (<>
+          <div className="login-q">כניסה למערכת</div>
+          <label className="field"><span>דוא״ל / מספר עובד / קוד טכנאי</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder="vadim@chemipal.co.il / 1042 / 1234" onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitUser}>כניסה</button>
-        </>) : mode === "worker" ? (<>
-          <div className="login-q">כניסת עובד — מספר וקוד</div>
-          <label className="field"><span>מספר עובד</span><input value={workerNo} onChange={(e) => { setWorkerNo(e.target.value); setErr(""); }} inputMode="numeric" placeholder="לדוגמה: 1042" onKeyDown={(e) => e.key === "Enter" && submitWorker()} autoFocus /></label>
-          <label className="field"><span>קוד</span><input value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitWorker()} /></label>
-          <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
-          {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitWorker}>כניסה</button>
+          <button className="btn-primary full" onClick={submitIdentifier}>המשך</button>
         </>) : (<>
-          <div className="login-q">כניסת טכנאי — קוד בלבד</div>
-          <label className="field"><span>קוד כניסה</span><input value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitTech()} autoFocus /></label>
+          <div className="login-q">שלום {resolved.user.name}</div>
+          <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? "הזינו סיסמה להשלמת הכניסה." : "הזינו קוד אישי להשלמת הכניסה."}</div>
+          {resolved.auth === "password" ? <label className="field"><span>סיסמה</span><input value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="••••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>
+            : <label className="field"><span>קוד אישי</span><input value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitTech}>כניסה</button>
+          <button className="btn-primary full" onClick={submitSecret}>כניסה</button>
+          <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>חזרה</button>
         </>)}
-        <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה (תמיד פעילה): {mode === "user" ? "vadim@chemipal.co.il · סיסמה 1234" : mode === "worker" ? "מספר עובד 1042 · קוד 1234" : "קוד 1234"}</div>
+        <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>
         <div className="login-foot">גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
         </>)}

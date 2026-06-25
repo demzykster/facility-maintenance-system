@@ -4,6 +4,7 @@ import { resolveIdentifier } from "../src/loginIdentifierModel.js";
 const users = [
   { id: "admin-1", role: "admin", email: "Vadim@Chemipal.co.il", password: "1234" },
   { id: "mgr-1", role: "user", email: "manager@local", password: "1234", active: false },
+  { id: "mgr-2", role: "user", email: "old-manager@local", password: "1234", status: "archived" },
   { id: "worker-1", role: "worker", workerNo: "1042", pin: "1234" },
   { id: "cleaner-1", role: "cleaner", workerNo: "1050", pin: "1234" },
   { id: "tech-1", role: "tech", pin: "7788" }
@@ -31,6 +32,11 @@ describe("resolveIdentifier", () => {
       identifierType: "email",
       auth: "password",
       user: { id: "mgr-1" }
+    });
+    expect(resolveIdentifier("old-manager@local", users, builtins)).toMatchObject({
+      status: "archived",
+      identifierType: "email",
+      user: { id: "mgr-2" }
     });
   });
 
