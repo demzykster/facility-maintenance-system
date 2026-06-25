@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Multi-responsibility permissions contract
+### SLA stage model
 
-- Status: active branch `codex/test-multi-responsibility-permissions`.
-- Last synchronized `main` before this entry: `1cb7805 fix: deep-link asset notifications (#108)`.
+- Status: active branch `codex/document-sla-stage-model`.
+- Last synchronized `main` before this entry: `ef75654 test: cover multi responsibility permissions [skip vercel] (#109)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - lock down the current permission model for one person with several responsibilities;
-  - prove that a manager can receive HR/worker-access/PPE/analytics capabilities through module permissions;
-  - avoid adding role templates before the business model is clearer.
+  - define the next safe direction for ticket SLA and stage timing;
+  - document how existing `statusMs` / `statusSince` lifecycle data should evolve;
+  - prevent scattered SLA fixes from making dashboard, analytics, and export disagree.
 
 ### Latest Completed Work
 
+- PR #109: multi-responsibility permission contract was tested.
+  - A manager can keep `role: user` while receiving users, workerAccess, PPE, and analytics permissions through module permissions.
+  - This supports one person holding several operational responsibilities without adding a new role/template yet.
+  - Vercel was rate-limited, but local tests/build passed before merge.
 - PR #108: asset notifications now deep-link to the relevant Fleet sub-tabs.
   - PM notifications open `כלי שינוע` -> `לוח טיפולים`.
   - Fleet/document/driver notifications open `כלי שינוע` -> `כלים ונהגים`.
@@ -189,6 +193,11 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/document-sla-stage-model`:
+
+- `npm test -- --run`: passed, 12 files / 38 tests.
+- Browser smoke-check: not required for docs-only SLA planning contract; no product UI code changed.
 
 Branch `codex/test-multi-responsibility-permissions`:
 
