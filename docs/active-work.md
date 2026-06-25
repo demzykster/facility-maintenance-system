@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active branch `codex/technician-tolerance-model`.
-- Last synchronized `main` before this entry: `4567926 Merge pull request #60 from demzykster/codex/update-handoff-backlog-guidance`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `85ba05b Merge pull request #61 from demzykster/codex/technician-tolerance-model`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - implement the first small Topic #4 foundation step;
-  - add a pure/tested technician tolerance fallback helper;
-  - avoid UI wiring until the business placement is clearer.
+  - continue backlog-driven work from `docs/backlog.md`;
+  - keep the ledger accurate after PR #61.
 
 ### Latest Completed Work
 
 - PR #60: handoff backlog guidance was updated.
   - Removed completed starter suggestions from `docs/handoff-for-next-codex.md`.
   - Added the rule that active-work updates travel with the same code PR.
+- PR #61: technician tolerance fallback model was added.
+  - Added `src/technicianToleranceModel.js`.
+  - Added `tests/technicianToleranceModel.test.js`.
+  - Topic #4 now has a pure/tested fallback contract before any UI wiring.
 
 - PR #48: worker activation seeding was added.
   - New worker/cleaner forms seed an activation token when the editor has `workerAccess:manage`.
@@ -77,15 +80,6 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-Before this PR is merged:
-
-1. Run `npm test -- --run`.
-2. Run `npm run build`.
-3. Open PR for `codex/technician-tolerance-model`.
-4. No browser smoke-check is required unless UI wiring is added.
-
-After this PR is merged:
-
 1. Sync latest `main`.
 2. Continue with the next smallest item from `docs/backlog.md`.
 3. Update this ledger in the same PR as the code when the active state changes.
@@ -111,7 +105,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- `codex/technician-tolerance-model`:
+- PR #61:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
   - Browser smoke-check: not run; no UI behavior changed.
