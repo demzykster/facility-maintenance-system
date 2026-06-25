@@ -124,7 +124,7 @@ Suggested PR sequence:
 4. Remove `רישומים` only after it has no remaining editable content.
 
 Implementation so far:
-- Branch `codex/move-worker-shifts-to-team` moves `משמרות עבודה (בוקר/לילה)` into `צוות ומשתמשים`.
+- PR #75 moved `משמרות עבודה (בוקר/לילה)` into `צוות ומשתמשים`.
 - Departments are still pending for a separate PR.
 
 ## Settings / Information Architecture
