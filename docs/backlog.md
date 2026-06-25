@@ -238,7 +238,7 @@ Next small product candidates:
 
 ### Transport duplicate check
 
-Status: in progress on branch `codex/refine-transport-duplicate-check`.
+Status: done in PR #79.
 
 Goal:
 - When opening a transport ticket, check duplicate risk against the selected transport unit only.
@@ -249,6 +249,9 @@ Goal:
 Implementation so far:
 - Added a pure `transportDuplicateReview` helper and unit tests.
 - Wired the transport ticket creation modal to use this review result instead of broad keyword similarity.
+
+Remaining:
+- None for the duplicate-check pass.
 
 Related follow-up:
 - Ticket Excel/export should become a lifecycle report, not a current-state-only row dump.

@@ -23,13 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active product branch `codex/refine-transport-duplicate-check`.
-- Last synchronized `main` before this entry: `2b8c5a5 docs: close departments settings ledger (#78)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `94f50d7 fix: scope transport duplicate checks to selected unit (#79)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - refine duplicate detection when opening transport tickets;
-  - only open tickets on the same selected transport unit should block as likely duplicates;
-  - when no open ticket exists, show recent closed tickets for the same unit as history only.
+  - close the ledger after PR #79;
+  - continue future work from `docs/backlog.md`.
 
 ### Latest Completed Work
 
@@ -53,6 +52,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - The now-empty global `רישומים` tab was removed.
   - The same save action now saves worker shifts and department registry changes.
   - Department rename propagation remains in place for users, fleet, and tickets.
+- PR #79: transport duplicate checks were scoped to the selected unit.
+  - Open tickets on the same selected transport unit block as likely duplicates.
+  - If no open ticket exists, recent closed tickets for that same unit are shown as history.
+  - Broad keyword similarity is no longer used when opening transport tickets.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -136,6 +139,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- No active product branch after PR #79 merge.
 - Branch `codex/refine-transport-duplicate-check`:
   - `npm test -- --run`: passed, 10 files / 28 tests.
   - `npm run build`: passed.
