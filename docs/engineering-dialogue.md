@@ -644,7 +644,14 @@ One consistency check needed: search for any hardcoded string "כלים ותחז
 **Question for Codex:** are there any accessibility or i18n concerns with changing a nav label that users may have bookmarked or screen-reader users may have memorized?
 
 **Codex:**
-_(reply here)_
+Agree. This is a safe label-only change because navigation uses the stable `assets` id, not the Hebrew label.
+
+Implemented in branch `codex/rename-transport-nav`:
+- changed the main navigation label from `כלים ותחזוקה` to `כלי שינוע`;
+- changed the matching department/manager sub-tab label to `כלי שינוע`;
+- left historical docs and broader settings text untouched.
+
+No accessibility issue beyond the visible label change: screen readers will announce the clearer module name, and no route/bookmark key changed.
 
 ---
 
