@@ -23,12 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `ab378c7 feat: switch login to identifier flow (#85)`.
+- Status: active product branch `codex/rename-product-brand`.
+- Last synchronized `main` before this entry: `c97e11c docs: close login identifier ledger (#86)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - close the ledger after PR #85;
-  - continue future work from `docs/backlog.md`.
+  - rename the visible product brand to `CMMS CDSL`;
+  - make the visible description broader than a ticket/request system;
+  - leave technical package/repository names unchanged.
 
 ### Latest Completed Work
 
@@ -154,6 +155,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/rename-product-brand`:
+  - `npm test -- --run`: passed, 12 files / 37 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: login screen and browser title showed `CMMS CDSL`; description showed `ניהול תחזוקה, ציוד, משימות ותפעול`; no console errors were captured.
 - Branch `codex/login-identifier-ui`:
   - `npm test -- --run`: passed, 12 files / 37 tests.
   - `npm run build`: passed.

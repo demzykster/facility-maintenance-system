@@ -1,6 +1,6 @@
-# Facility Maintenance System
+# CMMS CDSL
 
-React/Vite CMMS prototype for maintenance requests, fleet, PPE, suppliers, and operational dashboards.
+React/Vite CMMS for CDSL maintenance, fleet, PPE, suppliers, tasks, and operational dashboards.
 
 ## Requirements
 
