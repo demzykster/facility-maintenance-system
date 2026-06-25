@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Settings and ticket filter cleanup
+### Backlog-driven product work
 
-- Status: active branch `codex/settings-and-ticket-filter-cleanup`.
-- Last synchronized `main` before this entry: `7072d8f docs: close permissions form ux ledger (#94)`.
-- Open PRs when this entry was started: none.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `e830f6b Merge pull request #95 from demzykster/codex/settings-and-ticket-filter-cleanup`.
+- Open PRs when this entry was written: none.
 - Purpose:
-  - remove the misleading global technician shift list from global settings;
-  - combine technician late/early tolerance into one shift grace value;
-  - make dashboard/analytics drill-down filters in `קריאות` one-time and clearable.
+  - close the ledger after PR #95;
+  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
 
 ### Latest Completed Work
 
+- PR #95: settings shift tolerance and ticket drill-down filters were cleaned up.
+  - Removed the misleading global technician shift list from global Settings.
+  - Replaced separate late/early tolerance fields with one `סבילות משמרת (דקות)` value that writes both existing config fields.
+  - Dashboard/Analytics drill-down filters in `קריאות` are now one-time instead of sticky.
+  - Added `נקה כל הסינונים` to reset ticket filters.
 - PR #93: user-form permission controls were collapsed.
   - Personal permissions now sit under the `הרשאות אישיות` foldout.
   - Selected responsibility chips keep stable width/row layout instead of jumping.
@@ -145,9 +149,9 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Finish branch `codex/settings-and-ticket-filter-cleanup`.
-2. Run `npm test -- --run`, `npm run build`, and browser smoke-check settings plus ticket drill-down reset.
-3. Open PR into `main` if checks pass.
+1. Sync latest `main`.
+2. Continue with the next smallest item from `docs/backlog.md` or the owner-approved status/stage analytics cleanup.
+3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
 
