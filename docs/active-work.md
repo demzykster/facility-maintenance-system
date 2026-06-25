@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Ignore legacy technician shiftId
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `e830fc1 Merge pull request #64 from demzykster/codex/individual-tech-shift-ui`.
+- Status: branch `codex/ignore-legacy-tech-shiftid` in progress.
+- Last synchronized `main` before this entry: `f4d661b Merge pull request #65 from demzykster/codex/close-individual-tech-shift-ledger`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - continue backlog-driven work from `docs/backlog.md`;
-  - keep the ledger accurate after PR #64.
+  - finish Topic #5 legacy cleanup from `docs/backlog.md`;
+  - keep technician shifts individual-only;
+  - stop carrying legacy technician `shiftId` into the active session.
 
 ### Latest Completed Work
 
@@ -83,9 +84,11 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Sync latest `main`.
-2. Continue with the next smallest item from `docs/backlog.md`.
-3. Update this ledger in the same PR as the code when the active state changes.
+1. Finish branch `codex/ignore-legacy-tech-shiftid`.
+2. Run `npm test -- --run`.
+3. Run `npm run build`.
+4. Open and merge one small PR if validation passes.
+5. After merge, close this ledger item and continue with the next smallest backlog item.
 
 ## Last Validation
 
@@ -108,6 +111,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/ignore-legacy-tech-shiftid`:
+  - `npm test -- --run`: passed, 9 files / 25 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: not run; no visual UI behavior changed.
 - PR #64:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
