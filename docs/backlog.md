@@ -157,13 +157,18 @@ Implementation:
 
 ### Topic 11 — move vehicle type settings to Fleet
 
-Status: open, medium/large.
+Status: in progress.
 
 Goal:
 - Move `סוגי כלים` from global Settings to a Fleet/`כלי שינוע` settings sub-tab.
 - Separate save handling for vehicle types.
 
 Ship separately from Topic 10 and Topic 12.
+
+Implementation in progress:
+- Vehicle type editing is moving from global Settings to a Fleet module settings sub-tab.
+- The existing vehicle type config shape remains unchanged.
+- Editing remains gated by settings management permission for this pass.
 
 ### Topic 12 — split registries
 
