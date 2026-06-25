@@ -5337,7 +5337,7 @@ function SettingsPanel(p) {
   const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
-  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null);
+  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
   const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftDef, setShiftDef] = useState(config.defaultShiftEnd || "16:30"), [startDef, setStartDef] = useState(config.defaultShiftStart || "07:30"), [lateG, setLateG] = useState(config.lateGraceMin ?? 10), [earlyG, setEarlyG] = useState(config.earlyGraceMin ?? 10);
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
@@ -5345,7 +5345,7 @@ function SettingsPanel(p) {
   const [shifts, setShifts] = useState(config.shifts?.length ? config.shifts.map((s) => ({ ...s })) : [{ id: "sh_main", name: "משמרת ראשית", start: config.defaultShiftStart || "07:30", end: config.defaultShiftEnd || "16:30" }]);
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
   const [tw, setTw] = useState({ ...(config.techWidgets || {}) }), [mw, setMw] = useState({ ...(config.mgrWidgets || {}) });
-  const [regMsg, setRegMsg] = useState(""), [maintMsg, setMaintMsg] = useState("");
+  const [maintMsg, setMaintMsg] = useState("");
   const mkRows = (arr) => (arr || []).map((s, i) => ({ id: "r" + i + "_" + s, name: s, _orig: s }));
   const [depts, setDepts] = useState(mkRows(config.departments)), [zones, setZones] = useState(mkRows(config.zones));
   const [cats, setCats] = useState((config.categories || CATEGORIES).map((c) => ({ id: c.id, label: c.label, ...SLA3(config.catSla?.[c.id]) })));
@@ -5368,19 +5368,18 @@ function SettingsPanel(p) {
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
   const saveGeneral = async () => { const cleanShifts = shifts.filter((s) => (s.name || "").trim()).map((s) => ({ id: s.id, name: s.name.trim(), start: s.start || "07:30", end: s.end || "16:30" })); const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: cleanShifts, defaultShiftStart: (cleanShifts[0]?.start) || startDef || "07:30", defaultShiftEnd: (cleanShifts[0]?.end) || shiftDef || "16:30", lateGraceMin: Math.max(0, Number(lateG) || 0), earlyGraceMin: Math.max(0, Number(earlyG) || 0), waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
-  const saveUsersCfg = async () => { await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw, workShifts: cleanWorkShifts() }); flash(); };
-  const saveRegistries = async () => {
-    setRegMsg("");
-    if (registryEmptied(depts, deptUse)) { setRegMsg("לא ניתן לרוקן שם של פריט שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return; }
+  const saveUsersCfg = async () => {
+    setUserCfgMsg("");
+    if (registryEmptied(depts, deptUse)) { setUserCfgMsg("לא ניתן לרוקן שם של מחלקה שנמצאת בשימוש — שנו שם או שחררו את הרשומות"); return; }
     try {
       for (const r of registryRenames(depts)) { const o = r._orig, n = r.name.trim();
         for (const u of users) if (u.dept === o) await saveUser({ ...u, dept: n });
         for (const f of (fleet || [])) { let ch = false; const nf = { ...f }; if (Array.isArray(f.depts) && f.depts.includes(o)) { nf.depts = f.depts.map((d) => d === o ? n : d); ch = true; } if (f.dept === o) { nf.dept = n; ch = true; } if (ch) await saveFleet(nf); }
         for (const t of (tickets || [])) if (t.reportedBy?.dept === o) await saveTicket({ ...t, reportedBy: { ...t.reportedBy, dept: n } }); }
-      await saveConfig({ ...config, departments: cleanRegistry(depts) });
+      await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw, workShifts: cleanWorkShifts(), departments: cleanRegistry(depts) });
       setDepts((s) => s.map((r) => ({ ...r, _orig: r.name.trim() })));
       flash();
-    } catch (e) { setRegMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
+    } catch (e) { setUserCfgMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
   };
   const saveMaint = async () => { setMaintMsg(""); if (registryEmptied(zones, zoneUse)) { setMaintMsg("לא ניתן לרוקן שם של אזור שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return; } try { const list = cats.filter((c) => c.label.trim()); for (const r of registryRenames(zones)) { const o = r._orig, n = r.name.trim(); for (const f of (fleet || [])) if (f.zone === o) await saveFleet({ ...f, zone: n }); for (const t of (tickets || [])) if (t.zone === o) await saveTicket({ ...t, zone: n }); } await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); flash(); } catch (e) { setMaintMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); } };
   const adminCount = users.filter((u) => u.role === "admin" && u.active).length;
@@ -5403,7 +5402,7 @@ function SettingsPanel(p) {
   const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim())));
   const restoreWorker = async (w) => { await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); setArcView(null); };
   return (<div className="settings-wrap">
-    {!p.only && <div className="seg-tabs s3"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "reg" ? "on" : ""} onClick={() => setTab("reg")}>רישומים</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button></div>}
+    {!p.only && <div className="seg-tabs"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button></div>}
 
     {tab === "general" && (<>
       <SectionTitle><Building2 size={15} /> חברה ואתר</SectionTitle>
@@ -5466,14 +5465,6 @@ function SettingsPanel(p) {
       <div style={{ height: 20 }} />
     </>)}
 
-    {tab === "reg" && (<>
-      <div className="hint" style={{ marginBottom: 10 }}>רישומים משותפים למערכת. שינוי שם של פריט «בשימוש» יתעדכן אוטומטית בכל הרשומות המקושרות בעת השמירה. מחיקה חסומה כל עוד הפריט בשימוש — כדי למחוק, שחררו תחילה את הרשומות.</div>
-      <SectionTitle>מחלקות</SectionTitle>
-      {regEditor(depts, setDepts, deptUse, "מחלקה", "שם מחלקה")}
-      <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveRegistries}>{saved ? "נשמר ✓" : "שמירת רישומים"}</button>
-      {regMsg && <div className="note" style={{ color: "#DC2626" }}>{regMsg}</div>}
-    </>)}
-
     {tab === "maint" && (<>
       <SectionTitle>קטגוריות אחזקה ו-SLA (שעות)</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>לכל קטגוריה זמני יעד נפרדים לפי דחיפות.</div>
@@ -5488,13 +5479,17 @@ function SettingsPanel(p) {
 
 
     {tab === "users" && (!mayViewUsers ? <div className="note">אין הרשאה לצפייה בניהול משתמשים.</div> : <>
-      {p.only === "users" && <div className="seg-tabs" style={{ marginBottom: 14 }}><button className={userSub === "users" ? "on" : ""} onClick={() => setUserSub("users")}>משתמשים</button><button className={userSub === "shifts" ? "on" : ""} onClick={() => setUserSub("shifts")}>משמרות עבודה</button></div>}
-      {userSub === "shifts" ? <>
+      {p.only === "users" && <div className="seg-tabs" style={{ marginBottom: 14 }}><button className={userSub === "users" ? "on" : ""} onClick={() => setUserSub("users")}>משתמשים</button><button className={userSub === "settings" ? "on" : ""} onClick={() => setUserSub("settings")}>הגדרות</button></div>}
+      {userSub === "settings" ? <>
       <SectionTitle><Clock size={15} /> משמרות עבודה (בוקר/לילה)</SectionTitle>
       <div className="hint" style={{ marginBottom: 6 }}>משמרות לשיוך עובדים ולעמודות בעץ המחלקות. ברירת מחדל: בוקר / לילה — ניתן להוסיף עוד.</div>
       {wshifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.label || ""} placeholder="שם המשמרת" onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /><input type="color" value={s.color || "#64748B"} title="צבע" style={{ width: 44, height: 34, padding: 0, border: "none", background: "none" }} onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, color: e.target.value } : x))} /><button className="reg-del" onClick={() => setWshifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={wshifts.length <= 1}><Trash2 size={15} /></button></div>)}
       <button className="btn-ghost sm" onClick={() => setWshifts((a) => [...a, { id: "ws" + Date.now().toString(36), label: "", color: "#64748B" }])}><Plus size={14} /> משמרת</button>
-      <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveUsersCfg}>{saved ? "נשמר ✓" : "שמירת משמרות עבודה"}</button>
+      <SectionTitle>מחלקות</SectionTitle>
+      <div className="hint" style={{ marginBottom: 10 }}>שינוי שם של מחלקה בשימוש יתעדכן אוטומטית בכל המשתמשים, הכלים והקריאות המקושרים בעת השמירה. מחיקה חסומה כל עוד המחלקה בשימוש.</div>
+      {regEditor(depts, setDepts, deptUse, "מחלקה", "שם מחלקה")}
+      <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveUsersCfg}>{saved ? "נשמר ✓" : "שמירת הגדרות צוות"}</button>
+      {userCfgMsg && <div className="note" style={{ color: "#DC2626" }}>{userCfgMsg}</div>}
       </> : <>
       <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button>}</div>
       {!mayManageUsers && <div className="hint" style={{ marginTop: 4 }}>יש לך הרשאת צפייה בלבד. יצירה, עריכה ושחזור עובדים דורשים הרשאת ניהול משתמשים.</div>}

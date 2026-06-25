@@ -23,12 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `237e4fc feat: move fleet type settings to fleet`.
+- Status: active product branch `codex/move-departments-to-team-settings`.
+- Last synchronized `main` before this entry: `f453824 docs: close worker shifts ledger (#76)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - continue backlog-driven work from `docs/backlog.md`;
-  - keep the ledger accurate after PR #70.
+  - move `מחלקות` into `צוות ומשתמשים` in the same sub-tab as worker shifts;
+  - rename the team settings sub-tab from `משמרות עבודה` to `הגדרות`;
+  - remove the now-empty global `רישומים` tab.
 
 ### Latest Completed Work
 
@@ -46,6 +47,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `משמרות עבודה (בוקר/לילה)` moved from global Settings to `צוות ומשתמשים`.
   - The team page now has `משתמשים` / `משמרות עבודה` sub-tabs.
   - Departments are still pending for a separate PR.
+- Current branch: departments are being moved into `צוות ומשתמשים` -> `הגדרות`.
+  - The same save action now saves worker shifts and department registry changes.
+  - Department rename propagation must stay intact for users, fleet, and tickets.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -129,7 +133,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- No active product branch after PR #75 merge.
+- Branch `codex/move-departments-to-team-settings`:
+  - `npm test -- --run`: passed, 9 files / 25 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: admin login; global Settings no longer showed `רישומים` or `מחלקות`; `צוות ומשתמשים` showed `משתמשים` / `הגדרות`; the `הגדרות` sub-tab showed both worker shifts and departments; no console errors were captured.
 - PR #64:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.
