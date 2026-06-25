@@ -70,6 +70,18 @@ Implementation so far:
 - The screen reuses the existing `SettingsPanel only="users"` and passes `canManageUsers(session)` for edit controls.
 - The full admin dashboard and unrelated modules remain hidden from non-admin managers.
 
+### User-form permissions UX
+
+Status: in progress on branch `codex/collapse-user-permissions-form`.
+
+Goal:
+- Keep advanced personal permissions available without making every manager form very long.
+- Stop responsibility department chips from shifting layout when selected.
+
+Implementation so far:
+- Personal permissions are folded under `הרשאות אישיות`.
+- Selected checkbox chips keep the same text weight to avoid width changes.
+
 ### Worker activation follow-up
 
 Status: done in branch `codex/worker-activation-copy-saved-token`.
