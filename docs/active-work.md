@@ -23,13 +23,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active product branch `codex/enrich-ticket-list-export`.
-- Last synchronized `main` before this entry: `99a8d4d docs: close ticket lifecycle export ledger (#82)`.
+- Status: active product branch `codex/login-identifier-model`.
+- Last synchronized `main` before this entry: `b5a39df feat: enrich regular ticket export (#83)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - extend the regular ticket-list Excel/print export with the same lifecycle fields added to Analytics;
-  - keep current wait reason separate from historical waiting/status durations;
-  - reuse the existing lifecycle export helper instead of adding a second calculation path.
+  - start Topic 3 with a pure/tested identifier resolver before changing the login UI;
+  - resolve email, worker number, and technician code consistently;
+  - block archived users before the password/PIN step.
 
 ### Latest Completed Work
 
@@ -61,6 +61,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - The main `קריאות` sheet now includes fault description, source classification, current wait reason, wait/status duration summaries, equipment wait time, return/rework reason, closure note, and closure quality.
   - A separate `מחזור חיים` sheet now lists one row per ticket status/wait duration.
   - Closed tickets can keep an empty current wait reason while still exposing historical wait time.
+- PR #83: regular ticket-list Excel/print export was enriched with lifecycle fields.
+  - Regular `קריאות` Excel export now includes description, source classification, current wait reason, wait/status duration summaries, equipment wait, return/rework reason, closure note, and closure quality.
+  - Regular print/report preview now includes description, current wait reason, and historical waiting duration.
+  - It reuses the same lifecycle summary helper as Analytics.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -144,6 +148,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
+- Branch `codex/login-identifier-model`:
+  - `npm test -- --run`: passed, 12 files / 37 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: not run; no UI behavior changed.
 - Branch `codex/enrich-ticket-list-export`:
   - `npm test -- --run`: passed, 11 files / 31 tests.
   - `npm run build`: passed.
