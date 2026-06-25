@@ -99,3 +99,4 @@ Current permissions work:
 - Worker activation rules now have a Vitest harness covering unsaved-link copy, unsaved reset-token copy, status labels, activation, and reset.
 - New user saves write module permissions through `perms`; legacy `fleetDocs/fleetTickets` flags are read only as a migration bridge.
 - Legacy permission migration into `perms` is covered by a Vitest harness.
+- `docs/settings-site-map.md` defines current and intended homes for future settings moves.

@@ -30,6 +30,7 @@ Remaining suggested work:
 
 - Replace scattered user-form permission toggles with one permissions concept.
 - Do not create duplicate settings for PPE, fleet docs, fleet tickets, worker activation, or future modules.
+- Use `docs/settings-site-map.md` before moving Settings sections into module pages.
 - Keep roles as defaults and use individual permission overrides for exceptions.
 - Treat "HR" as permissions, not a separate role for now.
 - Plan worker onboarding around activation links and code reset without showing old codes.

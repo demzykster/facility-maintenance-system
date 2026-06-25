@@ -101,7 +101,7 @@ Suggested PR sequence:
 
 ### Settings site map
 
-Status: open, docs-first.
+Status: done in branch `codex/settings-site-map-doc`.
 
 Goal:
 - Document where settings belong before moving sections.
@@ -109,6 +109,10 @@ Goal:
 
 Suggested first PR:
 - Add a short docs section/table describing current and intended homes for global, people, fleet, task, PPE, and maintenance settings.
+
+Implementation:
+- Added `docs/settings-site-map.md`.
+- Use it before implementing Topics 10, 11, or 12.
 
 ### Topic 10 — move task status settings to Tasks
 
