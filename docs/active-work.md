@@ -61,10 +61,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #57: worker activation link copy was hardened.
   - Copying now requires the activation token to already be saved on the worker record.
   - Newly generated reset links must be saved before they can be copied.
-- Current branch `codex/settings-site-map-doc`:
-  - adds `docs/settings-site-map.md`;
-  - marks the Settings site-map backlog item done;
-  - prepares future settings moves without changing UI code.
+- PR #58: Settings site map was documented.
+  - Added `docs/settings-site-map.md`.
+  - Marked the Settings site-map backlog item done.
+  - Prepared future settings moves without changing UI code.
 
 Older completed work is archived in:
 
@@ -102,7 +102,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- Docs-only change. Test/build skipped.
+- No active branch after PR #58 merge.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 
