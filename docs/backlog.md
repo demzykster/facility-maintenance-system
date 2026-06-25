@@ -111,21 +111,21 @@ Remaining:
 
 ### Topic 6 — move worker shifts to user management
 
-Status: open, medium.
+Status: in progress, medium.
 
 Goal:
 - Move `משמרות עבודה (בוקר/לילה)` from global Settings to `צוות ומשתמשים`.
-- Move `מחלקות` into `צוות ומשתמשים` as a separate settings sub-tab per owner decision.
+- Move `מחלקות` into the same `צוות ומשתמשים` settings sub-tab as worker shifts, per owner clarification.
 
 Suggested PR sequence:
 1. Add team-page sub-tabs: users / worker shifts.
 2. Move only worker-shift editor.
-3. Move departments into a separate team-page settings sub-tab.
+3. Move departments into the team-page `הגדרות` sub-tab.
 4. Remove `רישומים` only after it has no remaining editable content.
 
 Implementation so far:
 - PR #75 moved `משמרות עבודה (בוקר/לילה)` into `צוות ומשתמשים`.
-- Departments are still pending for a separate PR.
+- Branch `codex/move-departments-to-team-settings` moves `מחלקות` into the same `הגדרות` sub-tab and removes the empty global `רישומים` tab.
 
 ## Settings / Information Architecture
 
