@@ -4153,9 +4153,9 @@ function computeInsights(tickets, fleet, pm, config) {
   if (pmOver.length >= 3) out.push({ sev: "warn", text: `${pmOver.length} טיפולים תקופתיים באיחור.`, go: "pm" });
   return out.slice(0, 6);
 }
-function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo }) {
+function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo, clearDemo }) {
   const [cfgOpen, setCfgOpen] = useState(false);
-  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoBusy, setDemoBusy] = useState("");
   const [dashTrackLocal, setDashTrackLocal] = useState("all");
   const dashTrack = setCtx ? (ctx || "all") : dashTrackLocal;
   const setDashTrack = setCtx || setDashTrackLocal;
@@ -4220,7 +4220,14 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
         <div className="empty-demo-title">המערכת ריקה כרגע</div>
         <div className="empty-demo-text">טענו נתוני דמו כדי לראות קריאות, כלים, טיפולים, ניקיון וביגוד עובדים בסביבת ההדגמה.</div>
       </div>
-      <button className="btn-primary sm" disabled={demoBusy} onClick={async () => { setDemoBusy(true); try { await loadDemo(); } finally { setDemoBusy(false); } }}>{demoBusy ? "טוען…" : "טען נתוני דמו"}</button>
+      <button className="btn-primary sm" disabled={!!demoBusy} onClick={async () => { setDemoBusy("load"); try { await loadDemo(); } finally { setDemoBusy(""); } }}>{demoBusy === "load" ? "טוען…" : "טען נתוני דמו"}</button>
+    </div>}
+    {demoActive && clearDemo && <div className="empty-demo">
+      <div className="empty-demo-main">
+        <div className="empty-demo-title">נתוני דמו פעילים</div>
+        <div className="empty-demo-text">אפשר למחוק רק את נתוני הדמו. נתונים שהוזנו ידנית לא יימחקו.</div>
+      </div>
+      <ConfirmBtn className="btn-danger sm" label={demoBusy === "clear" ? "מוחק…" : "מחק נתוני דמו"} onConfirm={async () => { setDemoBusy("clear"); try { await clearDemo(); } finally { setDemoBusy(""); } }} />
     </div>}
     <div style={{ marginBottom: 16 }}><SectionTitle><Bell size={15} /> דורש טיפול</SectionTitle>{attn.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>הכל תחת שליטה — אין פריטים שדורשים טיפול דחוף כעת.</div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10, marginTop: 8 }}>{attn.map((a, i) => { const col = a.sev === 2 ? "#DC2626" : a.sev === 1 ? "#D97706" : "#0D9488"; const AIcon = a.Icon; return <button key={i} onClick={a.go} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "start", border: "1px solid var(--border)", borderInlineStartColor: col, borderInlineStartWidth: 3, borderRadius: 10, padding: "10px 12px", background: "var(--surface)", cursor: "pointer" }}><AIcon size={18} color={col} /><span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{a.text}</span><span style={{ fontWeight: 800, fontSize: 18, color: col }}>{a.n}</span></button>; })}</div>}</div>
     
@@ -5276,9 +5283,9 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
 }
 
 function SettingsPanel(p) {
-  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, loadDemo, clearDemo, getBackup, importBackup } = p;
+  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
-  const [demoBusy, setDemoBusy] = useState(""), [showDev, setShowDev] = useState(false), [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
+  const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [openType, setOpenType] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null);
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
   const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftDef, setShiftDef] = useState(config.defaultShiftEnd || "16:30"), [startDef, setStartDef] = useState(config.defaultShiftStart || "07:30"), [lateG, setLateG] = useState(config.lateGraceMin ?? 10), [earlyG, setEarlyG] = useState(config.earlyGraceMin ?? 10);
@@ -5420,12 +5427,6 @@ function SettingsPanel(p) {
         <button className="btn-ghost full" style={{ marginTop: 8 }} onClick={() => setPendImport(null)}>ביטול</button>
       </div>}
       {impMsg && <div className="note" style={{ color: impMsg.includes("✓") ? "#16A34A" : "#DC2626" }}>{impMsg}</div>}
-      <button className="dev-toggle" onClick={() => setShowDev((v) => !v)}>{showDev ? <EyeOff size={14} /> : <Eye size={14} />} פיתוח ובדיקות</button>
-      {showDev && (<div className="dev-box">
-        <div className="hint" style={{ marginBottom: 10 }}>טעינת כלים, קריאות וטיפולים לדוגמה. הנתונים מסומנים כדמו — מחיקה תסיר רק אותם, ולא נתונים שהוזנו ידנית.</div>
-        <button className="btn-primary full" disabled={!!demoBusy} onClick={async () => { setDemoBusy("load"); try { await loadDemo(); } finally { setDemoBusy(""); } }}>{demoBusy === "load" ? "טוען…" : "טען נתוני דמו"}</button>
-        <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label={demoBusy === "clear" ? "מוחק…" : "מחק נתוני דמו"} onConfirm={async () => { setDemoBusy("clear"); try { await clearDemo(); } finally { setDemoBusy(""); } }} />
-      </div>)}
       </>}
       <div style={{ height: 20 }} />
     </>)}

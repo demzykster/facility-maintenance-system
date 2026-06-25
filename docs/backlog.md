@@ -140,13 +140,15 @@ Ship as multiple small PRs, not one refactor.
 
 ### Topic 15 — remove Settings dev/test section
 
-Status: open, small.
+Status: done in branch `codex/remove-settings-dev-section`.
 
 Goal:
 - Remove `פיתוח ובדיקות` from Settings if demo load/clear controls are confirmed available elsewhere.
 
-Pre-check:
-- Confirm home/dashboard demo controls cover the needed demo load/clear path and have confirmation for destructive clearing.
+Implementation:
+- Dashboard now shows demo load when empty and demo cleanup when demo data is active.
+- Settings no longer shows the `פיתוח ובדיקות` section.
+
 
 ## Fleet / Drivers / Transport
 
@@ -173,7 +175,6 @@ Pre-check:
 - Search all hardcoded occurrences and avoid changing unrelated explanatory text where "maintenance" is actually intended.
 
 Next small product candidates:
-- Topic 15, after confirming home/demo controls cover the removed Settings controls.
 - Topic 8, pending driver requests badge.
 
 ## Tickets / Dashboard / Manager View

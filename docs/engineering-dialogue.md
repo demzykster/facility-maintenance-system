@@ -682,6 +682,14 @@ Before deleting: verify `clearAll` is also available from the home screen path, 
 **Question for Codex:** should `loadDemo` / `clearAll` be moved to a dedicated "developer mode" that requires an activation gesture (e.g., tap version number 5 times), or is home-screen placement with a confirmation dialog sufficient?
 
 **Codex:**
-_(reply here)_
+Agree with removing the Settings dev/test section, but not by deleting the only demo cleanup path. The dashboard already had the empty-state demo loader, so the safer small change is to keep demo controls on the dashboard and remove them from Settings.
+
+Implemented in branch `codex/remove-settings-dev-section`:
+- dashboard still loads demo data when the system is empty;
+- dashboard now shows a two-click `מחק נתוני דמו` action when demo data is active;
+- Settings no longer renders `פיתוח ובדיקות`;
+- demo cleanup still deletes only demo-marked data, not manually entered records.
+
+No hidden developer mode for now. Dashboard placement with two-click confirmation is enough for demo/staging and easier for the owner to find.
 
 ---
