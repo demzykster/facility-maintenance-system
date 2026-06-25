@@ -36,10 +36,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Added a Fleet -> Settings sub-tab for vehicle type configuration.
   - Removed vehicle type editing from global Settings.
   - Kept the existing vehicle type config shape and settings-manage gate.
-- Current branch `codex/move-zones-to-maint-settings`:
-  - moves maintenance zones from global Registries to Maintenance settings;
-  - keeps departments in `רישומים`;
-  - does not remove the `רישומים` tab.
+- PR #72: zones moved to Maintenance settings.
+  - Maintenance zones moved from global `רישומים` into `אחזקה`.
+  - Departments stayed in `רישומים`.
+  - The `רישומים` tab was not removed.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.
@@ -123,9 +123,7 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- `npm test -- --run`: passed, 9 files / 25 tests.
-- `npm run build`: passed.
-- Browser smoke-check: admin login, Settings -> `רישומים` showed departments without zones; Settings -> `אחזקה` showed maintenance categories and zones; browser console errors: none.
+- No active product branch after PR #72 merge.
 - PR #64:
   - `npm test -- --run`: passed, 9 files / 25 tests.
   - `npm run build`: passed.

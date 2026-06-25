@@ -172,7 +172,7 @@ Implementation:
 
 ### Topic 12 — split registries
 
-Status: in progress, medium/large.
+Status: partially done in PR #72, medium/large.
 
 Goal:
 - Move zones toward maintenance settings.
@@ -182,7 +182,7 @@ Goal:
 Ship as multiple small PRs, not one refactor.
 
 Implementation so far:
-- Branch `codex/move-zones-to-maint-settings` moves zones into Maintenance settings.
+- PR #72 moved zones into Maintenance settings.
 - Departments stay in `רישומים` for now, per `docs/settings-site-map.md`.
 - The `רישומים` tab is not removed in this step.
 
