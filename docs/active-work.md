@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Notification process coverage
+### Notification task/meeting category
 
-- Status: active branch `codex/fill-notification-process-gaps`.
-- Last synchronized `main` before this entry: `7289cdb Merge pull request #102 from demzykster/codex/close-vercel-skip-ledger`.
+- Status: active branch `codex/notification-task-meeting-category`.
+- Last synchronized `main` before this entry: `edf1094 fix: fill notification process gaps (#103)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - verify why the notification center misses some operational processes;
-  - add the dashboard attention gaps that already have data but were not emitted as bell notifications;
-  - keep the change small and avoid changing SLA/status timer semantics.
+  - stop management tasks and meetings from appearing under maintenance-treatment or escalation categories;
+  - add a dedicated `מטלות ופגישות` notification category;
+  - keep clicks routed to the existing Tasks module without changing task data.
 
 ### Latest Completed Work
 
+- PR #103: notification process coverage was improved.
+  - Added aggregated admin notifications for monthly vehicle inspections, pending PPE requests, PPE stock shortages, and PPE orders waiting receipt.
+  - Updated notification category labels/settings for vehicle checks, driver, PPE, and cleaning.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #101: Vercel skip rule was documented.
   - Vercel project settings now skip builds when the commit message contains `[skip vercel]` or `[skip deploy]`.
   - Docs-only and ledger-only PRs should include `[skip vercel]` in the commit message and PR title when no preview deployment is needed.
@@ -166,6 +170,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/notification-task-meeting-category`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: local app rendered at `http://127.0.0.1:5188/`; notification panel opened; task/meeting notification rendered with `.ni-dot.task` and remained clickable to the Tasks module; no app error was visible.
 
 Branch `codex/fill-notification-process-gaps`:
 

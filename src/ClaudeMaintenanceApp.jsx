@@ -975,6 +975,7 @@ const NOTIF_KINDS = [
   { kind: "confirm", label: "ממתינה לאישור / נוכחות" },
   { kind: "sla", label: "חריגת SLA" },
   { kind: "escalate", label: "הסלמות / כלי לא הועבר" },
+  { kind: "task", label: "מטלות ופגישות" },
   { kind: "pm", label: "טיפולים תקופתיים" },
   { kind: "doc", label: "מסמכים ובקרת כלים" },
   { kind: "driver", label: "נהגים ושיבוצים" },
@@ -986,8 +987,8 @@ const NOTIF_KIND_LABEL = (k) => (NOTIF_KINDS.find((x) => x.kind === k) || {}).la
 const DEFAULT_NOTIF_PREFS = { sort: "newest", group: false, hidden: {} };
 function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const ev = []; const vis = visibleTickets(session, tickets, fleet);
-  (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "escalate", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "pm", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "pm", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
-  (meetings || []).forEach((m) => { if (m.status !== "planned") return; if (!(m.ownerId === session.id || (m.participantIds || []).includes(session.id))) return; const dt = m.at - Date.now(); if (dt > -3600000 && dt < 24 * 3600000) ev.push({ key: "mtg-" + m.id, at: m.at, kind: "pm", go: "tasks", title: `פגישה קרובה · ${m.title}`, body: `${fmtDate(m.at)} ${fmtTime(m.at)}` }); });
+  (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "task", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
+  (meetings || []).forEach((m) => { if (m.status !== "planned") return; if (!(m.ownerId === session.id || (m.participantIds || []).includes(session.id))) return; const dt = m.at - Date.now(); if (dt > -3600000 && dt < 24 * 3600000) ev.push({ key: "mtg-" + m.id, at: m.at, kind: "task", go: "tasks", title: `פגישה קרובה · ${m.title}`, body: `${fmtDate(m.at)} ${fmtTime(m.at)}` }); });
   const shiftEvents = (go) => {
     const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false);
     const workday = isShiftWorkday();
@@ -5438,7 +5439,7 @@ function SettingsPanel(p) {
   const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
   const TW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"], ["presence", "כפתור משמרת"]];
   const MW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"]];
-  const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["doc", "מסמכים ובקרת כלים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"], ["driver", "נהגים ושיבוצים"], ["ppe", "ביגוד עובדים"], ["cleaning", "ניקיון וסבבים"]];
+  const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["task", "מטלות ופגישות"], ["doc", "מסמכים ובקרת כלים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"], ["driver", "נהגים ושיבוצים"], ["ppe", "ביגוד עובדים"], ["cleaning", "ניקיון וסבבים"]];
   const WAIT_BALL_OPTIONS = [["executor", "המבצע"], ["manager", "מנהל המחלקה"], ["admin", "מנהל מערכת"]];
   const WAIT_SETTER_OPTIONS = [["both", "טכנאי + מנהל"], ["tech", "טכנאי בלבד"], ["manager", "מנהל בלבד"]];
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
@@ -6785,7 +6786,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .notif-item{display:flex;gap:11px;width:100%;text-align:right;padding:11px;border-radius:11px;color:var(--ink);}
 .notif-item:hover{background:var(--surface-2);}
 .ni-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0;background:var(--muted);}
-.ni-dot.new{background:#2563EB;}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:#4F46E5;}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:#0EA5E9;}.ni-dot.doc{background:#EA580C;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}.ni-dot.ppe{background:#64748B;}
+.ni-dot.new{background:#2563EB;}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:#4F46E5;}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:#0EA5E9;}.ni-dot.task{background:#7C3AED;}.ni-dot.doc{background:#EA580C;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}.ni-dot.ppe{background:#64748B;}
 .ni-dot.cleaning{background:#0EA5E9;}
 .notif-item.clk{cursor:pointer;}.notif-item .ni-go{color:var(--muted);align-self:center;flex-shrink:0;opacity:.6;}
 .icon-btn.on2{background:var(--primary-soft,#FFF4ED);color:var(--primary);}
