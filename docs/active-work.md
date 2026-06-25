@@ -50,6 +50,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #53: transport nav label was renamed.
   - `כלים ותחזוקה` became `כלי שינוע` in the main nav and matching department/manager sub-tab.
   - Topic #14 was recorded in `docs/engineering-dialogue.md`.
+- Current branch `codex/remove-settings-dev-section`:
+  - moves demo cleanup out of Settings and onto the dashboard demo banner;
+  - removes the Settings `פיתוח ובדיקות` section;
+  - records the new rule that active-work updates should usually travel with the product PR, not as a follow-up ledger-only PR.
 
 Older completed work is archived in:
 
@@ -58,15 +62,14 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-After this ledger sync is merged:
+After this PR is merged:
 
 1. Sync latest `main`.
 2. Read `docs/active-work.md` and `docs/backlog.md`.
-3. Continue with one small product PR from the backlog, preferably:
-   - Topic #15: remove `פיתוח ובדיקות` from Settings after confirming home/demo controls; or
-   - Topic #8: pending driver requests badge.
+3. Continue with one small product PR from the backlog, preferably Topic #8:
+   - pending driver requests badge on `נהגים / כיסוי`.
 4. Run `npm test -- --run`, `npm run build`, and a browser smoke-check for any UI change.
-5. Update this ledger after merge.
+5. Update this ledger in the same PR as the code when the active state changes.
 
 ## Last Validation
 
@@ -86,6 +89,12 @@ Topic #14 validation before PR #53:
 - `npm test -- --run`: passed, 8 files / 21 tests.
 - `npm run build`: passed.
 - Browser smoke-check: admin login showed `כלי שינוע`, the old `כלים ותחזוקה` label was not visible, and no console errors were captured.
+
+Current branch validation:
+
+- `npm test -- --run`: passed, 8 files / 21 tests.
+- `npm run build`: passed.
+- Browser smoke-check: dashboard shows active demo cleanup, Settings no longer shows `פיתוח ובדיקות`, backup/restore remains visible, and no console errors were captured.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 
