@@ -23,13 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: active product branch `codex/enrich-ticket-lifecycle-export`.
-- Last synchronized `main` before this entry: `60eca97 docs: close transport duplicate ledger (#80)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `be31c79 feat: enrich ticket lifecycle export (#81)`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - enrich the Analytics ticket Excel export from current-state rows into lifecycle-aware reporting;
-  - preserve the current-state wait reason but add historical waiting/status durations;
-  - include fault description, source classification, return/rework reason, closure note, and closure quality.
+  - close the ledger after PR #81;
+  - continue future work from `docs/backlog.md`.
 
 ### Latest Completed Work
 
@@ -57,6 +56,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Open tickets on the same selected transport unit block as likely duplicates.
   - If no open ticket exists, recent closed tickets for that same unit are shown as history.
   - Broad keyword similarity is no longer used when opening transport tickets.
+- PR #81: Analytics ticket Excel export was enriched with lifecycle reporting.
+  - The main `קריאות` sheet now includes fault description, source classification, current wait reason, wait/status duration summaries, equipment wait time, return/rework reason, closure note, and closure quality.
+  - A separate `מחזור חיים` sheet now lists one row per ticket status/wait duration.
+  - Closed tickets can keep an empty current wait reason while still exposing historical wait time.
 - PR #68: task status settings moved to the Tasks module.
   - Added a Tasks -> Settings sub-tab for task status labels/colors.
   - Removed task status editing from global Settings.

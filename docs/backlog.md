@@ -259,17 +259,21 @@ Related follow-up:
 
 ### Ticket lifecycle Excel export
 
-Status: in progress on branch `codex/enrich-ticket-lifecycle-export`.
+Status: done in PR #81.
 
 Goal:
 - Keep the ticket export useful for CMMS decisions, not just a current-state table.
 - Closed tickets should still expose historical waits and status timing.
 - Avoid turning the main sheet into noise by adding a separate lifecycle sheet for per-status/per-waiting durations.
 
-Implementation so far:
+Implementation:
 - Added a pure lifecycle export helper and unit tests.
 - Analytics Excel export now adds description, source classification, waiting/status duration summaries, equipment-wait time, return reason, closure note, and closure quality.
 - Analytics Excel export now adds a `מחזור חיים` sheet with one row per ticket status/waiting duration.
+
+Remaining:
+- None for the Analytics lifecycle export pass.
+- The regular ticket-list Excel/print export can be reviewed separately if it needs the same lifecycle fields.
 
 ### Ticket-card second pass
 
