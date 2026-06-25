@@ -21,18 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Ignore legacy technician shiftId
+### Backlog-driven product work
 
-- Status: branch `codex/ignore-legacy-tech-shiftid` in progress.
-- Last synchronized `main` before this entry: `f4d661b Merge pull request #65 from demzykster/codex/close-individual-tech-shift-ledger`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `856c3df fix: ignore legacy technician shift id`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - finish Topic #5 legacy cleanup from `docs/backlog.md`;
-  - keep technician shifts individual-only;
-  - stop carrying legacy technician `shiftId` into the active session.
+  - continue backlog-driven work from `docs/backlog.md`;
+  - keep the ledger accurate after PR #66.
 
 ### Latest Completed Work
 
+- PR #66: legacy technician `shiftId` was ignored in runtime session logic.
+  - Technician login no longer carries `shiftId` into the active session.
+  - Admin impersonation as technician no longer carries `shiftId`.
+  - Stored legacy values can remain until a technician record is edited and saved.
 - PR #62: active ledger was closed after PR #61.
   - Topic #4 helper foundation was marked done.
   - The active branch was reset to no active product branch.
@@ -84,11 +87,9 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-1. Finish branch `codex/ignore-legacy-tech-shiftid`.
-2. Run `npm test -- --run`.
-3. Run `npm run build`.
-4. Open and merge one small PR if validation passes.
-5. After merge, close this ledger item and continue with the next smallest backlog item.
+1. Sync latest `main`.
+2. Continue with the next smallest item from `docs/backlog.md`.
+3. Update this ledger in the same PR as the code when the active state changes.
 
 ## Last Validation
 
