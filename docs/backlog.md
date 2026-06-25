@@ -80,16 +80,24 @@ Implementation so far:
 Remaining:
 - Wire the helper into the technician scheduling/SLA path only after the exact UI/business placement is chosen.
 
-### Topic 5 — technician shift assignment sync gap
+### Topic 5 — technician individual shift settings
 
-Status: open, medium.
+Status: direction clarified, open.
 
 Goal:
-- Avoid hidden divergence between manual `shiftStart`/`shiftEnd` and global `config.shifts`.
+- Keep each technician shift as an individual setting in that technician's profile.
+- Do not create a global technician shift list.
+- Avoid hidden divergence between profile-level `shiftStart`/`shiftEnd` and any older `shiftId`/global-shift remnants.
+
+Owner decision:
+- Technician shifts are individual only.
+- A technician's shift is assigned per technician in the profile/settings form.
+- Global shift lists can exist for workers if needed, but not for technicians.
 
 Suggested direction:
-- Prefer an explicit "not assigned" state when global shifts exist but a technician has no `shiftId`.
-- Preserve existing manual times as migration fallback until a shift is assigned.
+- Treat `shiftStart` and `shiftEnd` on the technician user record as the source of truth.
+- Remove or ignore technician `shiftId` UI paths after checking existing data compatibility.
+- Preserve existing manual times as the migration fallback.
 
 ### Topic 6 — move worker shifts to user management
 
