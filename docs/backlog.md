@@ -272,6 +272,20 @@ Next small product candidates:
 
 ## Tickets / Dashboard / Manager View
 
+### SLA / stage timing model
+
+Status: planning contract added in `docs/sla-stage-model.md`.
+
+Goal:
+- Treat SLA as more than one final due date.
+- Preserve the existing `statusMs` / `statusSince` lifecycle model.
+- Add a pure normalized lifecycle-stage helper before changing dashboard/analytics UI.
+
+Suggested first code PR:
+1. Add a pure helper that returns normalized ticket stages from `statusMs`, current status, waiting reason, equipment wait, return/rework, and closure fields.
+2. Cover it with unit tests.
+3. Reuse it in export/dashboard only after the helper contract is stable.
+
 ### Transport duplicate check
 
 Status: done in PR #79.
