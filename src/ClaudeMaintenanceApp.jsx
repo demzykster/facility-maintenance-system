@@ -976,7 +976,7 @@ const NOTIF_KINDS = [
   { kind: "sla", label: "חריגת SLA" },
   { kind: "escalate", label: "הסלמות / כלי לא הועבר" },
   { kind: "pm", label: "טיפולים תקופתיים" },
-  { kind: "doc", label: "מסמכים ורישוי" },
+  { kind: "doc", label: "מסמכים ובקרת כלים" },
   { kind: "driver", label: "נהגים ושיבוצים" },
   { kind: "ppe", label: "ביגוד עובדים" },
   { kind: "cleaning", label: "ניקיון וסבבים" },
@@ -984,7 +984,7 @@ const NOTIF_KINDS = [
 ];
 const NOTIF_KIND_LABEL = (k) => (NOTIF_KINDS.find((x) => x.kind === k) || {}).label || k;
 const DEFAULT_NOTIF_PREFS = { sort: "newest", group: false, hidden: {} };
-function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = []) {
+function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const ev = []; const vis = visibleTickets(session, tickets, fleet);
   (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "escalate", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "pm", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "pm", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
   (meetings || []).forEach((m) => { if (m.status !== "planned") return; if (!(m.ownerId === session.id || (m.participantIds || []).includes(session.id))) return; const dt = m.at - Date.now(); if (dt > -3600000 && dt < 24 * 3600000) ev.push({ key: "mtg-" + m.id, at: m.at, kind: "pm", go: "tasks", title: `פגישה קרובה · ${m.title}`, body: `${fmtDate(m.at)} ${fmtTime(m.at)}` }); });
@@ -1028,6 +1028,15 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
     tickets.filter((t) => needsHandler(t, users, fleet)).forEach((t) => ev.push({ key: "orphan-" + t.id, at: t.createdAt, ticketId: t.id, kind: "escalate", go: "tickets", title: `קריאה ללא מטפל · #${ticketNo(t)}`, body: `${t.subject} — ${t.assignee ? "המטפל אינו פעיל עוד" : "אין טכנאי פעיל לקבל"}. נדרש שיבוץ.` }));
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי קרוב", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
     pendingDriverReqs(fleet).forEach(({ unit, cat, driver }) => ev.push({ key: "drvreq-" + unit.id + cat, at: driver.reqAt || Date.now(), kind: "driver", go: "fleet", title: driver.status === "pending_add" ? "בקשת הוספת נהג — ממתין לאישורך" : "בקשת העברת נהג — ממתין לאישורך", body: `${driver.name} · ${unit.code} (${driverShiftMeta(cat).label})${driver.status === "pending_move" && driver.moveTo ? ` → ${driver.moveTo.unitCode}` : ""}${driver.needsChip ? " · צריך להנפיק צ׳יפ" : ""} · מ-${driver.addedByName || "מנהל"}` }));
+    { const lastInsp = {}; (insp || []).forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
+      const due = (fleet || []).filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
+      if (due.length) ev.push({ key: "inspdue-admin", at: Date.now(), kind: "doc", go: "fleet", title: "בקרת כלים חודשית חסרה", body: `${due.length} כלים ממתינים לבקרה חודשית` }); }
+    { const pend = (ppeReqs || []).filter((r) => r.status === "pending" || r.status === "worker_sign");
+      if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", title: "בקשות ביגוד ממתינות", body: `${pend.length} בקשות לאישור או חתימת עובד` }); }
+    { const low = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
+      if (low.length) ev.push({ key: "ppe-low-admin", at: Date.now(), kind: "ppe", go: "ppe", title: "חוסרי ביגוד לפי מידה", body: `${low.length} פריטים מתחת למינימום` }); }
+    { const openOrders = (ppeOrders || []).filter((o) => o.status === "sent");
+      if (openOrders.length) ev.push({ key: "ppe-orders-admin", at: Math.max(...openOrders.map((o) => o.sentAt || o.createdAt || 0)), kind: "ppe", go: "ppe", title: "הזמנות ביגוד ממתינות לקליטה", body: `${openOrders.length} הזמנות רכש פתוחות` }); }
     ev.push(...buildPpeApprovedEvents(ppeReqs));
     shiftEvents("team");
     { const nowTs = Date.now(); (zones || []).filter((z) => z.active !== false).forEach((z) => { const absent = isAbsentOn(z.cleanerId, absences); zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => { if (status === "missed") ev.push({ key: `clmiss-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) + (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: absent ? "סבב ניקיון — נדרש כיסוי (העובד בחופשה)" : "סבב ניקיון פוספס", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}${z.cleanerName ? " · " + z.cleanerName : ""}` }); }); }); }
@@ -1054,7 +1063,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
   }
   return ev.sort((a, b) => b.at - a.at);
 }
-function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = []) {
+function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const skey = `seen:${session.role}:${session.name}`;
   const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
   const [lastSeen, setLastSeen] = useState(null), [toast, setToast] = useState(null);
@@ -1063,7 +1072,7 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   useEffect(() => { store.get(skey, false).then((v) => setLastSeen(v ? Number(v) : 0)); }, [skey]);
   useEffect(() => { store.get(pkey, false).then((v) => { if (v) try { const p = JSON.parse(v); setPrefsState({ ...DEFAULT_NOTIF_PREFS, ...p, hidden: p.hidden || {} }); } catch (e) {} }); }, [pkey]);
   const setPrefs = (patch) => setPrefsState((p) => { const np = { ...p, ...patch }; store.set(pkey, JSON.stringify(np), false); return np; });
-  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs]);
+  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
   const unread = lastSeen == null ? 0 : visible.filter((e) => e.at > lastSeen).length;
@@ -4080,7 +4089,7 @@ function PpeHub(p) {
 function AdminApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
   const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null);
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs);
+  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const clearTicketFilter = () => setTFilter(null);
@@ -5429,7 +5438,7 @@ function SettingsPanel(p) {
   const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
   const TW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"], ["presence", "כפתור משמרת"]];
   const MW_DEFS = [["tickets", "קריאות"], ["pm", "לוח טיפולים"], ["sla", "חריגות SLA"]];
-  const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["doc", "תוקף מסמכים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"]];
+  const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["doc", "מסמכים ובקרת כלים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"], ["driver", "נהגים ושיבוצים"], ["ppe", "ביגוד עובדים"], ["cleaning", "ניקיון וסבבים"]];
   const WAIT_BALL_OPTIONS = [["executor", "המבצע"], ["manager", "מנהל המחלקה"], ["admin", "מנהל מערכת"]];
   const WAIT_SETTER_OPTIONS = [["both", "טכנאי + מנהל"], ["tech", "טכנאי בלבד"], ["manager", "מנהל בלבד"]];
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
@@ -6776,7 +6785,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .notif-item{display:flex;gap:11px;width:100%;text-align:right;padding:11px;border-radius:11px;color:var(--ink);}
 .notif-item:hover{background:var(--surface-2);}
 .ni-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0;background:var(--muted);}
-.ni-dot.new{background:#2563EB;}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:#4F46E5;}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:#0EA5E9;}.ni-dot.doc{background:#EA580C;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}
+.ni-dot.new{background:#2563EB;}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:#4F46E5;}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:#0EA5E9;}.ni-dot.doc{background:#EA580C;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}.ni-dot.ppe{background:#64748B;}
 .ni-dot.cleaning{background:#0EA5E9;}
 .notif-item.clk{cursor:pointer;}.notif-item .ni-go{color:var(--muted);align-self:center;flex-shrink:0;opacity:.6;}
 .icon-btn.on2{background:var(--primary-soft,#FFF4ED);color:var(--primary);}

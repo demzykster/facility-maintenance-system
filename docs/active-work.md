@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Backlog-driven product work
+### Notification process coverage
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `42c7962 Merge pull request #101 from demzykster/codex/document-vercel-skip`.
+- Status: active branch `codex/fill-notification-process-gaps`.
+- Last synchronized `main` before this entry: `7289cdb Merge pull request #102 from demzykster/codex/close-vercel-skip-ledger`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - close the ledger after PR #101;
-  - continue future work from `docs/backlog.md` and the owner discussion about status/stage analytics.
+  - verify why the notification center misses some operational processes;
+  - add the dashboard attention gaps that already have data but were not emitted as bell notifications;
+  - keep the change small and avoid changing SLA/status timer semantics.
 
 ### Latest Completed Work
 
@@ -165,6 +166,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/fill-notification-process-gaps`:
+
+- `npm test -- --run`: passed, 12 files / 37 tests.
+- `npm run build`: passed.
+- Browser smoke-check: local app rendered at `http://127.0.0.1:5188/`; notification panel opened; dashboard-only process gaps now appear as aggregated notifications for monthly vehicle inspections and PPE stock shortages without flooding the list; no app error was visible.
 
 Branch `codex/clarify-wait-reasons-settings`:
 
