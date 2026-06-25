@@ -63,7 +63,7 @@ Implementation:
 
 ### Topic 4 — per-technician tolerance overrides
 
-Status: foundation helper in progress.
+Status: foundation helper done in PR #61.
 
 Goal:
 - Keep global late/early tolerance as default.
