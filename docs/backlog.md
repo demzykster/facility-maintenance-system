@@ -164,7 +164,7 @@ Implementation notes:
 
 ### Topic 14 — rename navigation
 
-Status: open, very small.
+Status: done in PR #53.
 
 Goal:
 - Rename `כלים ותחזוקה` to `כלי שינוע` wherever it is a user-facing transport module label.
@@ -172,8 +172,9 @@ Goal:
 Pre-check:
 - Search all hardcoded occurrences and avoid changing unrelated explanatory text where "maintenance" is actually intended.
 
-Suggested first product PR after this backlog:
-- Topic 14, because it is the smallest isolated change.
+Next small product candidates:
+- Topic 15, after confirming home/demo controls cover the removed Settings controls.
+- Topic 8, pending driver requests badge.
 
 ## Tickets / Dashboard / Manager View
 

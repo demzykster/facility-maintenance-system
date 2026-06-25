@@ -44,6 +44,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #51: handoff token load was reduced.
   - `docs/active-work.md` and `docs/handoff-for-next-codex.md` were shortened.
   - Historical progress and validation moved to `docs/archive/`.
+- PR #52: `docs/backlog.md` was added.
+  - Open audit/permissions/onboarding tasks are now grouped by code area.
+  - Worker activation UI wiring was verified before product work.
+- PR #53: transport nav label was renamed.
+  - `כלים ותחזוקה` became `כלי שינוע` in the main nav and matching department/manager sub-tab.
+  - Topic #14 was recorded in `docs/engineering-dialogue.md`.
 
 Older completed work is archived in:
 
@@ -52,12 +58,13 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
-After `docs/backlog.md` is merged:
+After this ledger sync is merged:
 
 1. Sync latest `main`.
 2. Read `docs/active-work.md` and `docs/backlog.md`.
-3. Start with a very small product PR from the backlog, preferably Topic #14:
-   - rename the transport nav label from `כלים ותחזוקה` to `כלי שינוע`.
+3. Continue with one small product PR from the backlog, preferably:
+   - Topic #15: remove `פיתוח ובדיקות` from Settings after confirming home/demo controls; or
+   - Topic #8: pending driver requests badge.
 4. Run `npm test -- --run`, `npm run build`, and a browser smoke-check for any UI change.
 5. Update this ledger after merge.
 
@@ -73,6 +80,12 @@ Backlog planning verification on branch `codex/create-backlog-plan`:
 
 - Code check: worker activation status, create/reset button, and saved-worker copy-link control are wired in `src/ClaudeMaintenanceApp.jsx`.
 - Browser smoke-check: admin login, team screen, department worker list, and worker edit form rendered; worker login state and create-link controls were visible; no console errors were captured.
+
+Topic #14 validation before PR #53:
+
+- `npm test -- --run`: passed, 8 files / 21 tests.
+- `npm run build`: passed.
+- Browser smoke-check: admin login showed `כלי שינוע`, the old `כלים ותחזוקה` label was not visible, and no console errors were captured.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 
