@@ -23,15 +23,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Backlog-driven product work
 
-- Status: backlog prepared in branch `codex/create-backlog-plan`; after merge, continue from `docs/backlog.md`.
-- Last synchronized `main` before this entry: `3504e43 docs: reduce handoff token load (#51)`.
+- Status: active branch `codex/technician-tolerance-model`.
+- Last synchronized `main` before this entry: `4567926 Merge pull request #60 from demzykster/codex/update-handoff-backlog-guidance`.
 - Open PRs when this entry was started: none.
 - Purpose:
-  - use `docs/backlog.md` as the grouped working task list;
-  - keep product PRs small and backlog-driven;
-  - start with the smallest isolated product change.
+  - implement the first small Topic #4 foundation step;
+  - add a pure/tested technician tolerance fallback helper;
+  - avoid UI wiring until the business placement is clearer.
 
 ### Latest Completed Work
+
+- PR #60: handoff backlog guidance was updated.
+  - Removed completed starter suggestions from `docs/handoff-for-next-codex.md`.
+  - Added the rule that active-work updates travel with the same code PR.
 
 - PR #48: worker activation seeding was added.
   - New worker/cleaner forms seed an activation token when the editor has `workerAccess:manage`.
@@ -73,13 +77,18 @@ Older completed work is archived in:
 
 ## Next Exact Action
 
+Before this PR is merged:
+
+1. Run `npm test -- --run`.
+2. Run `npm run build`.
+3. Open PR for `codex/technician-tolerance-model`.
+4. No browser smoke-check is required unless UI wiring is added.
+
 After this PR is merged:
 
 1. Sync latest `main`.
-2. Read `docs/active-work.md` and `docs/backlog.md`.
-3. Continue with one small product PR from `docs/backlog.md`.
-4. Run `npm test -- --run`, `npm run build`, and a browser smoke-check for any UI change.
-5. Update this ledger in the same PR as the code when the active state changes.
+2. Continue with the next smallest item from `docs/backlog.md`.
+3. Update this ledger in the same PR as the code when the active state changes.
 
 ## Last Validation
 
@@ -102,7 +111,10 @@ Topic #14 validation before PR #53:
 
 Current branch validation:
 
-- No active branch after PR #58 merge.
+- `codex/technician-tolerance-model`:
+  - `npm test -- --run`: passed, 9 files / 25 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: not run; no UI behavior changed.
 
 For docs-only changes, test/build may be skipped if the diff is only documentation. For code changes, run:
 
