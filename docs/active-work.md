@@ -21,22 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/prefer-assigned-cleaner-smoke
+### Active branch: none
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `ba1936a docs: close permission route ledger (#195)`.
+- Status: main is clean after closing the R4 permissions package.
+- Latest synchronized `main`: `e0af210 fix: prefer assigned cleaner in role switch (#196)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - role-by-role smoke found that admin role-switch can pick a cleaner with no assigned zones.
-  - prefer an assigned cleaner for the demo/smoke role-switch, while keeping the existing fallback if none exists.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser role-smoke: admin, manager, technician, and worker shells rendered expected screens with no console errors.
-  - browser role-smoke: cleaner shell rendered cleanly with no console errors; current local data still shows the empty-zone state when no assigned cleaner is available.
+  - R4 Permissions And Role Reality Check is closed.
+  - next release package is R5 Screen Audit And Visual Noise.
 
 ## Latest Completed Work
 
+- PR #196: Admin role-switch now prefers an assigned cleaner when available.
+  - Role-smoke passed for admin, manager, technician, and worker.
+  - Cleaner shell rendered cleanly; when no assigned cleaner exists in current local data, the empty-zone state is expected.
+  - Vercel was rate-limited, but local tests/build/browser role-smoke passed before merge.
 - PR #194: Manager/user PPE management access is now directly visible when permitted.
   - `ביגוד עובדים` appears in the manager/user sidebar only for `ppe:manage` or `ppe:full`.
   - Ordinary request-only managers remain on the existing department/PPE request path to avoid sidebar noise.
@@ -88,11 +87,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Run a focused role-by-role smoke pass for R4:
-   admin, manager, technician, worker, cleaner.
-2. Verify expected module paths and read-only/manage boundaries for:
-   `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, `כלי שינוע`, `אנליטיקה`, `ספקים / קבלנים`, `הגדרות`, `יומן פעילות`.
-3. If smoke is clean, close R4 in `docs/release-checklist.md`; if not, fix the smallest concrete gap first.
+1. Continue R5 Screen Audit And Visual Noise.
+2. Start with `קריאות`: verify list filters, active drill-down banner, card labels, and reset behavior after analytics/dashboard navigation.
+3. If a critical bug appears, fix the smallest concrete bug before broader polish.
 
 ## Documentation Policy
 
