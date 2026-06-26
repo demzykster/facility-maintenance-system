@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/dashboard-lifecycle-bottlenecks`
+### Active branch: `codex/operational-sla-helper`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `a93973e docs: close lifecycle export ledger [skip vercel] (#118)`.
+- Last synchronized `main` before this entry: `53fc930 feat: add dashboard lifecycle bottleneck drilldown (#119)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - add a compact Dashboard block for current lifecycle bottlenecks;
-  - let the owner click a stuck stage and open `קריאות` filtered by the same lifecycle-stage contract used by Analytics/Excel;
-  - keep this PR UI-only and reuse existing lifecycle helpers.
+  - make operational SLA calculations use one helper that subtracts paused waiting time;
+  - align open-ticket SLA breach, closed-ticket analytics compliance, long-treatment analytics, and SLA bar progress;
+  - keep this as a helper-first stabilization step before bigger SLA/stage UI changes.
 - Validation so far:
-  - `npm test -- --run`: passed, 12 files / 42 tests.
+  - `npm test -- --run`: passed, 13 files / 45 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: dashboard showed lifecycle bottleneck chips; clicking `לא התקבל הכלי` opened `קריאות` with `מציג: שלב · לא התקבל הכלי` and one matching ticket (`T-909`); no console errors were captured.
+  - Browser smoke-check: dashboard reloaded, Analytics opened, SLA compliance/paused-time/long-treatment sections rendered, and no console errors were captured.
 
 ### Latest Completed Work
 
+- PR #119: Dashboard lifecycle bottleneck drill-down was added.
+  - Dashboard now shows compact current-stage chips under KPI quick filters.
+  - Clicking a chip opens `קריאות` filtered by `focus.lifecycleKey`.
+  - Browser smoke-check confirmed `לא התקבל הכלי` opened `T-909`; Vercel was green before merge.
 - PR #118: active-work ledger was closed after lifecycle export.
   - Local `main` and `origin/main` were synchronized at `a93973e`.
   - No product behavior changed.
