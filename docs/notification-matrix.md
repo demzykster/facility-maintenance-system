@@ -16,7 +16,7 @@ Source of truth in code:
 - `go: "cleaning"` opens `בקרת ניקיון`.
 - `go: "pm"` opens `כלי שינוע` with PM tab.
 - `go: "insp"` opens `כלי שינוע` with inspection tab.
-- `go: "fleet"` opens `כלי שינוע` with fleet tab.
+- `go: "fleet"` opens `כלי שינוע` with fleet tab; `fleetId` opens the exact unit card when present.
 - Unknown or missing `go` falls back to `לוח בקרה` or does nothing.
 
 ## Role Coverage
@@ -28,11 +28,11 @@ Source of truth in code:
 | admin | no-equipment waiting | `escalate` | exact ticket via `ticketId` | none found |
 | admin | SLA breach | `sla` | exact ticket via `ticketId` | none found |
 | admin | critical downtime escalation | `escalate` | exact ticket via `ticketId` | none found |
-| admin | fleet documents | `doc` | fleet tab via `go: "fleet"` | should eventually focus the unit |
+| admin | fleet documents | `doc` | exact unit card via `go: "fleet"` + `fleetId` | fixed after matrix creation |
 | admin | blocked fleet unit | `escalate` | exact ticket via `ticketId` | `go: "fleet"` is unused because `ticketId` wins |
 | admin | orphan ticket | `escalate` | exact ticket via `ticketId` | none found |
 | admin | PM due soon | `pm` | PM tab via `go: "pm"` | none found |
-| admin | driver requests | `driver` | fleet tab via `go: "fleet"` | should eventually focus the unit/request |
+| admin | driver requests | `driver` | exact unit card via `go: "fleet"` + `fleetId` | fixed after matrix creation |
 | admin | inspection due | `doc` | inspection tab via `go: "insp"` | none found |
 | admin | PPE requests/stock/orders | `ppe` | PPE module via `go: "ppe"` | should eventually focus the relevant tab/list |
 | admin | technician shift exceptions | `confirm` / `escalate` / `back` | team page via `go: "team"` | fixed after matrix creation |

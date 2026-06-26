@@ -21,16 +21,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### No active product branch
+### Active branch: codex/fleet-notification-focus, if PR is still open
 
-- Status: main is clean after the R3 notification route matrix correction.
-- Last synchronized `main` before this entry: `58037cb docs: correct dept notification route matrix (#183)`.
+- Status: ready for PR after local validation.
+- Last synchronized `main` before this entry: `af79b7f docs: close notification matrix ledger (#184)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-- continue R3 Notifications End-To-End from `docs/notification-matrix.md`.
-- Completed validation for the last docs correction:
-  - `git diff --check`
-  - browser/code inspection already verified `UserApp` maps unknown/dept notification routes to `המחלקה שלי` equipment tab.
+- focus admin fleet document and driver request notifications on the exact unit card when `fleetId` is available.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check `כלי שינוע` module opens with current data.
+  - code-path check: `NotifPanel` now passes the full event to `onGo`, and admin `go: "fleet"` forwards `fleetId` to `goAsset`.
 
 ## Latest Completed Work
 
@@ -132,8 +134,8 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Continue R3 by improving focus targets inside fleet/PPE notifications.
-2. Start with a small, verifiable focus target such as fleet document notifications opening the exact unit card.
+1. If branch `codex/fleet-notification-focus` is still open, review/merge it.
+2. If it is merged, continue R3 by improving PPE notification focus targets.
 3. Keep each route/focus fix in a separate small PR.
 
 ## Documentation Policy
