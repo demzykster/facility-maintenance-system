@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/clarify-ppe-catalog-add-action
+### Active branch: codex/clarify-ppe-orders-empty-copy
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `4e3894d fix: guide empty ppe catalog action (#202)`.
+- Latest synchronized `main`: `9c5b156 fix: clarify ppe catalog add action (#203)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - make the PPE catalog add action read as an action, not a generic `פריט` label.
-  - keep catalog form behavior unchanged.
+  - make the empty purchase-order copy match where the block is shown.
+  - avoid references to unavailable actions in the embedded movement-log order block.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: PPE catalog shows `הוסף פריט`, no longer shows a visible generic `פריט` button, and opens the `פריט חדש` form.
+  - browser smoke-check: PPE movement-log order block shows the corrected empty-state copy and no longer shows the old `«הזמנה» ליצירה ידנית` text.
 
 ## Latest Completed Work
 
+- PR #203: PPE catalog add action now reads clearly.
+  - The catalog button changed from generic `פריט` to `הוסף פריט`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #202: Empty PPE catalog now guides users to catalog setup.
   - The dashboard shows `הוסף פריט לקטלוג` instead of a visible purchase-order action when there are no active catalog items.
   - The purchase-order action now redirects to catalog setup if no active items exist.

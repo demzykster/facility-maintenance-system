@@ -4050,6 +4050,7 @@ function PpeOrders({ orders, items, config, session, savePpeOrder, delPpeOrder, 
   const all = (orders || []).slice();
   const live = all.filter((o) => o.status === "draft" || o.status === "sent").sort((a, b) => b.createdAt - a.createdAt);
   const done = all.filter((o) => o.status === "received" || o.status === "cancelled").sort((a, b) => (b.closedAt || b.createdAt) - (a.closedAt || a.createdAt));
+  const emptySub = embedded ? "יצירת הזמנה חדשה מתבצעת מלוח המלאי. כאן יופיעו הזמנות פתוחות לקליטה ומעקב." : "לחצו «צור הזמנת רכש» כדי ליצור טיוטה לפי חוסרים או ידנית.";
   const fromDeficit = () => { const lines = []; (items || []).filter((x) => x.active !== false).forEach((it) => { ppeNetDeficits(it, orders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setForm({ lines }); };
   const Card = ({ o }) => { const st = PPE_ORDER_ST[o.status] || PPE_ORDER_ST.draft; const q = ppeOrderQty(o), rr = ppeOrderRecv(o); return <button className="task-row" onClick={() => setOpenId(o.id)} style={{ borderInlineStartColor: st.color }}>
     <div className="task-row-main"><div className="task-row-t">{o.supplier || "ללא ספק"} · {countLabel((o.lines || []).length, "פריט", "פריטים")}</div><div className="task-row-sub">{q} יח׳{o.status === "sent" && rr > 0 ? ` · נקלטו ${rr}/${q}` : ""} · נוצר {fmtDate(o.createdAt)}{o.expectedAt ? ` · צפי ${fmtDate(o.expectedAt)}` : ""}</div></div>
@@ -4057,7 +4058,7 @@ function PpeOrders({ orders, items, config, session, savePpeOrder, delPpeOrder, 
   </button>; };
   return (<>
     {!embedded && <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle><button className="btn-primary sm" onClick={fromDeficit}><Plus size={15} /> צור הזמנת רכש</button></div>}
-    {live.length === 0 ? <Empty text="אין הזמנות פתוחות" Icon={Package} sub="«הזמנה» ליצירה ידנית או «מהחוסרים» למילוי לפי מלאי נמוך" /> : <div className="task-list">{live.map((o) => <Card key={o.id} o={o} />)}</div>}
+    {live.length === 0 ? <Empty text="אין הזמנות פתוחות" Icon={Package} sub={emptySub} /> : <div className="task-list">{live.map((o) => <Card key={o.id} o={o} />)}</div>}
     {done.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>היסטוריית הזמנות</SectionTitle><div className="task-list">{done.slice(0, 30).map((o) => <Card key={o.id} o={o} />)}</div></div>}
     {form && <Overlay persistent onClose={() => setForm(null)}><PpeOrderForm order={form} items={items} session={session} config={config} onCancel={() => setForm(null)} onSave={async (o) => { await savePpeOrder(o); setForm(null); }} /></Overlay>}
     {open && <Overlay onClose={() => setOpenId(null)}><PpeOrderCard order={open} items={items} session={session} savePpeOrder={savePpeOrder} delPpeOrder={async () => { await delPpeOrder(open.id); setOpenId(null); }} savePpeItem={savePpeItem} savePpe={savePpe} onEdit={() => { setForm(open); setOpenId(null); }} onClose={() => setOpenId(null)} /></Overlay>}
