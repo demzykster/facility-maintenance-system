@@ -21,22 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/user-ppe-management-route
+### Active branch: none
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `ed517d2 fix: expose settings to permitted managers (#193)`.
+- Status: main is clean after the R4 permission-route batch.
+- Latest synchronized `main`: `8ae97d2 fix: expose ppe management to permitted managers (#194)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - give manager/user sessions with `ppe:manage` or `ppe:full` a direct visible path to `ביגוד עובדים`.
-  - keep ordinary manager `ppe:request` users on the existing department/PPE request path to avoid extra sidebar noise.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check: app renders after reload and console has no errors.
-  - code-path check: `ppe:manage` adds the manager/user nav item and ordinary `ppe:request` does not.
+  - permissions route reachability was cleaned up across manager/user shell.
+  - next R4 step is a role-by-role smoke pass before closing the package.
 
 ## Latest Completed Work
 
+- PR #194: Manager/user PPE management access is now directly visible when permitted.
+  - `ביגוד עובדים` appears in the manager/user sidebar only for `ppe:manage` or `ppe:full`.
+  - Ordinary request-only managers remain on the existing department/PPE request path to avoid sidebar noise.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #193: Manager/user Settings access is now visible when permitted.
   - `הגדרות` appears only when the session has `settings:manage`.
   - Sensitive settings actions remain behind `settings:full`.
@@ -84,9 +83,11 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Finish and review `codex/user-suppliers-permission-route`.
-2. If merged, continue R4 with the next role/screen permission gap.
-3. Keep each permissions fix in a separate small PR.
+1. Run a focused role-by-role smoke pass for R4:
+   admin, manager, technician, worker, cleaner.
+2. Verify expected module paths and read-only/manage boundaries for:
+   `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, `כלי שינוע`, `אנליטיקה`, `ספקים / קבלנים`, `הגדרות`, `יומן פעילות`.
+3. If smoke is clean, close R4 in `docs/release-checklist.md`; if not, fix the smallest concrete gap first.
 
 ## Documentation Policy
 
