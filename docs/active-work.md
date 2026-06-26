@@ -21,22 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/dept-notification-fleet-focus
+### Active branch: codex/close-notification-release-package
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `cfaafda fix: focus ppe notifications on subtabs (#187)`.
+- Status: ready for PR after docs-only validation.
+- Latest synchronized `main`: `935bae9 fix: focus department notifications on fleet card (#188)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - route manager/user department PM and driver outcome notifications to the exact department fleet card when `fleetId` is available.
-  - keep this PR limited to manager/user department notification focus.
+  - close R3 Notifications End-To-End in the release checklist after PRs #180-#188.
+  - move the next exact action to R4 permissions/role reality checks.
 - Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check: current app stayed usable and console had no errors.
-  - code-path check: manager/user notifications now carry `fleetId`, `goNotif` passes it into `deptNav`, and `ManagerFleet` opens the matching fleet card when it is in scope.
+  - `git diff --check`
 
 ## Latest Completed Work
 
+- PR #188: Department notifications now focus exact fleet cards.
+  - Manager/user PM and driver outcome notifications pass `fleetId` into department fleet navigation.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #187: PPE notifications now focus relevant sub-tabs.
   - Admin PPE pending/low-stock notifications open the PPE dashboard; open-order notifications open the inventory movement/order tab.
   - Local tests/build/browser smoke-check passed before merge.
@@ -63,9 +63,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Finish and review `codex/dept-notification-fleet-focus`.
-2. If merged, reassess whether R3 can close or whether exact PPE record focus needs a follow-up.
-3. Keep each route/focus fix in a separate small PR.
+1. Finish and review `codex/close-notification-release-package`.
+2. If merged, continue R4 with a role-by-role permissions/reachability smoke-check.
+3. Keep each permissions fix in a separate small PR.
 
 ## Documentation Policy
 

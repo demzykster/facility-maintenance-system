@@ -13,7 +13,7 @@ This is the closure checklist for the current stabilization phase. It replaces b
 
 ### R3 — Notifications End-To-End
 
-Status: open.
+Status: done in PRs #180-#188.
 
 Why it matters:
 - Notifications should be an action map, not just a noisy inbox.
@@ -24,11 +24,11 @@ Done means:
 - Global notification type settings and personal notification-panel filtering are both understandable.
 - Duplicate/noisy notification patterns are either removed or intentionally grouped.
 
-Next PR candidate:
-- Build a small notification matrix from `computeEvents()` by role and kind, then fix one missing/wrong navigation target per PR.
-
-Current batch:
-- Focus admin PPE request, low-stock, and open-order notifications on the relevant PPE sub-tab.
+Closed notes:
+- The notification matrix now covers the important role/process pairs.
+- Critical routes open exact tickets, exact fleet cards, or clearly focused module tabs.
+- Global notification toggles and personal notification-panel filters are available.
+- Optional future polish: exact PPE record focus when aggregate PPE notifications represent a single request/order/item.
 
 ### R4 — Permissions And Role Reality Check
 
