@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: idle.
-- Last synchronized `main` before this entry: `bb397a1 docs: close dashboard polish ledger [skip vercel] (#146)`.
+- Last synchronized `main` before this entry: `5e62ed9 docs: simplify codex workflow [skip vercel] (#147)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - no active product branch;
@@ -60,9 +60,8 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Finish and merge the docs-only workflow simplification PR.
-2. Continue from `docs/backlog.md` or start a new focused UI audit pass.
-3. Update this ledger only when it helps the next Codex session resume safely.
+1. Continue from `docs/backlog.md` or start a new focused UI audit pass.
+2. Update this ledger only when it helps the next Codex session resume safely.
 
 ## Documentation Policy
 
