@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/user-suppliers-permission-route
+### Active branch: codex/user-analytics-readonly-route
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `1dc1ccd fix: gate manager audit log access (#190)`.
+- Latest synchronized `main`: `730c5e8 fix: expose suppliers to permitted managers (#191)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - give manager/user sessions with `suppliers:view` a visible path to `ספקים / קבלנים`.
-  - keep edits gated by existing `suppliers:manage`.
+  - give manager/user sessions with `analytics:view` a visible path to `אנליטיקה`.
+  - keep the manager/user analytics path read-only; damage report fields must not save edits from this route.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: current app renders after reload and console has no errors.
-  - code-path check: `suppliers:view` adds the manager/user nav item, and `suppliers:manage` is passed to `SuppliersPanel` as `canManage`.
+  - browser smoke-check: app renders after reload and console has no errors.
+  - code-path check: `analytics:view` adds the manager/user nav item, and `DamageReport` receives `canEdit={false}` from this route.
 
 ## Latest Completed Work
 
+- PR #191: Manager/user Suppliers access is now visible when permitted.
+  - `ספקים / קבלנים` appears only when the session has `suppliers:view`.
+  - Editing remains gated by `suppliers:manage`.
+  - Vercel was blocked by deployment rate limit; local tests/build/browser smoke-check passed before merge.
 - PR #190: Manager/user Audit Log access is now gated.
   - `יומן פעילות` appears only when the session has `audit:view`.
   - Vercel was green before merge.
