@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Analytics lifecycle export uses normalized stages
+### Lifecycle stage filter helper
 
-- Status: active branch `codex/use-normalized-lifecycle-export`.
-- Last synchronized `main` before this entry: `b1c2fdd test: add normalized ticket lifecycle stages (#111)`.
+- Status: active branch `codex/filter-lifecycle-stage-helper`.
+- Last synchronized `main` before this entry: `e7dac2f fix: use normalized lifecycle export rows (#112)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - use the normalized lifecycle helper in the analytics Excel lifecycle sheet;
-  - expose current-stage markers, equipment wait, and rework rows through one export contract;
-  - keep UI/dashboard behavior unchanged in this PR.
+  - add a pure helper for detecting whether a ticket contains a lifecycle stage;
+  - prepare Analytics drill-down filters to include historical stages, not only current status;
+  - keep UI behavior unchanged in this PR.
 
 ### Latest Completed Work
 
+- PR #112: Analytics lifecycle export now uses normalized stage rows.
+  - The `מחזור חיים` Excel sheet now uses the normalized lifecycle helper.
+  - It includes current-stage marker, equipment-wait rows, and rework rows through one contract.
+  - Vercel was green before merge.
 - PR #111: normalized ticket lifecycle stages were added.
   - Added a pure helper for current/historical ticket stages.
   - Covered current waiting, closed historical waiting, equipment wait, and rework markers with tests.
@@ -200,6 +204,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/filter-lifecycle-stage-helper`:
+
+- `npm test -- --run`: passed, 12 files / 42 tests.
+- `npm run build`: passed.
+- Browser smoke-check: not required; pure helper and tests only, no UI behavior changed.
 
 Branch `codex/use-normalized-lifecycle-export`:
 

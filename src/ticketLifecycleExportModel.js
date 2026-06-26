@@ -107,3 +107,9 @@ export function normalizedTicketLifecycleStages(ticket, {
 
   return stages;
 }
+
+export function ticketHasLifecycleStage(ticket, key, options = {}) {
+  if (!key) return false;
+  return normalizedTicketLifecycleStages(ticket, options)
+    .some((stage) => stage.key === key && (stage.current || stage.ms > 0 || stage.kind === "rework"));
+}
