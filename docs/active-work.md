@@ -21,23 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/polish-ticket-filter-banner
+### Active branch: codex/polish-ticket-card-stage-badge
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `7b84097 docs: close r4 permissions package (#197)`.
+- Latest synchronized `main`: `6601079 fix: clarify ticket drilldown filters (#198)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - start R5 with the `קריאות` screen.
-  - make dashboard/analytics drill-down filter state easier to understand and clear.
-  - keep the ticket filter row visually balanced when four filters are shown.
+  - continue R5 on the `קריאות` screen.
+  - make ticket card badges match the visible workflow stage.
+  - avoid showing `חדשה` as the main badge when the ticket is already waiting for technician acceptance.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: dashboard drill-down to `קריאות` shows the explicit `נקה סינון` action.
-  - browser smoke-check: four ticket filters render in one balanced row at the current desktop viewport.
+  - browser smoke-check: ticket list card waiting for technician acceptance shows `ממתין לקבלה` instead of a misleading `חדשה` badge.
 
 ## Latest Completed Work
 
+- PR #198: Ticket drill-down filters are easier to understand and clear.
+  - Dashboard/analytics drill-down banner now has an explicit `נקה סינון` action.
+  - The admin ticket filter row now keeps four filters in one balanced row at desktop width.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was rate-limited.
 - PR #196: Admin role-switch now prefers an assigned cleaner when available.
   - Role-smoke passed for admin, manager, technician, and worker.
   - Cleaner shell rendered cleanly; when no assigned cleaner exists in current local data, the empty-zone state is expected.
