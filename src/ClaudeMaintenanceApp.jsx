@@ -731,6 +731,7 @@ const waitReasonLifecycleMeta = (cfg, id) => {
   const reason = wReasonOf(cfg, id);
   return reason ? { ball: reason.ball || "executor", pauseSla: !!reason.pauseSla } : {};
 };
+const lifecycleOwnerLabel = (owner) => ({ executor: "טכנאי/מבצע", manager: "מנהל", admin: "מנהל מערכת", requester: "פותח", none: "ללא" }[owner] || owner || "—");
 // Причины, которые роль может ВЫСТАВЛЯТЬ (один список, фильтр по setters). no_equipment ставится отдельной кнопкой техника.
 const reasonsForRole = (cfg, role) => wReasons(cfg).filter((r) => r.id !== "no_equipment" && (r.setters === "both" || (role === "tech" ? r.setters === "tech" : r.setters === "manager"))).map((r) => (r.id === "manager_decision" && r.label === "ממתינה להחלטת מנהל") ? { ...r, label: "צריך עזרה / החלטה" } : r);
 const reasonPauses = (cfg, id) => !!(wReasonOf(cfg, id)?.pauseSla);
@@ -4219,11 +4220,10 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id)
   };
   const lifecycleBottlenecks = Array.from(open.reduce((acc, t) => {
-    const current = normalizedTicketLifecycleStages(t, lifecycleOptions).find((s) => s.current);
-    const stages = current ? [current] : [];
-    if (t.returned || t.returnReason) stages.push({ key: "rework", label: "הוחזר לטיפול", ms: 0 });
+    const stages = normalizedTicketLifecycleStages(t, lifecycleOptions)
+      .filter((stage) => stage.current || stage.kind === "rework");
     stages.forEach((stage) => {
-      const row = acc.get(stage.key) || { key: stage.key, label: stage.label, n: 0, ms: 0 };
+      const row = acc.get(stage.key) || { key: stage.key, label: stage.label, owner: stage.owner, countsOperationalSla: stage.countsOperationalSla, n: 0, ms: 0 };
       row.n += 1;
       row.ms += stage.ms || 0;
       acc.set(stage.key, row);
@@ -4301,7 +4301,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
       <button className="queue-chip" onClick={() => flt({ st: "pending_user" })}><span className="q-num" style={{ color: "#0D9488" }}>{waitUser.length}</span><span className="q-lbl">לאישור מנהל מחלקה</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "pending_admin" })}><span className="q-num" style={{ color: "#4F46E5" }}>{waitAdmin.length}</span><span className="q-lbl">לסגירה על ידך</span></button>
     </div>
-    {lifecycleBottlenecks.length > 0 && <div className="stage-watch"><div className="stage-watch-title"><Clock size={14} /> שלבים שדורשים מעקב</div><div className="stage-watch-grid">{lifecycleBottlenecks.map((s) => <button key={s.key} className="stage-chip" onClick={() => flt({ st: "open", focus: { label: `שלב · ${s.label}`, lifecycleKey: s.key } })}><span className="stage-chip-name">{s.label}</span><span className="stage-chip-meta">{countLabel(s.n, "קריאה", "קריאות")}{s.ms ? ` · ${fmtDur(s.ms)}` : ""}</span></button>)}</div></div>}
+    {lifecycleBottlenecks.length > 0 && <div className="stage-watch"><div className="stage-watch-title"><Clock size={14} /> שלבים שדורשים מעקב</div><div className="stage-watch-grid">{lifecycleBottlenecks.map((s) => <button key={s.key} className="stage-chip" onClick={() => flt({ st: "open", focus: { label: `שלב · ${s.label}`, lifecycleKey: s.key } })}><span className="stage-chip-name">{s.label}</span><span className="stage-chip-meta">{lifecycleOwnerLabel(s.owner)} · {countLabel(s.n, "קריאה", "קריאות")}{s.ms ? ` · ${fmtDur(s.ms)}` : ""}{s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}</span></button>)}</div></div>}
     </>}
     {w.docs && dashTrack !== "facility" && <><SectionTitle><FileText size={15} /> מסמכי כלי שינוע פגי-תוקף (30 ימים){expDocs.length ? ` · ${expDocs.length}` : ""}</SectionTitle>
       {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
@@ -5274,7 +5274,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     {pausedTotal > 0 && <div className="note" style={{ borderColor: "#DDD6FE", marginBottom: 8 }}><CalendarClock size={13} /> זמן המתנה שלא נספר ל-SLA (המתנה לגורם חיצוני): <b>{fmtDur(pausedTotal)}</b></div>}
     {returnsCount > 0 && <div className="note" style={{ borderColor: "#FECACA", marginBottom: 8 }}><RefreshCw size={13} /> קריאות שהוחזרו לתיקון (לא טופלו בפעם הראשונה): <b>{returnsCount}</b></div>}
     {showFleet && unitStats.length > 0 && <><SectionTitle><Truck size={15} /> כלים בעייתיים — תקלות ועלות</SectionTitle><div className="panel">{unitStats.map((u) => <div key={u.f.id} className={"kpi-unit-row" + (onFilter ? " bar-click" : "")} onClick={onFilter ? () => drill({ label: `כלי ${u.f.code}`, forkliftId: u.f.id }, { track: "transport", period: "quarter" }) : undefined} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: "1px solid var(--line)" }}><span style={{ fontWeight: 700, minWidth: 64 }}>{u.f.code}</span><div style={{ flex: 1 }}><div style={{ height: 8, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: (u.c90 / maxUnitC * 100) + "%", height: "100%", background: u.c90 >= 3 ? "#DC2626" : "#EA580C" }} /></div></div><span style={{ fontSize: 12.5, color: "var(--muted)", minWidth: 92, textAlign: "left" }}>{u.c90} ב-90 ימים</span><span style={{ fontWeight: 700, minWidth: 70, textAlign: "left" }}>{u.cost ? ils(u.cost) : "—"}</span>{onFilter && <ChevronLeft size={14} style={{ color: "var(--muted)" }} />}</div>)}<div className="hint" style={{ marginTop: 6 }}>מבוסס על קריאות שינוע 90 הימים האחרונים והעלות המצטברת. כלי עם 3+ תקלות מסומן אדום — מועמד לבחינת החלפה.</div></div></>}
-    {stageArr.length > 0 && <><SectionTitle><Clock size={15} /> זמן לפי שלבי קריאה</SectionTitle><div className="panel">{stageArr.map((s) => <Bar key={s.key} label={s.label} value={Math.round(s.ms / 360000) / 10} max={maxStageHours} suffix={` שע׳ · ${countLabel(s.n, "קריאה", "קריאות")}`} color={s.kind === "waiting" ? "#B45309" : s.kind === "rework" ? "#DC2626" : "#2563EB"} onClick={onFilter ? () => drill({ label: `שלב · ${s.label}`, lifecycleKey: s.key }, { st: "all", period }) : undefined} />)}</div></>}
+    {stageArr.length > 0 && <><SectionTitle><Clock size={15} /> זמן לפי שלבי קריאה</SectionTitle><div className="panel">{stageArr.map((s) => <Bar key={s.key} label={s.label} value={Math.round(s.ms / 360000) / 10} max={maxStageHours} suffix={` שע׳ · ${lifecycleOwnerLabel(s.owner)} · ${countLabel(s.n, "קריאה", "קריאות")}${s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}`} color={s.kind === "waiting" ? "#B45309" : s.kind === "rework" ? "#DC2626" : "#2563EB"} onClick={onFilter ? () => drill({ label: `שלב · ${s.label}`, lifecycleKey: s.key }, { st: "all", period }) : undefined} />)}</div></>}
     {waitReasonArr.length === 0 ? <div className="note">אין כרגע קריאות בהמתנה.</div> : <div className="panel">{waitReasonArr.map(([id, n]) => <Bar key={id} label={waitReasonLabel(id, config)} value={n} max={maxWait} color="#B45309" onClick={onFilter ? () => drill({ label: `סיבת המתנה · ${waitReasonLabel(id, config)}`, waitReason: id }, { st: "waiting" }) : undefined} />)}</div>}
     <SectionTitle>עלויות לפי ספק</SectionTitle>
     {supArr.length === 0 ? <div className="note">טרם נרשמו עלויות.</div> : <div className="panel">{supArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxSup} money color="#16A34A" onClick={onFilter ? () => drill({ label: `ספק · ${s}`, supplier: s }, { period }) : undefined} />)}</div>}
