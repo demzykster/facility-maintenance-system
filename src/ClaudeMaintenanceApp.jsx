@@ -17,7 +17,7 @@ import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { isOperationallyOverdue, metOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio, pausedMs } from "./slaModel.js";
+import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio, pausedMs } from "./slaModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -4373,7 +4373,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
   };
   const exportXlsx = () => {
     const options = lifecycleOptions();
-    const rows = list.map((t) => { const life = ticketLifecycleSummary(t, options); return ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config), "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait, "פירוט זמני סטטוס": life.statusDurations, "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason, "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "עלות (₪)": t.closure?.costAmount || 0 }); });
+    const rows = list.map((t) => { const life = ticketLifecycleSummary(t, options); return ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config), "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait, "פירוט זמני סטטוס": life.statusDurations, "חריגת SLA": missedOperationalSla(t) ? "כן" : "", "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason, "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "עלות (₪)": t.closure?.costAmount || 0 }); });
     try {
       const ws = XLSX.utils.json_to_sheet(rowsSafe(rows));
       const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]);
@@ -5142,7 +5142,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
         "השבתה (שע׳)": t.track === "transport" ? Math.round(downtimeMs(t) / 3600000) : "",
         "המתנה לחלקים": waitedParts(t) ? "כן" : "", "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait,
         "פירוט זמני סטטוס": life.statusDurations, "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason,
-        "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "חריגת SLA": isOverdue(t) ? "כן" : "",
+        "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "חריגת SLA": missedOperationalSla(t) ? "כן" : "",
       });
       });
       const wb = XLSX.utils.book_new();

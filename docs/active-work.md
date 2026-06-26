@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/operational-sla-helper`
+### Active branch: `codex/export-operational-sla-status`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `53fc930 feat: add dashboard lifecycle bottleneck drilldown (#119)`.
+- Last synchronized `main` before this entry: `e62d760 fix: centralize operational sla timing (#120)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - make operational SLA calculations use one helper that subtracts paused waiting time;
-  - align open-ticket SLA breach, closed-ticket analytics compliance, long-treatment analytics, and SLA bar progress;
-  - keep this as a helper-first stabilization step before bigger SLA/stage UI changes.
+  - make both ticket-list Excel and Analytics Excel report operational SLA misses consistently;
+  - include closed tickets that missed operational SLA after paused waiting time is subtracted;
+  - keep this export-only and helper-backed.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 45 tests.
+  - `npm test -- --run`: passed, 13 files / 46 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: dashboard reloaded, Analytics opened, SLA compliance/paused-time/long-treatment sections rendered, and no console errors were captured.
+  - Browser smoke-check: Analytics Excel and ticket-list Excel buttons both ran without console errors.
 
 ### Latest Completed Work
 
+- PR #120: operational SLA timing was centralized.
+  - Added `src/slaModel.js` with tests.
+  - Open-ticket breach, closed-ticket Analytics compliance, long-treatment Analytics, and SLA bars now subtract paused waiting time through one helper.
+  - Vercel was green before merge.
 - PR #119: Dashboard lifecycle bottleneck drill-down was added.
   - Dashboard now shows compact current-stage chips under KPI quick filters.
   - Clicking a chip opens `קריאות` filtered by `focus.lifecycleKey`.

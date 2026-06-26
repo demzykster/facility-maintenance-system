@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOperationallyOverdue, metOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio, pausedMs } from "../src/slaModel.js";
+import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio, pausedMs } from "../src/slaModel.js";
 
 describe("operational SLA model", () => {
   it("subtracts accumulated and active paused time from elapsed SLA", () => {
@@ -22,5 +22,12 @@ describe("operational SLA model", () => {
 
     expect(metOperationalSla(ticket)).toBe(true);
     expect(operationalSlaRatio(ticket)).toBe(0.9);
+    expect(missedOperationalSla(ticket)).toBe(false);
+  });
+
+  it("marks closed tickets that missed operational SLA", () => {
+    const ticket = { status: "done", createdAt: 0, dueAt: 10_000, pauseAccumMs: 2_000, closure: { signedAt: 15_000 } };
+
+    expect(missedOperationalSla(ticket)).toBe(true);
   });
 });
