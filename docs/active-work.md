@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: idle.
-- Last synchronized `main` before this entry: `9a059c9 fix: polish fleet count Hebrew (#150)`.
+- Last synchronized `main` before this entry: `edf72ba fix: polish supplier count Hebrew (#151)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - no active product branch;
@@ -34,6 +34,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- PR #152: backup restore count Hebrew was polished.
+  - Backup preview counters now use singular/plural wording for all collection counts.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #151: supplier-card count Hebrew was polished.
   - Supplier cards now use singular/plural wording for orders, vehicles, and contacts.
   - Local tests/build/browser smoke-check passed before merge.
