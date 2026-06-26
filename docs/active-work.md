@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Analytics lifecycle-stage drill-down
+### Wait-reason SLA copy clarification
 
-- Status: active branch `codex/analytics-lifecycle-stage-drilldown`.
-- Last synchronized `main` before this entry: `5b21648 fix: support lifecycle stage ticket filters (#114)`.
+- Status: active branch `codex/clarify-wait-reason-sla-copy`.
+- Last synchronized `main` before this entry: `d4fe132 feat: add analytics lifecycle stage drilldown (#115)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - add a compact clickable Analytics block for lifecycle-stage time;
-  - drill into `קריאות` using `focus.lifecycleKey`;
-  - keep this as the first visible stage analytics pass, not a full dashboard redesign.
+  - clarify the wait-reason `pauseSla` setting in the UI;
+  - explain that it means time does not count against the ticket operational SLA;
+  - keep the existing data model and behavior unchanged.
 
 ### Latest Completed Work
 
+- PR #115: Analytics lifecycle-stage drill-down was added.
+  - Analytics now shows `זמן לפי שלבי קריאה`.
+  - Clicking a stage opens `קריאות` filtered by `focus.lifecycleKey`.
+  - Browser smoke-check confirmed `ממתינה לחלקים` opened 2 matching tickets, including historical closed tickets.
 - PR #114: ticket-list lifecycle-stage filters were wired.
   - `קריאות` can now consume `focus.lifecycleKey`.
   - The filter uses historical lifecycle stages, not only current ticket status.
@@ -212,6 +216,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/clarify-wait-reason-sla-copy`:
+
+- `npm test -- --run`: passed, 12 files / 42 tests.
+- `npm run build`: passed.
+- Browser smoke-check: passed at `http://127.0.0.1:5188/`; Settings showed `סיבות המתנה`, `SLA תפעולי`, and the operational-SLA explanation.
 
 Branch `codex/analytics-lifecycle-stage-drilldown`:
 
