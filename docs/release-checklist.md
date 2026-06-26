@@ -28,7 +28,7 @@ Next PR candidate:
 - Build a small notification matrix from `computeEvents()` by role and kind, then fix one missing/wrong navigation target per PR.
 
 Current batch:
-- Fix notification routing for technician shift events that use `go: "team"`.
+- Fix cleaner cleaning notifications so they open `בקרת ניקיון`.
 
 ### R4 — Permissions And Role Reality Check
 

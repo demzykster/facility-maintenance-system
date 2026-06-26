@@ -1028,9 +1028,9 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
   if (session.role === "cleaner") {
     const nowTs = Date.now();
     (zones || []).filter((z) => z.active !== false && z.cleanerId === session.id).forEach((z) => zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => {
-      if ((status === "due" || status === "overdue") && !isAbsentOn(session.id, absences)) ev.push({ key: `cls-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) - (+win.tol || 0) * 60000, kind: "cleaning", title: status === "overdue" ? "סבב ניקיון באיחור" : "סבב ניקיון לביצוע כעת", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}` });
+      if ((status === "due" || status === "overdue") && !isAbsentOn(session.id, absences)) ev.push({ key: `cls-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) - (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: status === "overdue" ? "סבב ניקיון באיחור" : "סבב ניקיון לביצוע כעת", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}` });
     }));
-    (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && c.reportedById !== session.id && (zones || []).some((z) => z.id === c.zoneId && z.cleanerId === session.id)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", title: c.kind === "broken" ? "דווחה תקלה באזור שלך" : "דווח לכלוך באזור שלך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}${c.text ? " · " + c.text : ""}` }));
+    (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && c.reportedById !== session.id && (zones || []).some((z) => z.id === c.zoneId && z.cleanerId === session.id)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "דווחה תקלה באזור שלך" : "דווח לכלוך באזור שלך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}${c.text ? " · " + c.text : ""}` }));
     return ev.sort((a, b) => b.at - a.at);
   }
   if (session.role === "admin") {
