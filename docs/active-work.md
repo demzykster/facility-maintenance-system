@@ -21,18 +21,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/polish-ticket-filters`
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `9ad049d fix: clarify notification display settings (#133)`.
-- Open PRs when this entry was written: none expected.
+- Status: in progress.
+- Last synchronized `main` before this entry: `a004cae docs: close notification polish ledger [skip vercel] (#134)`.
+- Open PRs when this entry was written: none.
 - Purpose:
-  - continue from `docs/backlog.md`;
-  - keep the next step small and isolated.
+  - polish the `קריאות` filter row so each select has a visible Hebrew label;
+  - keep the first screen pass small before moving to `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, and `צוות ומשתמשים`.
 - Validation so far:
-  - `npm test -- --run`: skipped; docs-only ledger close.
-  - `npm run build`: skipped; docs-only ledger close.
-  - Browser smoke-check: not required; no product UI code changed.
+  - `npm test -- --run`: passed, 13 files / 49 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `קריאות` shows visible filter labels (`מצב`, `עדיפות`, `קטגוריה`, `עלות`), ticket cards still render, and no console errors were reported.
 
 ### Latest Completed Work
 

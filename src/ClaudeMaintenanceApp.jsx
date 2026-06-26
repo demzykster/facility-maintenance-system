@@ -4394,17 +4394,23 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
     } catch (e) {}
     setReport(buildHtml());
   };
+  const filterSelect = (label, value, onChange, children) => (
+    <label className="flt-field">
+      <span className="flt-lbl">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>{children}</select>
+    </label>
+  );
   return (<>
     <div className="seg-tabs s3" style={{ marginBottom: 10 }}>{[["all", "הכל"], ["facility", "מבנה"], ["transport", "שינוע"]].map(([id, lbl]) => <button key={id} className={track === id ? "on" : ""} onClick={() => { setTrack(id); setCat("all"); setUnitType("all"); }}>{lbl}</button>)}</div>
     {focus && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{focus.label}</b></span><button onClick={() => { setFocus(null); onInitialConsumed?.(); }} title="הסר סינון"><X size={15} /></button></div>}
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, נושא, כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="filter-row">
-      <select value={st} onChange={(e) => setSt(e.target.value)}><option value="open">פתוחות</option><option value="closed">סגורות</option><option value="all">הכל</option>{STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
-      <select value={pr} onChange={(e) => setPr(e.target.value)}><option value="all">עדיפות</option>{PRIORITIES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>
+      {filterSelect("מצב", st, setSt, <><option value="open">פתוחות</option><option value="closed">סגורות</option><option value="all">הכל</option>{STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</>)}
+      {filterSelect("עדיפות", pr, setPr, <><option value="all">כל העדיפויות</option>{PRIORITIES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</>)}
       {track === "transport"
-        ? <select value={unitType} onChange={(e) => setUnitType(e.target.value)}><option value="all">סוג כלי</option>{typeOpts.map((tp) => <option key={tp} value={tp}>{tp}</option>)}</select>
-        : <select value={cat} onChange={(e) => setCat(e.target.value)}><option value="all">קטגוריה</option>{catOpts.map(([id, lbl]) => <option key={id} value={id}>{lbl}</option>)}</select>}
-      <select value={costF} onChange={(e) => setCostF(e.target.value)}><option value="all">עלות</option><option value="with">עם עלות</option><option value="none">ללא עלות</option></select>
+        ? filterSelect("סוג כלי", unitType, setUnitType, <><option value="all">כל הסוגים</option>{typeOpts.map((tp) => <option key={tp} value={tp}>{tp}</option>)}</>)
+        : filterSelect("קטגוריה", cat, setCat, <><option value="all">כל הקטגוריות</option>{catOpts.map(([id, lbl]) => <option key={id} value={id}>{lbl}</option>)}</>)}
+      {filterSelect("עלות", costF, setCostF, <><option value="all">כל העלויות</option><option value="with">עם עלות</option><option value="none">ללא עלות</option></>)}
     </div>
     <div className="wtoggles" style={{ marginBottom: 10 }}>{PERIODS.map(([k, l]) => <button key={k} className={"wtoggle" + (period === k ? " on" : "")} onClick={() => setPeriod(k)}>{l}</button>)}</div>
     <div className="export-bar"><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={() => setReport(buildHtml())}><Printer size={15} /> דוח / הדפסה</button>{hasFilters && <button className="btn-ghost sm" onClick={resetFilters}><X size={15} /> נקה כל הסינונים</button>}</div>
