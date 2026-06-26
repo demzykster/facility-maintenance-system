@@ -21,14 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/correct-dept-notification-matrix, if PR is still open
+### No active product branch
 
-- Status: docs-only correction in progress.
-- Last synchronized `main` before this entry: `b894675 fix: route cleaner notifications to cleaning (#182)`.
+- Status: main is clean after the R3 notification route matrix correction.
+- Last synchronized `main` before this entry: `58037cb docs: correct dept notification route matrix (#183)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-- correct `docs/notification-matrix.md` after verifying `go: "dept"` already routes in `UserApp`.
-- Validation needed before PR:
+- continue R3 Notifications End-To-End from `docs/notification-matrix.md`.
+- Completed validation for the last docs correction:
   - `git diff --check`
   - browser/code inspection already verified `UserApp` maps unknown/dept notification routes to `המחלקה שלי` equipment tab.
 
@@ -132,8 +132,8 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/correct-dept-notification-matrix` is still open, review/merge it.
-2. If it is merged, continue R3 by improving focus targets inside fleet/PPE notifications.
+1. Continue R3 by improving focus targets inside fleet/PPE notifications.
+2. Start with a small, verifiable focus target such as fleet document notifications opening the exact unit card.
 3. Keep each route/focus fix in a separate small PR.
 
 ## Documentation Policy
