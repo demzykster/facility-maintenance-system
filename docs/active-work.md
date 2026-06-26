@@ -23,19 +23,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #167.
-- Last synchronized `main` before this entry: `2bbd04f fix: polish analytics parts wait Hebrew (#166)`.
-- Open PRs when this entry was written: PR #167 was ready to merge.
+- Status: idle after PR #168.
+- Last synchronized `main` before this entry: `7efe2ec fix: polish dashboard parts wait label (#167)`.
+- Open PRs when this entry was written: PR #168 was ready to merge.
 - Purpose:
-  - Dashboard parts-wait queue chip now uses lifecycle-compatible wording;
-  - displayed chip label is aligned with its lifecycle-key filter.
+  - Excel task-import update mode should match existing tasks by title, meeting, and open/closed status group;
+  - closed tasks should not be silently updated by newly imported open rows with the same title.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Dashboard parts-wait label.
+  - browser smoke-check passed for Tasks page and Excel-import menu.
 
 ## Latest Completed Work
 
+- PR #168: Task Excel import duplicate matching was narrowed.
+  - Update mode now matches existing tasks by title, meeting, and open/closed status group.
+  - Closed tasks are not silently updated by newly imported open rows with the same title.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #167: Dashboard parts-wait label was polished.
   - The queue chip now says `עיכוב חלקים`, matching the lifecycle-based count/filter.
   - Local tests/build/browser smoke-check passed before merge.
@@ -52,9 +56,6 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - PR #163: PPE pending request counts were aligned.
   - Manager approval (`pending`) and worker signature (`worker_sign`) requests now use one shared active-request helper.
   - Notifications, dashboard attention, PPE dashboard counts, request lists, and requester history split no longer diverge.
-  - Local tests/build/browser smoke-check passed before merge.
-- PR #162: Dashboard parts-wait KPI moved to lifecycle stages.
-  - The Dashboard parts-wait KPI now uses the normalized `waiting:parts` lifecycle stage and the old log-text helper was removed.
   - Local tests/build/browser smoke-check passed before merge.
 - PR #161: Analytics parts-wait summary moved to lifecycle stages.
   - The parts-wait card and Excel marker now use the normalized `waiting:parts` lifecycle stage.

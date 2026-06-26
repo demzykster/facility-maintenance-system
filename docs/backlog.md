@@ -281,6 +281,14 @@ Next small product candidates:
 
 ## Tickets / Dashboard / Manager View
 
+### Task Excel import duplicate matching
+
+Status: done in PR #168.
+
+Goal:
+- In update mode, match existing tasks by title + meeting + open/closed status group.
+- Do not update a closed task when the imported row is an open task with the same title, or vice versa.
+
 ### SLA / stage timing model
 
 Status: first helper contract implemented.

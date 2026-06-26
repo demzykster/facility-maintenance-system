@@ -16,6 +16,7 @@ import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, p
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
+import { findTaskImportMatch } from "./taskImportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
@@ -337,7 +338,6 @@ const parseTaskImportFile = async (file) => {
   return all;
 };
 const XL_DUE = (v) => { const s = String(v == null ? "" : v).trim(); if (!s) return { mode: "deferred", dueAt: null }; if (/שוטף|שגרת|קבוע|ongoing|routine/i.test(s)) return { mode: "permanent", dueAt: null }; if (/מיידי|immediate|דחוף/i.test(s)) return { mode: "deferred", dueAt: null, urgent: true }; if (/tbd|לקבוע|טרם|בהמשך/i.test(s)) return { mode: "deferred", dueAt: null }; const d = XL_DATE(v); return d ? { mode: "deadline", dueAt: d } : { mode: "deferred", dueAt: null }; };
-const normTitle = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
 // Разбор «дерева истории»: одна ячейка вида «вступление. DD/MM - текст, DD/MM - текст, …» → {lead, entries:[{at,text}]}.
 // Дату-маркер засчитываем только на границе предложения (начало / после , . ; перевода строки) — чтобы не ловить даты внутри текста (как «ב-27/3»). Год выводим хронологически от anchorYear (год даты строки).
 const parseHistory = (text, anchorYear) => {
@@ -2955,7 +2955,6 @@ function TaskImportWizard({ users, session, meetings, existing, defaultMeetingId
       setSheets(all); pickSheet(best, all); setStage("map"); setErr("");
     } catch (x) { setErr("שגיאה בקריאת הקובץ. ודאו שזה קובץ XLSX/CSV תקין."); }
   };
-  // TODO (дедуп на будущее): считать дублем только при совпадении статуса — закрытая и открытая задача с одним названием НЕ дубль.
   const preview = useMemo(() => {
     const anchorCol = headers.find((h) => /תאריך/.test(h) && !/יעד/.test(h)) || "";
     return rows.map((r) => {
@@ -2971,7 +2970,7 @@ function TaskImportWizard({ users, session, meetings, existing, defaultMeetingId
       const status = map.status ? XL_STATUS(r[map.status]) : "todo";
       let action = "new", delta = "", existId = null, newHist = hist.entries, statusChanged = false;
       if (mode === "update") {
-        const ex = (existing || []).find((e) => normTitle(e.title) === normTitle(title) && (!mtgId || e.meetingId === mtgId || (e.linkedMeetingIds || []).includes(mtgId)));
+        const ex = findTaskImportMatch(existing, { title, status, meetingId: mtgId });
         if (ex) {
           existId = ex.id;
           const days = new Set((ex.log || []).filter((l) => l.kind === "history").map((l) => fmtDate(l.at)));
