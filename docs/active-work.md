@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #157.
-- Last synchronized `main` before this entry: `9b89b87 feat: extend ticket lifecycle stage contract (#156)`.
-- Open PRs when this entry was written: PR #157 was ready to merge.
+- Status: idle after PR #158.
+- Last synchronized `main` before this entry: `5f9400c feat: surface lifecycle stage metadata (#157)`.
+- Open PRs when this entry was written: PR #158 was ready to merge.
 - Purpose:
-  - Analytics now uses normalized lifecycle owner/SLA metadata in stage UI;
-  - continue replacing older wait/SLA summaries or clarify wait-reason settings copy.
+  - wait-reason settings copy clarified so responsibility, allowed setters, and operational-SLA accounting are understandable to operators;
+  - continue replacing older wait/SLA summaries that still derive totals outside the normalized lifecycle helper.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Analytics and Tickets.
+  - browser smoke-check passed for Settings wait-reason copy.
 
 ## Latest Completed Work
 
+- PR #158: wait-reason settings copy was clarified.
+  - The settings now explain responsibility, allowed setters, and whether waiting time is counted in operational SLA.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #157: Analytics lifecycle stage metadata was surfaced.
   - Dashboard stage chips and Analytics stage-duration bars now show stage owner and whether the stage is outside operational SLA.
   - Local tests/build/browser smoke-check passed before merge.
