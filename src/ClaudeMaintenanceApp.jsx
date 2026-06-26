@@ -6314,6 +6314,10 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const risk = (isOpen(t) && admin && fleet && config) ? computeRisk(t, fleet, config) : null;
   const showRiskBadge = risk && (risk.level === "orange" || risk.level === "red");
   const showStatusBadge = !(t.status === "waiting" && t.waitingReason);
+  const waitingForTechAcceptance = isOpen(t) && t.status === "new" && ballIn(t) === "tech" && !t.assignee;
+  const statusBadge = waitingForTechAcceptance
+    ? { label: "ממתין לקבלה", color: "#D97706", bg: "#FEF3C7" }
+    : s;
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
   const holder = isOpen(t) ? ballHolder(t) : null;
@@ -6335,7 +6339,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
         : <div className="tcard-state" style={{ color: s.color }}>סטטוס: {s.label}</div>}
       {isOpen(t) && <SlaBar t={t} config={config} />}
       <div className="tcard-badges">
-        {showStatusBadge && <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>}
+        {showStatusBadge && <span className="badge sm" style={{ color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>}
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
         {missingHandler && <span className="badge sm" style={{ color: "#7F1D1D", background: "#FEE2E2" }}><AlertTriangle size={11} /> ללא מטפל פעיל</span>}
         {showRiskBadge && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
