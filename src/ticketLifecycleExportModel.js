@@ -189,3 +189,47 @@ export function ticketLifecycleWaitReasonStats(tickets = [], options = {}) {
   });
   return Object.values(stats).sort((a, b) => b.ms - a.ms || b.n - a.n || a.label.localeCompare(b.label, "he"));
 }
+
+const fallbackPausedMs = (ticket, now = Date.now()) => (
+  (ticket?.pauseAccumMs || 0) + (ticket?.pauseSince ? Math.max(0, now - ticket.pauseSince) : 0)
+);
+
+const operationalSlaMs = (ticket) => (
+  ticket?.dueAt != null && ticket?.createdAt != null ? Math.max(0, ticket.dueAt - ticket.createdAt) : 0
+);
+
+export function ticketLifecycleNonOperationalMs(ticket, options = {}) {
+  const now = options.now ?? Date.now();
+  const lifecycleMs = normalizedTicketLifecycleStages(ticket, { ...options, now })
+    .filter((stage) => stage.countsOperationalSla === false)
+    .reduce((sum, stage) => sum + (stage.ms || 0), 0);
+
+  return lifecycleMs > 0 ? lifecycleMs : fallbackPausedMs(ticket, now);
+}
+
+export function ticketLifecycleOperationalElapsedMs(ticket, at = Date.now(), options = {}) {
+  const endAt = at ?? Date.now();
+  return Math.max(0, endAt - (ticket?.createdAt ?? endAt) - ticketLifecycleNonOperationalMs(ticket, { ...options, now: endAt }));
+}
+
+export function ticketLifecycleMetOperationalSla(ticket, options = {}) {
+  const closedAt = ticket?.closure?.signedAt ?? ticket?.updatedAt;
+  const sla = operationalSlaMs(ticket);
+  if (!sla || !closedAt) return false;
+  return ticketLifecycleOperationalElapsedMs(ticket, closedAt, options) <= sla;
+}
+
+export function ticketLifecycleOperationalSlaRatio(ticket, options = {}) {
+  const closedAt = ticket?.closure?.signedAt ?? ticket?.updatedAt;
+  const sla = operationalSlaMs(ticket);
+  if (!sla || !closedAt) return null;
+  return ticketLifecycleOperationalElapsedMs(ticket, closedAt, options) / sla;
+}
+
+export function ticketLifecycleMissedOperationalSla(ticket, options = {}) {
+  const now = options.now ?? Date.now();
+  const sla = operationalSlaMs(ticket);
+  if (!sla || ticket?.status === "cancelled") return false;
+  if (ticket?.status === "done") return !ticketLifecycleMetOperationalSla(ticket, options);
+  return ticketLifecycleOperationalElapsedMs(ticket, now, options) > sla;
+}

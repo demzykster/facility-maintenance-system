@@ -21,16 +21,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/lifecycle-aware-sla, if PR is still open
 
-- Status: idle after PR #171.
-- Last synchronized `main` before this entry: `990dee5 feat: show global notification toggles (#170)`.
-- Open PRs when this entry was written: PR #171 was ready to merge.
+- Status: validation passed; ready for PR/merge. After merge, no active product branch is intentionally left open.
+- Last synchronized `main` before this entry: `f50d765 docs: add release closure checklist (#171)`.
+- Open PRs when this entry was written: none.
 - Purpose:
-  - replace broad repeating backlog headings with a closeable release checklist;
-  - make the next work packages measurable instead of letting the same 7 labels stay open forever.
-- Validation so far:
-  - `git diff --check` passed.
+  - R1 SLA/lifecycle trust batch;
+  - make ticket-list export and Analytics SLA breach/compliance calculations use lifecycle non-operational stages before falling back to legacy pause totals.
+- Validation:
+  - `npm test -- --run` passed.
+  - `npm run build` passed.
+  - browser smoke-check passed for Analytics after the lifecycle-SLA wiring change.
 
 ## Latest Completed Work
 
@@ -132,8 +134,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Continue from `docs/release-checklist.md`.
-2. Update this ledger only when it helps the next Codex session resume safely.
+1. If branch `codex/lifecycle-aware-sla` is still open, review/merge it.
+2. If it is already merged, continue R1 from `docs/release-checklist.md`.
+3. Update this ledger only when it helps the next Codex session resume safely.
 
 ## Documentation Policy
 

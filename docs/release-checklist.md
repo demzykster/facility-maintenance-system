@@ -27,6 +27,10 @@ Done means:
 Next PR candidate:
 - Search remaining direct `statusMs`, `waitingReason`, `pauseSla`, and SLA summary calculations in Dashboard/Analytics/ticket detail, then move one visible card at a time to lifecycle helpers.
 
+Current batch:
+- Ticket-list export and Analytics SLA breach/compliance calculations are being moved to lifecycle-aware SLA helpers.
+- Legacy pause totals remain as fallback when a ticket has no normalized non-operational lifecycle stages.
+
 ### R2 — Drill-Down And Filter Reset
 
 Status: open.
