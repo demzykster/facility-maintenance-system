@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/polish-ticket-filters`
+### Active branch: `codex/polish-analytics-drilldowns`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `a004cae docs: close notification polish ledger [skip vercel] (#134)`.
+- Last synchronized `main` before this entry: `526af10 fix: label ticket list filters (#135)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - polish the `קריאות` filter row so each select has a visible Hebrew label;
-  - keep the first screen pass small before moving to `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, and `צוות ומשתמשים`.
+  - polish Hebrew count grammar in `אנליטיקה` clickable rows and related stage chips;
+  - continue the screen-by-screen pass before moving to `ביגוד עובדים`, `הגדרות`, and `צוות ומשתמשים`.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `קריאות` shows visible filter labels (`מצב`, `עדיפות`, `קטגוריה`, `עלות`), ticket cards still render, and no console errors were reported.
+  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `אנליטיקה` no longer showed `1 קריאות`, stage rows showed `1 קריאה`, clicking an analytics row still opened `קריאות` with a focus banner, and no console errors were reported.
 
 ### Latest Completed Work
 
+- PR #135: ticket-list filters were labelled.
+  - `קריאות` now shows visible Hebrew labels for status, priority, category/unit type, and cost filters.
+  - Existing filter behavior was not changed.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #133: notification display settings copy was clarified.
   - Notification panel now shows a compact displayed-notifications count.
   - Display settings now labels type filtering more clearly and explains that hiding categories affects only the user's view.
