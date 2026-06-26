@@ -6,12 +6,17 @@ export const TICKET_QUALITY_LABELS = {
   external_needed: "נדרש קבלן חוץ"
 };
 
+const isTechAcceptanceStage = (ticket, key) => key === "new" && ticket?.routedTech && !ticket?.assignee;
+const lifecycleStageKey = (ticket, key) => isTechAcceptanceStage(ticket, key) ? "new:tech_acceptance" : key;
+const lifecycleStageLabel = (ticket, key, statusLabel) => lifecycleStageKey(ticket, key) === "new:tech_acceptance" ? "ממתין לקבלה" : statusLabel(key);
+
 const currentStatusKey = (ticket) => ticket?.status === "waiting"
   ? `waiting:${ticket.waitingReason || "other"}`
-  : (ticket?.status || "new");
+  : lifecycleStageKey(ticket, ticket?.status || "new");
 
 const DEFAULT_STATUS_OWNER = {
   new: "manager",
+  "new:tech_acceptance": "executor",
   open: "manager",
   pending_manager: "manager",
   in_progress: "executor",
@@ -71,18 +76,18 @@ export function ticketLifecycleSummary(ticket, {
   wearLabel = (id) => id,
   durationText = (ms) => String(ms)
 } = {}) {
-  const durations = ticketLifecycleDurations(ticket, { now, isOpen });
+  const rows = ticketLifecycleRows(ticket, { now, isOpen });
   const labelOf = (key) => key.startsWith("waiting:")
     ? `המתנה · ${waitReasonLabel(key.slice(8))}`
-    : statusLabel(key);
-  const waiting = durations.filter(([key]) => key.startsWith("waiting:"));
+    : lifecycleStageLabel(ticket, key, statusLabel);
+  const waiting = rows.filter((row) => row.kind === "waiting");
   const equipmentWaitMs = (ticket?.equipWaitMs || 0) + (ticket?.waitingReason === "no_equipment" && ticket?.equipWaitSince ? Math.max(0, now - ticket.equipWaitSince) : 0);
 
   return {
     description: ticket?.description || "",
     sourceClass: ticket?.wearType ? wearLabel(ticket.wearType) : (ticket?.damageClass || ""),
-    statusDurations: durations.map(([key, ms]) => `${labelOf(key)}: ${durationText(ms)}`).join(" · "),
-    waitingDurations: waiting.map(([key, ms]) => `${waitReasonLabel(key.slice(8))}: ${durationText(ms)}`).join(" · "),
+    statusDurations: rows.map((row) => `${labelOf(row.key)}: ${durationText(row.ms)}`).join(" · "),
+    waitingDurations: waiting.map((row) => `${waitReasonLabel(row.reason)}: ${durationText(row.ms)}`).join(" · "),
     equipmentWait: equipmentWaitMs ? durationText(equipmentWaitMs) : "",
     returned: ticket?.returned ? "כן" : "",
     returnReason: ticket?.returnReason || "",
@@ -93,13 +98,23 @@ export function ticketLifecycleSummary(ticket, {
 
 export function ticketLifecycleRows(ticket, labels = {}) {
   const durations = ticketLifecycleDurations(ticket, labels);
-  return durations.map(([key, ms]) => ({
-    ticket,
-    key,
-    kind: key.startsWith("waiting:") ? "waiting" : "status",
-    reason: key.startsWith("waiting:") ? key.slice(8) : "",
-    ms
-  }));
+  const rows = new Map();
+  durations.forEach(([rawKey, ms]) => {
+    const key = lifecycleStageKey(ticket, rawKey);
+    const existing = rows.get(key);
+    if (existing) {
+      existing.ms += ms;
+      return;
+    }
+    rows.set(key, {
+      ticket,
+      key,
+      kind: key.startsWith("waiting:") ? "waiting" : "status",
+      reason: key.startsWith("waiting:") ? key.slice(8) : "",
+      ms
+    });
+  });
+  return [...rows.values()].sort((a, b) => b.ms - a.ms);
 }
 
 export function normalizedTicketLifecycleStages(ticket, {
@@ -116,7 +131,7 @@ export function normalizedTicketLifecycleStages(ticket, {
       key: row.key,
       kind: row.kind,
       reason: row.reason,
-      label: row.kind === "waiting" ? waitReasonLabel(row.reason) : statusLabel(row.key),
+      label: row.kind === "waiting" ? waitReasonLabel(row.reason) : lifecycleStageLabel(ticket, row.key, statusLabel),
       ms: row.ms,
       current: false,
       currentStartedAt: current ? ticket.statusSince : null,

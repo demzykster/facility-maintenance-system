@@ -21,22 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/polish-ticket-card-stage-badge
+### Active branch: codex/clarify-lifecycle-tech-acceptance
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `6601079 fix: clarify ticket drilldown filters (#198)`.
+- Latest synchronized `main`: `3cc895b fix: clarify ticket acceptance badge (#199)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on the `קריאות` screen.
-  - make ticket card badges match the visible workflow stage.
-  - avoid showing `חדשה` as the main badge when the ticket is already waiting for technician acceptance.
+  - continue R5 from `קריאות` into `אנליטיקה`.
+  - make lifecycle analytics/export labels match the technician-acceptance workflow stage.
+  - avoid aggregating routed-but-unaccepted technician tickets under the generic `חדשה` stage.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: ticket list card waiting for technician acceptance shows `ממתין לקבלה` instead of a misleading `חדשה` badge.
+  - browser smoke-check: analytics separates `ממתין לקבלה` from generic `חדשה`.
+  - browser smoke-check: clicking the `ממתין לקבלה` analytics row opens `קריאות` with the matching drill-down banner and one matching card.
 
 ## Latest Completed Work
 
+- PR #199: Ticket cards now show technician-acceptance state clearly.
+  - Cards waiting for a technician to accept show `ממתין לקבלה` instead of the misleading raw `חדשה` badge.
+  - Underlying ticket status/data remains unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #198: Ticket drill-down filters are easier to understand and clear.
   - Dashboard/analytics drill-down banner now has an explicit `נקה סינון` action.
   - The admin ticket filter row now keeps four filters in one balanced row at desktop width.

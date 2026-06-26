@@ -58,6 +58,24 @@ describe("ticket lifecycle export model", () => {
     ]);
   });
 
+  it("names the technician acceptance pool as a workflow stage", () => {
+    const ticket = {
+      status: "new",
+      routedTech: true,
+      assignee: "",
+      statusSince: 8_000,
+      statusMs: { new: 1_000 }
+    };
+    const rows = ticketLifecycleRows(ticket, labels);
+    const stages = normalizedTicketLifecycleStages(ticket, labels);
+    const summary = ticketLifecycleSummary(ticket, labels);
+
+    expect(rows).toEqual([expect.objectContaining({ key: "new:tech_acceptance", kind: "status", ms: 3_000 })]);
+    expect(stages).toContainEqual(expect.objectContaining({ key: "new:tech_acceptance", label: "ממתין לקבלה", owner: "executor", current: true }));
+    expect(summary.statusDurations).toBe("ממתין לקבלה: 3s");
+    expect(ticketHasLifecycleStage(ticket, "new:tech_acceptance", labels)).toBe(true);
+  });
+
   it("normalizes current and historical lifecycle stages", () => {
     const stages = normalizedTicketLifecycleStages({
       status: "waiting",
