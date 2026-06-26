@@ -34,3 +34,9 @@ export const operationalSlaRatio = (ticket, closedAt = ticket?.closure?.signedAt
   if (!sla || !closedAt) return null;
   return operationalElapsedMs(ticket, closedAt) / sla;
 };
+
+export const missedOperationalSla = (ticket, now = Date.now()) => {
+  if (!operationalSlaMs(ticket) || ticket?.status === "cancelled") return false;
+  if (ticket?.status === "done") return !metOperationalSla(ticket);
+  return isOperationallyOverdue(ticket, now);
+};
