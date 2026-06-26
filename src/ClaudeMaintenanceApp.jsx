@@ -1722,7 +1722,7 @@ function UserApp(p) {
         <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
           {view === "tickets" ? (<>
-            {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {needAct} קריאות דורשות פעולה שלך</div>}
+            {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {countLabel(needAct, "קריאה דורשת", "קריאות דורשות")} פעולה שלך</div>}
             <div className="stat-strip">
               <div className="stat-box"><div className="stat-num">{mine.filter(isOpen).length}</div><div className="stat-lbl">פתוחות</div></div>
               <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>{needAct}</div><div className="stat-lbl">דורשות פעולה</div></div>
@@ -4585,7 +4585,7 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, on
         <Meta Icon={Clock} label="השבתה מצטברת" value={dt ? fmtDur(dt) : "—"} />
       </div>
       {canTickets && (() => { const h = assetHealth(f, tickets, insp, config); return (<div className="health-panel" style={{ borderColor: h.color + "55" }}>
-        <div className="health-top"><div className="health-score" style={{ color: h.color }}>{h.score}<span className="health-max">/100</span></div><div className="health-info"><div className="health-label" style={{ color: h.color }}>מצב הכלי · {h.label}</div><div className="health-stats">{h.count90} קריאות ב-90 ימים · MTTR {h.mttr ? fmtDur(h.mttr) : "—"} · עלות 90 ימים {ils(h.cost90)}</div></div></div>
+        <div className="health-top"><div className="health-score" style={{ color: h.color }}>{h.score}<span className="health-max">/100</span></div><div className="health-info"><div className="health-label" style={{ color: h.color }}>מצב הכלי · {h.label}</div><div className="health-stats">{countLabel(h.count90, "קריאה", "קריאות")} ב-90 ימים · MTTR {h.mttr ? fmtDur(h.mttr) : "—"} · עלות 90 ימים {ils(h.cost90)}</div></div></div>
         <div className="health-rec"><Sparkles size={13} /> {h.rec}</div>
       </div>); })()}
       {canDocs && <><SectionTitle><FileText size={15} /> מסמכים</SectionTitle>
@@ -5567,7 +5567,7 @@ function SettingsPanel(p) {
       <button className="btn-ghost full" onClick={doExport}><FileText size={15} /> ייצוא גיבוי (JSON)</button>
       <label className="btn-ghost full" style={{ marginTop: 10, cursor: "pointer" }}><input type="file" accept="application/json,.json" style={{ display: "none" }} onChange={onPickBackup} /><RefreshCw size={15} /> שחזור מקובץ גיבוי</label>
       {pendImport && <div className="dev-box" style={{ marginTop: 10, borderStyle: "solid" }}>
-        <div className="hint" style={{ marginBottom: 8 }}>נמצא גיבוי: {pendImport.counts.fleet} כלים · {pendImport.counts.tickets} קריאות · {pendImport.counts.pm} טיפולים · {pendImport.counts.insp} בקרות · {pendImport.counts.users} משתמשים. לשחזר ולמזג למערכת?</div>
+        <div className="hint" style={{ marginBottom: 8 }}>נמצא גיבוי: {pendImport.counts.fleet} כלים · {countLabel(pendImport.counts.tickets, "קריאה", "קריאות")} · {pendImport.counts.pm} טיפולים · {pendImport.counts.insp} בקרות · {pendImport.counts.users} משתמשים. לשחזר ולמזג למערכת?</div>
         <div className="hint" style={{ marginBottom: 8 }}>כולל גם: {pendImport.counts.tasks} משימות · {pendImport.counts.meetings} פגישות · {pendImport.counts.ppeReqs} בקשות ביגוד · {pendImport.counts.ppeOrders} הזמנות רכש.</div>
         {pendImport.analysis?.legacy && <div className="note" style={{ color: "#B45309", marginBottom: 8 }}>זה נראה כמו גיבוי ישן או חלקי. שחזור ימשיך, אבל ייתכן שחסרים בו נתוני ביגוד, משימות או פגישות שלא היו קיימים בגרסת הגיבוי.</div>}
         <button className="btn-primary full" disabled={impBusy} onClick={runImport}>{impBusy ? "משחזר…" : "שחזר ומזג"}</button>
@@ -5987,7 +5987,7 @@ function TicketDetail(p) {
       {photo && <><SectionTitle>תמונה</SectionTitle><img className="detail-photo" src={photo} alt="" /></>}
       {afterPhoto && <><SectionTitle><CheckCircle2 size={15} /> תמונת ביצוע</SectionTitle><img className="detail-photo" src={afterPhoto} alt="" /></>}
       {track === "transport" ? (<>
-        {exactRelated.length > 0 && <><SectionTitle><ListChecks size={15} /> קריאות לכלי זה ({exactRelated.length})</SectionTitle><div className="cards">{exactRelated.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>{exactRelated.length >= 3 && <div className="repeat-warn"><RefreshCw size={14} /> על כלי זה נפתחו {exactRelated.length} קריאות — שקלו טיפול שורש.</div>}</>}
+        {exactRelated.length > 0 && <><SectionTitle><ListChecks size={15} /> קריאות לכלי זה ({exactRelated.length})</SectionTitle><div className="cards">{exactRelated.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>{exactRelated.length >= 3 && <div className="repeat-warn"><RefreshCw size={14} /> על כלי זה נפתחו {countLabel(exactRelated.length, "קריאה", "קריאות")} — שקלו טיפול שורש.</div>}</>}
         <button className="btn-ghost full" style={{ marginTop: 12 }} onClick={() => setShowSim((v) => !v)}><Search size={15} /> {showSim ? "הסתר קריאות דומות" : `הצג קריאות דומות${similarRelated.length ? " (" + similarRelated.length + ")" : ""}`}</button>
         {showSim && (similarRelated.length === 0 ? <div className="note">לא נמצאו קריאות דומות.</div> : <div className="cards" style={{ marginTop: 10 }}>{similarRelated.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>)}
       </>)
