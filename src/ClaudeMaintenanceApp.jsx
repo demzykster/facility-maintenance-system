@@ -4203,6 +4203,24 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const inspDue = fleet.filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
   const monthCost = tickets.filter((t) => t.closure && Date.now() - t.closure.signedAt < 30 * 86400000).reduce((a, t) => a + (t.closure.costAmount || 0), 0);
   const insights = computeInsights(tickets, dashTrack === "facility" ? [] : fleet, dashTrack === "facility" ? [] : pm, config);
+  const lifecycleOptions = {
+    now: Date.now(),
+    isOpen,
+    statusLabel: (id) => stOf(id).label,
+    waitReasonLabel: (id) => waitReasonLabel(id, config)
+  };
+  const lifecycleBottlenecks = Array.from(open.reduce((acc, t) => {
+    const current = normalizedTicketLifecycleStages(t, lifecycleOptions).find((s) => s.current);
+    const stages = current ? [current] : [];
+    if (t.returned || t.returnReason) stages.push({ key: "rework", label: "הוחזר לטיפול", ms: 0 });
+    stages.forEach((stage) => {
+      const row = acc.get(stage.key) || { key: stage.key, label: stage.label, n: 0, ms: 0 };
+      row.n += 1;
+      row.ms += stage.ms || 0;
+      acc.set(stage.key, row);
+    });
+    return acc;
+  }, new Map()).values()).sort((a, b) => b.n - a.n || b.ms - a.ms).slice(0, 4);
   // Единая дедуплицированная очередь действий: каждая заявка попадает один раз, с НАИВЫСШИМ применимым приоритетом.
   const attnRules = [
     { test: (t) => needsHandler(t, users, fleet), tag: "ללא מטפל פעיל — נדרש שיבוץ", color: "#7F1D1D" },
@@ -4273,7 +4291,9 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
       <button className="queue-chip" onClick={() => flt({ st: "waiting", focus: { waitReason: "parts", label: "ממתינות לחלקים" } })}><span className="q-num" style={{ color: "#7C3AED" }}>{waitParts.length}</span><span className="q-lbl">ממתינות לחלקים</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "pending_user" })}><span className="q-num" style={{ color: "#0D9488" }}>{waitUser.length}</span><span className="q-lbl">לאישור מנהל מחלקה</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "pending_admin" })}><span className="q-num" style={{ color: "#4F46E5" }}>{waitAdmin.length}</span><span className="q-lbl">לסגירה על ידך</span></button>
-    </div></>}
+    </div>
+    {lifecycleBottlenecks.length > 0 && <div className="stage-watch"><div className="stage-watch-title"><Clock size={14} /> שלבים שדורשים מעקב</div><div className="stage-watch-grid">{lifecycleBottlenecks.map((s) => <button key={s.key} className="stage-chip" onClick={() => flt({ st: "open", focus: { label: `שלב · ${s.label}`, lifecycleKey: s.key } })}><span className="stage-chip-name">{s.label}</span><span className="stage-chip-meta">{s.n} קריאות{s.ms ? ` · ${fmtDur(s.ms)}` : ""}</span></button>)}</div></div>}
+    </>}
     {w.docs && dashTrack !== "facility" && <><SectionTitle><FileText size={15} /> מסמכי כלי שינוע פגי-תוקף (30 ימים){expDocs.length ? ` · ${expDocs.length}` : ""}</SectionTitle>
       {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
         : <div className="cards">{expDocs.map(({ f, s }) => <div key={f.id} className="doc-line"><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><button className="btn-ghost sm" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><PenLine size={13} /> לעדכן</button></div>)}</div>}</>}
@@ -7043,6 +7063,13 @@ button.notif-perm:hover{background:#D1FAE5;}
 .queue-chip:hover{border-color:var(--primary);}
 .q-num{font-family:var(--font-head);font-weight:700;font-size:21px;line-height:1;}
 .q-lbl{font-size:11px;color:var(--muted);text-align:center;line-height:1.2;}
+.stage-watch{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0 4px;}
+.stage-watch-title{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:8px;}
+.stage-watch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;}
+.stage-chip{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:start;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0;}
+.stage-chip:hover{border-color:var(--primary);}
+.stage-chip-name{font-size:12px;font-weight:800;color:var(--ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stage-chip-meta{font-size:11px;color:var(--muted);white-space:nowrap;}
 .admin-route{background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:15px;}
 .ar-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#7C3AED;margin-bottom:10px;}
 
