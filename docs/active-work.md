@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-month-picker-buttons
+### Active branch: codex/polish-ppe-empty-order-action
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `1708281 fix: label technician acceptance lifecycle (#200)`.
+- Latest synchronized `main`: `2c070e1 fix: label month picker controls (#201)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - make icon-only month/year navigation buttons understandable.
-  - keep MonthPicker behavior unchanged while adding accessible labels/tooltips.
+  - make the empty PPE catalog state point users to catalog setup, not an empty purchase-order form.
+  - keep purchase-order behavior unchanged when catalog items exist.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: PPE month and year icon controls expose clear `title` and `aria-label` values.
+  - browser smoke-check: empty PPE dashboard shows `הוסף פריט לקטלוג`, hides visible `צור הזמנת רכש`, and opens the `קטלוג` tab.
 
 ## Latest Completed Work
 
+- PR #201: PPE month picker icon controls now have clear labels/tooltips.
+  - Month, year, and chooser icon buttons expose Hebrew `title` and `aria-label` text.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was rate-limited.
 - PR #200: Lifecycle analytics/export labels now distinguish technician acceptance.
   - Routed-but-unaccepted technician tickets use the `ממתין לקבלה` lifecycle stage.
   - Analytics drill-down opens the exact matching ticket list.
