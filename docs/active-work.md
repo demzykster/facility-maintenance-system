@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/export-operational-sla-status`
+### Active branch: `codex/wire-technician-tolerance-helper`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `e62d760 fix: centralize operational sla timing (#120)`.
+- Last synchronized `main` before this entry: `c976bb0 fix: report operational sla misses in exports (#121)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - make both ticket-list Excel and Analytics Excel report operational SLA misses consistently;
-  - include closed tickets that missed operational SLA after paused waiting time is subtracted;
-  - keep this export-only and helper-backed.
+  - wire the existing technician tolerance helper into runtime shift lateness/early-leave calculations;
+  - keep global `סבילות משמרת` as the default;
+  - avoid adding new UI until there is a business decision for per-technician overrides.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 46 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: Analytics Excel and ticket-list Excel buttons both ran without console errors.
+  - Browser smoke-check: app reloaded and rendered with no console errors.
 
 ### Latest Completed Work
 
+- PR #121: operational SLA misses were added to Excel exports.
+  - Analytics Excel and regular ticket-list Excel now use `missedOperationalSla()`.
+  - Closed tickets that missed operational SLA after paused waiting time are now visible in export.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #120: operational SLA timing was centralized.
   - Added `src/slaModel.js` with tests.
   - Open-ticket breach, closed-ticket Analytics compliance, long-treatment Analytics, and SLA bars now subtract paused waiting time through one helper.

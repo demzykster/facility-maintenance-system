@@ -18,6 +18,7 @@ import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio, pausedMs } from "./slaModel.js";
+import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -826,7 +827,7 @@ const startOfDay = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); ret
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const presenceOf = (presence, userId) => { const r = (presence || []).find((x) => x.id === userId); if (!r) return { onShift: false }; const active = r.onShift && r.day === todayKey(); return { ...r, onShift: active }; };
 const lastSeenText = (ts) => { if (!ts) return ""; const m = Math.floor((Date.now() - ts) / 60000); if (m < 1) return "פעיל כעת"; if (m < 60) return `פעיל לפני ${m} ד׳`; const h = Math.floor(m / 60); return `פעיל לפני ${h} שע׳`; };
-// График смены техника: старт+конец (одно расписание на все дни). Источник — смена из настроек, иначе личные поля, иначе дефолт.
+// График смены техника: старт+конец (одно расписание на все дни). Источник — личные поля, затем дефолт.
 const techSched = (u, cfg) => ({ start: u?.shiftStart || cfg?.defaultShiftStart || "07:30", end: u?.shiftEnd || cfg?.defaultShiftEnd || "16:30" });
 const todayAtHM = (hm) => { const [hh, mm] = String(hm || "00:00").split(":").map(Number); const d = new Date(); d.setHours(hh || 0, mm || 0, 0, 0); return d.getTime(); };
 // Простой смены: опоздание к старту (вход позже старт+допуск) и ранний уход (выход раньше конец−допуск). Только рабочие дни.
@@ -834,7 +835,8 @@ const isShiftWorkday = () => WORK_WEEK.includes(new Date().getDay());
 // Плановое отсутствие: есть ли у пользователя отгул, покрывающий день dk (ISO YYYY-MM-DD).
 const isAbsentOn = (userId, absences, dk) => { const d = dk || todayKey(); return (absences || []).some((a) => a.userId === userId && a.from && a.from <= d && (a.to || a.from) >= d); };
 const shiftIdle = (rec, u, cfg) => {
-  const sc = techSched(u, cfg); const lg = (cfg?.lateGraceMin ?? 10) * 60000, eg = (cfg?.earlyGraceMin ?? 10) * 60000;
+  const sc = techSched(u, cfg), tol = resolveTechnicianTolerances(u, { lateTolerance: cfg?.lateGraceMin ?? 10, earlyTolerance: cfg?.earlyGraceMin ?? 10 });
+  const lg = tol.lateTolerance * 60000, eg = tol.earlyTolerance * 60000;
   const sTs = todayAtHM(sc.start), eTs = todayAtHM(sc.end);
   const since = (rec && rec.day === todayKey()) ? rec.since : null;
   const endedAt = (rec && rec.day === todayKey()) ? rec.endedAt : null;
