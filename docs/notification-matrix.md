@@ -44,9 +44,9 @@ Source of truth in code:
 | manager/user | pending user approval | `confirm` | exact ticket via `ticketId` | none found |
 | manager/user | no-equipment waiting | `escalate` | exact ticket via `ticketId` | none found |
 | manager/user | ticket updates | `upd` | exact ticket via `ticketId` | none found |
-| manager/user | department PM | `pm` | `go: "dept"` currently falls back to dashboard | should route to relevant fleet/department view |
+| manager/user | department PM | `pm` | department page equipment tab via `go: "dept"` | should eventually focus department-relevant fleet rows |
 | manager/user | blocked department unit | `escalate` | `ticketId` wins; `go: "dept"` ignored | none critical |
-| manager/user | driver request outcome | `driver` | `go: "dept"` currently falls back to dashboard | should route to relevant fleet/department view |
+| manager/user | driver request outcome | `driver` | department page equipment tab via `go: "dept"` | should eventually focus the relevant unit/request |
 | manager/user | cleaning complaints in managed zones | `cleaning` | cleaning module via `go: "cleaning"` | none found |
 | cleaner | due/overdue cleaning rounds | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
 | cleaner | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
@@ -54,5 +54,4 @@ Source of truth in code:
 
 ## First Fix Candidates
 
-1. Decide what `go: "dept"` should mean before changing it, because it may need a filtered fleet/dept view rather than a generic module jump.
-2. Eventually focus fleet/PPE records instead of only opening the broad module.
+1. Eventually focus fleet/PPE records instead of only opening the broad module.

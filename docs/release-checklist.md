@@ -28,7 +28,7 @@ Next PR candidate:
 - Build a small notification matrix from `computeEvents()` by role and kind, then fix one missing/wrong navigation target per PR.
 
 Current batch:
-- Fix cleaner cleaning notifications so they open `בקרת ניקיון`.
+- Correct the R3 notification matrix for existing manager/user `go: "dept"` routing.
 
 ### R4 — Permissions And Role Reality Check
 
