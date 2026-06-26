@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Ticket list lifecycle-stage filter plumbing
+### Analytics lifecycle-stage drill-down
 
-- Status: active branch `codex/filter-tickets-by-lifecycle-stage`.
-- Last synchronized `main` before this entry: `7a9b12f test: add lifecycle stage filter helper (#113)`.
+- Status: active branch `codex/analytics-lifecycle-stage-drilldown`.
+- Last synchronized `main` before this entry: `5b21648 fix: support lifecycle stage ticket filters (#114)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - let the ticket list consume a `focus.lifecycleKey` filter;
-  - make future Analytics drill-downs include historical lifecycle stages, not only current status;
-  - keep visible Analytics UI unchanged in this PR.
+  - add a compact clickable Analytics block for lifecycle-stage time;
+  - drill into `קריאות` using `focus.lifecycleKey`;
+  - keep this as the first visible stage analytics pass, not a full dashboard redesign.
 
 ### Latest Completed Work
 
+- PR #114: ticket-list lifecycle-stage filters were wired.
+  - `קריאות` can now consume `focus.lifecycleKey`.
+  - The filter uses historical lifecycle stages, not only current ticket status.
+  - Vercel was green before merge.
 - PR #113: lifecycle-stage filter helper was added.
   - Added `ticketHasLifecycleStage()` on top of normalized lifecycle stages.
   - Covered historical waiting and rework stage matching with tests.
@@ -208,6 +212,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/analytics-lifecycle-stage-drilldown`:
+
+- `npm test -- --run`: passed, 12 files / 42 tests.
+- `npm run build`: passed.
+- Browser smoke-check: passed at `http://127.0.0.1:5188/`; Analytics showed `זמן לפי שלבי קריאה`, clicking `ממתינה לחלקים` opened `קריאות` with focus banner `שלב · ממתינה לחלקים` and 2 filtered tickets.
 
 Branch `codex/filter-tickets-by-lifecycle-stage`:
 
