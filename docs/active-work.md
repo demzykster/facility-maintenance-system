@@ -21,19 +21,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/team-notification-route, if PR is still open
+### Active branch: codex/cleaner-notification-route, if PR is still open
 
 - Status: ready for PR after local validation.
-- Last synchronized `main` before this entry: `8fbf7b1 docs: map notification routes (#180)`.
+- Last synchronized `main` before this entry: `e82867b fix: route team notifications to users (#181)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - fix R3 notification routing for technician shift events using `go: "team"`;
-  - correct the notification matrix after verifying admin no-equipment notifications already have `ticketId`.
+  - route cleaner cleaning notifications to `בקרת ניקיון` with `go: "cleaning"`.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check notification panel opens with current data.
-  - code-path check: `go: "team"` now maps to the `team` tab instead of dashboard fallback.
+  - browser smoke-check cleaner role opens with current data.
+  - code-path check: cleaner cleaning events now include `go: "cleaning"`.
 
 ## Latest Completed Work
 
@@ -135,9 +134,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/team-notification-route` is still open, review/merge it.
-2. If it is merged, next code fix candidate: route cleaner cleaning notifications to `בקרת ניקיון`.
-3. Then decide what `go: "dept"` should mean before changing it.
+1. If branch `codex/cleaner-notification-route` is still open, review/merge it.
+2. If it is merged, decide what `go: "dept"` should mean before changing it.
+3. Then continue R3 route/focus fixes one small PR at a time.
 
 ## Documentation Policy
 

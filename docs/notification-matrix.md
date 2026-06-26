@@ -48,12 +48,11 @@ Source of truth in code:
 | manager/user | blocked department unit | `escalate` | `ticketId` wins; `go: "dept"` ignored | none critical |
 | manager/user | driver request outcome | `driver` | `go: "dept"` currently falls back to dashboard | should route to relevant fleet/department view |
 | manager/user | cleaning complaints in managed zones | `cleaning` | cleaning module via `go: "cleaning"` | none found |
-| cleaner | due/overdue cleaning rounds | `cleaning` | no route | should open cleaning module |
-| cleaner | complaints in owned zones | `cleaning` | no route | should open cleaning module |
+| cleaner | due/overdue cleaning rounds | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
+| cleaner | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
 | all relevant roles | tasks and meetings | `task` | tasks module via `go: "tasks"` | none found |
 
 ## First Fix Candidates
 
-1. Route cleaner cleaning notifications to `בקרת ניקיון`.
-2. Decide what `go: "dept"` should mean before changing it, because it may need a filtered fleet/dept view rather than a generic module jump.
-3. Eventually focus fleet/PPE records instead of only opening the broad module.
+1. Decide what `go: "dept"` should mean before changing it, because it may need a filtered fleet/dept view rather than a generic module jump.
+2. Eventually focus fleet/PPE records instead of only opening the broad module.
