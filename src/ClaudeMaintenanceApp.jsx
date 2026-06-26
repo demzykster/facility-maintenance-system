@@ -4286,7 +4286,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
       <button className="kpi-btn" onClick={() => flt({ st: "open" })}><Kpi num={open.length} label="קריאות פתוחות" color="#2563EB" /></button>
       <button className="kpi-btn" onClick={() => flt({ st: "open", track: "transport" })}><Kpi num={transOpen.length} label="כלי שינוע פתוחים" color="#EA580C" /></button>
       <button className="kpi-btn" onClick={() => flt({ st: "open", track: "facility" })}><Kpi num={facilityOpen.length} label="אחזקת מבנה" color="#0EA5E9" /></button>
-      <button className="kpi-btn" onClick={() => flt({ st: "open" })}><Kpi num={breach.length} label="חריגות SLA" color="#DC2626" /></button>
+      <button className="kpi-btn" onClick={() => flt({ st: "open", focus: { label: "חריגות SLA", overdue: true } })}><Kpi num={breach.length} label="חריגות SLA" color="#DC2626" /></button>
     </div>
     <div className="queue-row">
       <button className="queue-chip" onClick={() => flt({ st: "open", pr: "high" })}><span className="q-num" style={{ color: "#7C3AED" }}>{open.filter((t) => prOf(t.priority).id === "high").length}</span><span className="q-lbl">דחופות</span></button>
@@ -4335,6 +4335,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       if (focus.supplier && (t.closure?.costSupplier || "") !== focus.supplier) return false;
       if (focus.waitReason && t.waitingReason !== focus.waitReason) return false;
       if (focus.lifecycleKey && !ticketHasLifecycleStage(t, focus.lifecycleKey, { isOpen })) return false;
+      if (focus.overdue && !isOverdue(t)) return false;
       if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
     }
     if (q.trim()) { const s = `${ticketNo(t)} ${t.subject} ${t.description} ${t.asset || ""} ${t.assignee || ""} ${t.createdBy?.name}`.toLowerCase(); if (!s.includes(q.toLowerCase())) return false; }

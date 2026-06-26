@@ -21,19 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/fix-dashboard-sla-drilldown`
 
-- Status: idle.
-- Last synchronized `main` before this entry: `99db2c3 fix: clarify team shift settings copy (#139)`.
+- Status: in progress.
+- Last synchronized `main` before this entry: `85123f3 docs: close screen polish ledger [skip vercel]`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - current screen-by-screen polish pass is complete;
-  - continue future work from `docs/backlog.md` or a new owner-reported bug.
+  - make the Dashboard `חריגות SLA` KPI drill down to overdue tickets only;
+  - preserve the existing focus-banner pattern in `קריאות`.
 - Validation so far:
-  - docs-only ledger close; product validation was completed in PR #139.
+  - `npm test -- --run`: passed, 13 files / 49 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; clicking Dashboard `חריגות SLA` opens `קריאות` with focus banner `מציג: חריגות SLA`, the list count is narrowed to overdue tickets, and no console errors were reported.
 
 ### Latest Completed Work
 
+- PR #140: screen-polish ledger was closed.
+  - `docs/active-work.md` now starts from no active product branch after the previous screen pass.
+  - Docs-only PR used `[skip vercel]`.
 - PR #139: Team/User Management shift settings copy was clarified.
   - `צוות ומשתמשים` -> `הגדרות` now uses neutral `משמרות עבודה` wording instead of implying only morning/night shifts.
   - The hint explains that morning/night are the demo default and more shifts can be added.
