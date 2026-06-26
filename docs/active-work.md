@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/polish-ppe-screen-copy`
+### Active branch: `codex/polish-settings-screen-copy`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `211779c fix: polish analytics ticket count copy (#136)`.
+- Last synchronized `main` before this entry: `e6749c2 fix: polish PPE inventory copy (#137)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - polish Hebrew count grammar and repeated helper copy in `ביגוד עובדים`;
-  - continue the screen-by-screen pass before moving to `הגדרות` and `צוות ומשתמשים`.
+  - correct misleading demo/security copy in global `הגדרות`;
+  - continue the screen-by-screen pass before moving to `צוות ומשתמשים`.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `ביגוד עובדים` no longer showed `1 פריטים`, the reorder hint appears once, and no console errors were reported.
+  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; global `הגדרות` shows the updated demo/local-browser storage note, the old shared-users wording is gone, and no console errors were reported.
 
 ### Latest Completed Work
 
+- PR #137: PPE inventory copy was polished.
+  - `ביגוד עובדים` no longer shows `1 פריטים`; category counts use correct singular/plural Hebrew.
+  - The reorder-size helper now appears once per section instead of repeating inside every reorder card.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #136: Analytics count grammar was polished.
   - `אנליטיקה` and related dashboard stage chips now use `1 קריאה` instead of `1 קריאות`.
   - Analytics drill-down still opens filtered `קריאות` with the focus banner.
