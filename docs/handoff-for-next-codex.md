@@ -8,7 +8,7 @@ This file is the restart guide for a different Codex session on another computer
 - Demo/staging: https://facility-maintenance-system.vercel.app/
 - Main branch: `main`
 
-GitHub is the source of truth. Do not use old Claude artifacts or copied whole files as source.
+GitHub is the source of truth. Do not use old external artifacts or copied whole files as source.
 
 ## First Steps
 
@@ -49,7 +49,7 @@ Then read only what the current task needs:
 - `docs/collaboration-model.md` - collaboration or handoff questions.
 - `docs/permissions-model.md` - user permissions, roles, worker onboarding, module access.
 - `docs/full-ui-audit-2026-06-24.md` - UI audit follow-up.
-- `docs/engineering-dialogue.md` - Claude/Codex topic decisions and open audit topics.
+- `docs/engineering-dialogue.md` - historical engineering topic decisions; read only when the task touches those topics.
 - `docs/archive/progress-log.md` and `docs/archive/validation-log.md` - historical lookup only.
 
 ## Core Rules
@@ -62,7 +62,9 @@ Then read only what the current task needs:
 - Do not start Supabase/Auth/RLS/Railway/database work.
 - Do not do a broad modular split yet.
 - Keep changes small and reversible.
-- Update `docs/active-work.md` in the same commit as the code, not as a separate PR.
+- Keep `docs/active-work.md` short. Update it when the active state changes, work pauses mid-branch, strategy changes, or the current ledger would mislead the next session.
+- Do not update `docs/active-work.md` after every tiny merged PR if `main` is clean and the next step is obvious.
+- Do not update `docs/backlog.md` unless a task is opened, closed, or reprioritized.
 - After any code change, run:
   - `npm test -- --run`
   - `npm run build`
@@ -88,9 +90,9 @@ Read `docs/permissions-model.md` before changing user permissions or onboarding.
 
 ## Planning Step Before Product Code
 
-If `docs/backlog.md` does not exist yet, create it before product code work.
+`docs/backlog.md` already exists. Use it as the grouped task list, not as a per-PR journal.
 
-Planning requirements:
+If a new large area is opened, do a short planning step before product code:
 
 1. Verify worker activation UI wiring in code and browser:
    - copy activation link button after saving a worker;
@@ -104,7 +106,7 @@ Planning requirements:
 3. Group tasks by code area in `docs/backlog.md`.
 4. Merge backlog through its own docs-only PR.
 
-After backlog exists, work from it with one atomic PR per change. If a product-code diff is more than about 100 lines, split it.
+Work from the backlog with one clear theme per PR. Several closely related low-risk fixes can share one PR. If a product-code diff is more than about 100 lines or touches unrelated areas, split it.
 
 Check `docs/backlog.md` for the current smallest open item.
 
