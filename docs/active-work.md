@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/fix-critical-dashboard-drilldowns`
+### Active branch: `codex/fix-ticket-count-hebrew`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `8f1da0f fix: separate critical dashboard counts (#142)`.
+- Last synchronized `main` before this entry: `7c941b3 fix: focus critical dashboard drilldowns (#143)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - make Dashboard critical/escalated attention cards open matching focused ticket lists;
-  - avoid broad "all open transport tickets" drill-downs from narrow attention cards.
+  - fix singular/plural Hebrew in ticket-list and printable report counters;
+  - avoid showing `1 קריאות` or plural sorting wording when a focused drill-down has one result.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; clicking `תקלות קריטיות שהוסלמו` opened only `#T-901`, and clicking `תקלות שינוע קריטיות פתוחות` opened only `#T-915`.
+  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; a one-result focused drill-down now shows `1 קריאה · ממוינת לפי דחיפות`.
 
 ### Latest Completed Work
 
+- PR #143: Dashboard critical attention drill-downs now open focused ticket lists.
+  - `תקלות קריטיות שהוסלמו` opens only escalated critical tickets.
+  - `תקלות שינוע קריטיות פתוחות` opens only active non-escalated critical transport tickets.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #142: Dashboard critical attention counts were separated.
   - Escalated critical transport issues are no longer double-counted in the regular critical transport attention card.
   - Demo Dashboard now shows 1 escalated critical issue and 1 active critical transport issue instead of counting the escalated issue twice.
