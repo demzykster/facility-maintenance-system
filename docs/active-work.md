@@ -21,19 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/drilldown-filter-reset, if PR is still open
+### Active branch: codex/drilldown-filter-labels, if PR is still open
 
 - Status: ready for PR after local validation.
-- Last synchronized `main` before this entry: `9d0685b docs: close SLA lifecycle release package (#176)`.
+- Last synchronized `main` before this entry: `82dc501 fix: make drilldown filters visibly resettable (#177)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - R2 drill-down/filter reset;
-  - make drill-down filters from Dashboard/Analytics visibly labeled and clearable in one click, including filters that set status/track without a `focus` label.
+  - give Dashboard drill-down filters specific visible labels instead of the generic Dashboard/Analytics label where possible.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check Dashboard drill-down into Tickets, then clear the banner.
-  - browser smoke-check transport drill-down into Tickets, then clear the banner.
+  - browser smoke-check Dashboard open-ticket KPI banner label and clear action.
+  - browser smoke-check Dashboard transport KPI banner label and clear action.
 
 ## Latest Completed Work
 
@@ -135,7 +135,7 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/drilldown-filter-reset` is still open, review/merge it.
+1. If branch `codex/drilldown-filter-labels` is still open, review/merge it.
 2. If it is already merged, continue R2 from `docs/release-checklist.md`.
 3. Update this ledger only when it helps the next Codex session resume safely.
 
