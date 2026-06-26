@@ -438,6 +438,7 @@ Implementation so far:
 - Notification panel display settings now use clearer Hebrew copy for filtering notification types.
 - The panel shows how many notifications are currently displayed and clarifies that hiding categories only affects the user's local view.
 - PR #166 polished Analytics parts-wait card singular/plural Hebrew wording for delayed tickets and SLA breaches.
+- PR #167 polished the Dashboard parts-wait chip to lifecycle-compatible wording after the count moved to `waiting:parts`.
 
 ## Deferred / Out Of Scope For Now
 

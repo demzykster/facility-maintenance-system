@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #166.
-- Last synchronized `main` before this entry: `b708652 fix: align dashboard parts wait drilldown (#165)`.
-- Open PRs when this entry was written: PR #166 was ready to merge.
+- Status: idle after PR #167.
+- Last synchronized `main` before this entry: `2bbd04f fix: polish analytics parts wait Hebrew (#166)`.
+- Open PRs when this entry was written: PR #167 was ready to merge.
 - Purpose:
-  - Analytics parts-wait card now has correct Hebrew singular/plural wording;
-  - copy stays aligned for one delayed ticket and one SLA breach.
+  - Dashboard parts-wait queue chip now uses lifecycle-compatible wording;
+  - displayed chip label is aligned with its lifecycle-key filter.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Analytics parts-wait Hebrew copy.
+  - browser smoke-check passed for Dashboard parts-wait label.
 
 ## Latest Completed Work
 
+- PR #167: Dashboard parts-wait label was polished.
+  - The queue chip now says `עיכוב חלקים`, matching the lifecycle-based count/filter.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #166: Analytics parts-wait Hebrew copy was polished.
   - The parts-wait card now says `1 קריאה עוכבה` for a single delayed ticket instead of plural wording.
   - Local tests/build/browser smoke-check passed before merge.
