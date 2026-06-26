@@ -283,7 +283,7 @@ Next small product candidates:
 
 ### SLA / stage timing model
 
-Status: planning contract added in `docs/sla-stage-model.md`.
+Status: first helper contract implemented.
 
 Goal:
 - Treat SLA as more than one final due date.
@@ -294,6 +294,16 @@ Suggested first code PR:
 1. Add a pure helper that returns normalized ticket stages from `statusMs`, current status, waiting reason, equipment wait, return/rework, and closure fields.
 2. Cover it with unit tests.
 3. Reuse it in export/dashboard only after the helper contract is stable.
+
+Implementation so far:
+- `normalizedTicketLifecycleStages()` is the shared lifecycle-stage helper.
+- It now returns stage key, kind, reason, label, duration, current flag, current start time, owner/ball-holder, operational-SLA accounting, downtime accounting, and export/analytics/dashboard visibility hints.
+- Ticket-list and Analytics lifecycle Excel sheets include action owner and SLA/downtime accounting columns.
+- Unit tests cover current stages, closed historical waiting, equipment wait, rework, owner, operational-SLA accounting, downtime accounting, and visibility hints.
+
+Remaining:
+- Use the normalized stage fields directly in Analytics cards/drill-downs instead of deriving stage behavior in several places.
+- Improve user-facing labels for wait-reason settings so `pauseSla` is explained as operational-SLA accounting, not as a mysterious global SLA stop.
 
 ### Transport duplicate check
 

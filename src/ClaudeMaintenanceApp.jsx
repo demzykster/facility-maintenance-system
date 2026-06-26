@@ -727,6 +727,10 @@ const wReasonOf = (cfg, id) => wReasons(cfg).find((r) => r.id === id) || WAIT_RE
 const waitReasonLabel = (id, cfg) => (wReasonOf(cfg, id)?.label || "ממתינה");
 const ticketWaitReasonLabel = (t, cfg) => (t?.status === "waiting" && t.waitingReason) ? waitReasonLabel(t.waitingReason, cfg) : "";
 const reasonBall = (cfg, id) => (wReasonOf(cfg, id)?.ball || "executor");
+const waitReasonLifecycleMeta = (cfg, id) => {
+  const reason = wReasonOf(cfg, id);
+  return reason ? { ball: reason.ball || "executor", pauseSla: !!reason.pauseSla } : {};
+};
 // Причины, которые роль может ВЫСТАВЛЯТЬ (один список, фильтр по setters). no_equipment ставится отдельной кнопкой техника.
 const reasonsForRole = (cfg, role) => wReasons(cfg).filter((r) => r.id !== "no_equipment" && (r.setters === "both" || (role === "tech" ? r.setters === "tech" : r.setters === "manager"))).map((r) => (r.id === "manager_decision" && r.label === "ממתינה להחלטת מנהל") ? { ...r, label: "צריך עזרה / החלטה" } : r);
 const reasonPauses = (cfg, id) => !!(wReasonOf(cfg, id)?.pauseSla);
@@ -4211,7 +4215,8 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     now: Date.now(),
     isOpen,
     statusLabel: (id) => stOf(id).label,
-    waitReasonLabel: (id) => waitReasonLabel(id, config)
+    waitReasonLabel: (id) => waitReasonLabel(id, config),
+    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id)
   };
   const lifecycleBottlenecks = Array.from(open.reduce((acc, t) => {
     const current = normalizedTicketLifecycleStages(t, lifecycleOptions).find((s) => s.current);
@@ -4366,6 +4371,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       isOpen,
       statusLabel: (id) => stOf(id).label,
       waitReasonLabel: (id) => waitReasonLabel(id, config),
+      waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id),
       wearLabel: (id) => WEAR.find((w) => w.id === id)?.label || id,
       durationText: fmtDur
     };
@@ -4392,6 +4398,9 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
         "סוג שורה": row.kind === "waiting" ? "המתנה" : row.kind === "rework" ? "החזרה לטיפול" : "סטטוס",
         "סטטוס/סיבה": row.label,
         "נוכחי": row.current ? "כן" : "",
+        "מחזיק פעולה": row.owner || "",
+        "נספר ב-SLA תפעולי": row.countsOperationalSla ? "כן" : "לא",
+        "נספר כהשבתה": row.countsDowntime ? "כן" : "לא",
         "משך": fmtDur(row.ms), "משך (שעות)": Math.round(row.ms / 360000) / 10
       })));
       if (lifecycleRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(lifecycleRows)), "מחזור חיים");
@@ -5065,6 +5074,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     isOpen,
     statusLabel: (id) => stOf(id).label,
     waitReasonLabel: (id) => waitReasonLabel(id, config),
+    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id),
     wearLabel: (id) => WEAR.find((w) => w.id === id)?.label || id,
     durationText: fmtDur
   };
@@ -5168,6 +5178,9 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
         "סוג שורה": row.kind === "waiting" ? "המתנה" : row.kind === "rework" ? "החזרה לטיפול" : "סטטוס",
         "סטטוס/סיבה": row.label,
         "נוכחי": row.current ? "כן" : "",
+        "מחזיק פעולה": row.owner || "",
+        "נספר ב-SLA תפעולי": row.countsOperationalSla ? "כן" : "לא",
+        "נספר כהשבתה": row.countsDowntime ? "כן" : "לא",
         "משך": fmtDur(row.ms), "משך (שעות)": Math.round(row.ms / 360000) / 10
       })));
       if (lifecycleRows.length) {

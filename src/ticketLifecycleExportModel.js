@@ -10,6 +10,48 @@ const currentStatusKey = (ticket) => ticket?.status === "waiting"
   ? `waiting:${ticket.waitingReason || "other"}`
   : (ticket?.status || "new");
 
+const DEFAULT_STATUS_OWNER = {
+  new: "manager",
+  open: "manager",
+  pending_manager: "manager",
+  in_progress: "executor",
+  waiting: "executor",
+  pending_user: "requester",
+  pending_admin: "admin",
+  rework: "requester",
+  done: "none",
+  cancelled: "none"
+};
+
+const defaultWaitReasonMeta = (reason) => {
+  if (reason === "no_equipment") return { ball: "manager", pauseSla: true };
+  return {};
+};
+
+const stageOwner = (ticket, key, kind, reason, waitReasonMeta) => {
+  if (kind === "waiting") {
+    const meta = waitReasonMeta(reason) || {};
+    return meta.ball || (ticket?.waitBall && key === currentStatusKey(ticket) ? ticket.waitBall : "") || defaultWaitReasonMeta(reason).ball || "executor";
+  }
+  if (kind === "rework") return "requester";
+  return DEFAULT_STATUS_OWNER[key] || "executor";
+};
+
+const stageCountsOperationalSla = (key, kind, reason, waitReasonMeta) => {
+  if (key === "done" || key === "cancelled") return false;
+  if (kind !== "waiting") return true;
+  const meta = waitReasonMeta(reason) || {};
+  return !("pauseSla" in meta ? meta.pauseSla : defaultWaitReasonMeta(reason).pauseSla);
+};
+
+const stageCountsDowntime = (ticket, key, kind) => (
+  ticket?.track === "transport"
+  && !!ticket?.downtimeStart
+  && key !== "done"
+  && key !== "cancelled"
+  && kind !== "rework"
+);
+
 export function ticketLifecycleDurations(ticket, { now = Date.now(), isOpen = () => true } = {}) {
   const durations = { ...(ticket?.statusMs || {}) };
   if (ticket && isOpen(ticket) && ticket.statusSince) {
@@ -64,17 +106,26 @@ export function normalizedTicketLifecycleStages(ticket, {
   now = Date.now(),
   isOpen = () => true,
   statusLabel = (id) => id,
-  waitReasonLabel = (id) => id
+  waitReasonLabel = (id) => id,
+  waitReasonMeta = defaultWaitReasonMeta
 } = {}) {
   const stages = ticketLifecycleRows(ticket, { now, isOpen })
-    .map((row) => ({
+    .map((row) => {
+      const current = ticket && isOpen(ticket) && ticket.statusSince && row.key === currentStatusKey(ticket);
+      return {
       key: row.key,
       kind: row.kind,
       reason: row.reason,
       label: row.kind === "waiting" ? waitReasonLabel(row.reason) : statusLabel(row.key),
       ms: row.ms,
-      current: false
-    }));
+      current: false,
+      currentStartedAt: current ? ticket.statusSince : null,
+      owner: stageOwner(ticket, row.key, row.kind, row.reason, waitReasonMeta),
+      countsOperationalSla: stageCountsOperationalSla(row.key, row.kind, row.reason, waitReasonMeta),
+      countsDowntime: stageCountsDowntime(ticket, row.key, row.kind),
+      appearsIn: { export: true, analytics: true, dashboard: true }
+    };
+    });
 
   if (ticket && isOpen(ticket) && ticket.statusSince) {
     const key = currentStatusKey(ticket);
@@ -90,7 +141,12 @@ export function normalizedTicketLifecycleStages(ticket, {
       reason: "no_equipment",
       label: waitReasonLabel("no_equipment"),
       ms: equipmentWaitMs,
-      current: ticket?.status === "waiting" && ticket?.waitingReason === "no_equipment"
+      current: ticket?.status === "waiting" && ticket?.waitingReason === "no_equipment",
+      currentStartedAt: ticket?.status === "waiting" && ticket?.waitingReason === "no_equipment" ? (ticket.statusSince || ticket.equipWaitSince || null) : null,
+      owner: stageOwner(ticket, "waiting:no_equipment", "waiting", "no_equipment", waitReasonMeta),
+      countsOperationalSla: stageCountsOperationalSla("waiting:no_equipment", "waiting", "no_equipment", waitReasonMeta),
+      countsDowntime: stageCountsDowntime(ticket, "waiting:no_equipment", "waiting"),
+      appearsIn: { export: true, analytics: true, dashboard: true }
     });
   }
 
@@ -101,7 +157,12 @@ export function normalizedTicketLifecycleStages(ticket, {
       reason: "",
       label: "הוחזר לטיפול",
       ms: 0,
-      current: false
+      current: false,
+      currentStartedAt: null,
+      owner: stageOwner(ticket, "rework", "rework", "", waitReasonMeta),
+      countsOperationalSla: true,
+      countsDowntime: false,
+      appearsIn: { export: true, analytics: true, dashboard: true }
     });
   }
 
