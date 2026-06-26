@@ -29,7 +29,8 @@ Next PR candidate:
 
 Current batch:
 - PR #172 moved ticket-list export and Analytics SLA breach/compliance calculations to lifecycle-aware SLA helpers.
-- Current batch is moving visible ticket-list/detail SLA badges, SLA bar, attention queue, and overdue drill-down to the same helper.
+- PR #173 moved visible ticket-list/detail SLA badges, SLA bar, attention queue, and overdue drill-down to the same helper.
+- Current batch is moving visible ticket-list sorting and technician SLA counts to lifecycle-aware timing.
 - Legacy pause totals remain as fallback when a ticket has no normalized non-operational lifecycle stages.
 
 ### R2 — Drill-Down And Filter Reset
