@@ -1050,11 +1050,11 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
       const due = (fleet || []).filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
       if (due.length) ev.push({ key: "inspdue-admin", at: Date.now(), kind: "doc", go: "insp", title: "בקרת כלים חודשית חסרה", body: `${countLabel(due.length, "כלי ממתין", "כלים ממתינים")} לבקרה חודשית` }); }
     { const pend = (ppeReqs || []).filter(ppeRequestNeedsAction);
-      if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", title: "בקשות ביגוד ממתינות", body: `${countLabel(pend.length, "בקשה", "בקשות")} לאישור או חתימת עובד` }); }
+      if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", ppeSub: "dash", title: "בקשות ביגוד ממתינות", body: `${countLabel(pend.length, "בקשה", "בקשות")} לאישור או חתימת עובד` }); }
     { const low = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
-      if (low.length) ev.push({ key: "ppe-low-admin", at: Date.now(), kind: "ppe", go: "ppe", title: "חוסרי ביגוד לפי מידה", body: `${countLabel(low.length, "פריט", "פריטים")} מתחת למינימום` }); }
+      if (low.length) ev.push({ key: "ppe-low-admin", at: Date.now(), kind: "ppe", go: "ppe", ppeSub: "dash", title: "חוסרי ביגוד לפי מידה", body: `${countLabel(low.length, "פריט", "פריטים")} מתחת למינימום` }); }
     { const openOrders = (ppeOrders || []).filter((o) => o.status === "sent");
-      if (openOrders.length) ev.push({ key: "ppe-orders-admin", at: Math.max(...openOrders.map((o) => o.sentAt || o.createdAt || 0)), kind: "ppe", go: "ppe", title: "הזמנות ביגוד ממתינות לקליטה", body: `${countLabel(openOrders.length, "הזמנת רכש פתוחה", "הזמנות רכש פתוחות")}` }); }
+      if (openOrders.length) ev.push({ key: "ppe-orders-admin", at: Math.max(...openOrders.map((o) => o.sentAt || o.createdAt || 0)), kind: "ppe", go: "ppe", ppeSub: "log", title: "הזמנות ביגוד ממתינות לקליטה", body: `${countLabel(openOrders.length, "הזמנת רכש פתוחה", "הזמנות רכש פתוחות")}` }); }
     ev.push(...buildPpeApprovedEvents(ppeReqs));
     shiftEvents("team");
     { const nowTs = Date.now(); (zones || []).filter((z) => z.active !== false).forEach((z) => { const absent = isAbsentOn(z.cleanerId, absences); zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => { if (status === "missed") ev.push({ key: `clmiss-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) + (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: absent ? "סבב ניקיון — נדרש כיסוי (העובד בחופשה)" : "סבב ניקיון פוספס", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}${z.cleanerName ? " · " + z.cleanerName : ""}` }); }); }); }
@@ -4075,7 +4075,7 @@ function MonthPicker({ y, m, onChange }) {
 }
 
 function PpeHub(p) {
-  const { ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, users, config, session, savePpe, delPpe, savePpeItem, delPpeItem, saveNorm, delNorm, savePpeReq, delPpeReq, savePpeOrder, delPpeOrder, saveUser, saveConfig } = p;
+  const { ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, users, config, session, ppeNav, savePpe, delPpe, savePpeItem, delPpeItem, saveNorm, delNorm, savePpeReq, delPpeReq, savePpeOrder, delPpeOrder, saveUser, saveConfig } = p;
   const lvl = permLevel(session, "ppe");
   const isFull = permRank(lvl) >= permRank("full");
   const deptScope = isFull ? null : (userDepts(session).length ? userDepts(session) : ["__none__"]);
@@ -4089,6 +4089,7 @@ function PpeHub(p) {
   const [mStart, mEnd] = monthRange(mY, mM);
   const mLabel = monthLabelOf(mY, mM);
   const openOrder = () => { const lines = []; (ppeItems || []).filter((x) => x.active !== false).forEach((it) => { ppeNetDeficits(it, ppeOrders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setOrderForm({ lines }); };
+  useEffect(() => { if (["dash", "log", "catalog", "settings"].includes(ppeNav?.sub)) setSub(ppeNav.sub); }, [ppeNav?._t]);
   if (!canRequestPpe(session)) return <div className="note">אין הרשאה לבקשת או ניהול ביגוד עובדים.</div>;
   if (!isFull) return <PpeRequester ppe={ppe} items={ppeItems} norms={ppeNorms} reqs={ppeReqs} users={users} config={config} session={session} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} deptScope={deptScope} />;
   const tab = sub;
@@ -4105,12 +4106,13 @@ function PpeHub(p) {
 
 function AdminApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
-  const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null);
+  const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null);
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const clearTicketFilter = () => setTFilter(null);
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
+  const goPpe = (nav = {}) => { setPpeNav({ ...nav, _t: Date.now() }); setTab("ppe"); };
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
   const mayViewAnalytics = canViewAnalytics(session);
@@ -4151,7 +4153,7 @@ function AdminApp(p) {
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} />}
-          {activeTab === "ppe" && <PpeHub {...p} />}
+          {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
           {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
           {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
@@ -4164,7 +4166,7 @@ function AdminApp(p) {
       <AIFab onClick={() => setShowAI(true)} />
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "ppe" ? "ppe" : go === "team" ? "team" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>

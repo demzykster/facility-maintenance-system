@@ -28,7 +28,7 @@ Next PR candidate:
 - Build a small notification matrix from `computeEvents()` by role and kind, then fix one missing/wrong navigation target per PR.
 
 Current batch:
-- Focus admin fleet document and driver request notifications on the exact unit card.
+- Focus admin PPE request, low-stock, and open-order notifications on the relevant PPE sub-tab.
 
 ### R4 — Permissions And Role Reality Check
 
