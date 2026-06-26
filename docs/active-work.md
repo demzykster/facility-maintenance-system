@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #159.
-- Last synchronized `main` before this entry: `740c13b fix: clarify wait reason SLA settings (#158)`.
-- Open PRs when this entry was written: PR #159 was ready to merge.
+- Status: idle after PR #160.
+- Last synchronized `main` before this entry: `dfa1c04 fix: use lifecycle stages for wait totals (#159)`.
+- Open PRs when this entry was written: PR #160 was ready to merge.
 - Purpose:
-  - Analytics wait-time summary totals now use normalized lifecycle stages instead of older direct ticket fields;
+  - ticket detail non-operational-SLA wait time now uses normalized lifecycle stages instead of the older paused-time helper;
   - continue replacing older wait/SLA summaries and drill-downs that still derive totals outside the normalized lifecycle helper.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Analytics wait-time summaries.
+  - browser smoke-check passed for ticket detail wait-time metadata.
 
 ## Latest Completed Work
 
+- PR #160: ticket detail wait-time metadata moved to lifecycle stages.
+  - The non-operational-SLA wait-time field in ticket details now uses normalized lifecycle stage rows.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #159: Analytics wait-time summary totals moved to lifecycle stages.
   - No-equipment waiting and non-operational-SLA waiting now use normalized lifecycle stage rows.
   - Local tests/build/browser smoke-check passed before merge.

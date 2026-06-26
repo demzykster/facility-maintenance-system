@@ -17,7 +17,7 @@ import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shoul
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio, pausedMs } from "./slaModel.js";
+import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 
 /* ============================================================
@@ -5971,6 +5971,18 @@ function TicketDetail(p) {
   // Подтвердить «טופל» может менеджер (управляет всей площадкой) или админ. Техник — никогда.
   const canConfirm = !isTech && (role === "user" || role === "admin");
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
+  const detailLifecycleOptions = {
+    now: Date.now(),
+    isOpen,
+    statusLabel: (id) => stOf(id).label,
+    waitReasonLabel: (id) => waitReasonLabel(id, config),
+    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id),
+    wearLabel: (id) => WEAR.find((w) => w.id === id)?.label || id,
+    durationText: fmtDur
+  };
+  const detailPausedTotal = normalizedTicketLifecycleStages(ticket, detailLifecycleOptions)
+    .filter((stage) => stage.countsOperationalSla === false)
+    .reduce((sum, stage) => sum + (stage.ms || 0), 0);
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onBack}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">קריאה #{ticketNo(ticket)}</div>{onRepeat && <button className="icon-btn" onClick={repeat} style={{ marginInlineStart: "auto" }} title="פתח קריאה דומה"><Copy size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top">
@@ -5994,7 +6006,7 @@ function TicketDetail(p) {
         <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || "טרם שויך"} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
         {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
-        {pausedMs(ticket) > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(pausedMs(ticket))} />}
+        {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
         {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <div className="meta"><AlertTriangle size={15} color={r.color} /><div><div className="meta-lbl">רמת סיכון</div><div className="meta-val" style={{ color: r.color, fontWeight: 700 }}>{r.label}</div></div></div> : null; })()}
       </div>
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>
