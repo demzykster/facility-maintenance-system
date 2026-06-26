@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/user-analytics-readonly-route
+### Active branch: codex/user-settings-permission-route
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `730c5e8 fix: expose suppliers to permitted managers (#191)`.
+- Latest synchronized `main`: `1683a82 fix: expose readonly analytics to permitted managers (#192)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - give manager/user sessions with `analytics:view` a visible path to `אנליטיקה`.
-  - keep the manager/user analytics path read-only; damage report fields must not save edits from this route.
+  - give manager/user sessions with `settings:manage` a visible path to `הגדרות`.
+  - keep sensitive settings actions gated by existing `settings:full`.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
   - browser smoke-check: app renders after reload and console has no errors.
-  - code-path check: `analytics:view` adds the manager/user nav item, and `DamageReport` receives `canEdit={false}` from this route.
+  - code-path check: `settings:manage` adds the manager/user nav item, while sensitive actions still depend on `settings:full`.
 
 ## Latest Completed Work
 
+- PR #192: Manager/user Analytics access is now visible when permitted.
+  - `אנליטיקה` appears only when the session has `analytics:view`.
+  - Manager/user analytics opens in read-only mode; damage report edit controls do not save from this route.
+  - Vercel was green before merge.
 - PR #191: Manager/user Suppliers access is now visible when permitted.
   - `ספקים / קבלנים` appears only when the session has `suppliers:view`.
   - Editing remains gated by `suppliers:manage`.
