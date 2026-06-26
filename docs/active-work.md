@@ -21,18 +21,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/lifecycle-aware-sla, if PR is still open
+### Active branch: codex/lifecycle-overdue-ui, if PR is still open
 
 - Status: validation passed; ready for PR/merge. After merge, no active product branch is intentionally left open.
-- Last synchronized `main` before this entry: `f50d765 docs: add release closure checklist (#171)`.
+- Last synchronized `main` before this entry: `6aebccc fix: score analytics SLA from lifecycle stages (#172)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - R1 SLA/lifecycle trust batch;
-  - make ticket-list export and Analytics SLA breach/compliance calculations use lifecycle non-operational stages before falling back to legacy pause totals.
+  - make visible ticket-list/detail SLA badges, SLA bar, attention queue, and overdue drill-down use the same lifecycle-aware SLA helper as Analytics/export.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check passed for Analytics after the lifecycle-SLA wiring change.
+  - browser smoke-check passed for Dashboard, Tickets, and ticket detail.
 
 ## Latest Completed Work
 
@@ -134,7 +134,7 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/lifecycle-aware-sla` is still open, review/merge it.
+1. If branch `codex/lifecycle-overdue-ui` is still open, review/merge it.
 2. If it is already merged, continue R1 from `docs/release-checklist.md`.
 3. Update this ledger only when it helps the next Codex session resume safely.
 

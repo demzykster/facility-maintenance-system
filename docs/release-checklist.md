@@ -28,7 +28,8 @@ Next PR candidate:
 - Search remaining direct `statusMs`, `waitingReason`, `pauseSla`, and SLA summary calculations in Dashboard/Analytics/ticket detail, then move one visible card at a time to lifecycle helpers.
 
 Current batch:
-- Ticket-list export and Analytics SLA breach/compliance calculations are being moved to lifecycle-aware SLA helpers.
+- PR #172 moved ticket-list export and Analytics SLA breach/compliance calculations to lifecycle-aware SLA helpers.
+- Current batch is moving visible ticket-list/detail SLA badges, SLA bar, attention queue, and overdue drill-down to the same helper.
 - Legacy pause totals remain as fallback when a ticket has no normalized non-operational lifecycle stages.
 
 ### R2 — Drill-Down And Filter Reset

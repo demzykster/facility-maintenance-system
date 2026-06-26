@@ -15,11 +15,11 @@ import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, clean
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
-import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { isOperationallyOverdue, operationalElapsedMs, operationalRemainingMs } from "./slaModel.js";
+import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 
 /* ============================================================
@@ -731,6 +731,17 @@ const waitReasonLifecycleMeta = (cfg, id) => {
   const reason = wReasonOf(cfg, id);
   return reason ? { ball: reason.ball || "executor", pauseSla: !!reason.pauseSla } : {};
 };
+const lifecycleSlaOptions = (cfg, now = Date.now()) => ({
+  now,
+  isOpen,
+  waitReasonMeta: (id) => waitReasonLifecycleMeta(cfg, id)
+});
+const ticketMissedSla = (ticket, cfg, now = Date.now()) => ticketLifecycleMissedOperationalSla(ticket, lifecycleSlaOptions(cfg, now));
+const ticketOperationalElapsed = (ticket, cfg, now = Date.now()) => ticketLifecycleOperationalElapsedMs(ticket, now, lifecycleSlaOptions(cfg, now));
+const ticketOperationalRemaining = (ticket, cfg, now = Date.now()) => {
+  const sla = ticket?.dueAt != null && ticket?.createdAt != null ? Math.max(0, ticket.dueAt - ticket.createdAt) : null;
+  return sla == null ? null : sla - ticketOperationalElapsed(ticket, cfg, now);
+};
 const lifecycleOwnerLabel = (owner) => ({ executor: "טכנאי/מבצע", manager: "מנהל", admin: "מנהל מערכת", requester: "פותח", none: "ללא" }[owner] || owner || "—");
 // Причины, которые роль может ВЫСТАВЛЯТЬ (один список, фильтр по setters). no_equipment ставится отдельной кнопкой техника.
 const reasonsForRole = (cfg, role) => wReasons(cfg).filter((r) => r.id !== "no_equipment" && (r.setters === "both" || (role === "tech" ? r.setters === "tech" : r.setters === "manager"))).map((r) => (r.id === "manager_decision" && r.label === "ממתינה להחלטת מנהל") ? { ...r, label: "צריך עזרה / החלטה" } : r);
@@ -756,7 +767,7 @@ function computeRisk(ticket, fleet, config) {
   else if (pr.id === "medium") score += 1;
   if (ticket.downtimeType === "critical") { score += 4; reasons.push("השבתה קריטית"); }
   else if (ticket.downtimeType === "has_replacement") { score += 1; }
-  if (isOverdue(ticket)) { score += 3; reasons.push("חריגת SLA"); }
+  if (ticketMissedSla(ticket, config)) { score += 3; reasons.push("חריגת SLA"); }
   else if (ticket.dueAt && (ticket.dueAt - Date.now()) < 4 * 3600000 && isOpen(ticket)) { score += 2; reasons.push("SLA קרוב"); }
   if (!ticket.assignee && isOpen(ticket)) { score += 2; reasons.push("אין אחראי"); }
   if (ticket.status === "waiting") { score += 2; if (ticket.waitingReason) reasons.push(waitReasonLabel(ticket.waitingReason)); }
@@ -4233,10 +4244,10 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     { test: (t) => needsHandler(t, users, fleet), tag: "ללא מטפל פעיל — נדרש שיבוץ", color: "#7F1D1D" },
     { test: (t) => isOpen(t) && t.downtimeType === "critical" && !t.assignee, tag: "השבתה קריטית · ללא טכנאי", color: "#B91C1C" },
     { test: (t) => isOpen(t) && t.downtimeType === "critical", tag: "השבתה קריטית", color: "#DC2626" },
-    { test: (t) => isOverdue(t), tag: "חריגת SLA", color: "#DC2626" },
+    { test: (t) => ticketMissedSla(t, config), tag: "חריגת SLA", color: "#DC2626" },
     { test: (t) => isOpen(t) && t.returned, tag: "הוחזרה לטיפול", color: "#B45309" },
     { test: (t) => isOpen(t) && t.status === "pending_user", tag: "ממתינה לאישורך", color: "#0D9488" },
-    { test: (t) => !isOverdue(t) && t.dueAt && (t.dueAt - Date.now()) < 4 * 3600000 && isOpen(t), tag: "SLA קרוב", color: "#EA580C" },
+    { test: (t) => !ticketMissedSla(t, config) && t.dueAt && (t.dueAt - Date.now()) < 4 * 3600000 && isOpen(t), tag: "SLA קרוב", color: "#EA580C" },
   ];
   const seen = new Set();
   const attention = [];
@@ -4340,7 +4351,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       if (focus.supplier && (t.closure?.costSupplier || "") !== focus.supplier) return false;
       if (focus.waitReason && t.waitingReason !== focus.waitReason) return false;
       if (focus.lifecycleKey && !ticketHasLifecycleStage(t, focus.lifecycleKey, { isOpen })) return false;
-      if (focus.overdue && !isOverdue(t)) return false;
+      if (focus.overdue && !ticketMissedSla(t, config)) return false;
       if (focus.criticalEscalated && !isCriticalEscalated(t, config)) return false;
       if (focus.activeCriticalTransport && !((t.track || (t.forkliftId ? "transport" : "facility")) === "transport" && t.downtimeType === "critical" && !isCriticalEscalated(t, config))) return false;
       if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
@@ -6000,14 +6011,14 @@ function TicketDetail(p) {
         <span className="badge" style={{ color: s.color, background: s.bg }}>{s.label}</span>
         <span className="badge" style={{ color: tr.color, background: tr.color + "1f" }}><tr.Icon size={11} /> {tr.short}</span>
         <span className="badge" style={{ color: pr.color, background: pr.bg }}>{pr.label}</span>
-        {isOverdue(ticket) && <span className="badge ovd"><AlertTriangle size={12} /> SLA</span>}
+        {ticketMissedSla(ticket, config) && <span className="badge ovd"><AlertTriangle size={12} /> SLA</span>}
         {ticket.closure && <span className="badge" style={{ color: "#047857", background: "#D1FAE5" }}><PenLine size={11} /> חתום</span>}
       </div>
       <div className="detail-caption" style={{ color: tr.color }}><tr.Icon size={14} /> {tr.label}</div>
       <h2 className="detail-subj">{ticket.subject}</h2>
       <div className="detail-subline">{track === "transport" ? <>כלי: <b>{ticket.asset || "—"}</b>{ticket.forkliftId && fleetDeptOf(ticket, p.fleet) ? <> · מחלקה: <b>{fleetDeptOf(ticket, p.fleet)}</b></> : null}</> : <>קטגוריה: <b>{ticket.categoryLabel || c.label}</b> · מיקום: <b>{ticket.zone}</b></>}</div>
       {dtMeta && <div className="dt-banner" style={{ background: dtMeta.color + "16", color: dtMeta.color, borderColor: dtMeta.color + "44" }}><span className="dt-dot" style={{ background: dtMeta.color }} /> {dtMeta.label}{track === "transport" && <span className="dt-time"> · השבתה: {fmtDur(downtimeMs(ticket))}</span>}</div>}
-      <SlaBar t={ticket} big />
+      <SlaBar t={ticket} config={config} big />
       <div className="meta-grid">
         <Meta Icon={c.Icon} iconColor={c.color} label="קטגוריה" value={c.label} />
         {ticket.asset && <Meta Icon={track === "transport" ? Truck : Package} label={track === "transport" ? "כלי" : "ציוד"} value={ticket.asset} />}
@@ -6273,12 +6284,12 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
   </div></div>);
 }
 function Toast({ t, onClose }) { return <div className="toast" onClick={onClose}><Bell size={18} style={{ flexShrink: 0, marginTop: 1 }} /><div><div className="toast-title">{t.title}</div><div className="toast-body">{t.body}</div></div></div>; }
-function SlaBar({ t, big }) {
-  const total = Math.max(0, (t.dueAt ?? 0) - (t.createdAt ?? 0)), elapsed = operationalElapsedMs(t);
+function SlaBar({ t, config, big }) {
+  const total = Math.max(0, (t.dueAt ?? 0) - (t.createdAt ?? 0)), elapsed = ticketOperationalElapsed(t, config);
   const pct = Math.min(100, Math.max(0, total > 0 ? (elapsed / total) * 100 : 0));
   const done = t.status === "done" || t.status === "cancelled";
   const color = done ? "var(--muted)" : pct >= 100 ? "#DC2626" : pct >= 75 ? "#EA580C" : pct >= 50 ? "#CA8A04" : "#16A34A";
-  const remain = operationalRemainingMs(t);
+  const remain = ticketOperationalRemaining(t, config);
   const label = done ? (t.status === "done" ? "טופל" : "בוטל") : remain == null ? "ללא SLA" : remain > 0 ? `נותרו ${fmtDur(remain)}` : `חריגה ${fmtDur(-remain)}`;
   return (<div className={"sla" + (big ? " big" : "")}><div className="sla-track"><div className="sla-fill" style={{ width: (done ? 100 : pct) + "%", background: color }} /></div>{big && <div className="sla-lbl" style={{ color }}>{label}</div>}</div>);
 }
@@ -6306,7 +6317,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
       {holder
         ? <div className="tcard-state" style={{ color: holder.color }}><holder.Icon size={12} /> אצל: {holder.label} · {fmtDur(Date.now() - stateSince)}</div>
         : <div className="tcard-state" style={{ color: s.color }}>סטטוס: {s.label}</div>}
-      {isOpen(t) && <SlaBar t={t} />}
+      {isOpen(t) && <SlaBar t={t} config={config} />}
       <div className="tcard-badges">
         {showStatusBadge && <span className="badge sm" style={{ color: s.color, background: s.bg }}>{s.label}</span>}
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
@@ -6314,7 +6325,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
         {showRiskBadge && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
         {t.byAdmin && <span className="badge sm" style={{ color: "#7C3AED", background: "#EDE9FE" }}><ShieldCheck size={11} /> מנהל</span>}
         {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
-        {isOverdue(t) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
+        {ticketMissedSla(t, config) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
         {t.status === "waiting" && t.waitingReason && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>{waitReasonLabel(t.waitingReason, config)}</span>}
       </div>
     </div>
