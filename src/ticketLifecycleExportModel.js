@@ -174,3 +174,18 @@ export function ticketHasLifecycleStage(ticket, key, options = {}) {
   return normalizedTicketLifecycleStages(ticket, options)
     .some((stage) => stage.key === key && (stage.current || stage.ms > 0 || stage.kind === "rework"));
 }
+
+export function ticketLifecycleWaitReasonStats(tickets = [], options = {}) {
+  const stats = {};
+  (tickets || []).forEach((ticket) => {
+    normalizedTicketLifecycleStages(ticket, options)
+      .filter((stage) => stage.kind === "waiting" && stage.reason)
+      .forEach((stage) => {
+        const row = stats[stage.reason] || { reason: stage.reason, label: stage.label, n: 0, ms: 0 };
+        row.n += 1;
+        row.ms += stage.ms || 0;
+        stats[stage.reason] = row;
+      });
+  });
+  return Object.values(stats).sort((a, b) => b.ms - a.ms || b.n - a.n || a.label.localeCompare(b.label, "he"));
+}

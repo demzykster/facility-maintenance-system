@@ -23,19 +23,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #163.
-- Last synchronized `main` before this entry: `e8cedba fix: use lifecycle stage for dashboard parts wait (#162)`.
-- Open PRs when this entry was written: PR #163 was ready to merge.
+- Status: idle after PR #164.
+- Last synchronized `main` before this entry: `1caa1cb fix: align pending PPE request counts (#163)`.
+- Open PRs when this entry was written: PR #164 was ready to merge.
 - Purpose:
-  - PPE pending-request surfaces now treat `worker_sign` requests as active pending work everywhere;
-  - notification count, PPE dashboard pending block, requester pending/history split, and admin attention count now share one helper.
+  - Analytics wait-reason summary now uses normalized lifecycle stages instead of current-only `status === waiting` counts;
+  - drill-down stays clickable through lifecycle keys, so closed historical waits are not hidden.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for admin login and PPE dashboard render.
+  - browser smoke-check passed for admin login and Analytics render.
 
 ## Latest Completed Work
 
+- PR #164: Analytics wait-reason summary moved to lifecycle stages.
+  - Wait-reason bars now include historical and current waiting stages through a pure lifecycle helper.
+  - Clicking a wait reason drills down through `lifecycleKey`, not only the current ticket status.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #163: PPE pending request counts were aligned.
   - Manager approval (`pending`) and worker signature (`worker_sign`) requests now use one shared active-request helper.
   - Notifications, dashboard attention, PPE dashboard counts, request lists, and requester history split no longer diverge.

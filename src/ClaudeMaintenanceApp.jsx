@@ -15,7 +15,7 @@ import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, clean
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
-import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
@@ -5116,10 +5116,9 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const unitArr = Object.entries(byUnit).map(([id, v]) => ({ f: fleet.find((x) => x.id === id), ...v })).filter((x) => x.f).sort((a, b) => b.n - a.n);
   const maxUnit = Math.max(1, ...unitArr.map((x) => x.n));
   const wear = countBy(transDone.filter((t) => t.wearType), (t) => t.wearType);
-  const waitReason = countBy(tickets.filter((t) => t.status === "waiting" && t.waitingReason), (t) => t.waitingReason);
-  const waitReasonArr = Object.entries(waitReason).sort((a, b) => b[1] - a[1]);
-  const maxWait = Math.max(1, ...waitReasonArr.map(([, n]) => n));
   const lifecycleStageRows = tickets.flatMap((t) => normalizedTicketLifecycleStages(t, lifecycleOptions));
+  const waitReasonArr = ticketLifecycleWaitReasonStats(tickets, lifecycleOptions);
+  const maxWait = Math.max(1, ...waitReasonArr.map((row) => row.n));
   const stageMap = {};
   lifecycleStageRows.forEach((s) => {
     const row = stageMap[s.key] || { ...s, n: 0, ms: 0 };
@@ -5275,7 +5274,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     {returnsCount > 0 && <div className="note" style={{ borderColor: "#FECACA", marginBottom: 8 }}><RefreshCw size={13} /> קריאות שהוחזרו לתיקון (לא טופלו בפעם הראשונה): <b>{returnsCount}</b></div>}
     {showFleet && unitStats.length > 0 && <><SectionTitle><Truck size={15} /> כלים בעייתיים — תקלות ועלות</SectionTitle><div className="panel">{unitStats.map((u) => <div key={u.f.id} className={"kpi-unit-row" + (onFilter ? " bar-click" : "")} onClick={onFilter ? () => drill({ label: `כלי ${u.f.code}`, forkliftId: u.f.id }, { track: "transport", period: "quarter" }) : undefined} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: "1px solid var(--line)" }}><span style={{ fontWeight: 700, minWidth: 64 }}>{u.f.code}</span><div style={{ flex: 1 }}><div style={{ height: 8, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: (u.c90 / maxUnitC * 100) + "%", height: "100%", background: u.c90 >= 3 ? "#DC2626" : "#EA580C" }} /></div></div><span style={{ fontSize: 12.5, color: "var(--muted)", minWidth: 92, textAlign: "left" }}>{u.c90} ב-90 ימים</span><span style={{ fontWeight: 700, minWidth: 70, textAlign: "left" }}>{u.cost ? ils(u.cost) : "—"}</span>{onFilter && <ChevronLeft size={14} style={{ color: "var(--muted)" }} />}</div>)}<div className="hint" style={{ marginTop: 6 }}>מבוסס על קריאות שינוע 90 הימים האחרונים והעלות המצטברת. כלי עם 3+ תקלות מסומן אדום — מועמד לבחינת החלפה.</div></div></>}
     {stageArr.length > 0 && <><SectionTitle><Clock size={15} /> זמן לפי שלבי קריאה</SectionTitle><div className="panel">{stageArr.map((s) => <Bar key={s.key} label={s.label} value={Math.round(s.ms / 360000) / 10} max={maxStageHours} suffix={` שע׳ · ${lifecycleOwnerLabel(s.owner)} · ${countLabel(s.n, "קריאה", "קריאות")}${s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}`} color={s.kind === "waiting" ? "#B45309" : s.kind === "rework" ? "#DC2626" : "#2563EB"} onClick={onFilter ? () => drill({ label: `שלב · ${s.label}`, lifecycleKey: s.key }, { st: "all", period }) : undefined} />)}</div></>}
-    {waitReasonArr.length === 0 ? <div className="note">אין כרגע קריאות בהמתנה.</div> : <div className="panel">{waitReasonArr.map(([id, n]) => <Bar key={id} label={waitReasonLabel(id, config)} value={n} max={maxWait} color="#B45309" onClick={onFilter ? () => drill({ label: `סיבת המתנה · ${waitReasonLabel(id, config)}`, waitReason: id }, { st: "waiting" }) : undefined} />)}</div>}
+    {waitReasonArr.length === 0 ? <div className="note">אין זמני המתנה בתקופה שנבחרה.</div> : <div className="panel">{waitReasonArr.map(({ reason, label, n, ms }) => <Bar key={reason} label={label} value={n} max={maxWait} suffix={ms ? ` · ${fmtDur(ms)}` : ""} color="#B45309" onClick={onFilter ? () => drill({ label: `סיבת המתנה · ${label}`, lifecycleKey: `waiting:${reason}` }, { st: "all", period }) : undefined} />)}</div>}
     <SectionTitle>עלויות לפי ספק</SectionTitle>
     {supArr.length === 0 ? <div className="note">טרם נרשמו עלויות.</div> : <div className="panel">{supArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxSup} money color="#16A34A" onClick={onFilter ? () => drill({ label: `ספק · ${s}`, supplier: s }, { period }) : undefined} />)}</div>}
     <SectionTitle>עומס טכנאים</SectionTitle>
