@@ -11,25 +11,6 @@ This is the closure checklist for the current stabilization phase. It replaces b
 
 ## Current Release Packages
 
-### R2 — Drill-Down And Filter Reset
-
-Status: open.
-
-Why it matters:
-- Analytics and dashboard cards must be clickable, but the user must always understand and clear the filter.
-
-Done means:
-- Every clickable KPI opens the correct filtered list.
-- A visible filter banner explains where the filter came from.
-- One click clears the drill-down filter.
-- Leaving and returning to the ticket list does not keep a hidden stale filter unless the user intentionally kept it.
-
-Next PR candidate:
-- Audit `focus` / `ctx` / ticket-list filter state and make analytic drill-down filters explicitly resettable and non-sticky.
-
-Current batch:
-- Make Dashboard drill-down banners show specific source labels where possible.
-
 ### R3 — Notifications End-To-End
 
 Status: open.
@@ -111,6 +92,11 @@ Next PR candidate:
 
 ## Closed Release Packages
 
+- Drill-down and filter reset: closed in PRs #177-#178.
+  - Dashboard and Analytics drill-downs now show a visible source banner.
+  - Banner clear removes all drill-down-applied ticket filters in one click.
+  - Returning to Tickets through navigation resets hidden drill-down state unless the user intentionally applies a filter again.
+  - Dashboard KPI labels were made specific where possible.
 - SLA and lifecycle trust: closed in PRs #156-#175.
   - Dashboard, Analytics, ticket detail, exports, visible SLA badges, SLA bar, overdue drill-downs, ticket sorting, technician SLA count, and admin SLA notifications now use lifecycle helpers where historical waiting/stage timing matters.
   - Remaining direct `statusMs`, `waitingReason`, and `pauseSla` references are source data, lifecycle normalization, settings, transition bookkeeping, or fallback logic rather than visible stale SLA KPIs.
