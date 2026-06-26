@@ -301,6 +301,7 @@ Implementation so far:
 - Ticket-list and Analytics lifecycle Excel sheets include action owner and SLA/downtime accounting columns.
 - Dashboard stage chips and Analytics stage-duration bars now use the normalized owner and operational-SLA accounting fields.
 - Wait-reason settings now explain responsibility, allowed setters, and operational-SLA accounting in clearer user-facing copy.
+- Analytics wait-time summary totals now use normalized lifecycle stages for no-equipment waiting and non-operational-SLA waiting.
 - Unit tests cover current stages, closed historical waiting, equipment wait, rework, owner, operational-SLA accounting, downtime accounting, and visibility hints.
 
 Remaining:

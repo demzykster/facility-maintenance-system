@@ -5120,15 +5120,16 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const waitReason = countBy(tickets.filter((t) => t.status === "waiting" && t.waitingReason), (t) => t.waitingReason);
   const waitReasonArr = Object.entries(waitReason).sort((a, b) => b[1] - a[1]);
   const maxWait = Math.max(1, ...waitReasonArr.map(([, n]) => n));
+  const lifecycleStageRows = tickets.flatMap((t) => normalizedTicketLifecycleStages(t, lifecycleOptions));
   const stageMap = {};
-  tickets.forEach((t) => normalizedTicketLifecycleStages(t, lifecycleOptions).forEach((s) => {
+  lifecycleStageRows.forEach((s) => {
     const row = stageMap[s.key] || { ...s, n: 0, ms: 0 };
     row.n += 1; row.ms += s.ms || 0; stageMap[s.key] = row;
-  }));
+  });
   const stageArr = Object.values(stageMap).sort((a, b) => b.ms - a.ms || b.n - a.n).slice(0, 8);
   const maxStageHours = Math.max(1, ...stageArr.map((s) => Math.round(s.ms / 360000) / 10));
-  const equipWaitTotal = allTickets.reduce((a, t) => a + (t.equipWaitMs || 0) + (t.waitingReason === "no_equipment" && t.equipWaitSince ? Date.now() - t.equipWaitSince : 0), 0);
-  const pausedTotal = allTickets.reduce((a, t) => a + pausedMs(t), 0);
+  const equipWaitTotal = lifecycleStageRows.filter((s) => s.reason === "no_equipment").reduce((a, s) => a + (s.ms || 0), 0);
+  const pausedTotal = lifecycleStageRows.filter((s) => s.countsOperationalSla === false && s.reason !== "no_equipment").reduce((a, s) => a + (s.ms || 0), 0);
   const D90 = 90 * 86400000;
   const unitStats = (fleet || []).map((f) => { const rel = allTickets.filter((t) => t.forkliftId === f.id); const c90 = rel.filter((t) => Date.now() - t.createdAt <= D90).length; const cost = rel.reduce((a, t) => a + (t.closure?.costAmount || 0), 0); return { f, c90, total: rel.length, cost }; }).filter((x) => x.c90 >= 2 || x.cost > 0).sort((a, b) => b.c90 - a.c90 || b.cost - a.cost).slice(0, 8);
   const returnsCount = allTickets.filter((t) => t.returned).length;
