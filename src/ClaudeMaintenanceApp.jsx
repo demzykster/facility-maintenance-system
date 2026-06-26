@@ -1038,7 +1038,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
       ev.push({ key: t.id + "-c", at: t.createdAt, ticketId: t.id, kind: "new", title: `קריאה חדשה · ${TRACKS[t.track]?.short}`, body: t.subject });
       if (t.status === "pending_admin") ev.push({ key: t.id + "-pa", at: t.updatedAt, ticketId: t.id, kind: "ready", title: "ממתינה לסגירה סופית", body: t.subject });
       if (t.status === "waiting" && t.waitingReason === "no_equipment") ev.push({ key: t.id + "-noeq", at: t.updatedAt, ticketId: t.id, kind: "escalate", title: `הכלי לא הועבר לטכנאי · #${ticketNo(t)}`, body: `${t.asset || ""} · ${t.subject} — נדרשת העברת הכלי, נצבר זמן השבתה` });
-      if (isOverdue(t)) ev.push({ key: t.id + "-sla", at: t.dueAt, ticketId: t.id, kind: "sla", title: `חריגת SLA · #${ticketNo(t)}`, body: t.subject });
+      if (ticketMissedSla(t, cfg)) ev.push({ key: t.id + "-sla", at: t.dueAt, ticketId: t.id, kind: "sla", title: `חריגת SLA · #${ticketNo(t)}`, body: t.subject });
       if (isCriticalEscalated(t, cfg)) ev.push({ key: t.id + "-esc", at: t.createdAt + (cfg?.escalateCriticalHours ?? 2) * 3600000, ticketId: t.id, kind: "escalate", title: `השבתה קריטית ללא טכנאי · #${ticketNo(t)}`, body: `${t.asset || ""} · ${t.subject} — אף טכנאי לא קיבל את הקריאה מעל ${cfg?.escalateCriticalHours ?? 2} שע׳` });
     });
     (fleet || []).forEach((f) => { const s = docStatus(f, cfg); if (s.d != null && s.d <= (cfg?.docWarn?.yellow || 30)) ev.push({ key: "doc-" + f.id, at: Date.now() - (30 - Math.max(0, s.d)) * 3600000, kind: "doc", go: "fleet", fleetId: f.id, title: `מסמך פג-תוקף · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${s.label}` }); });

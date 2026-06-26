@@ -21,18 +21,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/lifecycle-ticket-sort, if PR is still open
+### Active branch: codex/lifecycle-sla-notifications, if PR is still open
 
 - Status: validation passed; ready for PR/merge. After merge, no active product branch is intentionally left open.
-- Last synchronized `main` before this entry: `102733a fix: align visible SLA badges with lifecycle timing (#173)`.
+- Last synchronized `main` before this entry: `02a8863 fix: sort ticket lists with lifecycle SLA timing (#174)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - R1 SLA/lifecycle trust batch;
-  - make ticket-list sorting and technician SLA count use lifecycle-aware SLA timing when config is available.
+  - make admin SLA notifications use the same lifecycle-aware SLA helper as Analytics, ticket cards, exports, and sorting.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check passed for ticket list.
+  - browser smoke-check passed for opening the notification panel without console errors.
 
 ## Latest Completed Work
 
@@ -134,7 +134,7 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/lifecycle-ticket-sort` is still open, review/merge it.
+1. If branch `codex/lifecycle-sla-notifications` is still open, review/merge it.
 2. If it is already merged, continue R1 from `docs/release-checklist.md`.
 3. Update this ledger only when it helps the next Codex session resume safely.
 
