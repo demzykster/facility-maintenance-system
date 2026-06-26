@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/user-form-copy-polish`
+### Active branch: none
 
-- Status: in progress.
-- Last synchronized `main` before this entry: `a95ff2a feat: add technician personal shift tolerance (#130)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `77094db fix: polish user form hebrew copy (#131)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - polish Hebrew copy in the user/technician form after PRs #129 and #130;
-  - remove stale instruction that said activation links require reopening the worker.
+  - continue from `docs/backlog.md`;
+  - keep the next step small and isolated.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 49 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: technician and worker form copy rendered with updated Hebrew text; no console errors.
+  - `npm test -- --run`: skipped; docs-only.
+  - `npm run build`: skipped; docs-only.
+  - Browser smoke-check: not required; no product UI code changed.
 
 ### Latest Completed Work
 
+- PR #131: user-form Hebrew copy was polished.
+  - Removed stale instruction that activation links require reopening the worker.
+  - Clarified the personal technician tolerance hint.
+  - Vercel was green before merge.
 - PR #130: optional personal technician shift tolerance was added.
   - Technician forms now include `סבילות משמרת אישית`.
   - Empty personal tolerance keeps the global Team/User Management default.
