@@ -23,12 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #156.
-- Last synchronized `main` before this entry: `9680531 fix: polish task meeting count Hebrew (#155)`.
-- Open PRs when this entry was written: PR #156 was ready to merge.
+- Status: idle after PR #157.
+- Last synchronized `main` before this entry: `9b89b87 feat: extend ticket lifecycle stage contract (#156)`.
+- Open PRs when this entry was written: PR #157 was ready to merge.
 - Purpose:
-  - SLA/stage helper contract pass completed;
-  - continue with Analytics stage cards/drill-downs or wait-reason settings copy.
+  - Analytics now uses normalized lifecycle owner/SLA metadata in stage UI;
+  - continue replacing older wait/SLA summaries or clarify wait-reason settings copy.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
@@ -36,6 +36,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- PR #157: Analytics lifecycle stage metadata was surfaced.
+  - Dashboard stage chips and Analytics stage-duration bars now show stage owner and whether the stage is outside operational SLA.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #156: ticket lifecycle-stage contract was extended.
   - Normalized lifecycle stages now include owner/ball-holder, operational-SLA accounting, downtime accounting, current start time, and visibility hints.
   - Ticket-list and Analytics lifecycle Excel sheets now include owner/SLA/downtime accounting columns.
