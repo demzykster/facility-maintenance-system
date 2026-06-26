@@ -99,7 +99,7 @@ Implementation:
 
 ### Topic 4 — per-technician tolerance overrides
 
-Status: foundation helper done in PR #61.
+Status: helper wired in PR #122; no per-technician UI planned for the current pass.
 
 Goal:
 - Keep global late/early tolerance as default.
@@ -112,9 +112,11 @@ Suggested architecture:
 Implementation so far:
 - `src/technicianToleranceModel.js` defines the fallback contract.
 - `tests/technicianToleranceModel.test.js` covers user override, global fallback, explicit zero, and invalid values.
+- PR #122 wired the helper into runtime technician shift lateness/early-leave calculations.
 
 Remaining:
-- Wire the helper into the technician scheduling/SLA path only after the exact UI/business placement is chosen.
+- None for the current pass.
+- Optional per-technician override fields remain a future business/UI decision.
 
 ### Topic 5 — technician individual shift settings
 
@@ -228,7 +230,10 @@ Ship as multiple small PRs, not one refactor.
 Implementation so far:
 - PR #72 moved zones into Maintenance settings.
 - Departments should move into `צוות ומשתמשים`, per owner decision.
-- The `רישומים` tab should not be removed until departments have a safe new home.
+- PR #77 moved departments into `צוות ומשתמשים` -> `הגדרות` and removed the now-empty `רישומים` tab.
+
+Remaining:
+- None for Topic 12.
 
 ### Topic 15 — remove Settings dev/test section
 
@@ -385,15 +390,15 @@ Notes:
 
 ### Topic 13 — backup completeness follow-up
 
-Status: mostly fixed, verify before more work.
+Status: done in PRs #37 and #125.
 
 Current code:
 - `src/backupModel.js` defines `BACKUP_COLLECTIONS`.
 - `tests/backupModel.test.js` covers the backup collection contract.
 
 Open follow-up:
-- Decide later whether backup format version warnings should be advisory or strict for older backups.
-- Do not expand this unless backup/restore is the active area.
+- None for the current pass.
+- PR #125 chose the advisory path for older/incomplete backups: warn before restore, do not block.
 
 ## Copy / Hebrew / Visual Polish
 
