@@ -5454,7 +5454,7 @@ function SettingsPanel(p) {
     try { const data = JSON.parse(await f.text());
       const analysis = analyzeBackupPayload(data);
       if (!analysis.valid) { setImpMsg("הקובץ אינו גיבוי תקין של המערכת"); return; }
-      setPendImport({ data, analysis, counts: { fleet: (data.fleet || []).length, tickets: (data.tickets || []).length, users: (data.users || []).length, pm: (data.pm || []).length, insp: (data.insp || []).length } });
+      setPendImport({ data, analysis, counts: { fleet: (data.fleet || []).length, tickets: (data.tickets || []).length, users: (data.users || []).length, pm: (data.pm || []).length, insp: (data.insp || []).length, tasks: (data.tasks || []).length, meetings: (data.meetings || []).length, ppeReqs: (data.ppeReqs || []).length, ppeOrders: (data.ppeOrders || []).length } });
     } catch (er) { setImpMsg("קריאת הקובץ נכשלה — JSON לא תקין"); }
   };
   const runImport = async () => { if (!pendImport) return; setImpBusy(true); try { await importBackup(pendImport.data); setPendImport(null); setImpMsg("השחזור הושלם ✓"); } catch (er) { setImpMsg("השחזור נכשל"); } finally { setImpBusy(false); } };
@@ -5557,6 +5557,7 @@ function SettingsPanel(p) {
       <label className="btn-ghost full" style={{ marginTop: 10, cursor: "pointer" }}><input type="file" accept="application/json,.json" style={{ display: "none" }} onChange={onPickBackup} /><RefreshCw size={15} /> שחזור מקובץ גיבוי</label>
       {pendImport && <div className="dev-box" style={{ marginTop: 10, borderStyle: "solid" }}>
         <div className="hint" style={{ marginBottom: 8 }}>נמצא גיבוי: {pendImport.counts.fleet} כלים · {pendImport.counts.tickets} קריאות · {pendImport.counts.pm} טיפולים · {pendImport.counts.insp} בקרות · {pendImport.counts.users} משתמשים. לשחזר ולמזג למערכת?</div>
+        <div className="hint" style={{ marginBottom: 8 }}>כולל גם: {pendImport.counts.tasks} משימות · {pendImport.counts.meetings} פגישות · {pendImport.counts.ppeReqs} בקשות ביגוד · {pendImport.counts.ppeOrders} הזמנות רכש.</div>
         {pendImport.analysis?.legacy && <div className="note" style={{ color: "#B45309", marginBottom: 8 }}>זה נראה כמו גיבוי ישן או חלקי. שחזור ימשיך, אבל ייתכן שחסרים בו נתוני ביגוד, משימות או פגישות שלא היו קיימים בגרסת הגיבוי.</div>}
         <button className="btn-primary full" disabled={impBusy} onClick={runImport}>{impBusy ? "משחזר…" : "שחזר ומזג"}</button>
         <button className="btn-ghost full" style={{ marginTop: 8 }} onClick={() => setPendImport(null)}>ביטול</button>
