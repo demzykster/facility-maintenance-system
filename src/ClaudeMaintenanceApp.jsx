@@ -4295,7 +4295,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     </div>
     <div className="queue-row">
       <button className="queue-chip" onClick={() => flt({ st: "open", pr: "high" })}><span className="q-num" style={{ color: "#7C3AED" }}>{open.filter((t) => prOf(t.priority).id === "high").length}</span><span className="q-lbl">דחופות</span></button>
-      <button className="queue-chip" onClick={() => flt({ st: "open", focus: { lifecycleKey: "waiting:parts", label: "ממתינות לחלקים" } })}><span className="q-num" style={{ color: "#7C3AED" }}>{waitParts.length}</span><span className="q-lbl">ממתינות לחלקים</span></button>
+      <button className="queue-chip" onClick={() => flt({ st: "open", focus: { lifecycleKey: "waiting:parts", label: "עיכוב חלקים" } })}><span className="q-num" style={{ color: "#7C3AED" }}>{waitParts.length}</span><span className="q-lbl">עיכוב חלקים</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "pending_user" })}><span className="q-num" style={{ color: "#0D9488" }}>{waitUser.length}</span><span className="q-lbl">לאישור מנהל מחלקה</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "pending_admin" })}><span className="q-num" style={{ color: "#4F46E5" }}>{waitAdmin.length}</span><span className="q-lbl">לסגירה על ידך</span></button>
     </div>
