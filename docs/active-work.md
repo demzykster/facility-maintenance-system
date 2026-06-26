@@ -21,18 +21,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### SLA stage model
+### Normalized ticket lifecycle stages
 
-- Status: active branch `codex/document-sla-stage-model`.
-- Last synchronized `main` before this entry: `ef75654 test: cover multi responsibility permissions [skip vercel] (#109)`.
+- Status: active branch `codex/normalized-ticket-stages`.
+- Last synchronized `main` before this entry: `6bc7b70 docs: define SLA stage model [skip vercel] (#110)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - define the next safe direction for ticket SLA and stage timing;
-  - document how existing `statusMs` / `statusSince` lifecycle data should evolve;
-  - prevent scattered SLA fixes from making dashboard, analytics, and export disagree.
+  - add a pure normalized lifecycle-stage helper before UI changes;
+  - cover current status, historical waiting, equipment wait, and rework markers with tests;
+  - prepare dashboard/analytics to reuse one lifecycle contract.
 
 ### Latest Completed Work
 
+- PR #110: SLA/stage timing contract was documented.
+  - Added `docs/sla-stage-model.md`.
+  - Backlog now points to a helper-first implementation path before dashboard/analytics UI changes.
 - PR #109: multi-responsibility permission contract was tested.
   - A manager can keep `role: user` while receiving users, workerAccess, PPE, and analytics permissions through module permissions.
   - This supports one person holding several operational responsibilities without adding a new role/template yet.
@@ -193,6 +196,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/normalized-ticket-stages`:
+
+- `npm test -- --run`: passed, 12 files / 41 tests.
+- `npm run build`: passed.
+- Browser smoke-check: not required; pure helper and tests only, no UI behavior changed.
 
 Branch `codex/document-sla-stage-model`:
 
