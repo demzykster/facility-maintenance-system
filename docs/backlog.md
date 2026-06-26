@@ -305,6 +305,7 @@ Implementation so far:
 - Ticket detail non-operational-SLA wait time now uses normalized lifecycle stages.
 - Analytics parts-wait summary and Excel marker now use the normalized `waiting:parts` lifecycle stage.
 - Dashboard parts-wait KPI now uses the normalized `waiting:parts` lifecycle stage; the old log-text helper was removed.
+- PR #164 moved Analytics wait-reason summary to normalized historical/current waiting stages, not only tickets currently in `waiting`.
 - Unit tests cover current stages, closed historical waiting, equipment wait, rework, owner, operational-SLA accounting, downtime accounting, and visibility hints.
 
 Remaining:

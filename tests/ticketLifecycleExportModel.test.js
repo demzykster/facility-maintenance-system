@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleRows, ticketLifecycleSummary } from "../src/ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleRows, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "../src/ticketLifecycleExportModel.js";
 
 const labels = {
   now: 10_000,
@@ -132,5 +132,18 @@ describe("ticket lifecycle export model", () => {
     expect(ticketHasLifecycleStage(ticket, "waiting:parts", labels)).toBe(true);
     expect(ticketHasLifecycleStage(ticket, "rework", labels)).toBe(true);
     expect(ticketHasLifecycleStage(ticket, "waiting:budget", labels)).toBe(false);
+  });
+
+  it("aggregates waiting reasons from historical and current lifecycle stages", () => {
+    const stats = ticketLifecycleWaitReasonStats([
+      { status: "done", statusMs: { "waiting:parts": 4_000 } },
+      { status: "waiting", waitingReason: "no_equipment", equipWaitSince: 8_000 },
+      { status: "done", statusMs: { "waiting:parts": 2_000 } }
+    ], labels);
+
+    expect(stats).toEqual([
+      { reason: "parts", label: "ממתין לחלקים", n: 2, ms: 6_000 },
+      { reason: "no_equipment", label: "הכלי לא התקבל", n: 1, ms: 2_000 }
+    ]);
   });
 });
