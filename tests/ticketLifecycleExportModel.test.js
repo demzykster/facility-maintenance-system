@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizedTicketLifecycleStages, ticketLifecycleRows, ticketLifecycleSummary } from "../src/ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleRows, ticketLifecycleSummary } from "../src/ticketLifecycleExportModel.js";
 
 const labels = {
   now: 10_000,
@@ -89,5 +89,17 @@ describe("ticket lifecycle export model", () => {
 
     expect(stages).toContainEqual({ key: "waiting:no_equipment", kind: "waiting", reason: "no_equipment", label: "הכלי לא התקבל", ms: 6_000, current: false });
     expect(stages).toContainEqual({ key: "rework", kind: "rework", reason: "", label: "הוחזר לטיפול", ms: 0, current: false });
+  });
+
+  it("checks whether a ticket contains a lifecycle stage", () => {
+    const ticket = {
+      status: "done",
+      statusMs: { "waiting:parts": 4_000 },
+      returned: true
+    };
+
+    expect(ticketHasLifecycleStage(ticket, "waiting:parts", labels)).toBe(true);
+    expect(ticketHasLifecycleStage(ticket, "rework", labels)).toBe(true);
+    expect(ticketHasLifecycleStage(ticket, "waiting:budget", labels)).toBe(false);
   });
 });
