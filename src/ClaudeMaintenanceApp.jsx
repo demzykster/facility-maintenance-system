@@ -5473,16 +5473,16 @@ function SettingsPanel(p) {
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
       <SectionTitle>סיבות המתנה</SectionTitle>
-      <div className="hint" style={{ marginBottom: 8 }}>סיבה נבחרת כאשר קריאה נעצרת באמצע טיפול. היא קובעת מי צריך לפעול עכשיו, מי רשאי לבחור אותה, והאם הזמן הזה לא נספר ב-SLA. היסטוריית ההמתנה נשמרת לדוחות ולאנליטיקה.</div>
+      <div className="hint" style={{ marginBottom: 8 }}>סיבה נבחרת כאשר קריאה נעצרת באמצע טיפול. היא קובעת מי צריך לפעול עכשיו, מי רשאי לבחור אותה, והאם הזמן הזה לא נספר ב-SLA התפעולי של הקריאה. היסטוריית ההמתנה נשמרת לדוחות ולאנליטיקה.</div>
       <div style={{ display: "grid", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
         <div className="hint" style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(100px, .8fr) 42px", gap: 6, padding: "0 8px", fontWeight: 800 }}>
-          <span>סיבה</span><span>אצל מי</span><span>מי בוחר</span><span>SLA</span><span />
+          <span>סיבה</span><span>אצל מי</span><span>מי בוחר</span><span>SLA תפעולי</span><span />
         </div>
         {wreasons.map((r, i) => <div key={r.id || i} className="reg-row" style={{ marginBottom: 0, gap: 6, display: "grid", gridTemplateColumns: "minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(100px, .8fr) 42px" }}>
           <input className="reg-name" value={r.label} placeholder="שם הסיבה" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
           <select value={r.ball || "executor"} title="מי מחזיק את הכדור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, ball: e.target.value } : x))}>{WAIT_BALL_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
           <select value={r.setters || "both"} title="מי רשאי לבחור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, setters: e.target.value } : x))}>{WAIT_SETTER_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
-          <label className="chk-line" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={!!r.pauseSla} onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, pauseSla: e.target.checked } : x))} /> לא נספר</label>
+          <label className="chk-line" title="כאשר מסומן, זמן ההמתנה נשמר בדוחות אך לא נספר ב-SLA התפעולי" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={!!r.pauseSla} onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, pauseSla: e.target.checked } : x))} /> לא נספר</label>
           <button className="reg-del" disabled={r.id === "no_equipment"} title={r.id === "no_equipment" ? "סיבה מערכתית" : "מחק"} onClick={() => setWreasons((a) => r.id === "no_equipment" ? a : a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
         </div>)}
       </div>
