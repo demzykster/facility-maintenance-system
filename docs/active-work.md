@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/fix-ticket-count-hebrew`
+### Active branch: `codex/fix-more-ticket-count-hebrew`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `7c941b3 fix: focus critical dashboard drilldowns (#143)`.
+- Last synchronized `main` before this entry: `1a08d8a fix: polish ticket count Hebrew (#144)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - fix singular/plural Hebrew in ticket-list and printable report counters;
-  - avoid showing `1 קריאות` or plural sorting wording when a focused drill-down has one result.
+  - continue targeted Hebrew count cleanup outside the main ticket-list counter;
+  - use singular/plural wording for action banners, asset health, backup summary, and related-ticket warnings.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; a one-result focused drill-down now shows `1 קריאה · ממוינת לפי דחיפות`.
+  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; Dashboard rendered with `CMMS CDSL` and `דורש טיפול` after the copy changes.
 
 ### Latest Completed Work
 
+- PR #144: ticket-list count Hebrew was polished.
+  - One-result ticket drill-downs now show `1 קריאה · ממוינת לפי דחיפות`.
+  - Printable ticket-list report counters use the same singular/plural helper.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #143: Dashboard critical attention drill-downs now open focused ticket lists.
   - `תקלות קריטיות שהוסלמו` opens only escalated critical tickets.
   - `תקלות שינוע קריטיות פתוחות` opens only active non-escalated critical transport tickets.
