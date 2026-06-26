@@ -21,18 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/notifications-backlog-polish`
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `77094db fix: polish user form hebrew copy (#131)`.
-- Open PRs when this entry was written: none expected.
+- Status: in progress.
+- Last synchronized `main` before this entry: `4a79137 docs: close user form copy ledger [skip vercel]`.
+- Open PRs when this entry was written: none.
 - Purpose:
-  - continue from `docs/backlog.md`;
-  - keep the next step small and isolated.
+  - polish Hebrew/copy clarity in the notifications panel;
+  - update backlog entries that were stale after PRs #129 and #130;
+  - keep code and ledger/docs in the same PR.
 - Validation so far:
-  - `npm test -- --run`: skipped; docs-only.
-  - `npm run build`: skipped; docs-only.
-  - Browser smoke-check: not required; no product UI code changed.
+  - `npm test -- --run`: passed, 13 files / 49 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; the notifications panel opened, display settings showed the clearer filtering copy, and no console errors were reported.
 
 ### Latest Completed Work
 

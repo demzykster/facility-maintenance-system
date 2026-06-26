@@ -84,7 +84,7 @@ Implementation so far:
 
 ### Worker activation follow-up
 
-Status: done in branch `codex/worker-activation-copy-saved-token`.
+Status: done in PRs #57 and #129.
 
 Goal:
 - Decide whether the saved/reopen requirement for copying an activation link needs a clearer post-save path.
@@ -96,10 +96,14 @@ Suggested first PR:
 Implementation:
 - Copying an activation link now requires the form token to match the token already saved on the worker record.
 - Newly generated reset links must be saved before they can be copied.
+- After saving a pending activation link, the worker/cleaner form stays open so the saved link can be copied immediately.
+
+Remaining:
+- None for the current activation-link copy pass.
 
 ### Topic 4 — per-technician tolerance overrides
 
-Status: helper wired in PR #122; no per-technician UI planned for the current pass.
+Status: done in PRs #122 and #130.
 
 Goal:
 - Keep global late/early tolerance as default.
@@ -113,10 +117,10 @@ Implementation so far:
 - `src/technicianToleranceModel.js` defines the fallback contract.
 - `tests/technicianToleranceModel.test.js` covers user override, global fallback, explicit zero, and invalid values.
 - PR #122 wired the helper into runtime technician shift lateness/early-leave calculations.
+- PR #130 added `סבילות משמרת אישית` to technician forms. Empty personal value keeps the global default.
 
 Remaining:
 - None for the current pass.
-- Optional per-technician override fields remain a future business/UI decision.
 
 ### Topic 5 — technician individual shift settings
 
@@ -404,13 +408,17 @@ Open follow-up:
 
 ### Hebrew copy pass
 
-Status: open, broad.
+Status: open, broad; notification panel copy polished in current pass.
 
 Goal:
 - Continue plural/count grammar cleanup outside the already fixed day/period cases.
 
 Approach:
 - Do this by screen or component, not as a whole-app text sweep.
+
+Implementation so far:
+- Notification panel display settings now use clearer Hebrew copy for filtering notification types.
+- The panel shows how many notifications are currently displayed and clarifies that hiding categories only affects the user's local view.
 
 ## Deferred / Out Of Scope For Now
 
