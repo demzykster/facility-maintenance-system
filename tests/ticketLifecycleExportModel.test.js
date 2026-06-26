@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ticketLifecycleRows, ticketLifecycleSummary } from "../src/ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketLifecycleRows, ticketLifecycleSummary } from "../src/ticketLifecycleExportModel.js";
 
 const labels = {
   now: 10_000,
@@ -51,5 +51,43 @@ describe("ticket lifecycle export model", () => {
       ["waiting", "waiting:no_equipment", "no_equipment", 2_000],
       ["status", "new", "", 1_000]
     ]);
+  });
+
+  it("normalizes current and historical lifecycle stages", () => {
+    const stages = normalizedTicketLifecycleStages({
+      status: "waiting",
+      waitingReason: "parts",
+      statusSince: 7_000,
+      statusMs: { new: 2_000, in_progress: 5_000 }
+    }, labels);
+
+    expect(stages).toMatchObject([
+      { key: "in_progress", kind: "status", label: "בטיפול", ms: 5_000, current: false },
+      { key: "waiting:parts", kind: "waiting", reason: "parts", label: "ממתין לחלקים", ms: 3_000, current: true },
+      { key: "new", kind: "status", label: "חדשה", ms: 2_000, current: false }
+    ]);
+  });
+
+  it("keeps closed historical waiting stages without a current wait reason", () => {
+    const stages = normalizedTicketLifecycleStages({
+      status: "done",
+      statusMs: { "waiting:parts": 4_000 }
+    }, labels);
+
+    expect(stages).toEqual([
+      { key: "waiting:parts", kind: "waiting", reason: "parts", label: "ממתין לחלקים", ms: 4_000, current: false }
+    ]);
+  });
+
+  it("adds equipment wait and rework markers for analytics", () => {
+    const stages = normalizedTicketLifecycleStages({
+      status: "in_progress",
+      equipWaitMs: 6_000,
+      returned: true,
+      returnReason: "לא תקין"
+    }, labels);
+
+    expect(stages).toContainEqual({ key: "waiting:no_equipment", kind: "waiting", reason: "no_equipment", label: "הכלי לא התקבל", ms: 6_000, current: false });
+    expect(stages).toContainEqual({ key: "rework", kind: "rework", reason: "", label: "הוחזר לטיפול", ms: 0, current: false });
   });
 });

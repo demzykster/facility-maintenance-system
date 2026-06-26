@@ -59,3 +59,51 @@ export function ticketLifecycleRows(ticket, labels = {}) {
     ms
   }));
 }
+
+export function normalizedTicketLifecycleStages(ticket, {
+  now = Date.now(),
+  isOpen = () => true,
+  statusLabel = (id) => id,
+  waitReasonLabel = (id) => id
+} = {}) {
+  const stages = ticketLifecycleRows(ticket, { now, isOpen })
+    .map((row) => ({
+      key: row.key,
+      kind: row.kind,
+      reason: row.reason,
+      label: row.kind === "waiting" ? waitReasonLabel(row.reason) : statusLabel(row.key),
+      ms: row.ms,
+      current: false
+    }));
+
+  if (ticket && isOpen(ticket) && ticket.statusSince) {
+    const key = currentStatusKey(ticket);
+    const current = stages.find((stage) => stage.key === key);
+    if (current) current.current = true;
+  }
+
+  const equipmentWaitMs = (ticket?.equipWaitMs || 0) + (ticket?.waitingReason === "no_equipment" && ticket?.equipWaitSince ? Math.max(0, now - ticket.equipWaitSince) : 0);
+  if (equipmentWaitMs > 0 && !stages.some((stage) => stage.key === "waiting:no_equipment")) {
+    stages.push({
+      key: "waiting:no_equipment",
+      kind: "waiting",
+      reason: "no_equipment",
+      label: waitReasonLabel("no_equipment"),
+      ms: equipmentWaitMs,
+      current: ticket?.status === "waiting" && ticket?.waitingReason === "no_equipment"
+    });
+  }
+
+  if (ticket?.returned || ticket?.returnReason) {
+    stages.push({
+      key: "rework",
+      kind: "rework",
+      reason: "",
+      label: "הוחזר לטיפול",
+      ms: 0,
+      current: false
+    });
+  }
+
+  return stages;
+}
