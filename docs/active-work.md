@@ -21,19 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/backup-legacy-warning`
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `3165223 fix: reduce ppe reorder card noise (#123)`.
+- Status: in progress.
+- Last synchronized `main` before this entry: `e2a6465 docs: close ppe noise ledger [skip vercel] (#124)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - continue from `docs/backlog.md`;
-  - keep the next step small and isolated.
+  - warn before importing old or incomplete backup files;
+  - keep restore advisory rather than blocked;
+  - reduce risk of silent data loss when PPE/tasks collections are absent from an old backup.
 - Validation so far:
-  - Not applicable; no active code branch.
+  - `npm test -- --run`: passed, 13 files / 48 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: Settings backup/restore controls rendered; no console errors.
 
 ### Latest Completed Work
 
+- PR #124: PPE ledger/backlog was closed.
+  - `docs/active-work.md` no longer points at the already merged PPE branch.
+  - `docs/backlog.md` marks the PPE reorder-card noise follow-up closed.
 - PR #123: PPE reorder cards were made less noisy.
   - `ביגוד עובדים` -> `לוח מלאי` now shows only sizes that actually need ordering in reorder cards.
   - Existing PPE stock/order calculations were not changed.

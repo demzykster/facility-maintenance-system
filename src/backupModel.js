@@ -24,6 +24,18 @@ export const BACKUP_COLLECTIONS = Object.freeze([
 
 export const BACKUP_COLLECTION_KEYS = BACKUP_COLLECTIONS.map((collection) => collection.key);
 
+export function analyzeBackupPayload(data) {
+  if (!data || data.__app !== BACKUP_APP_ID) return { valid: false, missingCollections: [], legacy: false };
+  const missingCollections = BACKUP_COLLECTION_KEYS.filter((key) => !Array.isArray(data[key]));
+  const version = Number(data.v || 1);
+  return {
+    valid: true,
+    version,
+    legacy: version < BACKUP_VERSION || missingCollections.length > 0,
+    missingCollections,
+  };
+}
+
 export function buildBackupPayload({ config, collections, photos = {}, exportedAt = Date.now() }) {
   const payload = {
     __app: BACKUP_APP_ID,
