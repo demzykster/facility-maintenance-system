@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleRows, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "../src/ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMissedOperationalSla, ticketLifecycleNonOperationalMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleRows, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "../src/ticketLifecycleExportModel.js";
 
 const labels = {
   now: 10_000,
@@ -145,5 +145,33 @@ describe("ticket lifecycle export model", () => {
       { reason: "parts", label: "ממתין לחלקים", n: 2, ms: 6_000 },
       { reason: "no_equipment", label: "הכלי לא התקבל", n: 1, ms: 2_000 }
     ]);
+  });
+
+  it("uses lifecycle non-operational stages for SLA scoring", () => {
+    const ticket = {
+      status: "done",
+      createdAt: 0,
+      dueAt: 10_000,
+      closure: { signedAt: 15_000 },
+      statusMs: { "waiting:parts": 6_000 }
+    };
+
+    expect(ticketLifecycleNonOperationalMs(ticket, labels)).toBe(6_000);
+    expect(ticketLifecycleOperationalSlaRatio(ticket, labels)).toBe(0.9);
+    expect(ticketLifecycleMissedOperationalSla(ticket, labels)).toBe(false);
+  });
+
+  it("falls back to stored pause totals when lifecycle stages do not include paused time", () => {
+    const ticket = {
+      status: "done",
+      createdAt: 0,
+      dueAt: 10_000,
+      pauseAccumMs: 6_000,
+      closure: { signedAt: 15_000 }
+    };
+
+    expect(ticketLifecycleNonOperationalMs(ticket, labels)).toBe(6_000);
+    expect(ticketLifecycleOperationalSlaRatio(ticket, labels)).toBe(0.9);
+    expect(ticketLifecycleMissedOperationalSla(ticket, labels)).toBe(false);
   });
 });

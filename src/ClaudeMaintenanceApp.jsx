@@ -15,11 +15,11 @@ import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, clean
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
-import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio } from "./slaModel.js";
+import { isOperationallyOverdue, operationalElapsedMs, operationalRemainingMs } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 
 /* ============================================================
@@ -4384,7 +4384,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
   };
   const exportXlsx = () => {
     const options = lifecycleOptions();
-    const rows = list.map((t) => { const life = ticketLifecycleSummary(t, options); return ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config), "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait, "פירוט זמני סטטוס": life.statusDurations, "חריגת SLA": missedOperationalSla(t) ? "כן" : "", "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason, "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "עלות (₪)": t.closure?.costAmount || 0 }); });
+    const rows = list.map((t) => { const life = ticketLifecycleSummary(t, options); return ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config), "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait, "פירוט זמני סטטוס": life.statusDurations, "חריגת SLA": ticketLifecycleMissedOperationalSla(t, options) ? "כן" : "", "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason, "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "עלות (₪)": t.closure?.costAmount || 0 }); });
     try {
       const ws = XLSX.utils.json_to_sheet(rowsSafe(rows));
       const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]);
@@ -5076,6 +5076,9 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     wearLabel: (id) => WEAR.find((w) => w.id === id)?.label || id,
     durationText: fmtDur
   };
+  const missedSla = (ticket) => ticketLifecycleMissedOperationalSla(ticket, lifecycleOptions);
+  const metSla = (ticket) => ticketLifecycleMetOperationalSla(ticket, lifecycleOptions);
+  const slaRatio = (ticket) => ticketLifecycleOperationalSlaRatio(ticket, lifecycleOptions);
   const isT = (t) => t.track === "transport" || (!t.track && t.forkliftId);
   const segAll = atab === "maint" ? allTickets.filter((t) => !isT(t)) : atab === "fleet" ? allTickets.filter(isT) : allTickets;
   const tickets = segAll.filter((t) => inP(t.createdAt));
@@ -5091,8 +5094,8 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const pmPlanned = pmDone + pmMissed;
   const pmRate = pmPlanned ? Math.round((pmDone / pmPlanned) * 100) : null;
   const pmTicketCost = closedP.filter((t) => t.sourcePmId).reduce((a, t) => a + (t.closure?.costAmount || 0), 0);
-  const considered = tickets.filter((t) => t.status === "done" || isOverdue(t));
-  const met = tickets.filter((t) => t.status === "done" && metOperationalSla(t));
+  const considered = tickets.filter((t) => t.status === "done" || missedSla(t));
+  const met = tickets.filter((t) => t.status === "done" && metSla(t));
   const compliance = considered.length >= 3 ? Math.round((met.length / considered.length) * 100) : null;
   // Facility analytics
   const facTickets = tickets.filter((t) => !isT(t));
@@ -5108,7 +5111,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const mttr = done.length ? done.reduce((a, t) => a + ((t.closure?.signedAt || t.updatedAt) - t.createdAt), 0) / done.length : 0;
   const transDone = done.filter((t) => t.track === "transport");
   const totalDowntime = tickets.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
-  const breach = tickets.filter(isOverdue);
+  const breach = tickets.filter(missedSla);
   const hasPartsLifecycleStage = (t) => ticketHasLifecycleStage(t, "waiting:parts", lifecycleOptions);
   const stuckParts = tickets.filter(hasPartsLifecycleStage);
   const partsBreach = breach.filter(hasPartsLifecycleStage);
@@ -5143,7 +5146,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const recurUnits = unitArr.filter((x) => x.n >= REPEAT_MIN).slice(0, 5).map((x) => ({ name: `${unitLabel(x.f, config)}`, n: x.n }));
   const recurFac = Object.entries(facAssetCount).filter(([, n]) => n >= REPEAT_MIN).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, n]) => ({ name, n }));
   const recurList = atab === "fleet" ? recurUnits : atab === "maint" ? recurFac : [...recurUnits, ...recurFac].slice(0, 6);
-  const longList = closedP.map((t) => ({ t, ratio: operationalSlaRatio(t) })).filter((x) => x.ratio != null && x.ratio >= SLA_FACTOR).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
+  const longList = closedP.map((t) => ({ t, ratio: slaRatio(t) })).filter((x) => x.ratio != null && x.ratio >= SLA_FACTOR).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
   const costByCat = {}; closedP.filter((t) => t.closure?.costAmount).forEach((t) => { const key = isT(t) ? (unitTypeName(fleet.find((f) => f.id === t.forkliftId), config) || "כלי שינוע") : catOf(t).label; costByCat[key] = (costByCat[key] || 0) + t.closure.costAmount; });
   const costCatArr = Object.entries(costByCat).sort((a, b) => b[1] - a[1]).slice(0, 6); const maxCostCat = Math.max(1, ...costCatArr.map(([, v]) => v));
   const costCatTitle = atab === "fleet" ? "עלות לפי סוג כלי" : atab === "maint" ? "עלות לפי קטגוריה" : "עלות לפי קטגוריה / סוג";
@@ -5166,7 +5169,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
         "השבתה (שע׳)": t.track === "transport" ? Math.round(downtimeMs(t) / 3600000) : "",
         "המתנה לחלקים": hasPartsLifecycleStage(t) ? "כן" : "", "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait,
         "פירוט זמני סטטוס": life.statusDurations, "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason,
-        "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "חריגת SLA": missedOperationalSla(t) ? "כן" : "",
+        "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "חריגת SLA": missedSla(t) ? "כן" : "",
       });
       });
       const wb = XLSX.utils.book_new();
