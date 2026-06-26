@@ -21,12 +21,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/ppe-notification-subtabs
 
-- Status: main is clean after PR #185.
+- Status: ready for PR after local validation.
 - Latest synchronized `main`: `fce540c fix: focus fleet notifications on unit (#185)`.
 - Open PRs when this entry was written: none.
-- Next product focus: continue R3 notification routing by improving PPE notification focus targets.
+- Purpose:
+  - route admin PPE notifications into the relevant PPE sub-tab instead of only opening the broad PPE module.
+  - keep this PR limited to sub-tab focus; exact PPE record focus can follow separately.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: admin PPE module opens, `תנועות מלאי` sub-tab switches correctly, and console has no errors.
 
 ## Latest Completed Work
 
@@ -53,8 +59,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Continue R3 by improving PPE notification focus targets.
-2. Keep each route/focus fix in a separate small PR.
+1. Finish and review `codex/ppe-notification-subtabs`.
+2. If merged, continue R3 with exact PPE record focus or the next release-checklist polish item.
+3. Keep each route/focus fix in a separate small PR.
 
 ## Documentation Policy
 

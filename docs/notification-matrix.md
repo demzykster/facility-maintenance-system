@@ -12,7 +12,7 @@ Source of truth in code:
 
 - `ticketId` opens the exact ticket detail.
 - `go: "tasks"` opens `מטלות`.
-- `go: "ppe"` opens `ביגוד עובדים`.
+- `go: "ppe"` opens `ביגוד עובדים`; `ppeSub` focuses a known PPE sub-tab (`dash`, `log`, `catalog`, or `settings`) when present.
 - `go: "cleaning"` opens `בקרת ניקיון`.
 - `go: "pm"` opens `כלי שינוע` with PM tab.
 - `go: "insp"` opens `כלי שינוע` with inspection tab.
@@ -34,7 +34,7 @@ Source of truth in code:
 | admin | PM due soon | `pm` | PM tab via `go: "pm"` | none found |
 | admin | driver requests | `driver` | exact unit card via `go: "fleet"` + `fleetId` | fixed after matrix creation |
 | admin | inspection due | `doc` | inspection tab via `go: "insp"` | none found |
-| admin | PPE requests/stock/orders | `ppe` | PPE module via `go: "ppe"` | should eventually focus the relevant tab/list |
+| admin | PPE requests/stock/orders | `ppe` | PPE module via `go: "ppe"` + `ppeSub` | now focuses dashboard for requests/low stock and stock log for open orders; exact record focus can be added later |
 | admin | technician shift exceptions | `confirm` / `escalate` / `back` | team page via `go: "team"` | fixed after matrix creation |
 | admin | cleaning rounds/complaints | `cleaning` | cleaning module via `go: "cleaning"` | none found |
 | tech | new transport tickets | `new` | exact ticket via `ticketId` | none found |
@@ -54,4 +54,4 @@ Source of truth in code:
 
 ## First Fix Candidates
 
-1. Eventually focus fleet/PPE records instead of only opening the broad module.
+1. Eventually focus exact PPE records instead of only opening the relevant PPE sub-tab.
