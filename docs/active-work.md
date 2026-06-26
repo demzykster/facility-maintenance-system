@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: idle.
-- Last synchronized `main` before this entry: `a74a3a1 docs: fix active-work next action [skip vercel] (#148)`.
+- Last synchronized `main` before this entry: `ea74362 fix: polish notification count Hebrew (#149)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - no active product branch;
@@ -34,6 +34,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- PR #150: Fleet and Inspection count Hebrew was polished.
+  - Visible vehicle, treatment, and inspection counters now use singular/plural wording.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #149: notification count Hebrew was polished.
   - Aggregate monthly-inspection/PPE notification bodies now use singular/plural wording.
   - Local tests/build/browser smoke-check passed before merge.
