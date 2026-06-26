@@ -63,7 +63,7 @@ Done means:
 - Findings are fixed or deliberately deferred with a reason.
 
 Next PR candidate:
-- Start with `קריאות`: verify list filters, active drill-down banner, card labels, and reset behavior after analytics/dashboard navigation.
+- Polish `קריאות` drill-down filter visibility and the filter row layout.
 
 ### R6 — Worker Onboarding Polish
 
