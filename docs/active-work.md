@@ -21,21 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/worker-activation-copy-after-save`
 
-- Status: no active product branch.
-- Last synchronized `main` before this entry: `981b817 fix: show backup restore extended counts (#127)`.
+- Status: in progress.
+- Last synchronized `main` before this entry: `cd33de6 docs: close backup summary ledger [skip vercel] (#128)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - continue from `docs/backlog.md`;
-  - keep the next step small and isolated.
+  - keep worker/cleaner edit forms open after saving a pending activation link so the saved link can be copied immediately;
+  - preserve the rule that only saved activation links can be copied.
 - Validation so far:
-  - `npm test -- --run`: skipped; docs-only.
-  - `npm run build`: skipped; docs-only.
-  - Browser smoke-check: not required; no product UI code changed.
+  - `npm test -- --run`: passed, 13 files / 49 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: `צוות ומשתמשים` rendered after reload; no console errors.
 
 ### Latest Completed Work
 
+- PR #128: active-work was closed after the backup restore summary change.
+  - Local `main` was left with no active product branch.
+  - Vercel was rate-limited; docs-only.
 - PR #127: backup restore confirmation now shows extended counts.
   - The restore preview includes tasks, meetings, PPE requests, and PPE purchase orders.
   - Local tests/build/browser smoke-check passed; Vercel was rate-limited before merge.

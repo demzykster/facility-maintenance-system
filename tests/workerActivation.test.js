@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "../src/workerAccessModel.js";
+import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "../src/workerAccessModel.js";
 
 function createActivationLink(user, token) {
   return {
@@ -39,6 +39,15 @@ describe("worker activation rules", () => {
     expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, false)).toBe(false);
     expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, true)).toBe(true);
     expect(canCopyActivationLink(savedWorker, "token-not-saved-yet", true)).toBe(false);
+  });
+
+  it("keeps saved pending worker forms open so the saved activation link can be copied", () => {
+    const savedWorker = createActivationLink({ id: "user-4010", role: "worker", workerNo: "4010" }, "token-1");
+
+    expect(shouldKeepWorkerFormOpenForActivationLink(savedWorker, true)).toBe(true);
+    expect(shouldKeepWorkerFormOpenForActivationLink({ ...savedWorker, activationStatus: "activated" }, true)).toBe(false);
+    expect(shouldKeepWorkerFormOpenForActivationLink({ ...savedWorker, id: "" }, true)).toBe(false);
+    expect(shouldKeepWorkerFormOpenForActivationLink(savedWorker, false)).toBe(false);
   });
 
   it("tracks pending, activated, temporary-code, and no-access states", () => {
