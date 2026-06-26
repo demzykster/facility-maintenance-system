@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Ticket-list lifecycle Excel sheet
+### No active product branch
 
-- Status: active branch `codex/add-ticket-list-lifecycle-sheet`.
-- Last synchronized `main` before this entry: `334141d fix: clarify wait reason sla copy (#116)`.
-- Open PRs when this entry was written: none.
+- Status: clean checkpoint after PR #117.
+- Last synchronized `main` before this entry: `d8848d2 fix: add ticket lifecycle sheet to list export (#117)`.
+- Open PRs when this entry was written: none expected.
 - Purpose:
-  - add the `מחזור חיים` sheet to the regular ticket-list Excel export;
-  - keep the regular export consistent with Analytics export;
-  - reuse normalized lifecycle stages for status/wait/equipment/rework rows.
+  - continue from `docs/backlog.md` and the owner-approved SLA/stage analytics cleanup;
+  - next likely work should be another small isolated UX/reporting cleanup;
+  - do not infer a still-active product branch from older entries.
 
 ### Latest Completed Work
 
+- PR #117: regular ticket-list Excel export now includes lifecycle sheet.
+  - Added `מחזור חיים` to the regular `קריאות` Excel export.
+  - The sheet reuses normalized lifecycle stages for status, waiting, equipment-wait, and rework rows.
+  - Vercel was green before merge.
 - PR #116: wait-reason SLA copy was clarified.
   - Settings now labels the wait-reason SLA column as `SLA תפעולי`.
   - The hint explains that excluded waiting time remains in reports but is not counted in operational ticket SLA.
@@ -220,6 +224,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/close-ledger-after-lifecycle-export`:
+
+- `npm test -- --run`: skipped; docs-only ledger close.
+- `npm run build`: skipped; docs-only ledger close.
+- Browser smoke-check: not required; no product UI code changed.
 
 Branch `codex/add-ticket-list-lifecycle-sheet`:
 
