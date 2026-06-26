@@ -63,7 +63,7 @@ Done means:
 - Findings are fixed or deliberately deferred with a reason.
 
 Next PR candidate:
-- Add clear labels to icon-only month controls used in `ביגוד עובדים`.
+- Continue `ביגוד עובדים`: review catalog/log/settings empty states and order flow for misleading actions.
 
 ### R6 — Worker Onboarding Polish
 
