@@ -21,18 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/cleaner-notification-route, if PR is still open
+### Active branch: codex/correct-dept-notification-matrix, if PR is still open
 
-- Status: ready for PR after local validation.
-- Last synchronized `main` before this entry: `e82867b fix: route team notifications to users (#181)`.
+- Status: docs-only correction in progress.
+- Last synchronized `main` before this entry: `b894675 fix: route cleaner notifications to cleaning (#182)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - route cleaner cleaning notifications to `בקרת ניקיון` with `go: "cleaning"`.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check cleaner role opens with current data.
-  - code-path check: cleaner cleaning events now include `go: "cleaning"`.
+- correct `docs/notification-matrix.md` after verifying `go: "dept"` already routes in `UserApp`.
+- Validation needed before PR:
+  - `git diff --check`
+  - browser/code inspection already verified `UserApp` maps unknown/dept notification routes to `המחלקה שלי` equipment tab.
 
 ## Latest Completed Work
 
@@ -134,9 +132,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/cleaner-notification-route` is still open, review/merge it.
-2. If it is merged, decide what `go: "dept"` should mean before changing it.
-3. Then continue R3 route/focus fixes one small PR at a time.
+1. If branch `codex/correct-dept-notification-matrix` is still open, review/merge it.
+2. If it is merged, continue R3 by improving focus targets inside fleet/PPE notifications.
+3. Keep each route/focus fix in a separate small PR.
 
 ## Documentation Policy
 
