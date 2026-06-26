@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #165.
-- Last synchronized `main` before this entry: `7588287 fix: use lifecycle wait reasons in analytics (#164)`.
-- Open PRs when this entry was written: PR #165 was ready to merge.
+- Status: idle after PR #166.
+- Last synchronized `main` before this entry: `b708652 fix: align dashboard parts wait drilldown (#165)`.
+- Open PRs when this entry was written: PR #166 was ready to merge.
 - Purpose:
-  - Dashboard parts-wait queue chip drill-down now uses the same lifecycle key as the count;
-  - count/list mismatch is avoided when an open ticket has historical `waiting:parts` time.
+  - Analytics parts-wait card now has correct Hebrew singular/plural wording;
+  - copy stays aligned for one delayed ticket and one SLA breach.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Dashboard parts-wait drill-down.
+  - browser smoke-check passed for Analytics parts-wait Hebrew copy.
 
 ## Latest Completed Work
 
+- PR #166: Analytics parts-wait Hebrew copy was polished.
+  - The parts-wait card now says `1 קריאה עוכבה` for a single delayed ticket instead of plural wording.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #165: Dashboard parts-wait drill-down aligned with lifecycle count.
   - The parts-wait queue chip now opens tickets by `lifecycleKey: waiting:parts`.
   - Local tests/build/browser smoke-check passed before merge.

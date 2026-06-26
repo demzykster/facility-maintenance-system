@@ -5150,6 +5150,8 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const costByAsset = {}; closedP.filter((t) => t.closure?.costAmount).forEach((t) => { const key = t.forkliftId ? (fleet.find((f) => f.id === t.forkliftId)?.code || t.asset || "—") : (t.asset || "כללי"); costByAsset[key] = (costByAsset[key] || 0) + t.closure.costAmount; });
   const costAssetArr = Object.entries(costByAsset).sort((a, b) => b[1] - a[1]).slice(0, 6); const maxCostAsset = Math.max(1, ...costAssetArr.map(([, v]) => v));
   const hasInsights = recurList.length || longList.length || costCatArr.length || costAssetArr.length;
+  const partsWaitTitle = `${countLabel(stuckParts.length, "קריאה", "קריאות")} ${stuckParts.length === 1 ? "עוכבה" : "עוכבו"} בשל המתנה לחלקים`;
+  const partsBreachText = partsBreach.length === 1 ? "אחת חרגה" : `${partsBreach.length} חרגו`;
   const exportExcel = () => {
     try {
       const rows = tickets.map((t) => {
@@ -5261,7 +5263,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
       {zoneArr.length === 0 ? <div className="note">אין נתוני אזורים.</div> : <div className="panel">{zoneArr.slice(0, 8).map(([z, n]) => <Bar key={z} label={z} value={n} max={maxZone} color="#0EA5E9" />)}</div>}
     </>)}
     {atab === "all" && <><SectionTitle><BarChart3 size={15} /> עלויות: מבנה מול שינוע</SectionTitle><div className="panel"><Bar label="אחזקת מבנה" value={facCost} max={Math.max(facCost, transCost, 1)} money color={TRACKS.facility.color} /><Bar label="כלי שינוע" value={transCost} max={Math.max(facCost, transCost, 1)} money color={TRACKS.transport.color} /></div></>}
-    {stuckParts.length > 0 && <div className="parts-card"><div className="parts-row"><span className="parts-icon"><Clock size={16} /></span><div><div className="parts-title">{countLabel(stuckParts.length, "קריאה", "קריאות")} עוכבו בשל המתנה לחלקים</div><div className="parts-sub">מתוך אלו, {partsBreach.length} חרגו מ-SLA — עיכוב שאינו בהכרח באחריות הטכנאי</div></div></div></div>}
+    {stuckParts.length > 0 && <div className="parts-card"><div className="parts-row"><span className="parts-icon"><Clock size={16} /></span><div><div className="parts-title">{partsWaitTitle}</div><div className="parts-sub">מתוכן, {partsBreachText} מ-SLA — עיכוב שאינו בהכרח באחריות הטכנאי</div></div></div></div>}
     {showFleet && <><SectionTitle><Gauge size={15} /> השבתת כלי שינוע</SectionTitle>
     <div className="panel"><div className="row-stats"><div><div className="rs-num">{fmtDur(totalDowntime)}</div><div className="rs-lbl">השבתה מצטברת</div></div><div><div className="rs-num">{mtbf ? fmtDur(mtbf) : "—"}</div><div className="rs-lbl">זמן ממוצע בין תקלות</div></div></div></div>
     <SectionTitle>כלים בעייתיים (מספר קריאות)</SectionTitle>
