@@ -21,21 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/backup-restore-summary-counts`
+### Active branch: none
 
-- Status: in progress.
-- Last synchronized `main` before this entry: `0e77d74 docs: close stale backlog items [skip vercel] (#126)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `981b817 fix: show backup restore extended counts (#127)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - make backup restore confirmation show the newer tasks/meetings/PPE collections;
-  - close the stale active-work entry after PR #126.
+  - continue from `docs/backlog.md`;
+  - keep the next step small and isolated.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 48 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: Settings backup/restore controls rendered; no console errors.
+  - `npm test -- --run`: skipped; docs-only.
+  - `npm run build`: skipped; docs-only.
+  - Browser smoke-check: not required; no product UI code changed.
 
 ### Latest Completed Work
 
+- PR #127: backup restore confirmation now shows extended counts.
+  - The restore preview includes tasks, meetings, PPE requests, and PPE purchase orders.
+  - Local tests/build/browser smoke-check passed; Vercel was rate-limited before merge.
 - PR #126: stale backlog entries were closed.
   - Topic #4, Topic #12, and backup follow-up docs now reflect the already merged implementation work.
   - Vercel was rate-limited; docs-only.
