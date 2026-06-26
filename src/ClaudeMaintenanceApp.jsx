@@ -5555,7 +5555,7 @@ function SettingsPanel(p) {
       <SectionTitle>השבתה קריטית — סף התראה (שעות)</SectionTitle>
       <label className="sla-cell" style={{ maxWidth: 160 }}><span style={{ color: "#DC2626" }}>שעות עד הסלמה</span><input type="number" value={escH} onChange={(e) => setEscH(e.target.value)} /></label>
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveGeneral}>{saved ? "נשמר ✓" : "שמירת הגדרות"}</button>
-      <div className="note">גרסת הדגמה. הנתונים משותפים בין המשתמשים. ה-PIN אינו אבטחה אמיתית — לגרסת ייצור נדרש שרת.</div>
+      <div className="note">גרסת הדגמה: הנתונים נשמרים בדפדפן הנוכחי בלבד. ה-PIN אינו אבטחה אמיתית — לגרסת ייצור נדרשים שרת ואימות משתמשים.</div>
       {mayFullSettings && <>
       <SectionTitle><FileText size={15} /> גיבוי ושחזור</SectionTitle>
       <div className="hint" style={{ marginBottom: 10 }}>ייצוא של כל הנתונים לקובץ JSON. שחזור ממזג לפי מזהה — מעדכן רשומות קיימות ומוסיף חדשות, ולא מוחק נתונים.</div>
