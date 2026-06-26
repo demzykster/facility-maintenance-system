@@ -1728,15 +1728,16 @@ function UserApp(p) {
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
   const mayViewAudit = canViewAudit(session);
+  const mayViewAnalytics = canViewAnalytics(session);
   const mayViewSuppliers = canViewSuppliers(session);
   const mayManageSuppliers = canManageSuppliers(session);
-  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view;
-  const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
+  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view;
+  const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
-        nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
+        nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
       <div className="main-col">
         <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
@@ -1771,7 +1772,7 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} tasks={p.tasks} meetings={p.meetings} users={users} canEditDamage={false} ppe={p.ppe} ppeItems={p.ppeItems} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -2697,7 +2698,7 @@ function ManageStats({ tasks, meetings, users }) {
     <div className="hint" style={{ marginTop: 8 }}>הנתונים לפי ההרשאות שלך. לדוח מפורט — «ייצוא ל-Excel» במסכי מטלות/פגישות.</div>
   </>);
 }
-function DamageReport({ tickets, fleet, config, saveTicket }) {
+function DamageReport({ tickets, fleet, config, saveTicket, canEdit = !!saveTicket }) {
   const [days, setDays] = useState(180);
   const CLASSES = ["ללא ידע", "נזק טבעי", "רשלנות", "טעות אנוש"];
   const since = Date.now() - days * 86400000;
@@ -2709,7 +2710,7 @@ function DamageReport({ tickets, fleet, config, saveTicket }) {
   const totalDown = (t) => { const p = parts(t); if (p.length) return p.reduce((a, [, v]) => a + v, 0); return downtimeMs(t); };
   const defDriver = (t) => { if (t.driverInvolved != null) return t.driverInvolved; const dr = fleetOf(t).drivers || {}; return (dr.morning && dr.morning.name) || (dr.night && dr.night.name) || ""; };
   const causeOf = (t) => t.damageCause != null ? t.damageCause : ((t.closure && t.closure.costNote) || "");
-  const set = (t, patch) => saveTicket({ ...t, ...patch });
+  const set = (t, patch) => canEdit && saveTicket && saveTicket({ ...t, ...patch });
   const txt = () => rows.map((t) => { const f = fleetOf(t); return [fmtDate(t.downtimeStart || t.createdAt), "כלי " + (f.code || t.asset || ""), f.type || "", t.subject || "", "נהג: " + (defDriver(t) || "—"), "סיווג: " + (t.damageClass || "—"), "₪" + (t.closure?.costAmount || 0), "השבתה: " + fmtDur(totalDown(t)), parts(t).map(([k, v]) => stName(k) + " " + fmtDur(v)).join(", ")].join(" | "); }).join("\n");
   const copy = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt()); return; } } catch (e) {} try { const ta = document.getElementById("dmg-txt"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
   const xlsx = () => { const r = rows.map((t) => { const f = fleetOf(t); return { "תאריך": fmtDate(t.downtimeStart || t.createdAt), "מס׳ כלי": f.code || t.asset || "", "סוג ציוד": f.type || "", "תיאור הנזק": t.subject || "", "תיאור האירוע": causeOf(t), "נהג מעורב": defDriver(t), "סיווג": t.damageClass || "", "עלות תיקון": (t.closure && t.closure.costAmount) || 0, "השבתה כוללת": fmtDur(totalDown(t)), "פירוט לפי סטטוס": parts(t).map(([k, v]) => `${stName(k)}: ${fmtDur(v)}`).join(" · ") }; }); if (!r.length) return; try { const ws = XLSX.utils.json_to_sheet(rowsSafe(r)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "נזקים"); downloadXlsx(wb, `damage_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {} };
@@ -2732,11 +2733,11 @@ function DamageReport({ tickets, fleet, config, saveTicket }) {
           <td style={{ ...td, fontWeight: 700 }}>{f.code || t.asset || "—"}</td>
           <td style={td}>{f.type || "—"}</td>
           <td style={{ ...td, maxWidth: 200 }}>{t.subject || t.description || "—"}</td>
-          <td style={td}><input value={defDriver(t)} onChange={(e) => set(t, { driverInvolved: e.target.value })} style={{ width: 110, fontSize: 12 }} /></td>
-          <td style={td}><select value={t.damageClass || ""} onChange={(e) => set(t, { damageClass: e.target.value })} style={{ fontSize: 12 }}><option value="">—</option>{CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
+          <td style={td}><input value={defDriver(t)} onChange={(e) => set(t, { driverInvolved: e.target.value })} readOnly={!canEdit} style={{ width: 110, fontSize: 12 }} /></td>
+          <td style={td}><select value={t.damageClass || ""} onChange={(e) => set(t, { damageClass: e.target.value })} disabled={!canEdit} style={{ fontSize: 12 }}><option value="">—</option>{CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
           <td style={{ ...td, whiteSpace: "nowrap" }}>{t.closure ? ils(t.closure.costAmount || 0) : "—"}</td>
           <td style={{ ...td, minWidth: 160 }}><b>{fmtDur(totalDown(t))}</b>{parts(t).length > 0 && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{parts(t).map(([k, v]) => `${stName(k)}: ${fmtDur(v)}`).join(" · ")}</div>}</td>
-          <td style={td}><input value={causeOf(t)} onChange={(e) => set(t, { damageCause: e.target.value })} placeholder="סיבת האירוע" style={{ width: 150, fontSize: 12 }} /></td>
+          <td style={td}><input value={causeOf(t)} onChange={(e) => set(t, { damageCause: e.target.value })} readOnly={!canEdit} placeholder="סיבת האירוע" style={{ width: 150, fontSize: 12 }} /></td>
         </tr>; })}</tbody>
       </table>
     </div>
@@ -2802,11 +2803,11 @@ function BigudAnalytics({ ppe, items, users, config }) {
   </div>);
 }
 
-function InsightsHub({ tickets, fleet, pm, config, zones, rounds, complaints, onFilter, ctx, setCtx, tasks, meetings, users, saveTicket, ppe, ppeItems }) {
+function InsightsHub({ tickets, fleet, pm, config, zones, rounds, complaints, onFilter, ctx, setCtx, tasks, meetings, users, saveTicket, canEditDamage = !!saveTicket, ppe, ppeItems }) {
   const [t, setT] = useState("perf");
   return (<>
     <div className="seg-tabs" style={{ maxWidth: 700, marginBottom: 14, flexWrap: "wrap" }}><button className={t === "perf" ? "on" : ""} onClick={() => setT("perf")}>ביצועים</button><button className={t === "bigud" ? "on" : ""} onClick={() => setT("bigud")}>ביגוד עובדים</button><button className={t === "damage" ? "on" : ""} onClick={() => setT("damage")}>נזקים</button><button className={t === "manage" ? "on" : ""} onClick={() => setT("manage")}>ניהול</button><button className={t === "cleaning" ? "on" : ""} onClick={() => setT("cleaning")}>בקרת ניקיון</button><button className={t === "reports" ? "on" : ""} onClick={() => setT("reports")}>דיווחי עובדים</button></div>
-    {t === "manage" ? <ManageStats tasks={tasks} meetings={meetings} users={users} /> : t === "reports" ? <WorkerReportsAnalytics tickets={tickets} dept={null} /> : t === "cleaning" ? <CleaningAnalytics zones={zones} rounds={rounds} complaints={complaints} /> : t === "damage" ? <DamageReport tickets={tickets} fleet={fleet} config={config} saveTicket={saveTicket} /> : t === "bigud" ? <BigudAnalytics ppe={ppe} items={ppeItems} users={users} config={config} /> : <Analytics tickets={tickets} fleet={fleet} pm={pm} config={config} onFilter={onFilter} ctx={ctx} setCtx={setCtx} />}
+    {t === "manage" ? <ManageStats tasks={tasks} meetings={meetings} users={users} /> : t === "reports" ? <WorkerReportsAnalytics tickets={tickets} dept={null} /> : t === "cleaning" ? <CleaningAnalytics zones={zones} rounds={rounds} complaints={complaints} /> : t === "damage" ? <DamageReport tickets={tickets} fleet={fleet} config={config} saveTicket={saveTicket} canEdit={canEditDamage} /> : t === "bigud" ? <BigudAnalytics ppe={ppe} items={ppeItems} users={users} config={config} /> : <Analytics tickets={tickets} fleet={fleet} pm={pm} config={config} onFilter={onFilter} ctx={ctx} setCtx={setCtx} />}
   </>);
 }
 function PeoplePicker({ users, value, onChange, placeholder = "— בחרו אחראים —", me }) {
