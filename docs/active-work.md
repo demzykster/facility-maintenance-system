@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/wire-technician-tolerance-helper`
+### Active branch: `codex/ppe-deficit-card-noise`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `c976bb0 fix: report operational sla misses in exports (#121)`.
+- Last synchronized `main` before this entry: `ed1c162 fix: use technician tolerance helper in shifts (#122)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - wire the existing technician tolerance helper into runtime shift lateness/early-leave calculations;
-  - keep global `סבילות משמרת` as the default;
-  - avoid adding new UI until there is a business decision for per-technician overrides.
+  - reduce noise in PPE reorder cards by showing only sizes that actually need ordering;
+  - keep existing PPE inventory/order calculations unchanged;
+  - close the stale ledger entry after PR #122.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 46 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: app reloaded and rendered with no console errors.
+  - Browser smoke-check: PPE dashboard rendered; reorder cards showed only deficit sizes; no console errors.
 
 ### Latest Completed Work
 
+- PR #122: technician tolerance fallback is now used by runtime shift checks.
+  - Shift lateness and early-leave calculations now resolve tolerances through the existing helper.
+  - The global `סבילות משמרת` setting remains the default; no new per-technician UI was added.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #121: operational SLA misses were added to Excel exports.
   - Analytics Excel and regular ticket-list Excel now use `missedOperationalSla()`.
   - Closed tickets that missed operational SLA after paused waiting time are now visible in export.
