@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/fix-dashboard-sla-drilldown`
+### Active branch: `codex/fix-dashboard-critical-count`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `85123f3 docs: close screen polish ledger [skip vercel]`.
+- Last synchronized `main` before this entry: `90e4c4b fix: filter dashboard SLA drilldown (#141)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - make the Dashboard `חריגות SLA` KPI drill down to overdue tickets only;
-  - preserve the existing focus-banner pattern in `קריאות`.
+  - stop double-counting escalated critical transport issues in the Dashboard attention cards;
+  - keep the escalated-critical and currently-critical cards as separate queues.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; clicking Dashboard `חריגות SLA` opens `קריאות` with focus banner `מציג: חריגות SLA`, the list count is narrowed to overdue tickets, and no console errors were reported.
+  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; Dashboard now shows 1 escalated critical issue and 1 active critical transport issue in demo data instead of double-counting the escalated issue, and no console errors were reported.
 
 ### Latest Completed Work
 
+- PR #141: Dashboard SLA drill-down now filters correctly.
+  - The Dashboard `חריגות SLA` KPI opens `קריאות` with an SLA focus banner.
+  - The target list is narrowed to overdue tickets instead of all open tickets.
+  - Vercel was green before merge.
 - PR #140: screen-polish ledger was closed.
   - `docs/active-work.md` now starts from no active product branch after the previous screen pass.
   - Docs-only PR used `[skip vercel]`.

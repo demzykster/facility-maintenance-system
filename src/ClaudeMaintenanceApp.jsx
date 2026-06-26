@@ -4199,6 +4199,8 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const waitAdmin = open.filter((t) => t.status === "pending_admin");
   const critNow = open.filter((t) => t.track === "transport" && t.downtimeType === "critical");
   const critEsc = critNow.filter((t) => isCriticalEscalated(t, config));
+  const critEscIds = new Set(critEsc.map((t) => t.id));
+  const critActive = critNow.filter((t) => !critEscIds.has(t.id));
   const expDocs = fleet.map((f) => ({ f, s: docStatus(f, config) })).filter((x) => x.s.d != null && x.s.d <= 30).sort((a, b) => a.s.d - b.s.d);
   const pmSoon = (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue);
   const lastInsp = {}; (insp || []).forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
@@ -4247,7 +4249,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const isEmptyDemo = !demoActive && allTickets.length === 0 && fleet.length === 0 && (pm || []).length === 0 && (ppeItems || []).length === 0 && (zones || []).length === 0 && (complaints || []).length === 0;
   const attn = [
     critEsc.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות קריטיות שהוסלמו", n: critEsc.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
-    (critNow.length - critEsc.length) > 0 ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critNow.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
+    critActive.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critActive.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
     tasksOverdue.length ? { sev: 2, Icon: ClipboardList, text: "משימות באיחור", n: tasksOverdue.length, go: () => setTab("tasks") } : null,
     waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin" }) : setTab("tickets") } : null,
     waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user" }) : setTab("tickets") } : null,
