@@ -10,7 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
+import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
@@ -5452,8 +5452,9 @@ function SettingsPanel(p) {
     setImpMsg(""); setPendImport(null);
     const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
     try { const data = JSON.parse(await f.text());
-      if (!data || data.__app !== "maintenance-cmms") { setImpMsg("הקובץ אינו גיבוי תקין של המערכת"); return; }
-      setPendImport({ data, counts: { fleet: (data.fleet || []).length, tickets: (data.tickets || []).length, users: (data.users || []).length, pm: (data.pm || []).length, insp: (data.insp || []).length } });
+      const analysis = analyzeBackupPayload(data);
+      if (!analysis.valid) { setImpMsg("הקובץ אינו גיבוי תקין של המערכת"); return; }
+      setPendImport({ data, analysis, counts: { fleet: (data.fleet || []).length, tickets: (data.tickets || []).length, users: (data.users || []).length, pm: (data.pm || []).length, insp: (data.insp || []).length } });
     } catch (er) { setImpMsg("קריאת הקובץ נכשלה — JSON לא תקין"); }
   };
   const runImport = async () => { if (!pendImport) return; setImpBusy(true); try { await importBackup(pendImport.data); setPendImport(null); setImpMsg("השחזור הושלם ✓"); } catch (er) { setImpMsg("השחזור נכשל"); } finally { setImpBusy(false); } };
@@ -5556,6 +5557,7 @@ function SettingsPanel(p) {
       <label className="btn-ghost full" style={{ marginTop: 10, cursor: "pointer" }}><input type="file" accept="application/json,.json" style={{ display: "none" }} onChange={onPickBackup} /><RefreshCw size={15} /> שחזור מקובץ גיבוי</label>
       {pendImport && <div className="dev-box" style={{ marginTop: 10, borderStyle: "solid" }}>
         <div className="hint" style={{ marginBottom: 8 }}>נמצא גיבוי: {pendImport.counts.fleet} כלים · {pendImport.counts.tickets} קריאות · {pendImport.counts.pm} טיפולים · {pendImport.counts.insp} בקרות · {pendImport.counts.users} משתמשים. לשחזר ולמזג למערכת?</div>
+        {pendImport.analysis?.legacy && <div className="note" style={{ color: "#B45309", marginBottom: 8 }}>זה נראה כמו גיבוי ישן או חלקי. שחזור ימשיך, אבל ייתכן שחסרים בו נתוני ביגוד, משימות או פגישות שלא היו קיימים בגרסת הגיבוי.</div>}
         <button className="btn-primary full" disabled={impBusy} onClick={runImport}>{impBusy ? "משחזר…" : "שחזר ומזג"}</button>
         <button className="btn-ghost full" style={{ marginTop: 8 }} onClick={() => setPendImport(null)}>ביטול</button>
       </div>}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BACKUP_COLLECTIONS, BACKUP_COLLECTION_KEYS, BACKUP_VERSION, buildBackupPayload } from "../src/backupModel.js";
+import { analyzeBackupPayload, BACKUP_COLLECTIONS, BACKUP_COLLECTION_KEYS, BACKUP_VERSION, buildBackupPayload } from "../src/backupModel.js";
 
 describe("backup model", () => {
   it("covers every business collection that must round-trip through backup/restore", () => {
@@ -73,5 +73,24 @@ describe("backup model", () => {
     expect(payload.ppeItems).toEqual([]);
     expect(payload.ppeNorms).toEqual([]);
     expect(payload.ppeOrders).toEqual([]);
+  });
+
+  it("detects legacy backups that are missing current collections", () => {
+    expect(analyzeBackupPayload({ __app: "maintenance-cmms", v: 1, users: [] })).toMatchObject({
+      valid: true,
+      version: 1,
+      legacy: true,
+    });
+    expect(analyzeBackupPayload({ __app: "maintenance-cmms", v: 1, users: [] }).missingCollections).toContain("ppeReqs");
+  });
+
+  it("accepts current complete backup payloads without a legacy warning", () => {
+    const payload = buildBackupPayload({ config: {}, collections: {} });
+    expect(analyzeBackupPayload(payload)).toEqual({
+      valid: true,
+      version: BACKUP_VERSION,
+      legacy: false,
+      missingCollections: [],
+    });
   });
 });
