@@ -11,29 +11,6 @@ This is the closure checklist for the current stabilization phase. It replaces b
 
 ## Current Release Packages
 
-### R1 — SLA And Lifecycle Trust
-
-Status: open.
-
-Why it matters:
-- This is the core CMMS promise: who holds the work, where it waited, whether SLA was breached, and what the reports mean.
-
-Done means:
-- Dashboard, Analytics, ticket detail, and exports use `normalizedTicketLifecycleStages()` or lifecycle helpers for waiting/stage timing.
-- No visible KPI says “waiting/parts/SLA” while using only current status when historical lifecycle data is required.
-- Drill-down counts match the list that opens after clicking.
-- Unit tests cover any new lifecycle aggregation helper.
-
-Next PR candidate:
-- Search remaining direct `statusMs`, `waitingReason`, `pauseSla`, and SLA summary calculations in Dashboard/Analytics/ticket detail, then move one visible card at a time to lifecycle helpers.
-
-Current batch:
-- PR #172 moved ticket-list export and Analytics SLA breach/compliance calculations to lifecycle-aware SLA helpers.
-- PR #173 moved visible ticket-list/detail SLA badges, SLA bar, attention queue, and overdue drill-down to the same helper.
-- PR #174 moved visible ticket-list sorting and technician SLA counts to lifecycle-aware timing.
-- Current batch is moving admin SLA notifications to the same lifecycle-aware timing.
-- Legacy pause totals remain as fallback when a ticket has no normalized non-operational lifecycle stages.
-
 ### R2 — Drill-Down And Filter Reset
 
 Status: open.
@@ -131,6 +108,9 @@ Next PR candidate:
 
 ## Closed Release Packages
 
+- SLA and lifecycle trust: closed in PRs #156-#175.
+  - Dashboard, Analytics, ticket detail, exports, visible SLA badges, SLA bar, overdue drill-downs, ticket sorting, technician SLA count, and admin SLA notifications now use lifecycle helpers where historical waiting/stage timing matters.
+  - Remaining direct `statusMs`, `waitingReason`, and `pauseSla` references are source data, lifecycle normalization, settings, transition bookkeeping, or fallback logic rather than visible stale SLA KPIs.
 - Settings information architecture: task statuses, vehicle types, zones, departments, worker shifts, and empty registries were moved/cleaned in earlier PRs.
 - Task Excel import duplicate matching: closed in PR #168.
 - Notification default coverage and global type toggles: closed in PRs #169 and #170.
