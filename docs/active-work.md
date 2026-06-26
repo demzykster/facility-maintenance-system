@@ -21,22 +21,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/ppe-deficit-card-noise`
+### Active branch: none
 
-- Status: in progress.
-- Last synchronized `main` before this entry: `ed1c162 fix: use technician tolerance helper in shifts (#122)`.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `3165223 fix: reduce ppe reorder card noise (#123)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - reduce noise in PPE reorder cards by showing only sizes that actually need ordering;
-  - keep existing PPE inventory/order calculations unchanged;
-  - close the stale ledger entry after PR #122.
+  - continue from `docs/backlog.md`;
+  - keep the next step small and isolated.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 46 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: PPE dashboard rendered; reorder cards showed only deficit sizes; no console errors.
+  - Not applicable; no active code branch.
 
 ### Latest Completed Work
 
+- PR #123: PPE reorder cards were made less noisy.
+  - `ביגוד עובדים` -> `לוח מלאי` now shows only sizes that actually need ordering in reorder cards.
+  - Existing PPE stock/order calculations were not changed.
+  - Local tests/build/browser smoke-check passed; Vercel was rate-limited before merge.
 - PR #122: technician tolerance fallback is now used by runtime shift checks.
   - Shift lateness and early-leave calculations now resolve tolerances through the existing helper.
   - The global `סבילות משמרת` setting remains the default; no new per-technician UI was added.
