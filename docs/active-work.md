@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/polish-settings-screen-copy`
+### Active branch: `codex/polish-team-settings-copy`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `e6749c2 fix: polish PPE inventory copy (#137)`.
+- Last synchronized `main` before this entry: `d2cc008 fix: clarify settings demo storage copy (#138)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - correct misleading demo/security copy in global `הגדרות`;
-  - continue the screen-by-screen pass before moving to `צוות ומשתמשים`.
+  - polish workforce shift settings copy in `צוות ומשתמשים`;
+  - complete the current pass across `קריאות`, `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, and `צוות ומשתמשים`.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; global `הגדרות` shows the updated demo/local-browser storage note, the old shared-users wording is gone, and no console errors were reported.
+  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `צוות ומשתמשים` -> `הגדרות` shows neutral `משמרות עבודה` copy, the old `(בוקר/לילה)` title is gone, and no console errors were reported.
 
 ### Latest Completed Work
 
+- PR #138: Settings demo storage copy was clarified.
+  - Global `הגדרות` now says demo data is stored in the current browser only.
+  - The note clarifies that production requires a server and real user authentication.
+  - Vercel was green before merge.
 - PR #137: PPE inventory copy was polished.
   - `ביגוד עובדים` no longer shows `1 פריטים`; category counts use correct singular/plural Hebrew.
   - The reorder-size helper now appears once per section instead of repeating inside every reorder card.
