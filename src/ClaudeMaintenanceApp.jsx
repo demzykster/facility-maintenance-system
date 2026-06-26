@@ -6206,12 +6206,13 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
   const list = showAll ? notif.events : notif.events.slice(0, 60);
   const grouped = prefs.group ? NOTIF_KINDS.map((k) => [k, list.filter((e) => e.kind === k.kind)]).filter(([, arr]) => arr.length) : null;
   return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" onClick={(e) => e.stopPropagation()}>
-    <div className="notif-head"><div className="notif-title"><Bell size={18} /> התראות</div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
+    <div className="notif-head"><div><div className="notif-title"><Bell size={18} /> התראות</div><div className="notif-count">{notif.events.length ? `${notif.events.length} מוצגות` : "אין פריטים להצגה"}</div></div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
     {list.length > 0 && <button className="notif-markall" onClick={markAll}><Check size={14} /> {marked ? "סומן הכל כנקרא ✓" : "סמן הכל כנקרא"}</button>}
     {settings && <div className="notif-settings">
       <div className="ns-row"><span className="ns-lbl">מיון</span><div className="seg-tabs s2 mini"><button className={prefs.sort === "newest" ? "on" : ""} onClick={() => setPrefs({ sort: "newest" })}>חדש→ישן</button><button className={prefs.sort === "oldest" ? "on" : ""} onClick={() => setPrefs({ sort: "oldest" })}>ישן→חדש</button></div></div>
       <label className="ns-row clk"><span className="ns-lbl">קיבוץ לפי קטגוריה</span><input type="checkbox" checked={!!prefs.group} onChange={(e) => setPrefs({ group: e.target.checked })} /></label>
-      <div className="ns-sub">הצגת סוגי התראות</div>
+      <div className="ns-sub">סינון סוגי התראות</div>
+      <div className="ns-note">הסתרה כאן משפיעה רק על התצוגה שלך.</div>
       <div className="ns-kinds">{NOTIF_KINDS.map((k) => <label key={k.kind} className="ns-kind"><input type="checkbox" checked={!prefs.hidden[k.kind]} onChange={(e) => setPrefs({ hidden: { ...prefs.hidden, [k.kind]: !e.target.checked } })} /><span className={"ni-dot " + k.kind} />{k.label}</label>)}</div>
     </div>}
     {!settings && (perm === "granted" ? <div className="notif-perm ok"><Check size={15} /> התראות מחשב הופעלו</div>
@@ -6220,7 +6221,7 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
     <div className="notif-list">{list.length === 0 ? <div className="empty sm"><Bell size={28} /><div className="empty-t">אין התראות</div></div>
       : grouped ? grouped.map(([k, arr]) => <div key={k.kind} className="ni-group"><div className="ni-group-h"><span className={"ni-dot " + k.kind} /> {k.label} <span className="ni-group-n">{arr.length}</span></div>{arr.map(item)}</div>)
       : list.map(item)}</div>
-    {hiddenCount > 0 && <button className="notif-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "הצג פחות" : `הצג עוד ${hiddenCount} התראות`}</button>}
+    {hiddenCount > 0 && <button className="notif-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "הצג פחות" : `הצג עוד ${hiddenCount} ישנות יותר`}</button>}
   </div></div>);
 }
 function Toast({ t, onClose }) { return <div className="toast" onClick={onClose}><Bell size={18} style={{ flexShrink: 0, marginTop: 1 }} /><div><div className="toast-title">{t.title}</div><div className="toast-body">{t.body}</div></div></div>; }
@@ -6749,6 +6750,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .notif-panel{background:var(--surface);width:100%;max-width:440px;max-height:80vh;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35);}
 .notif-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);}
 .notif-title{font-family:var(--font-head);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;}
+.notif-count{font-size:12px;color:var(--muted);margin-top:3px;}
 .notif-perm{display:flex;align-items:center;justify-content:center;gap:7px;margin:12px 16px 0;background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;border-radius:10px;padding:10px;font-size:13.5px;font-weight:600;cursor:pointer;}
 button.notif-perm:hover{background:#D1FAE5;}
 .notif-perm.warn{background:#FEF3C7;color:#92400E;border-color:#FCD34D;cursor:default;}
@@ -6852,6 +6854,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .ns-lbl{font-size:13px;font-weight:600;}
 .seg-tabs.mini{display:inline-flex;width:auto;}.seg-tabs.mini button{font-size:11.5px;padding:5px 10px;}
 .ns-sub{font-size:11px;font-weight:700;color:var(--muted);margin:8px 0 5px;}
+.ns-note{font-size:11.5px;color:var(--muted);line-height:1.4;margin-bottom:7px;}
 .ns-kinds{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px;}
 .ns-kind{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;}
 .ns-kind .ni-dot{position:static;flex-shrink:0;}
