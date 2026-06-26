@@ -48,7 +48,7 @@ Next PR candidate:
 - Add or run a role-by-role browser smoke checklist for `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, and `כלי שינוע`.
 
 Current batch:
-- Give manager/user sessions with `ppe:manage` or `ppe:full` a direct path to `ביגוד עובדים`, without adding sidebar noise for ordinary request-only managers.
+- Permission route reachability was cleaned up in PRs #190-#194. Next: role-by-role smoke pass before closing R4.
 
 ### R5 — Screen Audit And Visual Noise
 
