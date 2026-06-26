@@ -21,19 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/close-notification-release-package
+### Active branch: codex/gate-user-audit-log
 
-- Status: ready for PR after docs-only validation.
-- Latest synchronized `main`: `935bae9 fix: focus department notifications on fleet card (#188)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `15b6e59 docs: close notification release package (#189)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - close R3 Notifications End-To-End in the release checklist after PRs #180-#188.
-  - move the next exact action to R4 permissions/role reality checks.
+  - fix the first R4 permissions gap: manager/user shell should show `יומן פעילות` only with `audit:view`.
+  - keep this PR limited to Audit Log reachability/visibility.
 - Validation passed before PR:
-  - `git diff --check`
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: current app renders after reload and console has no errors.
 
 ## Latest Completed Work
 
+- PR #189: R3 notification release package was closed.
+  - `docs/release-checklist.md` now marks Notifications End-To-End done in PRs #180-#188.
+  - Docs-only validation: `git diff --check`.
 - PR #188: Department notifications now focus exact fleet cards.
   - Manager/user PM and driver outcome notifications pass `fleetId` into department fleet navigation.
   - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
@@ -63,8 +68,8 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Finish and review `codex/close-notification-release-package`.
-2. If merged, continue R4 with a role-by-role permissions/reachability smoke-check.
+1. Finish and review `codex/gate-user-audit-log`.
+2. If merged, continue R4 with the next role/screen permission gap.
 3. Keep each permissions fix in a separate small PR.
 
 ## Documentation Policy
