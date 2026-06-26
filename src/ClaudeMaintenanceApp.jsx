@@ -4376,7 +4376,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       const life = ticketLifecycleSummary(t, options);
       return `<tr><td>${ticketNo(t)}</td><td>${trLabel(t)}</td><td>${esc(t.subject)}</td><td>${esc(life.description || "—")}</td><td>${esc(catOf(t).label)}</td><td>${prOf(t.priority).label}</td><td>${stOf(t.status).label}</td><td>${esc(ticketWaitReasonLabel(t, config) || "—")}</td><td>${esc(life.waitingDurations || "—")}</td><td>${esc(t.asset || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`;
     }).join("");
-    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right;vertical-align:top}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}רשימת קריאות</h2><div class="sub">${list.length} קריאות · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>תיאור התקלה</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>סיבת המתנה נוכחית</th><th>פירוט זמני המתנה</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
+    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right;vertical-align:top}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}רשימת קריאות</h2><div class="sub">${countLabel(list.length, "קריאה", "קריאות")} · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>תיאור התקלה</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>סיבת המתנה נוכחית</th><th>פירוט זמני המתנה</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
   };
   const exportXlsx = () => {
     const options = lifecycleOptions();
@@ -4419,11 +4419,11 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
     </div>
     <div className="wtoggles" style={{ marginBottom: 10 }}>{PERIODS.map(([k, l]) => <button key={k} className={"wtoggle" + (period === k ? " on" : "")} onClick={() => setPeriod(k)}>{l}</button>)}</div>
     <div className="export-bar"><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={() => setReport(buildHtml())}><Printer size={15} /> דוח / הדפסה</button>{hasFilters && <button className="btn-ghost sm" onClick={resetFilters}><X size={15} /> נקה כל הסינונים</button>}</div>
-    <div className="count-line">{list.length} קריאות · ממוינות לפי דחיפות</div>
+    <div className="count-line">{countLabel(list.length, "קריאה", "קריאות")} · {list.length === 1 ? "ממוינת" : "ממוינות"} לפי דחיפות</div>
     {list.length === 0 ? <Empty text="לא נמצאו קריאות" Icon={ListChecks} />
       : grouped ? <>{G.map((g) => { const items = list.filter(g.test); if (!items.length) return null; return <div key={g.key}><SectionTitle><g.Icon size={15} color={g.color} /> {g.label} ({items.length})</SectionTitle><div className="cards">{items.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div></div>; })}</>
       : <div className="cards">{list.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div>}
-    {report && <ReportView html={report} count={`${list.length} קריאות`} onClose={() => setReport(null)} />}
+    {report && <ReportView html={report} count={countLabel(list.length, "קריאה", "קריאות")} onClose={() => setReport(null)} />}
   </>);
 }
 
