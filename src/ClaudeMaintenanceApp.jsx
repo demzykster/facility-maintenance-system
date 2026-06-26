@@ -4441,7 +4441,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
   );
   return (<>
     <div className="seg-tabs s3" style={{ marginBottom: 10 }}>{[["all", "הכל"], ["facility", "מבנה"], ["transport", "שינוע"]].map(([id, lbl]) => <button key={id} className={track === id ? "on" : ""} onClick={() => { setTrack(id); setCat("all"); setUnitType("all"); }}>{lbl}</button>)}</div>
-    {drilldownLabel && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{drilldownLabel}</b></span><button onClick={resetFilters} title="הסר סינון"><X size={15} /></button></div>}
+    {drilldownLabel && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{drilldownLabel}</b></span><button onClick={resetFilters} title="הסר סינון"><X size={14} /> נקה סינון</button></div>}
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, נושא, כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="filter-row">
       {filterSelect("מצב", st, setSt, <><option value="open">פתוחות</option><option value="closed">סגורות</option><option value="all">הכל</option>{STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</>)}
@@ -6500,7 +6500,7 @@ a{color:inherit;}
 .sect svg{color:var(--muted);}
 .search-wrap{display:flex;align-items:center;gap:9px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:0 13px;margin-bottom:11px;color:var(--muted);}
 .search-wrap input{flex:1;border:none;outline:none;padding:12px 0;background:none;}
-.filter-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;}
+.filter-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px;}
 .filter-row select{border:1.5px solid var(--line);border-radius:10px;padding:9px 6px;background:var(--input);font-size:12.5px;}
 .count-line{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
 .settings-wrap{max-width:600px;}
@@ -6808,7 +6808,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .kpi-unit-row.bar-click{display:flex;cursor:pointer;border-radius:9px;}
 .focus-banner{display:flex;align-items:center;gap:8px;background:var(--primary-soft,rgba(37,99,235,0.1));border:1.5px solid var(--primary);color:var(--primary);border-radius:11px;padding:8px 12px;margin-bottom:10px;font-size:13px;}
 .focus-banner span{flex:1;}
-.focus-banner button{background:var(--surface);border:1px solid currentColor;color:inherit;border-radius:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
+.focus-banner button{background:var(--surface);border:1px solid currentColor;color:inherit;border-radius:8px;min-height:30px;padding:0 10px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;flex:none;font-size:12px;font-weight:700;white-space:nowrap;}
 .bar-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;gap:10px;}
 .bar-lbl{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.bar-val{font-weight:700;flex-shrink:0;}
 .bar-track{height:9px;border-radius:999px;background:var(--surface-2);overflow:hidden;}

@@ -21,14 +21,20 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/polish-ticket-filter-banner
 
-- Status: main is clean after closing the R4 permissions package.
-- Latest synchronized `main`: `e0af210 fix: prefer assigned cleaner in role switch (#196)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `7b84097 docs: close r4 permissions package (#197)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - R4 Permissions And Role Reality Check is closed.
-  - next release package is R5 Screen Audit And Visual Noise.
+  - start R5 with the `קריאות` screen.
+  - make dashboard/analytics drill-down filter state easier to understand and clear.
+  - keep the ticket filter row visually balanced when four filters are shown.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: dashboard drill-down to `קריאות` shows the explicit `נקה סינון` action.
+  - browser smoke-check: four ticket filters render in one balanced row at the current desktop viewport.
 
 ## Latest Completed Work
 
