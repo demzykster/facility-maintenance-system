@@ -48,7 +48,7 @@ Next PR candidate:
 - Add or run a role-by-role browser smoke checklist for `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, and `כלי שינוע`.
 
 Current batch:
-- Gate manager/user Audit Log visibility with `audit:view`.
+- Give manager/user sessions with `suppliers:view` a visible path to `ספקים / קבלנים`, with edits still gated by `suppliers:manage`.
 
 ### R5 — Screen Audit And Visual Noise
 
