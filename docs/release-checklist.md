@@ -48,7 +48,7 @@ Next PR candidate:
 - Add or run a role-by-role browser smoke checklist for `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, and `כלי שינוע`.
 
 Current batch:
-- Permission route reachability was cleaned up in PRs #190-#194. Next: role-by-role smoke pass before closing R4.
+- Prefer assigned cleaners in the admin role-switch when available; current local cleaner smoke still renders the empty-zone state cleanly when no assigned cleaner exists.
 
 ### R5 — Screen Audit And Visual Noise
 

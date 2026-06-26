@@ -1296,7 +1296,7 @@ export default function App() {
   const firstTech = (users || []).find((u) => u.role === "tech" && u.active !== false);
   const firstMgr = (users || []).find((u) => u.role === "user" && u.active !== false);
   const firstWorker = (users || []).find((u) => u.role === "worker" && u.active !== false);
-  const firstCleaner = (users || []).find((u) => u.role === "cleaner" && u.active !== false);
+  const firstCleaner = (users || []).find((u) => u.role === "cleaner" && u.active !== false && (zones || []).some((z) => z.cleanerId === u.id)) || (users || []).find((u) => u.role === "cleaner" && u.active !== false);
   const effSession = !impersonating ? session
     : actAs === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", shiftId: "", techScope: "transport", techCats: [] })
     : actAs === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })

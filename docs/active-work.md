@@ -21,14 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/prefer-assigned-cleaner-smoke
 
-- Status: main is clean after the R4 permission-route batch.
-- Latest synchronized `main`: `8ae97d2 fix: expose ppe management to permitted managers (#194)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `ba1936a docs: close permission route ledger (#195)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - permissions route reachability was cleaned up across manager/user shell.
-  - next R4 step is a role-by-role smoke pass before closing the package.
+  - role-by-role smoke found that admin role-switch can pick a cleaner with no assigned zones.
+  - prefer an assigned cleaner for the demo/smoke role-switch, while keeping the existing fallback if none exists.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser role-smoke: admin, manager, technician, and worker shells rendered expected screens with no console errors.
+  - browser role-smoke: cleaner shell rendered cleanly with no console errors; current local data still shows the empty-zone state when no assigned cleaner is available.
 
 ## Latest Completed Work
 
