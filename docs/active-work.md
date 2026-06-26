@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/polish-analytics-drilldowns`
+### Active branch: `codex/polish-ppe-screen-copy`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `526af10 fix: label ticket list filters (#135)`.
+- Last synchronized `main` before this entry: `211779c fix: polish analytics ticket count copy (#136)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - polish Hebrew count grammar in `אנליטיקה` clickable rows and related stage chips;
-  - continue the screen-by-screen pass before moving to `ביגוד עובדים`, `הגדרות`, and `צוות ומשתמשים`.
+  - polish Hebrew count grammar and repeated helper copy in `ביגוד עובדים`;
+  - continue the screen-by-screen pass before moving to `הגדרות` and `צוות ומשתמשים`.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `אנליטיקה` no longer showed `1 קריאות`, stage rows showed `1 קריאה`, clicking an analytics row still opened `קריאות` with a focus banner, and no console errors were reported.
+  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `ביגוד עובדים` no longer showed `1 פריטים`, the reorder hint appears once, and no console errors were reported.
 
 ### Latest Completed Work
 
+- PR #136: Analytics count grammar was polished.
+  - `אנליטיקה` and related dashboard stage chips now use `1 קריאה` instead of `1 קריאות`.
+  - Analytics drill-down still opens filtered `קריאות` with the focus banner.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #135: ticket-list filters were labelled.
   - `קריאות` now shows visible Hebrew labels for status, priority, category/unit type, and cost filters.
   - Existing filter behavior was not changed.
