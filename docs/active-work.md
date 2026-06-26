@@ -21,15 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/close-r1-sla-lifecycle, if PR is still open
+### Active branch: codex/drilldown-filter-reset, if PR is still open
 
-- Status: docs-only closeout for R1 after PR #175.
-- Last synchronized `main` before this entry: `43eb23c fix: use lifecycle SLA for notifications (#175)`.
+- Status: ready for PR after local validation.
+- Last synchronized `main` before this entry: `9d0685b docs: close SLA lifecycle release package (#176)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - close the R1 SLA/lifecycle package after verifying remaining `statusMs`, `waitingReason`, `pauseSla`, and `isOverdue` hits are source data, lifecycle normalization, settings, transition bookkeeping, fallback logic, or tests rather than stale visible SLA KPIs.
-- Validation needed before PR:
-  - `git diff --check`
+  - R2 drill-down/filter reset;
+  - make drill-down filters from Dashboard/Analytics visibly labeled and clearable in one click, including filters that set status/track without a `focus` label.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check Dashboard drill-down into Tickets, then clear the banner.
+  - browser smoke-check transport drill-down into Tickets, then clear the banner.
 
 ## Latest Completed Work
 
@@ -131,7 +135,7 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/close-r1-sla-lifecycle` is still open, review/merge it.
+1. If branch `codex/drilldown-filter-reset` is still open, review/merge it.
 2. If it is already merged, continue R2 from `docs/release-checklist.md`.
 3. Update this ledger only when it helps the next Codex session resume safely.
 
