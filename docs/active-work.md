@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/backup-legacy-warning`
+### Active branch: `codex/close-backlog-stale-items`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `e2a6465 docs: close ppe noise ledger [skip vercel] (#124)`.
+- Last synchronized `main` before this entry: `6d37f1e fix: warn on legacy backup imports (#125)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - warn before importing old or incomplete backup files;
-  - keep restore advisory rather than blocked;
-  - reduce risk of silent data loss when PPE/tasks collections are absent from an old backup.
+  - close stale backlog entries after PRs #122, #125, and earlier settings moves;
+  - keep the next session from reopening completed work.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 48 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: Settings backup/restore controls rendered; no console errors.
+  - `npm test -- --run`: skipped; docs-only.
+  - `npm run build`: skipped; docs-only.
+  - Browser smoke-check: not required; no product UI code changed.
 
 ### Latest Completed Work
 
+- PR #125: legacy/incomplete backup imports now show an advisory warning.
+  - Added `analyzeBackupPayload()` with tests.
+  - The restore flow warns when an old backup may lack PPE, tasks, or meetings data.
+  - Restore remains advisory/allowed rather than blocked.
+  - Vercel was green before merge.
 - PR #124: PPE ledger/backlog was closed.
   - `docs/active-work.md` no longer points at the already merged PPE branch.
   - `docs/backlog.md` marks the PPE reorder-card noise follow-up closed.
