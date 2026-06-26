@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Lifecycle stage filter helper
+### Ticket list lifecycle-stage filter plumbing
 
-- Status: active branch `codex/filter-lifecycle-stage-helper`.
-- Last synchronized `main` before this entry: `e7dac2f fix: use normalized lifecycle export rows (#112)`.
+- Status: active branch `codex/filter-tickets-by-lifecycle-stage`.
+- Last synchronized `main` before this entry: `7a9b12f test: add lifecycle stage filter helper (#113)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - add a pure helper for detecting whether a ticket contains a lifecycle stage;
-  - prepare Analytics drill-down filters to include historical stages, not only current status;
-  - keep UI behavior unchanged in this PR.
+  - let the ticket list consume a `focus.lifecycleKey` filter;
+  - make future Analytics drill-downs include historical lifecycle stages, not only current status;
+  - keep visible Analytics UI unchanged in this PR.
 
 ### Latest Completed Work
 
+- PR #113: lifecycle-stage filter helper was added.
+  - Added `ticketHasLifecycleStage()` on top of normalized lifecycle stages.
+  - Covered historical waiting and rework stage matching with tests.
+  - Vercel was green before merge.
 - PR #112: Analytics lifecycle export now uses normalized stage rows.
   - The `מחזור חיים` Excel sheet now uses the normalized lifecycle helper.
   - It includes current-stage marker, equipment-wait rows, and rework rows through one contract.
@@ -204,6 +208,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/filter-tickets-by-lifecycle-stage`:
+
+- `npm test -- --run`: passed, 12 files / 42 tests.
+- `npm run build`: passed.
+- Browser smoke-check: not required; hidden filter plumbing only, no visible UI trigger changed.
 
 Branch `codex/filter-lifecycle-stage-helper`:
 

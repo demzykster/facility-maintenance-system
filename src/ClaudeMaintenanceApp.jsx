@@ -15,7 +15,7 @@ import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, clean
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
-import { normalizedTicketLifecycleStages, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 
 /* ============================================================
@@ -4312,6 +4312,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       if (focus.forkliftId && t.forkliftId !== focus.forkliftId) return false;
       if (focus.supplier && (t.closure?.costSupplier || "") !== focus.supplier) return false;
       if (focus.waitReason && t.waitingReason !== focus.waitReason) return false;
+      if (focus.lifecycleKey && !ticketHasLifecycleStage(t, focus.lifecycleKey, { isOpen })) return false;
       if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
     }
     if (q.trim()) { const s = `${ticketNo(t)} ${t.subject} ${t.description} ${t.asset || ""} ${t.assignee || ""} ${t.createdBy?.name}`.toLowerCase(); if (!s.includes(q.toLowerCase())) return false; }
