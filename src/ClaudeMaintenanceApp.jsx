@@ -17,6 +17,7 @@ import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shoul
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
+import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isOperationallyOverdue, metOperationalSla, missedOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
@@ -258,7 +259,7 @@ const DEFAULT_CONFIG = {
   widgets: WIDGETS.reduce((a, w) => ((a[w.id] = true), a), {}),
   techWidgets: { tickets: true, pm: true, sla: true, presence: true },
   mgrWidgets: { tickets: true, pm: true, sla: true },
-  notify: { new: true, confirm: true, back: true, ready: true, escalate: true, sla: true, doc: true, pm: true, upd: true },
+  notify: { ...DEFAULT_NOTIFY_CONFIG },
   defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
   vehicleTypes: [], modelSupplier: {}, modelType: {}, shifts: [], workShifts: [],
 };

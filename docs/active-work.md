@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #168.
-- Last synchronized `main` before this entry: `7efe2ec fix: polish dashboard parts wait label (#167)`.
-- Open PRs when this entry was written: PR #168 was ready to merge.
+- Status: idle after PR #169.
+- Last synchronized `main` before this entry: `e1e2fe8 fix: match task imports by status group (#168)`.
+- Open PRs when this entry was written: PR #169 was ready to merge.
 - Purpose:
-  - Excel task-import update mode should match existing tasks by title, meeting, and open/closed status group;
-  - closed tasks should not be silently updated by newly imported open rows with the same title.
+  - Default notification config should explicitly include every notification kind the app can emit;
+  - task, driver, PPE, and cleaning notifications should not rely on implicit `undefined !== false` behavior.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Tasks page and Excel-import menu.
+  - browser smoke-check passed for Settings page loading with no console errors.
 
 ## Latest Completed Work
 
+- PR #169: Notification defaults were completed.
+  - Default config now explicitly includes all emitted notification kinds, including task, driver, PPE, and cleaning.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #168: Task Excel import duplicate matching was narrowed.
   - Update mode now matches existing tasks by title, meeting, and open/closed status group.
   - Closed tasks are not silently updated by newly imported open rows with the same title.
