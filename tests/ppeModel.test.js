@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "../src/ppeModel.js";
+import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "../src/ppeModel.js";
 
 describe("PPE request model", () => {
   it("uses explicit labels for request statuses", () => {
@@ -7,6 +7,13 @@ describe("PPE request model", () => {
     expect(ppeRequestStatusLabel("worker_sign")).toBe("ממתינה לחתימת העובד");
     expect(ppeRequestStatusLabel("approved")).toBe("אושרה והונפקה");
     expect(ppeRequestStatusLabel("rejected")).toBe("נדחתה");
+  });
+
+  it("treats manager approval and worker signature as active requests", () => {
+    expect(ppeRequestNeedsAction({ status: "pending" })).toBe(true);
+    expect(ppeRequestNeedsAction({ status: "worker_sign" })).toBe(true);
+    expect(ppeRequestNeedsAction({ status: "approved" })).toBe(false);
+    expect(ppeRequestNeedsAction({ status: "rejected" })).toBe(false);
   });
 
   it("summarizes PPE request lines", () => {

@@ -12,7 +12,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
-import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "./ppeModel.js";
+import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
@@ -1037,7 +1037,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
     { const lastInsp = {}; (insp || []).forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
       const due = (fleet || []).filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
       if (due.length) ev.push({ key: "inspdue-admin", at: Date.now(), kind: "doc", go: "insp", title: "בקרת כלים חודשית חסרה", body: `${countLabel(due.length, "כלי ממתין", "כלים ממתינים")} לבקרה חודשית` }); }
-    { const pend = (ppeReqs || []).filter((r) => r.status === "pending" || r.status === "worker_sign");
+    { const pend = (ppeReqs || []).filter(ppeRequestNeedsAction);
       if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", title: "בקשות ביגוד ממתינות", body: `${countLabel(pend.length, "בקשה", "בקשות")} לאישור או חתימת עובד` }); }
     { const low = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
       if (low.length) ev.push({ key: "ppe-low-admin", at: Date.now(), kind: "ppe", go: "ppe", title: "חוסרי ביגוד לפי מידה", body: `${countLabel(low.length, "פריט", "פריטים")} מתחת למינימום` }); }
@@ -3877,8 +3877,8 @@ const ppeIssueRecs = async (recs, items, savePpeItem, savePpe) => {
 function PpeRequester({ ppe, items, norms, reqs, users, config, session, saveUser, savePpeReq, delPpeReq, deptScope }) {
   const [form, setForm] = useState(false);
   const mine = (reqs || []).filter((r) => r.by && r.by.id === session.id).sort((a, b) => b.at - a.at);
-  const pend = mine.filter((r) => r.status === "pending" || r.status === "worker_sign");
-  const done = mine.filter((r) => r.status !== "pending" && r.status !== "worker_sign");
+  const pend = mine.filter(ppeRequestNeedsAction);
+  const done = mine.filter((r) => !ppeRequestNeedsAction(r));
   const submit = (recs) => {
     const arr = Array.isArray(recs) ? recs : [recs];
     if (!arr.length) return;
@@ -3890,7 +3890,7 @@ function PpeRequester({ ppe, items, norms, reqs, users, config, session, saveUse
   const lineTxt = ppeRequestLineSummary;
   const Card = ({ r }) => <div className="task-row" style={{ borderInlineStartColor: r.status === "approved" ? "#0D9488" : r.status === "rejected" ? "#DC2626" : "#D97706", cursor: "default" }}>
     <div className="task-row-main"><div className="task-row-t">{r.workerName}{r.workerNo ? ` · מס׳ ${r.workerNo}` : ""}</div><div className="task-row-sub">{lineTxt(r)}</div>{r.status === "rejected" && r.rejectReason && <div className="task-row-sub" style={{ color: "#B91C1C" }}>סיבת דחייה: {r.rejectReason}</div>}</div>
-    <div className="task-row-side"><span className="task-due">{fmtDate(r.at)}</span>{chip(r)}{(r.status === "pending" || r.status === "worker_sign") && <button className="btn-ghost sm" onClick={() => delPpeReq(r.id)}>ביטול</button>}</div>
+    <div className="task-row-side"><span className="task-due">{fmtDate(r.at)}</span>{chip(r)}{ppeRequestNeedsAction(r) && <button className="btn-ghost sm" onClick={() => delPpeReq(r.id)}>ביטול</button>}</div>
   </div>;
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Shirt size={15} /> בקשות הנפקת ביגוד</SectionTitle><button className="btn-primary sm" onClick={() => setForm(true)}><Plus size={15} /> שלח בקשה</button></div>
@@ -3908,8 +3908,8 @@ function PpeRequests({ ppe, reqs, items, norms, users, config, session, savePpe,
   const [reason, setReason] = useState("");
   const [showDone, setShowDone] = useState(false);
   const all = (reqs || []).slice();
-  const pend = all.filter((r) => r.status === "pending").sort((a, b) => a.at - b.at);
-  const done = all.filter((r) => r.status !== "pending").sort((a, b) => (b.decidedAt || b.at) - (a.decidedAt || a.at));
+  const pend = all.filter(ppeRequestNeedsAction).sort((a, b) => a.at - b.at);
+  const done = all.filter((r) => !ppeRequestNeedsAction(r)).sort((a, b) => (b.decidedAt || b.at) - (a.decidedAt || a.at));
   const onApprove = async (recs) => {
     const arr = (Array.isArray(recs) ? recs : [recs]).map((x) => ({ ...x, initiatedByName: (approve && approve.by && approve.by.name) || x.initiatedByName || "", initiatedAt: (approve && approve.at) || x.initiatedAt || Date.now() }));
     await ppeIssueRecs(arr, items, savePpeItem, savePpe);
@@ -4068,7 +4068,7 @@ function PpeHub(p) {
   const lvl = permLevel(session, "ppe");
   const isFull = permRank(lvl) >= permRank("full");
   const deptScope = isFull ? null : (userDepts(session).length ? userDepts(session) : ["__none__"]);
-  const pendN = (ppeReqs || []).filter((r) => r.status === "pending").length;
+  const pendN = (ppeReqs || []).filter(ppeRequestNeedsAction).length;
   const ordersN = (ppeOrders || []).filter((o) => o.status === "draft" || o.status === "sent").length;
   const [sub, setSub] = useState("dash");
   const [orderForm, setOrderForm] = useState(null);
@@ -4245,7 +4245,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const toggle = (id) => saveConfig({ ...config, widgets: { ...w, [id]: !w[id] } });
   const _now = Date.now();
   const lowPpe = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
-  const ppeReqPend = (ppeReqs || []).filter((r) => r.status === "pending" || r.status === "worker_sign");
+  const ppeReqPend = (ppeReqs || []).filter(ppeRequestNeedsAction);
   const ordRecv = (ppeOrders || []).filter((o) => o.status === "sent");
   const tasksOverdue = (tasks || []).filter((t) => t.dueAt && t.dueAt < _now && t.status !== "done" && t.status !== "cancelled");
   const complOpen = (complaints || []).filter((c) => c.status === "open" || c.status === "pending");
