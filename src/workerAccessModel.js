@@ -12,6 +12,14 @@ export function canCopyActivationLink(user, activationToken, canManageWorkerAcce
   return !!user?.id && !!activationToken && activationToken === user.activationToken && !!canManageWorkerAccess;
 }
 
+export function shouldKeepWorkerFormOpenForActivationLink(user, canManageWorkerAccess) {
+  return !!canManageWorkerAccess
+    && !!user?.id
+    && isWorkerLoginRole(user.role)
+    && !!user.activationToken
+    && user.activationStatus === "pending";
+}
+
 export function shouldSeedWorkerActivation(user, role, canManageWorkerAccess) {
   return !!canManageWorkerAccess
     && !user?.id
