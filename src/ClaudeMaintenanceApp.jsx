@@ -5111,8 +5111,9 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const transDone = done.filter((t) => t.track === "transport");
   const totalDowntime = tickets.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
   const breach = tickets.filter(isOverdue);
-  const stuckParts = tickets.filter(waitedParts);
-  const partsBreach = breach.filter(waitedParts);
+  const hasPartsLifecycleStage = (t) => ticketHasLifecycleStage(t, "waiting:parts", lifecycleOptions);
+  const stuckParts = tickets.filter(hasPartsLifecycleStage);
+  const partsBreach = breach.filter(hasPartsLifecycleStage);
   const byUnit = {}; tickets.filter((t) => t.forkliftId).forEach((t) => { byUnit[t.forkliftId] = byUnit[t.forkliftId] || { n: 0, dt: 0 }; byUnit[t.forkliftId].n++; byUnit[t.forkliftId].dt += downtimeMs(t); });
   const unitArr = Object.entries(byUnit).map(([id, v]) => ({ f: fleet.find((x) => x.id === id), ...v })).filter((x) => x.f).sort((a, b) => b.n - a.n);
   const maxUnit = Math.max(1, ...unitArr.map((x) => x.n));
@@ -5164,7 +5165,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
         "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "",
         "עלות (₪)": t.closure?.costAmount || 0, "ספק": t.closure?.costSupplier || "",
         "השבתה (שע׳)": t.track === "transport" ? Math.round(downtimeMs(t) / 3600000) : "",
-        "המתנה לחלקים": waitedParts(t) ? "כן" : "", "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait,
+        "המתנה לחלקים": hasPartsLifecycleStage(t) ? "כן" : "", "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait,
         "פירוט זמני סטטוס": life.statusDurations, "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason,
         "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "חריגת SLA": missedOperationalSla(t) ? "כן" : "",
       });
