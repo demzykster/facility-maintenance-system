@@ -25,7 +25,7 @@ Source of truth in code:
 | --- | --- | --- | --- | --- |
 | admin | new tickets | `new` | exact ticket via `ticketId` | none found |
 | admin | final closure | `ready` | exact ticket via `ticketId` | none found |
-| admin | no-equipment waiting | `escalate` | no route | should open exact ticket |
+| admin | no-equipment waiting | `escalate` | exact ticket via `ticketId` | none found |
 | admin | SLA breach | `sla` | exact ticket via `ticketId` | none found |
 | admin | critical downtime escalation | `escalate` | exact ticket via `ticketId` | none found |
 | admin | fleet documents | `doc` | fleet tab via `go: "fleet"` | should eventually focus the unit |
@@ -35,7 +35,7 @@ Source of truth in code:
 | admin | driver requests | `driver` | fleet tab via `go: "fleet"` | should eventually focus the unit/request |
 | admin | inspection due | `doc` | inspection tab via `go: "insp"` | none found |
 | admin | PPE requests/stock/orders | `ppe` | PPE module via `go: "ppe"` | should eventually focus the relevant tab/list |
-| admin | technician shift exceptions | `confirm` / `escalate` / `back` | team page via `go: "team"` currently falls back to dashboard | should route to `צוות ומשתמשים` |
+| admin | technician shift exceptions | `confirm` / `escalate` / `back` | team page via `go: "team"` | fixed after matrix creation |
 | admin | cleaning rounds/complaints | `cleaning` | cleaning module via `go: "cleaning"` | none found |
 | tech | new transport tickets | `new` | exact ticket via `ticketId` | none found |
 | tech | returned by user | `back` | exact ticket via `ticketId` | none found |
@@ -54,8 +54,6 @@ Source of truth in code:
 
 ## First Fix Candidates
 
-1. Add `ticketId` to admin no-equipment waiting notifications.
-2. Route `go: "team"` to `צוות ומשתמשים` instead of falling back to dashboard.
-3. Route cleaner cleaning notifications to `בקרת ניקיון`.
-4. Decide what `go: "dept"` should mean before changing it, because it may need a filtered fleet/dept view rather than a generic module jump.
-
+1. Route cleaner cleaning notifications to `בקרת ניקיון`.
+2. Decide what `go: "dept"` should mean before changing it, because it may need a filtered fleet/dept view rather than a generic module jump.
+3. Eventually focus fleet/PPE records instead of only opening the broad module.

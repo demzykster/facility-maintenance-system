@@ -28,7 +28,7 @@ Next PR candidate:
 - Build a small notification matrix from `computeEvents()` by role and kind, then fix one missing/wrong navigation target per PR.
 
 Current batch:
-- Add `docs/notification-matrix.md` as the R3 route map.
+- Fix notification routing for technician shift events that use `go: "team"`.
 
 ### R4 — Permissions And Role Reality Check
 

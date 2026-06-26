@@ -21,15 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/notification-matrix, if PR is still open
+### Active branch: codex/team-notification-route, if PR is still open
 
-- Status: docs-only R3 mapping in progress.
-- Last synchronized `main` before this entry: `dceb8ca docs: close drilldown filter reset package (#179)`.
+- Status: ready for PR after local validation.
+- Last synchronized `main` before this entry: `8fbf7b1 docs: map notification routes (#180)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - start R3 Notifications End-To-End with a compact route matrix from `computeEvents()`.
-- Validation needed before PR:
-  - `git diff --check`
+  - fix R3 notification routing for technician shift events using `go: "team"`;
+  - correct the notification matrix after verifying admin no-equipment notifications already have `ticketId`.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check notification panel opens with current data.
+  - code-path check: `go: "team"` now maps to the `team` tab instead of dashboard fallback.
 
 ## Latest Completed Work
 
@@ -131,9 +135,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/notification-matrix` is still open, review/merge it.
-2. If it is merged, first code fix candidate: add `ticketId` to admin no-equipment waiting notifications.
-3. Then fix `go: "team"` routing and cleaner cleaning notification routing in separate PRs.
+1. If branch `codex/team-notification-route` is still open, review/merge it.
+2. If it is merged, next code fix candidate: route cleaner cleaning notifications to `בקרת ניקיון`.
+3. Then decide what `go: "dept"` should mean before changing it.
 
 ## Documentation Policy
 
