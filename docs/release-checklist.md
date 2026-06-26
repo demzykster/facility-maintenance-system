@@ -48,7 +48,7 @@ Next PR candidate:
 - Add or run a role-by-role browser smoke checklist for `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, and `כלי שינוע`.
 
 Current batch:
-- Give manager/user sessions with `analytics:view` a visible path to `אנליטיקה`, with damage-report editing disabled from that route.
+- Give manager/user sessions with `settings:manage` a visible path to `הגדרות`, with sensitive system actions still gated by `settings:full`.
 
 ### R5 — Screen Audit And Visual Noise
 
