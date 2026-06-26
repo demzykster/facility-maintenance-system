@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/gate-user-audit-log
+### Active branch: codex/user-suppliers-permission-route
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `15b6e59 docs: close notification release package (#189)`.
+- Latest synchronized `main`: `1dc1ccd fix: gate manager audit log access (#190)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - fix the first R4 permissions gap: manager/user shell should show `יומן פעילות` only with `audit:view`.
-  - keep this PR limited to Audit Log reachability/visibility.
+  - give manager/user sessions with `suppliers:view` a visible path to `ספקים / קבלנים`.
+  - keep edits gated by existing `suppliers:manage`.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
   - browser smoke-check: current app renders after reload and console has no errors.
+  - code-path check: `suppliers:view` adds the manager/user nav item, and `suppliers:manage` is passed to `SuppliersPanel` as `canManage`.
 
 ## Latest Completed Work
 
+- PR #190: Manager/user Audit Log access is now gated.
+  - `יומן פעילות` appears only when the session has `audit:view`.
+  - Vercel was green before merge.
 - PR #189: R3 notification release package was closed.
   - `docs/release-checklist.md` now marks Notifications End-To-End done in PRs #180-#188.
   - Docs-only validation: `git diff --check`.
@@ -68,7 +72,7 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Finish and review `codex/gate-user-audit-log`.
+1. Finish and review `codex/user-suppliers-permission-route`.
 2. If merged, continue R4 with the next role/screen permission gap.
 3. Keep each permissions fix in a separate small PR.
 
