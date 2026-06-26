@@ -21,18 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/lifecycle-sla-notifications, if PR is still open
+### Active branch: codex/close-r1-sla-lifecycle, if PR is still open
 
-- Status: validation passed; ready for PR/merge. After merge, no active product branch is intentionally left open.
-- Last synchronized `main` before this entry: `02a8863 fix: sort ticket lists with lifecycle SLA timing (#174)`.
+- Status: docs-only closeout for R1 after PR #175.
+- Last synchronized `main` before this entry: `43eb23c fix: use lifecycle SLA for notifications (#175)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - R1 SLA/lifecycle trust batch;
-  - make admin SLA notifications use the same lifecycle-aware SLA helper as Analytics, ticket cards, exports, and sorting.
-- Validation:
-  - `npm test -- --run` passed.
-  - `npm run build` passed.
-  - browser smoke-check passed for opening the notification panel without console errors.
+  - close the R1 SLA/lifecycle package after verifying remaining `statusMs`, `waitingReason`, `pauseSla`, and `isOverdue` hits are source data, lifecycle normalization, settings, transition bookkeeping, fallback logic, or tests rather than stale visible SLA KPIs.
+- Validation needed before PR:
+  - `git diff --check`
 
 ## Latest Completed Work
 
@@ -134,8 +131,8 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. If branch `codex/lifecycle-sla-notifications` is still open, review/merge it.
-2. If it is already merged, continue R1 from `docs/release-checklist.md`.
+1. If branch `codex/close-r1-sla-lifecycle` is still open, review/merge it.
+2. If it is already merged, continue R2 from `docs/release-checklist.md`.
 3. Update this ledger only when it helps the next Codex session resume safely.
 
 ## Documentation Policy
