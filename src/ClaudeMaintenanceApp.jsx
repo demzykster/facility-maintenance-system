@@ -15,7 +15,7 @@ import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, clean
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
-import { ticketLifecycleRows, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
+import { normalizedTicketLifecycleStages, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 
 /* ============================================================
@@ -5108,10 +5108,11 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
       const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]);
       ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map((key) => ({ wch: wideCols.has(key) ? 30 : 14 }));
       XLSX.utils.book_append_sheet(wb, ws, "קריאות");
-      const lifecycleRows = tickets.flatMap((t) => ticketLifecycleRows(t, lifecycleOptions).map((row) => ({
+      const lifecycleRows = tickets.flatMap((t) => normalizedTicketLifecycleStages(t, lifecycleOptions).map((row) => ({
         "מספר": ticketNo(t), "מסלול": TRACKS[t.track]?.label || (t.forkliftId ? "שינוע" : "מבנה"), "נושא": t.subject,
-        "סוג שורה": row.kind === "waiting" ? "המתנה" : "סטטוס",
-        "סטטוס/סיבה": row.kind === "waiting" ? waitReasonLabel(row.reason, config) : stOf(row.key).label,
+        "סוג שורה": row.kind === "waiting" ? "המתנה" : row.kind === "rework" ? "החזרה לטיפול" : "סטטוס",
+        "סטטוס/סיבה": row.label,
+        "נוכחי": row.current ? "כן" : "",
         "משך": fmtDur(row.ms), "משך (שעות)": Math.round(row.ms / 360000) / 10
       })));
       if (lifecycleRows.length) {

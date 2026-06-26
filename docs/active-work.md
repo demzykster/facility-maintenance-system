@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Normalized ticket lifecycle stages
+### Analytics lifecycle export uses normalized stages
 
-- Status: active branch `codex/normalized-ticket-stages`.
-- Last synchronized `main` before this entry: `6bc7b70 docs: define SLA stage model [skip vercel] (#110)`.
+- Status: active branch `codex/use-normalized-lifecycle-export`.
+- Last synchronized `main` before this entry: `b1c2fdd test: add normalized ticket lifecycle stages (#111)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - add a pure normalized lifecycle-stage helper before UI changes;
-  - cover current status, historical waiting, equipment wait, and rework markers with tests;
-  - prepare dashboard/analytics to reuse one lifecycle contract.
+  - use the normalized lifecycle helper in the analytics Excel lifecycle sheet;
+  - expose current-stage markers, equipment wait, and rework rows through one export contract;
+  - keep UI/dashboard behavior unchanged in this PR.
 
 ### Latest Completed Work
 
+- PR #111: normalized ticket lifecycle stages were added.
+  - Added a pure helper for current/historical ticket stages.
+  - Covered current waiting, closed historical waiting, equipment wait, and rework markers with tests.
+  - Vercel was green before merge.
 - PR #110: SLA/stage timing contract was documented.
   - Added `docs/sla-stage-model.md`.
   - Backlog now points to a helper-first implementation path before dashboard/analytics UI changes.
@@ -196,6 +200,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/use-normalized-lifecycle-export`:
+
+- `npm test -- --run`: passed, 12 files / 41 tests.
+- `npm run build`: passed.
+- Browser smoke-check: not required; Analytics Excel export mapping changed, no visible UI behavior changed.
 
 Branch `codex/normalized-ticket-stages`:
 
