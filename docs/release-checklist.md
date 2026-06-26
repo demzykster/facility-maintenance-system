@@ -32,7 +32,7 @@ Closed notes:
 
 ### R4 — Permissions And Role Reality Check
 
-Status: open.
+Status: done in PRs #190-#196.
 
 Why it matters:
 - A CMMS with wrong access is dangerous even if the UI looks correct.
@@ -44,11 +44,11 @@ Done means:
 - Worker activation/reset remains gated by `workerAccess:manage`.
 - Any role-specific smoke-check notes are captured in the related PR.
 
-Next PR candidate:
-- Add or run a role-by-role browser smoke checklist for `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, and `כלי שינוע`.
-
-Current batch:
-- Prefer assigned cleaners in the admin role-switch when available; current local cleaner smoke still renders the empty-zone state cleanly when no assigned cleaner exists.
+Closed notes:
+- Manager/user routes now respect `users`, `audit`, `suppliers`, `analytics`, `settings`, and PPE management permissions.
+- View/manage split was checked for the newly exposed routes: suppliers edit controls still require `suppliers:manage`, analytics damage fields are read-only in manager/user route, sensitive settings actions still require `settings:full`.
+- Worker activation/reset remains gated by `workerAccess:manage`.
+- Role-smoke passed for admin, manager, technician, and worker; cleaner shell renders cleanly and shows the empty-zone state when current local data has no assigned cleaner.
 
 ### R5 — Screen Audit And Visual Noise
 
