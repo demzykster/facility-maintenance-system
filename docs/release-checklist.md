@@ -47,6 +47,9 @@ Done means:
 Next PR candidate:
 - Add or run a role-by-role browser smoke checklist for `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, and `כלי שינוע`.
 
+Current batch:
+- Gate manager/user Audit Log visibility with `audit:view`.
+
 ### R5 — Screen Audit And Visual Noise
 
 Status: open.
