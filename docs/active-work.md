@@ -21,21 +21,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/polish-team-settings-copy`
+### Active branch: none
 
-- Status: in progress.
-- Last synchronized `main` before this entry: `d2cc008 fix: clarify settings demo storage copy (#138)`.
+- Status: idle.
+- Last synchronized `main` before this entry: `99db2c3 fix: clarify team shift settings copy (#139)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - polish workforce shift settings copy in `צוות ומשתמשים`;
-  - complete the current pass across `קריאות`, `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, and `צוות ומשתמשים`.
+  - current screen-by-screen polish pass is complete;
+  - continue future work from `docs/backlog.md` or a new owner-reported bug.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 49 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; `צוות ומשתמשים` -> `הגדרות` shows neutral `משמרות עבודה` copy, the old `(בוקר/לילה)` title is gone, and no console errors were reported.
+  - docs-only ledger close; product validation was completed in PR #139.
 
 ### Latest Completed Work
 
+- PR #139: Team/User Management shift settings copy was clarified.
+  - `צוות ומשתמשים` -> `הגדרות` now uses neutral `משמרות עבודה` wording instead of implying only morning/night shifts.
+  - The hint explains that morning/night are the demo default and more shifts can be added.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #138: Settings demo storage copy was clarified.
   - Global `הגדרות` now says demo data is stored in the current browser only.
   - The note clarifies that production requires a server and real user authentication.
