@@ -2074,7 +2074,7 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
       <button className={"ins-card clk" + (focus === "conflict" ? " on" : "")} onClick={() => toggleFocus("conflict")}><div className="ins-n" style={{ color: ins.conflict.length ? "#EA580C" : "#16A34A" }}>{ins.conflict.length}</div><div className="ins-l">התנגשות חוצת-משמרת</div></button>
       <button className={"ins-card clk" + (focus === "dups" ? " on" : "")} onClick={() => toggleFocus("dups")}><div className="ins-n" style={{ color: ins.dups.length ? "#EA580C" : "#16A34A" }}>{ins.dups.length}</div><div className="ins-l">עובד ביותר מכלי אחד</div></button>
     </div>
-    {focus && <div className="focus-bar"><span>מסונן: {focus === "idle" ? "ללא נהג כלל" : focus === "conflict" ? "התנגשות חוצת-משמרת" : focus === "dups" ? "עובד בכמה כלים" : focus === "miss-morning" ? "ללא נהג בבוקר" : "ללא נהג בלילה"} · {rows.length} כלים</span><button onClick={() => setFocus(null)}><X size={13} /> ניקוי</button></div>}
+    {focus && <div className="focus-bar"><span>מסונן: {focus === "idle" ? "ללא נהג כלל" : focus === "conflict" ? "התנגשות חוצת-משמרת" : focus === "dups" ? "עובד בכמה כלים" : focus === "miss-morning" ? "ללא נהג בבוקר" : "ללא נהג בלילה"} · {countLabel(rows.length, "כלי", "כלים")}</span><button onClick={() => setFocus(null)}><X size={13} /> ניקוי</button></div>}
     {ins.suggest.length > 0 && <div className="advice-box"><div className="advice-h"><Sparkles size={14} /> הצעות אופטימיזציה</div>{ins.suggest.map((s, i) => <div key={i} className="advice-row">העבירו את <b>{s.driver.name}</b> ({driverShiftMeta(s.shift).label}) מ-{s.fromCode} ל-<b>{s.toCode}</b> — פנוי במשמרת זו. <span className="advice-why">{s.reason}</span></div>)}</div>}
     {ins.conflict.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>נהג חוצה-משמרת תופס כלי לצד מחליפו: {ins.conflict.map((f) => f.code).join(", ")}</div>}
     {ins.dups.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>עובדים המשובצים ביותר מכלי אחד: {ins.dups.map((g) => `${g[0].driver.name} (${g.map((a) => a.unit.code).join("/")})`).join(" · ")}</div>}
@@ -2089,7 +2089,7 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
       rows.forEach((f) => { const dep = fleetDepts(f)[0] || "ללא מחלקה"; if (!groups.has(dep)) groups.set(dep, []); groups.get(dep).push(f); });
       const arr = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "he"));
       const card = (f) => { const blk = unitBlock(f, tickets, config); return <div key={f.id} className={"drv-unit" + (blk ? " blocked" : "")} style={blk ? { borderColor: blk.level.color } : {}}><div className="drv-unit-head"><span className="drv-unit-code">{f.code}</span><span className="drv-unit-desc">{unitDesc(f, config)}</span>{blk && <span className="blk-chip" style={{ background: blk.level.color, marginInlineStart: "auto" }}><ShieldAlert size={11} /> מושבת</span>}</div><div className="drv-slots">{(catF === "all" ? DRIVER_SHIFTS : DRIVER_SHIFTS.filter((s) => s.id === catF)).map((s) => { const d = driverOf(f, s.id); return <div key={s.id} className="drv-slot"><span className="drv-cat" style={{ background: s.color + "1a", color: s.color }}>{s.label}</span>{d ? <Chip unit={f} cat={s.id} d={d} /> : (canEditCat(s.id) ? <button className="drv-add" onClick={() => setForm({ unit: f, cat: s.id, existing: null })}><Plus size={14} /> הוסף נהג</button> : <span className="drv-cat" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא שובץ נהג</span>)}</div>; })}</div></div>; };
-      return arr.map(([dep, units]) => <div key={dep} className="dept-group"><div className="dept-head"><span className="dept-line" /><span className="dept-name">מחלקה · {dep}</span><span className="dept-count">{units.length} כלים</span><span className="dept-line" /></div><div className="cards">{units.map(card)}</div></div>);
+      return arr.map(([dep, units]) => <div key={dep} className="dept-group"><div className="dept-head"><span className="dept-line" /><span className="dept-name">מחלקה · {dep}</span><span className="dept-count">{countLabel(units.length, "כלי", "כלים")}</span><span className="dept-line" /></div><div className="cards">{units.map(card)}</div></div>);
     })()}
     {form && <Overlay persistent onClose={() => setForm(null)}><DriverForm fixedCat={form.cat} existing={form.existing} isAdmin={isAdmin} users={users} saveUser={saveUser} config={config} dupCheck={(name, workNo) => (name.trim() || workNo.trim()) ? driverDupes(scoped, { name, workNo }, form.unit.id, form.existing ? form.cat : null) : []} onCancel={() => setForm(null)} onSave={submitForm} /></Overlay>}
     {move && <Overlay persistent onClose={() => setMove(null)}><MovePicker units={scoped} source={move} onCancel={() => setMove(null)} onSave={handleBTarget} /></Overlay>}
@@ -4168,7 +4168,7 @@ function computeInsights(tickets, fleet, pm, config) {
   const byZ = {}; recent.filter((t) => !isT(t) && t.zone).forEach((t) => { byZ[t.zone] = (byZ[t.zone] || 0) + 1; });
   Object.entries(byZ).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(([z, n]) => { out.push({ sev: "warn", text: `אזור ${z} — ${n} קריאות אחזקה ב-30 ימים. בעיה חוזרת.`, go: "facility" }); });
   const byType = {}; fleet.forEach((f) => { const s = docStatus(f, config); if (s.d != null && s.d <= 30) byType[f.type] = (byType[f.type] || 0) + 1; });
-  Object.entries(byType).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(([ty, n]) => { out.push({ sev: "warn", text: `מסמכי ${ty} — ${n} כלים פגי/קרובי תוקף. בדקו מול הספק/הליסינג.`, go: "fleet" }); });
+  Object.entries(byType).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(([ty, n]) => { out.push({ sev: "warn", text: `מסמכי ${ty} — ${countLabel(n, "כלי", "כלים")} פגי/קרובי תוקף. בדקו מול הספק/הליסינג.`, go: "fleet" }); });
   const open = tickets.filter(isOpen), waiting = open.filter((t) => t.status === "waiting");
   if (open.length >= 4 && waiting.length / open.length >= 0.4) out.push({ sev: "warn", text: `${Math.round(waiting.length / open.length * 100)}% מהקריאות הפתוחות ממתינות (חלקים/ספק/אישור).`, go: "wait" });
   const fac = tickets.filter((t) => !isT(t)), catNow = {}, catPrev = {};
@@ -4178,7 +4178,7 @@ function computeInsights(tickets, fleet, pm, config) {
   const byA = {}; open.filter((t) => t.assignee).forEach((t) => { byA[t.assignee] = (byA[t.assignee] || 0) + 1; });
   Object.entries(byA).filter(([, n]) => n >= 4).sort((a, b) => b[1] - a[1]).slice(0, 1).forEach(([a, n]) => { out.push({ sev: "info", text: `${a} — ${n} קריאות פתוחות בטיפול. ייתכן עומס.` }); });
   const pmOver = (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) < 0);
-  if (pmOver.length >= 3) out.push({ sev: "warn", text: `${pmOver.length} טיפולים תקופתיים באיחור.`, go: "pm" });
+  if (pmOver.length >= 3) out.push({ sev: "warn", text: `${countLabel(pmOver.length, "טיפול תקופתי באיחור", "טיפולים תקופתיים באיחור")}.`, go: "pm" });
   return out.slice(0, 6);
 }
 function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo, clearDemo }) {
@@ -4302,7 +4302,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
       {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
         : <div className="cards">{expDocs.map(({ f, s }) => <div key={f.id} className="doc-line"><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><button className="btn-ghost sm" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><PenLine size={13} /> לעדכן</button></div>)}</div>}</>}
     {w.insp && dashTrack !== "facility" && <><SectionTitle><ClipboardCheck size={15} /> בקרת כלים לביצוע (חודשי)</SectionTitle>
-      {inspDue.length === 0 ? <div className="note">כל כלי השינוע סוקרו החודש.</div> : <div className="note" style={{ borderColor: "#FCD34D", cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "insp" }) : setTab("assets")}>{inspDue.length} כלים ממתינים לבקרה חודשית. גשו ללשונית "בקרת כלים".</div>}</>}
+      {inspDue.length === 0 ? <div className="note">כל כלי השינוע סוקרו החודש.</div> : <div className="note" style={{ borderColor: "#FCD34D", cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "insp" }) : setTab("assets")}>{countLabel(inspDue.length, "כלי ממתין", "כלים ממתינים")} לבקרה חודשית. גשו ללשונית "בקרת כלים".</div>}</>}
     {w.pm && dashTrack !== "facility" && pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים קרובים</SectionTitle><div className="pm-mini">{pmSoon.slice(0, 5).map((x) => { const d = daysLeft(x.nextDue); const f = fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId); return <div key={x.id} className="pm-mini-item" style={{ cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span className="dot-lg" style={{ background: pmColor(d) }} /><span className="pm-mini-t">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="pm-mini-d" style={{ color: pmColor(d) }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></div>; })}</div></>}
     {w.presence && <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle><div className="panel">{(users || []).filter((u) => u.role === "tech" && u.active !== false).length === 0 ? <div className="note" style={{ margin: 0 }}>אין טכנאים מוגדרים.</div> : (users || []).filter((u) => u.role === "tech" && u.active !== false).map((u) => { const pr = presenceOf(presence, u.id); return <div key={u.id} className="presence-row"><span className={"presence-dot" + (pr.onShift ? " on" : "")} /><span className="presence-name">{u.name}{u.supplier ? <span className="presence-sup"> · {u.supplier}</span> : ""}</span><span className="presence-stat">{pr.onShift ? lastSeenText(pr.lastSeen) || "במשמרת" : "לא במשמרת"}</span></div>; })}</div></>}
     {w.costs && <><SectionTitle><DollarSign size={15} /> עלויות 30 ימים אחרונים</SectionTitle><div className="panel"><div className="big-stat">{ils(monthCost)}</div></div></>}
@@ -4438,7 +4438,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     const newModels = new Set();
     list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); }));
     const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type));
-    if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${orphan.length} כלים משויכים לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; }
+    if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${countLabel(orphan.length, "כלי משויך", "כלים משויכים")} לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; }
     await saveConfig({ ...config, ...flattenVehicleTypes(list) });
     setSaved(true); setTimeout(() => setSaved(false), 1800);
   };
@@ -4513,7 +4513,7 @@ function FleetModule(p) {
       <Sel label="מסמכים" value={doc} onChange={setDoc}><option value="expired">פג תוקף</option><option value="soon">קרוב לפקיעה</option><option value="ok">תקין</option></Sel>
     </div>
     <div className="fleet-results-bar">
-      <span className="fleet-count">{rows.length} כלים{rows.length !== fleet.length ? ` מתוך ${fleet.length}` : ""}</span>
+      <span className="fleet-count">{countLabel(rows.length, "כלי", "כלים")}{rows.length !== fleet.length ? ` מתוך ${countLabel(fleet.length, "כלי", "כלים")}` : ""}</span>
       <div className="group-seg"><span className="group-lbl">קבץ לפי</span>{GROUP_OPTS.map(([id, lbl]) => <button key={id} className={groupBy === id ? "on" : ""} onClick={() => setGroupBy(id)}>{lbl}</button>)}</div>
       {hasFilter && <button className="repeat-link" onClick={resetFilters}>נקה פילטרים</button>}
     </div>
@@ -4631,7 +4631,7 @@ function InspectionsModule(p) {
           : (() => {
             const dueCard = (f) => { const last = lastInsp[f.id]; return <button key={f.id} className="tcard" onClick={() => setRun({ fleet: f, tplId: tplId !== "all" ? tplId : (config.typeMeta?.[f.type]?.inspTpl || null) })} style={{ borderInlineStartColor: "#EA580C" }}><div className="tcard-icon" style={{ background: "var(--surface-2)" }}><Truck size={20} color={TRACKS.transport.color} /></div><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{unitLabel(f, config)}</span></div><div className="tcard-sub">{resolveHydraulics(f, config) ? "תסקיר · " : ""}{f.type}{fleetDepts(f).length ? " · " + fleetDepts(f).join(", ") : ""}</div><div className="tcard-badges"><span className="badge sm" style={{ color: "#EA580C", background: "var(--surface-2)" }}>{last ? "נסקר " + fmtDate(last) : "טרם נסקר"}</span><span className="badge sm ovd">לביצוע</span></div></div></button>; };
             const igKey = (f) => igrp === "type" ? (unitTypeName(f, config) || f.type || "אחר") : (fleetDepts(f)[0] || "ללא מחלקה");
-            const ftr = <>{ok.length > 0 && <div className="note">{ok.length} כלים נוספים תקינים (נסקרו ב-30 הימים האחרונים) — ראו "היסטוריה".</div>}</>;
+            const ftr = <>{ok.length > 0 && <div className="note">{countLabel(ok.length, "כלי נוסף תקין", "כלים נוספים תקינים")} (נסקרו ב-30 הימים האחרונים) — ראו "היסטוריה".</div>}</>;
             if (igrp === "none") return <><div className="insp-grp-bar"><span className="group-lbl">קבץ לפי</span><div className="group-seg">{[["none", "ללא"], ["type", "סוג"], ["dept", "מחלקה"]].map(([id, lbl]) => <button key={id} className={igrp === id ? "on" : ""} onClick={() => setIgrp(id)}>{lbl}</button>)}</div></div><div className="cards">{due.map(dueCard)}{ftr}</div></>;
             const m = new Map(); due.forEach((f) => { const k = igKey(f); if (!m.has(k)) m.set(k, []); m.get(k).push(f); });
             const arr = [...m.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "he"));
@@ -4697,11 +4697,11 @@ function InspHistory({ pool, insp, templates, onRun, onView, config }) {
           </button>)}
         </div>}
     </>) : view === "month" ? (
-      <div className="cards">{Object.entries(months).map(([m, recs]) => <div key={m} className="panel" style={{ padding: 12 }}><div className="row-between"><div className="tcard-subj">{m}</div><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{recs.length} בקרות</span></div><div className="timeline" style={{ marginTop: 10 }}>{recs.map((r) => item(r.i, r.f))}</div></div>)}</div>
+      <div className="cards">{Object.entries(months).map(([m, recs]) => <div key={m} className="panel" style={{ padding: 12 }}><div className="row-between"><div className="tcard-subj">{m}</div><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel(recs.length, "בקרה", "בקרות")}</span></div><div className="timeline" style={{ marginTop: 10 }}>{recs.map((r) => item(r.i, r.f))}</div></div>)}</div>
     ) : (
       <div className="cards">{byFleet.map(({ f, list }) => { const open = openId === f.id; const shown = open ? list : list.slice(0, 2); return (
         <div key={f.id} className="panel" style={{ padding: 12 }}>
-          <div className="row-between"><div><div className="tcard-subj">{unitLabel(f, config)}</div><div className="tcard-sub" style={{ margin: 0 }}>{list.length} בקרות · אחרונה {fmtDate(list[0].at)} · הבאה {fmtDate(list[0].at + NEXT_DAYS * 86400000)}</div></div><button className="btn-ghost sm" onClick={() => onRun(f)}><ClipboardCheck size={14} /> בקרה חדשה</button></div>
+          <div className="row-between"><div><div className="tcard-subj">{unitLabel(f, config)}</div><div className="tcard-sub" style={{ margin: 0 }}>{countLabel(list.length, "בקרה", "בקרות")} · אחרונה {fmtDate(list[0].at)} · הבאה {fmtDate(list[0].at + NEXT_DAYS * 86400000)}</div></div><button className="btn-ghost sm" onClick={() => onRun(f)}><ClipboardCheck size={14} /> בקרה חדשה</button></div>
           <div className="timeline" style={{ marginTop: 10 }}>{shown.map((i) => item(i, f))}</div>
           {list.length > 2 && <button className="repeat-link" onClick={() => setOpenId(open ? null : f.id)}>{open ? "הסתר" : `הצג הכל (${list.length})`}</button>}
         </div>); })}</div>
