@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/ppe-notification-subtabs
+### Active branch: codex/dept-notification-fleet-focus
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `fce540c fix: focus fleet notifications on unit (#185)`.
+- Latest synchronized `main`: `cfaafda fix: focus ppe notifications on subtabs (#187)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - route admin PPE notifications into the relevant PPE sub-tab instead of only opening the broad PPE module.
-  - keep this PR limited to sub-tab focus; exact PPE record focus can follow separately.
+  - route manager/user department PM and driver outcome notifications to the exact department fleet card when `fleetId` is available.
+  - keep this PR limited to manager/user department notification focus.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: admin PPE module opens, `תנועות מלאי` sub-tab switches correctly, and console has no errors.
+  - browser smoke-check: current app stayed usable and console had no errors.
+  - code-path check: manager/user notifications now carry `fleetId`, `goNotif` passes it into `deptNav`, and `ManagerFleet` opens the matching fleet card when it is in scope.
 
 ## Latest Completed Work
 
+- PR #187: PPE notifications now focus relevant sub-tabs.
+  - Admin PPE pending/low-stock notifications open the PPE dashboard; open-order notifications open the inventory movement/order tab.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #185: Fleet notifications now focus the exact unit card.
   - Admin fleet document and driver request notifications pass `fleetId` into Fleet navigation.
   - Local tests/build/browser smoke-check passed before merge.
@@ -59,8 +63,8 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Finish and review `codex/ppe-notification-subtabs`.
-2. If merged, continue R3 with exact PPE record focus or the next release-checklist polish item.
+1. Finish and review `codex/dept-notification-fleet-focus`.
+2. If merged, reassess whether R3 can close or whether exact PPE record focus needs a follow-up.
 3. Keep each route/focus fix in a separate small PR.
 
 ## Documentation Policy

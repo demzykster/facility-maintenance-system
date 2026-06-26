@@ -1073,9 +1073,9 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
       if (t.status === "waiting" && t.waitingReason === "no_equipment") ev.push({ key: t.id + "-noeq", at: t.updatedAt, ticketId: t.id, kind: "escalate", title: `הכלי לא הועבר לטכנאי · #${ticketNo(t)}`, body: `${t.asset || ""} · ${t.subject} — יש להעביר את הכלי לטכנאי` });
       (t.log || []).forEach((l, i) => { if (l.byRole !== "user") ev.push({ key: `${t.id}-${i}`, at: l.at, ticketId: t.id, kind: "upd", title: `עדכון · #${ticketNo(t)}`, body: `${t.subject} — ${l.text}` }); });
     });
-    (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); if (!f || !fleetDepts(f).some((d) => userDepts(session).includes(d))) return; const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "dept", title: "כלי מחלקתך לטיפול", body: `${unitLabel(f, cfg)} · ${d < 0 ? "באיחור — יש להוציא" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
+    (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); if (!f || !fleetDepts(f).some((d) => userDepts(session).includes(d))) return; const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "dept", fleetId: f.id, title: "כלי מחלקתך לטיפול", body: `${unitLabel(f, cfg)} · ${d < 0 ? "באיחור — יש להוציא" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
     if (session.role === "user") fleetForSession(session, fleet).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "dept", title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
-    if (session.role === "user") (cfg.driverEvents || []).filter((e) => (e.type === "approved" || e.type === "rejected") && e.reqByUid === session.id).slice(0, 20).forEach((e) => ev.push({ key: "drvout-" + e.id, at: e.at, kind: "driver", go: "dept", title: e.type === "approved" ? "בקשת הנהג שלך אושרה" : "בקשת הנהג שלך נדחתה", body: `${e.sub === "move" ? "העברת" : "הוספת"} ${e.driverName} · ${e.unitCode}${e.toUnitCode ? ` → ${e.toUnitCode}` : ""}` }));
+    if (session.role === "user") (cfg.driverEvents || []).filter((e) => (e.type === "approved" || e.type === "rejected") && e.reqByUid === session.id).slice(0, 20).forEach((e) => ev.push({ key: "drvout-" + e.id, at: e.at, kind: "driver", go: "dept", fleetId: e.unitId || null, title: e.type === "approved" ? "בקשת הנהג שלך אושרה" : "בקשת הנהג שלך נדחתה", body: `${e.sub === "move" ? "העברת" : "הוספת"} ${e.driverName} · ${e.unitCode}${e.toUnitCode ? ` → ${e.toUnitCode}` : ""}` }));
     if (session.role === "user") { const mz = session.mgrZones || []; (complaints || []).filter((c) => c.status === "open" && mz.includes(c.zoneId)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "תקלה באזור של מחלקתך" : "לכלוך באזור של מחלקתך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}` })); }
     shiftEvents("dept");
   }
@@ -1716,8 +1716,8 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
 function UserApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
   const [view, setView] = useState("tickets");
-  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip");
-  const goNotif = (go) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); } };
+  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null);
+  const goNotif = (go, ev) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); setDeptNav(ev?.fleetId ? { fleetId: ev.fleetId, _t: Date.now() } : null); } };
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
   const myPm = useMemo(() => pmVisible(session, pm, fleet), [pm, fleet, session]);
@@ -1777,7 +1777,7 @@ function UserApp(p) {
                 <div className="note">העובדים מדווחים תקלות שמגיעות אליך לבדיקה. הם נכנסים עם מספר עובד + קוד שתגדירו כאן.</div>
                 {deptWorkers.length === 0 ? <Empty text="אין עובדים במחלקה" Icon={Users} sub="הוסיפו עובד בלחיצה על «הוסף עובד»" /> : <div className="cards">{deptWorkers.map((u) => <button key={u.id} className="tcard" onClick={() => setUEdit(u)} style={{ borderInlineStartColor: u.active ? "#16A34A" : "var(--muted)" }}><span className="avatar"><User size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>עובד</span></div><div className="tcard-sub">מס׳ עובד {u.workerNo || "—"} · {u.active ? "פעיל" : "מושבת"} · {workerLoginStateText(u)}</div></div></button>)}</div>}
               </>
-              : <ManagerFleet {...p} />}
+              : <ManagerFleet {...p} deptNav={deptNav} />}
           </>)}
         </div>
       </div>
@@ -2133,12 +2133,13 @@ function ProblemUnitsPanel({ fleet, tickets, insp, config, onOpen }) {
   </div>);
 }
 function ManagerFleet(p) {
-  const { session, fleet, config, tickets, insp, saveFleet, saveConfig } = p;
+  const { session, fleet, config, tickets, insp, saveFleet, saveConfig, deptNav } = p;
   const [tab, setTab] = useState("units"), [openId, setOpenId] = useState(null), [pmView, setPmView] = useState(null);
   const scoped = useMemo(() => fleetForSession(session, fleet).slice().sort((a, b) => (a.code > b.code ? 1 : -1)), [session, fleet]);
   const myPm = useMemo(() => pmVisible(session, p.pm, fleet), [p.pm, fleet, session]);
   const showDocs = canFleetDocs(session), showTickets = canFleetTickets(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
+  useEffect(() => { if (deptNav?.fleetId && scoped.some((f) => f.id === deptNav.fleetId)) { setTab("units"); setOpenId(deptNav.fleetId); } }, [deptNav?._t, scoped]);
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
     {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
