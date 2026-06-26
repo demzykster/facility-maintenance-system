@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/polish-ppe-empty-order-action
+### Active branch: codex/clarify-ppe-catalog-add-action
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `2c070e1 fix: label month picker controls (#201)`.
+- Latest synchronized `main`: `4e3894d fix: guide empty ppe catalog action (#202)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - make the empty PPE catalog state point users to catalog setup, not an empty purchase-order form.
-  - keep purchase-order behavior unchanged when catalog items exist.
+  - make the PPE catalog add action read as an action, not a generic `פריט` label.
+  - keep catalog form behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: empty PPE dashboard shows `הוסף פריט לקטלוג`, hides visible `צור הזמנת רכש`, and opens the `קטלוג` tab.
+  - browser smoke-check: PPE catalog shows `הוסף פריט`, no longer shows a visible generic `פריט` button, and opens the `פריט חדש` form.
 
 ## Latest Completed Work
 
+- PR #202: Empty PPE catalog now guides users to catalog setup.
+  - The dashboard shows `הוסף פריט לקטלוג` instead of a visible purchase-order action when there are no active catalog items.
+  - The purchase-order action now redirects to catalog setup if no active items exist.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #201: PPE month picker icon controls now have clear labels/tooltips.
   - Month, year, and chooser icon buttons expose Hebrew `title` and `aria-label` text.
   - Local tests/build/browser smoke-check passed before merge; Vercel was rate-limited.

@@ -3595,7 +3595,7 @@ function PpeCatalog({ items, ppe, onSave, onDelete, session, savePpe }) {
   const list = [...(items || [])].sort((a, b) => ((a.active === false ? 1 : 0) - (b.active === false ? 1 : 0)) || (a.name > b.name ? 1 : -1));
   const del = async (it) => { await onDelete(it.id); setEdit(null); setView(null); };
   return (<>
-    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> קטלוג ציוד</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> פריט</button></div>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> קטלוג ציוד</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> הוסף פריט</button></div>
     {list.length === 0 ? <Empty text="הקטלוג ריק" Icon={Package} sub="הוסיפו פריט ציוד מגן/בגדי עבודה" /> : <div className="cards">{list.map((it) => { const low = ppeLow(it); return <button key={it.id} className="tcard" onClick={() => setView(it)} style={{ borderInlineStartColor: it.active === false ? "var(--muted)" : (low ? "#DC2626" : "#0D9488"), cursor: "pointer", textAlign: "start" }}>
       <div className="tcard-main">
         <div className="tcard-row1"><span className="tcard-subj">{it.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ppeCatLabel(it.category)}</span>{low && <span className="badge sm" style={{ background: "#FEE2E2", color: "#B91C1C" }}>מלאי נמוך</span>}{it.active === false && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>מושבת</span>}</div>
