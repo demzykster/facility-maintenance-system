@@ -17,6 +17,7 @@ import { canCopyActivationLink, shouldSeedWorkerActivation, workerLoginStateText
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleSummary } from "./ticketLifecycleExportModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
+import { isOperationallyOverdue, metOperationalSla, operationalElapsedMs, operationalRemainingMs, operationalSlaRatio, pausedMs } from "./slaModel.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -383,8 +384,7 @@ const dayCountLabel = (n) => Number(n) === 1 ? "יום אחד" : `${n} ימים`
 const countLabel = (n, one, many) => `${n} ${Number(n) === 1 ? one : many}`;
 const fmtDur = (ms) => { const h = Math.round(ms / 3600000); if (h < 1) return "פחות משעה"; if (h < 48) return `${h} שע׳`; return dayCountLabel(Math.round(h / 24)); };
 const timeAgo = (ts) => { const s = (Date.now() - ts) / 1000; if (s < 60) return "כעת"; const m = s / 60; if (m < 60) return `לפני ${Math.floor(m)} ד׳`; const h = m / 60; if (h < 24) return `לפני ${Math.floor(h)} שע׳`; const d = h / 24; if (d < 30) return `לפני ${dayCountLabel(Math.floor(d))}`; return fmtDate(ts); };
-const pausedMs = (t, now = Date.now()) => (t.pauseAccumMs || 0) + (t.pauseSince ? Math.max(0, now - t.pauseSince) : 0);
-const isOverdue = (t) => t.dueAt && (Date.now() - pausedMs(t)) > t.dueAt && t.status !== "done" && t.status !== "cancelled";
+const isOverdue = (t) => isOperationallyOverdue(t);
 // "Гидравлика" теперь означает «мачта/подъём → требует תסקיר» (флаг типа tasrir, легаси: hydraulics).
 const typeMetaOf = (typeName, cfg) => (cfg?.typeMeta?.[typeName]) || {};
 const typeHydraulics = (typeName, cfg) => { const m = typeMetaOf(typeName, cfg); return !!(m.tasrir ?? m.hydraulics); };
@@ -5071,7 +5071,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const pmRate = pmPlanned ? Math.round((pmDone / pmPlanned) * 100) : null;
   const pmTicketCost = closedP.filter((t) => t.sourcePmId).reduce((a, t) => a + (t.closure?.costAmount || 0), 0);
   const considered = tickets.filter((t) => t.status === "done" || isOverdue(t));
-  const met = tickets.filter((t) => t.status === "done" && (t.closure?.signedAt || t.updatedAt) <= t.dueAt);
+  const met = tickets.filter((t) => t.status === "done" && metOperationalSla(t));
   const compliance = considered.length >= 3 ? Math.round((met.length / considered.length) * 100) : null;
   // Facility analytics
   const facTickets = tickets.filter((t) => !isT(t));
@@ -5121,7 +5121,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const recurUnits = unitArr.filter((x) => x.n >= REPEAT_MIN).slice(0, 5).map((x) => ({ name: `${unitLabel(x.f, config)}`, n: x.n }));
   const recurFac = Object.entries(facAssetCount).filter(([, n]) => n >= REPEAT_MIN).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, n]) => ({ name, n }));
   const recurList = atab === "fleet" ? recurUnits : atab === "maint" ? recurFac : [...recurUnits, ...recurFac].slice(0, 6);
-  const longList = closedP.filter((t) => t.dueAt && t.closure?.signedAt && (t.dueAt - t.createdAt) > 0).map((t) => ({ t, ratio: (t.closure.signedAt - t.createdAt) / (t.dueAt - t.createdAt) })).filter((x) => x.ratio >= SLA_FACTOR).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
+  const longList = closedP.map((t) => ({ t, ratio: operationalSlaRatio(t) })).filter((x) => x.ratio != null && x.ratio >= SLA_FACTOR).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
   const costByCat = {}; closedP.filter((t) => t.closure?.costAmount).forEach((t) => { const key = isT(t) ? (unitTypeName(fleet.find((f) => f.id === t.forkliftId), config) || "כלי שינוע") : catOf(t).label; costByCat[key] = (costByCat[key] || 0) + t.closure.costAmount; });
   const costCatArr = Object.entries(costByCat).sort((a, b) => b[1] - a[1]).slice(0, 6); const maxCostCat = Math.max(1, ...costCatArr.map(([, v]) => v));
   const costCatTitle = atab === "fleet" ? "עלות לפי סוג כלי" : atab === "maint" ? "עלות לפי קטגוריה" : "עלות לפי קטגוריה / סוג";
@@ -6217,12 +6217,12 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
 }
 function Toast({ t, onClose }) { return <div className="toast" onClick={onClose}><Bell size={18} style={{ flexShrink: 0, marginTop: 1 }} /><div><div className="toast-title">{t.title}</div><div className="toast-body">{t.body}</div></div></div>; }
 function SlaBar({ t, big }) {
-  const total = t.dueAt - t.createdAt, elapsed = Date.now() - t.createdAt;
+  const total = Math.max(0, (t.dueAt ?? 0) - (t.createdAt ?? 0)), elapsed = operationalElapsedMs(t);
   const pct = Math.min(100, Math.max(0, total > 0 ? (elapsed / total) * 100 : 0));
   const done = t.status === "done" || t.status === "cancelled";
   const color = done ? "var(--muted)" : pct >= 100 ? "#DC2626" : pct >= 75 ? "#EA580C" : pct >= 50 ? "#CA8A04" : "#16A34A";
-  const remain = t.dueAt - Date.now();
-  const label = done ? (t.status === "done" ? "טופל" : "בוטל") : remain > 0 ? `נותרו ${fmtDur(remain)}` : `חריגה ${fmtDur(-remain)}`;
+  const remain = operationalRemainingMs(t);
+  const label = done ? (t.status === "done" ? "טופל" : "בוטל") : remain == null ? "ללא SLA" : remain > 0 ? `נותרו ${fmtDur(remain)}` : `חריגה ${fmtDur(-remain)}`;
   return (<div className={"sla" + (big ? " big" : "")}><div className="sla-track"><div className="sla-fill" style={{ width: (done ? 100 : pct) + "%", background: color }} /></div>{big && <div className="sla-lbl" style={{ color }}>{label}</div>}</div>);
 }
 function TicketCard({ t, admin, onClick, fleet, users, config }) {
