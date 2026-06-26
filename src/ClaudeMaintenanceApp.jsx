@@ -4073,11 +4073,11 @@ function MonthPicker({ y, m, onChange }) {
   const go = (dm) => { let Y = y, M = m + dm; if (M < 0) { M = 11; Y--; } else if (M > 11) { M = 0; Y++; } onChange(Y, M); };
   const _now = new Date(); const isFuture = (Y, M) => (Y > _now.getFullYear() || (Y === _now.getFullYear() && M > _now.getMonth()));
   return (<div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 2 }}>
-    <button className="icon-btn" title="חודש הבא" disabled={isFuture(y, m + 1)} onClick={() => { if (!isFuture(y, m + 1)) go(1); }}><ChevronLeft size={18} /></button>
-    <button className="btn-ghost sm" onClick={() => setOpen((o) => !o)} style={{ minWidth: 112, fontWeight: 700, justifyContent: "center" }}>{HE_MONTHS[m]} {y}</button>
-    <button className="icon-btn" title="חודש קודם" onClick={() => go(-1)}><ChevronLeft size={18} style={{ transform: "scaleX(-1)" }} /></button>
+    <button className="icon-btn" title="חודש הבא" aria-label="חודש הבא" disabled={isFuture(y, m + 1)} onClick={() => { if (!isFuture(y, m + 1)) go(1); }}><ChevronLeft size={18} /></button>
+    <button className="btn-ghost sm" title="בחירת חודש" aria-label="בחירת חודש" onClick={() => setOpen((o) => !o)} style={{ minWidth: 112, fontWeight: 700, justifyContent: "center" }}>{HE_MONTHS[m]} {y}</button>
+    <button className="icon-btn" title="חודש קודם" aria-label="חודש קודם" onClick={() => go(-1)}><ChevronLeft size={18} style={{ transform: "scaleX(-1)" }} /></button>
     {open && <><div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 49 }} /><div style={{ position: "absolute", top: "115%", insetInlineEnd: 0, zIndex: 50, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", width: 232 }}>
-      <div className="row-between" style={{ marginBottom: 8 }}><button className="icon-btn" title="שנה הבאה" disabled={vy >= _now.getFullYear()} onClick={() => { if (vy < _now.getFullYear()) setVy(vy + 1); }}><ChevronLeft size={16} /></button><b>{vy}</b><button className="icon-btn" title="שנה קודמת" onClick={() => setVy(vy - 1)}><ChevronLeft size={16} style={{ transform: "scaleX(-1)" }} /></button></div>
+      <div className="row-between" style={{ marginBottom: 8 }}><button className="icon-btn" title="שנה הבאה" aria-label="שנה הבאה" disabled={vy >= _now.getFullYear()} onClick={() => { if (vy < _now.getFullYear()) setVy(vy + 1); }}><ChevronLeft size={16} /></button><b>{vy}</b><button className="icon-btn" title="שנה קודמת" aria-label="שנה קודמת" onClick={() => setVy(vy - 1)}><ChevronLeft size={16} style={{ transform: "scaleX(-1)" }} /></button></div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>{HE_MONTHS.map((nm, i) => { const fut = isFuture(vy, i); return <button key={i} className={"chip" + (vy === y && i === m ? " on" : "")} disabled={fut} style={fut ? { opacity: 0.4 } : {}} onClick={() => { if (!fut) { onChange(vy, i); setOpen(false); } }}>{nm.slice(0, 4)}</button>; })}</div>
     </div></>}
   </div>);
