@@ -52,6 +52,6 @@ Source of truth in code:
 | cleaner | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
 | all relevant roles | tasks and meetings | `task` | tasks module via `go: "tasks"` | none found |
 
-## First Fix Candidates
+## Optional Follow-Up
 
-1. Eventually focus exact PPE records instead of only opening the relevant PPE sub-tab.
+1. Add exact PPE record focus when an aggregate PPE notification represents one specific request, order, or item.
