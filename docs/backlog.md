@@ -300,11 +300,11 @@ Implementation so far:
 - It now returns stage key, kind, reason, label, duration, current flag, current start time, owner/ball-holder, operational-SLA accounting, downtime accounting, and export/analytics/dashboard visibility hints.
 - Ticket-list and Analytics lifecycle Excel sheets include action owner and SLA/downtime accounting columns.
 - Dashboard stage chips and Analytics stage-duration bars now use the normalized owner and operational-SLA accounting fields.
+- Wait-reason settings now explain responsibility, allowed setters, and operational-SLA accounting in clearer user-facing copy.
 - Unit tests cover current stages, closed historical waiting, equipment wait, rework, owner, operational-SLA accounting, downtime accounting, and visibility hints.
 
 Remaining:
 - Continue replacing older summary cards that still derive wait/SLA totals directly instead of using normalized stages.
-- Improve user-facing labels for wait-reason settings so `pauseSla` is explained as operational-SLA accounting, not as a mysterious global SLA stop.
 
 ### Transport duplicate check
 
