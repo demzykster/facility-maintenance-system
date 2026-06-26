@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/clarify-ppe-orders-empty-copy
+### Active branch: codex/disable-empty-ppe-export
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `9c5b156 fix: clarify ppe catalog add action (#203)`.
+- Latest synchronized `main`: `7936a60 fix: clarify ppe orders empty copy (#204)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - make the empty purchase-order copy match where the block is shown.
-  - avoid references to unavailable actions in the embedded movement-log order block.
+  - prevent the PPE movement export button from looking actionable when there are no rows to export.
+  - keep export behavior unchanged when rows exist.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: PPE movement-log order block shows the corrected empty-state copy and no longer shows the old `«הזמנה» ליצירה ידנית` text.
+  - browser smoke-check: empty PPE movement export button is disabled and exposes `אין נתונים לייצוא`.
 
 ## Latest Completed Work
 
+- PR #204: PPE purchase-order empty copy now matches its embedded location.
+  - The movement-log order block no longer references unavailable `הזמנה/מהחוסרים` actions.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #203: PPE catalog add action now reads clearly.
   - The catalog button changed from generic `פריט` to `הוסף פריט`.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
