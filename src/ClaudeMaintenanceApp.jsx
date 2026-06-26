@@ -4203,7 +4203,11 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const setDashTrack = setCtx || setDashTrackLocal;
   const isTransport = (t) => t.track === "transport" || (!t.track && t.forkliftId);
   const tickets = dashTrack === "all" ? allTickets : dashTrack === "transport" ? allTickets.filter(isTransport) : allTickets.filter((t) => !isTransport(t));
-  const flt = (f) => onFilter ? onFilter(dashTrack !== "all" ? { ...f, track: dashTrack } : f) : setTab("tickets");
+  const flt = (f, label) => {
+    const next = dashTrack !== "all" ? { ...f, track: dashTrack } : f;
+    const focus = next.focus || (label ? { label } : null);
+    return onFilter ? onFilter(focus ? { ...next, focus } : next) : setTab("tickets");
+  };
   const w = config.widgets || DEFAULT_CONFIG.widgets;
   const open = tickets.filter(isOpen), breach = tickets.filter(isOverdue);
   const transOpen = open.filter(isTransport);
@@ -4265,8 +4269,8 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     critEsc.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות קריטיות שהוסלמו", n: critEsc.length, go: () => onFilter ? onFilter({ st: "open", track: "transport", focus: { label: "תקלות קריטיות שהוסלמו", criticalEscalated: true } }) : setTab("tickets") } : null,
     critActive.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critActive.length, go: () => onFilter ? onFilter({ st: "open", track: "transport", focus: { label: "תקלות שינוע קריטיות פתוחות", activeCriticalTransport: true } }) : setTab("tickets") } : null,
     tasksOverdue.length ? { sev: 2, Icon: ClipboardList, text: "משימות באיחור", n: tasksOverdue.length, go: () => setTab("tasks") } : null,
-    waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin" }) : setTab("tickets") } : null,
-    waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user" }) : setTab("tickets") } : null,
+    waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin", focus: { label: "קריאות ממתינות לאישורך" } }) : setTab("tickets") } : null,
+    waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user", focus: { label: "קריאות ממתינות לסגירה על ידך" } }) : setTab("tickets") } : null,
     ppeReqPend.length ? { sev: 1, Icon: Shirt, text: "בקשות ביגוד ממתינות", n: ppeReqPend.length, go: () => setTab("ppe") } : null,
     lowPpe.length ? { sev: 1, Icon: Shirt, text: "חוסרי ביגוד לפי מידה", n: lowPpe.length, go: () => setTab("ppe") } : null,
     complOpen.length ? { sev: 1, Icon: AlertTriangle, text: "תלונות פתוחות", n: complOpen.length, go: () => setTab("cleaning") } : null,
@@ -4296,19 +4300,19 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     <div className="row-between"><div className="seg-tabs s3" style={{ maxWidth: 320, marginBottom: 0 }}><button className={dashTrack === "all" ? "on" : ""} onClick={() => setDashTrack("all")}>הכל</button><button className={dashTrack === "facility" ? "on" : ""} onClick={() => setDashTrack("facility")}>מבנה</button><button className={dashTrack === "transport" ? "on" : ""} onClick={() => setDashTrack("transport")}>שינוע</button></div><button className="btn-ghost sm" onClick={() => setCfgOpen((v) => !v)}><SlidersHorizontal size={15} /> התאמת לוח</button></div>
     {cfgOpen && <div className="panel" style={{ marginBottom: 12 }}><div className="wtoggles">{WIDGETS.map((x) => <button key={x.id} className={"wtoggle" + (w[x.id] ? " on" : "")} onClick={() => toggle(x.id)}>{w[x.id] ? <Eye size={14} /> : <EyeOff size={14} />} {x.label}</button>)}</div></div>}
     {attnShown.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש את תשומת לבך{attention.length > attnShown.length ? ` · ${attention.length}` : ""}</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{attnShown.map(({ t, tag, color }) => <button key={t.id + tag} className="attn-row" onClick={() => onOpen(t.id)}><span className="attn-dot" style={{ background: color }} /><span className="attn-main"><span className="attn-subj">#{ticketNo(t)} · {t.subject}</span><span className="attn-meta">{t.asset || catOf(t).label}</span></span><span className="attn-tag" style={{ color, background: color + "1a" }}>{tag}</span></button>)}</div></>}
-    {insights.length > 0 && <><SectionTitle><Sparkles size={15} /> תובנות מערכת</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{insights.map((ins, i) => { const c = ins.sev === "risk" ? "#DC2626" : ins.sev === "warn" ? "#EA580C" : "#4F46E5"; const go = ins.go === "fleet" ? () => setTab("assets") : ins.go === "pm" ? () => setTab("assets") : ins.go === "facility" ? () => flt({ track: "facility" }) : ins.go === "wait" ? () => flt({ st: "waiting" }) : null; const Tag = go ? "button" : "div"; return <Tag key={i} className={"insight-row" + (go ? " clickable" : "")} onClick={go || undefined}><span className="insight-dot" style={{ background: c }} /><span className="insight-text">{ins.text}</span>{go && <ChevronLeft size={15} className="insight-chev" />}</Tag>; })}</div></>}
+    {insights.length > 0 && <><SectionTitle><Sparkles size={15} /> תובנות מערכת</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{insights.map((ins, i) => { const c = ins.sev === "risk" ? "#DC2626" : ins.sev === "warn" ? "#EA580C" : "#4F46E5"; const go = ins.go === "fleet" ? () => setTab("assets") : ins.go === "pm" ? () => setTab("assets") : ins.go === "facility" ? () => flt({ track: "facility" }, "תובנה · אחזקת מבנה") : ins.go === "wait" ? () => flt({ st: "waiting" }, "תובנה · קריאות בהמתנה") : null; const Tag = go ? "button" : "div"; return <Tag key={i} className={"insight-row" + (go ? " clickable" : "")} onClick={go || undefined}><span className="insight-dot" style={{ background: c }} /><span className="insight-text">{ins.text}</span>{go && <ChevronLeft size={15} className="insight-chev" />}</Tag>; })}</div></>}
     {critEsc.length > 0 && <div className="alert-esc" onClick={() => onOpen(critEsc[0].id)}><AlertTriangle size={18} /> <b>{critEsc.length} השבתות קריטיות</b> ללא טכנאי מעל {config.escalateCriticalHours} שע׳ — נדרש טיפול מיידי</div>}
     {w.kpis && <><div className="kpi-grid">
-      <button className="kpi-btn" onClick={() => flt({ st: "open" })}><Kpi num={open.length} label="קריאות פתוחות" color="#2563EB" /></button>
-      <button className="kpi-btn" onClick={() => flt({ st: "open", track: "transport" })}><Kpi num={transOpen.length} label="כלי שינוע פתוחים" color="#EA580C" /></button>
-      <button className="kpi-btn" onClick={() => flt({ st: "open", track: "facility" })}><Kpi num={facilityOpen.length} label="אחזקת מבנה" color="#0EA5E9" /></button>
+      <button className="kpi-btn" onClick={() => flt({ st: "open" }, "קריאות פתוחות")}><Kpi num={open.length} label="קריאות פתוחות" color="#2563EB" /></button>
+      <button className="kpi-btn" onClick={() => flt({ st: "open", track: "transport" }, "כלי שינוע פתוחים")}><Kpi num={transOpen.length} label="כלי שינוע פתוחים" color="#EA580C" /></button>
+      <button className="kpi-btn" onClick={() => flt({ st: "open", track: "facility" }, "אחזקת מבנה פתוחה")}><Kpi num={facilityOpen.length} label="אחזקת מבנה" color="#0EA5E9" /></button>
       <button className="kpi-btn" onClick={() => flt({ st: "open", focus: { label: "חריגות SLA", overdue: true } })}><Kpi num={breach.length} label="חריגות SLA" color="#DC2626" /></button>
     </div>
     <div className="queue-row">
-      <button className="queue-chip" onClick={() => flt({ st: "open", pr: "high" })}><span className="q-num" style={{ color: "#7C3AED" }}>{open.filter((t) => prOf(t.priority).id === "high").length}</span><span className="q-lbl">דחופות</span></button>
+      <button className="queue-chip" onClick={() => flt({ st: "open", pr: "high" }, "קריאות דחופות")}><span className="q-num" style={{ color: "#7C3AED" }}>{open.filter((t) => prOf(t.priority).id === "high").length}</span><span className="q-lbl">דחופות</span></button>
       <button className="queue-chip" onClick={() => flt({ st: "open", focus: { lifecycleKey: "waiting:parts", label: "עיכוב חלקים" } })}><span className="q-num" style={{ color: "#7C3AED" }}>{waitParts.length}</span><span className="q-lbl">עיכוב חלקים</span></button>
-      <button className="queue-chip" onClick={() => flt({ st: "pending_user" })}><span className="q-num" style={{ color: "#0D9488" }}>{waitUser.length}</span><span className="q-lbl">לאישור מנהל מחלקה</span></button>
-      <button className="queue-chip" onClick={() => flt({ st: "pending_admin" })}><span className="q-num" style={{ color: "#4F46E5" }}>{waitAdmin.length}</span><span className="q-lbl">לסגירה על ידך</span></button>
+      <button className="queue-chip" onClick={() => flt({ st: "pending_user" }, "לאישור מנהל מחלקה")}><span className="q-num" style={{ color: "#0D9488" }}>{waitUser.length}</span><span className="q-lbl">לאישור מנהל מחלקה</span></button>
+      <button className="queue-chip" onClick={() => flt({ st: "pending_admin" }, "לסגירה על ידך")}><span className="q-num" style={{ color: "#4F46E5" }}>{waitAdmin.length}</span><span className="q-lbl">לסגירה על ידך</span></button>
     </div>
     {lifecycleBottlenecks.length > 0 && <div className="stage-watch"><div className="stage-watch-title"><Clock size={14} /> שלבים שדורשים מעקב</div><div className="stage-watch-grid">{lifecycleBottlenecks.map((s) => <button key={s.key} className="stage-chip" onClick={() => flt({ st: "open", focus: { label: `שלב · ${s.label}`, lifecycleKey: s.key } })}><span className="stage-chip-name">{s.label}</span><span className="stage-chip-meta">{lifecycleOwnerLabel(s.owner)} · {countLabel(s.n, "קריאה", "קריאות")}{s.ms ? ` · ${fmtDur(s.ms)}` : ""}{s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}</span></button>)}</div></div>}
     </>}

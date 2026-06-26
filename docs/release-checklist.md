@@ -28,7 +28,7 @@ Next PR candidate:
 - Audit `focus` / `ctx` / ticket-list filter state and make analytic drill-down filters explicitly resettable and non-sticky.
 
 Current batch:
-- Make Dashboard/Analytics drill-down filters show a visible source banner and clear all drill-down-applied filters in one click.
+- Make Dashboard drill-down banners show specific source labels where possible.
 
 ### R3 — Notifications End-To-End
 
