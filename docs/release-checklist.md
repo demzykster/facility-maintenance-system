@@ -48,7 +48,7 @@ Next PR candidate:
 - Add or run a role-by-role browser smoke checklist for `צוות ומשתמשים`, `קריאות`, `ביגוד עובדים`, `בקרת ניקיון`, and `כלי שינוע`.
 
 Current batch:
-- Give manager/user sessions with `settings:manage` a visible path to `הגדרות`, with sensitive system actions still gated by `settings:full`.
+- Give manager/user sessions with `ppe:manage` or `ppe:full` a direct path to `ביגוד עובדים`, without adding sidebar noise for ordinary request-only managers.
 
 ### R5 — Screen Audit And Visual Noise
 

@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/user-settings-permission-route
+### Active branch: codex/user-ppe-management-route
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `1683a82 fix: expose readonly analytics to permitted managers (#192)`.
+- Latest synchronized `main`: `ed517d2 fix: expose settings to permitted managers (#193)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - give manager/user sessions with `settings:manage` a visible path to `הגדרות`.
-  - keep sensitive settings actions gated by existing `settings:full`.
+  - give manager/user sessions with `ppe:manage` or `ppe:full` a direct visible path to `ביגוד עובדים`.
+  - keep ordinary manager `ppe:request` users on the existing department/PPE request path to avoid extra sidebar noise.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
   - browser smoke-check: app renders after reload and console has no errors.
-  - code-path check: `settings:manage` adds the manager/user nav item, while sensitive actions still depend on `settings:full`.
+  - code-path check: `ppe:manage` adds the manager/user nav item and ordinary `ppe:request` does not.
 
 ## Latest Completed Work
 
+- PR #193: Manager/user Settings access is now visible when permitted.
+  - `הגדרות` appears only when the session has `settings:manage`.
+  - Sensitive settings actions remain behind `settings:full`.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #192: Manager/user Analytics access is now visible when permitted.
   - `אנליטיקה` appears only when the session has `analytics:view`.
   - Manager/user analytics opens in read-only mode; damage report edit controls do not save from this route.
