@@ -23,19 +23,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #162.
-- Last synchronized `main` before this entry: `e5fc35a fix: use lifecycle stage for parts wait analytics (#161)`.
-- Open PRs when this entry was written: PR #162 was ready to merge.
+- Status: idle after PR #163.
+- Last synchronized `main` before this entry: `e8cedba fix: use lifecycle stage for dashboard parts wait (#162)`.
+- Open PRs when this entry was written: PR #163 was ready to merge.
 - Purpose:
-  - Dashboard parts-wait KPI now uses normalized lifecycle stages and the older log-text based helper was removed;
-  - continue replacing older wait/SLA summaries and drill-downs that still derive totals outside the normalized lifecycle helper.
+  - PPE pending-request surfaces now treat `worker_sign` requests as active pending work everywhere;
+  - notification count, PPE dashboard pending block, requester pending/history split, and admin attention count now share one helper.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Dashboard parts-wait KPI.
+  - browser smoke-check passed for admin login and PPE dashboard render.
 
 ## Latest Completed Work
 
+- PR #163: PPE pending request counts were aligned.
+  - Manager approval (`pending`) and worker signature (`worker_sign`) requests now use one shared active-request helper.
+  - Notifications, dashboard attention, PPE dashboard counts, request lists, and requester history split no longer diverge.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #162: Dashboard parts-wait KPI moved to lifecycle stages.
   - The Dashboard parts-wait KPI now uses the normalized `waiting:parts` lifecycle stage and the old log-text helper was removed.
   - Local tests/build/browser smoke-check passed before merge.

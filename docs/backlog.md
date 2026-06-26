@@ -404,6 +404,7 @@ Goal:
 Notes:
 - Main PPE pending workflow bugs were fixed earlier.
 - PR #123 reproduced the live inventory dashboard noise and reduced reorder cards to deficit sizes only.
+- PR #163 moved active PPE requests to one shared definition for both manager approval (`pending`) and worker signature (`worker_sign`), so dashboard counts and request lists do not diverge.
 
 ## Backup / Restore
 

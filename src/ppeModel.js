@@ -7,6 +7,10 @@ export function ppeRequestStatusLabel(status) {
   return "ממתינה לאישור מנהל";
 }
 
+export function ppeRequestNeedsAction(request) {
+  return request?.status === "pending" || request?.status === "worker_sign";
+}
+
 export function ppeRequestLineSummary(request) {
   return (request?.lines || [])
     .map((line) => {
