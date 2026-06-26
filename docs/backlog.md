@@ -446,7 +446,7 @@ Implementation so far:
 - Notification panel display settings now use clearer Hebrew copy for filtering notification types.
 - The panel shows how many notifications are currently displayed and clarifies that hiding categories only affects the user's local view.
 - PR #169: Notification defaults now explicitly include task, driver, PPE, and cleaning kinds instead of relying on missing keys being treated as enabled.
-- Global Settings still do not expose a dedicated notification-type editor; current user-facing filtering is in the notification panel.
+- Global Settings notification-type editor is being added in PR #170; personal filtering remains in the notification panel.
 - PR #166 polished Analytics parts-wait card singular/plural Hebrew wording for delayed tickets and SLA breaches.
 - PR #167 polished the Dashboard parts-wait chip to lifecycle-compatible wording after the count moved to `waiting:parts`.
 

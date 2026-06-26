@@ -23,19 +23,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #169.
-- Last synchronized `main` before this entry: `e1e2fe8 fix: match task imports by status group (#168)`.
-- Open PRs when this entry was written: PR #169 was ready to merge.
+- Status: idle after PR #170.
+- Last synchronized `main` before this entry: `6d115b9 fix: complete notification defaults (#169)`.
+- Open PRs when this entry was written: PR #170 was ready to merge.
 - Purpose:
-  - Default notification config should explicitly include every notification kind the app can emit;
-  - task, driver, PPE, and cleaning notifications should not rely on implicit `undefined !== false` behavior.
+  - Global Settings should expose the notification-type toggles already saved in `config.notify`;
+  - admins should not need to discover global notification categories only through code.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Settings page loading with no console errors.
+  - browser smoke-check passed for global notification-type toggles in Settings.
 
 ## Latest Completed Work
 
+- PR #170: Global notification-type toggles were exposed in Settings.
+  - Admins can now enable/disable notification categories from global Settings.
+  - Personal filtering remains in the notification panel.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #169: Notification defaults were completed.
   - Default config now explicitly includes all emitted notification kinds, including task, driver, PPE, and cleaning.
   - Local tests/build/browser smoke-check passed before merge.

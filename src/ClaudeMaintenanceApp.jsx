@@ -5573,6 +5573,14 @@ function SettingsPanel(p) {
       </div>
       <SectionTitle>השבתה קריטית — סף התראה (שעות)</SectionTitle>
       <label className="sla-cell" style={{ maxWidth: 160 }}><span style={{ color: "#DC2626" }}>שעות עד הסלמה</span><input type="number" value={escH} onChange={(e) => setEscH(e.target.value)} /></label>
+      <SectionTitle><Bell size={15} /> סוגי התראות</SectionTitle>
+      <div className="hint" style={{ marginBottom: 8 }}>כיבוי סוג התראה מסתיר אותו לכל המשתמשים. סינון אישי של התצוגה נשאר בפאנל ההתראות.</div>
+      <div className="notify-grid">
+        {NOTIFY_DEFS.map(([id, label]) => <label key={id} className="chk-line notify-kind">
+          <input type="checkbox" checked={notify[id] !== false} onChange={(e) => setNotify((s) => ({ ...s, [id]: e.target.checked }))} />
+          {label}
+        </label>)}
+      </div>
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveGeneral}>{saved ? "נשמר ✓" : "שמירת הגדרות"}</button>
       <div className="note">גרסת הדגמה: הנתונים נשמרים בדפדפן הנוכחי בלבד. ה-PIN אינו אבטחה אמיתית — לגרסת ייצור נדרשים שרת ואימות משתמשים.</div>
       {mayFullSettings && <>
@@ -6372,6 +6380,8 @@ a{color:inherit;}
 .field textarea,.ta{resize:vertical;line-height:1.5;}
 .chk-line{display:flex;align-items:center;gap:9px;font-size:14px;margin-bottom:15px;cursor:pointer;}
 .chk-line input{width:18px;height:18px;}
+.notify-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 12px;margin-bottom:12px;}
+.notify-kind{margin:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:700;}
 .hint{font-size:12.5px;color:var(--muted);margin-top:6px;}
 .err{background:#FEE2E2;color:#B91C1C;font-size:13.5px;font-weight:500;padding:10px 12px;border-radius:10px;margin-bottom:12px;}
 .btn-primary{background:var(--primary);color:#fff;font-weight:600;font-size:15px;border-radius:11px;padding:13px 18px;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.15s;}
