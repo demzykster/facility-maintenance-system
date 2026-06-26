@@ -706,7 +706,6 @@ const needsHandler = (t, users, fleet) => {
   if (t.assignee) return !(users || []).some((u) => u.role === "tech" && u.active !== false && u.name === t.assignee);
   return eligibleTechs(t, users, fleet).length === 0;
 };
-const WAIT_LABEL = "ממתינה לחלקים";
 // Причины ожидания — ДЕФОЛТНЫЙ список (сид). Админ редактирует в настройках (config.waitReasons).
 // ball: у кого мяч во время ожидания (executor|manager|admin). pauseSla: останавливает ли часы SLA (учёт — Phase 2). setters: кто может ставить (tech|manager|both).
 const WAIT_REASONS = [
@@ -797,7 +796,6 @@ function assetHealth(f, tickets, insp, config) {
   return { score, level, color: colors[level], label: labels[level], rec, count90: last90.length, mttr, cost90 };
 }
 
-const waitedParts = (t) => t.waitingReason === "parts" || !!(t.statusMs && t.statusMs["waiting:parts"]) || (t.log || []).some((l) => l.text && l.text.includes(WAIT_LABEL));
 const isCriticalEscalated = (t, cfg) => t.track === "transport" && t.downtimeType === "critical" && !t.assignee && isOpen(t) && (Date.now() - t.createdAt) > (cfg?.escalateCriticalHours ?? 2) * 3600000;
 const HE_STOP = new Set("של את עם על אם כי או גם לא יש אין זה זו הוא היא הם הן אני אתה אנחנו עד אל כל כך מה מי כמו בין אחר אחרי לפני תחת ליד מן אבל אז רק עוד כבר היה היתה להיות יותר פחות מאוד".split(/\s+/));
 const normToken = (w) => (w || "").replace(/[^\u0590-\u05FFa-zA-Z0-9]/g, "");
@@ -4199,7 +4197,6 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const open = tickets.filter(isOpen), breach = tickets.filter(isOverdue);
   const transOpen = open.filter(isTransport);
   const facilityOpen = open.filter((t) => !isTransport(t));
-  const waitParts = open.filter(waitedParts);
   const waitUser = open.filter((t) => t.status === "pending_user");
   const waitAdmin = open.filter((t) => t.status === "pending_admin");
   const critNow = open.filter((t) => t.track === "transport" && t.downtimeType === "critical");
@@ -4219,6 +4216,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     waitReasonLabel: (id) => waitReasonLabel(id, config),
     waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id)
   };
+  const waitParts = open.filter((t) => ticketHasLifecycleStage(t, "waiting:parts", lifecycleOptions));
   const lifecycleBottlenecks = Array.from(open.reduce((acc, t) => {
     const stages = normalizedTicketLifecycleStages(t, lifecycleOptions)
       .filter((stage) => stage.current || stage.kind === "rework");

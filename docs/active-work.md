@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #161.
-- Last synchronized `main` before this entry: `d6fd3ba fix: use lifecycle stages for ticket wait time (#160)`.
-- Open PRs when this entry was written: PR #161 was ready to merge.
+- Status: idle after PR #162.
+- Last synchronized `main` before this entry: `e5fc35a fix: use lifecycle stage for parts wait analytics (#161)`.
+- Open PRs when this entry was written: PR #162 was ready to merge.
 - Purpose:
-  - Analytics parts-wait summary and export marker now use normalized lifecycle stages instead of older direct/log-derived checks;
+  - Dashboard parts-wait KPI now uses normalized lifecycle stages and the older log-text based helper was removed;
   - continue replacing older wait/SLA summaries and drill-downs that still derive totals outside the normalized lifecycle helper.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for Analytics parts-wait summary.
+  - browser smoke-check passed for Dashboard parts-wait KPI.
 
 ## Latest Completed Work
 
+- PR #162: Dashboard parts-wait KPI moved to lifecycle stages.
+  - The Dashboard parts-wait KPI now uses the normalized `waiting:parts` lifecycle stage and the old log-text helper was removed.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #161: Analytics parts-wait summary moved to lifecycle stages.
   - The parts-wait card and Excel marker now use the normalized `waiting:parts` lifecycle stage.
   - Local tests/build/browser smoke-check passed before merge.
