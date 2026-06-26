@@ -6,6 +6,11 @@ const labels = {
   isOpen: (ticket) => ticket.status !== "done" && ticket.status !== "cancelled",
   statusLabel: (id) => ({ new: "חדשה", in_progress: "בטיפול" }[id] || id),
   waitReasonLabel: (id) => ({ parts: "ממתין לחלקים", no_equipment: "הכלי לא התקבל" }[id] || id),
+  waitReasonMeta: (id) => ({
+    parts: { ball: "executor", pauseSla: true },
+    manager_decision: { ball: "manager", pauseSla: false },
+    no_equipment: { ball: "manager", pauseSla: true }
+  }[id] || {}),
   wearLabel: (id) => ({ natural: "בלאי טבעי" }[id] || id),
   durationText: (ms) => `${Math.round(ms / 1000)}s`
 };
@@ -62,9 +67,9 @@ describe("ticket lifecycle export model", () => {
     }, labels);
 
     expect(stages).toMatchObject([
-      { key: "in_progress", kind: "status", label: "בטיפול", ms: 5_000, current: false },
-      { key: "waiting:parts", kind: "waiting", reason: "parts", label: "ממתין לחלקים", ms: 3_000, current: true },
-      { key: "new", kind: "status", label: "חדשה", ms: 2_000, current: false }
+      { key: "in_progress", kind: "status", label: "בטיפול", ms: 5_000, current: false, owner: "executor" },
+      { key: "waiting:parts", kind: "waiting", reason: "parts", label: "ממתין לחלקים", ms: 3_000, current: true, currentStartedAt: 7_000, owner: "executor", countsOperationalSla: false },
+      { key: "new", kind: "status", label: "חדשה", ms: 2_000, current: false, owner: "manager" }
     ]);
   });
 
@@ -74,8 +79,8 @@ describe("ticket lifecycle export model", () => {
       statusMs: { "waiting:parts": 4_000 }
     }, labels);
 
-    expect(stages).toEqual([
-      { key: "waiting:parts", kind: "waiting", reason: "parts", label: "ממתין לחלקים", ms: 4_000, current: false }
+    expect(stages).toMatchObject([
+      { key: "waiting:parts", kind: "waiting", reason: "parts", label: "ממתין לחלקים", ms: 4_000, current: false, owner: "executor", countsOperationalSla: false }
     ]);
   });
 
@@ -87,8 +92,34 @@ describe("ticket lifecycle export model", () => {
       returnReason: "לא תקין"
     }, labels);
 
-    expect(stages).toContainEqual({ key: "waiting:no_equipment", kind: "waiting", reason: "no_equipment", label: "הכלי לא התקבל", ms: 6_000, current: false });
-    expect(stages).toContainEqual({ key: "rework", kind: "rework", reason: "", label: "הוחזר לטיפול", ms: 0, current: false });
+    expect(stages).toContainEqual(expect.objectContaining({ key: "waiting:no_equipment", kind: "waiting", reason: "no_equipment", label: "הכלי לא התקבל", ms: 6_000, current: false, owner: "manager", countsOperationalSla: false }));
+    expect(stages).toContainEqual(expect.objectContaining({ key: "rework", kind: "rework", reason: "", label: "הוחזר לטיפול", ms: 0, current: false, owner: "requester" }));
+  });
+
+  it("adds owner and accounting semantics for dashboard and analytics", () => {
+    const stages = normalizedTicketLifecycleStages({
+      track: "transport",
+      status: "waiting",
+      waitingReason: "manager_decision",
+      waitBall: "manager",
+      statusSince: 9_000,
+      downtimeStart: 1_000,
+      statusMs: { "waiting:parts": 4_000 }
+    }, labels);
+
+    expect(stages).toContainEqual(expect.objectContaining({
+      key: "waiting:manager_decision",
+      owner: "manager",
+      countsOperationalSla: true,
+      countsDowntime: true,
+      appearsIn: { export: true, analytics: true, dashboard: true }
+    }));
+    expect(stages).toContainEqual(expect.objectContaining({
+      key: "waiting:parts",
+      owner: "executor",
+      countsOperationalSla: false,
+      countsDowntime: true
+    }));
   });
 
   it("checks whether a ticket contains a lifecycle stage", () => {

@@ -23,17 +23,32 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle.
-- Last synchronized `main` before this entry: `edf72ba fix: polish supplier count Hebrew (#151)`.
-- Open PRs when this entry was written: none.
+- Status: idle after PR #156.
+- Last synchronized `main` before this entry: `9680531 fix: polish task meeting count Hebrew (#155)`.
+- Open PRs when this entry was written: PR #156 was ready to merge.
 - Purpose:
-  - no active product branch;
-  - continue from `docs/backlog.md` or start a new focused UI audit pass.
+  - SLA/stage helper contract pass completed;
+  - continue with Analytics stage cards/drill-downs or wait-reason settings copy.
 - Validation so far:
-  - not applicable; ledger-only state.
+  - `npm test -- --run` passed;
+  - `npm run build` passed;
+  - browser smoke-check passed for Analytics and Tickets.
 
 ## Latest Completed Work
 
+- PR #156: ticket lifecycle-stage contract was extended.
+  - Normalized lifecycle stages now include owner/ball-holder, operational-SLA accounting, downtime accounting, current start time, and visibility hints.
+  - Ticket-list and Analytics lifecycle Excel sheets now include owner/SLA/downtime accounting columns.
+  - Local tests/build/browser smoke-check passed before merge.
+- PR #155: task and meeting count Hebrew was polished.
+  - Task headers and meeting rows now use singular/plural wording for open tasks and participants.
+  - Local tests/build/browser smoke-check passed before merge.
+- PR #154: cleaning count Hebrew was polished.
+  - Cleaning rounds, reports, checklist, zones, and open report counters now use singular/plural wording.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
+- PR #153: PPE purchase/order count Hebrew was polished.
+  - PPE movement, purchase-order, and supplier order counters now use singular/plural wording.
+  - Vercel was green before merge.
 - PR #152: backup restore count Hebrew was polished.
   - Backup preview counters now use singular/plural wording for all collection counts.
   - Local tests/build/browser smoke-check passed before merge.
