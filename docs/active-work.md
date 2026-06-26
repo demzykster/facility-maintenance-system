@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/worker-activation-copy-after-save`
+### Active branch: `codex/technician-personal-tolerance-ui`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `cd33de6 docs: close backup summary ledger [skip vercel] (#128)`.
+- Last synchronized `main` before this entry: `3903a6a fix: keep worker activation link available after save (#129)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - keep worker/cleaner edit forms open after saving a pending activation link so the saved link can be copied immediately;
-  - preserve the rule that only saved activation links can be copied.
+  - add optional per-technician shift tolerance UI;
+  - keep the global `סבילות משמרת` as fallback when the personal field is empty.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: `צוות ומשתמשים` rendered after reload; no console errors.
+  - Browser smoke-check: new technician form shows `סבילות משמרת אישית`; no console errors.
 
 ### Latest Completed Work
 
+- PR #129: worker activation links can be copied right after save.
+  - Worker/cleaner forms stay open after saving a pending activation link.
+  - Copying is still allowed only for a saved token.
+  - Vercel was green before merge.
 - PR #128: active-work was closed after the backup restore summary change.
   - Local `main` was left with no active product branch.
   - Vercel was rate-limited; docs-only.
