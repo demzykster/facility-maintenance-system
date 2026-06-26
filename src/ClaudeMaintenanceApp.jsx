@@ -4331,10 +4331,11 @@ function ReportView({ html, count, onClose }) {
 }
 function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, users, config }) {
   const [q, setQ] = useState(""), [track, setTrack] = useState("all"), [st, setSt] = useState("open"), [pr, setPr] = useState("all"), [cat, setCat] = useState("all"), [costF, setCostF] = useState("all"), [period, setPeriod] = useState("all"), [report, setReport] = useState(null), [unitType, setUnitType] = useState("all"), [focus, setFocus] = useState(initial?.focus || null);
+  const [drilldownLabel, setDrilldownLabel] = useState(initial ? (initial.focus?.label || "סינון מלוח הבקרה / אנליטיקה") : "");
   const PERIODS = [["all", "כל הזמן"], ["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"]];
   const from = period === "all" ? 0 : Date.now() - ({ week: 7, month: 30, quarter: 90, year: 365 }[period]) * 86400000;
-  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setPeriod(initial.period ?? "all"); setUnitType(initial.unitType ?? "all"); setCat(initial.cat ?? "all"); setCostF("all"); setFocus(initial.focus ?? null); setQ(""); onInitialConsumed?.(); } }, [initial?._t]);
-  const resetFilters = () => { setQ(""); setTrack("all"); setSt("open"); setPr("all"); setCat("all"); setCostF("all"); setPeriod("all"); setUnitType("all"); setFocus(null); onInitialConsumed?.(); };
+  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setPeriod(initial.period ?? "all"); setUnitType(initial.unitType ?? "all"); setCat(initial.cat ?? "all"); setCostF("all"); setFocus(initial.focus ?? null); setDrilldownLabel(initial.focus?.label || "סינון מלוח הבקרה / אנליטיקה"); setQ(""); onInitialConsumed?.(); } }, [initial?._t]);
+  const resetFilters = () => { setQ(""); setTrack("all"); setSt("open"); setPr("all"); setCat("all"); setCostF("all"); setPeriod("all"); setUnitType("all"); setFocus(null); setDrilldownLabel(""); onInitialConsumed?.(); };
   const f = tickets.filter((t) => {
     if (st === "open") { if (!isOpen(t)) return false; }
     else if (st === "closed") { if (isOpen(t)) return false; }
@@ -4425,7 +4426,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
   );
   return (<>
     <div className="seg-tabs s3" style={{ marginBottom: 10 }}>{[["all", "הכל"], ["facility", "מבנה"], ["transport", "שינוע"]].map(([id, lbl]) => <button key={id} className={track === id ? "on" : ""} onClick={() => { setTrack(id); setCat("all"); setUnitType("all"); }}>{lbl}</button>)}</div>
-    {focus && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{focus.label}</b></span><button onClick={() => { setFocus(null); onInitialConsumed?.(); }} title="הסר סינון"><X size={15} /></button></div>}
+    {drilldownLabel && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{drilldownLabel}</b></span><button onClick={resetFilters} title="הסר סינון"><X size={15} /></button></div>}
     <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, נושא, כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="filter-row">
       {filterSelect("מצב", st, setSt, <><option value="open">פתוחות</option><option value="closed">סגורות</option><option value="all">הכל</option>{STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</>)}
