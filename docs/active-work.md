@@ -21,21 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/close-backlog-stale-items`
+### Active branch: `codex/backup-restore-summary-counts`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `6d37f1e fix: warn on legacy backup imports (#125)`.
+- Last synchronized `main` before this entry: `0e77d74 docs: close stale backlog items [skip vercel] (#126)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - close stale backlog entries after PRs #122, #125, and earlier settings moves;
-  - keep the next session from reopening completed work.
+  - make backup restore confirmation show the newer tasks/meetings/PPE collections;
+  - close the stale active-work entry after PR #126.
 - Validation so far:
-  - `npm test -- --run`: skipped; docs-only.
-  - `npm run build`: skipped; docs-only.
-  - Browser smoke-check: not required; no product UI code changed.
+  - `npm test -- --run`: passed, 13 files / 48 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: Settings backup/restore controls rendered; no console errors.
 
 ### Latest Completed Work
 
+- PR #126: stale backlog entries were closed.
+  - Topic #4, Topic #12, and backup follow-up docs now reflect the already merged implementation work.
+  - Vercel was rate-limited; docs-only.
 - PR #125: legacy/incomplete backup imports now show an advisory warning.
   - Added `analyzeBackupPayload()` with tests.
   - The restore flow warns when an old backup may lack PPE, tasks, or meetings data.
