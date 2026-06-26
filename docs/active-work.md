@@ -21,18 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### No active product branch
+### Active branch: `codex/dashboard-lifecycle-bottlenecks`
 
-- Status: clean checkpoint after PR #117.
-- Last synchronized `main` before this entry: `d8848d2 fix: add ticket lifecycle sheet to list export (#117)`.
+- Status: in progress.
+- Last synchronized `main` before this entry: `a93973e docs: close lifecycle export ledger [skip vercel] (#118)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - continue from `docs/backlog.md` and the owner-approved SLA/stage analytics cleanup;
-  - next likely work should be another small isolated UX/reporting cleanup;
-  - do not infer a still-active product branch from older entries.
+  - add a compact Dashboard block for current lifecycle bottlenecks;
+  - let the owner click a stuck stage and open `קריאות` filtered by the same lifecycle-stage contract used by Analytics/Excel;
+  - keep this PR UI-only and reuse existing lifecycle helpers.
+- Validation so far:
+  - `npm test -- --run`: passed, 12 files / 42 tests.
+  - `npm run build`: passed.
+  - Browser smoke-check: dashboard showed lifecycle bottleneck chips; clicking `לא התקבל הכלי` opened `קריאות` with `מציג: שלב · לא התקבל הכלי` and one matching ticket (`T-909`); no console errors were captured.
 
 ### Latest Completed Work
 
+- PR #118: active-work ledger was closed after lifecycle export.
+  - Local `main` and `origin/main` were synchronized at `a93973e`.
+  - No product behavior changed.
 - PR #117: regular ticket-list Excel export now includes lifecycle sheet.
   - Added `מחזור חיים` to the regular `קריאות` Excel export.
   - The sheet reuses normalized lifecycle stages for status, waiting, equipment-wait, and rework rows.
