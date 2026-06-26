@@ -1,6 +1,6 @@
 # Current Status
 
-This file is the handoff point for any new Codex or Claude session.
+This file is a status reference for Codex sessions. The live handoff point is `docs/active-work.md`.
 
 ## Source Of Truth
 
@@ -16,7 +16,7 @@ The GitHub repository is now the source of truth. The old artifact/chat file is 
 
 ## Session Sync Rule
 
-Before answering project-status questions or starting work, every Codex/Claude session must synchronize with GitHub:
+Before answering project-status questions or starting work, every Codex session must synchronize with GitHub:
 
 - fetch/prune remote state;
 - inspect latest `origin/main`;
