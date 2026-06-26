@@ -372,14 +372,14 @@ Result:
 
 ### PPE spacing follow-up
 
-Status: open only if reproduced.
+Status: closed in PR #123.
 
 Goal:
 - Recheck the visual gap between issuance/action blocks and dashboard stats when pending PPE request demo data is present.
 
 Notes:
 - Main PPE pending workflow bugs were fixed earlier.
-- Do not change spacing without a reliable visual target.
+- PR #123 reproduced the live inventory dashboard noise and reduced reorder cards to deficit sizes only.
 
 ## Backup / Restore
 
