@@ -11,6 +11,12 @@ This file is the active grouped task list. It collects open items from the hando
 - Do not do a broad modular split.
 - For code changes run `npm test -- --run`, `npm run build`, and browser smoke-check UI behavior changes.
 
+## Release Closure Route
+
+Use `docs/release-checklist.md` as the active route for finishing the current stabilization phase.
+
+The backlog below remains useful for historical detail and code-area context, but broad topics should not stay open forever under vague labels. When working toward release readiness, close packages through the checklist acceptance criteria.
+
 ## Verified Planning Facts
 
 ### Worker Activation UI
@@ -446,7 +452,7 @@ Implementation so far:
 - Notification panel display settings now use clearer Hebrew copy for filtering notification types.
 - The panel shows how many notifications are currently displayed and clarifies that hiding categories only affects the user's local view.
 - PR #169: Notification defaults now explicitly include task, driver, PPE, and cleaning kinds instead of relying on missing keys being treated as enabled.
-- Global Settings notification-type editor is being added in PR #170; personal filtering remains in the notification panel.
+- PR #170: Global Settings notification-type editor was added; personal filtering remains in the notification panel.
 - PR #166 polished Analytics parts-wait card singular/plural Hebrew wording for delayed tickets and SLA breaches.
 - PR #167 polished the Dashboard parts-wait chip to lifecycle-compatible wording after the count moved to `waiting:parts`.
 

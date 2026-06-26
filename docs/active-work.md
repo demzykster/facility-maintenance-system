@@ -23,19 +23,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #170.
-- Last synchronized `main` before this entry: `6d115b9 fix: complete notification defaults (#169)`.
-- Open PRs when this entry was written: PR #170 was ready to merge.
+- Status: idle after PR #171.
+- Last synchronized `main` before this entry: `990dee5 feat: show global notification toggles (#170)`.
+- Open PRs when this entry was written: PR #171 was ready to merge.
 - Purpose:
-  - Global Settings should expose the notification-type toggles already saved in `config.notify`;
-  - admins should not need to discover global notification categories only through code.
+  - replace broad repeating backlog headings with a closeable release checklist;
+  - make the next work packages measurable instead of letting the same 7 labels stay open forever.
 - Validation so far:
-  - `npm test -- --run` passed;
-  - `npm run build` passed;
-  - browser smoke-check passed for global notification-type toggles in Settings.
+  - `git diff --check` passed.
 
 ## Latest Completed Work
 
+- PR #171: Release closure checklist was added.
+  - Broad repeating work areas now have closeable release packages with Done criteria and next PR candidates.
+  - `docs/release-checklist.md` is the active route for current stabilization work.
+  - Docs-only validation: `git diff --check`.
 - PR #170: Global notification-type toggles were exposed in Settings.
   - Admins can now enable/disable notification categories from global Settings.
   - Personal filtering remains in the notification panel.
@@ -130,7 +132,7 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Continue from `docs/backlog.md` or start a new focused UI audit pass.
+1. Continue from `docs/release-checklist.md`.
 2. Update this ledger only when it helps the next Codex session resume safely.
 
 ## Documentation Policy
