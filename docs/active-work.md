@@ -23,19 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: idle after PR #164.
-- Last synchronized `main` before this entry: `1caa1cb fix: align pending PPE request counts (#163)`.
-- Open PRs when this entry was written: PR #164 was ready to merge.
+- Status: idle after PR #165.
+- Last synchronized `main` before this entry: `7588287 fix: use lifecycle wait reasons in analytics (#164)`.
+- Open PRs when this entry was written: PR #165 was ready to merge.
 - Purpose:
-  - Analytics wait-reason summary now uses normalized lifecycle stages instead of current-only `status === waiting` counts;
-  - drill-down stays clickable through lifecycle keys, so closed historical waits are not hidden.
+  - Dashboard parts-wait queue chip drill-down now uses the same lifecycle key as the count;
+  - count/list mismatch is avoided when an open ticket has historical `waiting:parts` time.
 - Validation so far:
   - `npm test -- --run` passed;
   - `npm run build` passed;
-  - browser smoke-check passed for admin login and Analytics render.
+  - browser smoke-check passed for Dashboard parts-wait drill-down.
 
 ## Latest Completed Work
 
+- PR #165: Dashboard parts-wait drill-down aligned with lifecycle count.
+  - The parts-wait queue chip now opens tickets by `lifecycleKey: waiting:parts`.
+  - Local tests/build/browser smoke-check passed before merge.
 - PR #164: Analytics wait-reason summary moved to lifecycle stages.
   - Wait-reason bars now include historical and current waiting stages through a pure lifecycle helper.
   - Clicking a wait reason drills down through `lifecycleKey`, not only the current ticket status.
