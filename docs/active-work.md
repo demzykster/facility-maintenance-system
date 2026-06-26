@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/disable-empty-ppe-export
+### Active branch: none
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `7936a60 fix: clarify ppe orders empty copy (#204)`.
+- Status: no active product branch.
+- Latest synchronized `main`: `5e78b4b fix: disable empty ppe export (#205)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - prevent the PPE movement export button from looking actionable when there are no rows to export.
-  - keep export behavior unchanged when rows exist.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check: empty PPE movement export button is disabled and exposes `אין נתונים לייצוא`.
+  - the latest PPE empty-state/action polish PRs are merged.
+  - next work should continue from the R5 checklist, not from an open branch.
+- Validation:
+  - latest product PRs passed local tests/build/browser smoke-checks.
+  - this ledger cleanup is docs-only.
 
 ## Latest Completed Work
 
+- PR #205: Empty PPE movement export is no longer a dead action.
+  - The export button is disabled when there are no movement rows.
+  - The disabled button exposes `אין נתונים לייצוא`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #204: PPE purchase-order empty copy now matches its embedded location.
   - The movement-log order block no longer references unavailable `הזמנה/מהחוסרים` actions.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
@@ -118,7 +121,7 @@ Older completed work is available in GitHub history and, when needed, in:
 ## Next Exact Action
 
 1. Continue R5 Screen Audit And Visual Noise.
-2. Start with `קריאות`: verify list filters, active drill-down banner, card labels, and reset behavior after analytics/dashboard navigation.
+2. Next concrete screen pass: finish `ביגוד עובדים` settings sub-tab review, then move to the next R5 screen.
 3. If a critical bug appears, fix the smallest concrete bug before broader polish.
 
 ## Documentation Policy
