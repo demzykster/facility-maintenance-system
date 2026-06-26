@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/technician-personal-tolerance-ui`
+### Active branch: `codex/user-form-copy-polish`
 
 - Status: in progress.
-- Last synchronized `main` before this entry: `3903a6a fix: keep worker activation link available after save (#129)`.
+- Last synchronized `main` before this entry: `a95ff2a feat: add technician personal shift tolerance (#130)`.
 - Open PRs when this entry was written: none expected.
 - Purpose:
-  - add optional per-technician shift tolerance UI;
-  - keep the global `סבילות משמרת` as fallback when the personal field is empty.
+  - polish Hebrew copy in the user/technician form after PRs #129 and #130;
+  - remove stale instruction that said activation links require reopening the worker.
 - Validation so far:
   - `npm test -- --run`: passed, 13 files / 49 tests.
   - `npm run build`: passed.
-  - Browser smoke-check: new technician form shows `סבילות משמרת אישית`; no console errors.
+  - Browser smoke-check: technician and worker form copy rendered with updated Hebrew text; no console errors.
 
 ### Latest Completed Work
 
+- PR #130: optional personal technician shift tolerance was added.
+  - Technician forms now include `סבילות משמרת אישית`.
+  - Empty personal tolerance keeps the global Team/User Management default.
+  - Vercel was green before merge.
 - PR #129: worker activation links can be copied right after save.
   - Worker/cleaner forms stay open after saving a pending activation link.
   - Copying is still allowed only for a saved token.
