@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/notifications-backlog-polish`
+### Active branch: none
 
-- Status: in progress.
-- Last synchronized `main` before this entry: `4a79137 docs: close user form copy ledger [skip vercel]`.
-- Open PRs when this entry was written: none.
+- Status: no active product branch.
+- Last synchronized `main` before this entry: `9ad049d fix: clarify notification display settings (#133)`.
+- Open PRs when this entry was written: none expected.
 - Purpose:
-  - polish Hebrew/copy clarity in the notifications panel;
-  - update backlog entries that were stale after PRs #129 and #130;
-  - keep code and ledger/docs in the same PR.
+  - continue from `docs/backlog.md`;
+  - keep the next step small and isolated.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 49 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5188/`; the notifications panel opened, display settings showed the clearer filtering copy, and no console errors were reported.
+  - `npm test -- --run`: skipped; docs-only ledger close.
+  - `npm run build`: skipped; docs-only ledger close.
+  - Browser smoke-check: not required; no product UI code changed.
 
 ### Latest Completed Work
 
+- PR #133: notification display settings copy was clarified.
+  - Notification panel now shows a compact displayed-notifications count.
+  - Display settings now labels type filtering more clearly and explains that hiding categories affects only the user's view.
+  - Backlog entries for worker activation copy and personal technician tolerance were refreshed.
+  - Vercel was green before merge.
 - PR #131: user-form Hebrew copy was polished.
   - Removed stale instruction that activation links require reopening the worker.
   - Clarified the personal technician tolerance hint.
