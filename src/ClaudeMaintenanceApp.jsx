@@ -4248,8 +4248,8 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const complOpen = (complaints || []).filter((c) => c.status === "open" || c.status === "pending");
   const isEmptyDemo = !demoActive && allTickets.length === 0 && fleet.length === 0 && (pm || []).length === 0 && (ppeItems || []).length === 0 && (zones || []).length === 0 && (complaints || []).length === 0;
   const attn = [
-    critEsc.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות קריטיות שהוסלמו", n: critEsc.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
-    critActive.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critActive.length, go: () => onFilter ? onFilter({ st: "open", track: "transport" }) : setTab("tickets") } : null,
+    critEsc.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות קריטיות שהוסלמו", n: critEsc.length, go: () => onFilter ? onFilter({ st: "open", track: "transport", focus: { label: "תקלות קריטיות שהוסלמו", criticalEscalated: true } }) : setTab("tickets") } : null,
+    critActive.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critActive.length, go: () => onFilter ? onFilter({ st: "open", track: "transport", focus: { label: "תקלות שינוע קריטיות פתוחות", activeCriticalTransport: true } }) : setTab("tickets") } : null,
     tasksOverdue.length ? { sev: 2, Icon: ClipboardList, text: "משימות באיחור", n: tasksOverdue.length, go: () => setTab("tasks") } : null,
     waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin" }) : setTab("tickets") } : null,
     waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user" }) : setTab("tickets") } : null,
@@ -4338,6 +4338,8 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       if (focus.waitReason && t.waitingReason !== focus.waitReason) return false;
       if (focus.lifecycleKey && !ticketHasLifecycleStage(t, focus.lifecycleKey, { isOpen })) return false;
       if (focus.overdue && !isOverdue(t)) return false;
+      if (focus.criticalEscalated && !isCriticalEscalated(t, config)) return false;
+      if (focus.activeCriticalTransport && !((t.track || (t.forkliftId ? "transport" : "facility")) === "transport" && t.downtimeType === "critical" && !isCriticalEscalated(t, config))) return false;
       if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
     }
     if (q.trim()) { const s = `${ticketNo(t)} ${t.subject} ${t.description} ${t.asset || ""} ${t.assignee || ""} ${t.createdBy?.name}`.toLowerCase(); if (!s.includes(q.toLowerCase())) return false; }
