@@ -21,21 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/fix-more-ticket-count-hebrew`
+### Active branch: none
 
-- Status: in progress.
-- Last synchronized `main` before this entry: `1a08d8a fix: polish ticket count Hebrew (#144)`.
+- Status: idle.
+- Last synchronized `main` before this entry: `741a739 fix: polish remaining ticket count Hebrew (#145)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue targeted Hebrew count cleanup outside the main ticket-list counter;
-  - use singular/plural wording for action banners, asset health, backup summary, and related-ticket warnings.
+  - no active product branch;
+  - continue from `docs/backlog.md` or start a new focused UI audit pass.
 - Validation so far:
-  - `npm test -- --run`: passed, 13 files / 49 tests.
-  - `npm run build`: passed.
-  - Browser smoke-check: passed at `http://127.0.0.1:5173/`; Dashboard rendered with `CMMS CDSL` and `דורש טיפול` after the copy changes.
+  - not applicable; ledger-only close.
 
 ### Latest Completed Work
 
+- PR #145: additional ticket-count Hebrew copy was polished.
+  - Action banners, asset health, backup summary, and related-ticket warnings now use singular/plural count wording.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
 - PR #144: ticket-list count Hebrew was polished.
   - One-result ticket drill-downs now show `1 קריאה · ממוינת לפי דחיפות`.
   - Printable ticket-list report counters use the same singular/plural helper.
