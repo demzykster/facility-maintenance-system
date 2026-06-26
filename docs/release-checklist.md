@@ -63,7 +63,7 @@ Done means:
 - Findings are fixed or deliberately deferred with a reason.
 
 Next PR candidate:
-- Clarify technician-acceptance lifecycle labels in `אנליטיקה` and exports.
+- Add clear labels to icon-only month controls used in `ביגוד עובדים`.
 
 ### R6 — Worker Onboarding Polish
 

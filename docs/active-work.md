@@ -21,23 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/clarify-lifecycle-tech-acceptance
+### Active branch: codex/label-month-picker-buttons
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `3cc895b fix: clarify ticket acceptance badge (#199)`.
+- Latest synchronized `main`: `1708281 fix: label technician acceptance lifecycle (#200)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 from `קריאות` into `אנליטיקה`.
-  - make lifecycle analytics/export labels match the technician-acceptance workflow stage.
-  - avoid aggregating routed-but-unaccepted technician tickets under the generic `חדשה` stage.
+  - continue R5 on `ביגוד עובדים`.
+  - make icon-only month/year navigation buttons understandable.
+  - keep MonthPicker behavior unchanged while adding accessible labels/tooltips.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: analytics separates `ממתין לקבלה` from generic `חדשה`.
-  - browser smoke-check: clicking the `ממתין לקבלה` analytics row opens `קריאות` with the matching drill-down banner and one matching card.
+  - browser smoke-check: PPE month and year icon controls expose clear `title` and `aria-label` values.
 
 ## Latest Completed Work
 
+- PR #200: Lifecycle analytics/export labels now distinguish technician acceptance.
+  - Routed-but-unaccepted technician tickets use the `ממתין לקבלה` lifecycle stage.
+  - Analytics drill-down opens the exact matching ticket list.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was rate-limited.
 - PR #199: Ticket cards now show technician-acceptance state clearly.
   - Cards waiting for a technician to accept show `ממתין לקבלה` instead of the misleading raw `חדשה` badge.
   - Underlying ticket status/data remains unchanged.
