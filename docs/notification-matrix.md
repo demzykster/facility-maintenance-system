@@ -44,9 +44,9 @@ Source of truth in code:
 | manager/user | pending user approval | `confirm` | exact ticket via `ticketId` | none found |
 | manager/user | no-equipment waiting | `escalate` | exact ticket via `ticketId` | none found |
 | manager/user | ticket updates | `upd` | exact ticket via `ticketId` | none found |
-| manager/user | department PM | `pm` | department page equipment tab via `go: "dept"` | should eventually focus department-relevant fleet rows |
+| manager/user | department PM | `pm` | exact department fleet card via `go: "dept"` + `fleetId` | fixed after matrix creation |
 | manager/user | blocked department unit | `escalate` | `ticketId` wins; `go: "dept"` ignored | none critical |
-| manager/user | driver request outcome | `driver` | department page equipment tab via `go: "dept"` | should eventually focus the relevant unit/request |
+| manager/user | driver request outcome | `driver` | exact department fleet card via `go: "dept"` + `fleetId` | fixed after matrix creation |
 | manager/user | cleaning complaints in managed zones | `cleaning` | cleaning module via `go: "cleaning"` | none found |
 | cleaner | due/overdue cleaning rounds | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
 | cleaner | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
