@@ -4354,7 +4354,22 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
   const exportXlsx = () => {
     const options = lifecycleOptions();
     const rows = list.map((t) => { const life = ticketLifecycleSummary(t, options); return ({ "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass, "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config), "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait, "פירוט זמני סטטוס": life.statusDurations, "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "", "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason, "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "עלות (₪)": t.closure?.costAmount || 0 }); });
-    try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]); ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map((key) => ({ wch: wideCols.has(key) ? 30 : 14 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "קריאות"); if (downloadXlsx(wb, `קריאות_${new Date().toISOString().slice(0, 10)}.xlsx`)) return; } catch (e) {}
+    try {
+      const ws = XLSX.utils.json_to_sheet(rowsSafe(rows));
+      const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]);
+      ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map((key) => ({ wch: wideCols.has(key) ? 30 : 14 }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "קריאות");
+      const lifecycleRows = list.flatMap((t) => normalizedTicketLifecycleStages(t, options).map((row) => ({
+        "מספר": ticketNo(t), "מסלול": trLabel(t), "נושא": t.subject,
+        "סוג שורה": row.kind === "waiting" ? "המתנה" : row.kind === "rework" ? "החזרה לטיפול" : "סטטוס",
+        "סטטוס/סיבה": row.label,
+        "נוכחי": row.current ? "כן" : "",
+        "משך": fmtDur(row.ms), "משך (שעות)": Math.round(row.ms / 360000) / 10
+      })));
+      if (lifecycleRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(lifecycleRows)), "מחזור חיים");
+      if (downloadXlsx(wb, `קריאות_${new Date().toISOString().slice(0, 10)}.xlsx`)) return;
+    } catch (e) {}
     setReport(buildHtml());
   };
   return (<>

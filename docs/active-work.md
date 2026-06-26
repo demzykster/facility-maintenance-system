@@ -21,18 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Wait-reason SLA copy clarification
+### Ticket-list lifecycle Excel sheet
 
-- Status: active branch `codex/clarify-wait-reason-sla-copy`.
-- Last synchronized `main` before this entry: `d4fe132 feat: add analytics lifecycle stage drilldown (#115)`.
+- Status: active branch `codex/add-ticket-list-lifecycle-sheet`.
+- Last synchronized `main` before this entry: `334141d fix: clarify wait reason sla copy (#116)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - clarify the wait-reason `pauseSla` setting in the UI;
-  - explain that it means time does not count against the ticket operational SLA;
-  - keep the existing data model and behavior unchanged.
+  - add the `מחזור חיים` sheet to the regular ticket-list Excel export;
+  - keep the regular export consistent with Analytics export;
+  - reuse normalized lifecycle stages for status/wait/equipment/rework rows.
 
 ### Latest Completed Work
 
+- PR #116: wait-reason SLA copy was clarified.
+  - Settings now labels the wait-reason SLA column as `SLA תפעולי`.
+  - The hint explains that excluded waiting time remains in reports but is not counted in operational ticket SLA.
+  - Vercel was green before merge.
 - PR #115: Analytics lifecycle-stage drill-down was added.
   - Analytics now shows `זמן לפי שלבי קריאה`.
   - Clicking a stage opens `קריאות` filtered by `focus.lifecycleKey`.
@@ -216,6 +220,12 @@ Older completed work is archived in:
 3. Update this ledger in the same PR as code when active state changes.
 
 ## Last Validation
+
+Branch `codex/add-ticket-list-lifecycle-sheet`:
+
+- `npm test -- --run`: passed, 12 files / 42 tests.
+- `npm run build`: passed.
+- Browser smoke-check: passed at `http://127.0.0.1:5188/`; `קריאות` -> `ייצוא ל-Excel` clicked with no console errors and no fallback error report.
 
 Branch `codex/clarify-wait-reason-sla-copy`:
 
