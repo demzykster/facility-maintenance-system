@@ -63,7 +63,7 @@ Done means:
 - Findings are fixed or deliberately deferred with a reason.
 
 Next PR candidate:
-- Polish `קריאות` card badges so the visible label matches the current workflow stage.
+- Clarify technician-acceptance lifecycle labels in `אנליטיקה` and exports.
 
 ### R6 — Worker Onboarding Polish
 
