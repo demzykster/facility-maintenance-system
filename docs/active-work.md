@@ -21,19 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### No active product branch
+### Active branch: codex/notification-matrix, if PR is still open
 
-- Status: main is clean after the R2 drill-down/filter reset closeout.
-- Last synchronized `main` before this entry: `eb0f1df fix: label dashboard drilldown filters (#178)`.
+- Status: docs-only R3 mapping in progress.
+- Last synchronized `main` before this entry: `dceb8ca docs: close drilldown filter reset package (#179)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue the release checklist from R3 Notifications End-To-End.
-- R2 validation already passed:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check Dashboard drill-down banner labels and clear action.
-  - browser smoke-check leaving Tickets and returning through navigation clears hidden drill-down filters.
-  - browser smoke-check Analytics drill-down banner label and clear action.
+  - start R3 Notifications End-To-End with a compact route matrix from `computeEvents()`.
+- Validation needed before PR:
+  - `git diff --check`
 
 ## Latest Completed Work
 
@@ -135,9 +131,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Start R3 from `docs/release-checklist.md`.
-2. First R3 candidate: build a notification matrix from `computeEvents()` by role and notification kind.
-3. Fix missing/wrong notification navigation targets one small PR at a time.
+1. If branch `codex/notification-matrix` is still open, review/merge it.
+2. If it is merged, first code fix candidate: add `ticketId` to admin no-equipment waiting notifications.
+3. Then fix `go: "team"` routing and cleaner cleaning notification routing in separate PRs.
 
 ## Documentation Policy
 

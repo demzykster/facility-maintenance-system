@@ -27,6 +27,9 @@ Done means:
 Next PR candidate:
 - Build a small notification matrix from `computeEvents()` by role and kind, then fix one missing/wrong navigation target per PR.
 
+Current batch:
+- Add `docs/notification-matrix.md` as the R3 route map.
+
 ### R4 — Permissions And Role Reality Check
 
 Status: open.
