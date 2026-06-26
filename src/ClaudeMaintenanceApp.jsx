@@ -5589,8 +5589,8 @@ function SettingsPanel(p) {
     {tab === "users" && (!mayViewUsers ? <div className="note">אין הרשאה לצפייה בניהול משתמשים.</div> : <>
       {p.only === "users" && <div className="seg-tabs" style={{ marginBottom: 14 }}><button className={userSub === "users" ? "on" : ""} onClick={() => setUserSub("users")}>משתמשים</button><button className={userSub === "settings" ? "on" : ""} onClick={() => setUserSub("settings")}>הגדרות</button></div>}
       {userSub === "settings" ? <>
-      <SectionTitle><Clock size={15} /> משמרות עבודה (בוקר/לילה)</SectionTitle>
-      <div className="hint" style={{ marginBottom: 6 }}>משמרות לשיוך עובדים ולעמודות בעץ המחלקות. ברירת מחדל: בוקר / לילה — ניתן להוסיף עוד.</div>
+      <SectionTitle><Clock size={15} /> משמרות עבודה</SectionTitle>
+      <div className="hint" style={{ marginBottom: 6 }}>משמרות לשיוך עובדים ולעמודות בעץ המחלקות. בדמו ברירת המחדל היא בוקר / לילה, ואפשר להוסיף משמרות נוספות לפי הצורך.</div>
       {wshifts.map((s, i) => <div key={s.id || i} className="reg-row" style={{ marginBottom: 6, gap: 8 }}><input className="reg-name" value={s.label || ""} placeholder="שם המשמרת" onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /><input type="color" value={s.color || "#64748B"} title="צבע" style={{ width: 44, height: 34, padding: 0, border: "none", background: "none" }} onChange={(e) => setWshifts((a) => a.map((x, j) => j === i ? { ...x, color: e.target.value } : x))} /><button className="reg-del" onClick={() => setWshifts((a) => a.length > 1 ? a.filter((_, j) => j !== i) : a)} disabled={wshifts.length <= 1}><Trash2 size={15} /></button></div>)}
       <button className="btn-ghost sm" onClick={() => setWshifts((a) => [...a, { id: "ws" + Date.now().toString(36), label: "", color: "#64748B" }])}><Plus size={14} /> משמרת</button>
       <div className="note" style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, alignItems: "center" }}>
