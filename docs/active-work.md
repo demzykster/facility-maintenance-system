@@ -21,22 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/clarify-add-user-button
+### Active branch: none
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `b5b1bd1 fix: label ppe signature template field (#209)`.
+- Status: no active product branch.
+- Latest synchronized `main`: `ce7371d fix: clarify add user action (#210)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - make the user-management create action read as an action, not a generic `משתמש` label.
-  - keep user creation behavior unchanged.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check: Team/User management shows `הוסף משתמש`, no longer shows a visible generic `משתמש` create button, and opens the user form.
+  - the latest user-management add-button polish PR is merged.
+  - next work should continue from the R5 checklist, not from an open branch.
+- Validation:
+  - latest product PR passed local tests/build/browser smoke-check.
+  - this ledger cleanup is docs-only.
 
 ## Latest Completed Work
 
+- PR #210: User-management add action now reads clearly.
+  - The button changed from generic `משתמש` to `הוסף משתמש`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #209: PPE signature template textarea is now labeled.
   - The field exposes `תבנית אישור קבלת ציוד` for assistive tech and browser inspection.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
@@ -131,7 +133,7 @@ Older completed work is available in GitHub history and, when needed, in:
 ## Next Exact Action
 
 1. Continue R5 Screen Audit And Visual Noise.
-2. Next concrete screen pass: finish `ביגוד עובדים` settings sub-tab review, then move to the next R5 screen.
+2. Next concrete screen pass: continue `צוות ומשתמשים`, reviewing user cards, edit/create form, permissions blocks, visual noise, and unclear controls.
 3. If a critical bug appears, fix the smallest concrete bug before broader polish.
 
 ## Documentation Policy
