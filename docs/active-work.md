@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/quiet-readonly-user-card-hover
+### Active branch: codex/label-user-tree-groups
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `6cf5b10 fix: make readonly user cards non-actionable (#217)`.
+- Latest synchronized `main`: `9ea5373 fix: quiet readonly user card hover (#218)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - remove clickable hover feedback from read-only user cards.
-  - keep editable user cards visually actionable.
+  - expose user-tree group expanded/collapsed state to assistive tech.
+  - keep group toggle behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: admin user cards keep normal button behavior.
+  - browser smoke-check: group button exposes `aria-expanded` and still expands.
 
 ## Latest Completed Work
 
+- PR #218: Read-only user cards no longer show clickable hover feedback.
+  - Non-actionable user cards get an `inert` class.
+  - The inert hover state no longer lifts or shadows the card.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #217: Read-only user cards are no longer dead buttons.
   - User tree rows render as buttons only when the viewer can edit users.
   - Read-only rows render as non-actionable cards.
