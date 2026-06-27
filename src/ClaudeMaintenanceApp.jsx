@@ -4444,7 +4444,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
   return (<>
     <div className="seg-tabs s3" style={{ marginBottom: 10 }}>{[["all", "הכל"], ["facility", "מבנה"], ["transport", "שינוע"]].map(([id, lbl]) => <button key={id} className={track === id ? "on" : ""} onClick={() => { setTrack(id); setCat("all"); setUnitType("all"); }}>{lbl}</button>)}</div>
     {drilldownLabel && <div className="focus-banner"><SlidersHorizontal size={14} /><span>מציג: <b>{drilldownLabel}</b></span><button onClick={resetFilters} title="הסר סינון"><X size={14} /> נקה סינון</button></div>}
-    <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, נושא, כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש קריאות לפי מספר, נושא או כלי" placeholder="חיפוש לפי מספר, נושא, כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="filter-row">
       {filterSelect("מצב", st, setSt, <><option value="open">פתוחות</option><option value="closed">סגורות</option><option value="all">הכל</option>{STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</>)}
       {filterSelect("עדיפות", pr, setPr, <><option value="all">כל העדיפויות</option>{PRIORITIES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</>)}

@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-role-switch-buttons
+### Active branch: codex/label-ticket-search
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `8baf4ce fix: label floating ai action (#225)`.
+- Latest synchronized `main`: `e4921fc fix: label role switch actions (#226)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 visual/noise cleanup from the live screen audit.
-  - make the bottom demo role-switch icon buttons self-describing.
-  - keep role-switch behavior and placement unchanged.
+  - continue R5 on `קריאות`.
+  - make the ticket search field self-describing beyond placeholder text.
+  - keep search behavior and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: role-switch buttons expose descriptive labels.
+  - browser smoke-check: tickets search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #226: Bottom role-switch icon buttons now expose descriptive labels.
+  - Each demo role button has Hebrew `aria-label` text.
+  - Role-switch behavior and placement stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #225: Floating AI action now exposes a descriptive label.
   - The AI button has Hebrew `aria-label` and tooltip text.
   - AI behavior and placement stayed unchanged.
