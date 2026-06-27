@@ -1,10 +1,13 @@
 import { createApiStorageProvider } from "./apiStorageAdapter.js";
+import { createProductionAuthStore } from "./productionLoginAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 
 const importEnv = () => import.meta.env || {};
+const productionAuthStore = createProductionAuthStore();
 
 const apiProvider = () => createApiStorageProvider({
-  baseUrl: storageApiBaseUrlFromEnv(importEnv())
+  baseUrl: storageApiBaseUrlFromEnv(importEnv()),
+  getAccessToken: () => productionAuthStore.get()?.accessToken || ""
 });
 
 const defaultStorageProvider = () => (

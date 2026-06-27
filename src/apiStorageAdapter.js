@@ -9,16 +9,18 @@ const assertOk = async (response) => {
   throw new Error(body?.error || `storage_api_${response.status}`);
 };
 
-export function createApiStorageProvider({ baseUrl, fetchImpl = globalThis.fetch } = {}) {
+export function createApiStorageProvider({ baseUrl, fetchImpl = globalThis.fetch, getAccessToken = null } = {}) {
   if (!baseUrl) return null;
   const root = String(baseUrl).replace(/\/+$/, "");
   if (typeof fetchImpl !== "function") throw new Error("storage_api_fetch_missing");
 
   const request = async (path, options = {}) => {
+    const accessToken = typeof getAccessToken === "function" ? getAccessToken() : "";
     const response = await fetchImpl(`${root}${path}`, {
       ...options,
       headers: {
         "content-type": "application/json",
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
         ...(options.headers || {})
       }
     });

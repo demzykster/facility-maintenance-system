@@ -23,6 +23,7 @@ VITE_CMMS_STORAGE_API_URL=https://example.com/api
 
 - The frontend uses `src/apiStorageAdapter.js` to talk to the backend.
 - `/api/kv` route skeleton exists, but it is closed by default until server Auth/backend storage are configured.
+- When a production Supabase session exists, the frontend sends its access token as `Authorization: Bearer ...` on storage API requests.
 
 ### `upstash` server driver
 
@@ -100,6 +101,8 @@ CMMS_KV_BEARER_TOKEN=...
 ```
 
 Do not put this token into frontend `VITE_*` variables. Browser-visible secrets are not production security.
+
+The next server-side step is to accept Supabase user bearer tokens for `/api/kv` and remove the need for a browser-visible storage secret.
 
 ## Production Gate
 
