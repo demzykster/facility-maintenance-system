@@ -43,11 +43,13 @@ The first server file API is:
 Route files:
 
 - `api/files/index.js`
-- `api/files/[...path].js`
 - `api/files/handler.js`
 - `api/files/supabaseFileDriver.js`
+- `src/apiFileAdapter.js`
 
 The route is closed by default until `CMMS_FILE_DRIVER=supabase`, `CMMS_FILE_BUCKET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are configured.
+
+The frontend adapter is `createApiFileProvider` in `src/apiFileAdapter.js`. It follows the same API URL and Supabase access-token pattern as `src/apiStorageAdapter.js`.
 
 ## Next Implementation Step
 
