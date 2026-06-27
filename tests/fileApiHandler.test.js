@@ -261,6 +261,37 @@ describe("file API handler", () => {
     expect(driver.upload).not.toHaveBeenCalled();
   });
 
+  it("rejects uploads that exceed the configured file size limit", async () => {
+    const driver = { upload: vi.fn() };
+    const metadataDriver = { upsert: vi.fn() };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient(),
+      env: { CMMS_FILE_MAX_BYTES: "4" }
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" },
+      body: {
+        contentType: "image/jpeg",
+        data: Buffer.from("12345").toString("base64"),
+        metadata: {
+          ownerType: "ticket",
+          ownerId: "T-1",
+          kind: "ticket_before_photo"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(413);
+    expect(res.json()).toEqual({ error: "file_too_large", maxBytes: 4 });
+    expect(driver.upload).not.toHaveBeenCalled();
+    expect(metadataDriver.upsert).not.toHaveBeenCalled();
+  });
+
   it("rejects unsafe or missing storage paths", async () => {
     const driver = { download: vi.fn() };
     const handler = createFileApiHandler({
