@@ -102,7 +102,15 @@ CMMS_KV_BEARER_TOKEN=...
 
 Do not put this token into frontend `VITE_*` variables. Browser-visible secrets are not production security.
 
-The next server-side step is to accept Supabase user bearer tokens for `/api/kv` and remove the need for a browser-visible storage secret.
+The preferred server-side auth mode is Supabase user-session auth:
+
+```env
+CMMS_KV_AUTH=supabase
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+```
+
+In this mode `/api/kv` accepts the frontend's Supabase access token, verifies the linked CMMS `app_users` profile, blocks disabled users, and blocks users that still require first-password change.
 
 ## Production Gate
 

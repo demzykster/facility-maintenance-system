@@ -119,4 +119,69 @@ describe("kv API handler", () => {
     expect(res.json()).toEqual({ value: "ticket-json" });
     expect(fetchImpl.mock.calls[0][0]).toBe("https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=eq.ticket%3A1&select=value&limit=1");
   });
+
+  it("can require a Supabase user bearer token before serving storage", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue("ticket-json")
+    };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "admin",
+        name: "Owner",
+        active: true,
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const missing = await call(handler, { query: { key: "ticket:1" } });
+    expect(missing.statusCode).toBe(401);
+    expect(missing.json()).toEqual({ error: "supabase_access_token_required" });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "ticket:1", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ value: "ticket-json" });
+    expect(sessionClient.getAuthUser).toHaveBeenCalledWith("user-token");
+    expect(sessionClient.getAppUserProfile).toHaveBeenCalledWith("user-token", "auth-user-1");
+  });
+
+  it("blocks storage while a production password change is still required", async () => {
+    const driver = { get: vi.fn() };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "admin",
+        name: "Owner",
+        active: true,
+        must_change_password: true
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "ticket:1", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "password_change_required" });
+    expect(driver.get).not.toHaveBeenCalled();
+  });
 });
