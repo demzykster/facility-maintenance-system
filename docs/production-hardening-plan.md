@@ -139,6 +139,8 @@ Production requirement:
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 - Production release gate now requires explicit Supabase file/photo storage configuration before production mode can be considered ready.
 - Production AI mode now defaults to disabled, and direct browser AI provider calls are forbidden in production.
+- Production file metadata contract is documented in `docs/production-file-metadata.md`.
+- Production audit event contract is documented in `docs/production-audit-events.md`.
 
 ## Monolith Extraction Policy
 

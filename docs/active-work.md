@@ -23,12 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none after this PR merges
 
-- Status: this PR defines the production file metadata contract.
-- Latest synchronized `main`: `08ad3e5 feat: route cleaning photos through file adapter (#297)`.
+- Status: this PR defines the production audit event contract.
+- Latest synchronized `main`: `c190a2b [skip vercel] feat: add production file metadata contract (#298)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: define the shared `file_metadata` contract for protected file ownership before persisting metadata server-side.
+  - current production step: define the shared `audit_events` contract before sensitive writes move fully server-side.
   - next production step: continue moving permissions/data writes toward server/RLS.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
@@ -38,7 +38,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/fileMetadataModel.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/auditEventModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
@@ -48,6 +48,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production audit event contract is complete in this PR.
+  - `src/auditEventModel.js` defines the first shared audit event shape for sensitive production changes.
+  - `docs/production-audit-events.md` documents the future `audit_events` table fields.
+  - This is a contract step only; it does not yet persist audit rows server-side.
+  - Local tests, production builds, and release checks passed.
 - R9 production file metadata contract is complete in this PR.
   - `src/fileMetadataModel.js` defines the first shared ownership metadata shape for protected files.
   - `docs/production-file-metadata.md` documents the future `file_metadata` table fields.
