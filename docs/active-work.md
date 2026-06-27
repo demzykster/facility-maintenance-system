@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: main clean; no active product branch is open.
-- Latest synchronized `main`: `01d5931 fix: honor ticket lifecycle transition time (#264)`.
+- Latest synchronized `main`: `1612a42 docs: close R8 active ledger (#265)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - no active product branch is open.
