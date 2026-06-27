@@ -4988,7 +4988,7 @@ function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "—
   return (<>
     <button type="button" className="unit-pick-btn" onClick={() => setOpen((o) => !o)}>{sel ? <span>{sel.code} · {unitDesc(sel, config)}</span> : <span className="muted-txt">{placeholder}</span>}<ChevronLeft size={16} style={{ transform: open ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
     {open && <div className="unit-pick">
-      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus placeholder="חיפוש לפי מספר / סוג…" value={uq} onChange={(e) => setUq(e.target.value)} /></div>
+      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus aria-label="חיפוש כלי לבחירה לפי מספר או סוג" placeholder="חיפוש לפי מספר / סוג…" value={uq} onChange={(e) => setUq(e.target.value)} /></div>
       <div className="unit-pick-list">{groups.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו כלים</div> : groups.map(([t, units]) => <div key={t}><div className="unit-pick-grp">{t} <span className="upg-count">{units.length}</span></div>{units.map((f) => <button key={f.id} type="button" className={"unit-pick-row" + (f.id === value ? " on" : "")} onClick={() => { onChange(f.id); setOpen(false); setUq(""); }}><b>{f.code}</b><span className="upr-desc">{unitDesc(f, config)}{fleetDepts(f).length ? ` · ${fleetDepts(f).join(", ")}` : ""}</span></button>)}</div>)}</div>
     </div>}
   </>);

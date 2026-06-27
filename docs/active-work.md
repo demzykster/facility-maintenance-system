@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-fleet-search-field
+### Active branch: codex/label-pm-unit-search-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `2d83a5a fix: label supplier search fields (#232)`.
+- Latest synchronized `main`: `9451d0f fix: label fleet search field (#233)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `כלי שינוע`.
-  - make the main fleet search field self-describing beyond placeholder text.
-  - keep fleet filtering, search behavior, and layout unchanged.
+  - make the PM/unit picker search field self-describing beyond placeholder text.
+  - keep unit-picker filtering, selection behavior, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: fleet search exposes a descriptive label.
+  - browser smoke-check: PM/unit picker search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #233: Fleet search field now exposes a descriptive label.
+  - The main `כלי שינוע` search input no longer relies only on placeholder text.
+  - Fleet filtering, search behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #232: Supplier search/add fields now expose descriptive labels.
   - Supplier search and add-new fields no longer rely only on placeholder text.
   - Supplier filtering, add behavior, and layout stayed unchanged.
