@@ -22,6 +22,7 @@ Done means:
 - The frontend data-access boundary is extracted from `src/ClaudeMaintenanceApp.jsx`.
 - The current business collections are mapped to a production database schema.
 - Production mode disables demo seed data and built-in demo identities.
+- Production storage provider mode and API storage contract are defined without replacing the current demo storage path.
 - Auth, permissions/RLS, files/photos, AI calls, and backup/migration risks are explicitly tracked before implementation.
 - The monolith extraction path is adapter/model-first, not a whole-file rewrite.
 - Future broad modules have a shared-entity growth rule so budget, safety inspections, and current modules do not duplicate users/assets/tickets/suppliers/files/analytics.
@@ -33,6 +34,7 @@ Current notes:
 - `src/dataCollections.js` is the first shared map from current backup/storage collections to future production tables.
 - `docs/module-growth-architecture.md` defines how future budget and safety-inspection modules should reuse shared CMMS entities.
 - `src/seedPolicyModel.js` and `docs/production-seed-policy.md` define the production empty-start and first-admin bootstrap boundary.
+- `src/storageProviderModel.js`, `src/apiStorageAdapter.js`, and `docs/production-storage-provider.md` define the future backend storage path.
 
 ### R3 — Notifications End-To-End
 

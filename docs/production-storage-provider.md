@@ -1,0 +1,47 @@
+# Production Storage Provider
+
+This document defines the frontend storage-provider boundary for production.
+
+## Current Providers
+
+### `local`
+
+- Default provider.
+- Uses the current browser/app storage path.
+- Valid for local development, demo, training, and Vercel staging review.
+- Not valid as the final production data layer because every browser/device can hold different data.
+
+### `api`
+
+- Future production provider.
+- Selected with:
+
+```env
+VITE_CMMS_STORAGE_PROVIDER=api
+VITE_CMMS_STORAGE_API_URL=https://example.com/api
+```
+
+- The frontend uses `src/apiStorageAdapter.js` to talk to the backend.
+- The backend is not implemented in this PR.
+
+## API Contract
+
+The first production adapter keeps the same key/value contract as the current store so the monolith does not need a broad rewrite before backend work.
+
+- `GET /kv/:key?shared=1|0`
+  - returns `{ "value": "..." }` or `null`.
+- `PUT /kv/:key`
+  - body: `{ "value": "...", "shared": true|false }`.
+- `DELETE /kv/:key?shared=1|0`
+- `GET /kv?prefix=ticket%3A&shared=1|0`
+  - returns `{ "keys": ["ticket:..."] }`.
+
+## Production Gate
+
+`VITE_CMMS_APP_MODE=production` is not production-data-ready unless:
+
+- `VITE_CMMS_STORAGE_PROVIDER=api`;
+- `VITE_CMMS_STORAGE_API_URL` is configured;
+- the backend enforces real Auth/RLS/server-side permissions.
+
+This is a bridge, not the final normalized database model. The normalized tables are tracked in `docs/production-data-model.md`.

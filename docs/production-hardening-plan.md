@@ -107,6 +107,7 @@ Production requirement:
 - First production data model documented in `docs/production-data-model.md`.
 - Modular growth rules documented in `docs/module-growth-architecture.md`.
 - Production seed policy started in `src/seedPolicyModel.js` and documented in `docs/production-seed-policy.md`.
+- Storage provider policy and the first API storage-client contract are documented in `docs/production-storage-provider.md`.
 
 ## Monolith Extraction Policy
 

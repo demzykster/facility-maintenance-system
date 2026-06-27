@@ -1,5 +1,16 @@
+import { createApiStorageProvider } from "./apiStorageAdapter.js";
+import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
+
+const importEnv = () => import.meta.env || {};
+
+const apiProvider = () => createApiStorageProvider({
+  baseUrl: storageApiBaseUrlFromEnv(importEnv())
+});
+
 const defaultStorageProvider = () => (
-  typeof window !== "undefined" ? window.storage : null
+  storageProviderFromEnv(importEnv()) === STORAGE_PROVIDERS.api
+    ? apiProvider()
+    : (typeof window !== "undefined" ? window.storage : null)
 );
 
 export const withTimeout = (promise, ms = 2000) => Promise.race([
