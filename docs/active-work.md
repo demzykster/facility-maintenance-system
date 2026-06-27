@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-general-settings-delete-buttons
+### Active branch: codex/label-cleaning-zone-delete-actions
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `f98d993 fix: label ppe movement search field (#229)`.
+- Latest synchronized `main`: `03e0043 fix: label settings delete actions (#230)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `הגדרות`.
-  - make general settings delete icon buttons self-describing.
-  - keep wait-reason/downtime behavior, blocking, and save logic unchanged.
+  - continue R5 on `בקרת ניקיון`.
+  - make cleaning-zone checklist/window delete icon buttons self-describing.
+  - keep cleaning-zone form behavior, save logic, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: general settings delete controls expose descriptive labels.
+  - browser smoke-check: cleaning-zone form exposes descriptive delete controls.
 
 ## Latest Completed Work
 
+- PR #230: General settings delete icon buttons now expose descriptive labels.
+  - Wait-reason and downtime-level delete actions are named by item.
+  - Wait-reason/downtime behavior, blocking, and save logic stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #229: PPE movement search field now exposes a stable descriptive label.
   - The `ביגוד עובדים -> תנועות מלאי` search input no longer relies only on placeholder text.
   - Movement search, filtering, export, and layout stayed unchanged.
