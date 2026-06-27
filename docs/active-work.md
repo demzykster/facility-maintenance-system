@@ -309,9 +309,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Continue R5 Screen Audit And Visual Noise.
-2. Next concrete screen pass: continue `כלי שינוע`, after the driver request icon-label pass.
-3. Check remaining fleet/driver/coverage controls for misleading icons, unclear Hebrew labels, duplicate controls, and low-value visual noise.
+1. Continue R6 Worker Onboarding Polish.
+2. Browser-check the existing worker edit flow for saved activation links, temporary codes, reset links, and copy-link behavior.
+3. If the flow is still confusing, make the smallest UI/copy change that explains when the link must be saved and when it can be copied.
 4. If a critical bug appears, fix the smallest concrete bug before broader polish.
 
 ## Documentation Policy
