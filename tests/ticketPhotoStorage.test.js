@@ -23,7 +23,14 @@ describe("ticketPhotoStorage", () => {
 
     expect(apiProvider.upload).toHaveBeenCalledWith("tickets/T-1/before.png", {
       data: "data:image/png;base64,abc",
-      contentType: "image/png"
+      contentType: "image/png",
+      metadata: expect.objectContaining({
+        ownerType: "ticket",
+        ownerId: "T-1",
+        kind: "ticket_before_photo",
+        path: "tickets/T-1/before.png",
+        contentType: "image/png"
+      })
     });
   });
 

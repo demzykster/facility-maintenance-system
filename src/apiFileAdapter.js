@@ -30,10 +30,10 @@ export function createApiFileProvider({ baseUrl, fetchImpl = globalThis.fetch, g
   const filePath = (path) => `/files?path=${encodeURIComponent(path)}`;
 
   return {
-    async upload(path, { data, contentType = "application/octet-stream" } = {}) {
+    async upload(path, { data, contentType = "application/octet-stream", metadata = null } = {}) {
       await request(filePath(path), {
         method: "POST",
-        body: JSON.stringify({ data, contentType })
+        body: JSON.stringify({ data, contentType, ...(metadata ? { metadata } : {}) })
       });
       return true;
     },
