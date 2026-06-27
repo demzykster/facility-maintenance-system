@@ -28,7 +28,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: extend first-admin bootstrap to create the matching `public.app_users` profile, then move login/Auth permissions toward a server-backed Supabase Auth/profile/RLS model.
+  - next production step: add a server/session adapter that reads Supabase Auth plus `public.app_users`, then move login/Auth permissions toward that server-backed model.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -55,6 +55,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `supabase/migrations/20260627173000_app_users_permissions.sql` creates `public.app_users`, permission helper functions, and initial RLS policies.
   - `src/supabaseProfileModel.js` records the app-user/profile contract and keeps permission levels aligned with the current UI permission model.
   - `docs/supabase-auth-rls-foundation.md` documents the identity/profile split.
+  - Local tests, production build, production-mode API build, and release check passed.
+- R9 first-admin bootstrap now creates the CMMS app-user profile.
+  - `POST /api/bootstrap/admin` creates both the Supabase Auth user and the matching `public.app_users` profile.
+  - The endpoint only returns success after both records exist.
+  - If profile creation fails after Auth creation, it reports `authUserCreated` and `authUserId` for manual cleanup/retry instead of pretending bootstrap succeeded.
   - Local tests, production build, production-mode API build, and release check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.

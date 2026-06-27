@@ -34,9 +34,12 @@ Body:
 }
 ```
 
-The endpoint creates a Supabase Auth user with admin role metadata and `must_change_password` metadata.
+The endpoint creates:
 
-The Auth user is only the identity. The matching CMMS profile belongs in `public.app_users` when the Supabase profile/RLS schema is applied.
+- a Supabase Auth user with admin role metadata and `must_change_password` metadata;
+- a matching `public.app_users` CMMS profile linked by `auth_user_id`.
+
+The Auth user is only the identity. The CMMS profile is the operational source for role, active state, permissions, and later department/scope rules.
 
 ## Safety
 
@@ -44,6 +47,8 @@ The Auth user is only the identity. The matching CMMS profile belongs in `public
 - The endpoint refuses requests unless `CMMS_BOOTSTRAP_TOKEN` is configured and supplied.
 - The Supabase service role key is read only from server env.
 - The temporary password is sent to Supabase but never returned in the API response.
+- The bootstrap response is only successful after both the Auth user and `public.app_users` profile are created.
+- If profile creation fails after Auth user creation, the response includes `authUserCreated: true` and `authUserId` for manual cleanup/retry.
 - After a successful bootstrap, remove `CMMS_BOOTSTRAP_ENABLED` or set it to `false`, and remove `CMMS_BOOTSTRAP_TOKEN`.
 
 ## Temporary Limitation
@@ -52,7 +57,6 @@ This is the first bootstrap contract, not the full Auth/RLS implementation.
 
 The next production steps are:
 
-1. Add the application user/profile table in Postgres.
-2. Add RLS policies.
-3. Wire login/session handling to Supabase Auth.
-4. Enforce the `must_change_password` metadata in the UI/server flow.
+1. Wire login/session handling to Supabase Auth.
+2. Enforce the `must_change_password` metadata in the UI/server flow.
+3. Expand server-side profile reads and permission checks.
