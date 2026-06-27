@@ -21,23 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-fleet-pm-edit-buttons
+### Active branch: codex/label-pm-calendar-nav-buttons
 
 - Status: ready for PR.
-- Latest synchronized `main`: `1d6dc52 fix: label ticket detail header buttons (#246)`.
+- Latest synchronized `main`: `a64485f fix: label fleet and pm edit buttons (#247)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make fleet and periodic-maintenance detail edit icon buttons self-describing.
-  - keep edit behavior and modal layout unchanged.
+  - make PM year/month navigation icon buttons self-describing.
+  - keep calendar/matrix navigation behavior and layout unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: fleet detail edit exposes `עריכת כלי`.
-  - browser smoke-check: periodic-maintenance detail edit exposes `עריכת טיפול תקופתי`.
+  - browser smoke-check: PM calendar exposes `חודש קודם` and `חודש הבא`.
+  - browser smoke-check: PM yearly view exposes `שנה קודמת` and `שנה הבאה`.
 
 ## Latest Completed Work
 
+- PR #247: Fleet and periodic-maintenance detail edit icon buttons now expose descriptive labels.
+  - Fleet edit exposes `עריכת כלי`; PM edit exposes `עריכת טיפול תקופתי`.
+  - Edit behavior and modal layout stayed unchanged.
+  - Local tests/build/browser smoke-checks passed before merge; Vercel was blocked by build-rate limit.
 - PR #246: Ticket-detail header icon buttons now expose descriptive labels.
   - Back exposes `חזרה מרשימת הקריאה`; repeat exposes `פתיחת קריאה דומה`.
   - Back/repeat behavior and modal layout stayed unchanged.
