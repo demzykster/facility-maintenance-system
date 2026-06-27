@@ -74,7 +74,7 @@ Closed notes:
 
 ### R6 — Worker Onboarding Polish
 
-Status: open but lower priority.
+Status: done.
 
 Why it matters:
 - Worker activation works, but the flow should be obvious for the person creating/resetting access.
@@ -84,12 +84,15 @@ Done means:
 - Generated links explain when they must be saved before copying.
 - The saved/reopen behavior is not surprising.
 
-Next PR candidate:
-- Browser-check existing worker edit flow and decide whether the remaining limitation needs UI copy or code.
+Closed notes:
+- New worker/cleaner forms now tell the editor to save the worker before copying the generated activation link.
+- Existing worker/cleaner reset flows now tell the editor to save the new activation/reset link before copying it.
+- The save button says `שמירת עובד והצגת קישור` while a generated link is not yet copyable.
+- Saved activation links still require `workerAccess:manage`, remain hidden until saved, and show a copied confirmation after copy.
 
 ### R7 — Pre-Production Guardrails
 
-Status: open, do after product behavior is stable.
+Status: open.
 
 Why it matters:
 - Before treating the demo as close to production, we need to name what is still demo-only.

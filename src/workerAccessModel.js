@@ -12,6 +12,13 @@ export function canCopyActivationLink(user, activationToken, canManageWorkerAcce
   return !!user?.id && !!activationToken && activationToken === user.activationToken && !!canManageWorkerAccess;
 }
 
+export function workerActivationCopyHint(user, activationToken, canManageWorkerAccess) {
+  if (!canManageWorkerAccess || !activationToken) return "";
+  if (canCopyActivationLink(user, activationToken, canManageWorkerAccess)) return "הקישור שמור וזמין להעתקה.";
+  if (!user?.id) return "שמרו את העובד. מיד אחרי השמירה הקישור יופיע כאן להעתקה.";
+  return "שמרו את קישור ההפעלה/האיפוס החדש. אחרי השמירה הוא יופיע כאן להעתקה.";
+}
+
 export function shouldKeepWorkerFormOpenForActivationLink(user, canManageWorkerAccess) {
   return !!canManageWorkerAccess
     && !!user?.id

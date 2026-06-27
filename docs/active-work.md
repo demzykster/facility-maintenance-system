@@ -29,7 +29,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Purpose:
   - no active product branch is open.
   - R5 Screen Audit And Visual Noise is closed.
-  - continue with R6 Worker Onboarding Polish unless the owner reports a critical product bug.
+  - R6 Worker Onboarding Polish is closed.
+  - continue with R7 Pre-Production Guardrails unless the owner reports a critical product bug.
 - Validation:
   - docs-only closure update: `git diff --check`.
 
@@ -38,7 +39,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Final R5 closure pass: Screen Audit And Visual Noise is complete.
   - Browser pass covered `קריאות`, `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, `צוות ומשתמשים`, `כלי שינוע`, and `בקרת ניקיון`.
   - Visible controls on those screens had text, an accessible label, a title, or a clear field label/placeholder context.
-  - No product-code change was needed in the final pass; release checklist now points the next work to R6.
+  - No product-code change was needed in the final pass.
+- R6 worker onboarding polish is complete.
+  - New worker/cleaner activation links explain that the worker must be saved before the link can be copied.
+  - Existing worker/cleaner activation/reset links explain that the new link must be saved before copying.
+  - Browser smoke-check covered new worker and existing temporary-code worker flows.
+  - Local tests and production build passed.
 - PR #257: Driver-board warning dismiss icon now has an explicit label.
   - The warning close icon exposes `סגירת הודעה`.
   - Warning dismiss behavior stayed unchanged.
@@ -309,9 +315,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Continue R6 Worker Onboarding Polish.
-2. Browser-check the existing worker edit flow for saved activation links, temporary codes, reset links, and copy-link behavior.
-3. If the flow is still confusing, make the smallest UI/copy change that explains when the link must be saved and when it can be copied.
+1. Continue R7 Pre-Production Guardrails.
+2. Add or update the short pre-production readiness note: demo/localStorage limitations, backup/restore status, Vercel staging status, and explicit Supabase/Auth/RLS/database out-of-scope boundary.
+3. Verify backup/restore still covers the current collections before marking R7 closed.
 4. If a critical bug appears, fix the smallest concrete bug before broader polish.
 
 ## Documentation Policy
