@@ -44,9 +44,11 @@ This PR does not yet switch the live UI login to Supabase.
 
 The session endpoint is documented in `docs/supabase-session-adapter.md`.
 
+The production login adapter is documented in `docs/supabase-session-adapter.md`.
+
 The next steps are:
 
-1. Replace browser-only login checks in production mode.
-2. Enforce the `must_change_password` bootstrap flag.
-3. Keep demo/local login unchanged for non-production modes.
+1. Enforce the `must_change_password` bootstrap flag.
+2. Keep demo/local login unchanged for non-production modes.
+3. Decide production session persistence strategy.
 4. Expand table-specific RLS as each business table moves from local storage to Postgres.

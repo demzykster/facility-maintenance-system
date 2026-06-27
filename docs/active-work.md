@@ -28,7 +28,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: add a production login adapter that calls the server/session endpoint after Supabase Auth login, while keeping demo/local login unchanged.
+  - next production step: enforce `mustChangePassword` in the production login/session flow, then continue moving permissions/data writes toward server/RLS.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -66,6 +66,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - The endpoint uses `SUPABASE_ANON_KEY` and the user's bearer token, not the service role key.
   - Missing, disabled, unlinked, or mismatched profiles are rejected.
   - Local tests, production build, production-mode API build, and release check passed.
+- R9 production login adapter is complete.
+  - Production mode uses Supabase password login and then calls `/api/session/me` to create a normalized CMMS session.
+  - Demo/test login remains unchanged and still uses local/demo identities.
+  - Production session payload now carries the `public.app_users.id` as the CMMS session id and keeps `authUserId` separately.
+  - Local tests, production build, production-mode API build, release check, and browser smoke-check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.

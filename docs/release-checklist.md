@@ -44,6 +44,7 @@ Current notes:
 - `docs/production-bootstrap.md` and `/api/bootstrap/admin` define the server-only first-admin bootstrap contract for Supabase Auth plus `public.app_users`.
 - `supabase/migrations/20260627173000_app_users_permissions.sql` defines the first `public.app_users` profile/RLS layer linked to Supabase Auth.
 - `docs/supabase-session-adapter.md` and `/api/session/me` define the first server-side Supabase Auth + app profile session lookup.
+- `src/productionLoginAdapter.js` connects production login to Supabase Auth and `/api/session/me` while leaving demo/test login unchanged.
 - Upstash/Vercel Redis may be used as a bridge/cache path, but not as the final CMMS source of truth.
 
 ### R3 — Notifications End-To-End

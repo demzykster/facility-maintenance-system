@@ -20,6 +20,7 @@ export function normalizeSupabaseAppUserProfile(profile = {}) {
   const role = SUPABASE_APP_USER_ROLES.includes(profile.role) ? profile.role : "user";
   const email = String(profile.email || "").trim().toLowerCase();
   return {
+    id: profile.id || null,
     authUserId: profile.authUserId || profile.auth_user_id || null,
     role,
     name: String(profile.name || "").trim(),

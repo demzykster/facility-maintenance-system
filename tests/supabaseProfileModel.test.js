@@ -41,6 +41,7 @@ describe("supabase profile foundation", () => {
   it("normalizes app user profiles for the future Supabase auth adapter", () => {
     expect(normalizeSupabaseAppUserProfile({
       auth_user_id: "auth-1",
+      id: "app-user-1",
       role: "admin",
       name: " Owner ",
       email: "OWNER@Example.COM",
@@ -49,6 +50,7 @@ describe("supabase profile foundation", () => {
       must_change_password: true
     })).toEqual({
       authUserId: "auth-1",
+      id: "app-user-1",
       role: "admin",
       name: "Owner",
       email: "owner@example.com",
