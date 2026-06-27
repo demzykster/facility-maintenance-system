@@ -21,6 +21,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
+import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
@@ -35,6 +36,8 @@ import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
 const APP_MODE = appModeFromEnv(import.meta.env);
 const SEED_POLICY = seedPolicyForMode(APP_MODE);
+const AI_MODE = aiModeFromEnv(import.meta.env, APP_MODE);
+const BROWSER_AI_ENABLED = AI_MODE === AI_MODES.client;
 const PRODUCTION_LOGIN_CONFIG = productionLoginConfigFromEnv(import.meta.env);
 const PRODUCTION_AUTH_STORE = createProductionAuthStore();
 
@@ -938,6 +941,7 @@ function entryFor(session, text, kind) { return { at: Date.now(), by: session.na
 
 /* ---------- AI ---------- */
 async function callClaude(messages, system, maxTokens = 1024) {
+  if (!BROWSER_AI_ENABLED) throw new Error("ai-disabled");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: maxTokens, system, messages }),
@@ -1860,7 +1864,7 @@ function UserApp(p) {
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
       <nav className="bottom-nav"><NavBtn active={activeView === "tickets"} onClick={() => setView("tickets")} Icon={ListChecks} label="קריאות" /><NavBtn active={activeView === "tasks"} onClick={() => setView("tasks")} Icon={ClipboardList} label="מטלות" /><NavBtn active={activeView === "dept"} onClick={() => setView("dept")} Icon={Users} label="המחלקה" />{mayViewAudit && <NavBtn active={activeView === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" />}</nav>
-      <AIFab onClick={() => setShowAI(true)} />
+      {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
@@ -1942,7 +1946,7 @@ function TechApp(p) {
         </div>
       </div>
       <nav className="bottom-nav"><NavBtn active={view === "tickets"} onClick={() => setView("tickets")} Icon={Truck} label="קריאות" /><NavBtn active={view === "pm"} onClick={() => setView("pm")} Icon={CalendarClock} label="טיפולים" /><NavBtn active={view === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" /></nav>
-      <AIFab onClick={() => setShowAI(true)} />
+      {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} /></Overlay>}
       {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
@@ -3152,7 +3156,7 @@ function TasksModule(p) {
   const doneTotal = scope.filter((t) => t.status === "done" || t.status === "cancelled").length;
   const doneMonth = scope.filter((t) => (t.status === "done" || t.status === "cancelled") && (t.updatedAt || t.createdAt) >= moAgo).length;
   return (<>
-    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> מטלות {isAdmin ? "" : "שלי"} · {countLabel(openN, "מטלה פתוחה", "מטלות פתוחות")}{overdueN ? ` · ${overdueN} באיחור` : ""}</SectionTitle><div className="hdr-btns"><div className="more-wrap"><button className="btn-ghost sm" aria-label="עוד פעולות" onClick={() => setMoreOpen((v) => !v)}><SlidersHorizontal size={14} /> עוד</button>{moreOpen && <><div className="more-back" onClick={() => setMoreOpen(false)} /><div className="more-menu"><button onClick={() => { setMoreOpen(false); setAi(true); }}><Sparkles size={14} /> ניתוח פגישה (AI)</button><button onClick={() => { setMoreOpen(false); setImp(true); }}><FileSpreadsheet size={14} /> ייבוא מ-Excel</button><button onClick={() => { setMoreOpen(false); exportTasksXlsx(rows, users); }}><FileSpreadsheet size={14} /> ייצוא ל-Excel</button></div></>}</div><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> מטלה</button></div></div>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> מטלות {isAdmin ? "" : "שלי"} · {countLabel(openN, "מטלה פתוחה", "מטלות פתוחות")}{overdueN ? ` · ${overdueN} באיחור` : ""}</SectionTitle><div className="hdr-btns"><div className="more-wrap"><button className="btn-ghost sm" aria-label="עוד פעולות" onClick={() => setMoreOpen((v) => !v)}><SlidersHorizontal size={14} /> עוד</button>{moreOpen && <><div className="more-back" onClick={() => setMoreOpen(false)} /><div className="more-menu">{BROWSER_AI_ENABLED && <button onClick={() => { setMoreOpen(false); setAi(true); }}><Sparkles size={14} /> ניתוח פגישה (AI)</button>}<button onClick={() => { setMoreOpen(false); setImp(true); }}><FileSpreadsheet size={14} /> ייבוא מ-Excel</button><button onClick={() => { setMoreOpen(false); exportTasksXlsx(rows, users); }}><FileSpreadsheet size={14} /> ייצוא ל-Excel</button></div></>}</div><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> מטלה</button></div></div>
     <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש מטלות לפי כותרת, תוכן או הקשר" placeholder="חיפוש מטלה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{openN}</span><span className="kpi-mini-l">פתוחות</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={overdueN ? { color: "#DC2626" } : {}}>{overdueN}</span><span className="kpi-mini-l">באיחור</span></div><div className="kpi-mini"><span className="kpi-mini-v">{doneMonth}</span><span className="kpi-mini-l">הושלמו (30 ימים)</span></div><div className="kpi-mini"><span className="kpi-mini-v">{doneTotal}</span><span className="kpi-mini-l">הושלמו סה״כ</span></div></div>
     <div className="qchips">{[["all", "הכל"], ["mine", "שלי"], ["overdue", "באיחור"], ["today", "היום"], ["week", "השבוע"], ["waiting", "ממתין"], ["done", "הושלמו"]].map(([id, lbl]) => <button key={id} className={"qchip" + (quick === id ? " on" : "") + (id === "overdue" ? " danger" : "")} onClick={() => setQuick(id)}>{lbl}</button>)}</div>
@@ -4243,7 +4247,7 @@ function AdminApp(p) {
         </div>
       </div>
       <nav className="bottom-nav">{mobileNav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
-      <AIFab onClick={() => setShowAI(true)} />
+      {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
@@ -5994,7 +5998,7 @@ function TicketForm(p) {
         {slaOn && <label className="field"><input type="number" inputMode="numeric" value={slaH} onChange={(e) => setSlaH(e.target.value)} /></label>}
       </div>}
       <div className="field"><span>תמונה (אופציונלי)</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handlePhoto(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>}</div>
-      {track === "facility" && <><button className="ai-suggest" onClick={aiSuggest} disabled={aiBusy}>{aiBusy ? <><span className="spinner sm" /> מנתח…</> : <><Sparkles size={16} /> ניתוח חכם (AI) — לפי תיאור{photo ? " ותמונה" : ""}</>}</button>
+      {track === "facility" && BROWSER_AI_ENABLED && <><button className="ai-suggest" onClick={aiSuggest} disabled={aiBusy}>{aiBusy ? <><span className="spinner sm" /> מנתח…</> : <><Sparkles size={16} /> ניתוח חכם (AI) — לפי תיאור{photo ? " ותמונה" : ""}</>}</button>
       <div className="hint" style={{ margin: "2px 2px 10px" }}>ה-AI ינתח את התיאור והתמונה (אם צורפה) וישלים קטגוריה, עדיפות ותיאור משופר — ותוכלו לאשר או לערוך.</div>
       {aiNote && <div className="ai-note">{aiNote}</div>}</>}
       {err && <div className="err">{err}</div>}

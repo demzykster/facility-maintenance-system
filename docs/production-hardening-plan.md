@@ -138,6 +138,7 @@ Production requirement:
 - Production session restore now uses Supabase access/refresh tokens plus `/api/session/me`, not the old local CMMS session object.
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 - Production release gate now requires explicit Supabase file/photo storage configuration before production mode can be considered ready.
+- Production AI mode now defaults to disabled, and direct browser AI provider calls are forbidden in production.
 
 ## Monolith Extraction Policy
 

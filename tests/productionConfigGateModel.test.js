@@ -89,4 +89,27 @@ describe("productionConfigGateModel", () => {
       warnings: ["server_auth_rls_files_and_ai_still_require_backend_implementation"]
     });
   });
+
+  it("blocks direct browser AI mode in production", () => {
+    expect(productionConfigGate({
+      appMode: "production",
+      storageProvider: "api",
+      storageApiBaseUrl: "https://cmms.example/api",
+      kvServer: {
+        auth: "supabase",
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      },
+      fileStorage: {
+        driver: "supabase",
+        bucket: "cmms-files"
+      },
+      ai: { mode: "client" }
+    })).toMatchObject({
+      ok: false,
+      errors: ["production_forbids_browser_ai_provider_calls"]
+    });
+  });
 });

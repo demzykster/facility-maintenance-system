@@ -1,3 +1,4 @@
+import { aiServerConfigFromEnv } from "../src/aiProviderModel.js";
 import { appModeFromEnv } from "../src/seedPolicyModel.js";
 import { fileStorageConfigFromEnv, kvServerConfigFromEnv } from "../src/productionServerConfigModel.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv } from "../src/storageProviderModel.js";
@@ -8,7 +9,8 @@ const storageProvider = storageProviderFromEnv(process.env);
 const storageApiBaseUrl = storageApiBaseUrlFromEnv(process.env);
 const kvServer = kvServerConfigFromEnv(process.env);
 const fileStorage = fileStorageConfigFromEnv(process.env);
-const result = productionConfigGate({ appMode, storageProvider, storageApiBaseUrl, kvServer, fileStorage });
+const ai = aiServerConfigFromEnv(process.env);
+const result = productionConfigGate({ appMode, storageProvider, storageApiBaseUrl, kvServer, fileStorage, ai });
 
 for (const warning of result.warnings) console.warn(`[production-config] warning: ${warning}`);
 
