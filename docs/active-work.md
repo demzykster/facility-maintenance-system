@@ -21,19 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/clarify-worker-exit-icon
 
-- Status: no active product branch.
-- Latest synchronized `main`: `740f22a docs: close user tree group ledger (#220)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `fba3c49 docs: close ledger after user tree group (#221)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - continue reviewing user cards, edit/create form, permissions blocks, visual noise, and unclear controls.
-- Validation pending:
-  - none.
+  - replace the misleading hard-hat icon on the worker exit/equipment return action.
+  - keep offboarding behavior unchanged.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: worker edit form still shows the exit/equipment return action.
 
 ## Latest Completed Work
 
+- PR #221: Active work ledger closed the #220 ledger gap.
+  - `docs/active-work.md` now points at PR #220 as the latest synchronized main before this pass.
+  - Docs-only validation passed; Vercel was green.
 - PR #220: Active work ledger closed the user-tree group PR.
   - No active product branch remained after PR #219.
   - Docs-only validation passed; Vercel was green.

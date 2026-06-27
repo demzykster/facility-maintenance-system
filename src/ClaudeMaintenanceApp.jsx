@@ -5785,7 +5785,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       )}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>{lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש"}</button>
-      {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><HardHat size={15} /> עזיבת עובד / החזרת ציוד</button>}
+      {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
       {canDelete && !(onArchive && ["worker", "cleaner", "tech"].includes(role)) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
