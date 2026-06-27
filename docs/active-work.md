@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/ticket-photo-metadata-upload`
+### Active branch: `codex/cleaning-photo-metadata-upload`
 
-- Status: this PR sends ticket photo metadata through the production file API upload path.
-- Latest synchronized `main`: `34bb172 [skip vercel] feat: persist provided file metadata`.
+- Status: this PR sends cleaning complaint/round photo metadata through the production file API upload path.
+- Latest synchronized `main`: `353d4a0 [skip vercel] feat: send ticket photo metadata`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: pass explicit ticket photo metadata into `/api/files`.
-  - next production step: pass explicit cleaning complaint/round photo metadata into `/api/files`.
+  - current production step: pass explicit cleaning complaint/round photo metadata into `/api/files`.
+  - next production step: decide whether cleaning complaint issue photos need a separate metadata kind before wiring them.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -38,7 +38,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/apiFileAdapter.test.js tests/ticketPhotoStorage.test.js tests/fileMetadataModel.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/cleaningPhotoStorage.test.js tests/fileMetadataModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -48,6 +48,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 ticket photo metadata upload is complete in PR #308.
+  - Production+API ticket before/after photo uploads now include explicit file metadata.
+  - `/api/files` can persist ticket photo ownership rows through the configured metadata sink.
+  - Local tests, production builds, and release checks passed.
 - R9 file API metadata upsert is complete in PR #307.
   - `/api/files` accepts optional upload metadata and persists it when a metadata sink is configured.
   - Uploads with metadata fail with `file_metadata_not_configured` instead of silently losing metadata when the sink is missing.

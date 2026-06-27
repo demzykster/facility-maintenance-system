@@ -34,7 +34,14 @@ describe("cleaningPhotoStorage", () => {
     });
     expect(apiProvider.upload).toHaveBeenCalledWith("cleaning/complaints/C-1/photo.png", {
       data: "data:image/png;base64,abc",
-      contentType: "image/png"
+      contentType: "image/png",
+      metadata: expect.objectContaining({
+        ownerType: "cleaning_complaint",
+        ownerId: "C-1",
+        kind: "cleaning_complaint_photo",
+        path: "cleaning/complaints/C-1/photo.png",
+        contentType: "image/png"
+      })
     });
     await expect(storage.load(stored)).resolves.toBe("data:image/png;base64,abc");
   });
@@ -54,6 +61,18 @@ describe("cleaningPhotoStorage", () => {
     })).resolves.toEqual({
       id: "R-1",
       issues: [{ itemId: "floor", photo: null, photoPath: "cleaning/rounds/R-1/issues/floor.webp", hasPhoto: true, reason: "dirty" }]
+    });
+    expect(apiProvider.upload).toHaveBeenCalledWith("cleaning/rounds/R-1/issues/floor.webp", {
+      data: "data:image/webp;base64,abc",
+      contentType: "image/webp",
+      metadata: expect.objectContaining({
+        ownerType: "cleaning_round",
+        ownerId: "R-1",
+        ownerSubId: "floor",
+        kind: "cleaning_round_issue_photo",
+        path: "cleaning/rounds/R-1/issues/floor.webp",
+        contentType: "image/webp"
+      })
     });
   });
 
