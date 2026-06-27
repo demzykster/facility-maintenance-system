@@ -23,12 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main clean after the first-admin bootstrap PR is merged; no active product branch should remain open.
+- Status: main is expected to be clean after the production password-change enforcement PR is merged.
 - Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: enforce `mustChangePassword` in the production login/session flow, then continue moving permissions/data writes toward server/RLS.
+  - next production step: decide production session persistence strategy, then continue moving permissions/data writes toward server/RLS.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -71,6 +71,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Demo/test login remains unchanged and still uses local/demo identities.
   - Production session payload now carries the `public.app_users.id` as the CMMS session id and keeps `authUserId` separately.
   - Local tests, production build, production-mode API build, release check, and browser smoke-check passed.
+- R9 production password-change enforcement is complete.
+  - `POST /api/session/change-password` changes a flagged user's Supabase password and clears `public.app_users.must_change_password`.
+  - Production login blocks normal app entry while `mustChangePassword` is true and shows a first-password-change form.
+  - Demo/test login remains unchanged.
+  - Local tests, production build, production-mode build, release check, and browser smoke-check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.

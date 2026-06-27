@@ -22,7 +22,7 @@ import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
-import { loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady } from "./productionLoginAdapter.js";
+import { changeProductionPassword, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -1625,6 +1625,7 @@ function PublicReport({ zones, onSubmit, onClose }) {
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
+  const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
   const activationUser = activationToken ? active.find((u) => (u.role === "worker" || u.role === "cleaner") && u.activationToken === activationToken && u.activationStatus === "pending") : null;
@@ -1682,6 +1683,13 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
       try {
         const result = await loginWithProductionPassword({ email: resolved.user.email, password, config: productionLoginConfig });
         remember_save({ email: resolved.user.email, mode: "production" });
+        if (result.mustChangePassword) {
+          setPasswordChange({ accessToken: result.accessToken, session: result.session });
+          setPassword("");
+          setNewPassword("");
+          setNewPasswordConfirm("");
+          return;
+        }
         await onLogin(result.session);
       } catch (error) {
         setErr(error?.message === "production_login_not_configured" ? "כניסת ייצור עדיין לא הוגדרה בשרת" : "הכניסה נכשלה. בדקו דוא״ל וסיסמה או פנו למנהל המערכת");
@@ -1695,6 +1703,21 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     if (resolved.auth === "pin" && (u.pin || "") !== code.trim()) return setErr("הקוד שגוי");
     rememberLogin(u, resolved.identifierType);
     finish(withDefaultDept(u));
+  };
+  const submitNewPassword = async () => {
+    if (!passwordChange?.accessToken) return setErr("נדרש להתחבר מחדש");
+    if (newPassword.length < 12) return setErr("הסיסמה החדשה חייבת לכלול לפחות 12 תווים");
+    if (newPassword !== newPasswordConfirm) return setErr("הסיסמאות אינן זהות");
+    setBusy(true);
+    setErr("");
+    try {
+      const result = await changeProductionPassword({ accessToken: passwordChange.accessToken, newPassword, config: productionLoginConfig });
+      await onLogin(result.session);
+    } catch (error) {
+      setErr(error?.message === "production_login_not_configured" ? "כניסת ייצור עדיין לא הוגדרה בשרת" : "לא ניתן היה להחליף סיסמה. נסו שוב או פנו למנהל המערכת");
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="login-bg">
@@ -1711,7 +1734,15 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={activateWorker} disabled={!activationUser}>שמירה וכניסה</button>
         </>) : (<>
-        {!resolved ? (<>
+        {passwordChange ? (<>
+          <div className="login-q">החלפת סיסמה ראשונית</div>
+          <div className="hint" style={{ marginBottom: 10 }}>נדרש להגדיר סיסמה חדשה לפני כניסה למערכת.</div>
+          <label className="field"><span>סיסמה חדשה</span><input value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" placeholder="לפחות 12 תווים" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} autoFocus /></label>
+          <label className="field"><span>אישור סיסמה חדשה</span><input value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" placeholder="הקלידו שוב" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} /></label>
+          {err && <div className="err">{err}</div>}
+          <button className="btn-primary full" onClick={submitNewPassword} disabled={busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
+          <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setPasswordChange(null); setResolved(null); setPassword(""); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>חזרה</button>
+        </>) : !resolved ? (<>
           <div className="login-q">כניסה למערכת</div>
           <label className="field"><span>{productionLogin ? "דוא״ל" : "דוא״ל / מספר עובד / קוד טכנאי"}</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com" : "vadim@chemipal.co.il / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
