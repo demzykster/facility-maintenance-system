@@ -21,22 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-cleaning-zone-card-actions
+### Active branch: codex/label-cleaner-zone-card-actions
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `a940791 fix: label ticket note send button (#242)`.
+- Latest synchronized `main`: `5a18305 fix: label cleaning zone card actions (#243)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make cleaning-zone card action icon buttons self-describing.
-  - keep cleaning-zone card actions and layout unchanged.
+  - make cleaner/manager zone card action icon buttons self-describing.
+  - keep zone action behavior and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: cleaning-zone card actions expose descriptive labels.
+  - source check: cleaner/manager zone card actions expose descriptive labels.
+  - browser smoke-check note: this manager-cleaning card path is not reachable in current demo-role navigation.
 
 ## Latest Completed Work
 
+- PR #243: Cleaning-zone admin card action buttons now expose descriptive labels.
+  - Report issue, QR label, and edit actions include the zone name.
+  - Cleaning-zone action behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #242: Ticket note send icon button now exposes a descriptive label.
   - The admin ticket update send action is named for assistive tech/browser inspection.
   - Note submission behavior and layout stayed unchanged.
