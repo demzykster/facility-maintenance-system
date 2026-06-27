@@ -86,6 +86,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `/api/kv` gains a `CMMS_KV_DRIVER=supabase` path backed by `public.cmms_kv_records`.
   - This is a Postgres bridge for shared durable storage before final normalized business tables are wired.
   - Local tests, production build, production-mode build, and release check passed.
+- R9 API storage auth header is complete.
+  - The frontend API storage adapter sends the production Supabase access token as `Authorization: Bearer ...` when available.
+  - This prepares `/api/kv` to move from temporary bearer-token auth to Supabase user-session auth.
+  - Local tests, production build, production-mode build, and release check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.

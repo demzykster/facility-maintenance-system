@@ -37,6 +37,36 @@ describe("apiStorageAdapter", () => {
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual({ value: "ticket-json", shared: true });
   });
 
+  it("adds the production access token when available", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(ok({ value: "ticket-json" }));
+    const provider = createApiStorageProvider({
+      baseUrl: "https://cmms.example/api",
+      getAccessToken: () => "access-token",
+      fetchImpl
+    });
+
+    await provider.get("ticket:1", true);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/kv/ticket%3A1?shared=1", expect.objectContaining({
+      headers: expect.objectContaining({
+        authorization: "Bearer access-token"
+      })
+    }));
+  });
+
+  it("does not add an empty authorization header", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(ok({ value: "ticket-json" }));
+    const provider = createApiStorageProvider({
+      baseUrl: "https://cmms.example/api",
+      getAccessToken: () => "",
+      fetchImpl
+    });
+
+    await provider.get("ticket:1", true);
+
+    expect(fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("authorization");
+  });
+
   it("throws backend errors so the app store can fall back locally", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: false,
