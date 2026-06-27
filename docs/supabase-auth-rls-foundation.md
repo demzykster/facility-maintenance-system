@@ -44,7 +44,7 @@ This PR does not yet switch the live UI login to Supabase.
 
 The next steps are:
 
-1. Make first-admin bootstrap also create the `public.app_users` profile.
-2. Add a server/session adapter that reads Supabase Auth and `public.app_users`.
-3. Replace browser-only login checks in production mode.
+1. Add a server/session adapter that reads Supabase Auth and `public.app_users`.
+2. Replace browser-only login checks in production mode.
+3. Enforce the `must_change_password` bootstrap flag.
 4. Expand table-specific RLS as each business table moves from local storage to Postgres.

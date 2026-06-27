@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildBootstrapAppUserProfile,
   createBootstrapAdminHandler,
   createSupabaseAdminBootstrapClient,
   validateBootstrapAdminPayload
@@ -82,9 +83,17 @@ describe("bootstrap admin handler", () => {
 
   it("creates the admin through the injected server client without returning the password", async () => {
     const createAdmin = vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com", role: "admin", mustChangePassword: true });
+    const createAppUserProfile = vi.fn().mockResolvedValue({
+      id: "app-user-1",
+      authUserId: "auth-user-1",
+      email: "admin@example.com",
+      role: "admin",
+      active: true,
+      mustChangePassword: true
+    });
     const handler = createBootstrapAdminHandler({
       env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
-      supabaseClient: { createAdmin }
+      supabaseClient: { createAdmin, createAppUserProfile }
     });
 
     const res = await call(handler, {
@@ -96,6 +105,14 @@ describe("bootstrap admin handler", () => {
     expect(res.json()).toEqual({
       ok: true,
       admin: { id: "auth-user-1", email: "admin@example.com", role: "admin", mustChangePassword: true },
+      appUser: {
+        id: "app-user-1",
+        authUserId: "auth-user-1",
+        email: "admin@example.com",
+        role: "admin",
+        active: true,
+        mustChangePassword: true
+      },
       disableBootstrapAfterSuccess: true
     });
     expect(JSON.stringify(res.json())).not.toContain("long-password");
@@ -105,15 +122,69 @@ describe("bootstrap admin handler", () => {
       role: "admin",
       mustChangePassword: true
     }));
+    expect(createAppUserProfile).toHaveBeenCalledWith(expect.objectContaining({
+      email: "admin@example.com",
+      role: "admin",
+      mustChangePassword: true
+    }), expect.objectContaining({ id: "auth-user-1" }));
   });
 
-  it("calls Supabase Auth Admin create-user endpoint with server-only credentials", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue({
-      ok: true,
-      async text() {
-        return JSON.stringify({ id: "auth-user-1", email: "admin@example.com" });
-      }
+  it("does not report bootstrap success if the app profile insert fails after auth creation", async () => {
+    const createAdmin = vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com", role: "admin", mustChangePassword: true });
+    const createAppUserProfile = vi.fn().mockRejectedValue(new Error("profile_insert_failed"));
+    const handler = createBootstrapAdminHandler({
+      env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
+      supabaseClient: { createAdmin, createAppUserProfile }
     });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      body: { email: "admin@example.com", name: "Owner", temporaryPassword: "long-password" }
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({
+      error: "profile_insert_failed",
+      authUserCreated: true,
+      authUserId: "auth-user-1"
+    });
+  });
+
+  it("builds the app user profile row from the auth user", () => {
+    expect(buildBootstrapAppUserProfile({
+      email: "admin@example.com",
+      name: "Owner"
+    }, {
+      id: "auth-user-1"
+    })).toEqual({
+      auth_user_id: "auth-user-1",
+      role: "admin",
+      name: "Owner",
+      email: "admin@example.com",
+      active: true,
+      permissions: {},
+      login_metadata: {
+        source: "bootstrap",
+        bootstrap: true
+      },
+      must_change_password: true
+    });
+  });
+
+  it("calls Supabase Auth Admin and app_users REST endpoints with server-only credentials", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        async text() {
+          return JSON.stringify({ id: "auth-user-1", email: "admin@example.com" });
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        async text() {
+          return JSON.stringify([{ id: "app-user-1", auth_user_id: "auth-user-1", email: "admin@example.com", role: "admin", active: true, must_change_password: true }]);
+        }
+      });
     const client = createSupabaseAdminBootstrapClient({
       url: "https://supabase.example/",
       serviceRoleKey: "service-role-key",
@@ -127,6 +198,13 @@ describe("bootstrap admin handler", () => {
       temporaryPassword: "long-password",
       mustChangePassword: true
     });
+    const appUser = await client.createAppUserProfile({
+      email: "admin@example.com",
+      name: "Owner",
+      role: "admin",
+      temporaryPassword: "long-password",
+      mustChangePassword: true
+    }, admin);
 
     expect(admin).toEqual({ id: "auth-user-1", email: "admin@example.com", role: "admin", mustChangePassword: true });
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/admin/users", expect.objectContaining({
@@ -141,6 +219,31 @@ describe("bootstrap admin handler", () => {
       email_confirm: true,
       user_metadata: { role: "admin", must_change_password: true },
       app_metadata: { role: "admin" }
+    });
+    expect(appUser).toEqual({
+      id: "app-user-1",
+      authUserId: "auth-user-1",
+      email: "admin@example.com",
+      role: "admin",
+      active: true,
+      mustChangePassword: true
+    });
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/app_users", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({
+        apikey: "service-role-key",
+        authorization: "Bearer service-role-key",
+        prefer: "return=representation"
+      })
+    }));
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toMatchObject({
+      auth_user_id: "auth-user-1",
+      email: "admin@example.com",
+      role: "admin",
+      active: true,
+      permissions: {},
+      login_metadata: { source: "bootstrap" },
+      must_change_password: true
     });
   });
 });

@@ -50,6 +50,22 @@ export function validateBootstrapAdminPayload(body = {}) {
   };
 }
 
+export function buildBootstrapAppUserProfile(admin, authUser) {
+  return {
+    auth_user_id: authUser.id,
+    role: "admin",
+    name: admin.name,
+    email: admin.email,
+    active: true,
+    permissions: {},
+    login_metadata: {
+      source: "bootstrap",
+      bootstrap: true
+    },
+    must_change_password: true
+  };
+}
+
 export function bootstrapAuthorization(req, env = {}) {
   const configuredToken = String(env.CMMS_BOOTSTRAP_TOKEN || "");
   if (!configuredToken) return { ok: false, status: 503, error: "bootstrap_auth_not_configured" };
@@ -115,6 +131,35 @@ export function createSupabaseAdminBootstrapClient({ url, serviceRoleKey, fetchI
         role: "admin",
         mustChangePassword: true
       };
+    },
+    async createAppUserProfile(admin, authUser) {
+      if (!authUser?.id) throw new Error("supabase_auth_user_id_missing");
+      const profile = buildBootstrapAppUserProfile(admin, authUser);
+      const response = await fetchImpl(`${root}/rest/v1/app_users`, {
+        method: "POST",
+        headers: {
+          apikey: serviceRoleKey,
+          authorization: `Bearer ${serviceRoleKey}`,
+          "content-type": "application/json",
+          prefer: "return=representation"
+        },
+        body: JSON.stringify(profile)
+      });
+
+      const data = await responseJson(response);
+      if (!response.ok) {
+        throw new Error(data?.message || data?.details || data?.hint || data?.code || `supabase_profile_${response.status}`);
+      }
+
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        id: row?.id || "",
+        authUserId: row?.auth_user_id || authUser.id,
+        email: row?.email || admin.email,
+        role: row?.role || "admin",
+        active: row?.active !== false,
+        mustChangePassword: row?.must_change_password !== false
+      };
     }
   };
 }
@@ -143,7 +188,9 @@ export function createBootstrapAdminHandler({
       serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
       fetchImpl
     });
-    if (!client) return json(res, 503, { error: "supabase_admin_not_configured" });
+    if (!client || typeof client.createAdmin !== "function" || typeof client.createAppUserProfile !== "function") {
+      return json(res, 503, { error: "supabase_admin_not_configured" });
+    }
 
     try {
       const body = await readBody(req);
@@ -151,9 +198,20 @@ export function createBootstrapAdminHandler({
       if (!validated.ok) return json(res, 400, { error: validated.error });
 
       const admin = await client.createAdmin(validated.admin);
+      let appUser = null;
+      try {
+        appUser = await client.createAppUserProfile(validated.admin, admin);
+      } catch (profileError) {
+        return json(res, 500, {
+          error: profileError?.message || "bootstrap_profile_error",
+          authUserCreated: true,
+          authUserId: admin.id || ""
+        });
+      }
       return json(res, 200, {
         ok: true,
         admin,
+        appUser,
         disableBootstrapAfterSuccess: true
       });
     } catch (error) {
