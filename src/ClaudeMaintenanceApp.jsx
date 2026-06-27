@@ -4924,9 +4924,9 @@ function PMYearMatrix({ items, fleet, onOpen, config }) {
   return (<div>
     <div className="ymx-bar">
       <div className="ymx-nav">
-        <button className="icon-btn" onClick={() => setYear((y) => y - 1)}><ChevronLeft size={20} /></button>
+        <button className="icon-btn" onClick={() => setYear((y) => y - 1)} aria-label="שנה קודמת"><ChevronLeft size={20} /></button>
         <div className="ymx-year">{year}</div>
-        <button className="icon-btn" onClick={() => setYear((y) => y + 1)}><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button>
+        <button className="icon-btn" onClick={() => setYear((y) => y + 1)} aria-label="שנה הבאה"><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button>
       </div>
       <button className={"chip" + (onlyIssues ? " on" : "")} onClick={() => setOnlyIssues((v) => !v)}>רק חריגים</button>
     </div>
@@ -4969,7 +4969,7 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
   for (let wk = 0; wk < 6; wk++) { const row = []; for (let dow = 0; dow <= 4; dow++) { row.push(new Date(cur)); cur.setDate(cur.getDate() + 1); } cur.setDate(cur.getDate() + 2); weeks.push(row); if (cur.getMonth() !== month && cur > new Date(year, month + 1, 0)) break; }
   const todayK = startOfDay(Date.now());
   return (<div>
-    <div className="cal-head"><button className="icon-btn" onClick={() => setCursor(new Date(year, month - 1, 1))}><ChevronLeft size={20} /></button><div className="cal-title">{HE_MONTHS[month]} {year}</div><button className="icon-btn" onClick={() => setCursor(new Date(year, month + 1, 1))}><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button></div>
+    <div className="cal-head"><button className="icon-btn" onClick={() => setCursor(new Date(year, month - 1, 1))} aria-label="חודש קודם"><ChevronLeft size={20} /></button><div className="cal-title">{HE_MONTHS[month]} {year}</div><button className="icon-btn" onClick={() => setCursor(new Date(year, month + 1, 1))} aria-label="חודש הבא"><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button></div>
     <div className="cal-dows">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="cal-dow">{HE_DOW[i]}׳</div>)}</div>
     <div className="cal-grid">{weeks.map((row, wi) => row.map((day, di) => { const inMonth = day.getMonth() === month; const k = startOfDay(day.getTime()); const list = byDay[k] || []; const isToday = k === todayK; return (
       <div key={wi + "-" + di} className={"cal-cell" + (inMonth ? "" : " out") + (isToday ? " today" : "")}>
