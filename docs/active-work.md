@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/ppe-empty-state-polish
+### Active branch: codex/label-ppe-order-remove-buttons
 
 - Status: ready for PR.
-- Latest synchronized `main`: `54e9032 fix: flag duplicate user identities (#252)`.
+- Latest synchronized `main`: `07bb482 fix: clarify empty PPE order form (#253)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise on `ביגוד עובדים`.
-  - clarify the empty purchase-order form so a manual order does not look like a dead state.
-  - keep PPE order data, stock calculations, and save behavior unchanged.
+  - give PPE purchase-order remove-line icon buttons explicit Hebrew labels.
+  - keep order line removal behavior and order data unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: PPE purchase-order form shows the clarified empty state after order lines are removed before saving.
+  - browser smoke-check: PPE purchase-order line remove buttons expose item/size-specific Hebrew labels and titles.
 
 ## Latest Completed Work
 
+- PR #253: PPE purchase-order empty form now explains manual order creation.
+  - Empty order forms now tell the user to choose an item/size and add quantities.
+  - PPE order data, stock calculations, and save behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #252: Team/User Management now warns about possible duplicate login identities.
   - Active users sharing the same email, worker number, or technician code are counted in a visible warning.
   - User records, login behavior, editing, and rendering stayed unchanged.
