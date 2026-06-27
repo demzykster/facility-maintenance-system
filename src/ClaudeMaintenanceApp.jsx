@@ -6023,7 +6023,7 @@ function TicketDetail(p) {
   const detailPausedTotal = normalizedTicketLifecycleStages(ticket, detailLifecycleOptions)
     .filter((stage) => stage.countsOperationalSla === false)
     .reduce((sum, stage) => sum + (stage.ms || 0), 0);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onBack}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">קריאה #{ticketNo(ticket)}</div>{onRepeat && <button className="icon-btn" onClick={repeat} style={{ marginInlineStart: "auto" }} title="פתח קריאה דומה"><Copy size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onBack} aria-label="חזרה מרשימת הקריאה"><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">קריאה #{ticketNo(ticket)}</div>{onRepeat && <button className="icon-btn" onClick={repeat} style={{ marginInlineStart: "auto" }} title="פתח קריאה דומה" aria-label="פתיחת קריאה דומה"><Copy size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top">
         <span className="badge" style={{ color: s.color, background: s.bg }}>{s.label}</span>

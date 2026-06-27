@@ -21,23 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-task-meeting-edit-buttons
+### Active branch: codex/label-ticket-detail-header-buttons
 
 - Status: ready for PR.
-- Latest synchronized `main`: `df334c1 fix: label cleaner zone card actions (#244)`.
+- Latest synchronized `main`: `188d22f fix: label task and meeting edit buttons (#245)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make task and meeting detail edit icon buttons self-describing.
-  - keep edit behavior and modal layout unchanged.
+  - make ticket-detail header icon buttons self-describing.
+  - keep back/repeat behavior and modal layout unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: task detail edit button exposes `עריכת מטלה`.
-  - source-check: meeting detail edit button exposes `עריכת פגישה`.
+  - browser smoke-check: ticket detail header exposes `חזרה מרשימת הקריאה` and `פתיחת קריאה דומה`.
 
 ## Latest Completed Work
 
+- PR #245: Task and meeting detail edit icon buttons now expose descriptive labels.
+  - Task edit exposes `עריכת מטלה`; meeting edit exposes `עריכת פגישה`.
+  - Edit behavior and modal layout stayed unchanged.
+  - Local tests/build/browser smoke-check/source-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #244: Cleaner/manager zone card action buttons now expose descriptive labels.
   - Zone spec and report issue actions include the zone name.
   - Zone action behavior and layout stayed unchanged.
