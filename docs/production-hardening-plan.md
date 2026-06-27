@@ -124,6 +124,7 @@ Production requirement:
 - Production seed policy started in `src/seedPolicyModel.js` and documented in `docs/production-seed-policy.md`.
 - Storage provider policy and the first API storage-client contract are documented in `docs/production-storage-provider.md`.
 - `/api/kv` route skeleton exists and is intentionally closed until server auth and a durable backend driver are configured.
+- Upstash/Vercel Redis REST is the first supported `/api/kv` durable driver path.
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 
 ## Monolith Extraction Policy

@@ -24,6 +24,22 @@ VITE_CMMS_STORAGE_API_URL=https://example.com/api
 - The frontend uses `src/apiStorageAdapter.js` to talk to the backend.
 - `/api/kv` route skeleton exists, but it is closed by default until server Auth/backend storage are configured.
 
+### `upstash` server driver
+
+The first durable backend driver is Upstash/Vercel Redis over server-side REST.
+
+Server-only env:
+
+```env
+CMMS_KV_DRIVER=upstash
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
+```
+
+The same driver also accepts `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+
+These values must remain server-only. Do not expose them as `VITE_*`.
+
 ## API Contract
 
 The first production adapter keeps the same key/value contract as the current store so the monolith does not need a broad rewrite before backend work.
