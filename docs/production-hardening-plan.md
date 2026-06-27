@@ -141,6 +141,7 @@ Production requirement:
 - Production AI mode now defaults to disabled, and direct browser AI provider calls are forbidden in production.
 - Production file metadata contract is documented in `docs/production-file-metadata.md`.
 - Production audit event contract is documented in `docs/production-audit-events.md`.
+- Supabase `public.audit_events` sink is the first durable audit destination for sensitive server-side writes.
 
 ## Monolith Extraction Policy
 

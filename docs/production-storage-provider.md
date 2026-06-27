@@ -124,6 +124,15 @@ Supabase-authenticated `PUT`/`DELETE` requests also apply a server-side sensitiv
 
 This is an interim server permission layer for the KV bridge. It does not replace final normalized Supabase tables and row-level policies.
 
+Sensitive bridge writes can also be mirrored into the production audit table when the optional audit driver is configured:
+
+```env
+CMMS_AUDIT_DRIVER=supabase
+CMMS_AUDIT_SUPABASE_TABLE=audit_events
+```
+
+See `docs/production-audit-events.md`.
+
 For production release checks, API storage is accepted only when the server-side KV bridge is also configured for Supabase:
 
 ```env
