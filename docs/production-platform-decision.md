@@ -45,7 +45,10 @@ Next implementation work should move toward:
 1. Supabase project/env wiring.
 2. First-admin bootstrap using Supabase Auth/Postgres, not frontend hardcoded credentials.
 3. Postgres schema/RLS for users and permissions.
-4. Gradual table-backed data access, replacing the temporary key/value bridge.
-5. Supabase Storage for photos/files.
+4. Login/session handling through Supabase Auth instead of browser-only secrets.
+5. Gradual table-backed data access, replacing the temporary key/value bridge.
+6. Supabase Storage for photos/files.
+
+The first-admin bootstrap contract is documented in `docs/production-bootstrap.md`.
 
 Do not design future budget/safety-inspection modules as isolated stores. They must reuse the shared CMMS Postgres entities.
