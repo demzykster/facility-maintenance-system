@@ -23,12 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main is expected to be clean after PR #269 is merged.
+- Status: main clean; no active product branch is open.
 - Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
-- Open PRs when this entry was written: PR #269.
+- Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
-  - no active product branch remains after PR #269 merges.
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
+  - next production step: choose/wire the backend provider path, then add the production storage adapter beside the local adapter.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
