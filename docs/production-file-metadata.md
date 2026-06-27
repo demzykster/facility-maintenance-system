@@ -17,9 +17,9 @@ Production needs to answer:
 - whether it was deleted;
 - which business record should be checked before serving or deleting it.
 
-## Future Table
+## Supabase Table
 
-Future normalized table: `file_metadata`.
+Normalized table: `public.file_metadata`.
 
 Initial fields:
 
@@ -43,7 +43,23 @@ Initial fields:
 
 ## Current Scope
 
-This is a contract/model step only.
+The table and server-only Supabase metadata driver now exist.
+
+Server-only env:
+
+```env
+CMMS_FILE_METADATA_SUPABASE_TABLE=file_metadata
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+`CMMS_FILE_METADATA_SUPABASE_TABLE` is optional and defaults to `file_metadata`.
+
+The table is created by:
+
+```text
+supabase/migrations/20260627201000_file_metadata.sql
+```
 
 Current upload flows already store protected file bytes through `/api/files` in production+API mode. The next production step is to persist matching metadata rows server-side when uploads happen.
 

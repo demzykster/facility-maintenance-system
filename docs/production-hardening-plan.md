@@ -140,6 +140,7 @@ Production requirement:
 - Production release gate now requires explicit Supabase file/photo storage configuration before production mode can be considered ready.
 - Production AI mode now defaults to disabled, and direct browser AI provider calls are forbidden in production.
 - Production file metadata contract is documented in `docs/production-file-metadata.md`.
+- Supabase `public.file_metadata` sink is the first durable file ownership metadata destination.
 - Production audit event contract is documented in `docs/production-audit-events.md`.
 - Supabase `public.audit_events` sink is the first durable audit destination for sensitive server-side writes.
 

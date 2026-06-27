@@ -57,7 +57,7 @@ The frontend adapter is `createApiFileProvider` in `src/apiFileAdapter.js`. It f
 
 Protected file bytes live in Supabase Storage. Their business ownership belongs in a future `file_metadata` database table.
 
-The first shared contract is documented in `docs/production-file-metadata.md` and modeled in `src/fileMetadataModel.js`.
+The first shared metadata contract is documented in `docs/production-file-metadata.md`, modeled in `src/fileMetadataModel.js`, and backed by `api/files/supabaseFileMetadataDriver.js`.
 
 ## Next Implementation Step
 
