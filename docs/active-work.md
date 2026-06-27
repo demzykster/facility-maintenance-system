@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/clarify-user-form-save
 
-- Status: no active product branch.
-- Latest synchronized `main`: `ce7371d fix: clarify add user action (#210)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `53bdea9 docs: close add user ledger (#211)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - the latest user-management add-button polish PR is merged.
-  - next work should continue from the R5 checklist, not from an open branch.
-- Validation:
-  - latest product PR passed local tests/build/browser smoke-check.
-  - this ledger cleanup is docs-only.
+  - make the user/worker form save button read as a concrete action.
+  - keep user creation/edit behavior unchanged.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: new user form shows `שמירת משתמש`.
 
 ## Latest Completed Work
 
+- PR #211: Active work ledger now reflects the merged add-user polish.
+  - No active product branch remains after PR #210.
+  - Docs-only validation passed; Vercel was green.
 - PR #210: User-management add action now reads clearly.
   - The button changed from generic `משתמש` to `הוסף משתמש`.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
