@@ -63,6 +63,16 @@ Production requirement:
 - extract production boundaries first: storage, auth, backend adapters, schema/migration, pure workflow models;
 - split visual modules only after data/auth boundaries are stable.
 
+### P1 — Modular Growth Without Duplicate Systems
+
+Current state:
+- the product will continue to grow with broad future modules such as budget and safety inspections.
+
+Production requirement:
+- new modules must reuse shared CMMS entities: users, departments, tickets, assets, suppliers, files, status history, notifications, permissions, analytics, and audit;
+- broad future modules must extend existing workflows instead of creating duplicate users, suppliers, tickets, approvals, files, or analytics;
+- `docs/module-growth-architecture.md` is the rule for future module design.
+
 ## Execution Order
 
 1. Extract storage boundary from `ClaudeMaintenanceApp.jsx`.
@@ -81,6 +91,7 @@ Production requirement:
 - Storage boundary extracted in PR #268.
 - Production collection map started in `src/dataCollections.js`.
 - First production data model documented in `docs/production-data-model.md`.
+- Modular growth rules documented in `docs/module-growth-architecture.md`.
 
 ## Monolith Extraction Policy
 

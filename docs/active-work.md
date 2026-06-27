@@ -29,6 +29,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - next production step: choose/wire the backend provider path, then add the production storage adapter beside the local adapter.
+  - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
@@ -41,6 +42,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.
   - `docs/production-data-model.md` documents the first database table map.
   - Local tests, production build, and browser smoke-check passed.
+- R9 modular growth architecture is being documented.
+  - Future budget and safety-inspection modules should reuse shared CMMS users, departments, tickets, assets, suppliers, files, lifecycle/status history, notifications, permissions, analytics, and audit.
+  - The goal is comfortable modernization without duplicate module-specific islands.
 - R9 Production Backend Foundation has started in PR #268.
   - The frontend storage adapter was extracted from `src/ClaudeMaintenanceApp.jsx` to `src/storageAdapter.js`.
   - The adapter stays lazy so it can use `window.storage` after module import and later be swapped for a backend provider.
