@@ -92,7 +92,7 @@ Closed notes:
 
 ### R7 — Pre-Production Guardrails
 
-Status: open.
+Status: done.
 
 Why it matters:
 - Before treating the demo as close to production, we need to name what is still demo-only.
@@ -103,8 +103,11 @@ Done means:
 - Vercel demo status is understood.
 - Supabase/Auth/RLS/database remains explicitly out of scope until the owner starts that phase.
 
-Next PR candidate:
-- Add a short pre-production readiness note only after R1-R5 are materially closed.
+Closed notes:
+- `docs/pre-production-readiness.md` now names Vercel as demo/staging, not production.
+- The note documents current `localStorage` limits, demo-only login/activation/permission boundaries, and sensitive JSON backup handling.
+- Backup/restore coverage was verified through `BACKUP_COLLECTIONS` and the backup model tests.
+- Supabase/Auth/RLS/database/Railway/broad modular split remain explicitly out of scope until the owner starts that phase.
 
 ## Closed Release Packages
 

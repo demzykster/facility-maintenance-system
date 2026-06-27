@@ -30,7 +30,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - no active product branch is open.
   - R5 Screen Audit And Visual Noise is closed.
   - R6 Worker Onboarding Polish is closed.
-  - continue with R7 Pre-Production Guardrails unless the owner reports a critical product bug.
+  - R7 Pre-Production Guardrails is closed.
+  - current stabilization release packages are closed unless the owner reports a critical product bug.
 - Validation:
   - docs-only closure update: `git diff --check`.
 
@@ -45,6 +46,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Existing worker/cleaner activation/reset links explain that the new link must be saved before copying.
   - Browser smoke-check covered new worker and existing temporary-code worker flows.
   - Local tests and production build passed.
+- R7 pre-production guardrails are complete.
+  - `docs/pre-production-readiness.md` names Vercel as demo/staging and documents localStorage/demo-only limits.
+  - Backup/restore coverage was verified against `BACKUP_COLLECTIONS` and the backup model tests.
+  - Supabase/Auth/RLS/database/Railway/broad modular split remain out of scope until the owner starts that phase.
 - PR #257: Driver-board warning dismiss icon now has an explicit label.
   - The warning close icon exposes `סגירת הודעה`.
   - Warning dismiss behavior stayed unchanged.
@@ -315,10 +320,9 @@ Older completed work is available in GitHub history and, when needed, in:
 
 ## Next Exact Action
 
-1. Continue R7 Pre-Production Guardrails.
-2. Add or update the short pre-production readiness note: demo/localStorage limitations, backup/restore status, Vercel staging status, and explicit Supabase/Auth/RLS/database out-of-scope boundary.
-3. Verify backup/restore still covers the current collections before marking R7 closed.
-4. If a critical bug appears, fix the smallest concrete bug before broader polish.
+1. Ask the owner for the next product priority, or fix the next owner-reported critical bug.
+2. If no critical bug is reported, start a new explicit release package before broad work.
+3. Do not start Supabase/Auth/RLS/database/Railway/broad modular split until the owner explicitly opens that phase.
 
 ## Documentation Policy
 
