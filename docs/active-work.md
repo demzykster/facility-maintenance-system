@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-cleaning-zone-delete-actions
+### Active branch: codex/label-supplier-search-fields
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `03e0043 fix: label settings delete actions (#230)`.
+- Latest synchronized `main`: `fb12fd6 fix: label cleaning zone delete actions (#231)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `בקרת ניקיון`.
-  - make cleaning-zone checklist/window delete icon buttons self-describing.
-  - keep cleaning-zone form behavior, save logic, and layout unchanged.
+  - continue R5 on `ספקים / קבלנים`.
+  - make supplier search and add-new fields self-describing beyond placeholder text.
+  - keep supplier filtering, add behavior, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: cleaning-zone form exposes descriptive delete controls.
+  - browser smoke-check: supplier fields expose descriptive labels.
 
 ## Latest Completed Work
 
+- PR #231: Cleaning-zone delete icon buttons now expose descriptive labels.
+  - Checklist item deletes and round-window deletes are named by item/time.
+  - Cleaning-zone form behavior, save logic, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #230: General settings delete icon buttons now expose descriptive labels.
   - Wait-reason and downtime-level delete actions are named by item.
   - Wait-reason/downtime behavior, blocking, and save logic stayed unchanged.
