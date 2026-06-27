@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-task-search-field
+### Active branch: codex/label-audit-log-search-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `2a3db82 fix: label pm unit search field (#234)`.
+- Latest synchronized `main`: `52c1e17 fix: label task search field (#235)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `מטלות`.
-  - make the main task search field self-describing beyond placeholder text.
-  - keep task filtering, search behavior, and layout unchanged.
+  - continue R5 on `יומן פעילות`.
+  - make the activity-log search field self-describing beyond placeholder text.
+  - keep activity-log filtering, export, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: task search exposes a descriptive label.
+  - browser smoke-check: activity-log search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #235: Task search field now exposes a descriptive label.
+  - The main `מטלות` search input no longer relies only on placeholder text.
+  - Task filtering, search behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #234: PM/unit picker search field now exposes a descriptive label.
   - The unit picker search used by PM scheduling no longer relies only on placeholder text.
   - Unit-picker filtering, selection behavior, and layout stayed unchanged.

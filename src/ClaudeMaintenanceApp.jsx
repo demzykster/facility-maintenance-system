@@ -1939,7 +1939,7 @@ function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket }) {
     <SectionTitle><Clock size={15} /> יומן פעילות</SectionTitle>
     <div className="hint" style={{ marginBottom: 10 }}>תיעוד כרונולוגי של פעולות על קריאות. הקליקו על שורה לצפייה בכל היסטוריית הקריאה.</div>
     {session.role !== "admin" && <div className="seg-tabs s2" style={{ maxWidth: 320, marginBottom: 10 }}><button className={!mine ? "on" : ""} onClick={() => setMine(false)}>כל הפעילות</button><button className={mine ? "on" : ""} onClick={() => setMine(true)}>הפעולות שלי</button></div>}
-    <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר קריאה, טקסט, מבצע…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש ביומן פעילות לפי מספר קריאה, טקסט או מבצע" placeholder="חיפוש לפי מספר קריאה, טקסט, מבצע…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="תקופה" value={period} onChange={setPeriod}><option value="7">7 ימים</option><option value="30">30 ימים</option><option value="90">90 ימים</option><option value="365">שנה</option></Sel>
       <Sel label="פעולה" value={kind} onChange={setKind}>{LOG_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}<option value="other">אחר</option></Sel>
