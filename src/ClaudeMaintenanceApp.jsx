@@ -3726,7 +3726,7 @@ function PpeSignTemplate({ config, onSave }) {
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><FileText size={15} /> תבנית אישור קבלת ציוד (חתימה)</SectionTitle></div>
     <div className="hint" style={{ marginBottom: 6 }}>ההצהרה שהעובד חותם עליה באישור הקבלה. שדות אוטומטיים: {"{שם}, {מספר}, {מחלקה}, {תאריך}"}. טבלת הפריטים ותנאי הקיזוז מתווספים אוטומטית.</div>
-    <textarea rows={5} value={txt} onChange={(e) => setTxt(e.target.value)} style={{ width: "100%" }} />
+    <textarea rows={5} aria-label="תבנית אישור קבלת ציוד" value={txt} onChange={(e) => setTxt(e.target.value)} style={{ width: "100%" }} />
     <button className="btn-primary" style={{ marginTop: 10 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת תבנית"}</button>
   </>);
 }
