@@ -128,6 +128,54 @@ describe("file API handler", () => {
     expect(driver.delete).toHaveBeenCalledWith("tickets/T-1/before.jpg", expect.any(Object));
   });
 
+  it("writes audit events for upload and delete, but not download", async () => {
+    const driver = {
+      upload: vi.fn().mockResolvedValue(undefined),
+      download: vi.fn().mockResolvedValue({
+        contentType: "image/jpeg",
+        buffer: Buffer.from("photo-bytes")
+      }),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createFileApiHandler({
+      driver,
+      auditDriver,
+      sessionClient: activeSessionClient()
+    });
+
+    await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" },
+      body: { contentType: "image/jpeg", data: Buffer.from("photo-bytes").toString("base64") }
+    });
+    await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" }
+    });
+    await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" }
+    });
+
+    expect(auditDriver.write).toHaveBeenCalledTimes(2);
+    expect(auditDriver.write).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      actorId: "app-user-1",
+      entityType: "file",
+      entityId: "tickets/T-1/before.jpg",
+      action: "upload",
+      after: expect.objectContaining({ path: "tickets/T-1/before.jpg" }),
+      metadata: expect.objectContaining({ contentType: "image/jpeg" })
+    }));
+    expect(auditDriver.write).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      entityType: "file",
+      entityId: "tickets/T-1/before.jpg",
+      action: "delete"
+    }));
+  });
+
   it("rejects unsafe or missing storage paths", async () => {
     const driver = { download: vi.fn() };
     const handler = createFileApiHandler({

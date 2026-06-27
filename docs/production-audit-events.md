@@ -52,7 +52,7 @@ The sensitive KV bridge now also knows which protected key families should produ
 - `ppe:*`, `ppeitem:*`, `ppenorm:*`, `ppeorder:*` -> PPE changes;
 - `czone:*`, `cabsence:*` -> cleaning settings changes.
 
-`/api/kv` can now send audit events for successful sensitive writes when a server-side audit sink is configured. Without an audit sink, existing storage behavior stays unchanged.
+`/api/kv` can now send audit events for successful sensitive writes when a server-side audit sink is configured. `/api/files` can also send audit events for successful file upload/delete operations. Without an audit sink, existing storage behavior stays unchanged.
 
 Server-only env:
 
@@ -71,4 +71,4 @@ The table is created by:
 supabase/migrations/20260627200000_audit_events.sql
 ```
 
-The next production step is to extend the same pattern to ticket lifecycle/status changes and file upload/delete events.
+The next production step is to extend the same pattern to ticket lifecycle/status changes.
