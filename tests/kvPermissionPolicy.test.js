@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   kvWritePermissionError,
   kvWritePermissionForKey,
+  sensitiveKvWriteAuditEvent,
   sessionHasKvWritePermission,
   sessionPermissionLevel
 } from "../api/kv/permissionPolicy.js";
@@ -33,5 +34,35 @@ describe("KV write permission policy", () => {
     expect(sessionPermissionLevel({ role: "user", permissions: { ppe: "request" } }, "ppe")).toBe("request");
     expect(kvWritePermissionError({ role: "user", permissions: { ppe: "request" } }, "ppeorder:po-1")).toBe("permission_required:ppe:manage");
     expect(kvWritePermissionError({ role: "user", permissions: { ppe: "manage" } }, "ppeorder:po-1")).toBeNull();
+  });
+
+  it("builds audit events for sensitive writes without changing ordinary workflow writes", () => {
+    expect(sensitiveKvWriteAuditEvent({ key: "ticket:T-001" })).toBeNull();
+
+    expect(sensitiveKvWriteAuditEvent({
+      key: "config:v1",
+      method: "PUT",
+      actor: { id: "u-1", name: "Owner", role: "admin" },
+      before: "{\"old\":true}",
+      after: "{\"new\":true}",
+      shared: true,
+      at: 1000
+    })).toMatchObject({
+      at: 1000,
+      actorId: "u-1",
+      entityType: "settings",
+      entityId: "config:v1",
+      action: "update",
+      before: { value: "{\"old\":true}" },
+      after: { value: "{\"new\":true}" },
+      metadata: { key: "config:v1", shared: true, requiredPermission: "settings:manage" }
+    });
+
+    expect(sensitiveKvWriteAuditEvent({ key: "ppeorder:po-1", method: "DELETE" })).toMatchObject({
+      entityType: "ppe",
+      entityId: "ppeorder:po-1",
+      action: "delete",
+      metadata: { requiredPermission: "ppe:manage" }
+    });
   });
 });
