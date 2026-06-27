@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/polish-analytics-asset-labels
+### Active branch: codex/label-ppe-movement-search
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `87541cf fix: label ticket search field (#227)`.
+- Latest synchronized `main`: `a4e3458 fix: polish analytics asset wording (#228)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `אנליטיקה`.
-  - replace the visible asset-calque wording `אקטיב/אקטיבים` with clearer CMMS Hebrew.
-  - keep analytics calculations, filters, and drill-down behavior unchanged.
+  - continue R5 on `ביגוד עובדים`.
+  - make the inventory movement search field self-describing beyond placeholder text.
+  - keep movement search, filtering, export, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: analytics screen renders the updated labels.
+  - browser smoke-check: PPE movement search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #228: Analytics asset wording now uses clearer Hebrew.
+  - Visible `אקטיב/אקטיבים` wording was replaced with `כלים/ציוד`.
+  - Analytics calculations, filters, and drill-down behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #227: Ticket search field now exposes a stable descriptive label.
   - The `קריאות` search input no longer relies only on placeholder text.
   - Search behavior and layout stayed unchanged.
