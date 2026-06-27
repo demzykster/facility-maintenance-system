@@ -46,6 +46,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 sensitive KV write guard is complete.
+  - `/api/kv` now checks existing module permission levels before Supabase-authenticated `PUT`/`DELETE` on sensitive bridge keys.
+  - User records require `users:manage`; system/fleet/settings bridge records require `settings:manage`; PPE catalog/order records require `ppe:manage`.
+  - Ordinary workflow records such as tickets, PPE requests, cleaning rounds, and cleaning complaints remain available to active authenticated users until those flows move to normalized tables/RLS.
+  - Local tests, production build, production-mode API build, and release checks passed.
 - R9 first-admin bootstrap contract is complete.
   - `POST /api/bootstrap/admin` is disabled by default and requires `CMMS_BOOTSTRAP_ENABLED=true`, `CMMS_BOOTSTRAP_TOKEN`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`.
   - The endpoint creates the initial admin through Supabase Auth Admin semantics and never returns the temporary password.

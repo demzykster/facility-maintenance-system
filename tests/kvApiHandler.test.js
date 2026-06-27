@@ -184,4 +184,138 @@ describe("kv API handler", () => {
     expect(res.json()).toEqual({ error: "password_change_required" });
     expect(driver.get).not.toHaveBeenCalled();
   });
+
+  it("blocks sensitive Supabase-authenticated writes without the matching module permission", async () => {
+    const driver = { set: vi.fn() };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "user",
+        name: "Manager",
+        active: true,
+        permissions: { users: "view" },
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "user:worker-1", shared: "1" },
+      body: { value: "{}" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:users:manage" });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("allows sensitive Supabase-authenticated writes with the matching module permission", async () => {
+    const driver = { set: vi.fn().mockResolvedValue(undefined) };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "user",
+        name: "Manager",
+        active: true,
+        permissions: { users: "manage" },
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "user:worker-1", shared: "1" },
+      body: { value: "{\"id\":\"worker-1\"}" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    expect(driver.set).toHaveBeenCalledWith("user:worker-1", "{\"id\":\"worker-1\"}", true);
+  });
+
+  it("allows admins to write sensitive Supabase-authenticated records", async () => {
+    const driver = { delete: vi.fn().mockResolvedValue(undefined) };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "admin",
+        name: "Owner",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "config:v1", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    expect(driver.delete).toHaveBeenCalledWith("config:v1", true);
+  });
+
+  it("keeps ordinary workflow writes available to active Supabase-authenticated users", async () => {
+    const driver = { set: vi.fn().mockResolvedValue(undefined) };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "user",
+        name: "Reporter",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const ticket = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "ticket:T-001", shared: "1" },
+      body: { value: "{\"id\":\"T-001\"}" }
+    });
+    const ppeRequest = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "ppereq:req-1", shared: "1" },
+      body: { value: "{\"id\":\"req-1\"}" }
+    });
+
+    expect(ticket.statusCode).toBe(200);
+    expect(ppeRequest.statusCode).toBe(200);
+    expect(driver.set).toHaveBeenCalledWith("ticket:T-001", "{\"id\":\"T-001\"}", true);
+    expect(driver.set).toHaveBeenCalledWith("ppereq:req-1", "{\"id\":\"req-1\"}", true);
+  });
 });
