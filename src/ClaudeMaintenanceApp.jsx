@@ -22,7 +22,7 @@ import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
-import { changeProductionPassword, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady } from "./productionLoginAdapter.js";
+import { changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -36,6 +36,7 @@ const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מ
 const APP_MODE = appModeFromEnv(import.meta.env);
 const SEED_POLICY = seedPolicyForMode(APP_MODE);
 const PRODUCTION_LOGIN_CONFIG = productionLoginConfigFromEnv(import.meta.env);
+const PRODUCTION_AUTH_STORE = createProductionAuthStore();
 
 const TRACKS = {
   facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
@@ -1164,7 +1165,12 @@ export default function App() {
     }
     setUsers(us);
     // הצי אינו נטען אוטומטית: מצב ברירת המחדל ריק. הצי האמיתי (FLEET_SEED) נטען יחד עם «טען נתוני דמו».
-    const s = await store.get("session:v1", false); if (s) try { const ss = JSON.parse(s); if (us.find((u) => u.id === ss.id && u.active)) setSession(ss); } catch {}
+    if (SEED_POLICY.requiresServerBootstrapAdmin) {
+      const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
+      if (restored?.session) setSession(restored.session);
+    } else {
+      const s = await store.get("session:v1", false); if (s) try { const ss = JSON.parse(s); if (us.find((u) => u.id === ss.id && u.active)) setSession(ss); } catch {}
+    }
     await reloadAll();
     } catch (e) { console.error("init error", e); }
     finally { setReady(true); }
@@ -1282,8 +1288,16 @@ export default function App() {
   const setShift = async (on) => { if (!session) return; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); };
   const beat = async () => { if (!session || session.role !== "tech") return; const cur = presence.find((x) => x.id === session.id); if (!cur || !cur.onShift || cur.day !== todayKey()) return; const rec = { ...cur, lastSeen: Date.now() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); };
   useEffect(() => { if (!session || session.role !== "tech") return; const id = setInterval(beat, 60000); return () => clearInterval(id); }, [session, presence]);
-  const login = async (s) => { setSession(s); await store.set("session:v1", JSON.stringify(s), false); };
-  const logout = async () => { setActAs(null); setSession(null); await store.del("session:v1", false); };
+  const login = async (s, options = {}) => {
+    setSession(s);
+    if (s?.productionSession) {
+      await store.del("session:v1", false);
+      if (options.productionAuth) PRODUCTION_AUTH_STORE.set(options.productionAuth, { remember: options.remember === true });
+      return;
+    }
+    await store.set("session:v1", JSON.stringify(s), false);
+  };
+  const logout = async () => { setActAs(null); setSession(null); PRODUCTION_AUTH_STORE.clear(); await store.del("session:v1", false); };
   const toggleTheme = async () => { const n = theme === "light" ? "dark" : "light"; setTheme(n); await store.set("theme:v1", n, false); };
 
   const techNames = users.filter((u) => u.role === "tech" && u.active !== false).map((u) => u.name);
@@ -1684,13 +1698,13 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
         const result = await loginWithProductionPassword({ email: resolved.user.email, password, config: productionLoginConfig });
         remember_save({ email: resolved.user.email, mode: "production" });
         if (result.mustChangePassword) {
-          setPasswordChange({ accessToken: result.accessToken, session: result.session });
+          setPasswordChange({ accessToken: result.accessToken, auth: result.auth, session: result.session });
           setPassword("");
           setNewPassword("");
           setNewPasswordConfirm("");
           return;
         }
-        await onLogin(result.session);
+        await onLogin(result.session, { productionAuth: result.auth, remember });
       } catch (error) {
         setErr(error?.message === "production_login_not_configured" ? "כניסת ייצור עדיין לא הוגדרה בשרת" : "הכניסה נכשלה. בדקו דוא״ל וסיסמה או פנו למנהל המערכת");
       } finally {
@@ -1712,7 +1726,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     setErr("");
     try {
       const result = await changeProductionPassword({ accessToken: passwordChange.accessToken, newPassword, config: productionLoginConfig });
-      await onLogin(result.session);
+      await onLogin(result.session, { productionAuth: passwordChange.auth, remember });
     } catch (error) {
       setErr(error?.message === "production_login_not_configured" ? "כניסת ייצור עדיין לא הוגדרה בשרת" : "לא ניתן היה להחליף סיסמה. נסו שוב או פנו למנהל המערכת");
     } finally {

@@ -48,8 +48,9 @@ The production login adapter is documented in `docs/supabase-session-adapter.md`
 
 Mandatory first-password-change enforcement is documented in `docs/supabase-session-adapter.md`.
 
+Production session persistence is documented in `docs/supabase-session-adapter.md`.
+
 The next steps are:
 
 1. Keep demo/local login unchanged for non-production modes.
-2. Decide production session persistence strategy.
-3. Expand table-specific RLS as each business table moves from local storage to Postgres.
+2. Expand table-specific RLS as each business table moves from local storage to Postgres.
