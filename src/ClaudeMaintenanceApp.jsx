@@ -13,7 +13,7 @@ import * as XLSX from "xlsx";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
-import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "./workerAccessModel.js";
+import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
@@ -5685,10 +5685,12 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const [activationToken, setActivationToken] = useState(() => user.activationToken || (shouldSeedWorkerActivation(user, initialRole, canWorkerAccess) ? uid() : ""));
+  const [copiedActivation, setCopiedActivation] = useState(false);
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
   const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
   const activationLink = activationToken ? `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(activationToken)}` : "";
   const canCopyLink = canCopyActivationLink(user, activationToken, canWorkerAccess);
+  const activationHint = workerActivationCopyHint(user, activationToken, canWorkerAccess);
   const workerCodeActivated = (role === "worker" || role === "cleaner") && user.activationStatus === "activated" && !activationToken;
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
   const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
@@ -5696,7 +5698,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     setRole(nextRole);
     if (!activationToken && !pin.trim() && shouldSeedWorkerActivation(user, nextRole, canWorkerAccess)) setActivationToken(uid());
   };
-  const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
+  const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); setCopiedActivation(true); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); setCopiedActivation(true); } } catch (e) {} };
   const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
     const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
     return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select aria-label={`הרשאה: ${label}`} value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
@@ -5769,10 +5771,10 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
         <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{activationToken ? "ממתין להפעלה: שלחו לעובד את הקישור והוא יגדיר קוד אישי בעצמו." : workerCodeActivated ? "הופעל: העובד הגדיר קוד אישי. הקוד אינו מוצג למנהלים." : pin.trim() ? "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהעובד יחליף אותו בקוד אישי." : "טרם הוגדר קוד כניסה. צרו קישור הפעלה או הזינו קוד זמני."}</div></div>
         {canWorkerAccess ? <>
-          <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); }}>{workerCodeActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
+          <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); setCopiedActivation(false); }}>{workerCodeActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
           {activationToken && (canCopyLink
-            ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> העתק קישור</button><div className="hint">הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>
-            : <div className="hint">הקישור יהיה זמין להעתקה כאן מיד אחרי שמירת העובד.</div>)}
+            ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> {copiedActivation ? "הועתק" : "העתק קישור"}</button><div className="hint">{activationHint} הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>
+            : <div className="hint">{activationHint}</div>)}
           {!workerCodeActivated && !activationToken && <label className="field"><span>קוד כניסה זמני *</span><input value={pin} onChange={(e) => { setPin(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהעובד יגדיר קוד בעצמו.</div></label>}
           {workerCodeActivated && <div className="hint">לא מציגים קוד אישי קיים. אם העובד שכח את הקוד, צרו קישור איפוס ושלחו אותו מחדש.</div>}
         </> : <div className="hint">ניהול קוד כניסה או קישור הפעלה דורש הרשאת הפעלת כניסה לעובדים. שמירת פרטי העובד לא תשנה את הגדרת הכניסה הקיימת.</div>}
@@ -5789,7 +5791,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         </>
       )}
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>{lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש"}</button>
+      <button className="btn-primary full" onClick={save}>{(role === "worker" || role === "cleaner") && activationToken && !canCopyLink ? "שמירת עובד והצגת קישור" : (lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש")}</button>
       {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
       {canDelete && !(onArchive && ["worker", "cleaner", "tech"].includes(role)) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />

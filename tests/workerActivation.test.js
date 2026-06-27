@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerLoginStateText } from "../src/workerAccessModel.js";
+import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "../src/workerAccessModel.js";
 
 function createActivationLink(user, token) {
   return {
@@ -39,6 +39,17 @@ describe("worker activation rules", () => {
     expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, false)).toBe(false);
     expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, true)).toBe(true);
     expect(canCopyActivationLink(savedWorker, "token-not-saved-yet", true)).toBe(false);
+  });
+
+  it("explains when activation links must be saved before copying", () => {
+    const unsavedWorker = createActivationLink({ role: "worker", workerNo: "4010" }, "token-1");
+    const savedWorker = { ...unsavedWorker, id: "user-4010" };
+
+    expect(workerActivationCopyHint(unsavedWorker, unsavedWorker.activationToken, true)).toContain("שמרו את העובד");
+    expect(workerActivationCopyHint(savedWorker, "token-2", true)).toContain("ההפעלה/האיפוס");
+    expect(workerActivationCopyHint(savedWorker, savedWorker.activationToken, true)).toContain("זמין להעתקה");
+    expect(workerActivationCopyHint(savedWorker, savedWorker.activationToken, false)).toBe("");
+    expect(workerActivationCopyHint(savedWorker, "", true)).toBe("");
   });
 
   it("keeps saved pending worker forms open so the saved activation link can be copied", () => {
