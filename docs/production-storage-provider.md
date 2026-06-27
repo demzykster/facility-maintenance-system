@@ -148,6 +148,7 @@ Production release checks also require file/photo storage to be explicitly confi
 ```env
 CMMS_FILE_DRIVER=supabase
 CMMS_FILE_BUCKET=cmms-files
+CMMS_FILE_METADATA_DRIVER=supabase
 ```
 
 See `docs/production-file-storage.md`.

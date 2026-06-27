@@ -13,11 +13,12 @@ Required server env for release readiness:
 ```env
 CMMS_FILE_DRIVER=supabase
 CMMS_FILE_BUCKET=cmms-files
+CMMS_FILE_METADATA_DRIVER=supabase
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-The release gate only accepts production mode when file storage is explicitly configured. This prevents a false production-ready state while photos still rely on browser/KV string storage.
+The release gate only accepts production mode when file storage and file ownership metadata storage are explicitly configured. This prevents a false production-ready state while photos still rely on browser/KV string storage or upload without durable ownership rows.
 
 ## Current Boundary
 

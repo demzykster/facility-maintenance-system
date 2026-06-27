@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/cleaning-complaint-issue-metadata`
+### Active branch: `codex/require-file-metadata-gate`
 
-- Status: this PR adds a dedicated metadata kind for cleaning complaint issue photos and sends it through the production file API upload path.
-- Latest synchronized `main`: `2b69133 [skip vercel] feat: send cleaning photo metadata`.
+- Status: this PR requires Supabase file metadata storage in the production release gate.
+- Latest synchronized `main`: `b93260e [skip vercel] feat: tag cleaning complaint issue photos`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: give nested cleaning complaint issue photos their own file metadata kind instead of mislabeling them.
-  - next production step: review remaining production file flows beyond ticket and cleaning photos.
+  - current production step: block production mode unless file ownership metadata has a Supabase sink.
+  - next production step: review remaining production backend gaps after file bytes, metadata, audit, and auth/session gates.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -38,16 +38,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/cleaningPhotoStorage.test.js tests/fileMetadataModel.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/productionConfigGateModel.test.js --reporter=verbose` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` failed as expected with `production_requires_supabase_file_metadata_driver`.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - Browser smoke-check not needed: this branch changes only server-side model/permission policy/docs, not UI/runtime wiring.
 
 ## Latest Completed Work
 
+- R9 cleaning complaint issue file metadata is complete in PR #310.
+  - Nested cleaning complaint issue photos now have a dedicated `cleaning_complaint_issue_photo` metadata kind.
+  - Production+API cleaning complaint issue photo uploads now include explicit file metadata.
+  - Local tests, production builds, and release checks passed.
 - R9 cleaning photo metadata upload is complete in PR #309.
   - Production+API cleaning complaint main photos and cleaning round issue photos now include explicit file metadata.
   - Nested cleaning complaint issue photos were intentionally left for a dedicated metadata kind.

@@ -40,6 +40,7 @@ describe("productionConfigGateModel", () => {
         "production_requires_supabase_service_role_key",
         "production_requires_supabase_file_storage",
         "production_requires_file_storage_bucket",
+        "production_requires_supabase_file_metadata_driver",
         "production_requires_supabase_audit_driver"
       ]
     });
@@ -62,8 +63,38 @@ describe("productionConfigGateModel", () => {
       errors: [
         "production_requires_supabase_file_storage",
         "production_requires_file_storage_bucket",
+        "production_requires_supabase_file_metadata_driver",
         "production_requires_supabase_audit_driver"
       ]
+    });
+  });
+
+  it("blocks production mode when file metadata storage is not configured", () => {
+    expect(productionConfigGate({
+      appMode: "production",
+      storageProvider: "api",
+      storageApiBaseUrl: "https://cmms.example/api",
+      kvServer: {
+        auth: "supabase",
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      },
+      fileStorage: {
+        driver: "supabase",
+        bucket: "cmms-files",
+        supabaseUrl: "https://supabase.example",
+        supabaseServiceRoleKey: "service"
+      },
+      audit: {
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseServiceRoleKey: "service"
+      }
+    })).toMatchObject({
+      ok: false,
+      errors: ["production_requires_supabase_file_metadata_driver"]
     });
   });
 
@@ -82,6 +113,7 @@ describe("productionConfigGateModel", () => {
       fileStorage: {
         driver: "supabase",
         bucket: "cmms-files",
+        metadataDriver: "supabase",
         supabaseUrl: "https://supabase.example",
         supabaseServiceRoleKey: "service"
       }
@@ -91,7 +123,7 @@ describe("productionConfigGateModel", () => {
     });
   });
 
-  it("allows production mode only after api storage, Supabase KV, file storage, and audit storage are configured", () => {
+  it("allows production mode only after api storage, Supabase KV, file storage, file metadata, and audit storage are configured", () => {
     expect(productionConfigGate({
       appMode: "production",
       storageProvider: "api",
@@ -106,6 +138,7 @@ describe("productionConfigGateModel", () => {
       fileStorage: {
         driver: "supabase",
         bucket: "cmms-files",
+        metadataDriver: "supabase",
         supabaseUrl: "https://supabase.example",
         supabaseServiceRoleKey: "service"
       },
@@ -135,7 +168,8 @@ describe("productionConfigGateModel", () => {
       },
       fileStorage: {
         driver: "supabase",
-        bucket: "cmms-files"
+        bucket: "cmms-files",
+        metadataDriver: "supabase"
       },
       audit: { driver: "supabase" },
       ai: { mode: "client" }

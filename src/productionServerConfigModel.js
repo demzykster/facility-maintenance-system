@@ -35,6 +35,8 @@ export function fileStorageConfigFromEnv(env = {}) {
   return {
     driver: String(env.CMMS_FILE_DRIVER || "").trim().toLowerCase(),
     bucket: String(env.CMMS_FILE_BUCKET || "").trim(),
+    metadataDriver: String(env.CMMS_FILE_METADATA_DRIVER || "").trim().toLowerCase(),
+    metadataTable: String(env.CMMS_FILE_METADATA_SUPABASE_TABLE || "file_metadata").trim(),
     supabaseUrl: String(env.SUPABASE_URL || "").trim(),
     supabaseServiceRoleKey: String(env.SUPABASE_SERVICE_ROLE_KEY || "").trim()
   };
@@ -72,6 +74,7 @@ export function productionFileStoragePolicy({ appMode = "demo", fileStorage = {}
   if (requiresFileStorage) {
     if (fileStorage.driver !== "supabase") errors.push("production_requires_supabase_file_storage");
     if (!fileStorage.bucket) errors.push("production_requires_file_storage_bucket");
+    if (fileStorage.metadataDriver !== "supabase") errors.push("production_requires_supabase_file_metadata_driver");
     if (!fileStorage.supabaseUrl) errors.push("production_requires_supabase_url");
     if (!fileStorage.supabaseServiceRoleKey) errors.push("production_requires_supabase_service_role_key");
   }
