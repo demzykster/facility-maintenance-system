@@ -1,5 +1,6 @@
 import { createUpstashKvDriverFromEnv } from "./upstashDriver.js";
 import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
+import { kvWritePermissionError } from "./permissionPolicy.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 
 const json = (res, status, body) => {
@@ -89,6 +90,11 @@ export function createKvApiHandler({ driver = null, env = process.env, fetchImpl
         return json(res, 200, { keys });
       }
       if (!key) return json(res, 400, { error: "key_required" });
+
+      if ((method === "PUT" || method === "DELETE") && auth.user) {
+        const permissionError = kvWritePermissionError(auth.user, key);
+        if (permissionError) return json(res, 403, { error: permissionError });
+      }
 
       if (method === "GET") {
         const value = await backendDriver.get(key, shared);

@@ -112,6 +112,15 @@ SUPABASE_ANON_KEY=...
 
 In this mode `/api/kv` accepts the frontend's Supabase access token, verifies the linked CMMS `app_users` profile, blocks disabled users, and blocks users that still require first-password change.
 
+Supabase-authenticated `PUT`/`DELETE` requests also apply a server-side sensitive-write guard for the bridge keys that can change system structure or privileged data:
+
+- `user:*` requires `users:manage`;
+- `config:v1`, `fleet:*`, `pm:*`, `insp:*`, `itpl:*`, `czone:*`, and `cabsence:*` require `settings:manage`;
+- `ppe:*`, `ppeitem:*`, `ppenorm:*`, and `ppeorder:*` require `ppe:manage`;
+- ordinary workflow bridge records such as tickets, PPE requests, cleaning rounds, and cleaning complaints remain writable by an active authenticated user until those flows move to normalized tables/RLS.
+
+This is an interim server permission layer for the KV bridge. It does not replace final normalized Supabase tables and row-level policies.
+
 ## Production Gate
 
 `VITE_CMMS_APP_MODE=production` is not production-data-ready unless:
