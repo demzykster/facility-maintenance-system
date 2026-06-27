@@ -133,6 +133,7 @@ Production requirement:
 - `public.app_users` is the first Supabase profile/RLS table and is linked to `auth.users`.
 - `GET /api/session/me` defines the first server-side Supabase Auth + `public.app_users` session lookup.
 - Production login now uses Supabase Auth plus `/api/session/me`; demo/test login remains local.
+- `POST /api/session/change-password` enforces the first administrator password-change flow before normal production app entry.
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 
 ## Monolith Extraction Policy

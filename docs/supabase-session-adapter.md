@@ -42,8 +42,22 @@ This endpoint is that boundary. It does not use the service role key. It uses th
 
 Demo and test modes keep the existing local/demo login flow.
 
+## Mandatory First Password Change
+
+`POST /api/session/change-password` accepts the user's Supabase access token and a new password.
+
+The endpoint:
+
+1. verifies the current Supabase Auth user;
+2. verifies the linked `public.app_users` profile;
+3. only proceeds when `must_change_password` is true;
+4. updates the Supabase Auth password;
+5. clears `public.app_users.must_change_password`;
+6. returns a fresh normalized CMMS session.
+
+The frontend blocks normal production app entry while `mustChangePassword` is true and shows the first-password-change form instead.
+
 ## Next Steps
 
-1. Enforce `mustChangePassword` in the production login/session flow.
-2. Decide whether production sessions should persist through refresh via a dedicated token/session storage strategy.
-3. Continue moving data writes behind server/RLS.
+1. Decide whether production sessions should persist through refresh via a dedicated token/session storage strategy.
+2. Continue moving data writes behind server/RLS.

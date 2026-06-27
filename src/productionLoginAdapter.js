@@ -15,7 +15,8 @@ export function productionLoginConfigFromEnv(env = {}) {
   return {
     supabaseUrl: trimSlash(env.VITE_SUPABASE_URL || env.SUPABASE_URL),
     supabaseAnonKey: String(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || "").trim(),
-    sessionApiUrl: String(env.VITE_CMMS_SESSION_API_URL || "/api/session/me").trim() || "/api/session/me"
+    sessionApiUrl: String(env.VITE_CMMS_SESSION_API_URL || "/api/session/me").trim() || "/api/session/me",
+    changePasswordApiUrl: String(env.VITE_CMMS_CHANGE_PASSWORD_API_URL || "/api/session/change-password").trim() || "/api/session/change-password"
   };
 }
 
@@ -83,7 +84,27 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
 
       return {
         session: cmmsSessionFromProductionUser(sessionData.user),
+        accessToken: authData.access_token,
         mustChangePassword: sessionData.user?.mustChangePassword === true
+      };
+    },
+    async changePassword({ accessToken, newPassword }) {
+      if (!accessToken || !newPassword) throw new Error("access_token_and_password_required");
+      const response = await fetchImpl(config.changePasswordApiUrl || "/api/session/change-password", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ newPassword })
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || "password_change_failed");
+      }
+      return {
+        session: cmmsSessionFromProductionUser(data.user),
+        mustChangePassword: data.user?.mustChangePassword === true
       };
     }
   };
@@ -93,4 +114,10 @@ export async function loginWithProductionPassword({ email, password, config, fet
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
   return client.signInWithPassword({ email, password });
+}
+
+export async function changeProductionPassword({ accessToken, newPassword, config, fetchImpl } = {}) {
+  const client = createProductionLoginClient({ config, fetchImpl });
+  if (!client) throw new Error("production_login_not_configured");
+  return client.changePassword({ accessToken, newPassword });
 }

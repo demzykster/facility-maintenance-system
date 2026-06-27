@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  changeProductionPassword,
   cmmsSessionFromProductionUser,
   createProductionLoginClient,
   loginWithProductionPassword,
@@ -12,7 +13,8 @@ describe("productionLoginAdapter", () => {
     expect(productionLoginConfigFromEnv({ VITE_SUPABASE_URL: " https://supabase.example/// ", VITE_SUPABASE_ANON_KEY: "anon" })).toEqual({
       supabaseUrl: "https://supabase.example",
       supabaseAnonKey: "anon",
-      sessionApiUrl: "/api/session/me"
+      sessionApiUrl: "/api/session/me",
+      changePasswordApiUrl: "/api/session/change-password"
     });
     expect(productionLoginReady(productionLoginConfigFromEnv({}))).toBe(false);
     expect(productionLoginReady(productionLoginConfigFromEnv({ VITE_SUPABASE_URL: "https://supabase.example", VITE_SUPABASE_ANON_KEY: "anon" }))).toBe(true);
@@ -86,6 +88,7 @@ describe("productionLoginAdapter", () => {
       role: "admin",
       productionSession: true
     });
+    expect(result.accessToken).toBe("access-token");
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/token?grant_type=password", expect.objectContaining({
       method: "POST",
       headers: expect.objectContaining({ apikey: "anon-key" })
@@ -103,5 +106,49 @@ describe("productionLoginAdapter", () => {
   it("fails closed when production login is not configured", async () => {
     await expect(loginWithProductionPassword({ email: "owner@example.com", password: "secret", config: {} }))
       .rejects.toThrow("production_login_not_configured");
+  });
+
+  it("changes a mandatory production password through the CMMS endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          user: {
+            id: "app-user-1",
+            authUserId: "auth-user-1",
+            email: "owner@example.com",
+            name: "Owner",
+            role: "admin",
+            permissions: {},
+            mustChangePassword: false
+          }
+        });
+      }
+    });
+
+    const result = await changeProductionPassword({
+      accessToken: "access-token",
+      newPassword: "new-long-password",
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me",
+        changePasswordApiUrl: "/api/session/change-password"
+      },
+      fetchImpl
+    });
+
+    expect(result.session).toMatchObject({
+      id: "app-user-1",
+      authUserId: "auth-user-1",
+      mustChangePassword: false,
+      productionSession: true
+    });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/change-password", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ authorization: "Bearer access-token" }),
+      body: JSON.stringify({ newPassword: "new-long-password" })
+    }));
   });
 });
