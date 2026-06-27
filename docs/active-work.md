@@ -21,14 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/supabase-file-metadata-sink`
+### Active branch: `codex/file-api-metadata-upsert`
 
-- Status: this PR adds the concrete Supabase file metadata sink/table.
-- Latest synchronized `main`: `3450d74 [skip vercel] feat: audit ticket status changes`.
+- Status: this PR lets `/api/files` persist provided upload metadata through a configured metadata sink.
+- Latest synchronized `main`: `65b8ab1 [skip vercel] feat: add supabase file metadata sink`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: add durable Supabase `file_metadata` sink/table for protected file ownership metadata.
+  - current production step: wire optional upload metadata into `/api/files` without changing frontend upload callers yet.
   - next production step: pass explicit metadata from ticket/cleaning upload flows into `/api/files`.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
@@ -38,7 +38,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/supabaseFileMetadataDriver.test.js tests/fileMetadataModel.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/fileApiHandler.test.js tests/fileMetadataModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -48,6 +48,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 Supabase file metadata sink is complete in PR #306.
+  - `api/files/supabaseFileMetadataDriver.js` can upsert and soft-delete `public.file_metadata` rows.
+  - `supabase/migrations/20260627201000_file_metadata.sql` creates `public.file_metadata`.
+  - Upload flows are not yet passing metadata automatically.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 ticket status audit is complete in PR #305.
   - `/api/kv` writes audit events when stored `ticket:*` records change `status`.
   - Ticket saves without a status change do not create audit noise.
