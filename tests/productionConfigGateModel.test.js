@@ -39,7 +39,8 @@ describe("productionConfigGateModel", () => {
         "production_requires_supabase_anon_key",
         "production_requires_supabase_service_role_key",
         "production_requires_supabase_file_storage",
-        "production_requires_file_storage_bucket"
+        "production_requires_file_storage_bucket",
+        "production_requires_supabase_audit_driver"
       ]
     });
   });
@@ -60,12 +61,13 @@ describe("productionConfigGateModel", () => {
       ok: false,
       errors: [
         "production_requires_supabase_file_storage",
-        "production_requires_file_storage_bucket"
+        "production_requires_file_storage_bucket",
+        "production_requires_supabase_audit_driver"
       ]
     });
   });
 
-  it("allows production mode only after api storage, Supabase KV, and file storage are configured", () => {
+  it("blocks production mode when audit storage is not configured", () => {
     expect(productionConfigGate({
       appMode: "production",
       storageProvider: "api",
@@ -84,9 +86,38 @@ describe("productionConfigGateModel", () => {
         supabaseServiceRoleKey: "service"
       }
     })).toMatchObject({
+      ok: false,
+      errors: ["production_requires_supabase_audit_driver"]
+    });
+  });
+
+  it("allows production mode only after api storage, Supabase KV, file storage, and audit storage are configured", () => {
+    expect(productionConfigGate({
+      appMode: "production",
+      storageProvider: "api",
+      storageApiBaseUrl: "https://cmms.example/api",
+      kvServer: {
+        auth: "supabase",
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      },
+      fileStorage: {
+        driver: "supabase",
+        bucket: "cmms-files",
+        supabaseUrl: "https://supabase.example",
+        supabaseServiceRoleKey: "service"
+      },
+      audit: {
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseServiceRoleKey: "service"
+      }
+    })).toMatchObject({
       ok: true,
       errors: [],
-      warnings: ["server_auth_rls_files_and_ai_still_require_backend_implementation"]
+      warnings: ["server_auth_rls_and_normalized_tables_still_require_backend_implementation"]
     });
   });
 
@@ -106,6 +137,7 @@ describe("productionConfigGateModel", () => {
         driver: "supabase",
         bucket: "cmms-files"
       },
+      audit: { driver: "supabase" },
       ai: { mode: "client" }
     })).toMatchObject({
       ok: false,
