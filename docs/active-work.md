@@ -46,6 +46,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production AI boundary is complete.
+  - Production defaults AI mode to `disabled`; direct browser AI provider calls are forbidden by the release gate.
+  - Browser AI controls are hidden unless frontend AI mode is explicitly `client`, which remains a demo/local mode.
+  - `docs/production-ai.md` documents the safe production modes: disabled now, server endpoint later.
+  - Local tests, production build, production-mode API build, and release checks passed.
 - R9 production file-storage gate is complete.
   - `npm run release:check` now blocks production mode unless file/photo storage is explicitly configured with `CMMS_FILE_DRIVER=supabase` and `CMMS_FILE_BUCKET`.
   - `docs/production-file-storage.md` documents that current `photo:*` KV/base64 flows remain demo/local only and must move to server-side Supabase Storage before real production use.

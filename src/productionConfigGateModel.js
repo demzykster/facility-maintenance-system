@@ -1,3 +1,4 @@
+import { productionAiPolicy } from "./aiProviderModel.js";
 import { APP_MODES, seedPolicyForMode } from "./seedPolicyModel.js";
 import { STORAGE_PROVIDERS, storageProviderPolicy } from "./storageProviderModel.js";
 import { productionFileStoragePolicy, productionKvServerPolicy } from "./productionServerConfigModel.js";
@@ -13,7 +14,8 @@ export function productionConfigGate({
   storageProvider = STORAGE_PROVIDERS.local,
   storageApiBaseUrl = "",
   kvServer = {},
-  fileStorage = {}
+  fileStorage = {},
+  ai = {}
 } = {}) {
   const seedPolicy = seedPolicyForMode(appMode);
   const storagePolicy = storageProviderPolicy({
@@ -34,6 +36,7 @@ export function productionConfigGate({
       }
     })
     : { requiresFileStorage: false, ok: true, errors: [] };
+  const aiPolicy = productionAiPolicy({ appMode, ai });
   const errors = [];
   const warnings = [];
 
@@ -43,6 +46,7 @@ export function productionConfigGate({
     if (!storagePolicy.readyForProductionData) errors.push(storagePolicy.missingReason || "production_storage_not_ready");
     pushUnique(errors, kvServerPolicy.errors);
     pushUnique(errors, fileStoragePolicy.errors);
+    pushUnique(errors, aiPolicy.errors);
     warnings.push("server_auth_rls_files_and_ai_still_require_backend_implementation");
   }
 
@@ -53,6 +57,7 @@ export function productionConfigGate({
     errors,
     warnings,
     kvServer: kvServerPolicy,
-    fileStorage: fileStoragePolicy
+    fileStorage: fileStoragePolicy,
+    ai: aiPolicy
   };
 }
