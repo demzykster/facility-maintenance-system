@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/ticket-status-audit-events`
+### Active branch: `codex/supabase-file-metadata-sink`
 
-- Status: this PR writes audit events for ticket status changes through `/api/kv` when an audit sink is configured.
-- Latest synchronized `main`: `c7cc7b7 [skip vercel] feat: audit file uploads and deletes`.
+- Status: this PR adds the concrete Supabase file metadata sink/table.
+- Latest synchronized `main`: `3450d74 [skip vercel] feat: audit ticket status changes`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: extend server-side audit events beyond sensitive KV and files to ticket lifecycle/status changes.
-  - next production step: continue normalizing production write endpoints beyond the KV bridge.
+  - current production step: add durable Supabase `file_metadata` sink/table for protected file ownership metadata.
+  - next production step: pass explicit metadata from ticket/cleaning upload flows into `/api/files`.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -38,7 +38,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/kvApiHandler.test.js tests/auditEventModel.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/supabaseFileMetadataDriver.test.js tests/fileMetadataModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -48,6 +48,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 ticket status audit is complete in PR #305.
+  - `/api/kv` writes audit events when stored `ticket:*` records change `status`.
+  - Ticket saves without a status change do not create audit noise.
+  - Local tests, production builds, and release checks passed.
 - R9 file upload/delete audit is complete in PR #304.
   - `/api/files` writes audit events for upload and delete when an audit sink is configured.
   - File downloads are intentionally not audited yet to avoid noisy/private read logs without a separate product decision.
