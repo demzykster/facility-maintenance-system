@@ -214,6 +214,26 @@ describe("file API handler", () => {
     }));
   });
 
+  it("soft-deletes file metadata by path when a file is deleted", async () => {
+    const driver = { delete: vi.fn().mockResolvedValue(undefined) };
+    const metadataDriver = { markDeletedByPath: vi.fn().mockResolvedValue(undefined) };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient()
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.delete).toHaveBeenCalledWith("tickets/T-1/before.jpg", expect.any(Object));
+    expect(metadataDriver.markDeletedByPath).toHaveBeenCalledWith("tickets/T-1/before.jpg");
+  });
+
   it("does not silently drop provided upload metadata when no metadata sink is configured", async () => {
     const driver = { upload: vi.fn() };
     const handler = createFileApiHandler({

@@ -66,4 +66,6 @@ supabase/migrations/20260627201000_file_metadata.sql
 
 Ticket photo uploads now pass explicit file metadata through `/api/files`. Cleaning complaint main photos, cleaning complaint issue photos, and cleaning round issue photos now pass explicit file metadata through `/api/files`.
 
+File deletes through `/api/files` soft-delete matching metadata rows by storage path with `deleted_at` instead of deleting ownership history.
+
 Do not treat current demo/local backup photos as production migration data.

@@ -86,6 +86,27 @@ describe("Supabase file metadata driver", () => {
     }));
   });
 
+  it("marks metadata rows deleted by path", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return "";
+      }
+    });
+    const driver = createSupabaseFileMetadataDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    await driver.markDeletedByPath("tickets/T-1/before.jpg", 2000);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/file_metadata?path=eq.tickets%2FT-1%2Fbefore.jpg", expect.objectContaining({
+      method: "PATCH",
+      body: JSON.stringify({ deleted_at: "1970-01-01T00:00:02.000Z" })
+    }));
+  });
+
   it("surfaces Supabase write failures", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: false,
