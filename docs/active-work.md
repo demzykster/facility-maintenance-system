@@ -23,20 +23,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main clean; no active product branch is open.
-- Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
-- Open PRs when this entry was written: none.
+- Status: main is expected to be clean after PR #264 is merged.
+- Latest synchronized `main`: `1aa27bf docs: close pre-production guardrails (#263)`.
+- Open PRs when this entry was written: PR #264.
 - Purpose:
-  - no active product branch is open.
-  - R5 Screen Audit And Visual Noise is closed.
-  - R6 Worker Onboarding Polish is closed.
-  - R7 Pre-Production Guardrails is closed.
-  - current stabilization release packages are closed unless the owner reports a critical product bug.
+  - no active product branch remains after PR #264 merges.
+  - next work should continue from `docs/release-checklist.md` or a new owner-reported product bug.
 - Validation:
-  - docs-only closure update: `git diff --check`.
+  - PR #264 validation: `npm test -- --run`, `npm run build`, browser smoke-check.
 
 ## Latest Completed Work
 
+- R8 Ticket Lifecycle, Export And Analytics Trust is complete in PR #264.
+  - Transport duplicate review was checked: it is scoped to the same transport unit, prioritizes open tickets, and only shows recent closed tickets when no open same-unit ticket exists.
+  - Ticket Excel export and Analytics use shared lifecycle helpers for both transport (`שינוע`) and facility/building (`מבנה`) tickets.
+  - Backdated transport equipment receipt now uses the factual transition time, so waiting time is not overcounted in lifecycle analytics/export.
+  - Local tests, production build, browser smoke-check, and Vercel passed.
 - Final R5 closure pass: Screen Audit And Visual Noise is complete.
   - Browser pass covered `קריאות`, `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, `צוות ומשתמשים`, `כלי שינוע`, and `בקרת ניקיון`.
   - Visible controls on those screens had text, an accessible label, a title, or a clear field label/placeholder context.
