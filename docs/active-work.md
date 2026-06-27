@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main clean after PR #257.
-- Latest synchronized `main`: `1e4188a fix: label driver warning dismiss button (#257)`.
+- Status: main clean; no active product branch is open.
+- Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
 - Open PRs when this entry was written: none.
 - Purpose:
   - no active product branch is open.
