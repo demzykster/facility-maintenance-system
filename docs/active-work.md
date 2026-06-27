@@ -23,11 +23,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main is expected to be clean after PR #264 is merged.
-- Latest synchronized `main`: `1aa27bf docs: close pre-production guardrails (#263)`.
-- Open PRs when this entry was written: PR #264.
+- Status: main clean; no active product branch is open.
+- Latest synchronized `main`: `01d5931 fix: honor ticket lifecycle transition time (#264)`.
+- Open PRs when this entry was written: none.
 - Purpose:
-  - no active product branch remains after PR #264 merges.
+  - no active product branch is open.
   - next work should continue from `docs/release-checklist.md` or a new owner-reported product bug.
 - Validation:
   - PR #264 validation: `npm test -- --run`, `npm run build`, browser smoke-check.
