@@ -22,7 +22,11 @@ describe("apiFileAdapter", () => {
       .mockResolvedValueOnce(ok({ ok: true }));
     const provider = createApiFileProvider({ baseUrl: "https://cmms.example/api/", fetchImpl });
 
-    await expect(provider.upload("tickets/T-1/before.jpg", { data: "abc", contentType: "image/jpeg" })).resolves.toBe(true);
+    await expect(provider.upload("tickets/T-1/before.jpg", {
+      data: "abc",
+      contentType: "image/jpeg",
+      metadata: { ownerType: "ticket", ownerId: "T-1", kind: "ticket_before_photo" }
+    })).resolves.toBe(true);
     await expect(provider.download("tickets/T-1/before.jpg")).resolves.toEqual({
       path: "tickets/T-1/before.jpg",
       contentType: "image/jpeg",
@@ -35,7 +39,11 @@ describe("apiFileAdapter", () => {
       ["https://cmms.example/api/files?path=tickets%2FT-1%2Fbefore.jpg", "GET"],
       ["https://cmms.example/api/files?path=tickets%2FT-1%2Fbefore.jpg", "DELETE"]
     ]);
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({ data: "abc", contentType: "image/jpeg" });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
+      data: "abc",
+      contentType: "image/jpeg",
+      metadata: { ownerType: "ticket", ownerId: "T-1", kind: "ticket_before_photo" }
+    });
   });
 
   it("adds the production access token when available", async () => {

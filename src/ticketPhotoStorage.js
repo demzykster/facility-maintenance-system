@@ -1,4 +1,5 @@
 import { createApiFileProvider } from "./apiFileAdapter.js";
+import { ticketPhotoMetadata } from "./fileMetadataModel.js";
 import { createProductionAuthStore } from "./productionLoginAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 
@@ -44,7 +45,12 @@ export function createTicketPhotoStorage({ appMode = "demo", provider = STORAGE_
       if (!dataUrl) return {};
       if (this.usesApi) {
         const path = ticketPhotoPath(ticketId, kind, dataUrl);
-        await files.upload(path, { data: dataUrl, contentType: dataUrlMeta(dataUrl).contentType });
+        const contentType = dataUrlMeta(dataUrl).contentType;
+        await files.upload(path, {
+          data: dataUrl,
+          contentType,
+          metadata: ticketPhotoMetadata({ id: ticketId }, kind, path, { contentType })
+        });
         return { [meta.hasField]: true, [meta.pathField]: path };
       }
       await appStore?.set?.(meta.legacyKey(ticketId), dataUrl, true);

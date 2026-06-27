@@ -64,6 +64,6 @@ supabase/migrations/20260627201000_file_metadata.sql
 
 `/api/files` accepts optional upload metadata and persists it when the metadata sink is configured. If upload metadata is provided but the sink is not configured, the upload fails with `file_metadata_not_configured` so metadata is not silently lost.
 
-Current upload flows already store protected file bytes through `/api/files` in production+API mode. The next production step is to pass explicit metadata from ticket and cleaning upload flows.
+Ticket photo uploads now pass explicit file metadata through `/api/files`. The next production step is to pass explicit metadata from cleaning complaint and cleaning round issue upload flows.
 
 Do not treat current demo/local backup photos as production migration data.
