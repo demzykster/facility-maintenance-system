@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ppe-clawback-remove
+### Active branch: codex/label-ppe-sign-template-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `f3b5215 fix: count active ppe department norms (#207)`.
+- Latest synchronized `main`: `096cf24 fix: label ppe clawback remove action (#208)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - make the icon-only remove action in `קיזוז בעזיבה` understandable.
-  - keep clawback table behavior unchanged.
+  - make the PPE signature template textarea self-describing for assistive tech and browser inspection.
+  - keep signature template behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: clawback remove buttons expose `הסר מדרגת קיזוז`.
+  - browser smoke-check: signature template textarea exposes `תבנית אישור קבלת ציוד`.
 
 ## Latest Completed Work
 
+- PR #208: PPE clawback remove action is now labeled.
+  - The icon-only remove-row buttons expose `הסר מדרגת קיזוז` as both `aria-label` and tooltip.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #207: PPE department requirement counts now ignore inactive/missing catalog items.
   - The department label no longer reports stale hidden norms as active setup.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
