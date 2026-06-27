@@ -21,17 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/polish-user-card-actions-clean
 
-- Status: no active product branch.
-- Latest synchronized `main`: `c431714 fix: label user permission selects (#213)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `da5ae44 docs: close permission select ledger (#215)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - review user cards, edit/create form, permissions blocks, visual noise, and unclear controls.
-  - keep changes atomic and behavior-preserving unless a real workflow bug is found.
-- Validation pending:
-  - none.
+  - make read-only user cards non-actionable instead of dead buttons.
+  - keep editable user cards clickable for managers with manage permission.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: admin user cards remain actionable; read-only mode is represented by non-button rows in code.
 
 ## Latest Completed Work
 
