@@ -64,6 +64,8 @@ supabase/migrations/20260627201000_file_metadata.sql
 
 `/api/files` accepts optional upload metadata and persists it when the metadata sink is configured. If upload metadata is provided but the sink is not configured, the upload fails with `file_metadata_not_configured` so metadata is not silently lost.
 
-Ticket photo uploads now pass explicit file metadata through `/api/files`. The next production step is to pass explicit metadata from cleaning complaint and cleaning round issue upload flows.
+Ticket photo uploads now pass explicit file metadata through `/api/files`. Cleaning complaint main photos and cleaning round issue photos now pass explicit file metadata through `/api/files`.
+
+Cleaning complaint issue photos still need a product/model decision before wiring metadata, because they are nested issue files and should not be mislabeled as either the main complaint photo or a round issue photo.
 
 Do not treat current demo/local backup photos as production migration data.

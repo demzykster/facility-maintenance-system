@@ -1,4 +1,5 @@
 import { createApiFileProvider } from "./apiFileAdapter.js";
+import { cleaningComplaintPhotoMetadata, cleaningRoundIssuePhotoMetadata } from "./fileMetadataModel.js";
 import { createProductionAuthStore } from "./productionLoginAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 
@@ -41,21 +42,27 @@ export function createCleaningPhotoStorage({ appMode = "demo", provider = STORAG
     getAccessToken: () => authStore?.get?.()?.accessToken || ""
   }) : null);
 
-  const savePhoto = async (path, photo) => {
+  const savePhoto = async (path, photo, metadata = null) => {
     if (!photo || !files) return null;
-    await files.upload(path, { data: photo, contentType: dataUrlMeta(photo).contentType });
+    const contentType = dataUrlMeta(photo).contentType;
+    await files.upload(path, { data: photo, contentType, ...(metadata ? { metadata } : {}) });
     return path;
   };
 
-  const saveIssues = async (ownerId, issues = [], pathBuilder) => {
+  const saveIssues = async (owner, issues = [], pathBuilder, metadataBuilder = null) => {
     if (!Array.isArray(issues)) return issues;
+    const ownerId = owner?.id || owner;
     const out = [];
     for (const [index, issue] of issues.entries()) {
       if (!issue?.photo) {
         out.push(issue);
         continue;
       }
-      const photoPath = await savePhoto(pathBuilder(ownerId, issue, index, issue.photo), issue.photo);
+      const photoPath = pathBuilder(ownerId, issue, index, issue.photo);
+      const metadata = metadataBuilder ? metadataBuilder(owner, issue, photoPath, {
+        contentType: dataUrlMeta(issue.photo).contentType
+      }) : null;
+      await savePhoto(photoPath, issue.photo, metadata);
       out.push({ ...issue, photo: null, photoPath, hasPhoto: true });
     }
     return out;
@@ -67,7 +74,10 @@ export function createCleaningPhotoStorage({ appMode = "demo", provider = STORAG
       if (!this.usesApi || !complaint?.id) return complaint;
       const rec = { ...complaint };
       if (rec.photo) {
-        rec.photoPath = await savePhoto(cleaningComplaintPhotoPath(rec.id, rec.photo), rec.photo);
+        const photoPath = cleaningComplaintPhotoPath(rec.id, rec.photo);
+        rec.photoPath = await savePhoto(photoPath, rec.photo, cleaningComplaintPhotoMetadata(rec, photoPath, {
+          contentType: dataUrlMeta(rec.photo).contentType
+        }));
         rec.photo = null;
         rec.hasPhoto = true;
       }
@@ -78,7 +88,7 @@ export function createCleaningPhotoStorage({ appMode = "demo", provider = STORAG
       if (!this.usesApi || !round?.id) return round;
       return {
         ...round,
-        issues: await saveIssues(round.id, round.issues || [], cleaningRoundIssuePhotoPath)
+        issues: await saveIssues(round, round.issues || [], cleaningRoundIssuePhotoPath, cleaningRoundIssuePhotoMetadata)
       };
     },
     async load(record) {
