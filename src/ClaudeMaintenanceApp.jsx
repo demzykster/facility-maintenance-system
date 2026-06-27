@@ -4606,7 +4606,7 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, on
   const related = tickets.filter((t) => t.forkliftId === f.id).sort((a, b) => b.createdAt - a.createdAt);
   const inspections = insp.filter((i) => i.fleetId === f.id).sort((a, b) => b.at - a.at);
   const dt = related.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }}><PenLine size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }} aria-label="עריכת כלי"><PenLine size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top"><span className="badge" style={{ background: TRACKS.transport.color + "22", color: TRACKS.transport.color }}>{unitTypeName(f, config) || "כלי שינוע"}</span>{resolveHydraulics(f, config) && <span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>תסקיר</span>}</div>
       <h2 className="detail-subj">{unitDesc(f, config) || f.code}</h2>
@@ -5042,7 +5042,7 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
     onSave({ ...task, nextDue: nextWorkdayFrom(task.nextDue), history: [...(task.history || []), { type: "missed", at: now, by: session.name }] });
     onClose();
   };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">טיפול תקופתי</div>{canManage && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }}><PenLine size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">טיפול תקופתי</div>{canManage && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }} aria-label="עריכת טיפול תקופתי"><PenLine size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top"><span className="badge" style={{ color: pmColor(d), background: "var(--surface-2)" }}>{d < 0 ? `באיחור ${-d} י׳` : d === 0 ? "היום" : `בעוד ${d} ימים`}</span><span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{freqOf(task.frequency).label}</span></div>
       <h2 className="detail-subj">{f ? `${unitLabel(f, config)}` : "כלי לא ידוע"}</h2>
