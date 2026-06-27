@@ -21,14 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/file-upload-size-limit`
+### Active branch: `codex/file-path-prefix-guard`
 
-- Status: this PR adds a server-side upload size limit to `/api/files`.
-- Latest synchronized `main`: `2ab3a63 [skip vercel] feat: soft delete file metadata`.
+- Status: this PR adds a conservative allowed-prefix guard to `/api/files` paths.
+- Latest synchronized `main`: `5d9fa87 [skip vercel] feat: limit file upload size`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: reject oversized file uploads before writing to Supabase Storage or metadata.
+  - current production step: prevent active users from reading/writing arbitrary Supabase Storage bucket paths before final metadata/RLS-based authorization.
   - next production step: review remaining production backend gaps after file bytes, metadata, audit, and auth/session gates.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
@@ -48,6 +48,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 file upload size limit is complete in PR #313.
+  - `/api/files` now rejects uploads larger than `CMMS_FILE_MAX_BYTES`, defaulting to 10 MB.
+  - Oversized files are rejected before Supabase Storage or file metadata writes.
+  - Local tests, production builds, and release checks passed.
 - R9 file metadata soft-delete is complete in PR #312.
   - `/api/files` DELETE now marks matching file metadata rows with `deleted_at` by storage path.
   - File ownership history is retained instead of leaving deleted files looking active.
