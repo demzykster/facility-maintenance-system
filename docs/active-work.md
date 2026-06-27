@@ -21,22 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-task-people-search-field
+### Active branch: codex/label-driver-access-search-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `a872dc0 fix: label driver coverage search field (#237)`.
+- Latest synchronized `main`: `7ab65ae fix: label task people search field (#238)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `מטלות`.
-  - make the responsible-person picker search field self-describing beyond placeholder text.
-  - keep people-picker filtering, selection behavior, and layout unchanged.
+  - continue R5 on `כלי שינוע`.
+  - make the driver-access unit search field self-describing beyond placeholder text.
+  - keep driver access filtering, selection behavior, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: task people-picker search exposes a descriptive label.
+  - code search: no remaining `חיפוש` placeholder inputs without `aria-label`.
+  - browser smoke-check note: AccessPicker path is not reachable in current demo-data without a saved driver row.
 
 ## Latest Completed Work
 
+- PR #238: Task people-picker search field now exposes a descriptive label.
+  - The responsible-person picker search no longer relies only on placeholder text.
+  - People-picker filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #237: Driver coverage search field now exposes a descriptive label.
   - The visible `נהגים / כיסוי` search input no longer relies only on placeholder text.
   - Driver coverage filtering, selection behavior, and layout stayed unchanged.

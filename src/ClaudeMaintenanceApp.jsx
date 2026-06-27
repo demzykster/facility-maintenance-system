@@ -2016,7 +2016,7 @@ function AccessPicker({ allFleet, config, driver, seatUnitId, onCancel, onSave }
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">גישת {driver.name} לכלים</div></div>
     <div className="body">
       <div className="hint" style={{ marginBottom: 10 }}>סמנו כלים שהעובד מורשה לתפעל — מעבר לכלי הקבוע שלו, וגם ממחלקות אחרות. זו הרשאת גישה בלבד, אינה תופסת מקום במשמרת.</div>
-      <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כלי להוספת הרשאת נהג" placeholder="חיפוש כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <div className="cards" style={{ maxHeight: "46vh", overflowY: "auto", marginTop: 8 }}>{opts.map((u) => <label key={u.id} className={"acc-row" + (sel.has(u.id) ? " on" : "")}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggle(u.id)} /><span className="acc-code">{u.code}</span><span className="acc-desc">{unitDesc(u, config)}</span><span className="acc-dept">{fleetDepts(u)[0] || ""}</span></label>)}</div>
       <button className="btn-primary full" onClick={save} style={{ marginTop: 10 }}>שמירת גישה ({sel.size})</button><div style={{ height: 20 }} />
     </div></div>);
