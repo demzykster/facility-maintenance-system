@@ -21,19 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/show-user-duplicate-warning
 
-- Status: main clean after PR #250.
-- Latest synchronized `main`: `d417a0f fix: summarize personal permissions fold (#250)`.
+- Status: ready for PR.
+- Latest synchronized `main`: `163a3e5 docs: close permissions summary ledger (#251)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - no active product branch is open.
-  - continue R5 Screen Audit And Visual Noise from the next exact action below.
+  - continue R5 Screen Audit And Visual Noise on `צוות ומשתמשים`.
+  - make possible duplicate login identities visible in the user tree instead of silently hiding records.
+  - keep user records, login behavior, and editing behavior unchanged.
 - Validation:
-  - docs-only ledger update: `git diff --check`.
+  - `npm test -- --run` passed.
+  - `npm run build` passed.
+  - browser smoke-check: team screen shows duplicate warning when duplicate identities exist.
 
 ## Latest Completed Work
 
+- PR #251: Active work ledger was closed after the permissions summary pass.
+  - No active product branch remained after PR #250.
+  - Next exact action points to the `צוות ומשתמשים` user tree/group-list pass.
+  - Docs-only validation passed; Vercel was blocked by build-rate limit.
 - PR #250: User form personal-permissions block now shows a compact collapsed summary.
   - Manager forms show whether extra module permissions are present without opening the block.
   - Permission storage and editing behavior stayed unchanged.
