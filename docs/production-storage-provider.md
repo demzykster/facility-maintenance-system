@@ -121,6 +121,16 @@ Supabase-authenticated `PUT`/`DELETE` requests also apply a server-side sensitiv
 
 This is an interim server permission layer for the KV bridge. It does not replace final normalized Supabase tables and row-level policies.
 
+For production release checks, API storage is accepted only when the server-side KV bridge is also configured for Supabase:
+
+```env
+CMMS_KV_AUTH=supabase
+CMMS_KV_DRIVER=supabase
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
 ## Production Gate
 
 `VITE_CMMS_APP_MODE=production` is not production-data-ready unless:

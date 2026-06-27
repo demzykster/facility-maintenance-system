@@ -25,11 +25,35 @@ describe("productionConfigGateModel", () => {
     });
   });
 
-  it("allows production mode only after api storage is configured", () => {
+  it("blocks production api storage when server-side Supabase KV env is missing", () => {
     expect(productionConfigGate({
       appMode: "production",
       storageProvider: "api",
       storageApiBaseUrl: "https://cmms.example/api"
+    })).toMatchObject({
+      ok: false,
+      errors: [
+        "production_requires_supabase_kv_auth",
+        "production_requires_supabase_kv_driver",
+        "production_requires_supabase_url",
+        "production_requires_supabase_anon_key",
+        "production_requires_supabase_service_role_key"
+      ]
+    });
+  });
+
+  it("allows production mode only after api storage and server-side Supabase KV are configured", () => {
+    expect(productionConfigGate({
+      appMode: "production",
+      storageProvider: "api",
+      storageApiBaseUrl: "https://cmms.example/api",
+      kvServer: {
+        auth: "supabase",
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      }
     })).toMatchObject({
       ok: true,
       errors: [],
