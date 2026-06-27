@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: no active product branch.
-- Latest synchronized `main`: `3121bb8 fix: expose user tree group state (#219)`.
+- Latest synchronized `main`: `740f22a docs: close user tree group ledger (#220)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
@@ -34,6 +34,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- PR #220: Active work ledger closed the user-tree group PR.
+  - No active product branch remained after PR #219.
+  - Docs-only validation passed; Vercel was green.
 - PR #219: User-tree group toggles now expose expanded/collapsed state.
   - Group buttons use `type="button"` and `aria-expanded`.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
