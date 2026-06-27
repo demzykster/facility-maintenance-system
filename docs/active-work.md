@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-pm-unit-search-field
+### Active branch: codex/label-task-search-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `9451d0f fix: label fleet search field (#233)`.
+- Latest synchronized `main`: `2a3db82 fix: label pm unit search field (#234)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `כלי שינוע`.
-  - make the PM/unit picker search field self-describing beyond placeholder text.
-  - keep unit-picker filtering, selection behavior, and layout unchanged.
+  - continue R5 on `מטלות`.
+  - make the main task search field self-describing beyond placeholder text.
+  - keep task filtering, search behavior, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: PM/unit picker search exposes a descriptive label.
+  - browser smoke-check: task search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #234: PM/unit picker search field now exposes a descriptive label.
+  - The unit picker search used by PM scheduling no longer relies only on placeholder text.
+  - Unit-picker filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #233: Fleet search field now exposes a descriptive label.
   - The main `כלי שינוע` search input no longer relies only on placeholder text.
   - Fleet filtering, search behavior, and layout stayed unchanged.
