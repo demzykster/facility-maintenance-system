@@ -40,6 +40,8 @@ The same driver also accepts `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TO
 
 These values must remain server-only. Do not expose them as `VITE_*`.
 
+This driver is a bridge/cache path, not the final CMMS database. The selected target production platform is Supabase Postgres/Auth/RLS/Storage; see `docs/production-platform-decision.md`.
+
 ## API Contract
 
 The first production adapter keeps the same key/value contract as the current store so the monolith does not need a broad rewrite before backend work.

@@ -40,6 +40,8 @@ Current notes:
 - `src/storageProviderModel.js`, `src/apiStorageAdapter.js`, and `docs/production-storage-provider.md` define the future backend storage path.
 - `/api/kv` route skeleton exists but remains closed until server auth and a durable backend driver are configured.
 - `npm run release:check` validates the current production storage-provider boundary.
+- `docs/production-platform-decision.md` selects Vercel frontend + Supabase Postgres/Auth/RLS/Storage as the target production platform.
+- Upstash/Vercel Redis may be used as a bridge/cache path, but not as the final CMMS source of truth.
 
 ### R3 — Notifications End-To-End
 
