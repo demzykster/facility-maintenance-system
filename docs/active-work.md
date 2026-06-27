@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-driver-coverage-search-field
+### Active branch: codex/label-task-people-search-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `3295639 fix: label audit log search field (#236)`.
+- Latest synchronized `main`: `a872dc0 fix: label driver coverage search field (#237)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `כלי שינוע`.
-  - make the visible driver-coverage search field self-describing beyond placeholder text.
-  - keep driver coverage filtering, selection behavior, and layout unchanged.
+  - continue R5 on `מטלות`.
+  - make the responsible-person picker search field self-describing beyond placeholder text.
+  - keep people-picker filtering, selection behavior, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: driver-coverage search exposes a descriptive label.
+  - browser smoke-check: task people-picker search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #237: Driver coverage search field now exposes a descriptive label.
+  - The visible `נהגים / כיסוי` search input no longer relies only on placeholder text.
+  - Driver coverage filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #236: Activity-log search field now exposes a descriptive label.
   - The `יומן פעילות` search input no longer relies only on placeholder text.
   - Activity-log filtering/export behavior and layout stayed unchanged.

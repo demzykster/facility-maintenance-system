@@ -2824,7 +2824,7 @@ function PeoplePicker({ users, value, onChange, placeholder = "— בחרו אח
   return (<>
     <button type="button" className="unit-pick-btn" onClick={() => setOpen((o) => !o)}>{sel.length ? <span>{sel.map((id) => uName(id, users)).join(", ")}</span> : <span className="muted-txt">{placeholder}</span>}<ChevronLeft size={16} style={{ transform: open ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
     {open && <div className="unit-pick">
-      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus placeholder="חיפוש לפי שם / מחלקה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus aria-label="חיפוש אחראים לפי שם או מחלקה" placeholder="חיפוש לפי שם / מחלקה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <div className="unit-pick-list">{list.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו אנשים</div> : list.map((u) => <button key={u.id} type="button" className={"unit-pick-row" + (sel.includes(u.id) ? " on" : "")} onClick={() => toggle(u.id)}>{sel.includes(u.id) ? <CheckCircle2 size={15} color="var(--primary)" style={{ flexShrink: 0 }} /> : <span className="ppk-box" />}<b style={{ marginInlineStart: 4 }}>{u.name}{u.id === me ? " (אני)" : ""}</b><span className="upr-desc">{u.role === "admin" ? "מנהל מערכת" : "מנהל מחלקה"}{u.dept ? ` · ${u.dept}` : ""}</span></button>)}</div>
     </div>}
   </>);
