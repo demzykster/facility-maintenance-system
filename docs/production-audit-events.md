@@ -19,9 +19,9 @@ Production needs to answer:
 
 This is especially important before moving more writes behind server APIs and Supabase RLS.
 
-## Future Table
+## Supabase Table
 
-Future normalized table: `audit_events`.
+Normalized table: `public.audit_events`.
 
 Initial fields:
 
@@ -54,4 +54,21 @@ The sensitive KV bridge now also knows which protected key families should produ
 
 `/api/kv` can now send audit events for successful sensitive writes when a server-side audit sink is configured. Without an audit sink, existing storage behavior stays unchanged.
 
-The next production step is to add the concrete durable `audit_events` Supabase sink/table and then extend the same pattern to ticket lifecycle/status changes and file upload/delete events.
+Server-only env:
+
+```env
+CMMS_AUDIT_DRIVER=supabase
+CMMS_AUDIT_SUPABASE_TABLE=audit_events
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+`CMMS_AUDIT_SUPABASE_TABLE` is optional and defaults to `audit_events`.
+
+The table is created by:
+
+```text
+supabase/migrations/20260627200000_audit_events.sql
+```
+
+The next production step is to extend the same pattern to ticket lifecycle/status changes and file upload/delete events.

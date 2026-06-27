@@ -326,6 +326,65 @@ describe("kv API handler", () => {
     }));
   });
 
+  it("can wire the Supabase audit sink from server env", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        async text() {
+          return JSON.stringify([{ value: "{\"before\":true}" }]);
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        async text() {
+          return "";
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        async text() {
+          return "";
+        }
+      });
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "admin",
+        name: "Owner",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      fetchImpl,
+      sessionClient,
+      env: {
+        CMMS_KV_AUTH: "supabase",
+        CMMS_KV_DRIVER: "supabase",
+        CMMS_AUDIT_DRIVER: "supabase",
+        SUPABASE_URL: "https://supabase.example",
+        SUPABASE_SERVICE_ROLE_KEY: "service-key"
+      }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "config:v1", shared: "1" },
+      body: { value: "{\"after\":true}" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+      "https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=eq.config%3Av1&select=value&limit=1",
+      "https://supabase.example/rest/v1/cmms_kv_records?on_conflict=scope,record_key",
+      "https://supabase.example/rest/v1/audit_events"
+    ]);
+  });
+
   it("does not audit ordinary workflow writes through the KV bridge", async () => {
     const driver = {
       get: vi.fn(),

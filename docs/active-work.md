@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/kv-audit-sink-wiring`
+### Active branch: `codex/supabase-audit-sink`
 
-- Status: this PR lets `/api/kv` send audit events for successful sensitive writes when an audit sink is configured.
-- Latest synchronized `main`: `e8708cb [skip vercel] feat: map sensitive kv writes to audit contract`.
+- Status: this PR adds the concrete Supabase audit sink/table for server-side audit events.
+- Latest synchronized `main`: `8f4526e [skip vercel] feat: audit sensitive kv writes`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: wire the existing sensitive `/api/kv` write policy to an optional server-side audit sink.
-  - next production step: add the concrete durable Supabase `audit_events` sink/table.
+  - current production step: add a durable Supabase `audit_events` sink/table and wire it behind `CMMS_AUDIT_DRIVER=supabase`.
+  - next production step: decide whether production release gate should require audit driver before pilot/production.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -38,16 +38,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/kvApiHandler.test.js tests/kvPermissionPolicy.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/supabaseAuditDriver.test.js tests/kvApiHandler.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `npm run release:check` passed for default demo/local config.
   - Browser smoke-check not needed: this branch changes only server-side model/permission policy/docs, not UI/runtime wiring.
 
 ## Latest Completed Work
 
+- R9 sensitive KV audit sink wiring is complete in PR #301.
+  - `/api/kv` can send audit events for successful sensitive `PUT`/`DELETE` writes when an audit sink is configured.
+  - Ordinary workflow bridge records remain outside this sensitive audit bridge.
+  - Without an audit sink, existing storage behavior stays unchanged.
+  - Local tests, production builds, and release checks passed.
 - R9 sensitive KV audit contract is complete in PR #300.
   - The existing sensitive KV write rules now map protected key families to audit entity types.
   - `sensitiveKvWriteAuditEvent` builds audit events for protected KV writes without changing runtime API behavior.
