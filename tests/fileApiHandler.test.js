@@ -309,4 +309,21 @@ describe("file API handler", () => {
     }
     expect(driver.download).not.toHaveBeenCalled();
   });
+
+  it("rejects file paths outside the configured allowed prefixes", async () => {
+    const driver = { download: vi.fn() };
+    const handler = createFileApiHandler({
+      driver,
+      sessionClient: activeSessionClient()
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "private/secret.jpg" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "file_path_forbidden" });
+    expect(driver.download).not.toHaveBeenCalled();
+  });
 });

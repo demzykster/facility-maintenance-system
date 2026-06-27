@@ -37,6 +37,15 @@ const normalizePath = (value = "") => {
   return path;
 };
 
+const allowedPrefixesFromEnv = (env = {}) => {
+  const raw = String(env.CMMS_FILE_ALLOWED_PREFIXES || "tickets/,cleaning/");
+  return raw.split(",").map((part) => part.trim()).filter(Boolean);
+};
+
+const isAllowedPath = (path, allowedPrefixes = []) => (
+  allowedPrefixes.some((prefix) => path === prefix.replace(/\/+$/, "") || path.startsWith(prefix))
+);
+
 const bufferFromBody = (body = {}) => {
   const raw = String(body.data || body.value || "");
   const match = raw.match(/^data:([^;,]+);base64,(.+)$/i);
@@ -103,6 +112,7 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
   const backendMetadataDriver = metadataDriver
     || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
   const fileMaxBytes = fileMaxBytesFromEnv(env);
+  const allowedPrefixes = allowedPrefixesFromEnv(env);
 
   return async function fileApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -113,6 +123,7 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
       const method = String(req.method || "GET").toUpperCase();
       const path = normalizePath(req.query?.path);
       if (!path) return json(res, 400, { error: "path_required" });
+      if (!isAllowedPath(path, allowedPrefixes)) return json(res, 403, { error: "file_path_forbidden" });
 
       if (method === "GET") {
         const file = await backendDriver.download(path, auth.user);

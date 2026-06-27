@@ -15,6 +15,7 @@ CMMS_FILE_DRIVER=supabase
 CMMS_FILE_BUCKET=cmms-files
 CMMS_FILE_METADATA_DRIVER=supabase
 CMMS_FILE_MAX_BYTES=10485760
+CMMS_FILE_ALLOWED_PREFIXES=tickets/,cleaning/
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
@@ -23,6 +24,8 @@ The release gate only accepts production mode when file storage and file ownersh
 
 `CMMS_FILE_MAX_BYTES` is optional and defaults to `10485760` (10 MB). `/api/files` rejects larger uploads with `file_too_large` before writing to Supabase Storage or file metadata.
 
+`CMMS_FILE_ALLOWED_PREFIXES` is optional and defaults to `tickets/,cleaning/`, matching the current production file flows. It prevents active users from reading or writing arbitrary bucket paths until final metadata/RLS-based file authorization is in place.
+
 ## Current Boundary
 
 - Existing demo/local flows still read and write the current browser/KV photo records for review compatibility.
@@ -30,6 +33,7 @@ The release gate only accepts production mode when file storage and file ownersh
 - Production+API cleaning complaint and round issue photos use `/api/files` and metadata fields (`photoPath`, `hasPhoto`).
 - Backup/restore may still include `photos` for demo/local continuity.
 - Production rollout must keep protected file access behind server APIs before real use.
+- `/api/files` currently uses a conservative path-prefix allowlist before final metadata/RLS-based authorization.
 
 ## Server API Contract
 
