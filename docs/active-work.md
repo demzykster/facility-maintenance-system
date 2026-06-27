@@ -21,23 +21,29 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-pm-calendar-nav-buttons
+### Active branch: codex/label-remaining-icon-buttons
 
 - Status: ready for PR.
-- Latest synchronized `main`: `a64485f fix: label fleet and pm edit buttons (#247)`.
+- Latest synchronized `main`: `f07c5fd fix: label pm calendar navigation buttons (#248)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make PM year/month navigation icon buttons self-describing.
-  - keep calendar/matrix navigation behavior and layout unchanged.
+  - make the remaining smaller icon-only buttons self-describing.
+  - cover driver actions, ticket wizard back/duplicate close, checklist issue toggle, and notification settings.
+  - keep behavior and layout unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: PM calendar exposes `חודש קודם` and `חודש הבא`.
-  - browser smoke-check: PM yearly view exposes `שנה קודמת` and `שנה הבאה`.
+  - source-check: driver actions, ticket wizard, duplicate modal, checklist issue toggle, and notification settings expose descriptive labels.
+  - browser smoke-check: notification settings button exposes `הגדרות תצוגת התראות`.
 
 ## Latest Completed Work
 
+- PR #248: PM calendar/year navigation icon buttons now expose descriptive labels.
+  - Calendar month navigation exposes `חודש קודם` and `חודש הבא`.
+  - Yearly view navigation exposes `שנה קודמת` and `שנה הבאה`.
+  - Calendar/matrix navigation behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-checks passed before merge; Vercel was blocked by build-rate limit.
 - PR #247: Fleet and periodic-maintenance detail edit icon buttons now expose descriptive labels.
   - Fleet edit exposes `עריכת כלי`; PM edit exposes `עריכת טיפול תקופתי`.
   - Edit behavior and modal layout stayed unchanged.
