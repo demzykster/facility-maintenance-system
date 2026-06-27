@@ -24,6 +24,16 @@ export function productionLoginReady(config = {}) {
   return !!(config.supabaseUrl && config.supabaseAnonKey && config.sessionApiUrl);
 }
 
+export function productionAuthFromSupabase(data = {}, now = Date.now()) {
+  const expiresIn = Number(data.expires_in || 0);
+  return {
+    accessToken: data.access_token || "",
+    refreshToken: data.refresh_token || "",
+    expiresAt: Number(data.expires_at || 0) || (expiresIn ? now + expiresIn * 1000 : 0),
+    tokenType: data.token_type || "bearer"
+  };
+}
+
 export function cmmsSessionFromProductionUser(user = {}) {
   return {
     id: user.id || user.appUserId || "",
@@ -52,6 +62,24 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
   if (!productionLoginReady(config) || !fetchImpl) return null;
   const { supabaseUrl, supabaseAnonKey, sessionApiUrl } = config;
 
+  async function sessionFromAccessToken(accessToken) {
+    const sessionResponse = await fetchImpl(sessionApiUrl, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      }
+    });
+    const sessionData = await readJson(sessionResponse);
+    if (!sessionResponse.ok || !sessionData?.ok) {
+      throw new Error(sessionData?.error || "cmms_session_failed");
+    }
+    return {
+      session: cmmsSessionFromProductionUser(sessionData.user),
+      mustChangePassword: sessionData.user?.mustChangePassword === true
+    };
+  }
+
   return {
     async signInWithPassword({ email, password }) {
       const normalizedEmail = normalizeEmail(email);
@@ -70,23 +98,31 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
         throw new Error(authData?.message || authData?.msg || authData?.error_description || authData?.error || "supabase_login_failed");
       }
 
-      const sessionResponse = await fetchImpl(sessionApiUrl, {
-        method: "GET",
-        headers: {
-          authorization: `Bearer ${authData.access_token}`,
-          "content-type": "application/json"
-        }
-      });
-      const sessionData = await readJson(sessionResponse);
-      if (!sessionResponse.ok || !sessionData?.ok) {
-        throw new Error(sessionData?.error || "cmms_session_failed");
-      }
+      const auth = productionAuthFromSupabase(authData);
+      const result = await sessionFromAccessToken(auth.accessToken);
 
       return {
-        session: cmmsSessionFromProductionUser(sessionData.user),
-        accessToken: authData.access_token,
-        mustChangePassword: sessionData.user?.mustChangePassword === true
+        ...result,
+        auth,
+        accessToken: auth.accessToken
       };
+    },
+    sessionFromAccessToken,
+    async refreshAuth(refreshToken) {
+      if (!refreshToken) throw new Error("refresh_token_required");
+      const response = await fetchImpl(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: {
+          apikey: supabaseAnonKey,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data?.access_token) {
+        throw new Error(data?.message || data?.msg || data?.error_description || data?.error || "supabase_refresh_failed");
+      }
+      return productionAuthFromSupabase(data);
     },
     async changePassword({ accessToken, newPassword }) {
       if (!accessToken || !newPassword) throw new Error("access_token_and_password_required");
@@ -120,4 +156,65 @@ export async function changeProductionPassword({ accessToken, newPassword, confi
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
   return client.changePassword({ accessToken, newPassword });
+}
+
+export function createProductionAuthStore({ key = "cmms:productionAuth:v1", local = globalThis.localStorage, session = globalThis.sessionStorage } = {}) {
+  const read = (storage) => {
+    try {
+      const raw = storage?.getItem?.(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+  const remove = (storage) => {
+    try { storage?.removeItem?.(key); } catch {}
+  };
+  return {
+    get() {
+      return read(session) || read(local);
+    },
+    set(auth, { remember = false } = {}) {
+      this.clear();
+      const payload = JSON.stringify({ ...auth, remember: remember === true });
+      try { (remember ? local : session)?.setItem?.(key, payload); } catch {}
+    },
+    clear() {
+      remove(local);
+      remove(session);
+    }
+  };
+}
+
+export async function restoreProductionSession({ config, authStore = createProductionAuthStore(), fetchImpl } = {}) {
+  const client = createProductionLoginClient({ config, fetchImpl });
+  const auth = authStore?.get?.();
+  if (!client || !auth?.accessToken) return null;
+
+  try {
+    const result = await client.sessionFromAccessToken(auth.accessToken);
+    if (result.mustChangePassword) {
+      authStore.clear?.();
+      return null;
+    }
+    return { ...result, auth };
+  } catch (error) {
+    if (!auth.refreshToken) {
+      authStore.clear?.();
+      return null;
+    }
+    try {
+      const refreshed = await client.refreshAuth(auth.refreshToken);
+      authStore.set?.(refreshed, { remember: auth.remember === true });
+      const result = await client.sessionFromAccessToken(refreshed.accessToken);
+      if (result.mustChangePassword) {
+        authStore.clear?.();
+        return null;
+      }
+      return { ...result, auth: refreshed };
+    } catch {
+      authStore.clear?.();
+      return null;
+    }
+  }
 }

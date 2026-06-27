@@ -134,6 +134,7 @@ Production requirement:
 - `GET /api/session/me` defines the first server-side Supabase Auth + `public.app_users` session lookup.
 - Production login now uses Supabase Auth plus `/api/session/me`; demo/test login remains local.
 - `POST /api/session/change-password` enforces the first administrator password-change flow before normal production app entry.
+- Production session restore now uses Supabase access/refresh tokens plus `/api/session/me`, not the old local CMMS session object.
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 
 ## Monolith Extraction Policy

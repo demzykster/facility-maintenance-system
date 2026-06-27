@@ -2,11 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 import {
   changeProductionPassword,
   cmmsSessionFromProductionUser,
+  createProductionAuthStore,
   createProductionLoginClient,
   loginWithProductionPassword,
+  restoreProductionSession,
   productionLoginConfigFromEnv,
   productionLoginReady
 } from "../src/productionLoginAdapter.js";
+
+function memoryStorage() {
+  const data = new Map();
+  return {
+    getItem: (key) => data.get(key) || null,
+    setItem: (key, value) => data.set(key, value),
+    removeItem: (key) => data.delete(key)
+  };
+}
 
 describe("productionLoginAdapter", () => {
   it("reads public Supabase login config and keeps login disabled until configured", () => {
@@ -89,6 +100,7 @@ describe("productionLoginAdapter", () => {
       productionSession: true
     });
     expect(result.accessToken).toBe("access-token");
+    expect(result.auth).toMatchObject({ accessToken: "access-token" });
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/token?grant_type=password", expect.objectContaining({
       method: "POST",
       headers: expect.objectContaining({ apikey: "anon-key" })
@@ -149,6 +161,97 @@ describe("productionLoginAdapter", () => {
       method: "POST",
       headers: expect.objectContaining({ authorization: "Bearer access-token" }),
       body: JSON.stringify({ newPassword: "new-long-password" })
+    }));
+  });
+
+  it("stores production auth in session or local storage based on remember", () => {
+    const local = memoryStorage();
+    const session = memoryStorage();
+    const authStore = createProductionAuthStore({ key: "auth", local, session });
+
+    authStore.set({ accessToken: "session-token" }, { remember: false });
+    expect(JSON.parse(session.getItem("auth")).accessToken).toBe("session-token");
+    expect(local.getItem("auth")).toBe(null);
+
+    authStore.set({ accessToken: "local-token" }, { remember: true });
+    expect(JSON.parse(local.getItem("auth")).accessToken).toBe("local-token");
+    expect(session.getItem("auth")).toBe(null);
+
+    authStore.clear();
+    expect(authStore.get()).toBe(null);
+  });
+
+  it("restores a production session through the session endpoint", async () => {
+    const authStore = {
+      get: vi.fn().mockReturnValue({ accessToken: "access-token", refreshToken: "refresh-token", remember: true }),
+      set: vi.fn(),
+      clear: vi.fn()
+    };
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          user: { id: "app-user-1", authUserId: "auth-user-1", name: "Owner", role: "admin", mustChangePassword: false }
+        });
+      }
+    });
+
+    const restored = await restoreProductionSession({
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me"
+      },
+      authStore,
+      fetchImpl
+    });
+
+    expect(restored.session).toMatchObject({ id: "app-user-1", productionSession: true });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/me", expect.objectContaining({
+      headers: expect.objectContaining({ authorization: "Bearer access-token" })
+    }));
+    expect(authStore.set).not.toHaveBeenCalled();
+    expect(authStore.clear).not.toHaveBeenCalled();
+  });
+
+  it("refreshes expired production auth before restoring the session", async () => {
+    const authStore = {
+      get: vi.fn().mockReturnValue({ accessToken: "old-token", refreshToken: "refresh-token", remember: true }),
+      set: vi.fn(),
+      clear: vi.fn()
+    };
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({ ok: false, async text() { return JSON.stringify({ error: "expired" }); } })
+      .mockResolvedValueOnce({ ok: true, async text() { return JSON.stringify({ access_token: "new-token", refresh_token: "new-refresh", expires_in: 3600 }); } })
+      .mockResolvedValueOnce({
+        ok: true,
+        async text() {
+          return JSON.stringify({
+            ok: true,
+            user: { id: "app-user-1", authUserId: "auth-user-1", name: "Owner", role: "admin", mustChangePassword: false }
+          });
+        }
+      });
+
+    const restored = await restoreProductionSession({
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me"
+      },
+      authStore,
+      fetchImpl
+    });
+
+    expect(restored.session.id).toBe("app-user-1");
+    expect(authStore.set).toHaveBeenCalledWith(expect.objectContaining({
+      accessToken: "new-token",
+      refreshToken: "new-refresh"
+    }), { remember: true });
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/token?grant_type=refresh_token", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ refresh_token: "refresh-token" })
     }));
   });
 });

@@ -57,7 +57,16 @@ The endpoint:
 
 The frontend blocks normal production app entry while `mustChangePassword` is true and shows the first-password-change form instead.
 
+## Production Session Persistence
+
+Production mode persists Supabase token data, not a trusted local CMMS user object.
+
+- Access and refresh tokens are stored in browser storage according to the Remember checkbox.
+- App startup restores the CMMS session by calling `/api/session/me` with the access token.
+- If the access token is expired, the frontend refreshes it through Supabase Auth and retries `/api/session/me`.
+- Demo and test modes keep the existing local `session:v1` restore behavior.
+
 ## Next Steps
 
-1. Decide whether production sessions should persist through refresh via a dedicated token/session storage strategy.
-2. Continue moving data writes behind server/RLS.
+1. Continue moving data writes behind server/RLS.
+2. Move files/photos to Supabase Storage.

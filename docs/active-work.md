@@ -28,7 +28,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: decide production session persistence strategy, then continue moving permissions/data writes toward server/RLS.
+  - next production step: continue moving permissions/data writes toward server/RLS.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -75,6 +75,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `POST /api/session/change-password` changes a flagged user's Supabase password and clears `public.app_users.must_change_password`.
   - Production login blocks normal app entry while `mustChangePassword` is true and shows a first-password-change form.
   - Demo/test login remains unchanged.
+  - Local tests, production build, production-mode build, release check, and browser smoke-check passed.
+- R9 production session persistence is complete.
+  - Production login stores Supabase access/refresh tokens in browser storage according to the Remember checkbox.
+  - App startup restores production sessions through `/api/session/me`, not by trusting the old local CMMS session object.
+  - Expired access tokens are refreshed through Supabase before session restore.
+  - Demo/test session restore remains unchanged.
   - Local tests, production build, production-mode build, release check, and browser smoke-check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
