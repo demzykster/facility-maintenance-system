@@ -23,11 +23,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main is expected to be clean after PR #268 is merged.
+- Status: main is expected to be clean after PR #269 is merged.
 - Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
-- Open PRs when this entry was written: PR #268.
+- Open PRs when this entry was written: PR #269.
 - Purpose:
-  - no active product branch remains after PR #268 merges.
+  - no active product branch remains after PR #269 merges.
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
 - Validation:
   - `npm test -- --run` passed.
@@ -36,6 +36,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production data collection mapping is complete in PR #269.
+  - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
+  - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.
+  - `docs/production-data-model.md` documents the first database table map.
+  - Local tests, production build, and browser smoke-check passed.
 - R9 Production Backend Foundation has started in PR #268.
   - The frontend storage adapter was extracted from `src/ClaudeMaintenanceApp.jsx` to `src/storageAdapter.js`.
   - The adapter stays lazy so it can use `window.storage` after module import and later be swapped for a backend provider.
