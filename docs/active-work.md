@@ -28,7 +28,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: choose backend deployment/provider, implement the real server storage endpoint behind the API storage contract, and add first-admin bootstrap.
+  - next production step: choose durable backend driver/database for `/api/kv`, wire it behind the safe route skeleton, and add first-admin bootstrap.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
@@ -61,6 +61,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - R9 production storage provider policy is complete.
   - `src/storageProviderModel.js` defines local/api storage provider policy and marks production+local storage as not production-data-ready.
   - `src/apiStorageAdapter.js` defines the first REST key/value storage client contract for a future backend.
+  - `/api/kv` route skeleton exists and is closed by default without server auth/backend storage.
   - `docs/production-storage-provider.md` documents the env variables and API contract.
   - Local tests, default production build, production API-provider build, and browser smoke-check passed.
 - R9 production config gate is complete.

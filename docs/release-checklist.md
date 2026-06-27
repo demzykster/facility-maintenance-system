@@ -38,6 +38,7 @@ Current notes:
 - `src/seedPolicyModel.js` and `docs/production-seed-policy.md` define the production empty-start and first-admin bootstrap boundary.
 - Current demo/local records are not a migration source; future imports are optional and only for real owner-provided data.
 - `src/storageProviderModel.js`, `src/apiStorageAdapter.js`, and `docs/production-storage-provider.md` define the future backend storage path.
+- `/api/kv` route skeleton exists but remains closed until server auth and a durable backend driver are configured.
 - `npm run release:check` validates the current production storage-provider boundary.
 
 ### R3 — Notifications End-To-End
