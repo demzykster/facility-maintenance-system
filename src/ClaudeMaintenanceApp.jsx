@@ -6269,7 +6269,7 @@ function Overlay({ children, onClose, persistent }) {
   }, []);
   return <div className="ovl-backdrop" onClick={persistent ? undefined : onClose} role="presentation"><div ref={ref} className="ovl-panel" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>{children}</div></div>;
 }
-function AIFab({ onClick }) { return <button className="ai-fab" onClick={onClick}><Sparkles size={22} /></button>; }
+function AIFab({ onClick }) { return <button className="ai-fab" aria-label="עוזר AI" title="עוזר AI" onClick={onClick}><Sparkles size={22} /></button>; }
 function NotifPanel({ notif, onClose, onOpen, onGo }) {
   useEffect(() => { notif.markRead(); }, []);
   const [settings, setSettings] = useState(false), [marked, setMarked] = useState(false), [perm, setPerm] = useState(""), [showAll, setShowAll] = useState(false);
