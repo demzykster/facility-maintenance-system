@@ -21,14 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/require-file-metadata-gate`
+### Active branch: `codex/file-metadata-delete-path`
 
-- Status: this PR requires Supabase file metadata storage in the production release gate.
-- Latest synchronized `main`: `b93260e [skip vercel] feat: tag cleaning complaint issue photos`.
+- Status: this PR soft-deletes file metadata rows by path when `/api/files` deletes an object.
+- Latest synchronized `main`: `bb65ca8 [skip vercel] feat: require file metadata release gate`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: block production mode unless file ownership metadata has a Supabase sink.
+  - current production step: keep `file_metadata.deleted_at` aligned with protected file deletes.
   - next production step: review remaining production backend gaps after file bytes, metadata, audit, and auth/session gates.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
@@ -38,17 +38,20 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/productionConfigGateModel.test.js --reporter=verbose` passed.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` failed as expected with `production_requires_supabase_file_metadata_driver`.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
+  - `npx vitest run tests/fileApiHandler.test.js tests/supabaseFileMetadataDriver.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
   - Browser smoke-check not needed: this branch changes only server-side model/permission policy/docs, not UI/runtime wiring.
 
 ## Latest Completed Work
 
+- R9 file metadata release gate is complete in PR #311.
+  - Production `npm run release:check` now requires `CMMS_FILE_METADATA_DRIVER=supabase` once API storage and file storage are selected.
+  - The gate fails clearly with `production_requires_supabase_file_metadata_driver` when file metadata storage is missing.
+  - Local tests, production builds, and release checks passed.
 - R9 cleaning complaint issue file metadata is complete in PR #310.
   - Nested cleaning complaint issue photos now have a dedicated `cleaning_complaint_issue_photo` metadata kind.
   - Production+API cleaning complaint issue photo uploads now include explicit file metadata.

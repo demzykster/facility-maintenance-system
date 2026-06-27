@@ -129,6 +129,7 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
       }
       if (method === "DELETE") {
         await backendDriver.delete(path, auth.user);
+        await backendMetadataDriver?.markDeletedByPath?.(path);
         await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path }, AUDIT_ACTIONS.delete, auth.user));
         return json(res, 200, { ok: true, path });
       }
