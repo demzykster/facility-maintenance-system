@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ppe-sign-template-field
+### Active branch: codex/clarify-add-user-button
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `096cf24 fix: label ppe clawback remove action (#208)`.
+- Latest synchronized `main`: `b5b1bd1 fix: label ppe signature template field (#209)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `ביגוד עובדים`.
-  - make the PPE signature template textarea self-describing for assistive tech and browser inspection.
-  - keep signature template behavior unchanged.
+  - continue R5 on `צוות ומשתמשים`.
+  - make the user-management create action read as an action, not a generic `משתמש` label.
+  - keep user creation behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: signature template textarea exposes `תבנית אישור קבלת ציוד`.
+  - browser smoke-check: Team/User management shows `הוסף משתמש`, no longer shows a visible generic `משתמש` create button, and opens the user form.
 
 ## Latest Completed Work
 
+- PR #209: PPE signature template textarea is now labeled.
+  - The field exposes `תבנית אישור קבלת ציוד` for assistive tech and browser inspection.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #208: PPE clawback remove action is now labeled.
   - The icon-only remove-row buttons expose `הסר מדרגת קיזוז` as both `aria-label` and tooltip.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.

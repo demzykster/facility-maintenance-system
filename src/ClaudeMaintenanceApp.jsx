@@ -5662,7 +5662,7 @@ function SettingsPanel(p) {
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveUsersCfg}>{saved ? "נשמר ✓" : "שמירת הגדרות צוות"}</button>
       {userCfgMsg && <div className="note" style={{ color: "#DC2626" }}>{userCfgMsg}</div>}
       </> : <>
-      <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> משתמש</button>}</div>
+      <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> הוסף משתמש</button>}</div>
       {!mayManageUsers && <div className="hint" style={{ marginTop: 4 }}>יש לך הרשאת צפייה בלבד. יצירה, עריכה ושחזור עובדים דורשים הרשאת ניהול משתמשים.</div>}
       <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / מס׳ עובד / דוא״ל" /></div>
       <UserTree list={ulist} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
