@@ -21,23 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-cleaner-zone-card-actions
+### Active branch: codex/label-task-meeting-edit-buttons
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `5a18305 fix: label cleaning zone card actions (#243)`.
+- Status: ready for PR.
+- Latest synchronized `main`: `df334c1 fix: label cleaner zone card actions (#244)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make cleaner/manager zone card action icon buttons self-describing.
-  - keep zone action behavior and layout unchanged.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - source check: cleaner/manager zone card actions expose descriptive labels.
-  - browser smoke-check note: this manager-cleaning card path is not reachable in current demo-role navigation.
+  - make task and meeting detail edit icon buttons self-describing.
+  - keep edit behavior and modal layout unchanged.
+- Validation:
+  - `npm test -- --run` passed.
+  - `npm run build` passed.
+  - browser smoke-check: task detail edit button exposes `עריכת מטלה`.
+  - source-check: meeting detail edit button exposes `עריכת פגישה`.
 
 ## Latest Completed Work
 
+- PR #244: Cleaner/manager zone card action buttons now expose descriptive labels.
+  - Zone spec and report issue actions include the zone name.
+  - Zone action behavior and layout stayed unchanged.
+  - Local tests/build/source-check passed before merge; Vercel was green.
 - PR #243: Cleaning-zone admin card action buttons now expose descriptive labels.
   - Report issue, QR label, and edit actions include the zone name.
   - Cleaning-zone action behavior and layout stayed unchanged.
