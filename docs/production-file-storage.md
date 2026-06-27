@@ -22,6 +22,8 @@ The release gate only accepts production mode when file storage is explicitly co
 ## Current Boundary
 
 - Existing demo/local flows still read and write `photo:*` records through the current store.
+- Production+API ticket before/after photos now use `/api/files` and ticket metadata fields (`photoPath`, `afterPhotoPath`).
+- Cleaning round/complaint photos still need a follow-up move to `/api/files`.
 - Backup/restore may still include `photos` for demo/local continuity.
 - Production rollout must move photo upload/read/delete through server APIs before real use.
 
@@ -53,7 +55,7 @@ The frontend adapter is `createApiFileProvider` in `src/apiFileAdapter.js`. It f
 
 ## Next Implementation Step
 
-Move ticket and cleaning photo flows from `photo:*` KV/base64 records to the server file API:
+Move the remaining cleaning photo flows from inline/base64 records to the server file API:
 
 - write only metadata/path references into business records;
 - fetch protected image data through `/api/files`;

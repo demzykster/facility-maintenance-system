@@ -46,9 +46,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 first ticket photo file-adapter wiring is complete.
+  - Production+API mode now stores ticket before/after photos through `/api/files` and keeps `photoPath` / `afterPhotoPath` metadata on ticket records.
+  - Demo/test/local mode still uses the existing `photo:*` records, so current local review data and backup behavior stay compatible.
+  - Cleaning complaint/round photos are still a separate follow-up.
+  - Local tests and production build passed.
 - R9 API file adapter is complete.
   - `src/apiFileAdapter.js` adds upload/download/delete calls for `/api/files` and sends the production Supabase access token when available.
-  - The current UI photo flows are not switched yet; this prepares the next smaller PR to replace `photo:*` writes/reads safely.
+  - The adapter is now used by the first ticket photo flow; cleaning photo flows are still pending.
   - Local tests, production build, production-mode API build, and release checks passed.
 - R9 server file API foundation is complete.
   - `/api/files` now requires a Supabase user bearer token, blocks disabled users and first-password-change users, and is closed until Supabase Storage env is configured.
