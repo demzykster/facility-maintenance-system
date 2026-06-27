@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ticket-note-send-button
+### Active branch: codex/label-cleaning-zone-card-actions
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `058f94b fix: label worker topbar icon buttons (#241)`.
+- Latest synchronized `main`: `a940791 fix: label ticket note send button (#242)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make the ticket note send icon button self-describing.
-  - keep note submission behavior and layout unchanged.
+  - make cleaning-zone card action icon buttons self-describing.
+  - keep cleaning-zone card actions and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: ticket note send button exposes a descriptive label.
+  - browser smoke-check: cleaning-zone card actions expose descriptive labels.
 
 ## Latest Completed Work
 
+- PR #242: Ticket note send icon button now exposes a descriptive label.
+  - The admin ticket update send action is named for assistive tech/browser inspection.
+  - Note submission behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #241: Worker topbar icon buttons now expose descriptive labels.
   - Theme toggle and logout icon-only controls are named for assistive tech/browser inspection.
   - Theme toggle, logout behavior, and layout stayed unchanged.
