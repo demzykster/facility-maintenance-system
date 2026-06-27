@@ -1452,7 +1452,7 @@ export default function App() {
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
                   : <UserApp {...shared} key="imp-user" />}
             {isRealAdmin && <div className="role-switch">
-              {[["admin", "מנהל מערכת", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "עובד ניקיון", Sparkles]].map(([r, l, Ic]) => <button key={r} className={"rs-btn" + (((actAs || "admin") === r) ? " on" : "")} title={l} onClick={() => setActAs(r === "admin" ? null : r)}><Ic size={17} /></button>)}
+              {[["admin", "מנהל מערכת", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "עובד ניקיון", Sparkles]].map(([r, l, Ic]) => <button key={r} className={"rs-btn" + (((actAs || "admin") === r) ? " on" : "")} title={l} aria-label={`הצג כ-${l}`} onClick={() => setActAs(r === "admin" ? null : r)}><Ic size={17} /></button>)}
             </div>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}

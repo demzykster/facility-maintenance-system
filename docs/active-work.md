@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ai-fab
+### Active branch: codex/label-role-switch-buttons
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `bcd21fa fix: label team settings delete actions (#224)`.
+- Latest synchronized `main`: `8baf4ce fix: label floating ai action (#225)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 visual/noise cleanup from the live screen audit.
-  - make the floating AI action self-describing.
-  - keep AI behavior and placement unchanged.
+  - make the bottom demo role-switch icon buttons self-describing.
+  - keep role-switch behavior and placement unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: floating AI button exposes a descriptive label.
+  - browser smoke-check: role-switch buttons expose descriptive labels.
 
 ## Latest Completed Work
 
+- PR #225: Floating AI action now exposes a descriptive label.
+  - The AI button has Hebrew `aria-label` and tooltip text.
+  - AI behavior and placement stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #224: Team/settings delete icon buttons now expose descriptive labels.
   - Worker-shift deletes and shared registry deletes are named by item.
   - Delete blocking, save behavior, and layout stayed unchanged.
