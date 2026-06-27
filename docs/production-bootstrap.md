@@ -36,6 +36,8 @@ Body:
 
 The endpoint creates a Supabase Auth user with admin role metadata and `must_change_password` metadata.
 
+The Auth user is only the identity. The matching CMMS profile belongs in `public.app_users` when the Supabase profile/RLS schema is applied.
+
 ## Safety
 
 - The endpoint is disabled unless `CMMS_BOOTSTRAP_ENABLED=true`.

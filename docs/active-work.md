@@ -28,7 +28,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: move login/Auth permissions toward a server-backed Supabase Auth/profile/RLS model.
+  - next production step: extend first-admin bootstrap to create the matching `public.app_users` profile, then move login/Auth permissions toward a server-backed Supabase Auth/profile/RLS model.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -51,6 +51,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - The endpoint creates the initial admin through Supabase Auth Admin semantics and never returns the temporary password.
   - `docs/production-bootstrap.md` documents the one-time bootstrap flow and the requirement to disable bootstrap after success.
   - Local tests passed.
+- R9 Supabase Auth/RLS foundation has started.
+  - `supabase/migrations/20260627173000_app_users_permissions.sql` creates `public.app_users`, permission helper functions, and initial RLS policies.
+  - `src/supabaseProfileModel.js` records the app-user/profile contract and keeps permission levels aligned with the current UI permission model.
+  - `docs/supabase-auth-rls-foundation.md` documents the identity/profile split.
+  - Local tests, production build, production-mode API build, and release check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.

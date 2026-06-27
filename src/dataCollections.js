@@ -1,5 +1,5 @@
 export const DATA_COLLECTIONS = Object.freeze([
-  { key: "users", prefix: "user:", table: "users" },
+  { key: "users", prefix: "user:", table: "app_users" },
   { key: "fleet", prefix: "fleet:", table: "fleet_units" },
   { key: "tickets", prefix: "ticket:", table: "tickets" },
   { key: "pm", prefix: "pm:", table: "periodic_maintenance" },

@@ -42,6 +42,7 @@ Current notes:
 - `npm run release:check` validates the current production storage-provider boundary.
 - `docs/production-platform-decision.md` selects Vercel frontend + Supabase Postgres/Auth/RLS/Storage as the target production platform.
 - `docs/production-bootstrap.md` and `/api/bootstrap/admin` define the server-only first-admin bootstrap contract.
+- `supabase/migrations/20260627173000_app_users_permissions.sql` defines the first `public.app_users` profile/RLS layer linked to Supabase Auth.
 - Upstash/Vercel Redis may be used as a bridge/cache path, but not as the final CMMS source of truth.
 
 ### R3 — Notifications End-To-End

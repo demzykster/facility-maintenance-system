@@ -6,7 +6,7 @@ The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
 
 | Current backup key | Current storage prefix | Future table |
 |---|---|---|
-| `users` | `user:` | `users` |
+| `users` | `user:` | `app_users` |
 | `fleet` | `fleet:` | `fleet_units` |
 | `tickets` | `ticket:` | `tickets` |
 | `pm` | `pm:` | `periodic_maintenance` |
@@ -30,5 +30,6 @@ The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
 - Existing backup JSON can be read collection-by-collection using the `key` column.
 - Existing local records can be read by `prefix`.
 - Future tables should keep the existing record `id` as the primary migration key.
+- User identity lives in Supabase Auth (`auth.users`). CMMS profile, role, active status, departments, and module permissions live in `public.app_users`.
 - Photos are not included here as tables yet. They currently live under `photo:*` storage keys and should move to object storage with metadata references from tickets/reports.
 - `config:v1`, `session:v1`, `theme:v1`, `login:v1`, and notification preferences are not business collections. They need separate treatment as configuration, session, or user preference data.
