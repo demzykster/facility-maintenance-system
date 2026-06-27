@@ -21,13 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: none after this PR merges
 
-- Status: main is expected to be clean after the production password-change enforcement PR is merged.
-- Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
-- Open PRs: verify with `gh pr list --state open --limit 10` at session start.
+- Status: this PR completes cleaning photo file-adapter wiring.
+- Latest synchronized `main`: `a7e25ad feat: route ticket photos through file adapter (#296)`.
+- Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
+  - current production step: move cleaning complaint/round photos from embedded base64 records to `/api/files` metadata paths in production+API mode.
   - next production step: continue moving permissions/data writes toward server/RLS.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
@@ -37,28 +38,35 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
+  - `npx vitest run tests/cleaningPhotoStorage.test.js tests/ticketPhotoStorage.test.js tests/apiFileAdapter.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api npm run build` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `npm run release:check` passed for default demo/local config.
-  - `VITE_CMMS_APP_MODE=production npm run release:check` failed as expected because production cannot use local/browser storage.
   - Browser smoke-check on `http://127.0.0.1:5173/` loaded the app with no console errors.
 
 ## Latest Completed Work
 
+- R9 cleaning photo file-adapter wiring is complete.
+  - Production+API mode stores cleaning complaint photos and cleaning round issue photos through `/api/files`.
+  - Cleaning records now keep `photoPath` / `hasPhoto` metadata instead of embedded production base64.
+  - Demo/test/local mode still keeps existing inline cleaning photos so current local review data remains compatible.
+  - Facility tickets spawned from cleaning complaints can still receive the complaint photo, including when the complaint was already stored by path.
+  - Local tests, production build, release checks, and browser smoke-check passed.
 - R9 first ticket photo file-adapter wiring is complete.
   - Production+API mode now stores ticket before/after photos through `/api/files` and keeps `photoPath` / `afterPhotoPath` metadata on ticket records.
   - Demo/test/local mode still uses the existing `photo:*` records, so current local review data and backup behavior stay compatible.
-  - Cleaning complaint/round photos are still a separate follow-up.
+  - Cleaning complaint/round photos are now handled by the same file API boundary.
   - Local tests and production build passed.
 - R9 API file adapter is complete.
   - `src/apiFileAdapter.js` adds upload/download/delete calls for `/api/files` and sends the production Supabase access token when available.
-  - The adapter is now used by the first ticket photo flow; cleaning photo flows are still pending.
+  - The adapter is now used by ticket photo flows and cleaning photo flows.
   - Local tests, production build, production-mode API build, and release checks passed.
 - R9 server file API foundation is complete.
   - `/api/files` now requires a Supabase user bearer token, blocks disabled users and first-password-change users, and is closed until Supabase Storage env is configured.
   - `api/files/supabaseFileDriver.js` uploads, downloads, and deletes objects through Supabase Storage using server-only service role credentials.
-  - Existing UI photo flows still use `photo:*` KV/base64 records; the next step is moving ticket/cleaning photo writes and reads to `/api/files`.
+  - Ticket and cleaning photo writes/reads now use `/api/files` in production+API mode; demo/local review data remains compatible.
   - Local tests, production build, production-mode API build, and release checks passed.
 - R9 production AI boundary is complete.
   - Production defaults AI mode to `disabled`; direct browser AI provider calls are forbidden by the release gate.

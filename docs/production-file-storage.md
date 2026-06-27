@@ -1,6 +1,6 @@
 # Production File Storage
 
-CMMS CDSL currently keeps ticket and cleaning photos as browser/KV strings such as `photo:*` and `photo:after:*`.
+CMMS CDSL keeps demo/local photos as browser/KV strings such as `photo:*` and inline cleaning photo fields.
 
 That is acceptable for demo/local review, but not for production.
 
@@ -21,11 +21,11 @@ The release gate only accepts production mode when file storage is explicitly co
 
 ## Current Boundary
 
-- Existing demo/local flows still read and write `photo:*` records through the current store.
-- Production+API ticket before/after photos now use `/api/files` and ticket metadata fields (`photoPath`, `afterPhotoPath`).
-- Cleaning round/complaint photos still need a follow-up move to `/api/files`.
+- Existing demo/local flows still read and write the current browser/KV photo records for review compatibility.
+- Production+API ticket before/after photos use `/api/files` and ticket metadata fields (`photoPath`, `afterPhotoPath`).
+- Production+API cleaning complaint and round issue photos use `/api/files` and metadata fields (`photoPath`, `hasPhoto`).
 - Backup/restore may still include `photos` for demo/local continuity.
-- Production rollout must move photo upload/read/delete through server APIs before real use.
+- Production rollout must keep protected file access behind server APIs before real use.
 
 ## Server API Contract
 
@@ -55,8 +55,8 @@ The frontend adapter is `createApiFileProvider` in `src/apiFileAdapter.js`. It f
 
 ## Next Implementation Step
 
-Move the remaining cleaning photo flows from inline/base64 records to the server file API:
+Finish the production file boundary around backup/export and future normalized tables:
 
-- write only metadata/path references into business records;
-- fetch protected image data through `/api/files`;
-- stop including production photos inside backup JSON.
+- keep production business records as metadata/path references, not embedded base64;
+- keep protected image data fetched through `/api/files`;
+- avoid treating demo/local backup photos as production migration data.
