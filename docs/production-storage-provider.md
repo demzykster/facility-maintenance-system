@@ -44,4 +44,12 @@ The first production adapter keeps the same key/value contract as the current st
 - `VITE_CMMS_STORAGE_API_URL` is configured;
 - the backend enforces real Auth/RLS/server-side permissions.
 
+Run the current frontend configuration gate with:
+
+```bash
+npm run release:check
+```
+
+The gate fails production mode when the storage provider is still local/browser storage. It does not claim that Auth/RLS/files/AI are done; those backend items remain separate production blockers.
+
 This is a bridge, not the final normalized database model. The normalized tables are tracked in `docs/production-data-model.md`.
