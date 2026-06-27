@@ -23,12 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none after this PR merges
 
-- Status: this PR completes cleaning photo file-adapter wiring.
-- Latest synchronized `main`: `a7e25ad feat: route ticket photos through file adapter (#296)`.
+- Status: this PR defines the production file metadata contract.
+- Latest synchronized `main`: `08ad3e5 feat: route cleaning photos through file adapter (#297)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: move cleaning complaint/round photos from embedded base64 records to `/api/files` metadata paths in production+API mode.
+  - current production step: define the shared `file_metadata` contract for protected file ownership before persisting metadata server-side.
   - next production step: continue moving permissions/data writes toward server/RLS.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
@@ -38,16 +38,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/cleaningPhotoStorage.test.js tests/ticketPhotoStorage.test.js tests/apiFileAdapter.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/fileMetadataModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `npm run release:check` passed for default demo/local config.
-  - Browser smoke-check on `http://127.0.0.1:5173/` loaded the app with no console errors.
+  - Browser smoke-check not needed: this branch changes only pure model/docs, not UI/runtime wiring.
 
 ## Latest Completed Work
 
+- R9 production file metadata contract is complete in this PR.
+  - `src/fileMetadataModel.js` defines the first shared ownership metadata shape for protected files.
+  - `docs/production-file-metadata.md` documents the future `file_metadata` table fields.
+  - This is a contract step only; it does not yet persist metadata rows server-side.
+  - Local tests, production builds, and release checks passed.
 - R9 cleaning photo file-adapter wiring is complete.
   - Production+API mode stores cleaning complaint photos and cleaning round issue photos through `/api/files`.
   - Cleaning records now keep `photoPath` / `hasPhoto` metadata instead of embedded production base64.

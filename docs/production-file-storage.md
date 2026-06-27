@@ -53,10 +53,17 @@ The route is closed by default until `CMMS_FILE_DRIVER=supabase`, `CMMS_FILE_BUC
 
 The frontend adapter is `createApiFileProvider` in `src/apiFileAdapter.js`. It follows the same API URL and Supabase access-token pattern as `src/apiStorageAdapter.js`.
 
+## Metadata Contract
+
+Protected file bytes live in Supabase Storage. Their business ownership belongs in a future `file_metadata` database table.
+
+The first shared contract is documented in `docs/production-file-metadata.md` and modeled in `src/fileMetadataModel.js`.
+
 ## Next Implementation Step
 
 Finish the production file boundary around backup/export and future normalized tables:
 
 - keep production business records as metadata/path references, not embedded base64;
+- persist file ownership metadata server-side when upload flows are moved fully behind Supabase tables/RLS;
 - keep protected image data fetched through `/api/files`;
 - avoid treating demo/local backup photos as production migration data.

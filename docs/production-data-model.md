@@ -24,6 +24,7 @@ The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
 | `ppeNorms` | `ppenorm:` | `ppe_norms` |
 | `ppeReqs` | `ppereq:` | `ppe_requests` |
 | `ppeOrders` | `ppeorder:` | `ppe_orders` |
+| protected file metadata | `/api/files` paths | `file_metadata` |
 
 ## Migration Notes
 
@@ -31,6 +32,7 @@ The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
 - Existing local records can be read by `prefix`.
 - Future tables should keep the existing record `id` as the primary migration key.
 - User identity lives in Supabase Auth (`auth.users`). CMMS profile, role, active status, departments, and module permissions live in `public.app_users`.
-- Photos are not included here as tables yet. They currently live under `photo:*` storage keys and should move to object storage with metadata references from tickets/reports.
+- Demo/local backup photos may still appear under `photo:*` or inline cleaning photo fields for review compatibility.
+- Production file bytes belong in Supabase Storage and production file ownership belongs in `file_metadata`; see `docs/production-file-metadata.md`.
 - `config:v1`, `session:v1`, `theme:v1`, `login:v1`, and notification preferences are not business collections. They need separate treatment as configuration, session, or user preference data.
 - `public.cmms_kv_records` is a temporary Postgres bridge for the existing key/value storage contract. It is not the final normalized business schema.
