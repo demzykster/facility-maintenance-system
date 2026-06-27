@@ -5578,7 +5578,7 @@ function SettingsPanel(p) {
           <select value={r.ball || "executor"} title="אצל מי האחריות להמשך טיפול" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, ball: e.target.value } : x))}>{WAIT_BALL_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
           <select value={r.setters || "both"} title="מי רשאי לבחור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, setters: e.target.value } : x))}>{WAIT_SETTER_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
           <label className="chk-line" title="כאשר מסומן, זמן ההמתנה נשמר אך לא נספר ב-SLA התפעולי" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={!r.pauseSla} onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, pauseSla: !e.target.checked } : x))} /> נספר</label>
-          <button className="reg-del" disabled={r.id === "no_equipment"} title={r.id === "no_equipment" ? "סיבה מערכתית" : "מחק"} onClick={() => setWreasons((a) => r.id === "no_equipment" ? a : a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
+          <button className="reg-del" disabled={r.id === "no_equipment"} title={r.id === "no_equipment" ? "סיבה מערכתית" : "מחק"} aria-label={`${r.id === "no_equipment" ? "סיבה מערכתית — לא ניתן למחוק" : "מחק סיבת המתנה"}: ${r.label || "ללא שם"}`} onClick={() => setWreasons((a) => r.id === "no_equipment" ? a : a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
         </div>)}
       </div>
       <button className="btn-ghost sm" onClick={() => setWreasons((a) => [...a, { id: "wr" + Date.now().toString(36), label: "", ball: "executor", pauseSla: false, setters: "both" }])}><Plus size={14} /> סיבת המתנה</button>
@@ -5588,7 +5588,7 @@ function SettingsPanel(p) {
         <div className="dt-edit-line">
           <input className="reg-name" value={d.label} placeholder="שם הרמה" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
           <input className="reg-name dt-desc-in" value={d.desc || ""} placeholder="תיאור קצר (מוצג בבחירה)" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))} />
-          <button className="reg-del" onClick={() => setDlevels((a) => a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
+          <button className="reg-del" aria-label={`מחק רמת חומרה: ${d.label || "ללא שם"}`} onClick={() => setDlevels((a) => a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
         </div>
         <div className="dt-edit-line">
           <div className="pal">{DT_PALETTE.map((c) => <button key={c} type="button" className={"pal-sw" + (d.color === c ? " on" : "")} style={{ background: c }} title={c} onClick={() => setDlevels((a) => a.map((x, j) => j === i ? { ...x, color: c } : x))} />)}</div>

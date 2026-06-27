@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ppe-movement-search
+### Active branch: codex/label-general-settings-delete-buttons
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `a4e3458 fix: polish analytics asset wording (#228)`.
+- Latest synchronized `main`: `f98d993 fix: label ppe movement search field (#229)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `ביגוד עובדים`.
-  - make the inventory movement search field self-describing beyond placeholder text.
-  - keep movement search, filtering, export, and layout unchanged.
+  - continue R5 on `הגדרות`.
+  - make general settings delete icon buttons self-describing.
+  - keep wait-reason/downtime behavior, blocking, and save logic unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: PPE movement search exposes a descriptive label.
+  - browser smoke-check: general settings delete controls expose descriptive labels.
 
 ## Latest Completed Work
 
+- PR #229: PPE movement search field now exposes a stable descriptive label.
+  - The `ביגוד עובדים -> תנועות מלאי` search input no longer relies only on placeholder text.
+  - Movement search, filtering, export, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #228: Analytics asset wording now uses clearer Hebrew.
   - Visible `אקטיב/אקטיבים` wording was replaced with `כלים/ציוד`.
   - Analytics calculations, filters, and drill-down behavior stayed unchanged.
