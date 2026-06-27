@@ -8,6 +8,8 @@ The owner has opened the production backend/auth phase after R8.
 
 The goal is no longer only demo stabilization. The goal is to remove the risks that prevent real production use while keeping the existing working product intact.
 
+The target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage. See `docs/production-platform-decision.md`.
+
 ## Critical Risks To Remove
 
 ### P0 — Shared Durable Data
@@ -125,6 +127,8 @@ Production requirement:
 - Storage provider policy and the first API storage-client contract are documented in `docs/production-storage-provider.md`.
 - `/api/kv` route skeleton exists and is intentionally closed until server auth and a durable backend driver are configured.
 - Upstash/Vercel Redis REST is the first supported `/api/kv` durable driver path.
+- Upstash/Vercel Redis is a bridge/cache path, not the final CMMS database.
+- Supabase Postgres/Auth/RLS/Storage is the selected target production platform.
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 
 ## Monolith Extraction Policy

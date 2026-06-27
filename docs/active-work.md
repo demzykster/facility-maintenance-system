@@ -28,9 +28,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: add first-admin bootstrap, then move login/Auth permissions toward a server-backed model.
+  - next production step: add first-admin bootstrap using the selected Supabase/Postgres/Auth direction, then move login/Auth permissions toward a server-backed model.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
+  - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
   - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
@@ -64,6 +65,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `/api/kv` route skeleton exists and is closed by default without server auth/backend storage.
   - `/api/kv` can now use an Upstash/Vercel Redis REST driver through server-only env.
   - Upstash/Vercel Redis REST is the first selected durable `/api/kv` driver path.
+  - Upstash is a bridge/cache path, not the final CMMS database.
+  - `docs/production-platform-decision.md` selects Supabase Postgres/Auth/RLS/Storage as the target production platform.
   - `docs/production-storage-provider.md` documents the env variables and API contract.
   - Local tests, default production build, production API-provider build, and browser smoke-check passed.
 - R9 production config gate is complete.
