@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/cleaning-photo-metadata-upload`
+### Active branch: `codex/cleaning-complaint-issue-metadata`
 
-- Status: this PR sends cleaning complaint/round photo metadata through the production file API upload path.
-- Latest synchronized `main`: `353d4a0 [skip vercel] feat: send ticket photo metadata`.
+- Status: this PR adds a dedicated metadata kind for cleaning complaint issue photos and sends it through the production file API upload path.
+- Latest synchronized `main`: `2b69133 [skip vercel] feat: send cleaning photo metadata`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: pass explicit cleaning complaint/round photo metadata into `/api/files`.
-  - next production step: decide whether cleaning complaint issue photos need a separate metadata kind before wiring them.
+  - current production step: give nested cleaning complaint issue photos their own file metadata kind instead of mislabeling them.
+  - next production step: review remaining production file flows beyond ticket and cleaning photos.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -48,6 +48,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 cleaning photo metadata upload is complete in PR #309.
+  - Production+API cleaning complaint main photos and cleaning round issue photos now include explicit file metadata.
+  - Nested cleaning complaint issue photos were intentionally left for a dedicated metadata kind.
+  - Local tests, production builds, and release checks passed.
 - R9 ticket photo metadata upload is complete in PR #308.
   - Production+API ticket before/after photo uploads now include explicit file metadata.
   - `/api/files` can persist ticket photo ownership rows through the configured metadata sink.
