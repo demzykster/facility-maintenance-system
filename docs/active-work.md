@@ -46,6 +46,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production server KV config gate is complete.
+  - `npm run release:check` now blocks production API storage unless the server-side KV bridge is configured for Supabase auth, Supabase driver, URL, anon key, and service role key.
+  - The gate reports storage API URL problems before server env problems, so release feedback stays readable.
+  - Local tests, production build, production-mode API build, and release checks passed.
 - R9 sensitive KV write guard is complete.
   - `/api/kv` now checks existing module permission levels before Supabase-authenticated `PUT`/`DELETE` on sensitive bridge keys.
   - User records require `users:manage`; system/fleet/settings bridge records require `settings:manage`; PPE catalog/order records require `ppe:manage`.
