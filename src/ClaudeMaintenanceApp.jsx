@@ -6152,7 +6152,7 @@ function TicketDetail(p) {
           <SectionTitle>שיוך טכנאי (אופציונלי)</SectionTitle><select className="ta" value={ticket.assignee || ""} onChange={(ev) => upd({ assignee: ev.target.value, routedTech: !!ev.target.value, mgrExec: false, status: ticket.status === "new" && ev.target.value ? "in_progress" : ticket.status }, ev.target.value ? `שויך לטכנאי: ${ev.target.value}` : "השיוך הוסר")}><option value="">— טיפול עצמי / קבלן —</option>{p.techNames.map((t) => <option key={t}>{t}</option>)}</select></>}
         {track === "transport" && <><SectionTitle>שיוך טכנאי</SectionTitle><select className="ta" value={ticket.assignee || ""} onChange={(ev) => upd({ assignee: ev.target.value, status: ticket.status === "new" && ev.target.value ? "in_progress" : ticket.status }, ev.target.value ? `שויך: ${ev.target.value}` : "השיוך הוסר")}><option value="">— מאגר טכנאים —</option>{p.techNames.map((t) => <option key={t}>{t}</option>)}</select></>}
         <SectionTitle>הערה</SectionTitle>
-        <div className="note-row"><input value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" onKeyDown={(ev) => ev.key === "Enter" && addNote()} /><button className="btn-primary" onClick={addNote}><Send size={16} /></button></div>
+        <div className="note-row"><input value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" onKeyDown={(ev) => ev.key === "Enter" && addNote()} /><button className="btn-primary" aria-label="שליחת עדכון לקריאה" onClick={addNote}><Send size={16} /></button></div>
         <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>
       </>)}
 

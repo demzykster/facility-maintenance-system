@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-topbar-icon-buttons
+### Active branch: codex/label-ticket-note-send-button
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `bfd9629 docs: close search label pass ledger (#240)`.
+- Latest synchronized `main`: `058f94b fix: label worker topbar icon buttons (#241)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make worker topbar icon-only controls self-describing.
-  - keep theme toggle, logout behavior, and layout unchanged.
+  - make the ticket note send icon button self-describing.
+  - keep note submission behavior and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: worker topbar buttons expose descriptive labels.
+  - browser smoke-check: ticket note send button exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #241: Worker topbar icon buttons now expose descriptive labels.
+  - Theme toggle and logout icon-only controls are named for assistive tech/browser inspection.
+  - Theme toggle, logout behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #240: Active work ledger closed the search-label pass.
   - No active product branch remained after PR #239.
   - Docs-only validation passed; Vercel was blocked by build-rate limit.
