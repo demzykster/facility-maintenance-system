@@ -21,23 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-driver-access-search-field
+### Active branch: none
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `7ab65ae fix: label task people search field (#238)`.
+- Status: no active product branch.
+- Latest synchronized `main`: `9b141f3 fix: label driver access search field (#239)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `כלי שינוע`.
-  - make the driver-access unit search field self-describing beyond placeholder text.
-  - keep driver access filtering, selection behavior, and layout unchanged.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - code search: no remaining `חיפוש` placeholder inputs without `aria-label`.
-  - browser smoke-check note: AccessPicker path is not reachable in current demo-data without a saved driver row.
+  - R5 search-field accessibility pass is closed.
+  - Continue broader R5 Screen Audit And Visual Noise from the next concrete backlog/UI item.
+- Last validation:
+  - `npm test -- --run` passed in PR #239.
+  - `npm run build` passed in PR #239.
+  - code search found no remaining `חיפוש` placeholder inputs without `aria-label`.
 
 ## Latest Completed Work
 
+- PR #239: Driver-access search field now exposes a descriptive label.
+  - The hidden AccessPicker search no longer relies only on placeholder text.
+  - Driver access filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/code-search passed before merge; Vercel was blocked by build-rate limit.
 - PR #238: Task people-picker search field now exposes a descriptive label.
   - The responsible-person picker search no longer relies only on placeholder text.
   - People-picker filtering, selection behavior, and layout stayed unchanged.
