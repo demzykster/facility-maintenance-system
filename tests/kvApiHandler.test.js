@@ -280,6 +280,75 @@ describe("kv API handler", () => {
     expect(driver.delete).toHaveBeenCalledWith("config:v1", true);
   });
 
+  it("writes audit events for successful sensitive Supabase-authenticated writes when an audit sink is configured", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue("{\"before\":true}"),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "admin",
+        name: "Owner",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      auditDriver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "config:v1", shared: "1" },
+      body: { value: "{\"after\":true}" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.get).toHaveBeenCalledWith("config:v1", true);
+    expect(driver.set).toHaveBeenCalledWith("config:v1", "{\"after\":true}", true);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "app-user-1",
+      actorName: "Owner",
+      entityType: "settings",
+      entityId: "config:v1",
+      action: "update",
+      before: { value: "{\"before\":true}" },
+      after: { value: "{\"after\":true}" }
+    }));
+  });
+
+  it("does not audit ordinary workflow writes through the KV bridge", async () => {
+    const driver = {
+      get: vi.fn(),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const auditDriver = { write: vi.fn() };
+    const handler = createKvApiHandler({
+      driver,
+      auditDriver,
+      env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      query: { key: "ticket:T-001", shared: "1" },
+      body: { value: "{\"id\":\"T-001\"}" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.get).not.toHaveBeenCalled();
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
   it("keeps ordinary workflow writes available to active Supabase-authenticated users", async () => {
     const driver = { set: vi.fn().mockResolvedValue(undefined) };
     const sessionClient = {
