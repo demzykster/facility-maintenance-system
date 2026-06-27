@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-supplier-search-fields
+### Active branch: codex/label-fleet-search-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `fb12fd6 fix: label cleaning zone delete actions (#231)`.
+- Latest synchronized `main`: `2d83a5a fix: label supplier search fields (#232)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `ספקים / קבלנים`.
-  - make supplier search and add-new fields self-describing beyond placeholder text.
-  - keep supplier filtering, add behavior, and layout unchanged.
+  - continue R5 on `כלי שינוע`.
+  - make the main fleet search field self-describing beyond placeholder text.
+  - keep fleet filtering, search behavior, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: supplier fields expose descriptive labels.
+  - browser smoke-check: fleet search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #232: Supplier search/add fields now expose descriptive labels.
+  - Supplier search and add-new fields no longer rely only on placeholder text.
+  - Supplier filtering, add behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #231: Cleaning-zone delete icon buttons now expose descriptive labels.
   - Checklist item deletes and round-window deletes are named by item/time.
   - Cleaning-zone form behavior, save logic, and layout stayed unchanged.

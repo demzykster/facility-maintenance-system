@@ -4540,7 +4540,7 @@ function FleetModule(p) {
     <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
     {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} templates={p.templates} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
     <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div>
-    <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="סוג" value={type} onChange={setType}>{types.map((t) => <option key={t}>{t}</option>)}</Sel>
       <Sel label="מחלקה" value={dept} onChange={setDept}>{depts.map((d) => <option key={d}>{d}</option>)}</Sel>
