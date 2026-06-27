@@ -1,5 +1,5 @@
 import { createApiFileProvider } from "./apiFileAdapter.js";
-import { cleaningComplaintPhotoMetadata, cleaningRoundIssuePhotoMetadata } from "./fileMetadataModel.js";
+import { cleaningComplaintIssuePhotoMetadata, cleaningComplaintPhotoMetadata, cleaningRoundIssuePhotoMetadata } from "./fileMetadataModel.js";
 import { createProductionAuthStore } from "./productionLoginAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 
@@ -81,7 +81,7 @@ export function createCleaningPhotoStorage({ appMode = "demo", provider = STORAG
         rec.photo = null;
         rec.hasPhoto = true;
       }
-      rec.issues = await saveIssues(rec.id, rec.issues || [], cleaningComplaintIssuePhotoPath);
+      rec.issues = await saveIssues(rec, rec.issues || [], cleaningComplaintIssuePhotoPath, cleaningComplaintIssuePhotoMetadata);
       return rec;
     },
     async saveRound(round) {

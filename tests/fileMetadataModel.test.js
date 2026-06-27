@@ -3,6 +3,7 @@ import {
   FILE_KINDS,
   FILE_METADATA_TABLE_CONTRACT,
   FILE_OWNER_TYPES,
+  cleaningComplaintIssuePhotoMetadata,
   cleaningComplaintPhotoMetadata,
   cleaningRoundIssuePhotoMetadata,
   fileMetadataId,
@@ -77,6 +78,21 @@ describe("fileMetadataModel", () => {
       ownerType: "cleaning_complaint",
       ownerId: "C-1",
       kind: "cleaning_complaint_photo",
+      createdById: "cleaner-1",
+      createdAt: 300
+    });
+
+    expect(cleaningComplaintIssuePhotoMetadata({
+      id: "C-1",
+      at: 300,
+      reportedById: "cleaner-1",
+      reportedByName: "Cleaner",
+      reportedByRole: "cleaner"
+    }, { itemId: "sink" }, "cleaning/complaints/C-1/issues/sink.jpg")).toMatchObject({
+      ownerType: "cleaning_complaint",
+      ownerId: "C-1",
+      ownerSubId: "sink",
+      kind: "cleaning_complaint_issue_photo",
       createdById: "cleaner-1",
       createdAt: 300
     });

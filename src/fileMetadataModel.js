@@ -12,6 +12,7 @@ export const FILE_KINDS = Object.freeze({
   ticketBeforePhoto: "ticket_before_photo",
   ticketAfterPhoto: "ticket_after_photo",
   cleaningComplaintPhoto: "cleaning_complaint_photo",
+  cleaningComplaintIssuePhoto: "cleaning_complaint_issue_photo",
   cleaningRoundIssuePhoto: "cleaning_round_issue_photo",
   attachment: "attachment",
   document: "document"
@@ -78,6 +79,22 @@ export function cleaningComplaintPhotoMetadata(complaint = {}, path = "", option
     ownerType: FILE_OWNER_TYPES.cleaningComplaint,
     ownerId: complaint.id,
     kind: FILE_KINDS.cleaningComplaintPhoto,
+    path,
+    contentType: options.contentType,
+    sizeBytes: options.sizeBytes,
+    createdById: options.createdById || complaint.reportedById,
+    createdByName: options.createdByName || complaint.reportedByName,
+    createdByRole: options.createdByRole || complaint.reportedByRole,
+    createdAt: options.createdAt || complaint.at
+  });
+}
+
+export function cleaningComplaintIssuePhotoMetadata(complaint = {}, issue = {}, path = "", options = {}) {
+  return normalizeFileMetadata({
+    ownerType: FILE_OWNER_TYPES.cleaningComplaint,
+    ownerId: complaint.id,
+    ownerSubId: issue.id || issue.itemId,
+    kind: FILE_KINDS.cleaningComplaintIssuePhoto,
     path,
     contentType: options.contentType,
     sizeBytes: options.sizeBytes,

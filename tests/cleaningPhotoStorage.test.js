@@ -43,6 +43,18 @@ describe("cleaningPhotoStorage", () => {
         contentType: "image/png"
       })
     });
+    expect(apiProvider.upload).toHaveBeenCalledWith("cleaning/complaints/C-1/issues/sink.jpg", {
+      data: "data:image/jpeg;base64,def",
+      contentType: "image/jpeg",
+      metadata: expect.objectContaining({
+        ownerType: "cleaning_complaint",
+        ownerId: "C-1",
+        ownerSubId: "sink",
+        kind: "cleaning_complaint_issue_photo",
+        path: "cleaning/complaints/C-1/issues/sink.jpg",
+        contentType: "image/jpeg"
+      })
+    });
     await expect(storage.load(stored)).resolves.toBe("data:image/png;base64,abc");
   });
 
