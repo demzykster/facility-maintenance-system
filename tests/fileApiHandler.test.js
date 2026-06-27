@@ -176,6 +176,71 @@ describe("file API handler", () => {
     }));
   });
 
+  it("upserts file metadata for uploads when metadata and a metadata sink are provided", async () => {
+    const driver = { upload: vi.fn().mockResolvedValue(undefined) };
+    const metadataDriver = { upsert: vi.fn().mockResolvedValue(undefined) };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient()
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" },
+      body: {
+        contentType: "image/jpeg",
+        data: Buffer.from("photo-bytes").toString("base64"),
+        metadata: {
+          ownerType: "ticket",
+          ownerId: "T-1",
+          kind: "ticket_before_photo"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(metadataDriver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      ownerType: "ticket",
+      ownerId: "T-1",
+      kind: "ticket_before_photo",
+      path: "tickets/T-1/before.jpg",
+      contentType: "image/jpeg",
+      sizeBytes: Buffer.from("photo-bytes").length,
+      createdById: "app-user-1",
+      createdByName: "Owner",
+      createdByRole: "admin"
+    }));
+  });
+
+  it("does not silently drop provided upload metadata when no metadata sink is configured", async () => {
+    const driver = { upload: vi.fn() };
+    const handler = createFileApiHandler({
+      driver,
+      sessionClient: activeSessionClient()
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" },
+      body: {
+        contentType: "image/jpeg",
+        data: Buffer.from("photo-bytes").toString("base64"),
+        metadata: {
+          ownerType: "ticket",
+          ownerId: "T-1",
+          kind: "ticket_before_photo"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "file_metadata_not_configured" });
+    expect(driver.upload).not.toHaveBeenCalled();
+  });
+
   it("rejects unsafe or missing storage paths", async () => {
     const driver = { download: vi.fn() };
     const handler = createFileApiHandler({

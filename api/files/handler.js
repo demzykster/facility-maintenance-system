@@ -1,7 +1,9 @@
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { createSupabaseFileDriverFromEnv } from "./supabaseFileDriver.js";
+import { createSupabaseFileMetadataDriverFromEnv } from "./supabaseFileMetadataDriver.js";
 import { AUDIT_ACTIONS, fileAuditEvent } from "../../src/auditEventModel.js";
+import { normalizeFileMetadata } from "../../src/fileMetadataModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -75,11 +77,26 @@ const writeAuditEvent = async (auditDriver, event) => {
   if (typeof auditDriver.set === "function") return auditDriver.set(event);
 };
 
-export function createFileApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+const buildUploadMetadata = (metadata, { path, file, user }) => {
+  if (!metadata || typeof metadata !== "object") return null;
+  return normalizeFileMetadata({
+    ...metadata,
+    path,
+    contentType: file.contentType,
+    sizeBytes: file.buffer.length,
+    createdById: metadata.createdById || user.id,
+    createdByName: metadata.createdByName || user.name,
+    createdByRole: metadata.createdByRole || user.role
+  });
+};
+
+export function createFileApiHandler({ driver = null, auditDriver = null, metadataDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver
     || (env.CMMS_FILE_DRIVER === "supabase" ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
   const backendAuditDriver = auditDriver
     || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
+  const backendMetadataDriver = metadataDriver
+    || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
 
   return async function fileApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -100,9 +117,13 @@ export function createFileApiHandler({ driver = null, auditDriver = null, env = 
         });
       }
       if (method === "POST" || method === "PUT") {
-        const file = bufferFromBody(await readBody(req));
+        const body = await readBody(req);
+        const file = bufferFromBody(body);
         if (!file || !file.buffer.length) return json(res, 400, { error: "file_data_required" });
+        if (body.metadata && !backendMetadataDriver) return json(res, 503, { error: "file_metadata_not_configured" });
+        const metadata = buildUploadMetadata(body.metadata, { path, file, user: auth.user });
         await backendDriver.upload(path, file.buffer, file.contentType, auth.user);
+        if (metadata) await backendMetadataDriver?.upsert?.(metadata);
         await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path, contentType: file.contentType }, AUDIT_ACTIONS.upload, auth.user));
         return json(res, 200, { ok: true, path, contentType: file.contentType });
       }

@@ -48,6 +48,7 @@ The table and server-only Supabase metadata driver now exist.
 Server-only env:
 
 ```env
+CMMS_FILE_METADATA_DRIVER=supabase
 CMMS_FILE_METADATA_SUPABASE_TABLE=file_metadata
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
@@ -61,6 +62,8 @@ The table is created by:
 supabase/migrations/20260627201000_file_metadata.sql
 ```
 
-Current upload flows already store protected file bytes through `/api/files` in production+API mode. The next production step is to persist matching metadata rows server-side when uploads happen.
+`/api/files` accepts optional upload metadata and persists it when the metadata sink is configured. If upload metadata is provided but the sink is not configured, the upload fails with `file_metadata_not_configured` so metadata is not silently lost.
+
+Current upload flows already store protected file bytes through `/api/files` in production+API mode. The next production step is to pass explicit metadata from ticket and cleaning upload flows.
 
 Do not treat current demo/local backup photos as production migration data.
