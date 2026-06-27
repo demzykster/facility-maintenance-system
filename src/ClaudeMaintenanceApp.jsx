@@ -3743,7 +3743,7 @@ function PpeClawbackSettings({ config, onSave }) {
     <div className="cards">{rows.map((r, i) => <div key={i} className="tcard" style={{ cursor: "default" }}><div className="tcard-main" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>עד <input type="number" min="1" value={r.maxDays} onChange={(e) => setOne(i, "maxDays", e.target.value)} style={{ width: 80 }} /> ימים</label>
       <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>ניכוי <input type="number" min="0" max="100" value={r.pct} onChange={(e) => setOne(i, "pct", e.target.value)} style={{ width: 70 }} />%</label>
-      <button className="icon-btn" aria-label="הסר" onClick={() => rm(i)} style={{ marginInlineStart: "auto" }}><X size={18} /></button>
+      <button className="icon-btn" aria-label="הסר מדרגת קיזוז" title="הסר מדרגת קיזוז" onClick={() => rm(i)} style={{ marginInlineStart: "auto" }}><X size={18} /></button>
     </div></div>)}</div>
     <button className="btn-ghost sm" style={{ marginTop: 8 }} onClick={add}><Plus size={14} /> הוסף מדרגה</button>
     <button className="btn-primary full" style={{ marginTop: 12 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת מדרגות"}</button>

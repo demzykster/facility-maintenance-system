@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/fix-ppe-norm-active-count
+### Active branch: codex/label-ppe-clawback-remove
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `fdf0bbd docs: close ppe polish ledger (#206)`.
+- Latest synchronized `main`: `f3b5215 fix: count active ppe department norms (#207)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - make department PPE requirement counts reflect active catalog items only.
-  - avoid showing stale hidden norms as current department setup when the catalog is empty or items are inactive.
+  - make the icon-only remove action in `קיזוז בעזיבה` understandable.
+  - keep clawback table behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: PPE settings no longer shows stale active configured item counts when the active catalog is empty.
+  - browser smoke-check: clawback remove buttons expose `הסר מדרגת קיזוז`.
 
 ## Latest Completed Work
 
+- PR #207: PPE department requirement counts now ignore inactive/missing catalog items.
+  - The department label no longer reports stale hidden norms as active setup.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #205: Empty PPE movement export is no longer a dead action.
   - The export button is disabled when there are no movement rows.
   - The disabled button exposes `אין נתונים לייצוא`.
