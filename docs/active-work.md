@@ -21,22 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/ppe-order-suggest-net-deficit
+### Active branch: codex/label-driver-request-icon-buttons
 
 - Status: ready for PR.
-- Latest synchronized `main`: `33888a0 fix: label PPE order remove buttons (#254)`.
+- Latest synchronized `main`: `27744d6 fix: suggest PPE order net deficits (#255)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 Screen Audit And Visual Noise on `ביגוד עובדים`.
-  - make manual item quantity suggestions in PPE purchase orders respect already-open orders.
-  - keep purchase-order saving, receiving, and stock movement behavior unchanged.
+  - continue R5 Screen Audit And Visual Noise on `כלי שינוע`.
+  - give pending driver request approve/reject icon buttons explicit Hebrew labels.
+  - keep driver request approval/rejection behavior unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: PPE purchase-order form opens with item picker and no visible errors after wiring order data into suggestions.
+  - browser smoke-check: `כלי שינוע` opens cleanly; current demo data has no pending driver request buttons to display.
+  - source-check: pending driver approve/reject buttons now include driver/unit-specific Hebrew labels.
 
 ## Latest Completed Work
 
+- PR #255: PPE purchase-order manual suggestions now use net deficits.
+  - Manual item quantity suggestions account for already-open PPE orders.
+  - Purchase-order saving, receiving, and stock movement behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #254: PPE purchase-order remove-line icon buttons now have explicit labels.
   - Labels include the item name and size where relevant.
   - Order line removal behavior and order data stayed unchanged.
