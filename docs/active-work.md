@@ -21,22 +21,22 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-user-tree-groups
+### Active branch: none
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `9ea5373 fix: quiet readonly user card hover (#218)`.
+- Status: no active product branch.
+- Latest synchronized `main`: `3121bb8 fix: expose user tree group state (#219)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - expose user-tree group expanded/collapsed state to assistive tech.
-  - keep group toggle behavior unchanged.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check: group button exposes `aria-expanded` and still expands.
+  - continue reviewing user cards, edit/create form, permissions blocks, visual noise, and unclear controls.
+- Validation pending:
+  - none.
 
 ## Latest Completed Work
 
+- PR #219: User-tree group toggles now expose expanded/collapsed state.
+  - Group buttons use `type="button"` and `aria-expanded`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #218: Read-only user cards no longer show clickable hover feedback.
   - Non-actionable user cards get an `inert` class.
   - The inert hover state no longer lifts or shadows the card.
