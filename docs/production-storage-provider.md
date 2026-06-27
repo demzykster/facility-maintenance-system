@@ -88,7 +88,6 @@ Current server route files:
 - `api/kv/supabaseDriver.js`
 - `api/kv/upstashDriver.js`
 - `api/files/index.js`
-- `api/files/[...path].js`
 - `api/files/handler.js`
 - `api/files/supabaseFileDriver.js`
 

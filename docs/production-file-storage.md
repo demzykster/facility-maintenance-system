@@ -43,7 +43,6 @@ The first server file API is:
 Route files:
 
 - `api/files/index.js`
-- `api/files/[...path].js`
 - `api/files/handler.js`
 - `api/files/supabaseFileDriver.js`
 - `src/apiFileAdapter.js`
