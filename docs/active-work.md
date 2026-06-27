@@ -21,23 +21,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/summarize-user-permissions-fold
+### Active branch: none
 
-- Status: ready for PR.
-- Latest synchronized `main`: `e57ce4d fix: label remaining icon buttons (#249)`.
+- Status: main clean after PR #250.
+- Latest synchronized `main`: `d417a0f fix: summarize personal permissions fold (#250)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 Screen Audit And Visual Noise.
-  - continue `צוות ומשתמשים` form polish.
-  - show a compact summary on the collapsed personal-permissions block.
-  - keep permission storage and editing behavior unchanged.
+  - no active product branch is open.
+  - continue R5 Screen Audit And Visual Noise from the next exact action below.
 - Validation:
-  - `npm test -- --run` passed.
-  - `npm run build` passed.
-  - browser smoke-check: manager user form shows a visible permission summary in the collapsed personal-permissions block.
+  - docs-only ledger update: `git diff --check`.
 
 ## Latest Completed Work
 
+- PR #250: User form personal-permissions block now shows a compact collapsed summary.
+  - Manager forms show whether extra module permissions are present without opening the block.
+  - Permission storage and editing behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #249: Remaining smaller icon-only buttons now expose descriptive labels.
   - Driver actions, ticket wizard back, duplicate modal close, checklist issue toggle, and notification settings are named.
   - Behavior and layout stayed unchanged.
@@ -277,8 +277,9 @@ Older completed work is available in GitHub history and, when needed, in:
 ## Next Exact Action
 
 1. Continue R5 Screen Audit And Visual Noise.
-2. Next concrete screen pass: continue `צוות ומשתמשים`, reviewing user cards, edit/create form, permissions blocks, visual noise, and unclear controls.
-3. If a critical bug appears, fix the smallest concrete bug before broader polish.
+2. Next concrete screen pass: continue `צוות ומשתמשים`, starting with the user tree/group list.
+3. Verify whether repeated-looking users in the tree are real data duplicates or only UI duplication before changing rendering.
+4. If a critical bug appears, fix the smallest concrete bug before broader polish.
 
 ## Documentation Policy
 
