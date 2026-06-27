@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/clarify-worker-exit-icon
+### Active branch: codex/label-worker-shift-color
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `fba3c49 docs: close ledger after user tree group (#221)`.
+- Latest synchronized `main`: `f8b34c6 fix: clarify worker exit action icon (#222)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - replace the misleading hard-hat icon on the worker exit/equipment return action.
-  - keep offboarding behavior unchanged.
+  - make the worker-shift color picker in `צוות ומשתמשים -> הגדרות` self-describing.
+  - keep worker-shift data and behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: worker edit form still shows the exit/equipment return action.
+  - browser smoke-check: team settings renders shift color controls with descriptive labels.
 
 ## Latest Completed Work
 
+- PR #222: Worker exit/equipment return action now uses a clearer icon.
+  - The misleading hard-hat icon was replaced with the existing package/check icon.
+  - Offboarding behavior and copy stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #221: Active work ledger closed the #220 ledger gap.
   - `docs/active-work.md` now points at PR #220 as the latest synchronized main before this pass.
   - Docs-only validation passed; Vercel was green.
