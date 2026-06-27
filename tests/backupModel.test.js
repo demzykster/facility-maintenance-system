@@ -24,7 +24,7 @@ describe("backup model", () => {
       "ppeOrders",
     ]);
 
-    expect(BACKUP_COLLECTIONS).toEqual([
+    expect(BACKUP_COLLECTIONS.map(({ key, prefix }) => ({ key, prefix }))).toEqual([
       { key: "users", prefix: "user:" },
       { key: "fleet", prefix: "fleet:" },
       { key: "tickets", prefix: "ticket:" },

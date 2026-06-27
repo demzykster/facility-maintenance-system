@@ -76,6 +76,12 @@ Production requirement:
 9. Run migration rehearsal from backup JSON to database.
 10. Run production release gate.
 
+## Progress
+
+- Storage boundary extracted in PR #268.
+- Production collection map started in `src/dataCollections.js`.
+- First production data model documented in `docs/production-data-model.md`.
+
 ## Monolith Extraction Policy
 
 - Extract one boundary at a time.

@@ -28,6 +28,7 @@ Current notes:
 - Owner opened the production backend/auth phase after R8.
 - `docs/production-hardening-plan.md` is the active risk/order document.
 - First implementation step: storage boundary extraction.
+- `src/dataCollections.js` is the first shared map from current backup/storage collections to future production tables.
 
 ### R3 — Notifications End-To-End
 
