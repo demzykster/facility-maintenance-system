@@ -23,12 +23,14 @@ Done means:
 - The current business collections are mapped to a production database schema.
 - Auth, permissions/RLS, files/photos, AI calls, and backup/migration risks are explicitly tracked before implementation.
 - The monolith extraction path is adapter/model-first, not a whole-file rewrite.
+- Future broad modules have a shared-entity growth rule so budget, safety inspections, and current modules do not duplicate users/assets/tickets/suppliers/files/analytics.
 
 Current notes:
 - Owner opened the production backend/auth phase after R8.
 - `docs/production-hardening-plan.md` is the active risk/order document.
 - First implementation step: storage boundary extraction.
 - `src/dataCollections.js` is the first shared map from current backup/storage collections to future production tables.
+- `docs/module-growth-architecture.md` defines how future budget and safety-inspection modules should reuse shared CMMS entities.
 
 ### R3 — Notifications End-To-End
 
