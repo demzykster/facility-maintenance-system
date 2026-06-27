@@ -28,12 +28,17 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs when this entry was written: none.
 - Purpose:
   - no active product branch is open.
-  - continue R5 Screen Audit And Visual Noise from the next exact action below.
+  - R5 Screen Audit And Visual Noise is closed.
+  - continue with R6 Worker Onboarding Polish unless the owner reports a critical product bug.
 - Validation:
-  - docs-only ledger update: `git diff --check`.
+  - docs-only closure update: `git diff --check`.
 
 ## Latest Completed Work
 
+- Final R5 closure pass: Screen Audit And Visual Noise is complete.
+  - Browser pass covered `קריאות`, `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, `צוות ומשתמשים`, `כלי שינוע`, and `בקרת ניקיון`.
+  - Visible controls on those screens had text, an accessible label, a title, or a clear field label/placeholder context.
+  - No product-code change was needed in the final pass; release checklist now points the next work to R6.
 - PR #257: Driver-board warning dismiss icon now has an explicit label.
   - The warning close icon exposes `סגירת הודעה`.
   - Warning dismiss behavior stayed unchanged.
