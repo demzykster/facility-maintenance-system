@@ -1,7 +1,7 @@
 import { productionAiPolicy } from "./aiProviderModel.js";
 import { APP_MODES, seedPolicyForMode } from "./seedPolicyModel.js";
 import { STORAGE_PROVIDERS, storageProviderPolicy } from "./storageProviderModel.js";
-import { productionFileStoragePolicy, productionKvServerPolicy } from "./productionServerConfigModel.js";
+import { productionAuditPolicy, productionFileStoragePolicy, productionKvServerPolicy } from "./productionServerConfigModel.js";
 
 const pushUnique = (target, values) => {
   for (const value of values) {
@@ -15,6 +15,7 @@ export function productionConfigGate({
   storageApiBaseUrl = "",
   kvServer = {},
   fileStorage = {},
+  audit = {},
   ai = {}
 } = {}) {
   const seedPolicy = seedPolicyForMode(appMode);
@@ -37,6 +38,16 @@ export function productionConfigGate({
     })
     : { requiresFileStorage: false, ok: true, errors: [] };
   const aiPolicy = productionAiPolicy({ appMode, ai });
+  const auditPolicy = storagePolicy.readyForProductionData
+    ? productionAuditPolicy({
+      appMode,
+      audit: {
+        supabaseUrl: kvServer.supabaseUrl,
+        supabaseServiceRoleKey: kvServer.supabaseServiceRoleKey,
+        ...audit
+      }
+    })
+    : { requiresAudit: false, ok: true, errors: [] };
   const errors = [];
   const warnings = [];
 
@@ -46,8 +57,9 @@ export function productionConfigGate({
     if (!storagePolicy.readyForProductionData) errors.push(storagePolicy.missingReason || "production_storage_not_ready");
     pushUnique(errors, kvServerPolicy.errors);
     pushUnique(errors, fileStoragePolicy.errors);
+    pushUnique(errors, auditPolicy.errors);
     pushUnique(errors, aiPolicy.errors);
-    warnings.push("server_auth_rls_files_and_ai_still_require_backend_implementation");
+    warnings.push("server_auth_rls_and_normalized_tables_still_require_backend_implementation");
   }
 
   return {
@@ -58,6 +70,7 @@ export function productionConfigGate({
     warnings,
     kvServer: kvServerPolicy,
     fileStorage: fileStoragePolicy,
+    audit: auditPolicy,
     ai: aiPolicy
   };
 }

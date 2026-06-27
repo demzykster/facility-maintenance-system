@@ -152,6 +152,14 @@ CMMS_FILE_BUCKET=cmms-files
 
 See `docs/production-file-storage.md`.
 
+Production release checks also require audit storage to be explicitly configured:
+
+```env
+CMMS_AUDIT_DRIVER=supabase
+```
+
+See `docs/production-audit-events.md`.
+
 ## Production Gate
 
 `VITE_CMMS_APP_MODE=production` is not production-data-ready unless:
