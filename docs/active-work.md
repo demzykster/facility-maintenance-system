@@ -46,6 +46,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 API file adapter is complete.
+  - `src/apiFileAdapter.js` adds upload/download/delete calls for `/api/files` and sends the production Supabase access token when available.
+  - The current UI photo flows are not switched yet; this prepares the next smaller PR to replace `photo:*` writes/reads safely.
+  - Local tests, production build, production-mode API build, and release checks passed.
 - R9 server file API foundation is complete.
   - `/api/files` now requires a Supabase user bearer token, blocks disabled users and first-password-change users, and is closed until Supabase Storage env is configured.
   - `api/files/supabaseFileDriver.js` uploads, downloads, and deletes objects through Supabase Storage using server-only service role credentials.
