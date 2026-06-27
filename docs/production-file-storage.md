@@ -25,11 +25,34 @@ The release gate only accepts production mode when file storage is explicitly co
 - Backup/restore may still include `photos` for demo/local continuity.
 - Production rollout must move photo upload/read/delete through server APIs before real use.
 
+## Server API Contract
+
+The first server file API is:
+
+- `POST /api/files?path=tickets/T-001/before.jpg`
+  - body: `{ "contentType": "image/jpeg", "data": "<base64 or data-url>" }`
+  - requires Supabase user bearer token;
+  - stores the file in Supabase Storage using server-only credentials.
+- `GET /api/files?path=tickets/T-001/before.jpg`
+  - requires Supabase user bearer token;
+  - returns `{ "path": "...", "contentType": "...", "data": "<base64>" }`.
+- `DELETE /api/files?path=tickets/T-001/before.jpg`
+  - requires Supabase user bearer token;
+  - deletes the object from Supabase Storage.
+
+Route files:
+
+- `api/files/index.js`
+- `api/files/[...path].js`
+- `api/files/handler.js`
+- `api/files/supabaseFileDriver.js`
+
+The route is closed by default until `CMMS_FILE_DRIVER=supabase`, `CMMS_FILE_BUCKET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are configured.
+
 ## Next Implementation Step
 
-Add a server file API that:
+Move ticket and cleaning photo flows from `photo:*` KV/base64 records to the server file API:
 
-- verifies the Supabase user session;
-- stores files in Supabase Storage;
-- returns metadata or protected URLs instead of embedding base64 strings in business records;
-- enforces access using the same CMMS user/profile/permission model used by `/api/kv`.
+- write only metadata/path references into business records;
+- fetch protected image data through `/api/files`;
+- stop including production photos inside backup JSON.

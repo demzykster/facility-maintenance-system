@@ -46,6 +46,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 server file API foundation is complete.
+  - `/api/files` now requires a Supabase user bearer token, blocks disabled users and first-password-change users, and is closed until Supabase Storage env is configured.
+  - `api/files/supabaseFileDriver.js` uploads, downloads, and deletes objects through Supabase Storage using server-only service role credentials.
+  - Existing UI photo flows still use `photo:*` KV/base64 records; the next step is moving ticket/cleaning photo writes and reads to `/api/files`.
+  - Local tests, production build, production-mode API build, and release checks passed.
 - R9 production AI boundary is complete.
   - Production defaults AI mode to `disabled`; direct browser AI provider calls are forbidden by the release gate.
   - Browser AI controls are hidden unless frontend AI mode is explicitly `client`, which remains a demo/local mode.
