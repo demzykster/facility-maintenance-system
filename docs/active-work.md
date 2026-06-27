@@ -21,22 +21,29 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/polish-user-card-actions-clean
+### Active branch: codex/quiet-readonly-user-card-hover
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `da5ae44 docs: close permission select ledger (#215)`.
+- Latest synchronized `main`: `6cf5b10 fix: make readonly user cards non-actionable (#217)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - make read-only user cards non-actionable instead of dead buttons.
-  - keep editable user cards clickable for managers with manage permission.
+  - remove clickable hover feedback from read-only user cards.
+  - keep editable user cards visually actionable.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: admin user cards remain actionable; read-only mode is represented by non-button rows in code.
+  - browser smoke-check: admin user cards keep normal button behavior.
 
 ## Latest Completed Work
 
+- PR #217: Read-only user cards are no longer dead buttons.
+  - User tree rows render as buttons only when the viewer can edit users.
+  - Read-only rows render as non-actionable cards.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #215: Active work ledger closed the permission-select PR.
+  - No active product branch remained after PR #213.
+  - Vercel was green.
 - PR #213: User permission selects are now self-describing.
   - Personal permission selects expose Hebrew `הרשאה: ...` labels.
   - Permission behavior remains unchanged.
