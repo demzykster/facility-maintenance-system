@@ -42,9 +42,11 @@ Non-admin profile writes are intentionally not opened in the first RLS layer. Fu
 
 This PR does not yet switch the live UI login to Supabase.
 
+The session endpoint is documented in `docs/supabase-session-adapter.md`.
+
 The next steps are:
 
-1. Add a server/session adapter that reads Supabase Auth and `public.app_users`.
-2. Replace browser-only login checks in production mode.
-3. Enforce the `must_change_password` bootstrap flag.
+1. Replace browser-only login checks in production mode.
+2. Enforce the `must_change_password` bootstrap flag.
+3. Keep demo/local login unchanged for non-production modes.
 4. Expand table-specific RLS as each business table moves from local storage to Postgres.

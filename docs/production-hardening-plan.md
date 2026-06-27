@@ -131,6 +131,7 @@ Production requirement:
 - Supabase Postgres/Auth/RLS/Storage is the selected target production platform.
 - `POST /api/bootstrap/admin` defines the first-admin Supabase Auth + `public.app_users` bootstrap contract and is disabled by default.
 - `public.app_users` is the first Supabase profile/RLS table and is linked to `auth.users`.
+- `GET /api/session/me` defines the first server-side Supabase Auth + `public.app_users` session lookup.
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 
 ## Monolith Extraction Policy
