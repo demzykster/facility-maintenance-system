@@ -21,23 +21,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-driver-message-close
+### Active branch: none
 
-- Status: ready for PR.
-- Latest synchronized `main`: `5f10819 fix: label driver request icon buttons (#256)`.
+- Status: main clean after PR #257.
+- Latest synchronized `main`: `1e4188a fix: label driver warning dismiss button (#257)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 Screen Audit And Visual Noise on `כלי שינוע`.
-  - give the driver-board warning dismiss icon an explicit Hebrew label.
-  - keep warning dismiss behavior unchanged.
+  - no active product branch is open.
+  - continue R5 Screen Audit And Visual Noise from the next exact action below.
 - Validation:
-  - `npm test -- --run` passed.
-  - `npm run build` passed.
-  - browser smoke-check: `כלי שינוע` opens cleanly with no visible errors.
-  - source-check: driver-board warning dismiss button now has Hebrew `aria-label` and `title`.
+  - docs-only ledger update: `git diff --check`.
 
 ## Latest Completed Work
 
+- PR #257: Driver-board warning dismiss icon now has an explicit label.
+  - The warning close icon exposes `סגירת הודעה`.
+  - Warning dismiss behavior stayed unchanged.
+  - Local tests/build/browser smoke-check/source-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #256: Pending driver request approve/reject icon buttons now have explicit labels.
   - Labels include the driver name and unit code.
   - Driver request approval/rejection behavior stayed unchanged.
@@ -305,8 +305,8 @@ Older completed work is available in GitHub history and, when needed, in:
 ## Next Exact Action
 
 1. Continue R5 Screen Audit And Visual Noise.
-2. Next concrete screen pass: continue `צוות ומשתמשים`, starting with the user tree/group list.
-3. Verify whether repeated-looking users in the tree are real data duplicates or only UI duplication before changing rendering.
+2. Next concrete screen pass: continue `כלי שינוע`, after the driver request icon-label pass.
+3. Check remaining fleet/driver/coverage controls for misleading icons, unclear Hebrew labels, duplicate controls, and low-value visual noise.
 4. If a critical bug appears, fix the smallest concrete bug before broader polish.
 
 ## Documentation Policy
