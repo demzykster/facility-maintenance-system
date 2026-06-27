@@ -23,17 +23,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main clean; no active product branch is open.
+- Status: main is expected to be clean after PR #268 is merged.
 - Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
-- Open PRs when this entry was written: none.
+- Open PRs when this entry was written: PR #268.
 - Purpose:
-  - no active product branch is open.
-  - next work should continue from `docs/release-checklist.md` or a new owner-reported product bug.
+  - no active product branch remains after PR #268 merges.
+  - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
 - Validation:
-  - PR #264 validation: `npm test -- --run`, `npm run build`, browser smoke-check.
+  - `npm test -- --run` passed.
+  - `npm run build` passed.
+  - Browser smoke-check on `http://127.0.0.1:5173/` loaded the app with no console errors.
 
 ## Latest Completed Work
 
+- R9 Production Backend Foundation has started in PR #268.
+  - The frontend storage adapter was extracted from `src/ClaudeMaintenanceApp.jsx` to `src/storageAdapter.js`.
+  - The adapter stays lazy so it can use `window.storage` after module import and later be swapped for a backend provider.
+  - Adapter tests cover memory fallback, late external storage availability, and timeout failure handling.
+  - `docs/production-hardening-plan.md` now tracks the production risk order: database, Auth/RLS, files/photos, server-side AI, migration, and monolith extraction policy.
+  - Local tests, production build, browser smoke-check, and Vercel passed.
 - R8 Ticket Lifecycle, Export And Analytics Trust is complete in PR #264.
   - Transport duplicate review was checked: it is scoped to the same transport unit, prioritizes open tickets, and only shows recent closed tickets when no open same-unit ticket exists.
   - Ticket Excel export and Analytics use shared lifecycle helpers for both transport (`שינוע`) and facility/building (`מבנה`) tickets.

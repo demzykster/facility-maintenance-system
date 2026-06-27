@@ -11,6 +11,7 @@ import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
+import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
@@ -27,16 +28,6 @@ import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
    ============================================================ */
-
-/* ---------- storage ---------- */
-const mem = {};
-const withTimeout = (promise, ms = 2000) => Promise.race([promise, new Promise((res) => setTimeout(() => res(undefined), ms))]);
-const store = {
-  async get(k, sh = false) { try { if (window?.storage) { const r = await withTimeout(window.storage.get(k, sh)); if (r !== undefined) return r ? r.value : null; } } catch (e) {} return k in mem ? mem[k] : null; },
-  async set(k, v, sh = false) { mem[k] = v; if (!(window?.storage)) return true; try { const r = await withTimeout(window.storage.set(k, v, sh)); if (r === undefined) throw new Error("timeout"); return true; } catch (e) { try { store._onFail && store._onFail(); } catch (_) {} return false; } },
-  async del(k, sh = false) { delete mem[k]; if (!(window?.storage)) return true; try { const r = await withTimeout(window.storage.delete(k, sh)); if (r === undefined) throw new Error("timeout"); return true; } catch (e) { try { store._onFail && store._onFail(); } catch (_) {} return false; } },
-  async list(p, sh = false) { try { if (window?.storage) { const r = await withTimeout(window.storage.list(p, sh)); if (r !== undefined) return r ? r.keys : []; } } catch (e) {} return Object.keys(mem).filter((x) => x.startsWith(p)); },
-};
 
 /* ---------- domain ---------- */
 const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };

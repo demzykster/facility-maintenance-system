@@ -11,6 +11,24 @@ This is the closure checklist for the current stabilization phase. It replaces b
 
 ## Current Release Packages
 
+### R9 — Production Backend Foundation
+
+Status: in progress.
+
+Why it matters:
+- The project should move from browser-local demo storage to a real production foundation without breaking the working CMMS flows.
+
+Done means:
+- The frontend data-access boundary is extracted from `src/ClaudeMaintenanceApp.jsx`.
+- The current business collections are mapped to a production database schema.
+- Auth, permissions/RLS, files/photos, AI calls, and backup/migration risks are explicitly tracked before implementation.
+- The monolith extraction path is adapter/model-first, not a whole-file rewrite.
+
+Current notes:
+- Owner opened the production backend/auth phase after R8.
+- `docs/production-hardening-plan.md` is the active risk/order document.
+- First implementation step: storage boundary extraction.
+
 ### R3 — Notifications End-To-End
 
 Status: done in PRs #180-#188.
