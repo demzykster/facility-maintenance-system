@@ -21,22 +21,29 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-user-permission-selects
+### Active branch: codex/polish-user-card-actions
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `54c38a9 fix: clarify user form save action (#212)`.
+- Latest synchronized `main`: `da5ae44 docs: close permission select ledger (#215)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - make personal permission select controls self-describing.
-  - keep permission behavior unchanged.
+  - make read-only user cards non-actionable instead of dead buttons.
+  - keep editable user cards clickable for managers with manage permission.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: permission select controls expose `הרשאה: ...` aria labels.
+  - browser smoke-check: admin user cards remain actionable; read-only mode is represented by non-button rows in code.
 
 ## Latest Completed Work
 
+- PR #215: Active work ledger closed the permission-select PR.
+  - No active product branch remained after PR #213.
+  - Vercel was green.
+- PR #213: User permission selects are now self-describing.
+  - Personal permission selects expose Hebrew `הרשאה: ...` labels.
+  - Permission behavior remains unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #212: UserForm save action now names what is saved.
   - User forms show `שמירת משתמש`; worker-locked forms show `שמירת עובד`.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
