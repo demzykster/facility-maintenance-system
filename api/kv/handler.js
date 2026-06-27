@@ -3,6 +3,7 @@ import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
 import { kvWritePermissionError, kvWritePermissionForKey, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
+import { ticketStatusAuditEvent } from "../../src/auditEventModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -73,6 +74,25 @@ const writeAuditEvent = async (auditDriver, event) => {
   if (typeof auditDriver.set === "function") return auditDriver.set(event);
 };
 
+const parseStoredJson = (value) => {
+  if (!value || typeof value !== "string") return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const ticketStatusEventFromKv = (key, beforeValue, afterValue, actor) => {
+  if (!String(key || "").startsWith("ticket:")) return null;
+  const before = parseStoredJson(beforeValue);
+  const after = parseStoredJson(afterValue);
+  const previousStatus = String(before?.status || "");
+  const nextStatus = String(after?.status || "");
+  if (!previousStatus || !nextStatus || previousStatus === nextStatus) return null;
+  return ticketStatusAuditEvent({ ...after, id: after.id || String(key).slice("ticket:".length) }, previousStatus, nextStatus, actor);
+};
+
 export function createKvApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver
     || (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
@@ -114,7 +134,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         const value = body?.value ?? "";
         const writeShared = parseBool(body?.shared ?? shared);
         const shouldAudit = backendAuditDriver && kvWritePermissionForKey(key);
-        const before = shouldAudit ? await backendDriver.get?.(key, writeShared) : null;
+        const shouldAuditTicketStatus = backendAuditDriver && String(key).startsWith("ticket:");
+        const before = (shouldAudit || shouldAuditTicketStatus) ? await backendDriver.get?.(key, writeShared) : null;
         await backendDriver.set(key, value, writeShared);
         await writeAuditEvent(backendAuditDriver, shouldAudit && sensitiveKvWriteAuditEvent({
           key,
@@ -124,6 +145,7 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
           after: value,
           shared: writeShared
         }));
+        await writeAuditEvent(backendAuditDriver, ticketStatusEventFromKv(key, before, value, auth.user));
         return json(res, 200, { ok: true });
       }
       if (method === "DELETE") {

@@ -399,13 +399,58 @@ describe("kv API handler", () => {
 
     const res = await call(handler, {
       method: "PUT",
-      query: { key: "ticket:T-001", shared: "1" },
-      body: { value: "{\"id\":\"T-001\"}" }
+      query: { key: "ppereq:req-1", shared: "1" },
+      body: { value: "{\"id\":\"req-1\"}" }
     });
 
     expect(res.statusCode).toBe(200);
     expect(driver.get).not.toHaveBeenCalled();
     expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
+  it("writes ticket status audit events only when the stored ticket status changes", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue("{\"id\":\"T-001\",\"status\":\"new\",\"track\":\"שינוע\",\"num\":1}"),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "user",
+        name: "Manager",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      auditDriver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "ticket:T-001", shared: "1" },
+      body: { value: "{\"id\":\"T-001\",\"status\":\"done\",\"track\":\"שינוע\",\"num\":1}" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.get).toHaveBeenCalledWith("ticket:T-001", true);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "app-user-1",
+      entityType: "ticket",
+      entityId: "T-001",
+      action: "status_change",
+      before: { status: "new" },
+      after: { status: "done" },
+      metadata: { track: "שינוע", num: 1 }
+    }));
   });
 
   it("keeps ordinary workflow writes available to active Supabase-authenticated users", async () => {
