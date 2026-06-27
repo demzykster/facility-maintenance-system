@@ -128,6 +128,7 @@ Production requirement:
 - `/api/kv` route skeleton exists and is intentionally closed until server auth and a durable backend driver are configured.
 - Upstash/Vercel Redis REST is the first supported `/api/kv` durable driver path.
 - Upstash/Vercel Redis is a bridge/cache path, not the final CMMS database.
+- Supabase Postgres is supported as the preferred `/api/kv` bridge driver through `public.cmms_kv_records`.
 - Supabase Postgres/Auth/RLS/Storage is the selected target production platform.
 - `POST /api/bootstrap/admin` defines the first-admin Supabase Auth + `public.app_users` bootstrap contract and is disabled by default.
 - `public.app_users` is the first Supabase profile/RLS table and is linked to `auth.users`.

@@ -82,6 +82,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Expired access tokens are refreshed through Supabase before session restore.
   - Demo/test session restore remains unchanged.
   - Local tests, production build, production-mode build, release check, and browser smoke-check passed.
+- R9 Supabase KV bridge driver is complete.
+  - `/api/kv` gains a `CMMS_KV_DRIVER=supabase` path backed by `public.cmms_kv_records`.
+  - This is a Postgres bridge for shared durable storage before final normalized business tables are wired.
+  - Local tests, production build, production-mode build, and release check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.

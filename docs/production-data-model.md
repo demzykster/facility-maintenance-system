@@ -33,3 +33,4 @@ The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
 - User identity lives in Supabase Auth (`auth.users`). CMMS profile, role, active status, departments, and module permissions live in `public.app_users`.
 - Photos are not included here as tables yet. They currently live under `photo:*` storage keys and should move to object storage with metadata references from tickets/reports.
 - `config:v1`, `session:v1`, `theme:v1`, `login:v1`, and notification preferences are not business collections. They need separate treatment as configuration, session, or user preference data.
+- `public.cmms_kv_records` is a temporary Postgres bridge for the existing key/value storage contract. It is not the final normalized business schema.

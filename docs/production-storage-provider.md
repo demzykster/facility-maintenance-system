@@ -42,6 +42,29 @@ These values must remain server-only. Do not expose them as `VITE_*`.
 
 This driver is a bridge/cache path, not the final CMMS database. The selected target production platform is Supabase Postgres/Auth/RLS/Storage; see `docs/production-platform-decision.md`.
 
+### `supabase` server driver
+
+The preferred production bridge driver is Supabase Postgres over server-side PostgREST.
+
+Server-only env:
+
+```env
+CMMS_KV_DRIVER=supabase
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+CMMS_KV_SUPABASE_TABLE=cmms_kv_records
+```
+
+`CMMS_KV_SUPABASE_TABLE` is optional and defaults to `cmms_kv_records`.
+
+The table is created by:
+
+```text
+supabase/migrations/20260627190000_cmms_kv_records.sql
+```
+
+This driver is a bridge so the existing monolith can use shared Postgres storage before each business collection is normalized into final tables.
+
 ## API Contract
 
 The first production adapter keeps the same key/value contract as the current store so the monolith does not need a broad rewrite before backend work.
@@ -61,6 +84,8 @@ Current server route files:
 - `api/kv/index.js`
 - `api/kv/[key].js`
 - `api/kv/handler.js`
+- `api/kv/supabaseDriver.js`
+- `api/kv/upstashDriver.js`
 
 The handler is intentionally safe by default:
 

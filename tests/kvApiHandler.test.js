@@ -92,4 +92,31 @@ describe("kv API handler", () => {
     expect(res.json()).toEqual({ value: "ticket-json" });
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual(["GET", "shared:ticket:1"]);
   });
+
+  it("wires the supabase driver from server env after auth passes", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([{ value: "ticket-json" }]);
+      }
+    });
+    const handler = createKvApiHandler({
+      env: {
+        CMMS_KV_DRIVER: "supabase",
+        CMMS_KV_BEARER_TOKEN: "secret",
+        SUPABASE_URL: "https://supabase.example",
+        SUPABASE_SERVICE_ROLE_KEY: "service-key"
+      },
+      fetchImpl
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      query: { key: "ticket:1", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ value: "ticket-json" });
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=eq.ticket%3A1&select=value&limit=1");
+  });
 });

@@ -1,4 +1,5 @@
 import { createUpstashKvDriverFromEnv } from "./upstashDriver.js";
+import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -25,7 +26,9 @@ function isAuthorized(req, env) {
 }
 
 export function createKvApiHandler({ driver = null, env = process.env, fetchImpl = globalThis.fetch } = {}) {
-  const backendDriver = driver || (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null);
+  const backendDriver = driver
+    || (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
+    || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
 
   return async function kvApiHandler(req, res) {
     if (!isAuthorized(req, env)) {
