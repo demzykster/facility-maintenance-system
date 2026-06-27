@@ -21,22 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/clarify-user-form-save
+### Active branch: codex/label-user-permission-selects
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `53bdea9 docs: close add user ledger (#211)`.
+- Latest synchronized `main`: `54c38a9 fix: clarify user form save action (#212)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - make the user/worker form save button read as a concrete action.
-  - keep user creation/edit behavior unchanged.
+  - make personal permission select controls self-describing.
+  - keep permission behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: new user form shows `שמירת משתמש`.
+  - browser smoke-check: permission select controls expose `הרשאה: ...` aria labels.
 
 ## Latest Completed Work
 
+- PR #212: UserForm save action now names what is saved.
+  - User forms show `שמירת משתמש`; worker-locked forms show `שמירת עובד`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #211: Active work ledger now reflects the merged add-user polish.
   - No active product branch remains after PR #210.
   - Docs-only validation passed; Vercel was green.

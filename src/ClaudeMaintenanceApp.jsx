@@ -5694,7 +5694,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
   const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
     const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
-    return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
+    return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select aria-label={`הרשאה: ${label}`} value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
   };
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
