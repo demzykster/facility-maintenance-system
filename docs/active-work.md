@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-team-settings-delete-buttons
+### Active branch: codex/label-ai-fab
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `9d8906b fix: label worker shift color picker (#223)`.
+- Latest synchronized `main`: `bcd21fa fix: label team settings delete actions (#224)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `צוות ומשתמשים`.
-  - make delete icon buttons in team/settings registries self-describing.
-  - keep delete blocking, save behavior, and layout unchanged.
+  - continue R5 visual/noise cleanup from the live screen audit.
+  - make the floating AI action self-describing.
+  - keep AI behavior and placement unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: team settings renders descriptive delete controls.
+  - browser smoke-check: floating AI button exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #224: Team/settings delete icon buttons now expose descriptive labels.
+  - Worker-shift deletes and shared registry deletes are named by item.
+  - Delete blocking, save behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #223: Worker-shift color pickers now expose descriptive labels.
   - Color inputs in `צוות ומשתמשים -> הגדרות` are labeled by shift name.
   - Worker-shift data, save behavior, and layout stayed unchanged.
