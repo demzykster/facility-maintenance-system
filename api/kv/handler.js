@@ -1,5 +1,6 @@
 import { createUpstashKvDriverFromEnv } from "./upstashDriver.js";
 import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
+import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -17,23 +18,61 @@ const readBody = async (req) => {
 
 const parseBool = (value) => value === true || value === "1" || value === "true";
 
-function isAuthorized(req, env) {
+const getHeader = (headers = {}, name) => {
+  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
+  if (direct) return direct;
+  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
+  return match ? match[1] : "";
+};
+
+const bearerToken = (req) => {
+  const value = String(getHeader(req.headers, "authorization") || "");
+  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
+};
+
+function isTokenAuthorized(req, env) {
   if (env.CMMS_KV_ALLOW_UNAUTHENTICATED === "true") return true;
   const token = env.CMMS_KV_BEARER_TOKEN;
   if (!token) return false;
-  const header = req.headers?.authorization || req.headers?.Authorization || "";
-  return header === `Bearer ${token}`;
+  return bearerToken(req) === token;
 }
 
-export function createKvApiHandler({ driver = null, env = process.env, fetchImpl = globalThis.fetch } = {}) {
+async function authorize(req, env, fetchImpl, sessionClient) {
+  if (env.CMMS_KV_AUTH === "supabase") {
+    const token = bearerToken(req);
+    if (!token) return { ok: false, status: 401, error: "supabase_access_token_required" };
+    const client = sessionClient || createSupabaseSessionClient({
+      url: env.SUPABASE_URL,
+      anonKey: env.SUPABASE_ANON_KEY,
+      fetchImpl
+    });
+    if (!client) return { ok: false, status: 503, error: "supabase_session_not_configured" };
+
+    try {
+      const authUser = await client.getAuthUser(token);
+      const profile = await client.getAppUserProfile(token, authUser?.id);
+      const session = buildSessionPayload(authUser, profile);
+      if (!session.ok) return { ok: false, status: session.error === "app_user_disabled" ? 403 : 401, error: session.error };
+      if (session.user.mustChangePassword) return { ok: false, status: 403, error: "password_change_required" };
+      return { ok: true, user: session.user };
+    } catch (error) {
+      return { ok: false, status: 401, error: error?.message || "supabase_session_failed" };
+    }
+  }
+
+  return isTokenAuthorized(req, env)
+    ? { ok: true }
+    : { ok: false, status: 503, error: "storage_auth_not_configured" };
+}
+
+export function createKvApiHandler({ driver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver
     || (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
     || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
 
   return async function kvApiHandler(req, res) {
-    if (!isAuthorized(req, env)) {
-      return json(res, 503, { error: "storage_auth_not_configured" });
-    }
+    const auth = await authorize(req, env, fetchImpl, sessionClient);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
     if (!backendDriver) {
       return json(res, 503, { error: "storage_backend_not_configured" });
     }

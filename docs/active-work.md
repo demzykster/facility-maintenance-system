@@ -90,6 +90,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - The frontend API storage adapter sends the production Supabase access token as `Authorization: Bearer ...` when available.
   - This prepares `/api/kv` to move from temporary bearer-token auth to Supabase user-session auth.
   - Local tests, production build, production-mode build, and release check passed.
+- R9 Supabase KV auth is complete.
+  - `/api/kv` gains `CMMS_KV_AUTH=supabase` to verify Supabase user bearer tokens before storage access.
+  - Disabled users and users still requiring first-password change are blocked.
+  - Local tests, production build, production-mode build, and release check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.
