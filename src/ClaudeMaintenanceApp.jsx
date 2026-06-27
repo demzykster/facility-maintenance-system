@@ -27,6 +27,7 @@ import { changeProductionPassword, createProductionAuthStore, loginWithProductio
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
+import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -40,6 +41,7 @@ const AI_MODE = aiModeFromEnv(import.meta.env, APP_MODE);
 const BROWSER_AI_ENABLED = AI_MODE === AI_MODES.client;
 const PRODUCTION_LOGIN_CONFIG = productionLoginConfigFromEnv(import.meta.env);
 const PRODUCTION_AUTH_STORE = createProductionAuthStore();
+const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PRODUCTION_AUTH_STORE);
 
 const TRACKS = {
   facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
@@ -1230,7 +1232,7 @@ export default function App() {
   };
   const savePm = async (p) => { await store.set(`pm:${p.id}`, JSON.stringify(p), true); setPm((s) => [...s.filter((x) => x.id !== p.id), p].sort((a, b) => a.nextDue - b.nextDue)); };
   const delPm = async (id) => { await store.del(`pm:${id}`, true); setPm((s) => s.filter((x) => x.id !== id)); };
-  const delTicket = async (id) => { await store.del(`ticket:${id}`, true); try { await store.del(`photo:${id}`, true); } catch {} try { await store.del(`photo:after:${id}`, true); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); };
+  const delTicket = async (id) => { await store.del(`ticket:${id}`, true); try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); };
   const saveFleet = async (f) => { await store.set(`fleet:${f.id}`, JSON.stringify(f), true); setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); };
   const saveZone = async (z) => { await store.set(`czone:${z.id}`, JSON.stringify(z), true); setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); };
   const delZone = async (id) => { await store.del(`czone:${id}`, true); setZones((s) => s.filter((x) => x.id !== id)); };
@@ -1240,8 +1242,8 @@ export default function App() {
   const spawnFacilityFromComplaint = async (c) => {
     const tid = uid(), now = Date.now(); const cat = (config.categories || [])[0];
     const t = { id: tid, track: "facility", subject: (c.text || "").trim() || ("תקלה · " + c.zoneName), category: cat?.id || "", categoryLabel: cat?.label || "", priority: "medium", zone: c.zoneLoc || c.zoneName, asset: c.zoneName || "", forkliftId: null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null, description: `נפתח מדיווח על תקלה באזור ניקיון «${c.zoneName}»${c.zoneLoc ? " · " + c.zoneLoc : ""}.${c.text ? "\n" + c.text.trim() : ""}`, status: "new", assignee: "", routedTech: false, createdBy: { id: c.reportedById, name: c.reportedByName, role: c.reportedByRole === "anonymous" ? "user" : (c.reportedByRole || "user"), dept: "" }, createdAt: now, updatedAt: now, dueAt: now + 48 * 3600000, hasPhoto: !!c.photo, closure: null, log: [{ at: now, by: c.reportedByName, byRole: c.reportedByRole || "user", text: "נפתח מדיווח על תקלה באזור ניקיון" }] };
-    if (c.photo) { try { await store.set(`photo:${tid}`, c.photo, true); } catch (e) {} }
-    await saveTicket(t); return tid;
+    const rec = c.photo ? { ...t, ...(await TICKET_PHOTOS.save(tid, "before", c.photo)) } : t;
+    await saveTicket(rec); return tid;
   };
   const persistComplaint = async (comp) => { await store.set(`ccomplaint:${comp.id}`, JSON.stringify(comp), true); setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at)); };
   const fileComplaint = async (c) => {
@@ -1510,7 +1512,7 @@ function WorkerApp(p) {
       createdAt: now, updatedAt: now, dueAt: null, hasPhoto: !!photo, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", closure: null,
       log: [{ at: now, by: session.name, byRole: "worker", text: (!photo && noPhoto) ? `הדיווח נשלח ללא תמונה — ${noPhotoReason.trim()}` : "הדיווח נשלח לאישור מנהל המחלקה", kind: "open" }],
     };
-    try { if (photo) await store.set(`photo:${id}`, photo, true); await saveTicket(t); reset(); setSent(true); setTimeout(() => setSent(false), 3500); setView("mine"); }
+    try { const rec = photo ? { ...t, ...(await TICKET_PHOTOS.save(id, "before", photo)) } : t; await saveTicket(rec); reset(); setSent(true); setTimeout(() => setSent(false), 3500); setView("mine"); }
     catch (e) { setErr("שגיאה בשליחה."); }
     finally { setBusy(false); }
   };
@@ -5941,7 +5943,7 @@ function TicketForm(p) {
       log: [{ at: now, by: session.name, byRole: session.role, text: routeText }],
     };
   };
-  const finalize = async (t) => { if (photo) await store.set(`photo:${t.id}`, photo, true); await onCreate(t); };
+  const finalize = async (t) => { const rec = photo ? { ...t, ...(await TICKET_PHOTOS.save(t.id, "before", photo)) } : t; await onCreate(rec); };
   const submit = async () => {
     if (busyRef.current) return;
     if (!subject.trim()) return setErr("נא להזין נושא");
@@ -6022,8 +6024,8 @@ function TicketDetail(p) {
   const role = session.role;
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const afterRef = useRef(null);
-  useEffect(() => { let on = true; if (ticket?.hasPhoto) store.get(`photo:${ticket.id}`, true).then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto]);
-  useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) store.get(`photo:after:${ticket.id}`, true).then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto]);
+  useEffect(() => { let on = true; if (ticket?.hasPhoto) TICKET_PHOTOS.load(ticket, "before").then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto, ticket?.photoPath]);
+  useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) TICKET_PHOTOS.load(ticket, "after").then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto, ticket?.afterPhotoPath]);
   const grabAfter = (file) => { if (!file) return; const r = new FileReader(); r.onload = (ev) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const cv = document.createElement("canvas"); cv.width = width; cv.height = height; cv.getContext("2d").drawImage(img, 0, 0, width, height); setAfterPhoto(cv.toDataURL("image/jpeg", 0.6)); }; img.src = ev.target.result; }; r.readAsDataURL(file); };
   const exactRelated = useMemo(() => ticket?.forkliftId ? tickets.filter((t) => t.id !== ticket.id && t.forkliftId === ticket.forkliftId).sort((a, b) => b.createdAt - a.createdAt) : [], [ticket, tickets]);
   const related = useMemo(() => ticket ? similarTickets(ticket, tickets, { days: 30 }).map((x) => x.t) : [], [ticket, tickets]);
@@ -6049,9 +6051,9 @@ function TicketDetail(p) {
   const setStatus = (ns) => upd(ns === "waiting" ? { status: ns } : { status: ns, waitingReason: null }, `סטטוס: ${stOf(ns).label}`);
   const setWaiting = (reason) => onUpdate({ ...ticket, status: "waiting", waitingReason: reason, waitBall: reasonBall(config, reason), ...pausePatch(ticket, { status: "waiting", waitingReason: reason }, config), updatedAt: Date.now(), log: [...(ticket.log || []), e(`ממתין · ${waitReasonLabel(reason, config)}`, "waiting")] });
   const setWear = (wt) => upd({ wearType: wt }, `סיווג: ${WEAR.find((x) => x.id === wt).label}`, "classify");
-  const finishTech = async () => { if (afterPhoto && !ticket.hasAfterPhoto) { try { await store.set(`photo:after:${ticket.id}`, afterPhoto, true); } catch (e) {} } upd({ status: "pending_user", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto }, "הטיפול הסתיים — הועבר לאישור הפותח" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
+  const finishTech = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_user", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים — הועבר לאישור הפותח" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
   const takeMgr = () => upd({ status: "in_progress", waitingReason: null }, "המנהל קיבל את הקריאה לטיפול", "accept");
-  const finishMgr = async () => { if (afterPhoto && !ticket.hasAfterPhoto) { try { await store.set(`photo:after:${ticket.id}`, afterPhoto, true); } catch (e) {} } upd({ status: "pending_admin", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto }, "הטיפול הסתיים ע״י המנהל — הועבר לסגירת מנהל מערכת" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
+  const finishMgr = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_admin", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים ע״י המנהל — הועבר לסגירת מנהל מערכת" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
   const confirmUser = () => upd({ status: "pending_admin" }, "הפותח אישר שהתקלה טופלה", "approve");
   const remarksUser = () => { if (!note.trim()) return; onUpdate({ ...ticket, status: "in_progress", returned: true, returnReason: note.trim(), updatedAt: Date.now(), log: [...(ticket.log || []), e(`⤺ הוחזר לטיפול — הבעיה לא נפתרה: ${note.trim()}`, "reopen")] }); setNote(""); setReturning(false); };
   const addNote = () => { if (!note.trim()) return; upd({}, note.trim()); setNote(""); };
