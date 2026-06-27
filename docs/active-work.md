@@ -21,22 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ticket-detail-header-buttons
+### Active branch: codex/label-fleet-pm-edit-buttons
 
 - Status: ready for PR.
-- Latest synchronized `main`: `188d22f fix: label task and meeting edit buttons (#245)`.
+- Latest synchronized `main`: `1d6dc52 fix: label ticket detail header buttons (#246)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make ticket-detail header icon buttons self-describing.
-  - keep back/repeat behavior and modal layout unchanged.
+  - make fleet and periodic-maintenance detail edit icon buttons self-describing.
+  - keep edit behavior and modal layout unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: ticket detail header exposes `חזרה מרשימת הקריאה` and `פתיחת קריאה דומה`.
+  - browser smoke-check: fleet detail edit exposes `עריכת כלי`.
+  - browser smoke-check: periodic-maintenance detail edit exposes `עריכת טיפול תקופתי`.
 
 ## Latest Completed Work
 
+- PR #246: Ticket-detail header icon buttons now expose descriptive labels.
+  - Back exposes `חזרה מרשימת הקריאה`; repeat exposes `פתיחת קריאה דומה`.
+  - Back/repeat behavior and modal layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #245: Task and meeting detail edit icon buttons now expose descriptive labels.
   - Task edit exposes `עריכת מטלה`; meeting edit exposes `עריכת פגישה`.
   - Edit behavior and modal layout stayed unchanged.
