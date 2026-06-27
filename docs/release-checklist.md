@@ -52,7 +52,7 @@ Closed notes:
 
 ### R5 — Screen Audit And Visual Noise
 
-Status: open.
+Status: done in PRs #200-#257 plus final closure pass.
 
 Why it matters:
 - The system should feel like a dispatcher/control tool, not a pile of cards and duplicated controls.
@@ -62,8 +62,15 @@ Done means:
 - Each pass checks visual hierarchy, duplicate controls, unclear icons, Hebrew grammar, misleading labels, and dead/uninformative elements.
 - Findings are fixed or deliberately deferred with a reason.
 
-Next PR candidate:
-- Continue `ביגוד עובדים`: review catalog/log/settings empty states and order flow for misleading actions.
+Closed notes:
+- `קריאות`: search labeling, duplicate-review behavior, lifecycle/SLA display, drill-down reset, and ticket action labels were stabilized.
+- `אנליטיקה`: drill-down paths, lifecycle/waiting metrics, export coverage, and visible wording were stabilized.
+- `ביגוד עובדים`: empty order states, order-line labels, net-deficit suggestions, catalog/settings labels, and movement search were stabilized.
+- `הגדרות`: duplicate module settings were moved to their module homes; waiting reasons, downtime levels, notifications, demo/backup copy, and delete actions were clarified.
+- `צוות ומשתמשים`: permissions UI, read-only cards, group toggles, worker activation flow, duplicate login warning, departments, and worker shifts were stabilized.
+- `כלי שינוע`: fleet search, driver coverage search, driver request labels, warning dismissal, vehicle-type settings, PM/detail edit labels, and inspection controls were stabilized.
+- `בקרת ניקיון`: zone setup, delete actions, report/spec actions, cleaner/manager/admin paths, and notification/report labels were stabilized.
+- Final browser pass over all seven R5 screens found no visible unlabeled controls. Remaining broad redesign ideas should be tracked as explicit new packages, not as R5 leftovers.
 
 ### R6 — Worker Onboarding Polish
 
