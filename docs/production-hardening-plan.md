@@ -20,7 +20,8 @@ Current state:
 Production requirement:
 - shared database;
 - server-side writes;
-- migration path from current backup JSON.
+- production starts empty of demo/local browser data;
+- optional future import tools for real owner-provided data, not migration of current fake demo records.
 
 ### P0 — Real Auth And Server-Side Permissions
 
@@ -79,12 +80,25 @@ Production requirement:
 
 Current state:
 - demo data and demo credentials are useful for local/Vercel review.
+- current local users, tickets, fleet, PPE, cleaning records, and other demo records are fake/demo data.
 
 Production requirement:
 - production starts empty of business data;
 - demo seeding is disabled in production mode;
 - built-in demo identities are disabled in production mode;
 - the first administrator comes from a server/bootstrap process, not from frontend source code.
+- no current fake demo/localStorage records are migrated into production.
+
+### P0 — Empty Production Bootstrap
+
+Current state:
+- the demo contains fake users, tickets, fleet units, PPE records, cleaning records, suppliers, and history.
+
+Production requirement:
+- the first production environment is initialized with no business records;
+- the only required bootstrap is the first administrator;
+- the first administrator must be created server-side and forced through a credential-change/bootstrap-completion flow;
+- real business data is entered later through the app UI or future explicit imports.
 
 ## Execution Order
 
@@ -93,12 +107,13 @@ Production requirement:
 3. Define production seed/bootstrap policy.
 4. Add production storage adapter beside the local adapter.
 5. Add environment/config wiring for backend provider.
-6. Move Auth/activation/login to server-backed identity.
-7. Add server-side permission/RLS model.
-8. Move photos/files to object storage.
-9. Move AI calls to server-side endpoint.
-10. Run migration rehearsal from backup JSON to database.
-11. Run production release gate.
+6. Implement empty production bootstrap for the first administrator.
+7. Move Auth/activation/login to server-backed identity.
+8. Add server-side permission/RLS model.
+9. Move photos/files to object storage.
+10. Move AI calls to server-side endpoint.
+11. Add optional future import tools only for real owner-provided data.
+12. Run production release gate.
 
 ## Progress
 
@@ -108,6 +123,7 @@ Production requirement:
 - Modular growth rules documented in `docs/module-growth-architecture.md`.
 - Production seed policy started in `src/seedPolicyModel.js` and documented in `docs/production-seed-policy.md`.
 - Storage provider policy and the first API storage-client contract are documented in `docs/production-storage-provider.md`.
+- Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
 
 ## Monolith Extraction Policy
 

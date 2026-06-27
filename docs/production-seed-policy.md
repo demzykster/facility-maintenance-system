@@ -17,11 +17,13 @@ Production must not depend on demo seed data or frontend hardcoded credentials.
 ### Production
 
 - The system starts empty of business data.
+- Current local/demo users, tickets, fleet units, PPE records, cleaning records, suppliers, and history are fake data and must not be migrated into production.
 - Demo seed loading is disabled.
 - Built-in demo identities are disabled.
 - The first administrator is a server/bootstrap responsibility.
 - No production admin password, PIN, or reset secret may be hardcoded in the frontend bundle.
 - The first admin must be forced through a credential-change/bootstrap-completion flow when real Auth is implemented.
+- Real business data is entered later through the app UI or through future explicit imports using owner-provided source files.
 
 ## Current Implementation
 
@@ -36,3 +38,4 @@ This is not full production Auth yet. It is a boundary guard:
 - demo behavior remains explicit;
 - production behavior cannot accidentally ship with demo users;
 - the later Auth/RLS/server implementation has a clear bootstrap contract.
+- current demo/localStorage data is not treated as a migration source.
