@@ -1,3 +1,5 @@
+import { createUpstashKvDriverFromEnv } from "./upstashDriver.js";
+
 const json = (res, status, body) => {
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
@@ -22,12 +24,14 @@ function isAuthorized(req, env) {
   return header === `Bearer ${token}`;
 }
 
-export function createKvApiHandler({ driver = null, env = process.env } = {}) {
+export function createKvApiHandler({ driver = null, env = process.env, fetchImpl = globalThis.fetch } = {}) {
+  const backendDriver = driver || (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null);
+
   return async function kvApiHandler(req, res) {
     if (!isAuthorized(req, env)) {
       return json(res, 503, { error: "storage_auth_not_configured" });
     }
-    if (!driver) {
+    if (!backendDriver) {
       return json(res, 503, { error: "storage_backend_not_configured" });
     }
 
@@ -39,22 +43,22 @@ export function createKvApiHandler({ driver = null, env = process.env } = {}) {
 
       if (!key && method === "GET") {
         const prefix = String(query.prefix || "");
-        const keys = await driver.list(prefix, shared);
+        const keys = await backendDriver.list(prefix, shared);
         return json(res, 200, { keys });
       }
       if (!key) return json(res, 400, { error: "key_required" });
 
       if (method === "GET") {
-        const value = await driver.get(key, shared);
+        const value = await backendDriver.get(key, shared);
         return json(res, 200, value === null || value === undefined ? null : { value });
       }
       if (method === "PUT") {
         const body = await readBody(req);
-        await driver.set(key, body?.value ?? "", parseBool(body?.shared ?? shared));
+        await backendDriver.set(key, body?.value ?? "", parseBool(body?.shared ?? shared));
         return json(res, 200, { ok: true });
       }
       if (method === "DELETE") {
-        await driver.delete(key, shared);
+        await backendDriver.delete(key, shared);
         return json(res, 200, { ok: true });
       }
 

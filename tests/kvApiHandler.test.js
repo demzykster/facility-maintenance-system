@@ -65,4 +65,31 @@ describe("kv API handler", () => {
     expect(driver.delete).toHaveBeenCalledWith("ticket:1", true);
     expect(driver.list).toHaveBeenCalledWith("ticket:", true);
   });
+
+  it("wires the upstash driver from server env after auth passes", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({ result: "ticket-json" });
+      }
+    });
+    const handler = createKvApiHandler({
+      env: {
+        CMMS_KV_DRIVER: "upstash",
+        CMMS_KV_BEARER_TOKEN: "secret",
+        KV_REST_API_URL: "https://redis.example",
+        KV_REST_API_TOKEN: "redis-secret"
+      },
+      fetchImpl
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      query: { key: "ticket:1", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ value: "ticket-json" });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual(["GET", "shared:ticket:1"]);
+  });
 });

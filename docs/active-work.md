@@ -62,6 +62,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `src/storageProviderModel.js` defines local/api storage provider policy and marks production+local storage as not production-data-ready.
   - `src/apiStorageAdapter.js` defines the first REST key/value storage client contract for a future backend.
   - `/api/kv` route skeleton exists and is closed by default without server auth/backend storage.
+  - `/api/kv` can now use an Upstash/Vercel Redis REST driver through server-only env.
   - `docs/production-storage-provider.md` documents the env variables and API contract.
   - Local tests, default production build, production API-provider build, and browser smoke-check passed.
 - R9 production config gate is complete.
