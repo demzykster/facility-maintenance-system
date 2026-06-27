@@ -21,22 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-user-permission-selects
+### Active branch: none
 
-- Status: ready for PR after local validation.
-- Latest synchronized `main`: `54c38a9 fix: clarify user form save action (#212)`.
+- Status: no active product branch.
+- Latest synchronized `main`: `c431714 fix: label user permission selects (#213)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `צוות ומשתמשים`.
-  - make personal permission select controls self-describing.
-  - keep permission behavior unchanged.
-- Validation passed before PR:
-  - `npm test -- --run`
-  - `npm run build`
-  - browser smoke-check: permission select controls expose `הרשאה: ...` aria labels.
+  - review user cards, edit/create form, permissions blocks, visual noise, and unclear controls.
+  - keep changes atomic and behavior-preserving unless a real workflow bug is found.
+- Validation pending:
+  - none.
 
 ## Latest Completed Work
 
+- PR #213: User permission selects are now self-describing.
+  - Personal permission selects expose Hebrew `הרשאה: ...` labels.
+  - Permission behavior remains unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #212: UserForm save action now names what is saved.
   - User forms show `שמירת משתמש`; worker-locked forms show `שמירת עובד`.
   - Local tests/build/browser smoke-check passed before merge; Vercel was green.
