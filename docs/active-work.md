@@ -21,24 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-remaining-icon-buttons
+### Active branch: codex/summarize-user-permissions-fold
 
 - Status: ready for PR.
-- Latest synchronized `main`: `f07c5fd fix: label pm calendar navigation buttons (#248)`.
+- Latest synchronized `main`: `e57ce4d fix: label remaining icon buttons (#249)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise.
-  - make the remaining smaller icon-only buttons self-describing.
-  - cover driver actions, ticket wizard back/duplicate close, checklist issue toggle, and notification settings.
-  - keep behavior and layout unchanged.
+  - continue `צוות ומשתמשים` form polish.
+  - show a compact summary on the collapsed personal-permissions block.
+  - keep permission storage and editing behavior unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - source-check: driver actions, ticket wizard, duplicate modal, checklist issue toggle, and notification settings expose descriptive labels.
-  - browser smoke-check: notification settings button exposes `הגדרות תצוגת התראות`.
+  - browser smoke-check: manager user form shows a visible permission summary in the collapsed personal-permissions block.
 
 ## Latest Completed Work
 
+- PR #249: Remaining smaller icon-only buttons now expose descriptive labels.
+  - Driver actions, ticket wizard back, duplicate modal close, checklist issue toggle, and notification settings are named.
+  - Behavior and layout stayed unchanged.
+  - Local tests/build/source-check passed before merge; notification settings browser smoke-check passed. Vercel was blocked by build-rate limit.
 - PR #248: PM calendar/year navigation icon buttons now expose descriptive labels.
   - Calendar month navigation exposes `חודש קודם` and `חודש הבא`.
   - Yearly view navigation exposes `שנה קודמת` and `שנה הבאה`.
