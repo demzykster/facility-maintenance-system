@@ -23,6 +23,7 @@ Production must not depend on demo seed data or frontend hardcoded credentials.
 - The first administrator is a server/bootstrap responsibility.
 - No production admin password, PIN, or reset secret may be hardcoded in the frontend bundle.
 - The first admin must be forced through a credential-change/bootstrap-completion flow when real Auth is implemented.
+- The current bootstrap endpoint is `POST /api/bootstrap/admin`; it must stay disabled unless a one-time server bootstrap is being performed.
 - Real business data is entered later through the app UI or through future explicit imports using owner-provided source files.
 
 ## Current Implementation
@@ -30,6 +31,7 @@ Production must not depend on demo seed data or frontend hardcoded credentials.
 - `src/seedPolicyModel.js` owns the app-mode seed policy.
 - Default mode is `demo`, so existing local/demo behavior stays unchanged.
 - `VITE_CMMS_APP_MODE=production` disables demo data loading and built-in demo identities in the frontend.
+- `api/bootstrap/admin.js` defines the server-only first-admin bootstrap endpoint contract.
 
 ## Release Meaning
 

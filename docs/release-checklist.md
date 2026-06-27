@@ -41,6 +41,7 @@ Current notes:
 - `/api/kv` route skeleton exists but remains closed until server auth and a durable backend driver are configured.
 - `npm run release:check` validates the current production storage-provider boundary.
 - `docs/production-platform-decision.md` selects Vercel frontend + Supabase Postgres/Auth/RLS/Storage as the target production platform.
+- `docs/production-bootstrap.md` and `/api/bootstrap/admin` define the server-only first-admin bootstrap contract.
 - Upstash/Vercel Redis may be used as a bridge/cache path, but not as the final CMMS source of truth.
 
 ### R3 — Notifications End-To-End

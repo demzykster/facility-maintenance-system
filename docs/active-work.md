@@ -23,15 +23,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main clean; no active product branch is open.
+- Status: main clean after the first-admin bootstrap PR is merged; no active product branch should remain open.
 - Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: add first-admin bootstrap using the selected Supabase/Postgres/Auth direction, then move login/Auth permissions toward a server-backed model.
+  - next production step: move login/Auth permissions toward a server-backed Supabase Auth/profile/RLS model.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
+  - first-admin bootstrap now has a server-only endpoint contract; do not add frontend hardcoded production admin credentials.
   - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
@@ -45,6 +46,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 first-admin bootstrap contract is complete.
+  - `POST /api/bootstrap/admin` is disabled by default and requires `CMMS_BOOTSTRAP_ENABLED=true`, `CMMS_BOOTSTRAP_TOKEN`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`.
+  - The endpoint creates the initial admin through Supabase Auth Admin semantics and never returns the temporary password.
+  - `docs/production-bootstrap.md` documents the one-time bootstrap flow and the requirement to disable bootstrap after success.
+  - Local tests passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
   - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.
