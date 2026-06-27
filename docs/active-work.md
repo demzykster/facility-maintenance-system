@@ -28,7 +28,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: add a server/session adapter that reads Supabase Auth plus `public.app_users`, then move login/Auth permissions toward that server-backed model.
+  - next production step: add a production login adapter that calls the server/session endpoint after Supabase Auth login, while keeping demo/local login unchanged.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -60,6 +60,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `POST /api/bootstrap/admin` creates both the Supabase Auth user and the matching `public.app_users` profile.
   - The endpoint only returns success after both records exist.
   - If profile creation fails after Auth creation, it reports `authUserCreated` and `authUserId` for manual cleanup/retry instead of pretending bootstrap succeeded.
+  - Local tests, production build, production-mode API build, and release check passed.
+- R9 server session adapter is complete.
+  - `GET /api/session/me` accepts a Supabase access token, verifies the Auth user through Supabase, then reads the matching `public.app_users` profile.
+  - The endpoint uses `SUPABASE_ANON_KEY` and the user's bearer token, not the service role key.
+  - Missing, disabled, unlinked, or mismatched profiles are rejected.
   - Local tests, production build, production-mode API build, and release check passed.
 - R9 production data collection mapping is complete in PR #269.
   - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
