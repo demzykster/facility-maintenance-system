@@ -21,21 +21,25 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/label-topbar-icon-buttons
 
-- Status: no active product branch.
-- Latest synchronized `main`: `9b141f3 fix: label driver access search field (#239)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `bfd9629 docs: close search label pass ledger (#240)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - R5 search-field accessibility pass is closed.
-  - Continue broader R5 Screen Audit And Visual Noise from the next concrete backlog/UI item.
-- Last validation:
-  - `npm test -- --run` passed in PR #239.
-  - `npm run build` passed in PR #239.
-  - code search found no remaining `חיפוש` placeholder inputs without `aria-label`.
+  - continue R5 Screen Audit And Visual Noise.
+  - make worker topbar icon-only controls self-describing.
+  - keep theme toggle, logout behavior, and layout unchanged.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: worker topbar buttons expose descriptive labels.
 
 ## Latest Completed Work
 
+- PR #240: Active work ledger closed the search-label pass.
+  - No active product branch remained after PR #239.
+  - Docs-only validation passed; Vercel was blocked by build-rate limit.
 - PR #239: Driver-access search field now exposes a descriptive label.
   - The hidden AccessPicker search no longer relies only on placeholder text.
   - Driver access filtering, selection behavior, and layout stayed unchanged.

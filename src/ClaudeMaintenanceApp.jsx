@@ -1503,7 +1503,7 @@ function WorkerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{view === "new" ? "דיווח תקלה" : view === "ppe" ? "הציוד שלי" : view === "activity" ? "יומן פעילות" : "הדיווחים שלי"}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn" onClick={onLogout} title="יציאה"><LogOut size={20} /></button></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={20} /></button></div>
     </div>
     <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> הציוד שלי{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
     <div className="worker-body">
