@@ -49,6 +49,11 @@ const bufferFromBody = (body = {}) => {
   };
 };
 
+const fileMaxBytesFromEnv = (env = {}) => {
+  const value = Number(env.CMMS_FILE_MAX_BYTES || 10 * 1024 * 1024);
+  return Number.isFinite(value) && value > 0 ? value : 10 * 1024 * 1024;
+};
+
 async function authorize(req, env, fetchImpl, sessionClient) {
   const token = bearerToken(req);
   if (!token) return { ok: false, status: 401, error: "supabase_access_token_required" };
@@ -97,6 +102,7 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
     || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
   const backendMetadataDriver = metadataDriver
     || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
+  const fileMaxBytes = fileMaxBytesFromEnv(env);
 
   return async function fileApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -120,6 +126,7 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
         const body = await readBody(req);
         const file = bufferFromBody(body);
         if (!file || !file.buffer.length) return json(res, 400, { error: "file_data_required" });
+        if (file.buffer.length > fileMaxBytes) return json(res, 413, { error: "file_too_large", maxBytes: fileMaxBytes });
         if (body.metadata && !backendMetadataDriver) return json(res, 503, { error: "file_metadata_not_configured" });
         const metadata = buildUploadMetadata(body.metadata, { path, file, user: auth.user });
         await backendDriver.upload(path, file.buffer, file.contentType, auth.user);

@@ -14,11 +14,14 @@ Required server env for release readiness:
 CMMS_FILE_DRIVER=supabase
 CMMS_FILE_BUCKET=cmms-files
 CMMS_FILE_METADATA_DRIVER=supabase
+CMMS_FILE_MAX_BYTES=10485760
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
 The release gate only accepts production mode when file storage and file ownership metadata storage are explicitly configured. This prevents a false production-ready state while photos still rely on browser/KV string storage or upload without durable ownership rows.
+
+`CMMS_FILE_MAX_BYTES` is optional and defaults to `10485760` (10 MB). `/api/files` rejects larger uploads with `file_too_large` before writing to Supabase Storage or file metadata.
 
 ## Current Boundary
 

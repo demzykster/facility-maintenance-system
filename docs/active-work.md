@@ -21,14 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/file-metadata-delete-path`
+### Active branch: `codex/file-upload-size-limit`
 
-- Status: this PR soft-deletes file metadata rows by path when `/api/files` deletes an object.
-- Latest synchronized `main`: `bb65ca8 [skip vercel] feat: require file metadata release gate`.
+- Status: this PR adds a server-side upload size limit to `/api/files`.
+- Latest synchronized `main`: `2ab3a63 [skip vercel] feat: soft delete file metadata`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: keep `file_metadata.deleted_at` aligned with protected file deletes.
+  - current production step: reject oversized file uploads before writing to Supabase Storage or metadata.
   - next production step: review remaining production backend gaps after file bytes, metadata, audit, and auth/session gates.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
@@ -38,7 +38,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/fileApiHandler.test.js tests/supabaseFileMetadataDriver.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/fileApiHandler.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -48,6 +48,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 file metadata soft-delete is complete in PR #312.
+  - `/api/files` DELETE now marks matching file metadata rows with `deleted_at` by storage path.
+  - File ownership history is retained instead of leaving deleted files looking active.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 file metadata release gate is complete in PR #311.
   - Production `npm run release:check` now requires `CMMS_FILE_METADATA_DRIVER=supabase` once API storage and file storage are selected.
   - The gate fails clearly with `production_requires_supabase_file_metadata_driver` when file metadata storage is missing.
