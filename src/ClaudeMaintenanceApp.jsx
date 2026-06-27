@@ -15,6 +15,7 @@ import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, clean
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
+import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
@@ -1216,9 +1217,7 @@ export default function App() {
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
-    const _key = (x) => x.status === "waiting" ? ("waiting:" + (x.waitingReason || "other")) : (x.status || "new");
-    if (!_prev) { rec = { ...rec, statusMs: rec.statusMs || {}, statusSince: rec.statusSince || rec.createdAt || _now }; }
-    else { const pk = _key(_prev), nk = _key(rec); if (pk !== nk) { const sm = { ...(_prev.statusMs || {}) }; sm[pk] = (sm[pk] || 0) + Math.max(0, _now - (_prev.statusSince || _prev.createdAt || _now)); rec = { ...rec, statusMs: sm, statusSince: _now }; } else { rec = { ...rec, statusMs: rec.statusMs || _prev.statusMs || {}, statusSince: rec.statusSince || _prev.statusSince || _prev.createdAt || _now }; } }
+    rec = applyTicketStatusTiming(rec, _prev, _now);
     if (!rec.num) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
     await store.set(`ticket:${rec.id}`, JSON.stringify(rec), true);
     setTickets((p) => [rec, ...p.filter((x) => x.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
@@ -5960,7 +5959,11 @@ function TicketDetail(p) {
   const track = ticket.track || (ticket.forkliftId ? "transport" : "facility");
   const c = catOf(ticket), pr = prOf(ticket.priority), s = stOf(ticket.status), tr = TRACKS[track] || TRACKS.facility;
   const e = (text, kind) => entryFor(session, text, kind);
-  const upd = (patch, text, kind, pauseAt) => onUpdate({ ...ticket, ...patch, ...pausePatch(ticket, patch, config, pauseAt || Date.now()), updatedAt: Date.now(), log: [...(ticket.log || []), e(text, kind)] });
+  const upd = (patch, text, kind, pauseAt) => {
+    const now = Date.now();
+    const statusTransitionAt = pauseAt || now;
+    onUpdate({ ...ticket, ...patch, ...pausePatch(ticket, patch, config, statusTransitionAt), statusTransitionAt, updatedAt: now, log: [...(ticket.log || []), e(text, kind)] });
+  };
   const take = (pivotTs) => {
     // Если заявка ждала получения техники — точка разворота: ожидание транспорта кончается ТУТ и ремонт возобновляется ОТСЮДА.
     const wasWaitingEquip = ticket.status === "waiting" && ticket.waitingReason === "no_equipment" && ticket.equipWaitSince;
