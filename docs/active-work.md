@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none after this PR merges
+### Active branch: `codex/sensitive-kv-audit-contract`
 
-- Status: this PR defines the production audit event contract.
-- Latest synchronized `main`: `c190a2b [skip vercel] feat: add production file metadata contract (#298)`.
+- Status: this PR maps sensitive KV writes to the production audit-event contract.
+- Latest synchronized `main`: `a36b049 [skip vercel] feat: add production audit event contract (#299)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: define the shared `audit_events` contract before sensitive writes move fully server-side.
-  - next production step: continue moving permissions/data writes toward server/RLS.
+  - current production step: connect existing sensitive `/api/kv` write policy to the shared audit-event model.
+  - next production step: persist audit events server-side for sensitive writes.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -38,17 +38,17 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/auditEventModel.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/kvPermissionPolicy.test.js tests/auditEventModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `npm run release:check` passed for default demo/local config.
-  - Browser smoke-check not needed: this branch changes only pure model/docs, not UI/runtime wiring.
+  - Browser smoke-check not needed: this branch changes only server-side model/permission policy/docs, not UI/runtime wiring.
 
 ## Latest Completed Work
 
-- R9 production audit event contract is complete in this PR.
+- R9 production audit event contract is complete in PR #299.
   - `src/auditEventModel.js` defines the first shared audit event shape for sensitive production changes.
   - `docs/production-audit-events.md` documents the future `audit_events` table fields.
   - This is a contract step only; it does not yet persist audit rows server-side.

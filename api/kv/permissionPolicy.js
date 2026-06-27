@@ -1,3 +1,5 @@
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
+
 const LEVEL_RANK = Object.freeze({
   none: 0,
   view: 1,
@@ -7,11 +9,11 @@ const LEVEL_RANK = Object.freeze({
 });
 
 const WRITE_RULES = Object.freeze([
-  { prefixes: ["user:"], module: "users", minLevel: "manage" },
-  { prefixes: ["config:v1"], module: "settings", minLevel: "manage" },
-  { prefixes: ["fleet:", "pm:", "insp:", "itpl:"], module: "settings", minLevel: "manage" },
-  { prefixes: ["ppe:", "ppeitem:", "ppenorm:", "ppeorder:"], module: "ppe", minLevel: "manage" },
-  { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage" }
+  { prefixes: ["user:"], module: "users", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.user },
+  { prefixes: ["config:v1"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings },
+  { prefixes: ["fleet:", "pm:", "insp:", "itpl:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
+  { prefixes: ["ppe:", "ppeitem:", "ppenorm:", "ppeorder:"], module: "ppe", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.ppe },
+  { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning }
 ]);
 
 export function kvWritePermissionForKey(key = "") {
@@ -38,4 +40,23 @@ export function kvWritePermissionError(session = {}, key = "") {
   const rule = kvWritePermissionForKey(key);
   if (!rule || sessionHasKvWritePermission(session, key)) return null;
   return `permission_required:${rule.module}:${rule.minLevel}`;
+}
+
+export function sensitiveKvWriteAuditEvent({ key = "", method = "PUT", actor = {}, before = null, after = null, shared = false, at } = {}) {
+  const rule = kvWritePermissionForKey(key);
+  if (!rule) return null;
+  const action = String(method).toUpperCase() === "DELETE" ? AUDIT_ACTIONS.delete : AUDIT_ACTIONS.update;
+  return normalizeAuditEvent({
+    at,
+    actorId: actor.id,
+    actorName: actor.name,
+    actorRole: actor.role,
+    entityType: rule.entityType,
+    entityId: String(key || ""),
+    action,
+    summary: `Sensitive KV ${action}: ${key}`,
+    before: before === null || before === undefined ? {} : { value: before },
+    after: after === null || after === undefined ? {} : { value: after },
+    metadata: { key: String(key || ""), shared: Boolean(shared), requiredPermission: `${rule.module}:${rule.minLevel}` }
+  });
 }

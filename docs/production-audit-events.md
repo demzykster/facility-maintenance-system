@@ -42,6 +42,14 @@ Initial fields:
 
 ## Current Scope
 
-This is a contract/model step only.
+The shared event shape is a contract/model step only.
 
-The next production step is to write these events server-side for sensitive changes, starting with permissions, settings, ticket lifecycle/status changes, and file upload/delete events.
+The sensitive KV bridge now also knows which protected key families should produce audit events:
+
+- `user:*` -> user changes;
+- `config:v1` -> settings changes;
+- `fleet:*`, `pm:*`, `insp:*`, `itpl:*` -> fleet/configuration changes;
+- `ppe:*`, `ppeitem:*`, `ppenorm:*`, `ppeorder:*` -> PPE changes;
+- `czone:*`, `cabsence:*` -> cleaning settings changes.
+
+The next production step is to persist these events server-side for sensitive changes, starting with permissions, settings, ticket lifecycle/status changes, and file upload/delete events.
