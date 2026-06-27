@@ -26,12 +26,14 @@ Production requirement:
 
 Current state:
 - login, PINs, activation links, and module permissions are enforced in the browser.
+- demo mode can still use built-in demo identities, but production mode must not.
 
 Production requirement:
 - Auth provider;
 - server-side identity;
 - RLS or equivalent server-side authorization;
 - permissions enforced outside the UI.
+- server-side/bootstrap creation of the first administrator, with no hardcoded frontend production secret.
 
 ### P0 — Files And Photos
 
@@ -73,18 +75,30 @@ Production requirement:
 - broad future modules must extend existing workflows instead of creating duplicate users, suppliers, tickets, approvals, files, or analytics;
 - `docs/module-growth-architecture.md` is the rule for future module design.
 
+### P0 — Production Seed Boundary
+
+Current state:
+- demo data and demo credentials are useful for local/Vercel review.
+
+Production requirement:
+- production starts empty of business data;
+- demo seeding is disabled in production mode;
+- built-in demo identities are disabled in production mode;
+- the first administrator comes from a server/bootstrap process, not from frontend source code.
+
 ## Execution Order
 
 1. Extract storage boundary from `ClaudeMaintenanceApp.jsx`.
 2. Define database schema from current backup collections and actual store prefixes.
-3. Add production storage adapter beside the local adapter.
-4. Add environment/config wiring for backend provider.
-5. Move Auth/activation/login to server-backed identity.
-6. Add server-side permission/RLS model.
-7. Move photos/files to object storage.
-8. Move AI calls to server-side endpoint.
-9. Run migration rehearsal from backup JSON to database.
-10. Run production release gate.
+3. Define production seed/bootstrap policy.
+4. Add production storage adapter beside the local adapter.
+5. Add environment/config wiring for backend provider.
+6. Move Auth/activation/login to server-backed identity.
+7. Add server-side permission/RLS model.
+8. Move photos/files to object storage.
+9. Move AI calls to server-side endpoint.
+10. Run migration rehearsal from backup JSON to database.
+11. Run production release gate.
 
 ## Progress
 
@@ -92,6 +106,7 @@ Production requirement:
 - Production collection map started in `src/dataCollections.js`.
 - First production data model documented in `docs/production-data-model.md`.
 - Modular growth rules documented in `docs/module-growth-architecture.md`.
+- Production seed policy started in `src/seedPolicyModel.js` and documented in `docs/production-seed-policy.md`.
 
 ## Monolith Extraction Policy
 

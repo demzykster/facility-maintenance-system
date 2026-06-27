@@ -21,6 +21,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
+import { appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -31,6 +32,8 @@ import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 
 /* ---------- domain ---------- */
 const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
+const APP_MODE = appModeFromEnv(import.meta.env);
+const SEED_POLICY = seedPolicyForMode(APP_MODE);
 
 const TRACKS = {
   facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
@@ -1303,6 +1306,7 @@ export default function App() {
     setPresence((s) => [...s.filter((x) => x.id !== id), rec]);
   });
   const loadDemo = async () => {
+    if (!SEED_POLICY.allowDemoData) return false;
     const cfg0 = { ...config, departments: DEFAULT_CONFIG.departments };
     const { fleet: df, tickets: dt, pm: dp, driverEvents, vehicleTypes, modelType, users: du, zones: dz, rounds: dr, complaints: dc, absences: da, presence: dpr } = buildDemoData(cfg0);
     const adminU = users.find((u) => u.role === "admin"), mgrs = users.filter((u) => u.role === "user");
@@ -1429,13 +1433,13 @@ export default function App() {
     return () => { cancelled = true; };
   }, [session && session.id, session && session.role, impersonating]);
 
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, theme, toggleTheme, reloadAll, loadDemo, clearDemo, demoActive, getBackup: buildBackup, importBackup };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup };
 
   return (
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} />
+        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -1571,8 +1575,7 @@ function WorkerReportView({ report, session, saveTicket, onClose }) {
 }
 
 /* ============================================================ LOGIN */
-// ⚠️ ВРЕМЕННО (прототип): зашитые учётки работают всегда, независимо от storage/seeding.
-// На cloud-этапе заменить на настоящую БД-аутентификацию и УДАЛИТЬ этот блок.
+// Demo-only identities. Production mode disables this list through seed policy.
 const BUILTIN_LOGINS = [
   { id: "builtin_admin", name: "ודים", role: "admin", email: "vadim@chemipal.co.il", password: "1234", dept: "הנהלה" },
   { id: "builtin_mgr", name: "מנהל מחלקה", role: "user", email: "menahel@chemipal.co.il", password: "1234", dept: "" },
@@ -1617,7 +1620,7 @@ function PublicReport({ zones, onSubmit, onClose }) {
   </div></div>);
 }
 
-function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport }) {
+function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY }) {
   const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false);
   const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
   const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
@@ -1645,7 +1648,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     return remember_save({ mode: "tech" });
   };
   const submitIdentifier = () => {
-    const res = resolveIdentifier(identifier, users, BUILTIN_LOGINS);
+    const res = resolveIdentifier(identifier, users, builtinLogins);
     if (res.status === "empty") return setErr("הזינו דוא״ל, מספר עובד או קוד טכנאי");
     if (res.status === "archived") return setErr("המשתמש אינו פעיל. פנו למנהל המערכת");
     if (res.status === "not_found") return setErr("לא נמצא משתמש מתאים");
@@ -1694,8 +1697,8 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           <button className="btn-primary full" onClick={submitSecret}>כניסה</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>חזרה</button>
         </>)}
-        <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>
-        <div className="login-foot">גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת</div>
+        {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
+        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת" : "מצב ייצור · הכניסה מנוהלת דרך משתמשים שמורים ושרת אימות"}</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
         </>)}
       </div>

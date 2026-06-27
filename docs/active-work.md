@@ -29,10 +29,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - next production step: choose/wire the backend provider path, then add the production storage adapter beside the local adapter.
+  - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
+  - `VITE_CMMS_APP_MODE=production npm run build` passed.
   - Browser smoke-check on `http://127.0.0.1:5173/` loaded the app with no console errors.
 
 ## Latest Completed Work
@@ -45,6 +47,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - R9 modular growth architecture is being documented.
   - Future budget and safety-inspection modules should reuse shared CMMS users, departments, tickets, assets, suppliers, files, lifecycle/status history, notifications, permissions, analytics, and audit.
   - The goal is comfortable modernization without duplicate module-specific islands.
+- R9 production seed policy is complete.
+  - `src/seedPolicyModel.js` defines demo/test/production seed behavior.
+  - `VITE_CMMS_APP_MODE=production` disables demo seed loading and built-in demo identities.
+  - `docs/production-seed-policy.md` documents that the first production admin must come from a server/bootstrap process, not frontend source code.
+  - Local tests, default production build, production-mode build, and browser smoke-check passed.
 - R9 Production Backend Foundation has started in PR #268.
   - The frontend storage adapter was extracted from `src/ClaudeMaintenanceApp.jsx` to `src/storageAdapter.js`.
   - The adapter stays lazy so it can use `window.storage` after module import and later be swapped for a backend provider.
