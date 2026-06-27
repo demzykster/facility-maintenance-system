@@ -31,11 +31,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - next production step: choose backend deployment/provider and implement the real server storage endpoint behind the API storage contract.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
+  - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api npm run build` passed.
+  - `npm run release:check` passed for default demo/local config.
+  - `VITE_CMMS_APP_MODE=production npm run release:check` failed as expected because production cannot use local/browser storage.
   - Browser smoke-check on `http://127.0.0.1:5173/` loaded the app with no console errors.
 
 ## Latest Completed Work
@@ -58,6 +61,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `src/apiStorageAdapter.js` defines the first REST key/value storage client contract for a future backend.
   - `docs/production-storage-provider.md` documents the env variables and API contract.
   - Local tests, default production build, production API-provider build, and browser smoke-check passed.
+- R9 production config gate is complete.
+  - `src/productionConfigGateModel.js` and `tools/production-config-gate.mjs` provide `npm run release:check`.
+  - The gate allows demo/local development but blocks `VITE_CMMS_APP_MODE=production` when storage is still local/browser storage.
+  - The gate warns that server Auth/RLS/files/AI still require backend implementation.
 - R9 Production Backend Foundation has started in PR #268.
   - The frontend storage adapter was extracted from `src/ClaudeMaintenanceApp.jsx` to `src/storageAdapter.js`.
   - The adapter stays lazy so it can use `window.storage` after module import and later be swapped for a backend provider.

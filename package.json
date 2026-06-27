@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --configLoader native",
     "build": "vite build --configLoader native",
+    "release:check": "node tools/production-config-gate.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview --host 127.0.0.1",

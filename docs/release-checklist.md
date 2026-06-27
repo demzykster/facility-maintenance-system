@@ -23,6 +23,7 @@ Done means:
 - The current business collections are mapped to a production database schema.
 - Production mode disables demo seed data and built-in demo identities.
 - Production storage provider mode and API storage contract are defined without replacing the current demo storage path.
+- A release configuration gate blocks production mode when it still points at local/browser storage.
 - Auth, permissions/RLS, files/photos, AI calls, and backup/migration risks are explicitly tracked before implementation.
 - The monolith extraction path is adapter/model-first, not a whole-file rewrite.
 - Future broad modules have a shared-entity growth rule so budget, safety inspections, and current modules do not duplicate users/assets/tickets/suppliers/files/analytics.
@@ -35,6 +36,7 @@ Current notes:
 - `docs/module-growth-architecture.md` defines how future budget and safety-inspection modules should reuse shared CMMS entities.
 - `src/seedPolicyModel.js` and `docs/production-seed-policy.md` define the production empty-start and first-admin bootstrap boundary.
 - `src/storageProviderModel.js`, `src/apiStorageAdapter.js`, and `docs/production-storage-provider.md` define the future backend storage path.
+- `npm run release:check` validates the current production storage-provider boundary.
 
 ### R3 — Notifications End-To-End
 
