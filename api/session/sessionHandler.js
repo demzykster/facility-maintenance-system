@@ -74,6 +74,7 @@ export function buildSessionPayload(authUser, profile) {
   return {
     ok: true,
     user: {
+      id: appUser.id,
       authUserId: authUser.id,
       email: authUser.email || appUser.email || "",
       role: appUser.role,

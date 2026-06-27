@@ -52,6 +52,7 @@ describe("session handler", () => {
       id: "auth-user-1",
       email: "admin@example.com"
     }, {
+      id: "app-user-1",
       auth_user_id: "auth-user-1",
       role: "admin",
       name: "Owner",
@@ -62,6 +63,7 @@ describe("session handler", () => {
     })).toEqual({
       ok: true,
       user: {
+        id: "app-user-1",
         authUserId: "auth-user-1",
         email: "admin@example.com",
         role: "admin",
@@ -87,6 +89,7 @@ describe("session handler", () => {
       getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com" }),
       getAppUserProfile: vi.fn().mockResolvedValue({
         auth_user_id: "auth-user-1",
+        id: "app-user-1",
         role: "admin",
         name: "Owner",
         email: "admin@example.com",
@@ -103,6 +106,7 @@ describe("session handler", () => {
     expect(res.json()).toMatchObject({
       ok: true,
       user: {
+        id: "app-user-1",
         authUserId: "auth-user-1",
         role: "admin",
         name: "Owner"
@@ -123,7 +127,7 @@ describe("session handler", () => {
       .mockResolvedValueOnce({
         ok: true,
         async text() {
-          return JSON.stringify([{ auth_user_id: "auth-user-1", role: "admin", name: "Owner", email: "admin@example.com", active: true }]);
+          return JSON.stringify([{ id: "app-user-1", auth_user_id: "auth-user-1", role: "admin", name: "Owner", email: "admin@example.com", active: true }]);
         }
       });
     const client = createSupabaseSessionClient({

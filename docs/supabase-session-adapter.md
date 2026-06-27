@@ -36,8 +36,14 @@ This endpoint is that boundary. It does not use the service role key. It uses th
 - Disabled profiles are rejected.
 - A profile whose `auth_user_id` does not match the Auth user is rejected.
 
+## Frontend Production Login
+
+`src/productionLoginAdapter.js` signs in through Supabase Auth password login, then calls `/api/session/me` to receive a normalized CMMS session.
+
+Demo and test modes keep the existing local/demo login flow.
+
 ## Next Steps
 
-1. Add a production login adapter in the frontend that calls this endpoint after Supabase Auth login.
-2. Keep demo/local login unchanged for `demo` and `test` modes.
-3. Enforce `mustChangePassword` in the production login/session flow.
+1. Enforce `mustChangePassword` in the production login/session flow.
+2. Decide whether production sessions should persist through refresh via a dedicated token/session storage strategy.
+3. Continue moving data writes behind server/RLS.

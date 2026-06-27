@@ -22,6 +22,7 @@ import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
+import { loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -34,6 +35,7 @@ import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
 const APP_MODE = appModeFromEnv(import.meta.env);
 const SEED_POLICY = seedPolicyForMode(APP_MODE);
+const PRODUCTION_LOGIN_CONFIG = productionLoginConfigFromEnv(import.meta.env);
 
 const TRACKS = {
   facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
@@ -1439,7 +1441,7 @@ export default function App() {
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} />
+        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -1620,12 +1622,14 @@ function PublicReport({ zones, onSubmit, onClose }) {
   </div></div>);
 }
 
-function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY }) {
-  const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false);
+function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
+  const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
   const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
   const activationUser = activationToken ? active.find((u) => (u.role === "worker" || u.role === "cleaner") && u.activationToken === activationToken && u.activationStatus === "pending") : null;
+  const productionLogin = seedPolicy.requiresServerBootstrapAdmin;
+  const productionConfigured = productionLoginReady(productionLoginConfig);
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
   const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
@@ -1648,6 +1652,16 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     return remember_save({ mode: "tech" });
   };
   const submitIdentifier = () => {
+    if (productionLogin) {
+      const email = identifier.trim().toLowerCase();
+      if (!email) return setErr("הזינו דוא״ל");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setErr("הזינו דוא״ל תקין");
+      setResolved({ status: "active", identifierType: "email", auth: "password", source: "supabase", user: { email, name: email, role: "admin" } });
+      setPassword("");
+      setCode("");
+      setErr("");
+      return;
+    }
     const res = resolveIdentifier(identifier, users, builtinLogins);
     if (res.status === "empty") return setErr("הזינו דוא״ל, מספר עובד או קוד טכנאי");
     if (res.status === "archived") return setErr("המשתמש אינו פעיל. פנו למנהל המערכת");
@@ -1658,8 +1672,24 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     setCode("");
     setErr("");
   };
-  const submitSecret = () => {
+  const submitSecret = async () => {
     if (!resolved) return submitIdentifier();
+    if (productionLogin && resolved.source === "supabase") {
+      if (!productionConfigured) return setErr("כניסת ייצור עדיין לא הוגדרה בשרת");
+      if (!password) return setErr("הזינו סיסמה");
+      setBusy(true);
+      setErr("");
+      try {
+        const result = await loginWithProductionPassword({ email: resolved.user.email, password, config: productionLoginConfig });
+        remember_save({ email: resolved.user.email, mode: "production" });
+        await onLogin(result.session);
+      } catch (error) {
+        setErr(error?.message === "production_login_not_configured" ? "כניסת ייצור עדיין לא הוגדרה בשרת" : "הכניסה נכשלה. בדקו דוא״ל וסיסמה או פנו למנהל המערכת");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const u = resolved.user;
     if (resolved.auth === "password" && (u.password || "") !== password) return setErr("הסיסמה שגויה");
     if (resolved.auth === "pin" && (u.pin || "") !== code.trim()) return setErr("הקוד שגוי");
@@ -1683,7 +1713,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
         </>) : (<>
         {!resolved ? (<>
           <div className="login-q">כניסה למערכת</div>
-          <label className="field"><span>דוא״ל / מספר עובד / קוד טכנאי</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder="vadim@chemipal.co.il / 1042 / 1234" onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
+          <label className="field"><span>{productionLogin ? "דוא״ל" : "דוא״ל / מספר עובד / קוד טכנאי"}</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com" : "vadim@chemipal.co.il / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={submitIdentifier}>המשך</button>
@@ -1694,11 +1724,11 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
             : <label className="field"><span>קוד אישי</span><input value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitSecret}>כניסה</button>
+          <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? "מתחבר…" : "כניסה"}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>חזרה</button>
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
-        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת" : "מצב ייצור · הכניסה מנוהלת דרך משתמשים שמורים ושרת אימות"}</div>
+        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת" : "מצב ייצור · הכניסה מנוהלת דרך Supabase Auth ופרופיל CMMS"}</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
         </>)}
       </div>
