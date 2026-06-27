@@ -1,6 +1,6 @@
 import { createUpstashKvDriverFromEnv } from "./upstashDriver.js";
 import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
-import { kvWritePermissionError } from "./permissionPolicy.js";
+import { kvWritePermissionError, kvWritePermissionForKey, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 
 const json = (res, status, body) => {
@@ -66,7 +66,13 @@ async function authorize(req, env, fetchImpl, sessionClient) {
     : { ok: false, status: 503, error: "storage_auth_not_configured" };
 }
 
-export function createKvApiHandler({ driver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+const writeAuditEvent = async (auditDriver, event) => {
+  if (!auditDriver || !event) return;
+  if (typeof auditDriver.write === "function") return auditDriver.write(event);
+  if (typeof auditDriver.set === "function") return auditDriver.set(event);
+};
+
+export function createKvApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver
     || (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
     || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
@@ -102,11 +108,32 @@ export function createKvApiHandler({ driver = null, env = process.env, fetchImpl
       }
       if (method === "PUT") {
         const body = await readBody(req);
-        await backendDriver.set(key, body?.value ?? "", parseBool(body?.shared ?? shared));
+        const value = body?.value ?? "";
+        const writeShared = parseBool(body?.shared ?? shared);
+        const shouldAudit = auditDriver && kvWritePermissionForKey(key);
+        const before = shouldAudit ? await backendDriver.get?.(key, writeShared) : null;
+        await backendDriver.set(key, value, writeShared);
+        await writeAuditEvent(auditDriver, shouldAudit && sensitiveKvWriteAuditEvent({
+          key,
+          method,
+          actor: auth.user,
+          before,
+          after: value,
+          shared: writeShared
+        }));
         return json(res, 200, { ok: true });
       }
       if (method === "DELETE") {
+        const shouldAudit = auditDriver && kvWritePermissionForKey(key);
+        const before = shouldAudit ? await backendDriver.get?.(key, shared) : null;
         await backendDriver.delete(key, shared);
+        await writeAuditEvent(auditDriver, shouldAudit && sensitiveKvWriteAuditEvent({
+          key,
+          method,
+          actor: auth.user,
+          before,
+          shared
+        }));
         return json(res, 200, { ok: true });
       }
 
