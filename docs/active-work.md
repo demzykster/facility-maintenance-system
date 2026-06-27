@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ppe-order-remove-buttons
+### Active branch: codex/ppe-order-suggest-net-deficit
 
 - Status: ready for PR.
-- Latest synchronized `main`: `07bb482 fix: clarify empty PPE order form (#253)`.
+- Latest synchronized `main`: `33888a0 fix: label PPE order remove buttons (#254)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 Screen Audit And Visual Noise on `ביגוד עובדים`.
-  - give PPE purchase-order remove-line icon buttons explicit Hebrew labels.
-  - keep order line removal behavior and order data unchanged.
+  - make manual item quantity suggestions in PPE purchase orders respect already-open orders.
+  - keep purchase-order saving, receiving, and stock movement behavior unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: PPE purchase-order line remove buttons expose item/size-specific Hebrew labels and titles.
+  - browser smoke-check: PPE purchase-order form opens with item picker and no visible errors after wiring order data into suggestions.
 
 ## Latest Completed Work
 
+- PR #254: PPE purchase-order remove-line icon buttons now have explicit labels.
+  - Labels include the item name and size where relevant.
+  - Order line removal behavior and order data stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #253: PPE purchase-order empty form now explains manual order creation.
   - Empty order forms now tell the user to choose an item/size and add quantities.
   - PPE order data, stock calculations, and save behavior stayed unchanged.

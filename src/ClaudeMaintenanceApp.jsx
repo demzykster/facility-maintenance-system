@@ -3963,7 +3963,7 @@ const ppeOrderRecv = (o) => (o.lines || []).reduce((s, l) => s + (l.received || 
 const SUP_INDUSTRIES = [{ id: "transport", label: "תחבורה / מלגזות" }, { id: "facility", label: "מבנה ותחזוקה" }, { id: "clothing", label: "ביגוד וציוד מגן" }];
 const supIndLabel = (id) => (SUP_INDUSTRIES.find((x) => x.id === id) || {}).label || id;
 const supMeta = (config, name) => (config && config.supplierMeta && config.supplierMeta[name]) || {};
-function PpeOrderForm({ order, items, session, onCancel, onSave, config }) {
+function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config }) {
   const o = order || {};
   const active = (items || []).filter((x) => x.active !== false);
   const [supplier, setSupplier] = useState(o.supplier || "");
@@ -3974,7 +3974,7 @@ function PpeOrderForm({ order, items, session, onCancel, onSave, config }) {
   const pickItem = active.find((x) => x.id === pid);
   const psizes = pickItem ? ppeSizes(pickItem) : [];
   const setSQ = (sz, v) => setSizeQty((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
-  const pickAndSuggest = (id) => { setPid(id); const it2 = active.find((x) => x.id === id); const sq = {}; if (it2) ppeDeficits(it2).forEach((d) => { sq[d.size] = d.need; }); setSizeQty(sq); };
+  const pickAndSuggest = (id) => { setPid(id); const it2 = active.find((x) => x.id === id); const sq = {}; if (it2) ppeNetDeficits(it2, orders).forEach((d) => { sq[d.size] = d.need; }); setSizeQty(sq); };
   const addLines = () => { if (!pickItem) return; setLines((s) => { const c = [...s]; psizes.forEach((sz) => { const q = sizeQty[sz] || 0; if (q <= 0) return; const i = c.findIndex((l) => l.itemId === pickItem.id && l.size === sz); if (i >= 0) c[i] = { ...c[i], qty: (c[i].qty || 0) + q }; else c.push({ itemId: pickItem.id, itemName: pickItem.name, sku: pickItem.sku || "", category: pickItem.category, size: sz, qty: q, received: 0 }); }); return c; }); setPid(""); setSizeQty({}); };
   const rm = (i) => setLines((s) => s.filter((_, k) => k !== i));
   const setQty = (i, v) => setLines((s) => s.map((l, k) => k === i ? { ...l, qty: Math.max(1, parseInt(v || "1", 10) || 1) } : l));
@@ -4062,7 +4062,7 @@ function PpeOrders({ orders, items, config, session, savePpeOrder, delPpeOrder, 
     {!embedded && <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle><button className="btn-primary sm" onClick={fromDeficit}><Plus size={15} /> צור הזמנת רכש</button></div>}
     {live.length === 0 ? <Empty text="אין הזמנות פתוחות" Icon={Package} sub={emptySub} /> : <div className="task-list">{live.map((o) => <Card key={o.id} o={o} />)}</div>}
     {done.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>היסטוריית הזמנות</SectionTitle><div className="task-list">{done.slice(0, 30).map((o) => <Card key={o.id} o={o} />)}</div></div>}
-    {form && <Overlay persistent onClose={() => setForm(null)}><PpeOrderForm order={form} items={items} session={session} config={config} onCancel={() => setForm(null)} onSave={async (o) => { await savePpeOrder(o); setForm(null); }} /></Overlay>}
+    {form && <Overlay persistent onClose={() => setForm(null)}><PpeOrderForm order={form} items={items} orders={orders} session={session} config={config} onCancel={() => setForm(null)} onSave={async (o) => { await savePpeOrder(o); setForm(null); }} /></Overlay>}
     {open && <Overlay onClose={() => setOpenId(null)}><PpeOrderCard order={open} items={items} session={session} savePpeOrder={savePpeOrder} delPpeOrder={async () => { await delPpeOrder(open.id); setOpenId(null); }} savePpeItem={savePpeItem} savePpe={savePpe} onEdit={() => { setForm(open); setOpenId(null); }} onClose={() => setOpenId(null)} /></Overlay>}
   </>);
 }
@@ -4112,7 +4112,7 @@ function PpeHub(p) {
       : tab === "catalog" ? <PpeCatalog items={ppeItems} ppe={ppe} session={session} savePpe={savePpe} onSave={savePpeItem} onDelete={delPpeItem} />
       : tab === "settings" ? <><PpeNorms items={ppeItems} norms={ppeNorms} config={config} onSave={saveNorm} onDelete={delNorm} /><div style={{ height: 18 }} /><PpeClawbackSettings config={config} onSave={saveConfig} /><div style={{ height: 18 }} /><PpeSignTemplate config={config} onSave={saveConfig} /></>
       : <PpeLog ppe={ppe} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} deptScope={deptScope} canIssue={true} canExit={true} reqMode={false} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} />}
-    {orderForm && <Overlay persistent onClose={() => setOrderForm(null)}><PpeOrderForm order={orderForm} items={ppeItems} session={session} config={config} onCancel={() => setOrderForm(null)} onSave={async (o) => { await savePpeOrder(o); setOrderForm(null); }} /></Overlay>}
+    {orderForm && <Overlay persistent onClose={() => setOrderForm(null)}><PpeOrderForm order={orderForm} items={ppeItems} orders={ppeOrders} session={session} config={config} onCancel={() => setOrderForm(null)} onSave={async (o) => { await savePpeOrder(o); setOrderForm(null); }} /></Overlay>}
   </>);
 }
 
