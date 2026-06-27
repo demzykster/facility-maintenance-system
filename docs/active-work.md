@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: main clean; no active product branch is open.
-- Latest synchronized `main`: `1612a42 docs: close R8 active ledger (#265)`.
+- Latest synchronized `main`: verify with `git log --oneline -5 origin/main` at session start.
 - Open PRs when this entry was written: none.
 - Purpose:
   - no active product branch is open.
