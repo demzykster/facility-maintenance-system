@@ -28,13 +28,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: choose/wire the backend provider path, then add the production storage adapter beside the local adapter.
+  - next production step: choose backend deployment/provider and implement the real server storage endpoint behind the API storage contract.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
+  - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - `VITE_CMMS_APP_MODE=production npm run build` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api npm run build` passed.
   - Browser smoke-check on `http://127.0.0.1:5173/` loaded the app with no console errors.
 
 ## Latest Completed Work
@@ -52,6 +53,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `VITE_CMMS_APP_MODE=production` disables demo seed loading and built-in demo identities.
   - `docs/production-seed-policy.md` documents that the first production admin must come from a server/bootstrap process, not frontend source code.
   - Local tests, default production build, production-mode build, and browser smoke-check passed.
+- R9 production storage provider policy is complete.
+  - `src/storageProviderModel.js` defines local/api storage provider policy and marks production+local storage as not production-data-ready.
+  - `src/apiStorageAdapter.js` defines the first REST key/value storage client contract for a future backend.
+  - `docs/production-storage-provider.md` documents the env variables and API contract.
+  - Local tests, default production build, production API-provider build, and browser smoke-check passed.
 - R9 Production Backend Foundation has started in PR #268.
   - The frontend storage adapter was extracted from `src/ClaudeMaintenanceApp.jsx` to `src/storageAdapter.js`.
   - The adapter stays lazy so it can use `window.storage` after module import and later be swapped for a backend provider.
