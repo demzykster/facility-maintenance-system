@@ -51,4 +51,6 @@ Next implementation work should move toward:
 
 The first-admin bootstrap contract is documented in `docs/production-bootstrap.md`.
 
+The first Auth/profile/RLS schema layer is documented in `docs/supabase-auth-rls-foundation.md`.
+
 Do not design future budget/safety-inspection modules as isolated stores. They must reuse the shared CMMS Postgres entities.
