@@ -2885,7 +2885,7 @@ function TaskCard({ task, users, session, meetings, saveMeeting, onClose, onSave
   const removeLink = async (mid) => { const mt = (meetings || []).find((x) => x.id === mid); await patch({ linkedMeetingIds: linkedIds.filter((x) => x !== mid) }, `הוסר הקישור לפגישה «${mt?.title || ""}»`); };
   const addNote = async () => { if (!note.trim()) return; await patch({}, note.trim()); setNote(""); };
   const ovd = taskOverdue(task);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">מטלה</div>{canManage && onEdit && <button className="icon-btn" onClick={onEdit} title="עריכה"><PenLine size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">מטלה</div>{canManage && onEdit && <button className="icon-btn" onClick={onEdit} title="עריכה" aria-label="עריכת מטלה"><PenLine size={18} /></button>}</div>
     <div className="body">
       <h2 className="detail-subj">{task.title}</h2>
       <div className="tk-chips" style={{ margin: "8px 0" }}><span className="badge sm" style={{ color: "#fff", background: st.color }}>{st.label}</span><span className="badge sm" style={{ color: pr.color, background: pr.bg }}>עדיפות {pr.label}</span>{ovd && <span className="badge sm ovd">באיחור</span>}<span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{taskModeLabel(task.mode)}</span>{task.isPrivate && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>פרטית</span>}</div>
@@ -3187,7 +3187,7 @@ function MeetingCard({ meeting: m, users, tasks, session, onClose, onSave, onSav
     }
     onClose();
   };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פגישה</div>{canManage && onEdit && <button className="icon-btn" onClick={onEdit} title="עריכה"><PenLine size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פגישה</div>{canManage && onEdit && <button className="icon-btn" onClick={onEdit} title="עריכה" aria-label="עריכת פגישה"><PenLine size={18} /></button>}</div>
     <div className="body">
       <h2 className="detail-subj">{m.title}</h2>
       <div className="tk-chips" style={{ margin: "8px 0" }}><span className="badge sm" style={{ color: "#fff", background: ty.color }}>{ty.label}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{m.status === "done" ? "בוצעה" : m.status === "cancelled" ? "בוטלה" : "מתוכננת"}</span>{m.recur && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{RECUR_LABEL[m.recur]}</span>}</div>
