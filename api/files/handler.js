@@ -1,5 +1,7 @@
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
+import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { createSupabaseFileDriverFromEnv } from "./supabaseFileDriver.js";
+import { AUDIT_ACTIONS, fileAuditEvent } from "../../src/auditEventModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -67,9 +69,17 @@ async function authorize(req, env, fetchImpl, sessionClient) {
   }
 }
 
-export function createFileApiHandler({ driver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+const writeAuditEvent = async (auditDriver, event) => {
+  if (!auditDriver || !event) return;
+  if (typeof auditDriver.write === "function") return auditDriver.write(event);
+  if (typeof auditDriver.set === "function") return auditDriver.set(event);
+};
+
+export function createFileApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver
     || (env.CMMS_FILE_DRIVER === "supabase" ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
+  const backendAuditDriver = auditDriver
+    || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
 
   return async function fileApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -93,10 +103,12 @@ export function createFileApiHandler({ driver = null, env = process.env, fetchIm
         const file = bufferFromBody(await readBody(req));
         if (!file || !file.buffer.length) return json(res, 400, { error: "file_data_required" });
         await backendDriver.upload(path, file.buffer, file.contentType, auth.user);
+        await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path, contentType: file.contentType }, AUDIT_ACTIONS.upload, auth.user));
         return json(res, 200, { ok: true, path, contentType: file.contentType });
       }
       if (method === "DELETE") {
         await backendDriver.delete(path, auth.user);
+        await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path }, AUDIT_ACTIONS.delete, auth.user));
         return json(res, 200, { ok: true, path });
       }
 

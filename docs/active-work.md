@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/require-production-audit-gate`
+### Active branch: `codex/file-api-audit-events`
 
-- Status: this PR makes production release checks require the Supabase audit driver.
-- Latest synchronized `main`: `eb45005 [skip vercel] feat: add supabase audit sink`.
+- Status: this PR writes audit events for file upload/delete through `/api/files` when an audit sink is configured.
+- Latest synchronized `main`: `43c9d07 [skip vercel] feat: require production audit config`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: require `CMMS_AUDIT_DRIVER=supabase` in production release checks.
-  - next production step: extend server-side audit events beyond sensitive KV writes to ticket lifecycle/status changes and file upload/delete events.
+  - current production step: extend server-side audit events beyond sensitive KV writes to file upload/delete events.
+  - next production step: extend server-side audit events to ticket lifecycle/status changes.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -38,17 +38,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/productionConfigGateModel.test.js --reporter=verbose` passed.
-  - Production `npm run release:check` without `CMMS_AUDIT_DRIVER=supabase` failed as expected with `production_requires_supabase_audit_driver`.
-  - Production `npm run release:check` with `CMMS_AUDIT_DRIVER=supabase` passed.
+  - `npx vitest run tests/fileApiHandler.test.js tests/auditEventModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - Browser smoke-check not needed: this branch changes only server-side model/permission policy/docs, not UI/runtime wiring.
 
 ## Latest Completed Work
 
+- R9 production audit release gate is complete in PR #303.
+  - Production `npm run release:check` now requires `CMMS_AUDIT_DRIVER=supabase` once API storage is selected.
+  - Demo/local release checks remain unchanged.
+  - Gate feedback stays readable: audit errors are not shown until production API storage is otherwise selected.
+  - Local tests, production build, release checks, and Vercel passed.
 - R9 Supabase audit sink is complete in PR #302.
   - `api/audit/supabaseAuditDriver.js` writes normalized audit rows through Supabase REST using server-only service role credentials.
   - `supabase/migrations/20260627200000_audit_events.sql` creates `public.audit_events`.
