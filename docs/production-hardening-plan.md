@@ -137,6 +137,7 @@ Production requirement:
 - `POST /api/session/change-password` enforces the first administrator password-change flow before normal production app entry.
 - Production session restore now uses Supabase access/refresh tokens plus `/api/session/me`, not the old local CMMS session object.
 - Owner decision: current demo/local records are fake and must not be migrated into production; production starts empty except for first-admin bootstrap.
+- Production release gate now requires explicit Supabase file/photo storage configuration before production mode can be considered ready.
 
 ## Monolith Extraction Policy
 

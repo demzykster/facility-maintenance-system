@@ -37,12 +37,14 @@ describe("productionConfigGateModel", () => {
         "production_requires_supabase_kv_driver",
         "production_requires_supabase_url",
         "production_requires_supabase_anon_key",
-        "production_requires_supabase_service_role_key"
+        "production_requires_supabase_service_role_key",
+        "production_requires_supabase_file_storage",
+        "production_requires_file_storage_bucket"
       ]
     });
   });
 
-  it("allows production mode only after api storage and server-side Supabase KV are configured", () => {
+  it("blocks production mode when file storage is not configured", () => {
     expect(productionConfigGate({
       appMode: "production",
       storageProvider: "api",
@@ -52,6 +54,33 @@ describe("productionConfigGateModel", () => {
         driver: "supabase",
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      }
+    })).toMatchObject({
+      ok: false,
+      errors: [
+        "production_requires_supabase_file_storage",
+        "production_requires_file_storage_bucket"
+      ]
+    });
+  });
+
+  it("allows production mode only after api storage, Supabase KV, and file storage are configured", () => {
+    expect(productionConfigGate({
+      appMode: "production",
+      storageProvider: "api",
+      storageApiBaseUrl: "https://cmms.example/api",
+      kvServer: {
+        auth: "supabase",
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      },
+      fileStorage: {
+        driver: "supabase",
+        bucket: "cmms-files",
+        supabaseUrl: "https://supabase.example",
         supabaseServiceRoleKey: "service"
       }
     })).toMatchObject({

@@ -131,6 +131,15 @@ SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
+Production release checks also require file/photo storage to be explicitly configured:
+
+```env
+CMMS_FILE_DRIVER=supabase
+CMMS_FILE_BUCKET=cmms-files
+```
+
+See `docs/production-file-storage.md`.
+
 ## Production Gate
 
 `VITE_CMMS_APP_MODE=production` is not production-data-ready unless:
