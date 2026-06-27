@@ -24,12 +24,22 @@ This note names what is currently safe to assume before treating the demo as clo
 - Older or partial backups are accepted with a legacy warning instead of being blocked.
 - Verified locally with the backup model test suite after the latest collection changes.
 
-## Explicitly Out Of Scope For This Phase
+## Production Backend Phase
 
-- Supabase.
-- Auth provider integration.
-- RLS / database security rules.
-- Railway/server deployment.
-- Broad modular split of `src/ClaudeMaintenanceApp.jsx`.
+The owner opened the production backend/auth phase after R8.
 
-These start only when the owner explicitly opens the production backend/auth phase.
+The current Vercel deployment remains demo/staging until the production backend work is actually implemented and verified.
+
+Now in scope for the next phase:
+
+- database provider selection and schema design;
+- Auth provider integration;
+- RLS / server-side permission rules;
+- production file/photo storage;
+- server-side AI endpoint for provider secrets;
+- adapter/model-first extraction from `src/ClaudeMaintenanceApp.jsx`.
+
+Still not allowed:
+
+- whole-file replacement of `src/ClaudeMaintenanceApp.jsx`;
+- broad UI module split before storage/auth/server contracts are stable.
