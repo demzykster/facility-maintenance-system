@@ -21,18 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/fix-ppe-norm-active-count
 
-- Status: no active product branch.
-- Latest synchronized `main`: `5e78b4b fix: disable empty ppe export (#205)`.
+- Status: ready for PR after local validation.
+- Latest synchronized `main`: `fdf0bbd docs: close ppe polish ledger (#206)`.
 - Open PRs when this entry was written: none.
 - Purpose:
   - continue R5 on `ביגוד עובדים`.
-  - the latest PPE empty-state/action polish PRs are merged.
-  - next work should continue from the R5 checklist, not from an open branch.
-- Validation:
-  - latest product PRs passed local tests/build/browser smoke-checks.
-  - this ledger cleanup is docs-only.
+  - make department PPE requirement counts reflect active catalog items only.
+  - avoid showing stale hidden norms as current department setup when the catalog is empty or items are inactive.
+- Validation passed before PR:
+  - `npm test -- --run`
+  - `npm run build`
+  - browser smoke-check: PPE settings no longer shows stale active configured item counts when the active catalog is empty.
 
 ## Latest Completed Work
 

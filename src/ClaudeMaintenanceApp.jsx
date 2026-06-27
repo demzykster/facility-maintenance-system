@@ -3613,10 +3613,11 @@ function PpeNorms({ items, norms, config, onSave, onDelete }) {
   const depts = config.departments || [];
   const [dept, setDept] = useState(depts[0] || "");
   const active = (items || []).filter((x) => x.active !== false);
+  const activeIds = new Set(active.map((x) => x.id));
   const recFor = (id) => (norms || []).find((n) => n.dept === dept && n.itemId === id);
   const toggle = async (it) => { const ex = recFor(it.id); if (ex) await onDelete(ex.id); else await onSave({ id: uid(), dept, itemId: it.id, active: true, policy: it.clawbackEligible ? "subsidized" : "free", workerPct: 50, periodMonths: PPE_PERIOD_DEFAULT, createdAt: Date.now() }); };
   const patch = async (rec, p) => { await onSave({ ...rec, ...p }); };
-  const cnt = (norms || []).filter((n) => n.dept === dept).length;
+  const cnt = (norms || []).filter((n) => n.dept === dept && activeIds.has(n.itemId)).length;
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardCheck size={15} /> דרישות מחלקה ומדיניות חיוב</SectionTitle></div>
     <div className="hint" style={{ marginBottom: 10 }}>בחרו אילו פריטים זמינים בכל מחלקה ומה מדיניות החיוב. מחלקה ללא הגדרה — מציגה את כל הפריטים, ללא הקצאה (מחיר מלא).</div>
