@@ -28,6 +28,7 @@ import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
+import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -42,6 +43,7 @@ const BROWSER_AI_ENABLED = AI_MODE === AI_MODES.client;
 const PRODUCTION_LOGIN_CONFIG = productionLoginConfigFromEnv(import.meta.env);
 const PRODUCTION_AUTH_STORE = createProductionAuthStore();
 const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PRODUCTION_AUTH_STORE);
+const CLEANING_PHOTOS = createCleaningPhotoStorageFromEnv(import.meta.env, PRODUCTION_AUTH_STORE);
 
 const TRACKS = {
   facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
@@ -1236,13 +1238,14 @@ export default function App() {
   const saveFleet = async (f) => { await store.set(`fleet:${f.id}`, JSON.stringify(f), true); setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); };
   const saveZone = async (z) => { await store.set(`czone:${z.id}`, JSON.stringify(z), true); setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); };
   const delZone = async (id) => { await store.del(`czone:${id}`, true); setZones((s) => s.filter((x) => x.id !== id)); };
-  const saveRound = async (r) => { await store.set(`cround:${r.id}`, JSON.stringify(r), true); setRounds((s) => [...s.filter((x) => x.id !== r.id), r].sort((a, b) => b.at - a.at)); };
+  const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); await store.set(`cround:${rec.id}`, JSON.stringify(rec), true); setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); };
   const saveAbsence = async (a) => { await store.set(`cabsence:${a.id}`, JSON.stringify(a), true); setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1))); };
   const delAbsence = async (id) => { await store.del(`cabsence:${id}`, true); setAbsences((s) => s.filter((x) => x.id !== id)); };
   const spawnFacilityFromComplaint = async (c) => {
     const tid = uid(), now = Date.now(); const cat = (config.categories || [])[0];
-    const t = { id: tid, track: "facility", subject: (c.text || "").trim() || ("תקלה · " + c.zoneName), category: cat?.id || "", categoryLabel: cat?.label || "", priority: "medium", zone: c.zoneLoc || c.zoneName, asset: c.zoneName || "", forkliftId: null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null, description: `נפתח מדיווח על תקלה באזור ניקיון «${c.zoneName}»${c.zoneLoc ? " · " + c.zoneLoc : ""}.${c.text ? "\n" + c.text.trim() : ""}`, status: "new", assignee: "", routedTech: false, createdBy: { id: c.reportedById, name: c.reportedByName, role: c.reportedByRole === "anonymous" ? "user" : (c.reportedByRole || "user"), dept: "" }, createdAt: now, updatedAt: now, dueAt: now + 48 * 3600000, hasPhoto: !!c.photo, closure: null, log: [{ at: now, by: c.reportedByName, byRole: c.reportedByRole || "user", text: "נפתח מדיווח על תקלה באזור ניקיון" }] };
-    const rec = c.photo ? { ...t, ...(await TICKET_PHOTOS.save(tid, "before", c.photo)) } : t;
+    const complaintPhoto = c.photo || await CLEANING_PHOTOS.load(c);
+    const t = { id: tid, track: "facility", subject: (c.text || "").trim() || ("תקלה · " + c.zoneName), category: cat?.id || "", categoryLabel: cat?.label || "", priority: "medium", zone: c.zoneLoc || c.zoneName, asset: c.zoneName || "", forkliftId: null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null, description: `נפתח מדיווח על תקלה באזור ניקיון «${c.zoneName}»${c.zoneLoc ? " · " + c.zoneLoc : ""}.${c.text ? "\n" + c.text.trim() : ""}`, status: "new", assignee: "", routedTech: false, createdBy: { id: c.reportedById, name: c.reportedByName, role: c.reportedByRole === "anonymous" ? "user" : (c.reportedByRole || "user"), dept: "" }, createdAt: now, updatedAt: now, dueAt: now + 48 * 3600000, hasPhoto: !!complaintPhoto, closure: null, log: [{ at: now, by: c.reportedByName, byRole: c.reportedByRole || "user", text: "נפתח מדיווח על תקלה באזור ניקיון" }] };
+    const rec = complaintPhoto ? { ...t, ...(await TICKET_PHOTOS.save(tid, "before", complaintPhoto)) } : t;
     await saveTicket(rec); return tid;
   };
   const persistComplaint = async (comp) => { await store.set(`ccomplaint:${comp.id}`, JSON.stringify(comp), true); setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at)); };
@@ -1250,9 +1253,11 @@ export default function App() {
     const trusted = c.reportedByRole === "admin" || c.reportedByRole === "user";
     const ownerRole = c.reportedByRole === "cleaner" ? "admin" : "cleaner"; // מי אחראי לסגור: דיווח מעובד ניקיון ⇒ אצל המנהל/מערכת, לא חוזר אליו
     const status = trusted ? "open" : "pending";
+    const base = { ...c, id: c.id || uid(), at: c.at || Date.now() };
     let ticketId = null;
-    if (c.kind === "broken" && status === "open") ticketId = await spawnFacilityFromComplaint(c);
-    await persistComplaint({ ...c, id: c.id || uid(), at: c.at || Date.now(), status, ownerRole, verified: trusted, ticketId, demo: false });
+    if (base.kind === "broken" && status === "open") ticketId = await spawnFacilityFromComplaint(base);
+    const stored = await CLEANING_PHOTOS.saveComplaint(base);
+    await persistComplaint({ ...stored, status, ownerRole, verified: trusted, ticketId, demo: false });
   };
   const approveComplaint = async (c) => {
     let ticketId = c.ticketId || null;
@@ -2283,6 +2288,17 @@ const dayCompliance = (zone, rounds, dayTs, now) => {
   });
 };
 const COMPLAINT_KIND = { dirty: { label: "לכלוך", color: "#0EA5E9", Icon: Sparkles }, broken: { label: "תקלה / שבר", color: "#B45309", Icon: Wrench }, round: { label: "הערות סבב", color: "#DC2626", Icon: AlertTriangle } };
+const hasCleaningPhoto = (record) => !!(record?.photo || record?.photoPath);
+function CleaningPhoto({ record, className = "cmp-photo", style }) {
+  const [src, setSrc] = useState(record?.photo || null);
+  useEffect(() => {
+    let live = true;
+    setSrc(record?.photo || null);
+    if (!record?.photo && record?.photoPath) CLEANING_PHOTOS.load(record).then((data) => { if (live) setSrc(data || null); });
+    return () => { live = false; };
+  }, [record?.photo, record?.photoPath]);
+  return src ? <img className={className || undefined} style={style} src={src} alt="" /> : null;
+}
 function ComplaintCard({ c, onResolve, onApprove, onReject, onEscalate, onOpen }) {
   const k = COMPLAINT_KIND[c.kind] || COMPLAINT_KIND.dirty; const Ic = k.Icon;
   const anon = c.reportedByRole === "anonymous";
@@ -2298,7 +2314,7 @@ function ComplaintCard({ c, onResolve, onApprove, onReject, onEscalate, onOpen }
             : c.kind === "broken" ? <span className="cmp-done" style={{ color: "var(--muted)" }}><Wrench size={13} /> מסלול אחזקה</span>
               : <span className="cmp-done" style={{ color: "var(--muted)" }}>אצל עובד הניקיון</span>;
   if (onOpen) return (<button className="cmp-card clk" style={{ borderInlineStartColor: border, width: "100%", textAlign: "start", cursor: "pointer" }} onClick={() => onOpen(c)}>
-    {c.photo && <img className="cmp-photo" src={c.photo} alt="" />}
+    <CleaningPhoto record={c} />
     <div className="cmp-body">
       <div className="cmp-row1"><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}{nIss > 1 ? " · " + nIss : ""}</span><span className="cmp-zone">{c.zoneName}</span><ChevronLeft size={15} style={{ marginInlineStart: "auto", color: "var(--muted)" }} /></div>
       <div className="cmp-meta">{c.zoneLoc ? c.zoneLoc + " · " : ""}{srcLabel} · {timeAgo(c.at)}</div>
@@ -2307,12 +2323,12 @@ function ComplaintCard({ c, onResolve, onApprove, onReject, onEscalate, onOpen }
     </div>
   </button>);
   return (<div className="cmp-card" style={{ borderInlineStartColor: border }}>
-    {c.photo && <img className="cmp-photo" src={c.photo} alt="" />}
+    <CleaningPhoto record={c} />
     <div className="cmp-body">
       <div className="cmp-row1"><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}</span>{c.status === "pending" && <span className="badge sm" style={{ background: "#EDE9FE", color: "#6D28D9" }}>ממתין לאישור</span>}{escalated && (c.status === "open") && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>הועבר למנהל המערכת</span>}<span className="cmp-zone">{c.zoneName}</span></div>
       <div className="cmp-meta">{c.zoneLoc ? c.zoneLoc + " · " : ""}{srcLabel} · {timeAgo(c.at)}{c.ticketId ? " · נפתחה קריאת אחזקה" : ""}</div>
       {c.text && <div className="cmp-text">{c.text}</div>}
-      {!c.photo && c.noPhotoReason && <div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div>}
+      {!hasCleaningPhoto(c) && c.noPhotoReason && <div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div>}
       {c.status === "pending" && onApprove
         ? <div className="cmp-actions"><button className="btn-primary sm" onClick={() => onApprove(c)}><Check size={14} /> אישור</button><button className="btn-ghost sm" onClick={() => onReject(c)}><X size={14} /> דחייה</button></div>
         : c.status === "resolved" ? <div className="cmp-done"><CheckCircle2 size={13} /> טופל{c.resolvedBy ? " · " + c.resolvedBy : ""}</div>
@@ -2336,9 +2352,9 @@ function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve,
     <div className="body">
       <div className="round-zone"><div className="rz-name">{c.zoneName}</div><div className="rz-loc">{c.zoneLoc || "—"} · {src} · {fmtDate(c.at)} {fmtTime(c.at)}</div><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}</span></div>
       {c.text && <div className="field"><span>תיאור</span><div className="cmp-text">{c.text}</div></div>}
-      {issues.length > 0 && <div className="field"><span><AlertTriangle size={14} /> הערות ({countLabel(issues.length, "הערה", "הערות")})</span><div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}>{iss.photo && <img className="cmp-photo" src={iss.photo} alt="" />}<div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div></div></div>)}</div></div>}
-      {c.photo && issues.length === 0 && <div className="field"><span>תמונה</span><img src={c.photo} alt="" style={{ width: "100%", borderRadius: 12 }} /></div>}
-      {!c.photo && c.noPhotoReason && <div className="field"><span>תמונה</span><div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div></div>}
+      {issues.length > 0 && <div className="field"><span><AlertTriangle size={14} /> הערות ({countLabel(issues.length, "הערה", "הערות")})</span><div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}><CleaningPhoto record={iss} /><div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div></div></div>)}</div></div>}
+      {hasCleaningPhoto(c) && issues.length === 0 && <div className="field"><span>תמונה</span><CleaningPhoto record={c} className="" style={{ width: "100%", borderRadius: 12 }} /></div>}
+      {!hasCleaningPhoto(c) && c.noPhotoReason && <div className="field"><span>תמונה</span><div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div></div>}
       {round && <div className="field"><span>מקור</span><div className="audit-row"><span className="audit-kdot" style={{ background: "#0EA5E9" }} /><div className="audit-main"><div className="audit-text">סבב ניקיון{round.winTime ? " · " + round.winTime : ""}</div><div className="audit-meta">{round.byName} · {fmtTime(round.at)} · {round.doneCount}/{countLabel(round.total, "פריט", "פריטים")}</div></div></div></div>}
       <div className="field"><span>סטטוס והיסטוריה</span><div className="cmp-meta">
         {c.status === "pending" ? "ממתין לאישור" : c.status === "resolved" ? "טופל" : c.status === "rejected" ? "נדחה" : inProg ? "בטיפול" : c.ownerRole === "admin" ? "התקבל — בטיפול ההנהלה" : c.escalatedTo === "admin" ? "הועבר למנהל המערכת" : "אצל עובד הניקיון"}
@@ -2543,7 +2559,7 @@ function RoundDetail({ round, zone, onClose }) {
         <div className="audit-row"><span className="audit-kdot" style={{ background: issues.length ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{round.byName}{round.isCover ? " · כיסוי" + (round.coverFor ? " עבור " + round.coverFor : "") : ""}</div><div className="audit-meta">{dayLabel(dayStart(round.at))} · {fmtTime(round.at)} · בוצעו {round.doneCount}/{countLabel(round.total, "פריט", "פריטים")}</div></div></div>
       </div>
       {issues.length > 0 && <div className="field"><span style={{ color: "#DC2626" }}><AlertTriangle size={14} /> הערות / בעיות ({countLabel(issues.length, "הערה", "הערות")})</span>
-        <div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}>{iss.photo && <img className="cmp-photo" src={iss.photo} alt="" />}<div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}><AlertTriangle size={12} /> {iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div><div className="cmp-meta">נפתח דיווח אוטומטי</div></div></div>)}</div>
+        <div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}><CleaningPhoto record={iss} /><div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}><AlertTriangle size={12} /> {iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div><div className="cmp-meta">נפתח דיווח אוטומטי</div></div></div>)}</div>
       </div>}
       {items.length > 0 && <div className="field"><span>פירוט צ׳קליסט</span><div className="round-cl">{items.map((c) => { const ok = round.items && round.items[c.id]; const flagged = issues.some((x) => x.itemId === c.id); return <div key={c.id} className="round-item" style={{ cursor: "default", opacity: ok ? 1 : 0.55 }}><span className="ri-box" style={ok ? {} : { borderColor: "var(--muted)" }}>{ok && <Check size={14} />}</span>{c.label}{flagged && <AlertTriangle size={13} color="#DC2626" style={{ marginInlineStart: 6 }} />}{!ok && !flagged && <span style={{ color: "var(--muted)", fontSize: 12, marginInlineStart: 6 }}>· לא סומן</span>}</div>; })}</div></div>}
       <div style={{ height: 20 }} />
@@ -2627,7 +2643,7 @@ function CleanerApp(p) {
   const doneToday = useMemo(() => (rounds || []).filter((r) => r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
   const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
   const myReports = useMemo(() => (complaints || []).filter((c) => c.reportedById === session.id).sort((a, b) => b.at - a.at).slice(0, 30), [complaints, session.id]);
-  const doSave = (r) => { saveRound(r); const iss = r.issues || []; const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${countLabel(list.length, kind === "broken" ? "תקלה" : "הערה", kind === "broken" ? "תקלות" : "הערות")} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role }); const broken = iss.filter((x) => x.kind === "broken"); const dirty = iss.filter((x) => x.kind !== "broken"); if (broken.length) fileComplaint(mk("broken", broken)); if (dirty.length) fileComplaint(mk("round", dirty)); setRun(null); setSent(true); setTimeout(() => setSent(false), 2600); };
+  const doSave = async (r) => { await saveRound(r); const iss = r.issues || []; const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${countLabel(list.length, kind === "broken" ? "תקלה" : "הערה", kind === "broken" ? "תקלות" : "הערות")} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role }); const broken = iss.filter((x) => x.kind === "broken"); const dirty = iss.filter((x) => x.kind !== "broken"); if (broken.length) await fileComplaint(mk("broken", broken)); if (dirty.length) await fileComplaint(mk("round", dirty)); setRun(null); setSent(true); setTimeout(() => setSent(false), 2600); };
   const card = (z, cover) => {
     const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds);
     const oc = (complaints || []).filter((c) => c.zoneId === z.id && c.status === "open" && c.ownerRole !== "admin").length;
