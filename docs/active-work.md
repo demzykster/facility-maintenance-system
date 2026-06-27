@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-ticket-search
+### Active branch: codex/polish-analytics-asset-labels
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `e4921fc fix: label role switch actions (#226)`.
+- Latest synchronized `main`: `87541cf fix: label ticket search field (#227)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `קריאות`.
-  - make the ticket search field self-describing beyond placeholder text.
-  - keep search behavior and layout unchanged.
+  - continue R5 on `אנליטיקה`.
+  - replace the visible asset-calque wording `אקטיב/אקטיבים` with clearer CMMS Hebrew.
+  - keep analytics calculations, filters, and drill-down behavior unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: tickets search exposes a descriptive label.
+  - browser smoke-check: analytics screen renders the updated labels.
 
 ## Latest Completed Work
 
+- PR #227: Ticket search field now exposes a stable descriptive label.
+  - The `קריאות` search input no longer relies only on placeholder text.
+  - Search behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #226: Bottom role-switch icon buttons now expose descriptive labels.
   - Each demo role button has Hebrew `aria-label` text.
   - Role-switch behavior and placement stayed unchanged.
