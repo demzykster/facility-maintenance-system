@@ -5687,6 +5687,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const activationLink = activationToken ? `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(activationToken)}` : "";
   const canCopyLink = canCopyActivationLink(user, activationToken, canWorkerAccess);
   const workerCodeActivated = (role === "worker" || role === "cleaner") && user.activationStatus === "activated" && !activationToken;
+  const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
+  const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
   const changeRole = (nextRole) => {
     setRole(nextRole);
     if (!activationToken && !pin.trim() && shouldSeedWorkerActivation(user, nextRole, canWorkerAccess)) setActivationToken(uid());
@@ -5735,7 +5737,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
-          <details className="perm-fold"><summary>הרשאות אישיות / אחריות נוספת</summary>
+          <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
             <div className="hint">התפקיד קובע את הגישה הבסיסית. אם אותו אדם מחזיק כמה תחומי אחריות, מוסיפים כאן הרשאות מודול לפי הצורך במקום ליצור תפקיד חדש.</div>
             {USER_PERMISSION_MODULES.map((m) => <PermSelect key={m.mod} {...m} />)}
             <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
@@ -7023,6 +7025,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .perm-fold summary::-webkit-details-marker{display:none;}
 .perm-fold summary::after{content:"▾";color:var(--muted);font-size:12px;transition:transform .15s ease;}
 .perm-fold[open] summary::after{transform:rotate(180deg);}
+.perm-summary{margin-inline-start:auto;color:var(--muted);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .perm-fold > .field,.perm-fold > .hint{margin:0 14px 10px;}
 .perm-fold > .hint:first-of-type{margin-top:-2px;}
 .shift-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:14px;}
