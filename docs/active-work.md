@@ -28,8 +28,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: choose backend deployment/provider and implement the real server storage endpoint behind the API storage contract.
+  - next production step: choose backend deployment/provider, implement the real server storage endpoint behind the API storage contract, and add first-admin bootstrap.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
+  - current demo/local records are fake and are not a production migration source.
   - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
@@ -55,6 +56,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `src/seedPolicyModel.js` defines demo/test/production seed behavior.
   - `VITE_CMMS_APP_MODE=production` disables demo seed loading and built-in demo identities.
   - `docs/production-seed-policy.md` documents that the first production admin must come from a server/bootstrap process, not frontend source code.
+  - Owner clarified that current demo/local users, tickets, fleet, PPE, cleaning, suppliers, and history are fake data and must not be migrated into production.
   - Local tests, default production build, production-mode build, and browser smoke-check passed.
 - R9 production storage provider policy is complete.
   - `src/storageProviderModel.js` defines local/api storage provider policy and marks production+local storage as not production-data-ready.
