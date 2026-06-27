@@ -28,7 +28,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: verify with `gh pr list --state open --limit 10` at session start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: choose durable backend driver/database for `/api/kv`, wire it behind the safe route skeleton, and add first-admin bootstrap.
+  - next production step: add first-admin bootstrap, then move login/Auth permissions toward a server-backed model.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
@@ -63,6 +63,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `src/apiStorageAdapter.js` defines the first REST key/value storage client contract for a future backend.
   - `/api/kv` route skeleton exists and is closed by default without server auth/backend storage.
   - `/api/kv` can now use an Upstash/Vercel Redis REST driver through server-only env.
+  - Upstash/Vercel Redis REST is the first selected durable `/api/kv` driver path.
   - `docs/production-storage-provider.md` documents the env variables and API contract.
   - Local tests, default production build, production API-provider build, and browser smoke-check passed.
 - R9 production config gate is complete.
