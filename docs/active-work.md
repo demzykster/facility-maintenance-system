@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/label-audit-log-search-field
+### Active branch: codex/label-driver-coverage-search-field
 
 - Status: ready for PR after local validation.
-- Latest synchronized `main`: `52c1e17 fix: label task search field (#235)`.
+- Latest synchronized `main`: `3295639 fix: label audit log search field (#236)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 on `יומן פעילות`.
-  - make the activity-log search field self-describing beyond placeholder text.
-  - keep activity-log filtering, export, and layout unchanged.
+  - continue R5 on `כלי שינוע`.
+  - make the visible driver-coverage search field self-describing beyond placeholder text.
+  - keep driver coverage filtering, selection behavior, and layout unchanged.
 - Validation passed before PR:
   - `npm test -- --run`
   - `npm run build`
-  - browser smoke-check: activity-log search exposes a descriptive label.
+  - browser smoke-check: driver-coverage search exposes a descriptive label.
 
 ## Latest Completed Work
 
+- PR #236: Activity-log search field now exposes a descriptive label.
+  - The `יומן פעילות` search input no longer relies only on placeholder text.
+  - Activity-log filtering/export behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
 - PR #235: Task search field now exposes a descriptive label.
   - The main `מטלות` search input no longer relies only on placeholder text.
   - Task filtering, search behavior, and layout stayed unchanged.

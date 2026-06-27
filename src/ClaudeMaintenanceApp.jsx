@@ -2101,7 +2101,7 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
     {ins.suggest.length > 0 && <div className="advice-box"><div className="advice-h"><Sparkles size={14} /> הצעות אופטימיזציה</div>{ins.suggest.map((s, i) => <div key={i} className="advice-row">העבירו את <b>{s.driver.name}</b> ({driverShiftMeta(s.shift).label}) מ-{s.fromCode} ל-<b>{s.toCode}</b> — פנוי במשמרת זו. <span className="advice-why">{s.reason}</span></div>)}</div>}
     {ins.conflict.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>נהג חוצה-משמרת תופס כלי לצד מחליפו: {ins.conflict.map((f) => f.code).join(", ")}</div>}
     {ins.dups.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>עובדים המשובצים ביותר מכלי אחד: {ins.dups.map((g) => `${g[0].driver.name} (${g.map((a) => a.unit.code).join("/")})`).join(" · ")}</div>}
-    <div className="search-wrap"><Search size={18} /><input placeholder="חיפוש לפי כלי או שם נהג…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כיסוי נהגים לפי כלי או שם נהג" placeholder="חיפוש לפי כלי או שם נהג…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="משמרת" value={catF} onChange={setCatF}>{DRIVER_SHIFTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</Sel>
       <Sel label="נהג" value={presF} onChange={setPresF}><option value="has">יש נהג</option><option value="none">ללא נהג</option></Sel>
