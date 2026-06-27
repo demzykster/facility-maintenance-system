@@ -21,22 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/show-user-duplicate-warning
+### Active branch: codex/ppe-empty-state-polish
 
 - Status: ready for PR.
-- Latest synchronized `main`: `163a3e5 docs: close permissions summary ledger (#251)`.
+- Latest synchronized `main`: `54e9032 fix: flag duplicate user identities (#252)`.
 - Open PRs when this entry was written: none.
 - Purpose:
-  - continue R5 Screen Audit And Visual Noise on `צוות ומשתמשים`.
-  - make possible duplicate login identities visible in the user tree instead of silently hiding records.
-  - keep user records, login behavior, and editing behavior unchanged.
+  - continue R5 Screen Audit And Visual Noise on `ביגוד עובדים`.
+  - clarify the empty purchase-order form so a manual order does not look like a dead state.
+  - keep PPE order data, stock calculations, and save behavior unchanged.
 - Validation:
   - `npm test -- --run` passed.
   - `npm run build` passed.
-  - browser smoke-check: team screen shows duplicate warning when duplicate identities exist.
+  - browser smoke-check: PPE purchase-order form shows the clarified empty state after order lines are removed before saving.
 
 ## Latest Completed Work
 
+- PR #252: Team/User Management now warns about possible duplicate login identities.
+  - Active users sharing the same email, worker number, or technician code are counted in a visible warning.
+  - User records, login behavior, editing, and rendering stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
 - PR #251: Active work ledger was closed after the permissions summary pass.
   - No active product branch remained after PR #250.
   - Next exact action points to the `צוות ומשתמשים` user tree/group-list pass.
