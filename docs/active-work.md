@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after staging placeholder env guard.
-- Latest synchronized `main`: after staging placeholder env guard.
+- Status: no product branch is active after pre-Supabase setup checklist.
+- Latest synchronized `main`: after pre-Supabase setup checklist.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -54,6 +54,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
+  - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
   - Vercel currently has no project environment variables configured, so real empty staging smoke cannot run yet.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
@@ -80,6 +81,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Pre-Supabase local sanity and setup checklist is complete.
+  - Local login smoke on `http://127.0.0.1:5190/` reached the empty app shell and showed footer commit `5b78721`.
+  - Add a short setup checklist for Supabase project, migrations, Vercel env, bootstrap, smoke, and restore drill.
+  - Local tests, release check, production build, and diff check passed.
 - Staging placeholder env guard is complete.
   - Prevent copied `.env.staging.example` placeholder values from passing staging preflight.
   - Local tests, release check, production build, and diff check passed.
