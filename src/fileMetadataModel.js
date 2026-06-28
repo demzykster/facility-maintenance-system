@@ -58,6 +58,18 @@ export function normalizeFileMetadata(input = {}) {
   };
 }
 
+const pathOwnerRules = Object.freeze([
+  { ownerType: FILE_OWNER_TYPES.ticket, prefix: (id) => `tickets/${id}/` },
+  { ownerType: FILE_OWNER_TYPES.cleaningComplaint, prefix: (id) => `cleaning/complaints/${id}/` },
+  { ownerType: FILE_OWNER_TYPES.cleaningRound, prefix: (id) => `cleaning/rounds/${id}/` }
+]);
+
+export function fileMetadataPathMatchesOwner(metadata = {}) {
+  const normalized = normalizeFileMetadata(metadata);
+  const rule = pathOwnerRules.find((item) => item.ownerType === normalized.ownerType);
+  return rule ? normalized.path.startsWith(rule.prefix(normalized.ownerId)) : true;
+}
+
 export function ticketPhotoMetadata(ticket = {}, kind = "before", path = "", options = {}) {
   const isAfter = kind === "after";
   return normalizeFileMetadata({

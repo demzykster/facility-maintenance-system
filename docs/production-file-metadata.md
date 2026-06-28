@@ -64,6 +64,8 @@ supabase/migrations/20260627201000_file_metadata.sql
 
 `/api/files` accepts upload metadata and persists it when the metadata sink is configured. If upload metadata is provided but the sink is not configured, the upload fails with `file_metadata_not_configured` so metadata is not silently lost. If the metadata sink is configured, uploads without metadata fail with `file_metadata_required` so production cannot create orphaned files.
 
+For known protected file owners, upload metadata must also match the storage path owner. For example, `ownerType=ticket` and `ownerId=T-1` must upload under `tickets/T-1/...`, not another ticket path.
+
 Ticket photo uploads now pass explicit file metadata through `/api/files`. Cleaning complaint main photos, cleaning complaint issue photos, and cleaning round issue photos now pass explicit file metadata through `/api/files`.
 
 File deletes through `/api/files` soft-delete matching metadata rows by storage path with `deleted_at` instead of deleting ownership history.

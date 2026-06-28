@@ -3,7 +3,7 @@ import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.j
 import { createSupabaseFileDriverFromEnv } from "./supabaseFileDriver.js";
 import { createSupabaseFileMetadataDriverFromEnv } from "./supabaseFileMetadataDriver.js";
 import { AUDIT_ACTIONS, fileAuditEvent } from "../../src/auditEventModel.js";
-import { normalizeFileMetadata } from "../../src/fileMetadataModel.js";
+import { fileMetadataPathMatchesOwner, normalizeFileMetadata } from "../../src/fileMetadataModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -93,7 +93,7 @@ const writeAuditEvent = async (auditDriver, event) => {
 
 const buildUploadMetadata = (metadata, { path, file, user }) => {
   if (!metadata || typeof metadata !== "object") return null;
-  return normalizeFileMetadata({
+  const normalized = normalizeFileMetadata({
     ...metadata,
     path,
     contentType: file.contentType,
@@ -102,6 +102,8 @@ const buildUploadMetadata = (metadata, { path, file, user }) => {
     createdByName: metadata.createdByName || user.name,
     createdByRole: metadata.createdByRole || user.role
   });
+  if (!fileMetadataPathMatchesOwner(normalized)) throw new Error("file_metadata_path_owner_mismatch");
+  return normalized;
 };
 
 const requireActiveMetadata = async (metadataDriver, path) => {
@@ -150,7 +152,13 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
         if (file.buffer.length > fileMaxBytes) return json(res, 413, { error: "file_too_large", maxBytes: fileMaxBytes });
         if (backendMetadataDriver && !body.metadata) return json(res, 400, { error: "file_metadata_required" });
         if (body.metadata && !backendMetadataDriver) return json(res, 503, { error: "file_metadata_not_configured" });
-        const metadata = buildUploadMetadata(body.metadata, { path, file, user: auth.user });
+        let metadata = null;
+        try {
+          metadata = buildUploadMetadata(body.metadata, { path, file, user: auth.user });
+        } catch (error) {
+          if (error?.message === "file_metadata_path_owner_mismatch") return json(res, 400, { error: error.message });
+          throw error;
+        }
         await backendDriver.upload(path, file.buffer, file.contentType, auth.user);
         if (metadata) await backendMetadataDriver?.upsert?.(metadata);
         await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path, contentType: file.contentType }, AUDIT_ACTIONS.upload, auth.user));
