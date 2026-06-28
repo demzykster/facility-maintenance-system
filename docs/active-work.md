@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #335.
-- Latest synchronized `main`: `e76b9fe fix: read anonymous report rate limit timestamp (#335)`.
+- Status: no active product branch after PR #336.
+- Latest synchronized `main`: `4ea72a4 docs: clarify production ai assistant boundary (#336)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
