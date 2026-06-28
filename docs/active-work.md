@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/api-error-visibility`
+### Active branch: none
 
-- Status: production error visibility is in progress; unexpected API 500 responses should return a request id and log a sanitized server event.
-- Latest synchronized `main`: `5171387 fix: scope non-admin analytics exports (#352)`.
-- Open PRs: none at branch start.
+- Status: no product branch is active after PR #353.
+- Latest synchronized `main`: `0d2e4e0 fix: add api error request ids (#353)`.
+- Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -42,10 +42,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users. PR #351 adds a preflight command/runbook; the real smoke still requires Vercel/Supabase env to be configured.
   - configure daily Supabase backups and perform one restore drill.
-  - add minimum production error visibility for server/API failures.
   - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
-  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed during production error visibility work on branch `codex/api-error-visibility`.
+  - Vercel env list currently shows no configured environment variables, so real empty staging smoke and backup/restore drill are blocked until Supabase/Vercel env is configured.
+  - Production AI guard was re-checked from code: `aiModeFromEnv` defaults production to disabled, `BROWSER_AI_ENABLED` gates browser AI UI/calls, and production config gate rejects browser AI mode.
+  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #353 production error visibility.
   - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #352 export-boundary hardening.
   - Browser smoke for PR #352 was attempted, but browser-control timed out while reading the local tab; no app runtime failure was observed by CLI checks.
   - `npm run staging:preflight` failed as expected without staging env, listing missing required env.
@@ -58,6 +59,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 minimum production API error visibility is complete in PR #353.
+  - Unexpected API 500 responses now return a stable `requestId` instead of raw backend exception text.
+  - Server logs include a sanitized structured error event with route, method, code, and request id.
+  - Bootstrap profile-creation failures still report `authUserCreated` and `authUserId`, but now use a stable error code and request id.
+  - Local tests, release checks, production build, and Vercel passed.
 - R9 non-admin analytics export scoping is complete in PR #352.
   - Non-admin `InsightsHub` now receives scoped tickets, fleet, PM, tasks, meetings, cleaning, PPE, and user data instead of the full admin dataset.
   - Local tests, release checks, and production build passed.
