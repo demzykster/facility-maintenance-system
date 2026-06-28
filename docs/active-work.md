@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after staging Supabase schema preflight tooling.
-- Latest synchronized `main`: after staging Supabase schema preflight tooling.
+- Status: no product branch is active after staging placeholder env guard.
+- Latest synchronized `main`: after staging placeholder env guard.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -53,6 +53,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
+  - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
   - Vercel currently has no project environment variables configured, so real empty staging smoke cannot run yet.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
@@ -79,6 +80,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Staging placeholder env guard is complete.
+  - Prevent copied `.env.staging.example` placeholder values from passing staging preflight.
+  - Local tests, release check, production build, and diff check passed.
 - Staging Supabase schema preflight tooling is complete.
   - Add a command to check `app_users`, `cmms_kv_records`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket before manual smoke.
   - The command uses staging env but must not print secret values.

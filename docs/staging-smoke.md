@@ -18,6 +18,8 @@ For local verification before copying values into Vercel, copy `.env.staging.exa
 npm run staging:preflight:local
 ```
 
+The preflight rejects placeholder values such as `YOUR_PROJECT`, `YOUR_SUPABASE_ANON_KEY`, `REPLACE_WITH...`, and `CHANGE_ME`.
+
 To check whether the Vercel project already has the required variable names configured, run:
 
 ```bash

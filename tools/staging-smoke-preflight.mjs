@@ -3,7 +3,7 @@ import { appModeFromEnv } from "../src/seedPolicyModel.js";
 import { auditConfigFromEnv, fileStorageConfigFromEnv, kvServerConfigFromEnv } from "../src/productionServerConfigModel.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv } from "../src/storageProviderModel.js";
 import { productionConfigGate } from "../src/productionConfigGateModel.js";
-import { STAGING_SMOKE_OPTIONAL_ENV, STAGING_SMOKE_REQUIRED_ENV, stagingSupabaseEnvPairErrors } from "../src/stagingSmokePreflightModel.js";
+import { STAGING_SMOKE_OPTIONAL_ENV, STAGING_SMOKE_REQUIRED_ENV, stagingPlaceholderEnvErrors, stagingSupabaseEnvPairErrors } from "../src/stagingSmokePreflightModel.js";
 
 const present = (name) => String(process.env[name] || "").trim() !== "";
 const errors = [];
@@ -23,6 +23,7 @@ if (present("CMMS_AUDIT_DRIVER") && process.env.CMMS_AUDIT_DRIVER !== "supabase"
 if (present("CMMS_PUBLIC_COMPLAINTS_ENABLED") && process.env.CMMS_PUBLIC_COMPLAINTS_ENABLED !== "true") errors.push("staging_smoke_requires_public_complaints_enabled");
 if (present("CMMS_PUBLIC_COMPLAINTS_DRIVER") && process.env.CMMS_PUBLIC_COMPLAINTS_DRIVER !== "supabase") errors.push("staging_smoke_requires_public_complaints_supabase_driver");
 errors.push(...stagingSupabaseEnvPairErrors(process.env));
+errors.push(...stagingPlaceholderEnvErrors(process.env, [...STAGING_SMOKE_REQUIRED_ENV, ...STAGING_SMOKE_OPTIONAL_ENV]));
 
 if (present("CMMS_BOOTSTRAP_ENABLED") && process.env.CMMS_BOOTSTRAP_ENABLED !== "false") {
   errors.push("bootstrap_must_be_disabled_after_first_admin");
