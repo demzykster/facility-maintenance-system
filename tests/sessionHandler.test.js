@@ -79,9 +79,10 @@ describe("session handler", () => {
 
   it("rejects missing, mismatched, or disabled app profiles", () => {
     expect(buildSessionPayload({ id: "auth-user-1" }, null)).toEqual({ ok: false, error: "app_user_profile_missing" });
-    expect(buildSessionPayload({ id: "auth-user-1" }, { role: "admin", name: "Owner" })).toEqual({ ok: false, error: "app_user_profile_auth_link_missing" });
-    expect(buildSessionPayload({ id: "auth-user-1" }, { auth_user_id: "other", role: "admin", name: "Owner" })).toEqual({ ok: false, error: "app_user_profile_mismatch" });
-    expect(buildSessionPayload({ id: "auth-user-1" }, { auth_user_id: "auth-user-1", role: "admin", name: "Owner", active: false })).toEqual({ ok: false, error: "app_user_disabled" });
+    expect(buildSessionPayload({ id: "auth-user-1" }, { auth_user_id: "auth-user-1", role: "admin", name: "Owner" })).toEqual({ ok: false, error: "app_user_profile_id_missing" });
+    expect(buildSessionPayload({ id: "auth-user-1" }, { id: "app-user-1", role: "admin", name: "Owner" })).toEqual({ ok: false, error: "app_user_profile_auth_link_missing" });
+    expect(buildSessionPayload({ id: "auth-user-1" }, { id: "app-user-1", auth_user_id: "other", role: "admin", name: "Owner" })).toEqual({ ok: false, error: "app_user_profile_mismatch" });
+    expect(buildSessionPayload({ id: "auth-user-1" }, { id: "app-user-1", auth_user_id: "auth-user-1", role: "admin", name: "Owner", active: false })).toEqual({ ok: false, error: "app_user_disabled" });
   });
 
   it("serves the current session through the injected server client", async () => {

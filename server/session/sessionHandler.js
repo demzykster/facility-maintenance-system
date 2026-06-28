@@ -65,6 +65,7 @@ export function buildSessionPayload(authUser, profile) {
   if (!profile) return { ok: false, error: "app_user_profile_missing" };
 
   const appUser = normalizeSupabaseAppUserProfile(profile);
+  if (!appUser.id) return { ok: false, error: "app_user_profile_id_missing" };
   if (!appUser.authUserId) return { ok: false, error: "app_user_profile_auth_link_missing" };
   if (appUser.authUserId !== authUser.id) {
     return { ok: false, error: "app_user_profile_mismatch" };

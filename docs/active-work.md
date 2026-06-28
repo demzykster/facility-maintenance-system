@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/validate-active-file-metadata-path`
+### Active branch: `codex/require-app-user-id-in-session`
 
-- Status: in progress after PR #344.
-- Latest synchronized `main`: `056d2bf fix: validate file metadata path owner (#344)`.
+- Status: in progress after PR #345.
+- Latest synchronized `main`: `6fd5754 fix: validate active file metadata path (#345)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - current branch rejects active file metadata rows whose known owner IDs do not match their storage paths before download/delete.
+  - current branch rejects Supabase app profiles without a CMMS app-user id before building a production session.
   - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo import, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
@@ -41,6 +41,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 active file metadata owner/path validation is complete in PR #345.
+  - `/api/files` now rejects active file metadata rows whose known owner IDs do not match their storage paths before download/delete.
+  - This prevents corrupted metadata rows from authorizing protected file reads or deletes.
+  - Local tests, production build, and release checks passed. Vercel was rate-limited.
 - R9 file metadata upload owner/path validation is complete in PR #344.
   - Known file metadata owner IDs must match their storage paths before upload.
   - This prevents, for example, `ownerId=T-1` metadata from being saved for a `tickets/T-2/...` file path.
