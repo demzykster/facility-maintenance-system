@@ -33,6 +33,7 @@ import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
+import { parseFleetLicenseWorkbook } from "./fleetLicenseImportModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 
@@ -4696,9 +4697,61 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     {typeMsg && <div className="note" style={{ color: "#DC2626" }}>{typeMsg}</div>}
   </div>);
 }
+
+function FleetImportWizard({ fleet, onCancel, onImport }) {
+  const [result, setResult] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [done, setDone] = useState(false);
+  const readyRows = (result?.rows || []).filter((row) => row.action === "new");
+  const conflictRows = (result?.rows || []).filter((row) => row.action === "conflict");
+  const invalidRows = (result?.rows || []).filter((row) => row.action === "invalid");
+  const onFile = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    if (!/\.xlsx$/i.test(file.name || "")) { setErr("בחרו קובץ Excel מסוג XLSX."); e.target.value = ""; return; }
+    if (file.size > 10 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 10MB."); e.target.value = ""; return; }
+    setBusy(true); setErr(""); setDone(false);
+    try {
+      const parsed = parseFleetLicenseWorkbook(await readExcelFile(file), { existingFleet: fleet });
+      if (!parsed.ok) { setResult(null); setErr(parsed.error === "fleet_license_sheet_not_found" ? "לא נמצא גיליון בשם רישיונות." : "לא נמצאה טבלת רישיונות תקינה בקובץ."); return; }
+      setResult(parsed);
+    } catch (ex) { setResult(null); setErr("שגיאה בקריאת הקובץ. ודאו שזה קובץ XLSX תקין."); }
+    finally { setBusy(false); e.target.value = ""; }
+  };
+  const save = async () => {
+    if (!readyRows.length) return setErr("אין שורות חדשות לייבוא.");
+    setBusy(true); setErr("");
+    try {
+      const now = Date.now();
+      for (const [i, row] of readyRows.entries()) {
+        await onImport({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i });
+      }
+      setDone(true);
+    } catch (ex) { setErr("הייבוא נכשל באמצע. בדקו את הרשומות ונסו שוב."); }
+    finally { setBusy(false); }
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">ייבוא כלי שינוע מ-Excel</div></div>
+    <div className="body">
+      <div className="note">הייבוא קורא רק את הגיליון <b>רישיונות</b>. קישורי קבצים ישנים וגיליון DB לא מיובאים. שורות שכבר קיימות יוצגו כקונפליקט ולא יעודכנו אוטומטית.</div>
+      <label className="btn-primary full" style={{ marginTop: 14, cursor: "pointer", justifyContent: "center" }}><FileSpreadsheet size={16} /> בחירת קובץ רישיונות<input type="file" accept=".xlsx" onChange={onFile} style={{ display: "none" }} /></label>
+      {busy && <div className="note"><span className="spinner sm dark" /> קורא קובץ…</div>}
+      {err && <div className="err">{err}</div>}
+      {result && <><SectionTitle>תצוגה מקדימה</SectionTitle>
+        <div className="stat-strip">
+          <div className="stat-box"><div className="stat-num">{result.summary.total}</div><div className="stat-lbl">שורות</div></div>
+          <div className="stat-box"><div className="stat-num">{result.summary.ready}</div><div className="stat-lbl">חדשות</div></div>
+          <div className="stat-box"><div className="stat-num">{result.summary.conflicts}</div><div className="stat-lbl">קונפליקט</div></div>
+          <div className="stat-box"><div className="stat-num">{result.summary.invalid}</div><div className="stat-lbl">שגויות</div></div>
+        </div>
+        {conflictRows.length > 0 && <div className="note" style={{ borderColor: "#FCD34D" }}>{conflictRows.length} שורות כבר קיימות לפי מספר/שלדה. הן לא ייובאו עד שתבחרו פתרון ידני.</div>}
+        {invalidRows.length > 0 && <div className="err">{invalidRows.length} שורות חסרות מספר/ספק/דגם ולא ייובאו.</div>}
+        <div className="imp-prev">{result.rows.slice(0, 45).map((row) => <div key={row.sourceRow} className="imp-row" style={row.action !== "new" ? { opacity: 0.62 } : {}}><div className="imp-t"><span className={"act-tag " + (row.action === "new" ? "new" : row.action === "conflict" ? "update" : "nochange")}>{row.action === "new" ? "חדשה" : row.action === "conflict" ? "קונפליקט" : "שגויה"}</span>{row.unit.code || "—"} · {row.unit.vehicleKind || row.unit.type || "—"}</div><div className="imp-meta">{row.unit.supplier || "—"} · דגם {row.unit.type || "—"} · שלדה {row.unit.chassis || "—"} · מסמכים {Object.keys(row.unit.docs || {}).length}</div></div>)}</div>
+        {result.rows.length > 45 && <div className="hint">…ועוד {result.rows.length - 45} שורות</div>}
+        {done ? <div className="toast-ok"><CheckCircle2 size={16} /> יובאו {readyRows.length} כלים חדשים</div> : <button className="btn-primary full" disabled={busy || !readyRows.length} onClick={save}>ייבוא {readyRows.length} כלים חדשים</button>}
+      </>}
+    </div></div>);
+}
+
 function FleetModule(p) {
   const { fleet, config, tickets, insp, saveFleet, delFleet, saveTicket, session, saveConfig } = p;
-  const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units");
+  const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units"), [imp, setImp] = useState(false);
   const canEditSettings = canManageSettings(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
   useEffect(() => { if (p.openFleetId) { setFtab("units"); setOpenId(p.openFleetId); } }, [p.navT]);
@@ -4741,7 +4794,7 @@ function FleetModule(p) {
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
     {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} templates={p.templates} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
-    <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div>
+    <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
     <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="סוג" value={type} onChange={setType}>{types.map((t) => <option key={t}>{t}</option>)}</Sel>
@@ -4766,6 +4819,7 @@ function FleetModule(p) {
         </div>}
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} onCancel={() => setImp(false)} onImport={saveFleet} /></Overlay>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
   </>);
 }

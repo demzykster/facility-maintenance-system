@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #365.
-- Latest synchronized `main`: after PR #365 fleet license import parser model.
+- Status: no product branch is active after PR #366.
+- Latest synchronized `main`: after PR #366 fleet Excel import preview UI.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
