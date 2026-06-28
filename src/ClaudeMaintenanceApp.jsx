@@ -1118,7 +1118,7 @@ export default function App() {
   useEffect(() => { store._onFail = () => setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב"); return () => { store._onFail = null; }; }, []);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
   const [session, setSession] = useState(null);
-  const [actAs, setActAs] = useState(null);
+  const [rolePreviewRole, setRolePreviewRole] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   TASK_STATUS_META = config.taskStatusMeta || {};
   const [users, setUsers] = useState([]);
@@ -1326,23 +1326,23 @@ export default function App() {
     }
     await store.set("session:v1", JSON.stringify(s), false);
   };
-  const logout = async () => { setActAs(null); setSession(null); PRODUCTION_AUTH_STORE.clear(); await store.del("session:v1", false); };
+  const logout = async () => { setRolePreviewRole(null); setSession(null); PRODUCTION_AUTH_STORE.clear(); await store.del("session:v1", false); };
   const toggleTheme = async () => { const n = theme === "light" ? "dark" : "light"; setTheme(n); await store.set("theme:v1", n, false); };
 
   const techNames = users.filter((u) => u.role === "tech" && u.active !== false).map((u) => u.name);
   const isRealAdmin = session?.role === "admin";
-  const impersonating = isRealAdmin && actAs && actAs !== "admin";
+  const impersonating = isRealAdmin && rolePreviewRole && rolePreviewRole !== "admin";
   const firstTech = (users || []).find((u) => u.role === "tech" && u.active !== false);
   const firstMgr = (users || []).find((u) => u.role === "user" && u.active !== false);
   const firstWorker = (users || []).find((u) => u.role === "worker" && u.active !== false);
   const firstCleaner = (users || []).find((u) => u.role === "cleaner" && u.active !== false && (zones || []).some((z) => z.cleanerId === u.id)) || (users || []).find((u) => u.role === "cleaner" && u.active !== false);
   const effSession = !impersonating ? session
-    : actAs === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", shiftId: "", techScope: "transport", techCats: [] })
-    : actAs === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })
-    : actAs === "cleaner" ? (firstCleaner ? { id: firstCleaner.id, name: firstCleaner.name, role: "cleaner" } : { ...session, role: "cleaner" })
+    : rolePreviewRole === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", shiftId: "", techScope: "transport", techCats: [] })
+    : rolePreviewRole === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })
+    : rolePreviewRole === "cleaner" ? (firstCleaner ? { id: firstCleaner.id, name: firstCleaner.name, role: "cleaner" } : { ...session, role: "cleaner" })
     : (firstMgr ? { id: firstMgr.id, name: firstMgr.name, role: "user", dept: firstMgr.dept || config.departments[0] || "", depts: userDepts(firstMgr).length ? userDepts(firstMgr) : [config.departments[0] || ""], email: firstMgr.email || "", mgrZones: firstMgr.mgrZones || [], shift: firstMgr.shift || "", perms: normalizePerms(firstMgr) } : { ...session, role: "user", dept: session.dept || config.departments[0] || "", mgrZones: session.mgrZones || [] });
-  const effLogout = impersonating ? (async () => setActAs(null)) : logout;
-  // В режиме симуляции пишем присутствие под личностью имперсонируемого техника — чтобы статус был сквозным (видно и админу, и менеджеру).
+  const effLogout = impersonating ? (async () => setRolePreviewRole(null)) : logout;
+  // В режиме просмотра роли пишем присутствие под выбранным техником — чтобы статус был сквозным (видно и админу, и менеджеру).
   const effSetShift = !impersonating ? setShift : (async (on) => {
     const id = effSession.id; if (!id) return;
     const prev = presence.find((x) => x.id === id);
@@ -1479,7 +1479,7 @@ export default function App() {
     return () => { cancelled = true; };
   }, [session && session.id, session && session.role, impersonating]);
 
-  const rolePreview = isRealAdmin ? { active: actAs || "admin", realName: session.name, onChange: (role) => setActAs(role === "admin" ? null : role) } : null;
+  const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
   const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, rolePreview, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
