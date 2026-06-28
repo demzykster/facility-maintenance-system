@@ -142,10 +142,13 @@ For production release checks, API storage is accepted only when the server-side
 ```env
 CMMS_KV_AUTH=supabase
 CMMS_KV_DRIVER=supabase
+CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true
 SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
+
+`CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true` is intentionally explicit. The KV bridge is an interim compatibility layer for the monolith, not the final normalized RLS data model. Do not set it unless the owner accepts that release stage knowingly.
 
 Production release checks also require file/photo storage to be explicitly configured:
 
