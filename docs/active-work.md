@@ -21,16 +21,19 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/production-disable-memory-fallback`
+### Active branch: none
 
-- Status: this PR disables in-memory fallback for production API storage.
-- Latest synchronized `main`: `e2f4bee [skip vercel] fix: disable backup import in production`.
-- Open PRs: none at branch start.
+- Status: no active product branch. Continue from `docs/production-hardening-plan.md` and the next release-risk item.
+- Latest synchronized `main`: `6d73cfb [skip vercel] fix: disable api storage memory fallback`.
+- Open PRs: none after PR #321 merge.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - prevent production API storage failures from silently falling back to browser memory.
-  - keep demo/local fallback behavior for review work when no durable backend is configured.
-  - make failed production writes visible instead of creating temporary data that disappears after reload.
+  - Vercel is currently build-rate-limited on the Hobby plan after many preview deployments.
+  - Until the rate limit resets, small local-validated hardening/doc PRs can use `[skip vercel]`; run final Vercel smoke before any real demo/release decision.
+  - Next practical production hardening candidates:
+    - continue replacing bridge-wide KV behavior with normalized table/RLS contracts;
+    - review production bootstrap/first-admin operational flow end to end;
+    - review frontend API-storage error surfaces so failed production writes are visible to the user.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -39,15 +42,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/storageAdapter.test.js --reporter=verbose` passed.
-  - `npm test -- --run` passed.
-  - `npm run build` passed.
-  - `npm run release:check` passed for default demo/local config.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - pending for the next product branch.
 
 ## Latest Completed Work
 
+- R9 production API storage memory fallback guard is complete in PR #321.
+  - API storage no longer silently falls back to browser memory.
+  - Demo/local memory fallback remains available for review work.
+  - Local tests, production builds, and release checks passed. Vercel was rate-limited, so the PR used `[skip vercel]`.
 - R9 production backup import guard is complete in PR #320.
   - JSON backup restore/import is hidden in production mode while export remains available.
   - Demo/test still allow backup restore for local review workflows.
