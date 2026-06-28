@@ -16,15 +16,19 @@ const defaultStorageProvider = () => (
     : (typeof window !== "undefined" ? window.storage : null)
 );
 
+const defaultAllowMemoryFallback = () => storageProviderFromEnv(importEnv()) !== STORAGE_PROVIDERS.api;
+
 export const withTimeout = (promise, ms = 2000) => Promise.race([
   promise,
   new Promise((resolve) => setTimeout(() => resolve(undefined), ms))
 ]);
 
-export function createAppStore({ storageProvider = defaultStorageProvider, timeoutMs = 2000 } = {}) {
+export function createAppStore({ storageProvider = defaultStorageProvider, timeoutMs = 2000, allowMemoryFallback = defaultAllowMemoryFallback } = {}) {
   const mem = {};
+  const canUseMemoryFallback = () => typeof allowMemoryFallback === "function" ? !!allowMemoryFallback() : !!allowMemoryFallback;
   const store = {
     async get(key, shared = false) {
+      const fallback = canUseMemoryFallback();
       try {
         const storage = storageProvider();
         if (storage) {
@@ -32,12 +36,13 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
           if (result !== undefined) return result ? result.value : null;
         }
       } catch (e) {}
-      return Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
+      return fallback && Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
     },
     async set(key, value, shared = false) {
-      mem[key] = value;
+      const fallback = canUseMemoryFallback();
+      if (fallback) mem[key] = value;
       const storage = storageProvider();
-      if (!storage) return true;
+      if (!storage) return fallback;
       try {
         const result = await withTimeout(storage.set(key, value, shared), timeoutMs);
         if (result === undefined) throw new Error("timeout");
@@ -48,9 +53,10 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
       }
     },
     async del(key, shared = false) {
-      delete mem[key];
+      const fallback = canUseMemoryFallback();
+      if (fallback) delete mem[key];
       const storage = storageProvider();
-      if (!storage) return true;
+      if (!storage) return fallback;
       try {
         const result = await withTimeout(storage.delete(key, shared), timeoutMs);
         if (result === undefined) throw new Error("timeout");
@@ -61,6 +67,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
       }
     },
     async list(prefix, shared = false) {
+      const fallback = canUseMemoryFallback();
       try {
         const storage = storageProvider();
         if (storage) {
@@ -68,7 +75,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
           if (result !== undefined) return result ? result.keys : [];
         }
       } catch (e) {}
-      return Object.keys(mem).filter((key) => key.startsWith(prefix));
+      return fallback ? Object.keys(mem).filter((key) => key.startsWith(prefix)) : [];
     }
   };
   return store;

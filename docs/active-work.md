@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/production-disable-backup-import`
+### Active branch: `codex/production-disable-memory-fallback`
 
-- Status: this PR disables JSON backup restore/import in production mode while keeping export available.
-- Latest synchronized `main`: `d7d3783 fix: skip builtin users in production (#319)`.
+- Status: this PR disables in-memory fallback for production API storage.
+- Latest synchronized `main`: `e2f4bee [skip vercel] fix: disable backup import in production`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - align backup restore with the production seed policy: production starts empty except for server-side bootstrap and should not import old local/demo JSON backups.
-  - keep JSON backup export available for admin safety, but require a future owner-approved import tool for real production data imports.
-  - keep restore/import available in demo/test for local review workflows.
+  - prevent production API storage failures from silently falling back to browser memory.
+  - keep demo/local fallback behavior for review work when no durable backend is configured.
+  - make failed production writes visible instead of creating temporary data that disappears after reload.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -39,7 +39,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/seedPolicyModel.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/storageAdapter.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -48,6 +48,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production backup import guard is complete in PR #320.
+  - JSON backup restore/import is hidden in production mode while export remains available.
+  - Demo/test still allow backup restore for local review workflows.
+  - Local tests, production builds, and release checks passed. Vercel was rate-limited, so the PR used `[skip vercel]`.
 - R9 production builtin user guard is complete in PR #319.
   - The frontend no longer auto-creates builtin demo users in production mode.
   - Demo/test still keep builtin demo identities for local review.
