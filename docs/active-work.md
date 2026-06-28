@@ -21,14 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/block-optimistic-work-record-saves`
+### Active branch: `codex/block-optimistic-cleaning-ppe-saves`
 
-- Status: this PR prevents false optimistic UI updates for secondary work-record writes when shared storage persistence fails.
-- Latest synchronized `main`: `d2ff156 fix: block optimistic config user saves (#326)`.
+- Status: this PR prevents false optimistic UI updates for cleaning, zone, absence, and PPE writes when shared storage persistence fails.
+- Latest synchronized `main`: `434188f fix: block optimistic work record saves (#327)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - PM, inspection templates/results, tasks, and meetings must not appear saved when API persistence returns `false`.
+  - cleaning zones/rounds/complaints/absences and PPE inventory/issuance/request/order records must not appear saved when API persistence returns `false`.
   - the save/delete functions for those records now use the shared persistence guard before changing local React state.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
@@ -40,6 +40,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 optimistic work-record save guard is complete in PR #327.
+  - PM, inspection templates/results, tasks, and meetings no longer update local React state when shared persistence returns `false`.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 optimistic config/user save guard is complete in PR #326.
   - `saveConfig`, `saveUser`, and `delUser` no longer update local React state when shared persistence returns `false`.
   - This protects settings, permissions, and user-management changes from looking saved when the backend write failed.

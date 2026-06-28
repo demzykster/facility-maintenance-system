@@ -1254,11 +1254,11 @@ export default function App() {
   const delPm = async (id) => { if (!await deleteShared(`pm:${id}`)) return false; setPm((s) => s.filter((x) => x.id !== id)); return true; };
   const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
   const saveFleet = async (f) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f))) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
-  const saveZone = async (z) => { await store.set(`czone:${z.id}`, JSON.stringify(z), true); setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); };
-  const delZone = async (id) => { await store.del(`czone:${id}`, true); setZones((s) => s.filter((x) => x.id !== id)); };
-  const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); await store.set(`cround:${rec.id}`, JSON.stringify(rec), true); setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); };
-  const saveAbsence = async (a) => { await store.set(`cabsence:${a.id}`, JSON.stringify(a), true); setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1))); };
-  const delAbsence = async (id) => { await store.del(`cabsence:${id}`, true); setAbsences((s) => s.filter((x) => x.id !== id)); };
+  const saveZone = async (z) => { if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false; setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); return true; };
+  const delZone = async (id) => { if (!await deleteShared(`czone:${id}`)) return false; setZones((s) => s.filter((x) => x.id !== id)); return true; };
+  const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); if (!await persistShared(`cround:${rec.id}`, JSON.stringify(rec))) return false; setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); return true; };
+  const saveAbsence = async (a) => { if (!await persistShared(`cabsence:${a.id}`, JSON.stringify(a))) return false; setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1))); return true; };
+  const delAbsence = async (id) => { if (!await deleteShared(`cabsence:${id}`)) return false; setAbsences((s) => s.filter((x) => x.id !== id)); return true; };
   const spawnFacilityFromComplaint = async (c) => {
     const tid = uid(), now = Date.now(); const cat = (config.categories || [])[0];
     const complaintPhoto = c.photo || await CLEANING_PHOTOS.load(c);
@@ -1266,7 +1266,7 @@ export default function App() {
     const rec = complaintPhoto ? { ...t, ...(await TICKET_PHOTOS.save(tid, "before", complaintPhoto)) } : t;
     await saveTicket(rec); return tid;
   };
-  const persistComplaint = async (comp) => { await store.set(`ccomplaint:${comp.id}`, JSON.stringify(comp), true); setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at)); };
+  const persistComplaint = async (comp) => { if (!await persistShared(`ccomplaint:${comp.id}`, JSON.stringify(comp))) return false; setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at)); return true; };
   const fileComplaint = async (c) => {
     const trusted = c.reportedByRole === "admin" || c.reportedByRole === "user";
     const ownerRole = c.reportedByRole === "cleaner" ? "admin" : "cleaner"; // מי אחראי לסגור: דיווח מעובד ניקיון ⇒ אצל המנהל/מערכת, לא חוזר אליו
@@ -1297,16 +1297,16 @@ export default function App() {
   const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
   const saveMeeting = async (m) => { if (!await persistShared(`mmeet:${m.id}`, JSON.stringify(m))) return false; setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); return true; };
   const delMeeting = async (id) => { if (!await deleteShared(`mmeet:${id}`)) return false; setMeetings((s) => s.filter((x) => x.id !== id)); return true; };
-  const savePpeItem = async (x) => { await store.set(`ppeitem:${x.id}`, JSON.stringify(x), true); setPpeItems((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (a.name > b.name ? 1 : -1))); };
-  const delPpeItem = async (id) => { await store.del(`ppeitem:${id}`, true); setPpeItems((s) => s.filter((y) => y.id !== id)); };
-  const savePpe = async (x) => { await store.set(`ppe:${x.id}`, JSON.stringify(x), true); setPpe((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); };
-  const delPpe = async (id) => { await store.del(`ppe:${id}`, true); setPpe((s) => s.filter((y) => y.id !== id)); };
-  const saveNorm = async (x) => { await store.set(`ppenorm:${x.id}`, JSON.stringify(x), true); setPpeNorms((s) => [x, ...s.filter((y) => y.id !== x.id)]); };
-  const delNorm = async (id) => { await store.del(`ppenorm:${id}`, true); setPpeNorms((s) => s.filter((y) => y.id !== id)); };
-  const savePpeReq = async (x) => { await store.set(`ppereq:${x.id}`, JSON.stringify(x), true); setPpeReqs((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); };
-  const delPpeReq = async (id) => { await store.del(`ppereq:${id}`, true); setPpeReqs((s) => s.filter((y) => y.id !== id)); };
-  const savePpeOrder = async (x) => { await store.set(`ppeorder:${x.id}`, JSON.stringify(x), true); setPpeOrders((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.createdAt - a.createdAt)); };
-  const delPpeOrder = async (id) => { await store.del(`ppeorder:${id}`, true); setPpeOrders((s) => s.filter((y) => y.id !== id)); };
+  const savePpeItem = async (x) => { if (!await persistShared(`ppeitem:${x.id}`, JSON.stringify(x))) return false; setPpeItems((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (a.name > b.name ? 1 : -1))); return true; };
+  const delPpeItem = async (id) => { if (!await deleteShared(`ppeitem:${id}`)) return false; setPpeItems((s) => s.filter((y) => y.id !== id)); return true; };
+  const savePpe = async (x) => { if (!await persistShared(`ppe:${x.id}`, JSON.stringify(x))) return false; setPpe((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); return true; };
+  const delPpe = async (id) => { if (!await deleteShared(`ppe:${id}`)) return false; setPpe((s) => s.filter((y) => y.id !== id)); return true; };
+  const saveNorm = async (x) => { if (!await persistShared(`ppenorm:${x.id}`, JSON.stringify(x))) return false; setPpeNorms((s) => [x, ...s.filter((y) => y.id !== x.id)]); return true; };
+  const delNorm = async (id) => { if (!await deleteShared(`ppenorm:${id}`)) return false; setPpeNorms((s) => s.filter((y) => y.id !== id)); return true; };
+  const savePpeReq = async (x) => { if (!await persistShared(`ppereq:${x.id}`, JSON.stringify(x))) return false; setPpeReqs((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); return true; };
+  const delPpeReq = async (id) => { if (!await deleteShared(`ppereq:${id}`)) return false; setPpeReqs((s) => s.filter((y) => y.id !== id)); return true; };
+  const savePpeOrder = async (x) => { if (!await persistShared(`ppeorder:${x.id}`, JSON.stringify(x))) return false; setPpeOrders((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.createdAt - a.createdAt)); return true; };
+  const delPpeOrder = async (id) => { if (!await deleteShared(`ppeorder:${id}`)) return false; setPpeOrders((s) => s.filter((y) => y.id !== id)); return true; };
   // авто-миграция Тип/Модель: группировка по типу; версия 2 пересобирает старый 1:1
   useEffect(() => {
     if (ready && fleet.length && config.vtMigV !== 2) {
