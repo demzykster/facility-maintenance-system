@@ -21,21 +21,29 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/block-optimistic-shift-presence`
 
-- Status: no active product branch after PR #329.
-- Latest synchronized `main`: `9d3d4aa docs: close optimistic save ledger (#329)`.
-- Open PRs: none.
+- Status: this PR prevents technician shift presence from appearing changed when shared persistence fails.
+- Latest synchronized `main`: `87889c0 docs: sync active work after ledger close (#330)`.
+- Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - the main shared-save optimistic UI risk pass is complete for core records, settings/users, PM/inspections/tasks/meetings, cleaning, and PPE.
-  - remaining `store.set` / `store.del` calls are special flows and should be reviewed deliberately before changing: session/theme/login preferences, notifications, presence heartbeat, demo seed/import, anonymous rate-limit, and raw photo/cache writes.
+  - explicit technician shift start/end actions must not update local presence state when API persistence returns `false`.
+  - technician auto-start on login now also waits for presence persistence before updating local state.
+  - the background heartbeat remains intentionally quiet to avoid noisy minute-by-minute storage errors.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
-  - docs-only update; `git diff --check` passed.
+  - `npm test -- --run` passed.
+  - `npm run build` passed.
+  - `npm run release:check` passed for default demo/local config.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
 
 ## Latest Completed Work
 
+- R9 active-work main sync is complete in PR #330.
+  - `docs/active-work.md` now points at PR #329 / `9d3d4aa` as the latest clean handoff point.
+  - Vercel passed.
 - R9 optimistic save ledger close is complete in PR #329.
   - `docs/active-work.md` now marks no active product branch after PR #328.
   - The remaining direct storage writes are explicitly listed as special flows for deliberate review.
