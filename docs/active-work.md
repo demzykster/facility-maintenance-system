@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after staging/Vercel env preflight tooling.
-- Latest synchronized `main`: after staging/Vercel env preflight tooling.
+- Status: no product branch is active after staging Supabase schema preflight tooling.
+- Latest synchronized `main`: after staging Supabase schema preflight tooling.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -52,6 +52,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
+  - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - Vercel currently has no project environment variables configured, so real empty staging smoke cannot run yet.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
@@ -78,6 +79,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Staging Supabase schema preflight tooling is complete.
+  - Add a command to check `app_users`, `cmms_kv_records`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket before manual smoke.
+  - The command uses staging env but must not print secret values.
+  - The command currently fails as expected without `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `CMMS_FILE_BUCKET`.
+  - Local tests, release check, production build, and diff check passed.
 - Staging/Vercel env preflight tooling is complete.
   - `npm run staging:vercel-env` checks the Vercel project for required staging env variable names without printing secret values.
   - The command currently fails as expected because Vercel has no configured project env variables yet.

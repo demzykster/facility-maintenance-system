@@ -10,6 +10,7 @@
     "staging:preflight": "node tools/staging-smoke-preflight.mjs",
     "staging:preflight:local": "node tools/staging-smoke-preflight-local.mjs",
     "staging:vercel-env": "node tools/vercel-env-preflight.mjs --scope demzyksters-projects",
+    "staging:supabase-schema": "node tools/supabase-staging-schema-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview --host 127.0.0.1",

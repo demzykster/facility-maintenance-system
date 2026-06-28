@@ -26,6 +26,14 @@ npm run staging:vercel-env
 
 This command lists only missing variable names. It must not print secret values.
 
+After `.env.staging.local` is filled or the shell has staging Supabase env loaded, verify the required staging tables and private file bucket:
+
+```bash
+npm run staging:supabase-schema
+```
+
+This checks `app_users`, `cmms_kv_records`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket.
+
 ## Required Env Shape
 
 Use `.env.staging.example` as the non-secret template for Vercel environment variables.
@@ -57,7 +65,7 @@ After first-admin bootstrap succeeds:
 ## Manual Smoke Path
 
 1. Open the staging URL in a clean browser profile.
-2. Verify Supabase migrations are applied, including the private `cmms-files` storage bucket.
+2. Run `npm run staging:supabase-schema` and verify Supabase migrations are applied, including the private `cmms-files` storage bucket.
 3. Verify no demo login hints, demo users, demo tickets, demo fleet, or demo cleaning data appear.
 4. Bootstrap the first admin once, then disable bootstrap env and redeploy.
 5. Login as the admin and complete required password-change flow if shown.
