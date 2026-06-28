@@ -34,6 +34,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Current facts to preserve:
   - if Supabase `Automatically expose new tables` is disabled, the server-side REST checks require explicit `service_role` grants on CMMS tables.
+  - production login also requires `authenticated` select privilege on `public.app_users`; RLS still limits users to their own/allowed rows.
   - external Excel/CSV task import exists, but `.xlsx` import uses `read-excel-file` and CSV uses `papaparse`.
   - Excel export generation now uses `write-excel-file` through a small compatibility adapter instead of vulnerable `xlsx@0.18.5`; export formula injection remains mitigated through `rowsSafe`.
   - first-admin bootstrap is disabled by default, token-gated, and refuses a second active admin, but the deployment env does not physically disable itself after success.
@@ -86,6 +87,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Added the explicit `service_role` grants required when Supabase `Automatically expose new tables` is disabled.
   - Applied the grant SQL to `cmms-cdsl-staging`; `npm run staging:supabase-schema` now passes against the real staging project and private `cmms-files` bucket.
   - Local tests, release check, production build, and diff check passed.
+- Staging authenticated app-user profile grant is complete.
+  - Supabase Auth login worked directly, but `/api/session/me` returned `session_lookup_failed` until `authenticated` could select `public.app_users`.
+  - Added and applied a focused grant migration so production login can read the current app-user profile through RLS.
+  - First admin was bootstrapped, bootstrap env was removed, final Vercel redeploy completed, and `/api/bootstrap/admin` again returns `bootstrap_disabled`.
+  - UI login reached the first-password-change screen, password change completed, and the admin reached the app shell.
+  - Empty staging data check: `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`.
 - Pre-Supabase local sanity and setup checklist is complete.
   - Local login smoke on `http://127.0.0.1:5190/` reached the empty app shell and showed footer commit `5b78721`.
   - Add a short setup checklist for Supabase project, migrations, Vercel env, bootstrap, smoke, and restore drill.

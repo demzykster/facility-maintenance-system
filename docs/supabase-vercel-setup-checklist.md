@@ -41,6 +41,7 @@ Apply the current migrations in order:
 4. `supabase/migrations/20260627201000_file_metadata.sql`
 5. `supabase/migrations/20260628134000_cmms_files_bucket.sql`
 6. `supabase/migrations/20260628152000_service_role_api_grants.sql`
+7. `supabase/migrations/20260628161000_authenticated_app_user_select_grant.sql`
 
 Expected objects:
 
@@ -50,6 +51,7 @@ Expected objects:
 - `public.file_metadata`
 - private Supabase Storage bucket `cmms-files`
 - explicit `service_role` REST privileges for the server API routes
+- authenticated `SELECT` privilege on `public.app_users`, still constrained by RLS
 
 ## 3. Fill Local Staging Env
 
