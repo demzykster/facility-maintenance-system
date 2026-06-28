@@ -13,6 +13,7 @@ describe("seedPolicyModel", () => {
     expect(seedPolicyForMode(appModeFromEnv({}))).toMatchObject({
       allowDemoData: true,
       allowBuiltinDemoUsers: true,
+      allowBackupImport: true,
       productionStartsEmpty: false
     });
   });
@@ -20,6 +21,7 @@ describe("seedPolicyModel", () => {
   it("keeps demo and test modes usable for local/demo work", () => {
     expect(seedPolicyForMode(APP_MODES.demo).allowDemoData).toBe(true);
     expect(seedPolicyForMode(APP_MODES.test).allowBuiltinDemoUsers).toBe(true);
+    expect(seedPolicyForMode(APP_MODES.test).allowBackupImport).toBe(true);
   });
 
   it("disables demo seed and builtin identities in production mode", () => {
@@ -27,6 +29,7 @@ describe("seedPolicyModel", () => {
     expect(seedPolicyForMode(APP_MODES.production)).toMatchObject({
       allowDemoData: false,
       allowBuiltinDemoUsers: false,
+      allowBackupImport: false,
       requiresServerBootstrapAdmin: true,
       productionStartsEmpty: true
     });
