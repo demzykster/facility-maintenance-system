@@ -1945,7 +1945,7 @@ function UserApp(p) {
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
         nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
       <div className="main-col">
-        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
+        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeView === "tickets" ? (<>
             {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {countLabel(needAct, "קריאה דורשת", "קריאות דורשות")} פעולה שלך</div>}
@@ -2045,7 +2045,7 @@ function TechApp(p) {
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme}
         nav={[{ id: "tickets", Icon: ListChecks, label: "קריאות שינוע", active: view === "tickets", onClick: () => setView("tickets") }, { id: "pm", Icon: CalendarClock, label: "לוח טיפולים", active: view === "pm", onClick: () => setView("pm") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
       <div className="main-col">
-        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
+        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
         <div className="content with-nav">
           {tw.presence !== false && <div className="shift-bar"><div className="shift-info"><span className="presence-dot on" /><div><div className="shift-stat">במשמרת</div><div className="shift-sub">{myShift.since ? "מאז " + fmtTime(myShift.since) : "מחובר"} · עד {fmtTime(effectiveEnd)}{myIdle.lateMin > 0 ? " · איחור " + myIdle.lateMin + " ד׳" : ""}</div></div></div><button className="btn-ghost sm" onClick={endAndLogout}><Power size={15} /> סיום משמרת ויציאה</button></div>}
           {sessWarn && <div className="ovl-backdrop modal2" style={{ zIndex: 60 }}><div className="modal2-panel" style={{ textAlign: "center" }}><div className="modal2-body"><div style={{ fontSize: 38, marginBottom: 6 }}>⏰</div><div className="form-title" style={{ marginBottom: 6 }}>המשמרת עומדת להסתיים</div><div className="note" style={{ margin: "0 0 14px" }}>בעוד כ-10 דקות תתבצע יציאה אוטומטית. ללא בחירה תוך 5 דקות — המערכת תוציא אותך אוטומטית.</div><div className="row2"><button className="btn-ghost" onClick={extendShift}>הארכה ב-60 ד׳</button><button className="btn-primary" onClick={endAndLogout}><Power size={15} /> סיום ויציאה</button></div></div></div></div>}
@@ -4375,7 +4375,7 @@ function AdminApp(p) {
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
-        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
+        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
           extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => { if (e.target.value === "tickets") clearTicketFilter(); setTab(e.target.value); }}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
@@ -6599,9 +6599,10 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
     </div>
   </aside>);
 }
-function TopBar({ title, subtitle, onLogout, notif, onBell, theme, toggleTheme, extra, demoActive }) {
+function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, toggleTheme, extra, demoActive }) {
   return (<header className="topbar"><div className="tb-left"><div><div className="tb-title">{title}{demoActive && <span className="demo-badge">נתוני דמו</span>}</div>{subtitle && <div className="tb-sub">{subtitle}</div>}</div>{extra}</div>
-    <div className="tb-actions"><button className="bell" onClick={toggleTheme}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="tb-logout" onClick={onLogout}><LogOut size={18} /></button></div></header>);
+    <div className="tb-actions"><button className="bell" onClick={toggleTheme}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="tb-logout" onClick={onLogout}><LogOut size={18} /></button></div>
+    {rolePreview && <div className="tb-role-preview"><RolePreviewBox rolePreview={rolePreview} /></div>}</header>);
 }
 function Overlay({ children, onClose, persistent }) {
   const ref = useRef(null);
@@ -6796,7 +6797,7 @@ a{color:inherit;}
 .row-between{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .banner{display:flex;align-items:center;gap:8px;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;margin-bottom:12px;}
 
-.topbar{background:var(--slate);color:#fff;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:20;box-shadow:0 2px 0 var(--accent);}
+.topbar{background:var(--slate);color:#fff;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:20;box-shadow:0 2px 0 var(--accent);flex-wrap:wrap;}
 .tb-left{display:flex;align-items:center;gap:12px;min-width:0;}
 .tb-title{font-family:var(--font-head);font-weight:700;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tb-sub{font-size:12px;color:var(--side-ink);margin-top:2px;}
@@ -6806,6 +6807,10 @@ a{color:inherit;}
 .bell .dot{position:absolute;top:4px;inset-inline-start:4px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
 .mob-tab{background:#ffffff1a;color:#fff;border:1px solid #ffffff33;border-radius:9px;padding:7px 9px;font-size:13px;max-width:140px;}
 .mob-tab option{color:#16202E;}
+.tb-role-preview{width:100%;margin-top:2px;}
+.tb-role-preview .role-preview{margin-top:0;}
+.tb-role-preview .rp-toggle{min-height:34px;}
+.tb-role-preview .rp-grid{padding-bottom:0;}
 
 .stat-strip{display:flex;gap:9px;margin-bottom:14px;}
 .stat-box{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px 8px;text-align:center;}
