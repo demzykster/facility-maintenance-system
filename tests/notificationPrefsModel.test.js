@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLocalNotificationPrefs } from "../src/notificationPrefsModel.js";
+import { parseLocalNotificationPrefs, parseNotificationSeenAt } from "../src/notificationPrefsModel.js";
 
 describe("notification prefs model", () => {
   it("returns defaults when no local prefs exist", () => {
@@ -17,5 +17,10 @@ describe("notification prefs model", () => {
   it("repairs invalid saved preferences", () => {
     expect(parseLocalNotificationPrefs("{bad")).toEqual({ sort: "newest", group: false, hidden: {} });
     expect(parseLocalNotificationPrefs(JSON.stringify({ hidden: "bad" }))).toEqual({ sort: "newest", group: false, hidden: {} });
+  });
+
+  it("reads local notification seen timestamps", () => {
+    expect(parseNotificationSeenAt("1234")).toBe(1234);
+    expect(parseNotificationSeenAt("bad")).toBe(0);
   });
 });

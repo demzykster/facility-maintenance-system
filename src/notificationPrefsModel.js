@@ -21,3 +21,8 @@ export function parseLocalNotificationPrefs(raw, defaults = DEFAULT_LOCAL_NOTIFI
     return normalizeLocalNotificationPrefs(null, defaults);
   }
 }
+
+export function parseNotificationSeenAt(raw) {
+  const ts = Number(raw || 0);
+  return Number.isFinite(ts) ? ts : 0;
+}

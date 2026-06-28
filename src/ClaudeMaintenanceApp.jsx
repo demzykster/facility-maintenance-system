@@ -20,7 +20,7 @@ import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
-import { DEFAULT_LOCAL_NOTIFICATION_PREFS, parseLocalNotificationPrefs } from "./notificationPrefsModel.js";
+import { DEFAULT_LOCAL_NOTIFICATION_PREFS, parseLocalNotificationPrefs, parseNotificationSeenAt } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
@@ -1097,7 +1097,14 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   const [lastSeen, setLastSeen] = useState(null), [toast, setToast] = useState(null);
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
   const maxRef = useRef(0), initRef = useRef(false);
-  useEffect(() => { store.get(skey, false).then((v) => setLastSeen(v ? Number(v) : 0)); }, [skey]);
+  useEffect(() => {
+    let cancelled = false;
+    setLastSeen(null);
+    store.get(skey, false).then((v) => {
+      if (!cancelled) setLastSeen(parseNotificationSeenAt(v));
+    });
+    return () => { cancelled = true; };
+  }, [skey]);
   useEffect(() => {
     let cancelled = false;
     setPrefsState(parseLocalNotificationPrefs(null, DEFAULT_NOTIF_PREFS));
