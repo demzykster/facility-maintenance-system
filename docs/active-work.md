@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/require-app-user-id-in-session`
+### Active branch: `codex/include-supabase-profile-scopes`
 
-- Status: in progress after PR #345.
-- Latest synchronized `main`: `6fd5754 fix: validate active file metadata path (#345)`.
+- Status: in progress after PR #346.
+- Latest synchronized `main`: `e8b3d36 fix: require app user id in production session (#346)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - current branch rejects Supabase app profiles without a CMMS app-user id before building a production session.
+  - current branch carries Supabase profile scope fields through the production session boundary: manager zones, technician scope, and supplier.
   - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo import, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
@@ -41,6 +41,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production session app-user id guard is complete in PR #346.
+  - Production session creation now rejects Supabase app profiles without a CMMS app-user id.
+  - This prevents API/audit/file actor identity from becoming an empty session id.
+  - Local tests, production build, release checks, and Vercel passed.
 - R9 active file metadata owner/path validation is complete in PR #345.
   - `/api/files` now rejects active file metadata rows whose known owner IDs do not match their storage paths before download/delete.
   - This prevents corrupted metadata rows from authorizing protected file reads or deletes.

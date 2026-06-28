@@ -83,6 +83,9 @@ export function buildSessionPayload(authUser, profile) {
       workerNo: appUser.workerNo,
       department: appUser.department,
       departments: appUser.departments,
+      mgrZones: appUser.mgrZones,
+      techScope: appUser.techScope,
+      supplier: appUser.supplier,
       permissions: appUser.permissions,
       mustChangePassword: appUser.mustChangePassword
     }

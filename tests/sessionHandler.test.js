@@ -57,6 +57,9 @@ describe("session handler", () => {
       role: "admin",
       name: "Owner",
       email: "admin@example.com",
+      manager_zones: ["z1"],
+      tech_scope: "both",
+      supplier: "ספק א",
       active: true,
       permissions: { users: "manage" },
       must_change_password: true
@@ -71,6 +74,9 @@ describe("session handler", () => {
         workerNo: null,
         department: null,
         departments: [],
+        mgrZones: ["z1"],
+        techScope: "both",
+        supplier: "ספק א",
         permissions: { users: "manage" },
         mustChangePassword: true
       }
