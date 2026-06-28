@@ -21,6 +21,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
+import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession } from "./productionLoginAdapter.js";
@@ -1638,7 +1639,7 @@ function PublicReport({ zones, onSubmit, onClose }) {
     if (!prob) return setErr("נא לבחור סוג בעיה");
     if (!photo) return setErr("חובה לצרף תמונה — הדיווח לא יישלח בלעדיה");
     setBusy(true);
-    try { const last = await store.get("anonrl"); const t = last ? +last.value : 0; if (Date.now() - t < 45000) { setBusy(false); return setErr("דיווח נשלח לאחרונה ממכשיר זה. נסו שוב בעוד דקה."); } await store.set("anonrl", String(Date.now())); } catch (e) {}
+    try { const last = await store.get("anonrl"); if (isRateLimited(last)) { setBusy(false); return setErr("דיווח נשלח לאחרונה ממכשיר זה. נסו שוב בעוד דקה."); } await store.set("anonrl", String(Date.now())); } catch (e) {}
     try { await onSubmit({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind: prob.kind, photo, text: text.trim() || prob.label, reportedById: "", reportedByName: "דיווח אנונימי", reportedByRole: "anonymous" }); } catch (e) {}
     setDone(true);
   };

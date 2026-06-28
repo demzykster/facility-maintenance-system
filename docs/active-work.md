@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #333.
-- Latest synchronized `main`: `3d22137 feat: move admin role preview into sidebar (#333)`.
+- Status: no active product branch after PR #334.
+- Latest synchronized `main`: `63ef646 refactor: clarify admin role preview state (#334)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
