@@ -148,6 +148,7 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
         const file = bufferFromBody(body);
         if (!file || !file.buffer.length) return json(res, 400, { error: "file_data_required" });
         if (file.buffer.length > fileMaxBytes) return json(res, 413, { error: "file_too_large", maxBytes: fileMaxBytes });
+        if (backendMetadataDriver && !body.metadata) return json(res, 400, { error: "file_metadata_required" });
         if (body.metadata && !backendMetadataDriver) return json(res, 503, { error: "file_metadata_not_configured" });
         const metadata = buildUploadMetadata(body.metadata, { path, file, user: auth.user });
         await backendDriver.upload(path, file.buffer, file.contentType, auth.user);
