@@ -25,3 +25,23 @@ export const STAGING_SMOKE_OPTIONAL_ENV = [
   "CMMS_PUBLIC_COMPLAINT_RATE_LIMIT_MS",
   "VITE_CMMS_PUBLIC_COMPLAINT_API_URL"
 ];
+
+const clean = (value) => String(value || "").trim();
+const cleanUrl = (value) => clean(value).replace(/\/+$/, "");
+
+export function stagingSupabaseEnvPairErrors(env = {}) {
+  const errors = [];
+  const publicUrl = cleanUrl(env.VITE_SUPABASE_URL);
+  const serverUrl = cleanUrl(env.SUPABASE_URL);
+  const publicAnonKey = clean(env.VITE_SUPABASE_ANON_KEY);
+  const serverAnonKey = clean(env.SUPABASE_ANON_KEY);
+
+  if (publicUrl && serverUrl && publicUrl !== serverUrl) {
+    errors.push("staging_smoke_requires_matching_public_and_server_supabase_url");
+  }
+  if (publicAnonKey && serverAnonKey && publicAnonKey !== serverAnonKey) {
+    errors.push("staging_smoke_requires_matching_public_and_server_supabase_anon_key");
+  }
+
+  return errors;
+}

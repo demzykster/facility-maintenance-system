@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #359.
-- Latest synchronized `main`: after PR #359 staging storage bucket and backup/restore drill.
+- Status: no product branch is active after PR #360.
+- Latest synchronized `main`: after PR #360 matching public/server Supabase staging env guard.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -41,6 +41,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - notification unread badges must identify unread items and clear through explicit user actions, not rely on opening the panel.
   - staging requires both public `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` for browser login and server-only Supabase env for API routes.
   - the `cmms-files` Supabase Storage bucket must exist before file/photo smoke can pass.
+  - public and server Supabase env must point at the same project/key pair.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
