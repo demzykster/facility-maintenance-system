@@ -21,10 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/record-night-staging-smoke`
 
-- Status: no product branch is active after the fleet Excel import catalog guard.
-- Latest synchronized `main`: after pre-Supabase setup checklist.
+- Status: docs-only sync for the fleet import/export work and night staging smoke.
+- Latest synchronized `main`: `bdecfd5` (`feat: export fleet park to Excel`), deployed to the public Vercel staging URL.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -63,19 +63,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - finish empty Supabase/Vercel staging smoke: browser Excel download still needs confirmation, and full transport status progression still needs a technician assignment/acceptance path.
-  - configure daily Supabase backups and perform one restore drill.
+  - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill.
+  - before owner-facing pilot, decide whether to leave the current smoke records/users in staging or clear/reseed a clean demonstration scenario.
 - Validation:
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
   - Follow-up smoke check: the transport ticket detail opened in the UI, admin note update saved, and the cleaning UI shows the smoke public zone plus one pending report.
-  - Remaining smoke caveat: in-app browser did not emit a download event for ticket `ייצוא ל-Excel`; no UI or console error was observed, but export download is not yet proven in browser.
-  - Empty staging data after smoke contains exactly one admin user plus smoke records: two tickets, one fleet item, one public complaint, one file metadata row, and audit entries.
+  - Production Vercel alias was manually redeployed from clean `main` because the public app still served stale footer commit `97c8b0f`; the public staging URL now serves bundle commit `bdecfd5`.
+  - Ticket Excel export is proven in a real Chrome download smoke on `https://facility-maintenance-system.vercel.app/`: `קריאות_2026-06-28.xlsx` downloaded successfully with no relevant console errors.
+  - Fleet park Excel export is proven in a real Chrome download smoke on the same public staging URL: `fleet_2026-06-28.xlsx` downloaded successfully with no relevant console errors.
+  - Transport lifecycle smoke is proven through the real Vercel/Supabase API: the smoke transport ticket passed `new -> in_progress -> waiting:no_equipment -> in_progress -> pending_user -> pending_admin -> done`, including technician assignment, equipment-wait timing, manager confirmation, admin closure, status duration keys, and six ticket status audit events.
+  - Empty staging data after smoke contains one admin user plus smoke records and smoke role users for manager, technician, worker, and cleaner; these are temporary pilot/staging records and can be cleared before owner-facing demo.
   - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
   - `npm test -- --run`, `npm run release:check`, and `npm run build` passed during export writer replacement; build output dropped from roughly 377 kB gzip to roughly 301 kB gzip.
   - HTTP smoke on `http://127.0.0.1:5173/` returned `200 OK` and the `CMMS CDSL` app shell; in-app browser smoke timed out in browser-control before page inspection, with no CLI build/runtime failure observed.
-  - Vercel env list currently shows no configured environment variables, so real empty staging smoke and backup/restore drill are blocked until Supabase/Vercel env is configured.
   - Production AI guard was re-checked from code: `aiModeFromEnv` defaults production to disabled, `BROWSER_AI_ENABLED` gates browser AI UI/calls, and production config gate rejects browser AI mode.
   - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #353 production error visibility.
   - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #352 export-boundary hardening.
