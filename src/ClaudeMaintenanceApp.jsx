@@ -945,6 +945,45 @@ const visibleTickets = (session, tickets, fleet) => {
   });
 };
 
+const analyticsScopeForSession = (session, data = {}) => {
+  if (!session || session.role === "admin") return data;
+  const {
+    tickets = [], fleet = [], pm = [], zones = [], rounds = [], complaints = [],
+    tasks = [], meetings = [], ppe = [], ppeItems = [], users = []
+  } = data;
+  const scopedTickets = visibleTickets(session, tickets, fleet);
+  const scopedFleet = fleetForSession(session, fleet);
+  const scopedTasks = tasks.filter((t) => taskVisible(t, session, users) && (!t.isPrivate || t.ownerId === session.id));
+  const scopedMeetings = meetings.filter((m) => meetingVisible(m, session, scopedTasks));
+  const deptSet = new Set(userDepts(session));
+  const zoneSet = new Set(session.mgrZones || []);
+  const scopedZones = zones.filter((z) => zoneSet.has(z.id));
+  const scopedZoneIds = new Set(scopedZones.map((z) => z.id));
+  const scopedPpe = ppe.filter((x) => {
+    if (session.role === "worker" || session.role === "cleaner") return x.workerId === session.id;
+    return deptSet.size > 0 && x.dept && deptSet.has(x.dept);
+  });
+  const scopedPpeItemIds = new Set(scopedPpe.map((x) => x.itemId).filter(Boolean));
+  const userIds = new Set([session.id]);
+  scopedTasks.forEach((t) => [t.ownerId, ...(t.responsibleIds || []), ...(t.participantIds || [])].forEach((id) => id && userIds.add(id)));
+  scopedMeetings.forEach((m) => [m.ownerId, ...(m.participantIds || [])].forEach((id) => id && userIds.add(id)));
+  scopedPpe.forEach((x) => x.workerId && userIds.add(x.workerId));
+  return {
+    ...data,
+    tickets: scopedTickets,
+    fleet: scopedFleet,
+    pm: pmVisible(session, pm, fleet),
+    zones: scopedZones,
+    rounds: rounds.filter((r) => scopedZoneIds.has(r.zoneId)),
+    complaints: complaints.filter((c) => scopedZoneIds.has(c.zoneId)),
+    tasks: scopedTasks,
+    meetings: scopedMeetings,
+    ppe: scopedPpe,
+    ppeItems: ppeItems.filter((x) => scopedPpeItemIds.has(x.id)),
+    users: users.filter((u) => userIds.has(u.id) || (deptSet.size > 0 && u.dept && deptSet.has(u.dept))),
+  };
+};
+
 function entryFor(session, text, kind) { return { at: Date.now(), by: session.name, byRole: session.role, text, ...(kind ? { kind } : {}) }; }
 
 /* ---------- AI ---------- */
@@ -1860,6 +1899,10 @@ function UserApp(p) {
   const mayViewSuppliers = canViewSuppliers(session);
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
+  const analyticsScope = useMemo(() => analyticsScopeForSession(session, {
+    tickets, fleet, pm, zones, rounds, complaints, tasks: p.tasks, meetings: p.meetings,
+    ppe: p.ppe, ppeItems: p.ppeItems, users
+  }), [session, tickets, fleet, pm, zones, rounds, complaints, p.tasks, p.meetings, p.ppe, p.ppeItems, users]);
   const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view;
   const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   return (
@@ -1901,7 +1944,7 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} tasks={p.tasks} meetings={p.meetings} users={users} canEditDamage={false} ppe={p.ppe} ppeItems={p.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
