@@ -1,0 +1,173 @@
+import { createHash, randomUUID } from "node:crypto";
+import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
+
+const MAX_BODY_BYTES = 2_200_000;
+const MAX_PHOTO_CHARS = 2_000_000;
+const MAX_TEXT_CHARS = 700;
+const RATE_LIMIT_MS = 60_000;
+
+const json = (res, status, body) => {
+  res.statusCode = status;
+  res.setHeader("content-type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(body));
+};
+
+const parseBool = (value) => value === true || value === "1" || value === "true";
+
+const getHeader = (headers = {}, name) => {
+  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
+  if (direct) return direct;
+  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
+  return match ? match[1] : "";
+};
+
+const cleanText = (value, limit = MAX_TEXT_CHARS) => String(value || "")
+  .replace(/\s+/g, " ")
+  .trim()
+  .slice(0, limit);
+
+const zoneLoc = (zone = {}) => [zone.building, zone.floor].filter(Boolean).join(" · ");
+
+const safeZoneId = (value) => {
+  const id = String(value || "").trim();
+  return /^[A-Za-z0-9_-]{1,80}$/.test(id) ? id : "";
+};
+
+const safeKind = (value) => {
+  const kind = String(value || "").trim();
+  return kind === "broken" || kind === "dirty" ? kind : "";
+};
+
+const safePhoto = (value) => {
+  const photo = String(value || "");
+  if (!photo || photo.length > MAX_PHOTO_CHARS) return "";
+  return /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=\s]+$/.test(photo) ? photo : "";
+};
+
+const requestFingerprint = (req) => {
+  const forwarded = String(getHeader(req.headers, "x-forwarded-for") || "").split(",")[0].trim();
+  const realIp = String(getHeader(req.headers, "x-real-ip") || "").trim();
+  const userAgent = String(getHeader(req.headers, "user-agent") || "").slice(0, 160);
+  return `${forwarded || realIp || "unknown"}|${userAgent}`;
+};
+
+const hashKey = (value) => createHash("sha256").update(String(value || "")).digest("hex").slice(0, 32);
+
+const readBody = async (req) => {
+  if (req.body && typeof req.body === "object") return req.body;
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const buf = Buffer.from(chunk);
+    total += buf.length;
+    if (total > MAX_BODY_BYTES) throw new Error("payload_too_large");
+    chunks.push(buf);
+  }
+  const text = Buffer.concat(chunks).toString("utf8");
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("invalid_json");
+  }
+};
+
+const parseStoredJson = (value) => {
+  if (!value || typeof value !== "string") return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+export function buildPublicComplaintRecord({ body = {}, zone = {}, now = Date.now(), id = randomUUID() } = {}) {
+  const kind = safeKind(body.kind);
+  const text = cleanText(body.text) || (kind === "broken" ? "דווחה תקלה" : "דווח לכלוך");
+  return {
+    id,
+    at: now,
+    zoneId: zone.id,
+    zoneName: cleanText(zone.name, 160),
+    zoneLoc: zoneLoc(zone),
+    kind,
+    text,
+    photo: safePhoto(body.photo),
+    status: "pending",
+    ownerRole: "cleaner",
+    verified: false,
+    ticketId: null,
+    reportedById: "",
+    reportedByName: "דיווח אנונימי",
+    reportedByRole: "anonymous",
+    source: "public_endpoint",
+    demo: false
+  };
+}
+
+export function validatePublicComplaintPayload(body = {}) {
+  const zoneId = safeZoneId(body.zoneId);
+  if (!zoneId) return { ok: false, status: 400, error: "zone_id_required" };
+  if (!safeKind(body.kind)) return { ok: false, status: 400, error: "kind_invalid" };
+  if (!safePhoto(body.photo)) return { ok: false, status: 400, error: "photo_required" };
+  return { ok: true, zoneId };
+}
+
+export function createPublicComplaintHandler({
+  driver = null,
+  env = process.env,
+  now = () => Date.now(),
+  createId = () => randomUUID(),
+  fetchImpl = globalThis.fetch
+} = {}) {
+  const backendDriver = driver
+    || (env.CMMS_PUBLIC_COMPLAINTS_DRIVER === "supabase" || env.CMMS_KV_DRIVER === "supabase"
+      ? createSupabaseKvDriverFromEnv(env, fetchImpl)
+      : null);
+
+  return async function publicComplaintHandler(req, res) {
+    const method = String(req.method || "GET").toUpperCase();
+    if (method !== "POST") {
+      res.setHeader("allow", "POST");
+      return json(res, 405, { error: "method_not_allowed" });
+    }
+
+    if (!parseBool(env.CMMS_PUBLIC_COMPLAINTS_ENABLED)) {
+      return json(res, 503, { error: "public_complaints_disabled" });
+    }
+    if (!backendDriver) return json(res, 503, { error: "public_complaints_backend_not_configured" });
+
+    try {
+      const body = await readBody(req);
+      const validated = validatePublicComplaintPayload(body);
+      if (!validated.ok) return json(res, validated.status, { error: validated.error });
+
+      const currentTime = now();
+      const rateKey = `publicComplaintRate:${hashKey(requestFingerprint(req))}`;
+      const last = Number(await backendDriver.get(rateKey, false) || 0);
+      const rateLimitMs = Number(env.CMMS_PUBLIC_COMPLAINT_RATE_LIMIT_MS || RATE_LIMIT_MS) || RATE_LIMIT_MS;
+      if (last && currentTime - last < rateLimitMs) {
+        return json(res, 429, { error: "public_complaint_rate_limited" });
+      }
+
+      const zone = parseStoredJson(await backendDriver.get(`czone:${validated.zoneId}`, true));
+      if (!zone || zone.active === false) return json(res, 404, { error: "zone_not_found" });
+      const complaint = buildPublicComplaintRecord({
+        body,
+        zone: { ...zone, id: validated.zoneId },
+        now: currentTime,
+        id: createId()
+      });
+
+      await backendDriver.set(rateKey, String(currentTime), false);
+      await backendDriver.set(`ccomplaint:${complaint.id}`, JSON.stringify(complaint), true);
+      return json(res, 201, { ok: true, id: complaint.id, status: complaint.status });
+    } catch (error) {
+      if (error?.message === "payload_too_large") return json(res, 413, { error: "payload_too_large" });
+      if (error?.message === "invalid_json") return json(res, 400, { error: "invalid_json" });
+      return json(res, 500, { error: error?.message || "public_complaint_error" });
+    }
+  };
+}
+
+export default createPublicComplaintHandler();
