@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #366.
-- Latest synchronized `main`: after PR #366 fleet Excel import preview UI.
+- Status: no product branch is active after the notification read-state fix.
+- Latest synchronized `main`: after notification read-state fix.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -48,6 +48,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and must show conflicts instead of silently updating existing units.
+  - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
@@ -73,6 +74,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Notification read-state fix is complete.
+  - "Mark all read" now stores the currently visible notification keys, not only a timestamp.
+  - Legacy timestamp-only read state remains compatible.
+  - Local notification model tests, full tests, release checks, production build, and diff check passed.
 - R9 vulnerable `xlsx` export writer replacement is complete in PR #355.
   - `xlsx@0.18.5` was removed and `write-excel-file` now creates generated Excel exports through `src/xlsxExportAdapter.js`.
   - `npm audit --omit=dev` now reports `found 0 vulnerabilities`.

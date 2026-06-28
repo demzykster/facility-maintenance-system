@@ -21,7 +21,7 @@ import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
-import { DEFAULT_LOCAL_NOTIFICATION_PREFS, parseLocalNotificationPrefs, parseNotificationSeenAt } from "./notificationPrefsModel.js";
+import { DEFAULT_LOCAL_NOTIFICATION_PREFS, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
@@ -1146,14 +1146,14 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
 function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const skey = `seen:${session.role}:${session.name}`;
   const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
-  const [lastSeen, setLastSeen] = useState(null), [toast, setToast] = useState(null);
+  const [readState, setReadState] = useState(null), [toast, setToast] = useState(null);
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
   const maxRef = useRef(0), initRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
-    setLastSeen(null);
+    setReadState(null);
     store.get(skey, false).then((v) => {
-      if (!cancelled) setLastSeen(parseNotificationSeenAt(v));
+      if (!cancelled) setReadState(parseNotificationReadState(v));
     });
     return () => { cancelled = true; };
   }, [skey]);
@@ -1169,8 +1169,7 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
-  const eventAt = (e) => Number(e?.at) || 0;
-  const unreadKeys = useMemo(() => new Set(lastSeen == null ? [] : visible.filter((e) => eventAt(e) > lastSeen).map((e) => e.key)), [visible, lastSeen]);
+  const unreadKeys = useMemo(() => readState == null ? new Set() : unreadNotificationKeySet(visible, readState), [visible, readState]);
   const unread = unreadKeys.size;
   useEffect(() => {
     if (!visible.length) return; const max = visible[0].at;
@@ -1178,10 +1177,9 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
     if (max > maxRef.current) { const top = visible.find((e) => e.at > maxRef.current); maxRef.current = max; if (top) { setToast(top); try { if ("Notification" in window && Notification.permission === "granted") new Notification(top.title, { body: top.body }); } catch (e) {} setTimeout(() => setToast(null), 5200); } }
   }, [visible]);
   const markRead = async () => {
-    const maxVisibleAt = visible.reduce((max, e) => Math.max(max, eventAt(e)), 0);
-    const n = Math.max(Date.now(), maxVisibleAt);
-    setLastSeen(n);
-    await store.set(skey, String(n), false);
+    const next = notificationReadStateForEvents(visible);
+    setReadState(next);
+    await store.set(skey, JSON.stringify(next), false);
   };
   return { events, unread, unreadKeys, markRead, toast, dismissToast: () => setToast(null), prefs, setPrefs, presentKinds: [...new Set(rawEvents.map((e) => e.kind))] };
 }
