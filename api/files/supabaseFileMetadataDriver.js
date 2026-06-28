@@ -35,12 +35,39 @@ const toRow = (metadata = {}) => ({
   deleted_at: metadata.deletedAt ? new Date(Number(metadata.deletedAt)).toISOString() : null
 });
 
+const fromRow = (row = {}) => ({
+  id: row.id,
+  ownerType: row.owner_type,
+  ownerId: row.owner_id,
+  ownerSubId: row.owner_sub_id || "",
+  kind: row.kind,
+  path: row.path,
+  contentType: row.content_type,
+  storageProvider: row.storage_provider,
+  bucket: row.bucket,
+  sizeBytes: row.size_bytes || 0,
+  createdById: row.created_by_id || "",
+  createdByName: row.created_by_name || "",
+  createdByRole: row.created_by_role || "",
+  createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+  deletedAt: row.deleted_at ? Date.parse(row.deleted_at) : null
+});
+
 export function createSupabaseFileMetadataDriver({ url, serviceRoleKey, table = "file_metadata", fetchImpl = globalThis.fetch } = {}) {
   if (!url || !serviceRoleKey || !fetchImpl) return null;
   const root = String(url).replace(/\/+$/, "");
   const base = `${root}/rest/v1/${encodeURIComponent(table)}`;
 
   return {
+    async findActiveByPath(path) {
+      const response = await fetchImpl(`${base}?path=eq.${encodeURIComponent(path)}&deleted_at=is.null&select=*&limit=1`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_file_metadata_read_${response.status}`));
+      return Array.isArray(data) && data[0] ? fromRow(data[0]) : null;
+    },
     async upsert(metadata) {
       const response = await fetchImpl(`${base}?on_conflict=id`, {
         method: "POST",

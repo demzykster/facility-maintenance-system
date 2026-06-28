@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/file-metadata-read-guard`
 
-- Status: main is clean after PR #314.
-- Latest synchronized `main`: `9d3a08f [skip vercel] feat: guard file api path prefixes`.
-- Open PRs: none at session sync.
+- Status: this PR requires active file metadata before `/api/files` download/delete when a metadata lookup sink is configured.
+- Latest synchronized `main`: `3e37324 [skip vercel] docs: close file prefix guard ledger`.
+- Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - next production step: review remaining production backend gaps after file bytes, metadata, audit, and auth/session gates.
+  - current production step: bind protected file reads/deletes to active `file_metadata` rows instead of relying only on path prefixes.
+  - next production step: add owner/permission checks from file metadata once business table/RLS ownership is available.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -37,11 +38,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - Last code validation completed in PR #314.
-  - This ledger sync is docs-only.
+  - `npx vitest run tests/fileApiHandler.test.js tests/supabaseFileMetadataDriver.test.js --reporter=verbose` passed.
+  - `npm test -- --run` passed.
+  - `npm run build` passed.
+  - `npm run release:check` passed for default demo/local config.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
+  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
 
 ## Latest Completed Work
 
+- R9 file prefix ledger sync is complete in PR #315.
+  - `docs/active-work.md` now marks active work as none after PR #314.
+  - This was a docs-only sync with Vercel passing.
 - R9 file path prefix guard is complete in PR #314.
   - `/api/files` now rejects paths outside `CMMS_FILE_ALLOWED_PREFIXES`, defaulting to `tickets/,cleaning/`.
   - This prevents active users from reading or writing arbitrary Supabase Storage bucket paths before final metadata/RLS-based file authorization.
