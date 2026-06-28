@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #337.
-- Latest synchronized `main`: `6fc7555 fix: reset notification prefs on profile change (#337)`.
+- Status: no active product branch after PR #338.
+- Latest synchronized `main`: `8ab4ef6 fix: reset notification read state on profile change (#338)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.

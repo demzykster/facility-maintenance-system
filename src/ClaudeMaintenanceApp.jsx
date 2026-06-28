@@ -1600,15 +1600,15 @@ function WorkerApp(p) {
 function WorkerReportView({ report, session, saveTicket, onClose }) {
   const [photo, setPhoto] = useState(null), [newPhoto, setNewPhoto] = useState(null), [note, setNote] = useState(""), [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
-  useEffect(() => { let on = true; if (report?.hasPhoto) store.get(`photo:${report.id}`, true).then((d) => on && setPhoto(d)); return () => { on = false; }; }, [report?.id, report?.hasPhoto]);
+  useEffect(() => { let on = true; if (report?.hasPhoto) TICKET_PHOTOS.load(report, "before").then((d) => on && setPhoto(d)); return () => { on = false; }; }, [report?.id, report?.hasPhoto, report?.photoPath]);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setNewPhoto(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const s = stOf(report.status); const tr = TRACKS[report.track] || TRACKS.facility;
   const resubmit = async () => {
     if (busy) return; setBusy(true);
     try {
-      if (newPhoto) await store.set(`photo:${report.id}`, newPhoto, true);
+      const photoMeta = newPhoto ? await TICKET_PHOTOS.save(report.id, "before", newPhoto) : {};
       const text = "העובד שלח שוב לאחר תיקון" + (note.trim() ? `: ${note.trim()}` : "");
-      await saveTicket({ ...report, status: "pending_manager", updatedAt: Date.now(), log: [...(report.log || []), { at: Date.now(), by: session.name, byRole: "worker", text, kind: "reopen" }] });
+      await saveTicket({ ...report, ...photoMeta, status: "pending_manager", updatedAt: Date.now(), log: [...(report.log || []), { at: Date.now(), by: session.name, byRole: "worker", text, kind: "reopen" }] });
       onClose();
     } finally { setBusy(false); }
   };
