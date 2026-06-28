@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #361.
-- Latest synchronized `main`: after PR #361 staging env template contract test.
+- Status: no product branch is active after PR #362.
+- Latest synchronized `main`: after PR #362 local staging env preflight helper.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -43,6 +43,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - the `cmms-files` Supabase Storage bucket must exist before file/photo smoke can pass.
   - public and server Supabase env must point at the same project/key pair.
   - `.env.staging.example` must stay aligned with the staging smoke preflight env contract.
+  - `.env.staging.local` is the safe local place for real staging secrets before copying them into Vercel.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.

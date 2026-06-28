@@ -12,6 +12,12 @@ npm run staging:preflight
 
 The preflight fails if staging is still missing production-mode API/Supabase env, if public complaints are not configured through the dedicated endpoint, or if bootstrap remains enabled after the first admin has already been created.
 
+For local verification before copying values into Vercel, copy `.env.staging.example` to ignored `.env.staging.local`, fill real values, then run:
+
+```bash
+npm run staging:preflight:local
+```
+
 ## Required Env Shape
 
 Use `.env.staging.example` as the non-secret template for Vercel environment variables.
