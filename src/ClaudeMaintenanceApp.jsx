@@ -1314,7 +1314,7 @@ export default function App() {
       if (vts.length) saveConfig({ ...config, ...flattenVehicleTypes(vts), vtMigV: 2 });
     }
   }, [ready, fleet, config]);
-  const setShift = async (on) => { if (!session) return; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); };
+  const setShift = async (on) => { if (!session) return false; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return false; setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); return true; };
   const beat = async () => { if (!session || session.role !== "tech") return; const cur = presence.find((x) => x.id === session.id); if (!cur || !cur.onShift || cur.day !== todayKey()) return; const rec = { ...cur, lastSeen: Date.now() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); };
   useEffect(() => { if (!session || session.role !== "tech") return; const id = setInterval(beat, 60000); return () => clearInterval(id); }, [session, presence]);
   const login = async (s, options = {}) => {
@@ -1347,8 +1347,9 @@ export default function App() {
     const id = effSession.id; if (!id) return;
     const prev = presence.find((x) => x.id === id);
     const rec = { id, name: effSession.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() };
-    await store.set(`presence:${id}`, JSON.stringify(rec), true);
+    if (!await persistShared(`presence:${id}`, JSON.stringify(rec))) return false;
     setPresence((s) => [...s.filter((x) => x.id !== id), rec]);
+    return true;
   });
   const loadDemo = async () => {
     if (!SEED_POLICY.allowDemoData) return false;
@@ -1472,7 +1473,7 @@ export default function App() {
         ? { ...prev, onShift: true, lastSeen: Date.now() }
         : { id: session.id, name: session.name, onShift: true, since: Date.now(), endedAt: null, lastSeen: Date.now(), day: today };
       if (cancelled) return;
-      await store.set(`presence:${session.id}`, JSON.stringify(rec), true);
+      if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return;
       setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]);
     })();
     return () => { cancelled = true; };
