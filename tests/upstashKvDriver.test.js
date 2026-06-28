@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createUpstashKvDriver, createUpstashKvDriverFromEnv } from "../api/kv/upstashDriver.js";
+import { createUpstashKvDriver, createUpstashKvDriverFromEnv } from "../server/kv/upstashDriver.js";
 
 function ok(result) {
   return {

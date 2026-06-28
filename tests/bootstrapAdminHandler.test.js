@@ -4,7 +4,7 @@ import {
   createBootstrapAdminHandler,
   createSupabaseAdminBootstrapClient,
   validateBootstrapAdminPayload
-} from "../api/bootstrap/adminHandler.js";
+} from "../server/bootstrap/adminHandler.js";
 
 function createRes() {
   return {

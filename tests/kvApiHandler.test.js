@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createKvApiHandler } from "../api/kv/handler.js";
+import { createKvApiHandler } from "../server/kv/handler.js";
 
 function createRes() {
   return {

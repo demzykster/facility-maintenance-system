@@ -29,6 +29,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - current production step: reduce sensitive data exposure in the temporary KV bridge without breaking the current frontend collection-loading model.
+  - also fixes the Vercel Hobby function-count blocker by keeping `api/` limited to real endpoint files and moving helper modules under `server/`.
   - `/api/kv` write/delete guards already require manage permissions for sensitive keys; this branch protects user credential fields on reads.
   - full read blocking for `user:`, `config:v1`, fleet, PPE, and cleaning setup keys should wait for normalized tables/RLS or a frontend loader split, because the current monolith still loads shared collections broadly.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
@@ -45,6 +46,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` passed for default demo/local config.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - `npx vercel build --yes` passed after linking the local checkout to the existing Vercel project.
+  - `npx vercel deploy --prebuilt` passed; deployment `dpl_7z5MtgvfkafcfCjEAuLo3RtFvwoX` reached `READY`.
 
 ## Latest Completed Work
 

@@ -1,3 +1,3 @@
-import handler from "./adminHandler.js";
+import handler from "../../server/bootstrap/adminHandler.js";
 
 export default handler;

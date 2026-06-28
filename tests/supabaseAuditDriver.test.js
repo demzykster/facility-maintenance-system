@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSupabaseAuditDriver, createSupabaseAuditDriverFromEnv } from "../api/audit/supabaseAuditDriver.js";
+import { createSupabaseAuditDriver, createSupabaseAuditDriverFromEnv } from "../server/audit/supabaseAuditDriver.js";
 
 describe("Supabase audit driver", () => {
   it("stays disabled until required server env is configured", () => {

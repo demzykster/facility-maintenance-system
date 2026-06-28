@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSupabaseFileMetadataDriver, createSupabaseFileMetadataDriverFromEnv } from "../api/files/supabaseFileMetadataDriver.js";
+import { createSupabaseFileMetadataDriver, createSupabaseFileMetadataDriverFromEnv } from "../server/files/supabaseFileMetadataDriver.js";
 
 describe("Supabase file metadata driver", () => {
   it("stays disabled until required server env is configured", () => {

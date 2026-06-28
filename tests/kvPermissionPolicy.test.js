@@ -8,7 +8,7 @@ import {
   sessionHasKvWritePermission,
   sessionCanReadUserSecrets,
   sessionPermissionLevel
-} from "../api/kv/permissionPolicy.js";
+} from "../server/kv/permissionPolicy.js";
 
 describe("KV write permission policy", () => {
   it("maps sensitive record keys to the existing module permissions", () => {

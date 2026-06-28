@@ -1,3 +1,3 @@
-import handler from "./changePasswordHandler.js";
+import handler from "../../server/session/changePasswordHandler.js";
 
 export default handler;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSupabaseKvDriver, createSupabaseKvDriverFromEnv } from "../api/kv/supabaseDriver.js";
+import { createSupabaseKvDriver, createSupabaseKvDriverFromEnv } from "../server/kv/supabaseDriver.js";
 
 function ok(body) {
   return {

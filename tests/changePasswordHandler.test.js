@@ -3,7 +3,7 @@ import {
   createChangePasswordHandler,
   createSupabasePasswordChangeClient,
   validatePasswordChangePayload
-} from "../api/session/changePasswordHandler.js";
+} from "../server/session/changePasswordHandler.js";
 
 function createRes() {
   return {
