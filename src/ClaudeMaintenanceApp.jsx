@@ -9,7 +9,7 @@ import {
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
+import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
@@ -292,24 +292,31 @@ const downloadBlob = (blob, filename) => {
   } catch (e) { return false; }
 };
 const downloadXlsx = (wb, filename) => {
-  // метод 1 — нативный writeFile
-  try { XLSX.writeFile(wb, filename); return true; } catch (e) {}
-  // метод 2 — Blob и ссылка
-  try { const out = XLSX.write(wb, { bookType: "xlsx", type: "array" }); if (downloadBlob(new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename)) return true; } catch (e) {}
-  // метод 3 — CSV-скачивание
+  const fallback = () => {
+    if (downloadWorkbookFallback(wb, filename)) return;
+    alert("הסביבה חוסמת הורדת קבצים. נסו בדפדפן/בגרסת הענן.");
+  };
+  try {
+    workbookToBlob(wb)
+      .then((blob) => { if (!downloadBlob(blob, filename)) fallback(); })
+      .catch(fallback);
+    return true;
+  } catch (e) { fallback(); return false; }
+};
+const downloadWorkbookFallback = (wb, filename) => {
+  // CSV-скачивание
   try {
     const ws = wb.Sheets[wb.SheetNames[0]];
     const csv = "\uFEFF" + XLSX.utils.sheet_to_csv(ws);
     if (downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), filename.replace(/\.xlsx$/, ".csv"))) return true;
   } catch (e) {}
-  // метод 4 — открыть в новом окне для ручного сохранения
+  // открыть в новом окне для ручного сохранения
   try {
     const ws = wb.Sheets[wb.SheetNames[0]];
     const html = XLSX.utils.sheet_to_html(ws);
     const w = window.open("", "_blank");
     if (w) { w.document.write(`<html dir="rtl"><head><meta charset="utf8"><title>${filename}</title></head><body>${html}</body></html>`); w.document.close(); return true; }
   } catch (e) {}
-  alert("הסביבה חוסמת הורדת קבצים. נסו בדפדפן/בגרסת הענן.");
   return false;
 };
 // ---- Excel למטלות: ייצוא + ייבוא חכם ----

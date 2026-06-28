@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/replace-xlsx-export-writer`
 
-- Status: no product branch is active after PR #353.
-- Latest synchronized `main`: `0d2e4e0 fix: add api error request ids (#353)`.
-- Open PRs: none.
+- Status: replacing the vulnerable `xlsx` export dependency with a write-only export adapter is in progress.
+- Latest synchronized `main`: `ab51cb6 docs: sync ledger after api errors (#354)`.
+- Open PRs: none at branch start.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -33,7 +33,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - do not spend current release time on workflow-table normalization or old-data migration unless a launch blocker proves it is required.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Current facts to preserve:
-  - external Excel/CSV task import exists, but `.xlsx` import uses `read-excel-file` and CSV uses `papaparse`; `xlsx` is currently used for generated exports/fallback export formats.
+  - external Excel/CSV task import exists, but `.xlsx` import uses `read-excel-file` and CSV uses `papaparse`.
+  - Excel export generation is being moved from vulnerable `xlsx@0.18.5` to `write-excel-file`; export formula injection remains mitigated through `rowsSafe`.
   - first-admin bootstrap is disabled by default, token-gated, and refuses a second active admin, but the deployment env does not physically disable itself after success.
   - staging smoke must therefore verify bootstrap works once, then env is disabled/removed and `/api/bootstrap/admin` returns closed.
 - Accepted v1 pilot risks:
@@ -42,8 +43,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users. PR #351 adds a preflight command/runbook; the real smoke still requires Vercel/Supabase env to be configured.
   - configure daily Supabase backups and perform one restore drill.
-  - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
+  - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
+  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed during export writer replacement; build output dropped from roughly 377 kB gzip to roughly 301 kB gzip.
+  - HTTP smoke on `http://127.0.0.1:5173/` returned `200 OK` and the `CMMS CDSL` app shell; in-app browser smoke timed out in browser-control before page inspection, with no CLI build/runtime failure observed.
   - Vercel env list currently shows no configured environment variables, so real empty staging smoke and backup/restore drill are blocked until Supabase/Vercel env is configured.
   - Production AI guard was re-checked from code: `aiModeFromEnv` defaults production to disabled, `BROWSER_AI_ENABLED` gates browser AI UI/calls, and production config gate rejects browser AI mode.
   - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #353 production error visibility.
