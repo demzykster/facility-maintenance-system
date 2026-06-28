@@ -21,27 +21,31 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/block-optimistic-ticket-fleet-save`
+### Active branch: `codex/preserve-state-on-storage-read-fail`
 
-- Status: this PR prevents false optimistic UI updates for ticket and fleet writes when shared storage persistence fails.
-- Latest synchronized `main`: `bb5b311 fix: block repeated admin bootstrap`.
+- Status: this PR prevents production API read/list failures from being treated as empty data.
+- Latest synchronized `main`: `69a5ef6 fix: block optimistic ticket fleet saves (#324)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - after API storage memory fallback was disabled for production, failed writes must not appear as saved in the UI.
-  - ticket and fleet writes/deletes are the highest-risk first slice because they are core operational records.
-  - this PR keeps the existing Hebrew storage-error toast and prevents local ticket/fleet state from changing when the shared write/delete returns `false`.
+  - after API storage memory fallback was disabled for production, failed reads must not look like a legitimate empty database.
+  - `store.list` / `store.get` now notify failure and throw when fallback is disabled, so reloads do not wipe the current in-memory screen state with empty arrays.
+  - `loadColl` no longer catches storage read failures as if they were invalid JSON records.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
+  - `npx vitest run tests/storageAdapter.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
-  - In-app browser smoke was attempted twice against `http://127.0.0.1:5173/`, but browser control timed out before returning page state; local server itself responded `HTTP 200`.
 
 ## Latest Completed Work
 
+- R9 optimistic ticket/fleet save guard is complete in PR #324.
+  - Ticket and fleet save/delete flows no longer update local UI state when shared persistence returns `false`.
+  - The existing Hebrew storage failure toast remains the user-visible signal.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 repeat first-admin bootstrap guard is complete in PR #323.
   - `/api/bootstrap-admin` now refuses to create another admin when an active admin profile already exists.
   - This reduces damage if bootstrap env remains enabled accidentally after first setup.

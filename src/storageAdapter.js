@@ -26,6 +26,7 @@ export const withTimeout = (promise, ms = 2000) => Promise.race([
 export function createAppStore({ storageProvider = defaultStorageProvider, timeoutMs = 2000, allowMemoryFallback = defaultAllowMemoryFallback } = {}) {
   const mem = {};
   const canUseMemoryFallback = () => typeof allowMemoryFallback === "function" ? !!allowMemoryFallback() : !!allowMemoryFallback;
+  const notifyFail = () => { try { store._onFail && store._onFail(); } catch (_) {} };
   const store = {
     async get(key, shared = false) {
       const fallback = canUseMemoryFallback();
@@ -33,9 +34,12 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
         const storage = storageProvider();
         if (storage) {
           const result = await withTimeout(storage.get(key, shared), timeoutMs);
+          if (result === undefined) throw new Error("timeout");
           if (result !== undefined) return result ? result.value : null;
         }
-      } catch (e) {}
+      } catch (e) {
+        if (!fallback) { notifyFail(); throw e; }
+      }
       return fallback && Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
     },
     async set(key, value, shared = false) {
@@ -48,7 +52,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
         if (result === undefined) throw new Error("timeout");
         return true;
       } catch (e) {
-        try { store._onFail && store._onFail(); } catch (_) {}
+        notifyFail();
         return false;
       }
     },
@@ -62,7 +66,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
         if (result === undefined) throw new Error("timeout");
         return true;
       } catch (e) {
-        try { store._onFail && store._onFail(); } catch (_) {}
+        notifyFail();
         return false;
       }
     },
@@ -72,9 +76,12 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
         const storage = storageProvider();
         if (storage) {
           const result = await withTimeout(storage.list(prefix, shared), timeoutMs);
+          if (result === undefined) throw new Error("timeout");
           if (result !== undefined) return result ? result.keys : [];
         }
-      } catch (e) {}
+      } catch (e) {
+        if (!fallback) { notifyFail(); throw e; }
+      }
       return fallback ? Object.keys(mem).filter((key) => key.startsWith(prefix)) : [];
     }
   };
