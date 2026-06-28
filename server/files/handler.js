@@ -109,9 +109,9 @@ const buildUploadMetadata = (metadata, { path, file, user }) => {
 const requireActiveMetadata = async (metadataDriver, path) => {
   if (typeof metadataDriver?.findActiveByPath !== "function") return { ok: true, metadata: null };
   const metadata = await metadataDriver.findActiveByPath(path);
-  return metadata
-    ? { ok: true, metadata }
-    : { ok: false, status: 404, error: "file_metadata_not_found" };
+  if (!metadata) return { ok: false, status: 404, error: "file_metadata_not_found" };
+  if (!fileMetadataPathMatchesOwner(metadata)) return { ok: false, status: 400, error: "file_metadata_path_owner_mismatch" };
+  return { ok: true, metadata };
 };
 
 export function createFileApiHandler({ driver = null, auditDriver = null, metadataDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {

@@ -70,6 +70,6 @@ Ticket photo uploads now pass explicit file metadata through `/api/files`. Clean
 
 File deletes through `/api/files` soft-delete matching metadata rows by storage path with `deleted_at` instead of deleting ownership history.
 
-When a metadata lookup sink is configured, `/api/files` download and delete require an active `file_metadata` row for the requested path. This keeps protected file access tied to known business ownership instead of relying only on storage path prefixes.
+When a metadata lookup sink is configured, `/api/files` download and delete require an active `file_metadata` row for the requested path. The active metadata row must also pass the known owner/path check. This keeps protected file access tied to known business ownership instead of relying only on storage path prefixes.
 
 Do not treat current demo/local backup photos as production migration data.
