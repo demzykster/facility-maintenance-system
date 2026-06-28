@@ -77,6 +77,28 @@ const existingConflict = (unit, existingFleet = []) => {
   }) || null;
 };
 
+export function planFleetLicenseCatalogAdditions(rows = [], config = {}) {
+  const existingModels = new Set();
+  (config.forkliftTypes || []).forEach((model) => { const m = cleanText(model); if (m) existingModels.add(m); });
+  (config.vehicleTypes || []).forEach((type) => (type.models || []).forEach((model) => { const m = cleanText(model); if (m) existingModels.add(m); }));
+  const byType = new Map();
+
+  (rows || []).filter((row) => row?.action === "new").forEach((row) => {
+    const unit = row.unit || {};
+    const model = cleanText(unit.model || unit.type);
+    if (!model || existingModels.has(model)) return;
+    const name = cleanText(unit.vehicleKind || unit.notes || model) || model;
+    if (!byType.has(name)) byType.set(name, { name, models: [], docs: { tasrir: false, license: false, lease: false } });
+    const entry = byType.get(name);
+    if (!entry.models.includes(model)) entry.models.push(model);
+    entry.docs.tasrir = entry.docs.tasrir || !!unit.docs?.tasrir;
+    entry.docs.license = entry.docs.license || !!unit.docs?.license;
+    entry.docs.lease = entry.docs.lease || !!unit.docs?.lease;
+  });
+
+  return [...byType.values()].sort((a, b) => a.name.localeCompare(b.name, "he"));
+}
+
 export function parseFleetLicenseSheet(aoa = [], options = {}) {
   const headerIndex = aoa.findIndex((row) => (row || []).some((cell) => cleanHeader(cell) === "ספק") && (row || []).some((cell) => cleanHeader(cell).includes("רכב")));
   if (headerIndex < 0) {

@@ -33,7 +33,7 @@ import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
-import { parseFleetLicenseWorkbook } from "./fleetLicenseImportModel.js";
+import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -445,6 +445,21 @@ const flattenVehicleTypes = (vts) => {
     });
   });
   return { vehicleTypes: vts, forkliftTypes, typeSla, typeMeta, modelSupplier, modelType };
+};
+const mergeFleetCatalogAdditions = (config, fleet, additions) => {
+  const list = ((config.vehicleTypes && config.vehicleTypes.length) ? config.vehicleTypes : buildVehicleTypes(config, fleet)).map((v) => ({ ...v, models: [...(v.models || [])] }));
+  (additions || []).forEach((add) => {
+    let type = list.find((v) => (v.name || "").trim() === add.name);
+    if (!type) {
+      type = { id: "vt_import_" + Date.now().toString(36) + "_" + list.length, name: add.name, high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] };
+      list.push(type);
+    }
+    (add.models || []).forEach((m) => { if (m && !type.models.includes(m)) type.models.push(m); });
+    type.tasrir = type.tasrir || !!add.docs?.tasrir;
+    type.license = type.license || !!add.docs?.license;
+    type.lease = type.lease || !!add.docs?.lease;
+  });
+  return { ...config, ...flattenVehicleTypes(list) };
 };
 const modelTypeName = (model, cfg) => (cfg?.modelType?.[model]) || "";
 const modelSupplierOf = (model, cfg) => (cfg?.modelSupplier?.[model]) || "";
@@ -4698,18 +4713,20 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   </div>);
 }
 
-function FleetImportWizard({ fleet, onCancel, onImport }) {
+function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog }) {
   const [result, setResult] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [done, setDone] = useState(false);
   const [confirmSkipConflicts, setConfirmSkipConflicts] = useState(false);
+  const [confirmCatalog, setConfirmCatalog] = useState(false);
   const readyRows = (result?.rows || []).filter((row) => row.action === "new");
   const conflictRows = (result?.rows || []).filter((row) => row.action === "conflict");
   const invalidRows = (result?.rows || []).filter((row) => row.action === "invalid");
-  const canImport = !!readyRows.length && (!conflictRows.length || confirmSkipConflicts);
+  const catalogAdditions = result ? planFleetLicenseCatalogAdditions(result.rows, config) : [];
+  const canImport = !!readyRows.length && (!conflictRows.length || confirmSkipConflicts) && (!catalogAdditions.length || confirmCatalog);
   const onFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     if (!/\.xlsx$/i.test(file.name || "")) { setErr("בחרו קובץ Excel מסוג XLSX."); e.target.value = ""; return; }
     if (file.size > 10 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 10MB."); e.target.value = ""; return; }
-    setBusy(true); setErr(""); setDone(false); setConfirmSkipConflicts(false);
+    setBusy(true); setErr(""); setDone(false); setConfirmSkipConflicts(false); setConfirmCatalog(false);
     try {
       const parsed = parseFleetLicenseWorkbook(await readExcelFile(file), { existingFleet: fleet });
       if (!parsed.ok) { setResult(null); setErr(parsed.error === "fleet_license_sheet_not_found" ? "לא נמצא גיליון בשם רישיונות." : "לא נמצאה טבלת רישיונות תקינה בקובץ."); return; }
@@ -4723,6 +4740,10 @@ function FleetImportWizard({ fleet, onCancel, onImport }) {
     setBusy(true); setErr("");
     try {
       const now = Date.now();
+      if (catalogAdditions.length && onSaveCatalog) {
+        const catalogOk = await onSaveCatalog(catalogAdditions);
+        if (catalogOk === false) throw new Error("catalog_save_failed");
+      }
       for (const [i, row] of readyRows.entries()) {
         await onImport({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i });
       }
@@ -4746,6 +4767,11 @@ function FleetImportWizard({ fleet, onCancel, onImport }) {
         {conflictRows.length > 0 && <div className="note" style={{ borderColor: "#FCD34D" }}>
           <div>{conflictRows.length} שורות כבר קיימות לפי מספר/שלדה. הן לא יעודכנו אוטומטית.</div>
           <label className="confirm-line"><input type="checkbox" checked={confirmSkipConflicts} onChange={(ev) => setConfirmSkipConflicts(ev.target.checked)} />ייבא רק {readyRows.length} כלים חדשים והשאר את הקונפליקטים ללא שינוי</label>
+        </div>}
+        {catalogAdditions.length > 0 && <div className="note" style={{ borderColor: "#93C5FD" }}>
+          <div>נמצאו דגמים/סוגים שלא קיימים בהגדרות כלי שינוע. הם יתווספו לפני הייבוא כדי שלכלים יהיו כללי SLA, מסמכים וטיפולים.</div>
+          <div className="imp-prev" style={{ marginTop: 8 }}>{catalogAdditions.map((x) => <div key={x.name} className="imp-row"><div className="imp-t">{x.name}</div><div className="imp-meta">דגמים: {x.models.join(", ")} · מסמכים: {[x.docs.tasrir && "תסקיר", x.docs.license && "רישיון", x.docs.lease && "ליסינג"].filter(Boolean).join(", ") || "ללא"}</div></div>)}</div>
+          <label className="confirm-line"><input type="checkbox" checked={confirmCatalog} onChange={(ev) => setConfirmCatalog(ev.target.checked)} />צור/עדכן את קטלוג סוגי הכלים לפני הייבוא</label>
         </div>}
         {invalidRows.length > 0 && <div className="err">{invalidRows.length} שורות חסרות מספר/ספק/דגם ולא ייובאו.</div>}
         <div className="imp-prev">{result.rows.slice(0, 45).map((row) => <div key={row.sourceRow} className="imp-row" style={row.action !== "new" ? { opacity: 0.62 } : {}}><div className="imp-t"><span className={"act-tag " + (row.action === "new" ? "new" : row.action === "conflict" ? "update" : "nochange")}>{row.action === "new" ? "חדשה" : row.action === "conflict" ? "קונפליקט" : "שגויה"}</span>{row.unit.code || "—"} · {row.unit.vehicleKind || row.unit.type || "—"}</div><div className="imp-meta">{row.unit.supplier || "—"} · דגם {row.unit.type || "—"} · שלדה {row.unit.chassis || "—"} · מסמכים {Object.keys(row.unit.docs || {}).length}</div></div>)}</div>
@@ -4825,7 +4851,7 @@ function FleetModule(p) {
         </div>}
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
-    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} onCancel={() => setImp(false)} onImport={saveFleet} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={saveFleet} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds))} /></Overlay>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
   </>);
 }
