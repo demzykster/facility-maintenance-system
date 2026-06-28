@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/production-no-demo-users`
+### Active branch: `codex/production-disable-backup-import`
 
-- Status: this PR prevents the frontend from auto-creating builtin demo users in production mode.
-- Latest synchronized `main`: `f02f744 test: gate vercel api route files (#318)`.
+- Status: this PR disables JSON backup restore/import in production mode while keeping export available.
+- Latest synchronized `main`: `d7d3783 fix: skip builtin users in production (#319)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - align the frontend boot path with `seedPolicyForMode`: production must start empty except for server-side first-admin bootstrap.
-  - keep builtin demo accounts available only in demo/test.
-  - prevent old fake/local identities from being written into production API storage when a production session is restored.
+  - align backup restore with the production seed policy: production starts empty except for server-side bootstrap and should not import old local/demo JSON backups.
+  - keep JSON backup export available for admin safety, but require a future owner-approved import tool for real production data imports.
+  - keep restore/import available in demo/test for local review workflows.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -39,6 +39,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
+  - `npx vitest run tests/seedPolicyModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -47,6 +48,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production builtin user guard is complete in PR #319.
+  - The frontend no longer auto-creates builtin demo users in production mode.
+  - Demo/test still keep builtin demo identities for local review.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 Vercel API route gate is complete in PR #318.
   - `npm run release:check` now fails if helper modules are placed under `api/`.
   - The current route allowlist keeps Vercel endpoint files at 6/12 for the Hobby function limit.

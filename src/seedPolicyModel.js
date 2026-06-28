@@ -16,6 +16,7 @@ export function seedPolicyForMode(mode) {
     mode: normalized,
     allowDemoData: !production,
     allowBuiltinDemoUsers: !production,
+    allowBackupImport: !production,
     requiresServerBootstrapAdmin: production,
     productionStartsEmpty: production
   };
