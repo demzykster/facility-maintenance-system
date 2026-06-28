@@ -8,6 +8,7 @@
     "build": "vite build --configLoader native",
     "release:check": "node tools/vercel-api-route-gate.mjs && node tools/production-config-gate.mjs",
     "staging:preflight": "node tools/staging-smoke-preflight.mjs",
+    "staging:preflight:local": "node tools/staging-smoke-preflight-local.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview --host 127.0.0.1",
