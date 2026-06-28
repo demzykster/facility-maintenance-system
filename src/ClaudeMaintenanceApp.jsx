@@ -1479,7 +1479,8 @@ export default function App() {
     return () => { cancelled = true; };
   }, [session && session.id, session && session.role, impersonating]);
 
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const rolePreview = isRealAdmin ? { active: actAs || "admin", realName: session.name, onChange: (role) => setActAs(role === "admin" ? null : role) } : null;
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, rolePreview, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
@@ -1492,9 +1493,6 @@ export default function App() {
                 : effSession.role === "worker" ? <WorkerApp {...shared} key="imp-worker" />
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
                   : <UserApp {...shared} key="imp-user" />}
-            {isRealAdmin && <div className="role-switch">
-              {[["admin", "מנהל מערכת", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "עובד ניקיון", Sparkles]].map(([r, l, Ic]) => <button key={r} className={"rs-btn" + (((actAs || "admin") === r) ? " on" : "")} title={l} aria-label={`הצג כ-${l}`} onClick={() => setActAs(r === "admin" ? null : r)}><Ic size={17} /></button>)}
-            </div>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
     </div>
@@ -1837,7 +1835,7 @@ function UserApp(p) {
   const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
         nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
       <div className="main-col">
@@ -1938,7 +1936,7 @@ function TechApp(p) {
   const extendShift = () => { setExtendUntil(effectiveEnd + 60 * 60000); setSessWarn(false); setWarnAt(0); };
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme}
         nav={[{ id: "tickets", Icon: ListChecks, label: "קריאות שינוע", active: view === "tickets", onClick: () => setView("tickets") }, { id: "pm", Icon: CalendarClock, label: "לוח טיפולים", active: view === "pm", onClick: () => setView("pm") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
       <div className="main-col">
         <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
@@ -4265,7 +4263,7 @@ function AdminApp(p) {
   const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
           extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => { if (e.target.value === "tickets") clearTicketFilter(); setTab(e.target.value); }}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
@@ -6353,7 +6351,8 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
 }
 
 /* ============================================================ SHARED UI */
-function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, theme, toggleTheme }) {
+function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme }) {
+  const previewOptions = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "ניקיון", Sparkles]];
   return (<aside className="sidebar">
     <div className="side-brand"><div className="brand-mark sm"><Wrench size={18} /></div><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
     {primary && <button className="side-newbtn" onClick={primary.onClick}><Plus size={18} /> {primary.label}</button>}
@@ -6362,6 +6361,10 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
       <button className="side-item" onClick={toggleTheme}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}<span>{theme === "dark" ? "מצב בהיר" : "מצב כהה"}</span></button>
       <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
+      {rolePreview && <div className="role-preview">
+        <div className="rp-head"><span>תצוגת תפקיד</span><small>מחובר: {rolePreview.realName}</small></div>
+        <div className="rp-grid">{previewOptions.map(([role, label, Icon]) => <button key={role} className={"rp-btn" + (rolePreview.active === role ? " on" : "")} title={`הצג כ-${label}`} aria-label={`הצג כ-${label}`} onClick={() => rolePreview.onChange(role)}><Icon size={15} /><span>{label}</span></button>)}</div>
+      </div>}
     </div>
   </aside>);
 }
@@ -6619,10 +6622,6 @@ a{color:inherit;}
 .fab:hover{background:var(--primary-d);}
 .ai-fab{position:fixed;bottom:calc(82px + env(safe-area-inset-bottom));inset-inline-end:18px;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(99,102,241,.45);z-index:19;}
 .ai-fab:hover{transform:scale(1.05);}
-.role-switch{position:fixed;bottom:calc(150px + env(safe-area-inset-bottom));inset-inline-end:14px;display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:0 6px 18px rgba(0,0,0,.18);z-index:20;white-space:nowrap;}
-.rs-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;border:none;background:transparent;color:var(--muted);}
-.rs-btn.on{background:#7C3AED;color:#fff;}
-
 .sect{font-family:var(--font-head);font-weight:600;font-size:14px;color:var(--ink);margin:18px 0 9px;display:flex;align-items:center;gap:7px;}
 .sect svg{color:var(--muted);}
 .search-wrap{display:flex;align-items:center;gap:9px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:0 13px;margin-bottom:11px;color:var(--muted);}
@@ -6732,7 +6731,6 @@ a{color:inherit;}
 .insight-text{flex:1;min-width:0;font-size:13.5px;font-weight:500;line-height:1.45;}
 .insight-chev{color:var(--muted);flex-shrink:0;}
 body.modal-open{overflow:hidden;}
-body.modal-open .role-switch{opacity:.4;pointer-events:none;filter:grayscale(.4);}
 body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .dup-open{background:#FEF3C7;border:1px solid #FCD34D;border-radius:11px;padding:9px 11px;margin-bottom:8px;}
 .dup-open .tl-dot{margin-top:3px;}
@@ -7304,6 +7302,13 @@ button.notif-perm:hover{background:#D1FAE5;}
   .su-name{font-size:13.5px;font-weight:600;color:#fff;}.su-role{font-size:11.5px;color:var(--side-ink);}
   .side-logout{display:flex;align-items:center;gap:9px;color:var(--side-ink);padding:10px 13px;border-radius:11px;font-size:14px;}
   .side-logout:hover{background:#ffffff12;color:#fff;}
+  .role-preview{margin-top:8px;padding:10px;border:1px solid #ffffff1a;border-radius:12px;background:#ffffff08;}
+  .rp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px;color:#fff;font-size:12px;font-weight:700;}
+  .rp-head small{color:var(--side-ink);font-size:10.5px;font-weight:500;text-align:left;line-height:1.35;}
+  .rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+  .rp-btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:30px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11.5px;font-weight:600;}
+  .rp-btn:hover{background:#ffffff14;color:#fff;}
+  .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
   .topbar,.bottom-nav,.fab{display:none;}
   .content,.content.with-nav{max-width:1180px;padding:28px 40px 44px;margin:0 auto;}
   .settings-wrap{max-width:none;}
