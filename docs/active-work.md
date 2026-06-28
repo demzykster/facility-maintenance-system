@@ -23,20 +23,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #338.
-- Latest synchronized `main`: `8ab4ef6 fix: reset notification read state on profile change (#338)`.
+- Status: no active product branch after PR #339.
+- Latest synchronized `main`: `e4d3543 fix: route worker report photos through adapter (#339)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, notifications, demo seed/import, raw photo/cache writes, and quiet heartbeat writes.
+  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo export/import, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
   - docs-only update; `git diff --check` passed.
 
 ## Latest Completed Work
 
+- R9 worker report photo adapter routing is complete in PR #339.
+  - Worker report photo reload/resubmit now uses `TICKET_PHOTOS` instead of direct `photo:*` storage.
+  - This keeps production+API replacement photos on the same file adapter boundary as normal ticket photos.
+- R9 notification local-state cleanup is complete in PRs #337 and #338.
+  - Notification display preferences reset to defaults when the user/profile key changes.
+  - Notification read-state also resets while the new profile's `seen:*` timestamp loads, preventing stale role-preview reads from leaking across profiles.
 - R9 anonymous report rate-limit read fix is complete in PR #335.
   - The anonymous quick-report cooldown now reads the actual string value returned by the app store instead of expecting a legacy `{ value }` wrapper.
   - Focused Vitest coverage was added for current and legacy timestamp shapes.
