@@ -132,6 +132,21 @@ export function createSupabaseAdminBootstrapClient({ url, serviceRoleKey, fetchI
         mustChangePassword: true
       };
     },
+    async hasExistingActiveAdmin() {
+      const response = await fetchImpl(`${root}/rest/v1/app_users?role=eq.admin&active=is.true&select=id&limit=1`, {
+        method: "GET",
+        headers: {
+          apikey: serviceRoleKey,
+          authorization: `Bearer ${serviceRoleKey}`
+        }
+      });
+
+      const data = await responseJson(response);
+      if (!response.ok) {
+        throw new Error(data?.message || data?.details || data?.hint || data?.code || `supabase_profile_check_${response.status}`);
+      }
+      return Array.isArray(data) && data.length > 0;
+    },
     async createAppUserProfile(admin, authUser) {
       if (!authUser?.id) throw new Error("supabase_auth_user_id_missing");
       const profile = buildBootstrapAppUserProfile(admin, authUser);
@@ -196,6 +211,10 @@ export function createBootstrapAdminHandler({
       const body = await readBody(req);
       const validated = validateBootstrapAdminPayload(body);
       if (!validated.ok) return json(res, 400, { error: validated.error });
+
+      if (typeof client.hasExistingActiveAdmin === "function" && await client.hasExistingActiveAdmin()) {
+        return json(res, 409, { error: "bootstrap_admin_already_exists" });
+      }
 
       const admin = await client.createAdmin(validated.admin);
       let appUser = null;

@@ -150,6 +150,27 @@ describe("bootstrap admin handler", () => {
     });
   });
 
+  it("refuses bootstrap when an active admin profile already exists", async () => {
+    const createAdmin = vi.fn();
+    const createAppUserProfile = vi.fn();
+    const hasExistingActiveAdmin = vi.fn().mockResolvedValue(true);
+    const handler = createBootstrapAdminHandler({
+      env: { CMMS_BOOTSTRAP_ENABLED: "true", CMMS_BOOTSTRAP_TOKEN: "secret" },
+      supabaseClient: { createAdmin, createAppUserProfile, hasExistingActiveAdmin }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer secret" },
+      body: { email: "admin@example.com", name: "Owner", temporaryPassword: "long-password" }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "bootstrap_admin_already_exists" });
+    expect(hasExistingActiveAdmin).toHaveBeenCalledTimes(1);
+    expect(createAdmin).not.toHaveBeenCalled();
+    expect(createAppUserProfile).not.toHaveBeenCalled();
+  });
+
   it("builds the app user profile row from the auth user", () => {
     expect(buildBootstrapAppUserProfile({
       email: "admin@example.com",
@@ -176,6 +197,12 @@ describe("bootstrap admin handler", () => {
       .mockResolvedValueOnce({
         ok: true,
         async text() {
+          return JSON.stringify([]);
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        async text() {
           return JSON.stringify({ id: "auth-user-1", email: "admin@example.com" });
         }
       })
@@ -191,6 +218,7 @@ describe("bootstrap admin handler", () => {
       fetchImpl
     });
 
+    await expect(client.hasExistingActiveAdmin()).resolves.toBe(false);
     const admin = await client.createAdmin({
       email: "admin@example.com",
       name: "Owner",
@@ -207,6 +235,13 @@ describe("bootstrap admin handler", () => {
     }, admin);
 
     expect(admin).toEqual({ id: "auth-user-1", email: "admin@example.com", role: "admin", mustChangePassword: true });
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/app_users?role=eq.admin&active=is.true&select=id&limit=1", expect.objectContaining({
+      method: "GET",
+      headers: expect.objectContaining({
+        apikey: "service-role-key",
+        authorization: "Bearer service-role-key"
+      })
+    }));
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/admin/users", expect.objectContaining({
       method: "POST",
       headers: expect.objectContaining({
@@ -214,7 +249,7 @@ describe("bootstrap admin handler", () => {
         authorization: "Bearer service-role-key"
       })
     }));
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toMatchObject({
       email: "admin@example.com",
       email_confirm: true,
       user_metadata: { role: "admin", must_change_password: true },
@@ -236,7 +271,7 @@ describe("bootstrap admin handler", () => {
         prefer: "return=representation"
       })
     }));
-    expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toMatchObject({
+    expect(JSON.parse(fetchImpl.mock.calls[2][1].body)).toMatchObject({
       auth_user_id: "auth-user-1",
       email: "admin@example.com",
       role: "admin",
