@@ -35,6 +35,7 @@ describe("productionConfigGateModel", () => {
       errors: [
         "production_requires_supabase_kv_auth",
         "production_requires_supabase_kv_driver",
+        "production_requires_explicit_kv_bridge_acceptance",
         "production_requires_supabase_url",
         "production_requires_supabase_anon_key",
         "production_requires_supabase_service_role_key",
@@ -54,6 +55,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
         supabaseServiceRoleKey: "service"
@@ -77,6 +79,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
         supabaseServiceRoleKey: "service"
@@ -106,6 +109,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
         supabaseServiceRoleKey: "service"
@@ -123,7 +127,7 @@ describe("productionConfigGateModel", () => {
     });
   });
 
-  it("allows production mode only after api storage, Supabase KV, file storage, file metadata, and audit storage are configured", () => {
+  it("blocks production mode until the interim KV bridge is explicitly accepted", () => {
     expect(productionConfigGate({
       appMode: "production",
       storageProvider: "api",
@@ -131,6 +135,37 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      },
+      fileStorage: {
+        driver: "supabase",
+        bucket: "cmms-files",
+        metadataDriver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseServiceRoleKey: "service"
+      },
+      audit: {
+        driver: "supabase",
+        supabaseUrl: "https://supabase.example",
+        supabaseServiceRoleKey: "service"
+      }
+    })).toMatchObject({
+      ok: false,
+      errors: ["production_requires_explicit_kv_bridge_acceptance"]
+    });
+  });
+
+  it("allows production mode only after api storage, accepted Supabase KV bridge, file storage, file metadata, and audit storage are configured", () => {
+    expect(productionConfigGate({
+      appMode: "production",
+      storageProvider: "api",
+      storageApiBaseUrl: "https://cmms.example/api",
+      kvServer: {
+        auth: "supabase",
+        driver: "supabase",
+        allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
         supabaseServiceRoleKey: "service"
@@ -162,6 +197,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
         supabaseServiceRoleKey: "service"
