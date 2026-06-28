@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #336.
-- Latest synchronized `main`: `4ea72a4 docs: clarify production ai assistant boundary (#336)`.
+- Status: no active product branch after PR #337.
+- Latest synchronized `main`: `6fc7555 fix: reset notification prefs on profile change (#337)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
