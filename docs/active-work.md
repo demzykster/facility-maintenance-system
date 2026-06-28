@@ -33,6 +33,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - do not spend current release time on workflow-table normalization or old-data migration unless a launch blocker proves it is required.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Current facts to preserve:
+  - if Supabase `Automatically expose new tables` is disabled, the server-side REST checks require explicit `service_role` grants on CMMS tables.
   - external Excel/CSV task import exists, but `.xlsx` import uses `read-excel-file` and CSV uses `papaparse`.
   - Excel export generation now uses `write-excel-file` through a small compatibility adapter instead of vulnerable `xlsx@0.18.5`; export formula injection remains mitigated through `rowsSafe`.
   - first-admin bootstrap is disabled by default, token-gated, and refuses a second active admin, but the deployment env does not physically disable itself after success.
@@ -81,6 +82,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Staging Supabase service-role REST grants are complete.
+  - Added the explicit `service_role` grants required when Supabase `Automatically expose new tables` is disabled.
+  - Applied the grant SQL to `cmms-cdsl-staging`; `npm run staging:supabase-schema` now passes against the real staging project and private `cmms-files` bucket.
+  - Local tests, release check, production build, and diff check passed.
 - Pre-Supabase local sanity and setup checklist is complete.
   - Local login smoke on `http://127.0.0.1:5190/` reached the empty app shell and showed footer commit `5b78721`.
   - Add a short setup checklist for Supabase project, migrations, Vercel env, bootstrap, smoke, and restore drill.

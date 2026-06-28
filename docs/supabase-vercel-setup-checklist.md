@@ -40,6 +40,7 @@ Apply the current migrations in order:
 3. `supabase/migrations/20260627200000_audit_events.sql`
 4. `supabase/migrations/20260627201000_file_metadata.sql`
 5. `supabase/migrations/20260628134000_cmms_files_bucket.sql`
+6. `supabase/migrations/20260628152000_service_role_api_grants.sql`
 
 Expected objects:
 
@@ -48,6 +49,7 @@ Expected objects:
 - `public.audit_events`
 - `public.file_metadata`
 - private Supabase Storage bucket `cmms-files`
+- explicit `service_role` REST privileges for the server API routes
 
 ## 3. Fill Local Staging Env
 
