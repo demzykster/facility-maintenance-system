@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #355.
-- Latest synchronized `main`: `79563b0 fix: replace xlsx export writer (#355)`.
+- Status: no product branch is active after PR #357.
+- Latest synchronized `main`: after PR #357 role-preview/logout and notification clarity fix.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -37,6 +37,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Excel export generation now uses `write-excel-file` through a small compatibility adapter instead of vulnerable `xlsx@0.18.5`; export formula injection remains mitigated through `rowsSafe`.
   - first-admin bootstrap is disabled by default, token-gated, and refuses a second active admin, but the deployment env does not physically disable itself after success.
   - staging smoke must therefore verify bootstrap works once, then env is disabled/removed and `/api/bootstrap/admin` returns closed.
+  - admin role preview must remain usable from role screens that do not render the desktop sidebar, especially worker and cleaner views.
+  - notification unread badges must identify unread items and clear through explicit user actions, not rely on opening the panel.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.

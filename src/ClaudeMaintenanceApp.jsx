@@ -1165,14 +1165,21 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
-  const unread = lastSeen == null ? 0 : visible.filter((e) => e.at > lastSeen).length;
+  const eventAt = (e) => Number(e?.at) || 0;
+  const unreadKeys = useMemo(() => new Set(lastSeen == null ? [] : visible.filter((e) => eventAt(e) > lastSeen).map((e) => e.key)), [visible, lastSeen]);
+  const unread = unreadKeys.size;
   useEffect(() => {
     if (!visible.length) return; const max = visible[0].at;
     if (!initRef.current) { initRef.current = true; maxRef.current = max; return; }
     if (max > maxRef.current) { const top = visible.find((e) => e.at > maxRef.current); maxRef.current = max; if (top) { setToast(top); try { if ("Notification" in window && Notification.permission === "granted") new Notification(top.title, { body: top.body }); } catch (e) {} setTimeout(() => setToast(null), 5200); } }
   }, [visible]);
-  const markRead = async () => { const n = Date.now(); setLastSeen(n); await store.set(skey, String(n), false); };
-  return { events, unread, markRead, toast, dismissToast: () => setToast(null), prefs, setPrefs, presentKinds: [...new Set(rawEvents.map((e) => e.kind))] };
+  const markRead = async () => {
+    const maxVisibleAt = visible.reduce((max, e) => Math.max(max, eventAt(e)), 0);
+    const n = Math.max(Date.now(), maxVisibleAt);
+    setLastSeen(n);
+    await store.set(skey, String(n), false);
+  };
+  return { events, unread, unreadKeys, markRead, toast, dismissToast: () => setToast(null), prefs, setPrefs, presentKinds: [...new Set(rawEvents.map((e) => e.kind))] };
 }
 
 /* ============================================================ ROOT */
@@ -1614,6 +1621,7 @@ function WorkerApp(p) {
       <div><div className="wk-title">{view === "new" ? "דיווח תקלה" : view === "ppe" ? "הציוד שלי" : view === "activity" ? "יומן פעילות" : "הדיווחים שלי"}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
       <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={20} /></button></div>
     </div>
+    {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> הציוד שלי{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
     <div className="worker-body">
       {toSign.length > 0 && view !== "ppe" && <button type="button" onClick={() => setView("ppe")} style={{ width: "100%", textAlign: "start", display: "flex", alignItems: "center", gap: 10, background: "#B91C1C", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px", marginBottom: 12, cursor: "pointer", boxShadow: "0 2px 10px rgba(185,28,28,0.35)" }}><PenLine size={22} /><div style={{ flex: 1 }}><div style={{ fontWeight: 800, fontSize: 15 }}>יש לך {toSign.length === 1 ? "מסמך" : `${toSign.length} מסמכים`} לחתימה</div><div style={{ fontSize: 12.5, opacity: 0.92 }}>לחצו לצפייה ולחתימה על קבלת הציוד</div></div><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button>}
@@ -2760,7 +2768,11 @@ function CleanerApp(p) {
     return <button key={z.id} className="tcard clk" disabled={!target} onClick={() => target && setRun({ zone: z, win: target })} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{z.cleanerName ? " · עבור " + z.cleanerName : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{oc} דיווחים</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
   };
   return (<div className="worker-shell">
-    <TopBar title="סבבי ניקיון" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} theme={theme} toggleTheme={toggleTheme} />
+    <div className="worker-top">
+      <div><div className="wk-title">סבבי ניקיון</div><div className="wk-sub">{session.name}</div></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="icon-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={20} /></button></div>
+    </div>
+    {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <main className="content">
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> הסבב נרשם</div>}
       {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> לביצוע עכשיו ({countLabel(todo.length, "סבב", "סבבים")})</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => setRun({ zone: z, win })}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}חלון {win.time} · {WIN_META[status].label}</div></div><ChevronLeft size={16} /></button>)}</div>}
@@ -6430,8 +6442,17 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
 }
 
 /* ============================================================ SHARED UI */
+const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "ניקיון", Sparkles]];
+
+function RolePreviewBox({ rolePreview }) {
+  if (!rolePreview) return null;
+  return <div className="role-preview">
+    <div className="rp-head"><span>תצוגת תפקיד</span><small>מחובר: {rolePreview.realName}</small></div>
+    <div className="rp-grid">{ROLE_PREVIEW_OPTIONS.map(([role, label, Icon]) => <button key={role} className={"rp-btn" + (rolePreview.active === role ? " on" : "")} title={`הצג כ-${label}`} aria-label={`הצג כ-${label}`} onClick={() => rolePreview.onChange(role)}><Icon size={15} /><span>{label}</span></button>)}</div>
+  </div>;
+}
+
 function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme }) {
-  const previewOptions = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "ניקיון", Sparkles]];
   return (<aside className="sidebar">
     <div className="side-brand"><div className="brand-mark sm"><Wrench size={18} /></div><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
     {primary && <button className="side-newbtn" onClick={primary.onClick}><Plus size={18} /> {primary.label}</button>}
@@ -6440,10 +6461,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
       <button className="side-item" onClick={toggleTheme}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}<span>{theme === "dark" ? "מצב בהיר" : "מצב כהה"}</span></button>
       <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
-      {rolePreview && <div className="role-preview">
-        <div className="rp-head"><span>תצוגת תפקיד</span><small>מחובר: {rolePreview.realName}</small></div>
-        <div className="rp-grid">{previewOptions.map(([role, label, Icon]) => <button key={role} className={"rp-btn" + (rolePreview.active === role ? " on" : "")} title={`הצג כ-${label}`} aria-label={`הצג כ-${label}`} onClick={() => rolePreview.onChange(role)}><Icon size={15} /><span>{label}</span></button>)}</div>
-      </div>}
+      <RolePreviewBox rolePreview={rolePreview} />
     </div>
   </aside>);
 }
@@ -6473,19 +6491,21 @@ function Overlay({ children, onClose, persistent }) {
 }
 function AIFab({ onClick }) { return <button className="ai-fab" aria-label="עוזר AI" title="עוזר AI" onClick={onClick}><Sparkles size={22} /></button>; }
 function NotifPanel({ notif, onClose, onOpen, onGo }) {
-  useEffect(() => { notif.markRead(); }, []);
   const [settings, setSettings] = useState(false), [marked, setMarked] = useState(false), [perm, setPerm] = useState(""), [showAll, setShowAll] = useState(false);
   const markAll = () => { notif.markRead(); setMarked(true); setTimeout(() => setMarked(false), 1600); };
   const askPerm = () => { try { const r = Notification.requestPermission(); if (r && r.then) r.then((res) => setPerm(res || "denied")).catch(() => setPerm("blocked")); else setPerm(typeof r === "string" ? r : "blocked"); } catch (e) { setPerm("blocked"); } };
   const canAsk = typeof window !== "undefined" && "Notification" in window && Notification.permission === "default";
   const { prefs, setPrefs } = notif;
-  const click = (ev) => { if (ev.ticketId) onOpen && onOpen(ev.ticketId); else if (ev.go && onGo) onGo(ev.go, ev); };
-  const item = (ev) => <button key={ev.key} className={"notif-item" + (ev.ticketId || ev.go ? " clk" : "")} onClick={() => click(ev)}><div className={"ni-dot " + ev.kind} /><div className="ni-body"><div className="ni-title">{ev.title}</div><div className="ni-text">{ev.body}</div><div className="ni-time">{timeAgo(ev.at)}</div></div>{(ev.ticketId || ev.go) && <ChevronLeft size={15} className="ni-go" />}</button>;
+  const click = async (ev) => { await notif.markRead(); if (ev.ticketId) onOpen && onOpen(ev.ticketId); else if (ev.go && onGo) onGo(ev.go, ev); };
+  const item = (ev) => {
+    const unread = notif.unreadKeys?.has(ev.key);
+    return <button key={ev.key} className={"notif-item" + (ev.ticketId || ev.go ? " clk" : "") + (unread ? " unread" : "")} onClick={() => click(ev)}><div className={"ni-dot " + ev.kind} /><div className="ni-body"><div className="ni-title">{ev.title}{unread && <span className="ni-new">חדש</span>}</div><div className="ni-text">{ev.body}</div><div className="ni-time">{timeAgo(ev.at)}</div></div>{(ev.ticketId || ev.go) && <ChevronLeft size={15} className="ni-go" />}</button>;
+  };
   const hiddenCount = Math.max(0, notif.events.length - 60);
   const list = showAll ? notif.events : notif.events.slice(0, 60);
   const grouped = prefs.group ? NOTIF_KINDS.map((k) => [k, list.filter((e) => e.kind === k.kind)]).filter(([, arr]) => arr.length) : null;
   return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" onClick={(e) => e.stopPropagation()}>
-    <div className="notif-head"><div><div className="notif-title"><Bell size={18} /> התראות</div><div className="notif-count">{notif.events.length ? `${notif.events.length} מוצגות` : "אין פריטים להצגה"}</div></div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה" aria-label="הגדרות תצוגת התראות"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
+    <div className="notif-head"><div><div className="notif-title"><Bell size={18} /> התראות</div><div className="notif-count">{notif.events.length ? (notif.unread ? `${notif.unread} חדשות · ${notif.events.length} מוצגות` : `${notif.events.length} מוצגות · הכל נקרא`) : "אין פריטים להצגה"}</div></div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה" aria-label="הגדרות תצוגת התראות"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
     {list.length > 0 && <button className="notif-markall" onClick={markAll}><Check size={14} /> {marked ? "סומן הכל כנקרא ✓" : "סמן הכל כנקרא"}</button>}
     {settings && <div className="notif-settings">
       <div className="ns-row"><span className="ns-lbl">מיון</span><div className="seg-tabs s2 mini"><button className={prefs.sort === "newest" ? "on" : ""} onClick={() => setPrefs({ sort: "newest" })}>חדש→ישן</button><button className={prefs.sort === "oldest" ? "on" : ""} onClick={() => setPrefs({ sort: "oldest" })}>ישן→חדש</button></div></div>
@@ -7122,8 +7142,10 @@ button.notif-perm:hover{background:#D1FAE5;}
 .notif-list{overflow-y:auto;padding:8px;}
 .notif-more{border-top:1px solid var(--border);padding:11px 14px;background:var(--surface);font-weight:800;color:var(--primary);width:100%;}
 .notif-more:hover{background:var(--surface-2);}
-.notif-item{display:flex;gap:11px;width:100%;text-align:right;padding:11px;border-radius:11px;color:var(--ink);}
+.notif-item{display:flex;gap:11px;width:100%;text-align:right;padding:11px;border:1px solid transparent;border-radius:11px;color:var(--ink);}
 .notif-item:hover{background:var(--surface-2);}
+.notif-item.unread{background:#FFF7ED;border-color:#FED7AA;}
+.app-dark .notif-item.unread{background:#2a1d10;border-color:#7c2d12;}
 .ni-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0;background:var(--muted);}
 .ni-dot.new{background:#2563EB;}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:#4F46E5;}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:#0EA5E9;}.ni-dot.task{background:#7C3AED;}.ni-dot.doc{background:#EA580C;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}.ni-dot.ppe{background:#64748B;}
 .ni-dot.cleaning{background:#0EA5E9;}
@@ -7143,8 +7165,17 @@ button.notif-perm:hover{background:#D1FAE5;}
 .ni-group-h{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:800;color:var(--ink);padding:7px 14px 4px;}
 .ni-group-h .ni-dot{position:static;}
 .ni-group-n{font-size:10px;font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:1px 7px;}
-.ni-title{font-weight:600;font-size:13.5px;}.ni-text{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}.ni-time{font-size:11px;color:var(--muted);margin-top:3px;}
+.ni-title{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.ni-new{display:inline-flex;align-items:center;border-radius:999px;background:var(--primary);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;line-height:1;}
+.ni-text{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}.ni-time{font-size:11px;color:var(--muted);margin-top:3px;}
 .side-badge{margin-inline-start:auto;background:#EF4444;color:#fff;min-width:20px;height:20px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;}
+.role-preview{margin-top:8px;padding:10px;border:1px solid #ffffff1a;border-radius:12px;background:#ffffff08;}
+.rp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px;color:#fff;font-size:12px;font-weight:700;}
+.rp-head small{color:var(--side-ink);font-size:10.5px;font-weight:500;text-align:left;line-height:1.35;}
+.rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.rp-btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:30px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11.5px;font-weight:600;}
+.rp-btn:hover{background:#ffffff14;color:#fff;}
+.rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
 .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#EF4444;color:#fff;font-size:11px;font-weight:800;line-height:1;margin-inline-start:6px;}
 
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--slate);color:#fff;border-radius:13px;padding:13px 16px;display:flex;gap:11px;align-items:flex-start;max-width:90%;width:360px;box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:80;animation:rise .3s ease;cursor:pointer;}
@@ -7381,13 +7412,6 @@ button.notif-perm:hover{background:#D1FAE5;}
   .su-name{font-size:13.5px;font-weight:600;color:#fff;}.su-role{font-size:11.5px;color:var(--side-ink);}
   .side-logout{display:flex;align-items:center;gap:9px;color:var(--side-ink);padding:10px 13px;border-radius:11px;font-size:14px;}
   .side-logout:hover{background:#ffffff12;color:#fff;}
-  .role-preview{margin-top:8px;padding:10px;border:1px solid #ffffff1a;border-radius:12px;background:#ffffff08;}
-  .rp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px;color:#fff;font-size:12px;font-weight:700;}
-  .rp-head small{color:var(--side-ink);font-size:10.5px;font-weight:500;text-align:left;line-height:1.35;}
-  .rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
-  .rp-btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:30px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11.5px;font-weight:600;}
-  .rp-btn:hover{background:#ffffff14;color:#fff;}
-  .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
   .topbar,.bottom-nav,.fab{display:none;}
   .content,.content.with-nav{max-width:1180px;padding:28px 40px 44px;margin:0 auto;}
   .settings-wrap{max-width:none;}
@@ -7426,6 +7450,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .worker-shell{min-height:100vh;background:var(--bg);max-width:560px;margin:0 auto;display:flex;flex-direction:column;}
 .worker-top{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 12px;background:var(--slate);color:#fff;}
 .worker-top .icon-btn{color:#fff;}.worker-top .icon-btn:hover{background:rgba(255,255,255,.14);}
+.worker-preview{background:var(--slate);padding:0 16px 12px;}
+.worker-preview .role-preview{margin-top:0;}
 .wk-title{font-family:var(--font-head);font-weight:700;font-size:20px;}
 .wk-sub{color:#94A3B8;font-size:13px;margin-top:2px;}
 .wk-tabs{display:flex;gap:8px;padding:12px 16px 0;background:var(--slate);}
