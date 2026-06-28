@@ -1186,6 +1186,16 @@ export default function App() {
   useEffect(() => { if (!session) return; const id = setInterval(() => { if (!document.hidden) reloadAll(); }, 15000); const onVis = () => { if (!document.hidden) reloadAll(); }; document.addEventListener("visibilitychange", onVis); return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); }; }, [session]);
 
   async function loadColl(prefix) { const keys = await store.list(prefix, true); const arr = await Promise.all(keys.map(async (k) => { try { return JSON.parse(await store.get(k, true)); } catch { return null; } })); return arr.filter(Boolean); }
+  const persistShared = async (key, value) => {
+    const ok = await store.set(key, value, true);
+    if (!ok) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+    return ok;
+  };
+  const deleteShared = async (key) => {
+    const ok = await store.del(key, true);
+    if (!ok) setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+    return ok;
+  };
   async function reloadAll() {
     const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, pp, ppit, ppn, ppreq, pord] = await Promise.all([
       loadColl("ticket:"), loadColl("pm:"), loadColl("fleet:"), loadColl("insp:"),
@@ -1229,13 +1239,14 @@ export default function App() {
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
     rec = applyTicketStatusTiming(rec, _prev, _now);
     if (!rec.num) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
-    await store.set(`ticket:${rec.id}`, JSON.stringify(rec), true);
+    if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
     setTickets((p) => [rec, ...p.filter((x) => x.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
+    return true;
   };
   const savePm = async (p) => { await store.set(`pm:${p.id}`, JSON.stringify(p), true); setPm((s) => [...s.filter((x) => x.id !== p.id), p].sort((a, b) => a.nextDue - b.nextDue)); };
   const delPm = async (id) => { await store.del(`pm:${id}`, true); setPm((s) => s.filter((x) => x.id !== id)); };
-  const delTicket = async (id) => { await store.del(`ticket:${id}`, true); try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); };
-  const saveFleet = async (f) => { await store.set(`fleet:${f.id}`, JSON.stringify(f), true); setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); };
+  const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
+  const saveFleet = async (f) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f))) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
   const saveZone = async (z) => { await store.set(`czone:${z.id}`, JSON.stringify(z), true); setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); };
   const delZone = async (id) => { await store.del(`czone:${id}`, true); setZones((s) => s.filter((x) => x.id !== id)); };
   const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); await store.set(`cround:${rec.id}`, JSON.stringify(rec), true); setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); };
@@ -1268,7 +1279,7 @@ export default function App() {
   const escalateComplaint = async (c) => { await persistComplaint({ ...c, status: "open", escalatedTo: "admin", escalatedAt: Date.now(), escalatedBy: effSession.name }); };
   const resolveComplaint = async (c) => { await persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name }); };
   const progressComplaint = async (c) => { await persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() }); };
-  const delFleet = async (id) => { await store.del(`fleet:${id}`, true); setFleet((s) => s.filter((x) => x.id !== id)); };
+  const delFleet = async (id) => { if (!await deleteShared(`fleet:${id}`)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
   const saveInsp = async (i) => { await store.set(`insp:${i.id}`, JSON.stringify(i), true); setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); };
   const saveTpl = async (t) => { await store.set(`itpl:${t.id}`, JSON.stringify(t), true); setTemplates((s) => [...s.filter((x) => x.id !== t.id), t]); };
   const delTpl = async (id) => { await store.del(`itpl:${id}`, true); setTemplates((s) => s.filter((x) => x.id !== id)); };

@@ -21,34 +21,31 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/bootstrap-single-admin-guard`
+### Active branch: `codex/block-optimistic-ticket-fleet-save`
 
-- Status: this PR prevents repeat first-admin bootstrap once an active admin profile exists.
-- Latest synchronized `main`: `6b7cf04 [skip vercel] docs: close api fallback ledger`.
+- Status: this PR prevents false optimistic UI updates for ticket and fleet writes when shared storage persistence fails.
+- Latest synchronized `main`: `bb5b311 fix: block repeated admin bootstrap`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - Vercel is currently build-rate-limited on the Hobby plan after many preview deployments.
-  - Until the rate limit resets, small local-validated hardening/doc PRs can use `[skip vercel]`; run final Vercel smoke before any real demo/release decision.
-  - first-admin bootstrap should be one-time operationally: enabled only for the initial admin, and blocked if an active admin already exists.
-  - this reduces damage if bootstrap env remains enabled accidentally after first setup.
-  - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
-  - current demo/local records are fake and are not a production migration source.
+  - after API storage memory fallback was disabled for production, failed writes must not appear as saved in the UI.
+  - ticket and fleet writes/deletes are the highest-risk first slice because they are core operational records.
+  - this PR keeps the existing Hebrew storage-error toast and prevents local ticket/fleet state from changing when the shared write/delete returns `false`.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
-  - first-admin bootstrap now has a server-only endpoint contract; do not add frontend hardcoded production admin credentials.
-  - production storage provider boundary is now defined; do not treat local browser storage as production data storage.
-  - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
-  - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/bootstrapAdminHandler.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - In-app browser smoke was attempted twice against `http://127.0.0.1:5173/`, but browser control timed out before returning page state; local server itself responded `HTTP 200`.
 
 ## Latest Completed Work
 
+- R9 repeat first-admin bootstrap guard is complete in PR #323.
+  - `/api/bootstrap-admin` now refuses to create another admin when an active admin profile already exists.
+  - This reduces damage if bootstrap env remains enabled accidentally after first setup.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 active-work ledger close is complete in PR #322.
   - `docs/active-work.md` now marks no active product branch after PR #321.
   - It records the current Vercel Hobby build-rate-limit condition and next R9 candidates.
