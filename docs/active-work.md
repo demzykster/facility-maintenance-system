@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/validate-file-metadata-path-owner`
+### Active branch: `codex/validate-active-file-metadata-path`
 
-- Status: in progress after PR #343.
-- Latest synchronized `main`: `41d3296 fix: require file metadata for configured uploads (#343)`.
+- Status: in progress after PR #344.
+- Latest synchronized `main`: `056d2bf fix: validate file metadata path owner (#344)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - current branch validates known file metadata owner IDs against their storage paths before upload.
+  - current branch rejects active file metadata rows whose known owner IDs do not match their storage paths before download/delete.
   - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo import, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
@@ -41,6 +41,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 file metadata upload owner/path validation is complete in PR #344.
+  - Known file metadata owner IDs must match their storage paths before upload.
+  - This prevents, for example, `ownerId=T-1` metadata from being saved for a `tickets/T-2/...` file path.
+  - Local tests, production build, release checks, and Vercel passed.
 - R9 file upload metadata requirement is complete in PR #343.
   - `/api/files` now rejects uploads without metadata when the production file metadata sink is configured.
   - This prevents orphaned protected files that cannot be tied back to `file_metadata`.

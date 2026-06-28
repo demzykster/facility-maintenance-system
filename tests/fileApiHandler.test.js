@@ -267,6 +267,43 @@ describe("file API handler", () => {
     expect(driver.delete).not.toHaveBeenCalled();
   });
 
+  it("rejects active file metadata that does not match the storage path owner", async () => {
+    const driver = {
+      download: vi.fn(),
+      delete: vi.fn()
+    };
+    const metadataDriver = {
+      findActiveByPath: vi.fn().mockResolvedValue({
+        ownerType: "ticket",
+        ownerId: "T-1",
+        kind: "ticket_before_photo",
+        path: "tickets/T-2/before.jpg"
+      })
+    };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient()
+    });
+
+    const download = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-2/before.jpg" }
+    });
+    const del = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-2/before.jpg" }
+    });
+
+    expect(download.statusCode).toBe(400);
+    expect(download.json()).toEqual({ error: "file_metadata_path_owner_mismatch" });
+    expect(del.statusCode).toBe(400);
+    expect(del.json()).toEqual({ error: "file_metadata_path_owner_mismatch" });
+    expect(driver.download).not.toHaveBeenCalled();
+    expect(driver.delete).not.toHaveBeenCalled();
+  });
+
   it("does not silently drop provided upload metadata when no metadata sink is configured", async () => {
     const driver = { upload: vi.fn() };
     const handler = createFileApiHandler({
