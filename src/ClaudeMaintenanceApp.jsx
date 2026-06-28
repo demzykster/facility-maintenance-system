@@ -9,6 +9,7 @@ import {
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
+import packageInfo from "../package.json";
 import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { store } from "./storageAdapter.js";
@@ -32,6 +33,8 @@ import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
+
+const APP_VERSION = packageInfo.version || "0.0.0";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -6445,10 +6448,17 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
 const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "ניקיון", Sparkles]];
 
 function RolePreviewBox({ rolePreview }) {
+  const [open, setOpen] = useState(false);
   if (!rolePreview) return null;
+  const active = ROLE_PREVIEW_OPTIONS.find(([role]) => role === rolePreview.active);
+  const ActiveIcon = active?.[2] || ShieldCheck;
   return <div className="role-preview">
-    <div className="rp-head"><span>תצוגת תפקיד</span><small>מחובר: {rolePreview.realName}</small></div>
-    <div className="rp-grid">{ROLE_PREVIEW_OPTIONS.map(([role, label, Icon]) => <button key={role} className={"rp-btn" + (rolePreview.active === role ? " on" : "")} title={`הצג כ-${label}`} aria-label={`הצג כ-${label}`} onClick={() => rolePreview.onChange(role)}><Icon size={15} /><span>{label}</span></button>)}</div>
+    <button className={"rp-toggle" + (open ? " on" : "")} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="פתיחת תצוגת תפקיד">
+      <span className="rp-toggle-ic"><ActiveIcon size={17} /></span>
+      <span className="rp-toggle-txt"><b>תצוגת תפקיד</b><small>{active?.[1] || ROLE_LABEL[rolePreview.active] || rolePreview.active} · {rolePreview.realName}</small></span>
+      <ChevronLeft size={15} className="rp-toggle-chev" />
+    </button>
+    {open && <div className="rp-grid">{ROLE_PREVIEW_OPTIONS.map(([role, label, Icon]) => <button key={role} className={"rp-btn" + (rolePreview.active === role ? " on" : "")} title={`הצג כ-${label}`} aria-label={`הצג כ-${label}`} onClick={() => { rolePreview.onChange(role); setOpen(false); }}><Icon size={15} /><span>{label}</span></button>)}</div>}
   </div>;
 }
 
@@ -6462,6 +6472,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
       <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
       <RolePreviewBox rolePreview={rolePreview} />
+      <div className="side-version">CMMS CDSL · v{APP_VERSION}</div>
     </div>
   </aside>);
 }
@@ -7169,13 +7180,20 @@ button.notif-perm:hover{background:#D1FAE5;}
 .ni-new{display:inline-flex;align-items:center;border-radius:999px;background:var(--primary);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;line-height:1;}
 .ni-text{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}.ni-time{font-size:11px;color:var(--muted);margin-top:3px;}
 .side-badge{margin-inline-start:auto;background:#EF4444;color:#fff;min-width:20px;height:20px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;}
-.role-preview{margin-top:8px;padding:10px;border:1px solid #ffffff1a;border-radius:12px;background:#ffffff08;}
-.rp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px;color:#fff;font-size:12px;font-weight:700;}
-.rp-head small{color:var(--side-ink);font-size:10.5px;font-weight:500;text-align:left;line-height:1.35;}
-.rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.role-preview{margin-top:8px;}
+.rp-toggle{display:flex;align-items:center;gap:9px;width:100%;min-height:42px;border:1px solid #ffffff1a;border-radius:14px;background:#ffffff08;color:#fff;padding:7px 8px;text-align:right;}
+.rp-toggle:hover,.rp-toggle.on{background:#ffffff12;border-color:#ffffff28;}
+.rp-toggle-ic{width:30px;height:30px;border-radius:999px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
+.rp-toggle-txt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;}
+.rp-toggle-txt b{font-size:12.5px;font-weight:800;line-height:1.2;}
+.rp-toggle-txt small{font-size:10.5px;font-weight:500;color:var(--side-ink);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rp-toggle-chev{color:var(--side-ink);transition:transform .15s ease;flex:none;}
+.rp-toggle.on .rp-toggle-chev{transform:rotate(-90deg);}
+.rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px;padding:8px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff06;}
 .rp-btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:30px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11.5px;font-weight:600;}
 .rp-btn:hover{background:#ffffff14;color:#fff;}
 .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
+.side-version{color:var(--side-ink);font-size:10.5px;text-align:center;padding:5px 4px 0;opacity:.82;}
 .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#EF4444;color:#fff;font-size:11px;font-weight:800;line-height:1;margin-inline-start:6px;}
 
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--slate);color:#fff;border-radius:13px;padding:13px 16px;display:flex;gap:11px;align-items:flex-start;max-width:90%;width:360px;box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:80;animation:rise .3s ease;cursor:pointer;}
