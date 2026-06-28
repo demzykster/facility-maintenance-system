@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after the build commit footer fix.
-- Latest synchronized `main`: after build commit footer fix.
+- Status: no product branch is active after worker/cleaner role-preview and logout polish.
+- Latest synchronized `main`: after worker/cleaner role-preview and logout polish.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -50,6 +50,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
+  - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
@@ -75,6 +76,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Worker/cleaner role-preview and logout polish is complete.
+  - Worker and cleaner top bars now show a visible `יציאה` button instead of relying on an icon-only logout action.
+  - Role preview controls are more compact and the expanded role grid uses less vertical space.
+  - This is UI-only; permissions and role logic did not change.
 - Build commit footer is complete.
   - The sidebar footer now shows `CMMS CDSL · v... · <commit>` and a build-time tooltip.
   - Vite injects the short Git commit locally and uses `VERCEL_GIT_COMMIT_SHA` when Vercel provides it.
