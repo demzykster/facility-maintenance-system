@@ -1290,9 +1290,9 @@ export default function App() {
   const saveInsp = async (i) => { await store.set(`insp:${i.id}`, JSON.stringify(i), true); setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); };
   const saveTpl = async (t) => { await store.set(`itpl:${t.id}`, JSON.stringify(t), true); setTemplates((s) => [...s.filter((x) => x.id !== t.id), t]); };
   const delTpl = async (id) => { await store.del(`itpl:${id}`, true); setTemplates((s) => s.filter((x) => x.id !== id)); };
-  const saveUser = async (u) => { await store.set(`user:${u.id}`, JSON.stringify(u), true); setUsers((s) => [...s.filter((x) => x.id !== u.id), u]); };
-  const delUser = async (id) => { await store.del(`user:${id}`, true); setUsers((s) => s.filter((x) => x.id !== id)); };
-  const saveConfig = async (n) => { setConfig(n); await store.set("config:v1", JSON.stringify(n), true); };
+  const saveUser = async (u) => { if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false; setUsers((s) => [...s.filter((x) => x.id !== u.id), u]); return true; };
+  const delUser = async (id) => { if (!await deleteShared(`user:${id}`)) return false; setUsers((s) => s.filter((x) => x.id !== id)); return true; };
+  const saveConfig = async (n) => { if (!await persistShared("config:v1", JSON.stringify(n))) return false; setConfig(n); return true; };
   const saveTask = async (t) => { await store.set(`mtask:${t.id}`, JSON.stringify(t), true); setTasks((s) => [t, ...s.filter((x) => x.id !== t.id)].sort((a, b) => b.createdAt - a.createdAt)); };
   const delTask = async (id) => { await store.del(`mtask:${id}`, true); setTasks((s) => s.filter((x) => x.id !== id)); };
   const saveMeeting = async (m) => { await store.set(`mmeet:${m.id}`, JSON.stringify(m), true); setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); };

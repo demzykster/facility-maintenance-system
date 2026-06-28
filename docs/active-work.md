@@ -21,19 +21,17 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/preserve-state-on-storage-read-fail`
+### Active branch: `codex/block-optimistic-config-user-save`
 
-- Status: this PR prevents production API read/list failures from being treated as empty data.
-- Latest synchronized `main`: `69a5ef6 fix: block optimistic ticket fleet saves (#324)`.
+- Status: this PR prevents false optimistic UI updates for configuration and user writes when shared storage persistence fails.
+- Latest synchronized `main`: `ff7f47f fix: preserve state on storage read failure (#325)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - after API storage memory fallback was disabled for production, failed reads must not look like a legitimate empty database.
-  - `store.list` / `store.get` now notify failure and throw when fallback is disabled, so reloads do not wipe the current in-memory screen state with empty arrays.
-  - `loadColl` no longer catches storage read failures as if they were invalid JSON records.
+  - settings, permissions, and user records must not appear saved when API persistence returns `false`.
+  - `saveConfig`, `saveUser`, and `delUser` now use the shared persistence guard before changing local React state.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
-  - `npx vitest run tests/storageAdapter.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -42,6 +40,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 production API read-failure guard is complete in PR #325.
+  - API storage `get` / `list` now throw on timeout/read failure when memory fallback is disabled.
+  - App collection loading no longer swallows storage read failures as invalid JSON.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 optimistic ticket/fleet save guard is complete in PR #324.
   - Ticket and fleet save/delete flows no longer update local UI state when shared persistence returns `false`.
   - The existing Hebrew storage failure toast remains the user-visible signal.
