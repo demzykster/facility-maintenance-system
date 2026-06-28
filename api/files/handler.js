@@ -104,6 +104,14 @@ const buildUploadMetadata = (metadata, { path, file, user }) => {
   });
 };
 
+const requireActiveMetadata = async (metadataDriver, path) => {
+  if (typeof metadataDriver?.findActiveByPath !== "function") return { ok: true, metadata: null };
+  const metadata = await metadataDriver.findActiveByPath(path);
+  return metadata
+    ? { ok: true, metadata }
+    : { ok: false, status: 404, error: "file_metadata_not_found" };
+};
+
 export function createFileApiHandler({ driver = null, auditDriver = null, metadataDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver
     || (env.CMMS_FILE_DRIVER === "supabase" ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
@@ -126,6 +134,8 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
       if (!isAllowedPath(path, allowedPrefixes)) return json(res, 403, { error: "file_path_forbidden" });
 
       if (method === "GET") {
+        const metadata = await requireActiveMetadata(backendMetadataDriver, path);
+        if (!metadata.ok) return json(res, metadata.status, { error: metadata.error });
         const file = await backendDriver.download(path, auth.user);
         return json(res, 200, {
           path,
@@ -146,6 +156,8 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
         return json(res, 200, { ok: true, path, contentType: file.contentType });
       }
       if (method === "DELETE") {
+        const metadata = await requireActiveMetadata(backendMetadataDriver, path);
+        if (!metadata.ok) return json(res, metadata.status, { error: metadata.error });
         await backendDriver.delete(path, auth.user);
         await backendMetadataDriver?.markDeletedByPath?.(path);
         await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path }, AUDIT_ACTIONS.delete, auth.user));

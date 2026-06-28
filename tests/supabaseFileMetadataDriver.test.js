@@ -65,6 +65,49 @@ describe("Supabase file metadata driver", () => {
     });
   });
 
+  it("finds active metadata rows by path", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([{
+          id: "ticket:T-1:ticket_before_photo:tickets/T-1/before.jpg",
+          owner_type: "ticket",
+          owner_id: "T-1",
+          owner_sub_id: "",
+          kind: "ticket_before_photo",
+          path: "tickets/T-1/before.jpg",
+          content_type: "image/jpeg",
+          storage_provider: "supabase",
+          bucket: "cmms-files",
+          size_bytes: 128,
+          created_by_id: "app-user-1",
+          created_by_name: "Owner",
+          created_by_role: "admin",
+          created_at: "1970-01-01T00:00:01.000Z",
+          deleted_at: null
+        }]);
+      }
+    });
+    const driver = createSupabaseFileMetadataDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    await expect(driver.findActiveByPath("tickets/T-1/before.jpg")).resolves.toMatchObject({
+      ownerType: "ticket",
+      ownerId: "T-1",
+      kind: "ticket_before_photo",
+      path: "tickets/T-1/before.jpg",
+      contentType: "image/jpeg",
+      deletedAt: null
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/file_metadata?path=eq.tickets%2FT-1%2Fbefore.jpg&deleted_at=is.null&select=*&limit=1", expect.objectContaining({
+      method: "GET"
+    }));
+  });
+
   it("marks metadata rows deleted without deleting the row", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
