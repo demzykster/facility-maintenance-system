@@ -2,6 +2,7 @@ import { buildSessionPayload, createSupabaseSessionClient } from "../session/ses
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { createSupabaseFileDriverFromEnv } from "./supabaseFileDriver.js";
 import { createSupabaseFileMetadataDriverFromEnv } from "./supabaseFileMetadataDriver.js";
+import { sendServerError } from "../httpErrors.js";
 import { AUDIT_ACTIONS, fileAuditEvent } from "../../src/auditEventModel.js";
 import { fileMetadataPathMatchesOwner, normalizeFileMetadata } from "../../src/fileMetadataModel.js";
 
@@ -80,8 +81,8 @@ async function authorize(req, env, fetchImpl, sessionClient) {
     if (!session.ok) return { ok: false, status: session.error === "app_user_disabled" ? 403 : 401, error: session.error };
     if (session.user.mustChangePassword) return { ok: false, status: 403, error: "password_change_required" };
     return { ok: true, user: session.user };
-  } catch (error) {
-    return { ok: false, status: 401, error: error?.message || "supabase_session_failed" };
+  } catch {
+    return { ok: false, status: 401, error: "supabase_session_failed" };
   }
 }
 
@@ -176,7 +177,7 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
       res.setHeader("allow", "GET, POST, PUT, DELETE");
       return json(res, 405, { error: "method_not_allowed" });
     } catch (error) {
-      return json(res, 500, { error: error?.message || "file_storage_error" });
+      return sendServerError(req, res, error, { code: "file_storage_error", route: "/api/files" });
     }
   };
 }
