@@ -36,6 +36,8 @@ import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./pub
 import { parseFleetLicenseWorkbook } from "./fleetLicenseImportModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
+const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
+const APP_BUILD_TIME = typeof __CMMS_BUILD_TIME__ !== "undefined" ? __CMMS_BUILD_TIME__ : "";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -6530,7 +6532,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
       <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
       <RolePreviewBox rolePreview={rolePreview} />
-      <div className="side-version">CMMS CDSL · v{APP_VERSION}</div>
+      <div className="side-version" title={APP_BUILD_TIME ? `Build ${APP_BUILD_COMMIT} · ${APP_BUILD_TIME}` : `Build ${APP_BUILD_COMMIT}`}>CMMS CDSL · v{APP_VERSION} · {APP_BUILD_COMMIT}</div>
     </div>
   </aside>);
 }
