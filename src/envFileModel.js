@@ -15,3 +15,10 @@ export function parseEnvFile(text = "") {
   }
   return env;
 }
+
+export function applyEnvValues(target = {}, values = {}) {
+  for (const [key, value] of Object.entries(values || {})) {
+    target[key] = value;
+  }
+  return target;
+}

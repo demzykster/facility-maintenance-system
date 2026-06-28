@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEnvFile } from "../src/envFileModel.js";
+import { applyEnvValues, parseEnvFile } from "../src/envFileModel.js";
 
 describe("envFileModel", () => {
   it("parses simple dotenv files without leaking comments into values", () => {
@@ -15,6 +15,16 @@ BROKEN_LINE
       SUPABASE_URL: "https://supabase.example",
       SUPABASE_ANON_KEY: "anon",
       EMPTY: ""
+    });
+  });
+
+  it("applies local env values as the explicit source for that preflight run", () => {
+    expect(applyEnvValues({ SUPABASE_URL: "https://old.example" }, {
+      SUPABASE_URL: "https://new.example",
+      VITE_SUPABASE_URL: "https://new.example"
+    })).toEqual({
+      SUPABASE_URL: "https://new.example",
+      VITE_SUPABASE_URL: "https://new.example"
     });
   });
 });
