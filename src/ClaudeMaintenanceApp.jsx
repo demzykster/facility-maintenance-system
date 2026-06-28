@@ -1156,7 +1156,7 @@ export default function App() {
       }
       if (migrated) us = await loadColl("user:");
     }
-    { // гарантируем наличие дефолтных учёток (добавляем, если их нет — без перезаписи существующих)
+    if (SEED_POLICY.allowBuiltinDemoUsers) { // гарантируем наличие дефолтных учёток в demo/test בלבד
       const defaults = [
         { name: "ודים", role: "admin", email: "vadim@chemipal.co.il", password: "1234", pin: "", dept: "הנהלה" },
         { name: "מנהל מחלקה", role: "user", email: "menahel@chemipal.co.il", password: "1234", pin: "", dept: (DEFAULT_CONFIG.departments[0] || "שילוח") },
