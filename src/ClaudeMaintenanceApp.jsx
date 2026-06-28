@@ -20,6 +20,7 @@ import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
+import { DEFAULT_LOCAL_NOTIFICATION_PREFS, parseLocalNotificationPrefs } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
@@ -1010,7 +1011,7 @@ const NOTIF_KINDS = [
   { kind: "back", label: "סיום משמרת / החזרות" },
 ];
 const NOTIF_KIND_LABEL = (k) => (NOTIF_KINDS.find((x) => x.kind === k) || {}).label || k;
-const DEFAULT_NOTIF_PREFS = { sort: "newest", group: false, hidden: {} };
+const DEFAULT_NOTIF_PREFS = DEFAULT_LOCAL_NOTIFICATION_PREFS;
 function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const ev = []; const vis = visibleTickets(session, tickets, fleet);
   (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "task", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
@@ -1097,7 +1098,14 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
   const maxRef = useRef(0), initRef = useRef(false);
   useEffect(() => { store.get(skey, false).then((v) => setLastSeen(v ? Number(v) : 0)); }, [skey]);
-  useEffect(() => { store.get(pkey, false).then((v) => { if (v) try { const p = JSON.parse(v); setPrefsState({ ...DEFAULT_NOTIF_PREFS, ...p, hidden: p.hidden || {} }); } catch (e) {} }); }, [pkey]);
+  useEffect(() => {
+    let cancelled = false;
+    setPrefsState(parseLocalNotificationPrefs(null, DEFAULT_NOTIF_PREFS));
+    store.get(pkey, false).then((v) => {
+      if (!cancelled) setPrefsState(parseLocalNotificationPrefs(v, DEFAULT_NOTIF_PREFS));
+    });
+    return () => { cancelled = true; };
+  }, [pkey]);
   const setPrefs = (patch) => setPrefsState((p) => { const np = { ...p, ...patch }; store.set(pkey, JSON.stringify(np), false); return np; });
   const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
