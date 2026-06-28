@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/require-file-upload-metadata`
+### Active branch: `codex/validate-file-metadata-path-owner`
 
-- Status: in progress after PR #342.
-- Latest synchronized `main`: `8ae657b fix: require explicit production kv bridge acceptance (#342)`.
+- Status: in progress after PR #343.
+- Latest synchronized `main`: `41d3296 fix: require file metadata for configured uploads (#343)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - current branch blocks file uploads without metadata when the production file metadata sink is configured, preventing orphaned protected files.
+  - current branch validates known file metadata owner IDs against their storage paths before upload.
   - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo import, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
@@ -41,6 +41,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 file upload metadata requirement is complete in PR #343.
+  - `/api/files` now rejects uploads without metadata when the production file metadata sink is configured.
+  - This prevents orphaned protected files that cannot be tied back to `file_metadata`.
+  - Local tests, production build, release checks, and Vercel passed.
 - R9 explicit KV bridge production acceptance is complete in PR #342.
   - Production release checks now require `CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true` before accepting the interim Supabase KV bridge.
   - This prevents confusing the monolith compatibility bridge with the final normalized RLS data model.

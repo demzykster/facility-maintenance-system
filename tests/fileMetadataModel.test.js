@@ -6,6 +6,7 @@ import {
   cleaningComplaintIssuePhotoMetadata,
   cleaningComplaintPhotoMetadata,
   cleaningRoundIssuePhotoMetadata,
+  fileMetadataPathMatchesOwner,
   fileMetadataId,
   normalizeFileMetadata,
   ticketPhotoMetadata
@@ -111,6 +112,27 @@ describe("fileMetadataModel", () => {
       createdById: "cleaner-2",
       createdAt: 400
     });
+  });
+
+  it("checks known owner metadata against the storage path", () => {
+    expect(fileMetadataPathMatchesOwner({
+      ownerType: FILE_OWNER_TYPES.ticket,
+      ownerId: "T-1",
+      kind: FILE_KINDS.ticketBeforePhoto,
+      path: "tickets/T-1/before.jpg"
+    })).toBe(true);
+    expect(fileMetadataPathMatchesOwner({
+      ownerType: FILE_OWNER_TYPES.ticket,
+      ownerId: "T-1",
+      kind: FILE_KINDS.ticketBeforePhoto,
+      path: "tickets/T-2/before.jpg"
+    })).toBe(false);
+    expect(fileMetadataPathMatchesOwner({
+      ownerType: FILE_OWNER_TYPES.cleaningComplaint,
+      ownerId: "C-1",
+      kind: FILE_KINDS.cleaningComplaintPhoto,
+      path: "cleaning/complaints/C-1/photo.jpg"
+    })).toBe(true);
   });
 
   it("documents the future Supabase table fields in one contract", () => {
