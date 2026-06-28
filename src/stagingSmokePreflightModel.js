@@ -29,6 +29,25 @@ export const STAGING_SMOKE_OPTIONAL_ENV = [
 const clean = (value) => String(value || "").trim();
 const cleanUrl = (value) => clean(value).replace(/\/+$/, "");
 
+export function stagingPlaceholderEnvErrors(env = {}, names = STAGING_SMOKE_REQUIRED_ENV) {
+  const errors = [];
+  for (const name of names) {
+    const value = clean(env[name]);
+    if (!value) continue;
+    const upper = value.toUpperCase();
+    if (
+      upper.includes("YOUR_") ||
+      upper.includes("YOUR-") ||
+      upper.includes("YOUR_PROJECT") ||
+      upper.includes("REPLACE_WITH") ||
+      upper.includes("CHANGE_ME")
+    ) {
+      errors.push(`placeholder_env:${name}`);
+    }
+  }
+  return errors;
+}
+
 export function stagingSupabaseEnvPairErrors(env = {}) {
   const errors = [];
   const publicUrl = cleanUrl(env.VITE_SUPABASE_URL);
