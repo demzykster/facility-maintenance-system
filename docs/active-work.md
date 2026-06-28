@@ -21,17 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/kv-sensitive-read-guard`
+### Active branch: `codex/vercel-api-route-gate`
 
-- Status: this PR redacts user login secrets from `/api/kv` reads for sessions that cannot manage users or worker activation.
-- Latest synchronized `main`: `d910e13 [skip vercel] feat: guard file reads with metadata (#316)`.
+- Status: this PR adds a release gate that fails when helper modules are placed under Vercel's `api/` route tree.
+- Latest synchronized `main`: `f9fd9f6 feat: redact kv user secrets and trim Vercel routes (#317)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: reduce sensitive data exposure in the temporary KV bridge without breaking the current frontend collection-loading model.
-  - also fixes the Vercel Hobby function-count blocker by keeping `api/` limited to real endpoint files and moving helper modules under `server/`.
-  - `/api/kv` write/delete guards already require manage permissions for sensitive keys; this branch protects user credential fields on reads.
-  - full read blocking for `user:`, `config:v1`, fleet, PPE, and cleaning setup keys should wait for normalized tables/RLS or a frontend loader split, because the current monolith still loads shared collections broadly.
+  - prevent a repeat of the Vercel Hobby function-count failure found in PR #317.
+  - `api/` should contain only endpoint files; implementation helpers belong under `server/`.
+  - `npm run release:check` should catch this locally before GitHub/Vercel preview fails.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -40,17 +39,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/kvPermissionPolicy.test.js tests/kvApiHandler.test.js --reporter=verbose` passed.
+  - `node tools/vercel-api-route-gate.mjs` passed.
+  - `npx vitest run tests/vercelApiRouteModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
-  - `npx vercel build --yes` passed after linking the local checkout to the existing Vercel project.
-  - `npx vercel deploy --prebuilt` passed; deployment `dpl_7z5MtgvfkafcfCjEAuLo3RtFvwoX` reached `READY`.
 
 ## Latest Completed Work
 
+- R9 KV user secret redaction and Vercel route trimming are complete in PR #317.
+  - `/api/kv` redacts password/pin/activation tokens from user reads unless the session can manage users or worker activation.
+  - API helper modules moved from `api/` to `server/`, leaving only real Vercel endpoint files under `api/`.
+  - This fixed the Vercel Hobby deployment failure caused by helper modules being counted as Serverless Functions.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 file metadata read/delete guard is complete in PR #316.
   - `/api/files` download/delete now require an active `file_metadata` row when the metadata driver supports lookup by path.
   - Missing or soft-deleted metadata returns `file_metadata_not_found`.
