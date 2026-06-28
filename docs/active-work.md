@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/scope-user-analytics-exports`
 
-- Status: staging smoke preflight/runbook is complete in PR #351; continue by configuring empty staging env.
-- Latest synchronized `main`: `049acbc docs: sync live ledger after public complaints (#350)`.
-- Open PRs: none.
+- Status: export boundary hardening is in progress; non-admin analytics/export views should receive scoped data only.
+- Latest synchronized `main`: `321ed5d chore: add staging smoke preflight (#351)`.
+- Open PRs: #352 (`codex/scope-user-analytics-exports` -> `main`).
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -41,10 +41,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
   - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users. PR #351 adds a preflight command/runbook; the real smoke still requires Vercel/Supabase env to be configured.
+  - finish export boundary hardening: module exports visible to roles below admin/manager must use the same scoped data as the screen.
   - configure daily Supabase backups and perform one restore drill.
   - add minimum production error visibility for server/API failures.
   - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
+  - `npm test -- --run` passed during export-boundary hardening on branch `codex/scope-user-analytics-exports`.
+  - `npm run release:check` passed during export-boundary hardening on branch `codex/scope-user-analytics-exports`.
+  - `npm run build` passed during export-boundary hardening on branch `codex/scope-user-analytics-exports`.
+  - Browser smoke was attempted, but browser-control timed out while reading the local tab; no app runtime failure was observed by CLI checks.
   - `npm run staging:preflight` failed as expected without staging env, listing missing required env.
   - `npm run staging:preflight` passed with a synthetic complete staging env.
   - `npm test -- --run tests/publicComplaintHandler.test.js tests/vercelApiRouteModel.test.js` passed before PR #349 merge.
