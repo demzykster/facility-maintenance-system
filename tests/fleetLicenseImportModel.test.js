@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectFleetLicenseColumns, parseFleetLicenseSheet, parseFleetLicenseWorkbook } from "../src/fleetLicenseImportModel.js";
+import { detectFleetLicenseColumns, parseFleetLicenseSheet, parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "../src/fleetLicenseImportModel.js";
 
 const headers = [
   "ספק",
@@ -134,5 +134,22 @@ describe("fleet license import model", () => {
       ok: true,
       summary: { total: 1, ready: 1, conflicts: 0, invalid: 0 }
     });
+  });
+
+  it("plans missing vehicle catalog entries for new imported models", () => {
+    const parsed = parseFleetLicenseSheet([
+      headers,
+      ["טויוטה", "194335", "RRE200H", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
+      ["טויוטה", "194336", "RRE200H", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-18", 2810, ""],
+      ["Still", "771", "KNOWN", "לא", "אין תסקיר", "", "", "", "אין רישוי", "", "", "", "עגלת אדם", "כלי", "", "", "בבעלות", ""]
+    ], { existingFleet: [] });
+
+    expect(planFleetLicenseCatalogAdditions(parsed.rows, { forkliftTypes: ["KNOWN"], vehicleTypes: [] })).toEqual([
+      {
+        name: "מלגזת היגש",
+        models: ["RRE200H"],
+        docs: { tasrir: true, license: true, lease: true }
+      }
+    ]);
   });
 });
