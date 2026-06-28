@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #357.
-- Latest synchronized `main`: after PR #357 role-preview/logout and notification clarity fix.
+- Status: no product branch is active after PR #358.
+- Latest synchronized `main`: after PR #358 staging public Supabase env preflight fix.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -39,6 +39,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - staging smoke must therefore verify bootstrap works once, then env is disabled/removed and `/api/bootstrap/admin` returns closed.
   - admin role preview must remain usable from role screens that do not render the desktop sidebar, especially worker and cleaner views.
   - notification unread badges must identify unread items and clear through explicit user actions, not rely on opening the panel.
+  - staging requires both public `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` for browser login and server-only Supabase env for API routes.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.

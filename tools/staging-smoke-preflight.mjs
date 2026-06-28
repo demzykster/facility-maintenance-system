@@ -3,38 +3,13 @@ import { appModeFromEnv } from "../src/seedPolicyModel.js";
 import { auditConfigFromEnv, fileStorageConfigFromEnv, kvServerConfigFromEnv } from "../src/productionServerConfigModel.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv } from "../src/storageProviderModel.js";
 import { productionConfigGate } from "../src/productionConfigGateModel.js";
-
-const required = [
-  "VITE_CMMS_APP_MODE",
-  "VITE_CMMS_STORAGE_PROVIDER",
-  "VITE_CMMS_STORAGE_API_URL",
-  "CMMS_KV_AUTH",
-  "CMMS_KV_DRIVER",
-  "CMMS_ALLOW_PRODUCTION_KV_BRIDGE",
-  "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "CMMS_FILE_DRIVER",
-  "CMMS_FILE_BUCKET",
-  "CMMS_FILE_METADATA_DRIVER",
-  "CMMS_AUDIT_DRIVER",
-  "CMMS_PUBLIC_COMPLAINTS_ENABLED",
-  "CMMS_PUBLIC_COMPLAINTS_DRIVER"
-];
-
-const optional = [
-  "CMMS_KV_SUPABASE_TABLE",
-  "CMMS_FILE_METADATA_SUPABASE_TABLE",
-  "CMMS_AUDIT_SUPABASE_TABLE",
-  "CMMS_PUBLIC_COMPLAINT_RATE_LIMIT_MS",
-  "VITE_CMMS_PUBLIC_COMPLAINT_API_URL"
-];
+import { STAGING_SMOKE_OPTIONAL_ENV, STAGING_SMOKE_REQUIRED_ENV } from "../src/stagingSmokePreflightModel.js";
 
 const present = (name) => String(process.env[name] || "").trim() !== "";
 const errors = [];
 const warnings = [];
 
-for (const name of required) {
+for (const name of STAGING_SMOKE_REQUIRED_ENV) {
   if (!present(name)) errors.push(`missing_env:${name}`);
 }
 
@@ -55,7 +30,7 @@ if (present("CMMS_BOOTSTRAP_TOKEN")) {
   errors.push("bootstrap_token_must_be_removed_after_first_admin");
 }
 
-for (const name of optional) {
+for (const name of STAGING_SMOKE_OPTIONAL_ENV) {
   if (!present(name)) warnings.push(`optional_env_not_set:${name}`);
 }
 
