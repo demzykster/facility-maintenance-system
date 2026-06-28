@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/vercel-api-route-gate`
+### Active branch: `codex/production-no-demo-users`
 
-- Status: this PR adds a release gate that fails when helper modules are placed under Vercel's `api/` route tree.
-- Latest synchronized `main`: `f9fd9f6 feat: redact kv user secrets and trim Vercel routes (#317)`.
+- Status: this PR prevents the frontend from auto-creating builtin demo users in production mode.
+- Latest synchronized `main`: `f02f744 test: gate vercel api route files (#318)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - prevent a repeat of the Vercel Hobby function-count failure found in PR #317.
-  - `api/` should contain only endpoint files; implementation helpers belong under `server/`.
-  - `npm run release:check` should catch this locally before GitHub/Vercel preview fails.
+  - align the frontend boot path with `seedPolicyForMode`: production must start empty except for server-side first-admin bootstrap.
+  - keep builtin demo accounts available only in demo/test.
+  - prevent old fake/local identities from being written into production API storage when a production session is restored.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -39,8 +39,6 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `node tools/vercel-api-route-gate.mjs` passed.
-  - `npx vitest run tests/vercelApiRouteModel.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
@@ -49,6 +47,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 Vercel API route gate is complete in PR #318.
+  - `npm run release:check` now fails if helper modules are placed under `api/`.
+  - The current route allowlist keeps Vercel endpoint files at 6/12 for the Hobby function limit.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 KV user secret redaction and Vercel route trimming are complete in PR #317.
   - `/api/kv` redacts password/pin/activation tokens from user reads unless the session can manage users or worker activation.
   - API helper modules moved from `api/` to `server/`, leaving only real Vercel endpoint files under `api/`.
