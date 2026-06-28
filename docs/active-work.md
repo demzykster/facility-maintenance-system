@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after the fleet import conflict confirmation fix.
-- Latest synchronized `main`: after fleet import conflict confirmation fix.
+- Status: no product branch is active after the build commit footer fix.
+- Latest synchronized `main`: after build commit footer fix.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -46,6 +46,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `.env.staging.local` is the safe local place for real staging secrets before copying them into Vercel.
   - local staging preflight must use `.env.staging.local` as the explicit source for that run, even if stale shell env exists.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
+  - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
@@ -74,6 +75,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Build commit footer is complete.
+  - The sidebar footer now shows `CMMS CDSL · v... · <commit>` and a build-time tooltip.
+  - Vite injects the short Git commit locally and uses `VERCEL_GIT_COMMIT_SHA` when Vercel provides it.
+  - Local tests, release checks, production build, and diff check passed.
 - Fleet import conflict confirmation is complete.
   - If imported Excel rows conflict with existing fleet units, the import button stays disabled until the user explicitly confirms importing only new rows.
   - Existing units are still not silently updated.
