@@ -57,14 +57,17 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
   - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
-  - Vercel currently has no project environment variables configured, so real empty staging smoke cannot run yet.
+  - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users. PR #351 adds a preflight command/runbook; the real smoke still requires Vercel/Supabase env to be configured.
+  - finish empty Supabase/Vercel staging smoke: browser Excel download still needs confirmation, transport ticket status update still needs a UI check, and the cleaning zone was inserted directly for public complaint smoke rather than created through the UI.
   - configure daily Supabase backups and perform one restore drill.
 - Validation:
+  - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
+  - Remaining smoke caveat: in-app browser did not emit a download event for `ייצוא ל-Excel`; no UI or console error was observed, but export download is not yet proven in browser.
+  - Empty staging data after smoke contains exactly one admin user plus smoke records: two tickets, one fleet item, one public complaint, one file metadata row, and audit entries.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
   - `npm test -- --run`, `npm run release:check`, and `npm run build` passed during export writer replacement; build output dropped from roughly 377 kB gzip to roughly 301 kB gzip.
   - HTTP smoke on `http://127.0.0.1:5173/` returned `200 OK` and the `CMMS CDSL` app shell; in-app browser smoke timed out in browser-control before page inspection, with no CLI build/runtime failure observed.
