@@ -43,15 +43,17 @@ After first-admin bootstrap succeeds:
 ## Manual Smoke Path
 
 1. Open the staging URL in a clean browser profile.
-2. Verify no demo login hints, demo users, demo tickets, demo fleet, or demo cleaning data appear.
-3. Bootstrap the first admin once, then disable bootstrap env and redeploy.
-4. Login as the admin and complete required password-change flow if shown.
-5. Create one facility ticket and one transport ticket.
-6. Change status on each ticket and verify the lifecycle/history is visible.
-7. Upload one ticket photo and verify it reloads.
-8. Create one cleaning zone, then submit one anonymous public complaint.
-9. Verify the complaint appears as pending and does not auto-create an open ticket.
-10. Export tickets and verify the file includes lifecycle/status/waiting columns.
-11. Check audit visibility for the created ticket/status/file actions.
+2. Verify Supabase migrations are applied, including the private `cmms-files` storage bucket.
+3. Verify no demo login hints, demo users, demo tickets, demo fleet, or demo cleaning data appear.
+4. Bootstrap the first admin once, then disable bootstrap env and redeploy.
+5. Login as the admin and complete required password-change flow if shown.
+6. Create one facility ticket and one transport ticket.
+7. Change status on each ticket and verify the lifecycle/history is visible.
+8. Upload one ticket photo and verify it reloads.
+9. Create one cleaning zone, then submit one anonymous public complaint.
+10. Verify the complaint appears as pending and does not auto-create an open ticket.
+11. Export tickets and verify the file includes lifecycle/status/waiting columns.
+12. Check audit visibility for the created ticket/status/file actions.
+13. Complete `docs/supabase-backup-restore-drill.md` against the same staging project.
 
 If any step fails, do not mark staging ready. Fix the smallest blocker first.
