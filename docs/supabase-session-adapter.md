@@ -19,7 +19,7 @@ The endpoint reads:
 
 1. Supabase Auth user from `/auth/v1/user`;
 2. matching CMMS profile from `public.app_users`;
-3. normalized CMMS session payload for the frontend/server code.
+3. normalized CMMS session payload for the frontend/server code, including department, manager-zone, technician-scope, supplier, and module-permission fields.
 
 ## Why
 
@@ -32,6 +32,7 @@ This endpoint is that boundary. It does not use the service role key. It uses th
 - No token means no session.
 - Missing Supabase env returns a configuration error.
 - Missing `public.app_users` profile does not create a fake session.
+- Profile rows must include their CMMS app-user `id`; an empty app-user id is rejected.
 - Profile rows must be explicitly linked to the Auth user through `auth_user_id`.
 - Disabled profiles are rejected.
 - A profile whose `auth_user_id` does not match the Auth user is rejected.

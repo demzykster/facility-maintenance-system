@@ -46,6 +46,9 @@ describe("supabase profile foundation", () => {
       name: " Owner ",
       email: "OWNER@Example.COM",
       dept: "הנהלה",
+      manager_zones: ["z1"],
+      tech_scope: "both",
+      supplier: "ספק א",
       perms: { users: "manage" },
       must_change_password: true
     })).toEqual({
@@ -57,6 +60,9 @@ describe("supabase profile foundation", () => {
       workerNo: null,
       department: "הנהלה",
       departments: [],
+      mgrZones: ["z1"],
+      techScope: "both",
+      supplier: "ספק א",
       permissions: { users: "manage" },
       active: true,
       mustChangePassword: true

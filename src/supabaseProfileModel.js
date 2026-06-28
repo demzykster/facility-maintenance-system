@@ -28,6 +28,9 @@ export function normalizeSupabaseAppUserProfile(profile = {}) {
     workerNo: profile.workerNo || profile.worker_no || null,
     department: profile.department || profile.dept || null,
     departments: Array.isArray(profile.departments) ? profile.departments : [],
+    mgrZones: Array.isArray(profile.mgrZones) ? profile.mgrZones : (Array.isArray(profile.manager_zones) ? profile.manager_zones : []),
+    techScope: profile.techScope || profile.tech_scope || "",
+    supplier: profile.supplier || "",
     permissions: profile.permissions || profile.perms || {},
     active: profile.active !== false,
     mustChangePassword: profile.mustChangePassword === true || profile.must_change_password === true
