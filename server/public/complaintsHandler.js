@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
+import { sendServerError } from "../httpErrors.js";
 
 const MAX_BODY_BYTES = 2_200_000;
 const MAX_PHOTO_CHARS = 2_000_000;
@@ -165,7 +166,7 @@ export function createPublicComplaintHandler({
     } catch (error) {
       if (error?.message === "payload_too_large") return json(res, 413, { error: "payload_too_large" });
       if (error?.message === "invalid_json") return json(res, 400, { error: "invalid_json" });
-      return json(res, 500, { error: error?.message || "public_complaint_error" });
+      return sendServerError(req, res, error, { code: "public_complaint_error", route: "/api/public/complaints" });
     }
   };
 }

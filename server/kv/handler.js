@@ -3,6 +3,7 @@ import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
 import { kvReadValueForSession, kvWritePermissionError, kvWritePermissionForKey, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
+import { sendServerError } from "../httpErrors.js";
 import { ticketStatusAuditEvent } from "../../src/auditEventModel.js";
 
 const json = (res, status, body) => {
@@ -58,8 +59,8 @@ async function authorize(req, env, fetchImpl, sessionClient) {
       if (!session.ok) return { ok: false, status: session.error === "app_user_disabled" ? 403 : 401, error: session.error };
       if (session.user.mustChangePassword) return { ok: false, status: 403, error: "password_change_required" };
       return { ok: true, user: session.user };
-    } catch (error) {
-      return { ok: false, status: 401, error: error?.message || "supabase_session_failed" };
+    } catch {
+      return { ok: false, status: 401, error: "supabase_session_failed" };
     }
   }
 
@@ -169,7 +170,7 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
       res.setHeader("allow", key ? "GET, PUT, DELETE" : "GET");
       return json(res, 405, { error: "method_not_allowed" });
     } catch (error) {
-      return json(res, 500, { error: error?.message || "storage_api_error" });
+      return sendServerError(req, res, error, { code: "storage_api_error", route: "/api/kv" });
     }
   };
 }

@@ -120,8 +120,8 @@ export function createSessionMeHandler({
       const session = buildSessionPayload(authUser, profile);
       if (!session.ok) return json(res, session.error === "app_user_disabled" ? 403 : 401, { error: session.error });
       return json(res, 200, session);
-    } catch (error) {
-      return json(res, 401, { error: error?.message || "session_lookup_failed" });
+    } catch {
+      return json(res, 401, { error: "session_lookup_failed" });
     }
   };
 }

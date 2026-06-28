@@ -1,3 +1,5 @@
+import { sendServerError } from "../httpErrors.js";
+
 const json = (res, status, body) => {
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
@@ -221,10 +223,13 @@ export function createBootstrapAdminHandler({
       try {
         appUser = await client.createAppUserProfile(validated.admin, admin);
       } catch (profileError) {
-        return json(res, 500, {
-          error: profileError?.message || "bootstrap_profile_error",
-          authUserCreated: true,
-          authUserId: admin.id || ""
+        return sendServerError(req, res, profileError, {
+          code: "bootstrap_profile_error",
+          route: "/api/bootstrap/admin",
+          extra: {
+            authUserCreated: true,
+            authUserId: admin.id || ""
+          }
         });
       }
       return json(res, 200, {
@@ -234,7 +239,7 @@ export function createBootstrapAdminHandler({
         disableBootstrapAfterSuccess: true
       });
     } catch (error) {
-      return json(res, 500, { error: error?.message || "bootstrap_admin_error" });
+      return sendServerError(req, res, error, { code: "bootstrap_admin_error", route: "/api/bootstrap/admin" });
     }
   };
 }

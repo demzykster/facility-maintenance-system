@@ -1,4 +1,5 @@
 import { buildSessionPayload } from "./sessionHandler.js";
+import { sendServerError } from "../httpErrors.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -121,10 +122,13 @@ export function createChangePasswordHandler({
       await client.updateAuthPassword(token, validated.newPassword);
       const updatedProfile = await client.clearMustChangePassword(authUser.id);
       const session = buildSessionPayload(authUser, updatedProfile);
-      if (!session.ok) return json(res, 500, { error: session.error });
+      if (!session.ok) return sendServerError(req, res, new Error(session.error), {
+        code: "password_change_session_error",
+        route: "/api/session/change-password"
+      });
       return json(res, 200, session);
     } catch (error) {
-      return json(res, 500, { error: error?.message || "password_change_failed" });
+      return sendServerError(req, res, error, { code: "password_change_failed", route: "/api/session/change-password" });
     }
   };
 }

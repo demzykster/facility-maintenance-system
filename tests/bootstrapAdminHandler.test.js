@@ -130,6 +130,7 @@ describe("bootstrap admin handler", () => {
   });
 
   it("does not report bootstrap success if the app profile insert fails after auth creation", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const createAdmin = vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com", role: "admin", mustChangePassword: true });
     const createAppUserProfile = vi.fn().mockRejectedValue(new Error("profile_insert_failed"));
     const handler = createBootstrapAdminHandler({
@@ -137,17 +138,30 @@ describe("bootstrap admin handler", () => {
       supabaseClient: { createAdmin, createAppUserProfile }
     });
 
-    const res = await call(handler, {
-      headers: { authorization: "Bearer secret" },
-      body: { email: "admin@example.com", name: "Owner", temporaryPassword: "long-password" }
-    });
+    try {
+      const res = await call(handler, {
+        headers: { authorization: "Bearer secret", "x-request-id": "bootstrap-req-1" },
+        body: { email: "admin@example.com", name: "Owner", temporaryPassword: "long-password" }
+      });
 
-    expect(res.statusCode).toBe(500);
-    expect(res.json()).toEqual({
-      error: "profile_insert_failed",
-      authUserCreated: true,
-      authUserId: "auth-user-1"
-    });
+      expect(res.statusCode).toBe(500);
+      expect(res.headers["x-cmms-request-id"]).toBe("bootstrap-req-1");
+      expect(res.json()).toEqual({
+        error: "bootstrap_profile_error",
+        requestId: "bootstrap-req-1",
+        authUserCreated: true,
+        authUserId: "auth-user-1"
+      });
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(consoleError.mock.calls[0][0])).toMatchObject({
+        requestId: "bootstrap-req-1",
+        route: "/api/bootstrap/admin",
+        code: "bootstrap_profile_error",
+        message: "profile_insert_failed"
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("refuses bootstrap when an active admin profile already exists", async () => {

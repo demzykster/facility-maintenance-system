@@ -66,6 +66,34 @@ describe("kv API handler", () => {
     expect(driver.list).toHaveBeenCalledWith("ticket:", true);
   });
 
+  it("hides unexpected backend failures behind a request id", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const driver = {
+      get: vi.fn().mockRejectedValue(new Error("internal-driver-secret"))
+    };
+    const handler = createKvApiHandler({ driver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    try {
+      const res = await call(handler, {
+        headers: { "x-request-id": "kv-req-1" },
+        query: { key: "ticket:1" }
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.headers["x-cmms-request-id"]).toBe("kv-req-1");
+      expect(res.json()).toEqual({ error: "storage_api_error", requestId: "kv-req-1" });
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(consoleError.mock.calls[0][0])).toMatchObject({
+        requestId: "kv-req-1",
+        route: "/api/kv",
+        code: "storage_api_error",
+        message: "internal-driver-secret"
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("wires the upstash driver from server env after auth passes", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,

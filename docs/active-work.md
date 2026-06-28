@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/scope-user-analytics-exports`
+### Active branch: `codex/api-error-visibility`
 
-- Status: export boundary hardening is in progress; non-admin analytics/export views should receive scoped data only.
-- Latest synchronized `main`: `321ed5d chore: add staging smoke preflight (#351)`.
-- Open PRs: #352 (`codex/scope-user-analytics-exports` -> `main`).
+- Status: production error visibility is in progress; unexpected API 500 responses should return a request id and log a sanitized server event.
+- Latest synchronized `main`: `5171387 fix: scope non-admin analytics exports (#352)`.
+- Open PRs: none at branch start.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -41,15 +41,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
   - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users. PR #351 adds a preflight command/runbook; the real smoke still requires Vercel/Supabase env to be configured.
-  - finish export boundary hardening: module exports visible to roles below admin/manager must use the same scoped data as the screen.
   - configure daily Supabase backups and perform one restore drill.
   - add minimum production error visibility for server/API failures.
   - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
-  - `npm test -- --run` passed during export-boundary hardening on branch `codex/scope-user-analytics-exports`.
-  - `npm run release:check` passed during export-boundary hardening on branch `codex/scope-user-analytics-exports`.
-  - `npm run build` passed during export-boundary hardening on branch `codex/scope-user-analytics-exports`.
-  - Browser smoke was attempted, but browser-control timed out while reading the local tab; no app runtime failure was observed by CLI checks.
+  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed during production error visibility work on branch `codex/api-error-visibility`.
+  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #352 export-boundary hardening.
+  - Browser smoke for PR #352 was attempted, but browser-control timed out while reading the local tab; no app runtime failure was observed by CLI checks.
   - `npm run staging:preflight` failed as expected without staging env, listing missing required env.
   - `npm run staging:preflight` passed with a synthetic complete staging env.
   - `npm test -- --run tests/publicComplaintHandler.test.js tests/vercelApiRouteModel.test.js` passed before PR #349 merge.
@@ -60,6 +58,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 non-admin analytics export scoping is complete in PR #352.
+  - Non-admin `InsightsHub` now receives scoped tickets, fleet, PM, tasks, meetings, cleaning, PPE, and user data instead of the full admin dataset.
+  - Local tests, release checks, and production build passed.
+  - Vercel preview was blocked by Hobby build-rate-limit, not by a code build failure.
 - R9 staging smoke preflight is complete in PR #351.
   - `npm run staging:preflight` checks the required production-mode API/Supabase/public-complaints env without printing secret values.
   - `docs/staging-smoke.md` defines the empty staging smoke path and bootstrap disable check.
