@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { parseEnvFile } from "../src/envFileModel.js";
+import { applyEnvValues, parseEnvFile } from "../src/envFileModel.js";
 
 const file = ".env.staging.local";
 
@@ -9,9 +9,6 @@ if (!existsSync(file)) {
   process.exit(1);
 }
 
-const parsed = parseEnvFile(readFileSync(file, "utf8"));
-for (const [key, value] of Object.entries(parsed)) {
-  if (!process.env[key]) process.env[key] = value;
-}
+applyEnvValues(process.env, parseEnvFile(readFileSync(file, "utf8")));
 
 await import("./staging-smoke-preflight.mjs");
