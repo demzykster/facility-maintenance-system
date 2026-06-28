@@ -10,7 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload } from "./backupModel.js";
+import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
@@ -1456,8 +1456,8 @@ export default function App() {
   const buildBackup = async () => {
     const photos = {};
     for (const t of tickets) {
-      if (t.hasPhoto) { try { const p = await store.get(`photo:${t.id}`, true); if (p) photos[`photo:${t.id}`] = p; } catch {} }
-      if (t.hasAfterPhoto) { try { const p = await store.get(`photo:after:${t.id}`, true); if (p) photos[`photo:after:${t.id}`] = p; } catch {} }
+      if (shouldExportLegacyTicketPhoto(t)) { try { const p = await store.get(`photo:${t.id}`, true); if (p) photos[`photo:${t.id}`] = p; } catch {} }
+      if (shouldExportLegacyTicketPhoto(t, "after")) { try { const p = await store.get(`photo:after:${t.id}`, true); if (p) photos[`photo:after:${t.id}`] = p; } catch {} }
     }
     return buildBackupPayload({
       config,

@@ -21,22 +21,29 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/skip-file-backed-photos-in-backup`
 
-- Status: no active product branch after PR #339.
-- Latest synchronized `main`: `e4d3543 fix: route worker report photos through adapter (#339)`.
+- Status: in progress after PR #340.
+- Latest synchronized `main`: `64f27cf docs: close special storage flow ledger (#340)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo export/import, and quiet heartbeat writes.
+  - current branch narrows backup legacy photo export so JSON backup only reads legacy `photo:*` keys for tickets that do not already use file-backed `photoPath` / `afterPhotoPath`.
+  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo import, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
-  - docs-only update; `git diff --check` passed.
+  - `npm test -- --run` passed.
+  - `npm run build` passed.
+  - `npm run release:check` passed.
+  - `git diff --check` passed.
 
 ## Latest Completed Work
 
+- R9 special storage flow ledger close is complete in PR #340.
+  - `docs/active-work.md` recorded the remaining deliberate direct-storage exceptions after worker report photo adapter routing.
+  - This was a docs-only sync.
 - R9 worker report photo adapter routing is complete in PR #339.
   - Worker report photo reload/resubmit now uses `TICKET_PHOTOS` instead of direct `photo:*` storage.
   - This keeps production+API replacement photos on the same file adapter boundary as normal ticket photos.

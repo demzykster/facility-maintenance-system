@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeBackupPayload, BACKUP_COLLECTIONS, BACKUP_COLLECTION_KEYS, BACKUP_VERSION, buildBackupPayload } from "../src/backupModel.js";
+import { analyzeBackupPayload, BACKUP_COLLECTIONS, BACKUP_COLLECTION_KEYS, BACKUP_VERSION, buildBackupPayload, shouldExportLegacyTicketPhoto } from "../src/backupModel.js";
 
 describe("backup model", () => {
   it("covers every business collection that must round-trip through backup/restore", () => {
@@ -92,5 +92,12 @@ describe("backup model", () => {
       legacy: false,
       missingCollections: [],
     });
+  });
+
+  it("exports only legacy ticket photo keys, not file-backed production photos", () => {
+    expect(shouldExportLegacyTicketPhoto({ hasPhoto: true })).toBe(true);
+    expect(shouldExportLegacyTicketPhoto({ hasPhoto: true, photoPath: "tickets/T-1/before.jpg" })).toBe(false);
+    expect(shouldExportLegacyTicketPhoto({ hasAfterPhoto: true }, "after")).toBe(true);
+    expect(shouldExportLegacyTicketPhoto({ hasAfterPhoto: true, afterPhotoPath: "tickets/T-1/after.jpg" }, "after")).toBe(false);
   });
 });
