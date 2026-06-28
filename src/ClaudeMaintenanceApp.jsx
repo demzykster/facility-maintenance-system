@@ -4698,14 +4698,16 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
 
 function FleetImportWizard({ fleet, onCancel, onImport }) {
   const [result, setResult] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [done, setDone] = useState(false);
+  const [confirmSkipConflicts, setConfirmSkipConflicts] = useState(false);
   const readyRows = (result?.rows || []).filter((row) => row.action === "new");
   const conflictRows = (result?.rows || []).filter((row) => row.action === "conflict");
   const invalidRows = (result?.rows || []).filter((row) => row.action === "invalid");
+  const canImport = !!readyRows.length && (!conflictRows.length || confirmSkipConflicts);
   const onFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     if (!/\.xlsx$/i.test(file.name || "")) { setErr("בחרו קובץ Excel מסוג XLSX."); e.target.value = ""; return; }
     if (file.size > 10 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 10MB."); e.target.value = ""; return; }
-    setBusy(true); setErr(""); setDone(false);
+    setBusy(true); setErr(""); setDone(false); setConfirmSkipConflicts(false);
     try {
       const parsed = parseFleetLicenseWorkbook(await readExcelFile(file), { existingFleet: fleet });
       if (!parsed.ok) { setResult(null); setErr(parsed.error === "fleet_license_sheet_not_found" ? "לא נמצא גיליון בשם רישיונות." : "לא נמצאה טבלת רישיונות תקינה בקובץ."); return; }
@@ -4715,6 +4717,7 @@ function FleetImportWizard({ fleet, onCancel, onImport }) {
   };
   const save = async () => {
     if (!readyRows.length) return setErr("אין שורות חדשות לייבוא.");
+    if (conflictRows.length && !confirmSkipConflicts) return setErr("יש קונפליקטים. אשרו במפורש לייבא רק את הכלים החדשים ולהשאיר את הקונפליקטים ללא שינוי.");
     setBusy(true); setErr("");
     try {
       const now = Date.now();
@@ -4738,11 +4741,14 @@ function FleetImportWizard({ fleet, onCancel, onImport }) {
           <div className="stat-box"><div className="stat-num">{result.summary.conflicts}</div><div className="stat-lbl">קונפליקט</div></div>
           <div className="stat-box"><div className="stat-num">{result.summary.invalid}</div><div className="stat-lbl">שגויות</div></div>
         </div>
-        {conflictRows.length > 0 && <div className="note" style={{ borderColor: "#FCD34D" }}>{conflictRows.length} שורות כבר קיימות לפי מספר/שלדה. הן לא ייובאו עד שתבחרו פתרון ידני.</div>}
+        {conflictRows.length > 0 && <div className="note" style={{ borderColor: "#FCD34D" }}>
+          <div>{conflictRows.length} שורות כבר קיימות לפי מספר/שלדה. הן לא יעודכנו אוטומטית.</div>
+          <label className="confirm-line"><input type="checkbox" checked={confirmSkipConflicts} onChange={(ev) => setConfirmSkipConflicts(ev.target.checked)} />ייבא רק {readyRows.length} כלים חדשים והשאר את הקונפליקטים ללא שינוי</label>
+        </div>}
         {invalidRows.length > 0 && <div className="err">{invalidRows.length} שורות חסרות מספר/ספק/דגם ולא ייובאו.</div>}
         <div className="imp-prev">{result.rows.slice(0, 45).map((row) => <div key={row.sourceRow} className="imp-row" style={row.action !== "new" ? { opacity: 0.62 } : {}}><div className="imp-t"><span className={"act-tag " + (row.action === "new" ? "new" : row.action === "conflict" ? "update" : "nochange")}>{row.action === "new" ? "חדשה" : row.action === "conflict" ? "קונפליקט" : "שגויה"}</span>{row.unit.code || "—"} · {row.unit.vehicleKind || row.unit.type || "—"}</div><div className="imp-meta">{row.unit.supplier || "—"} · דגם {row.unit.type || "—"} · שלדה {row.unit.chassis || "—"} · מסמכים {Object.keys(row.unit.docs || {}).length}</div></div>)}</div>
         {result.rows.length > 45 && <div className="hint">…ועוד {result.rows.length - 45} שורות</div>}
-        {done ? <div className="toast-ok"><CheckCircle2 size={16} /> יובאו {readyRows.length} כלים חדשים</div> : <button className="btn-primary full" disabled={busy || !readyRows.length} onClick={save}>ייבוא {readyRows.length} כלים חדשים</button>}
+        {done ? <div className="toast-ok"><CheckCircle2 size={16} /> יובאו {readyRows.length} כלים חדשים</div> : <button className="btn-primary full" disabled={busy || !canImport} onClick={save}>ייבוא {readyRows.length} כלים חדשים</button>}
       </>}
     </div></div>);
 }
@@ -7021,6 +7027,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .act-tag.new{background:#DCFCE7;color:#15803D;}
 .act-tag.update{background:#DBEAFE;color:#1D4ED8;}
 .act-tag.nochange{background:var(--surface-2);color:var(--muted);}
+.confirm-line{display:flex;align-items:flex-start;gap:8px;margin-top:9px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;line-height:1.45;}
+.confirm-line input{margin-top:2px;flex-shrink:0;}
 .quick-cap{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:9px;margin-bottom:8px;display:flex;flex-direction:column;gap:7px;}
 .qc-line{display:flex;gap:7px;align-items:center;}
 .qc-loc{flex:0 0 38%;}

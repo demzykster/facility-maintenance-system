@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after the notification read-state fix.
-- Latest synchronized `main`: after notification read-state fix.
+- Status: no product branch is active after the fleet import conflict confirmation fix.
+- Latest synchronized `main`: after fleet import conflict confirmation fix.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -47,7 +47,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - local staging preflight must use `.env.staging.local` as the explicit source for that run, even if stale shell env exists.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
-  - fleet Excel import treats `מס' רכב` as chassis/source identifier and must show conflicts instead of silently updating existing units.
+  - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
@@ -74,6 +74,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Fleet import conflict confirmation is complete.
+  - If imported Excel rows conflict with existing fleet units, the import button stays disabled until the user explicitly confirms importing only new rows.
+  - Existing units are still not silently updated.
+  - Local tests, release checks, production build, and diff check passed.
 - Notification read-state fix is complete.
   - "Mark all read" now stores the currently visible notification keys, not only a timestamp.
   - Legacy timestamp-only read state remains compatible.
