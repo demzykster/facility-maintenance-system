@@ -56,16 +56,17 @@ describe("app storage adapter", () => {
 
   it("can disable memory fallback for production API storage", async () => {
     const onFail = vi.fn();
+    const never = () => new Promise(() => {});
     const store = createAppStore({
-      storageProvider: () => ({ set: () => new Promise(() => {}) }),
+      storageProvider: () => ({ get: never, set: never, list: never }),
       timeoutMs: 1,
       allowMemoryFallback: false
     });
     store._onFail = onFail;
 
     await expect(store.set("ticket:4", "lost-if-fallback", true)).resolves.toBe(false);
-    await expect(store.get("ticket:4", true)).resolves.toBeNull();
-    await expect(store.list("ticket:", true)).resolves.toEqual([]);
-    expect(onFail).toHaveBeenCalledTimes(1);
+    await expect(store.get("ticket:4", true)).rejects.toThrow("timeout");
+    await expect(store.list("ticket:", true)).rejects.toThrow("timeout");
+    expect(onFail).toHaveBeenCalledTimes(3);
   });
 });

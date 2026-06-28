@@ -1185,7 +1185,14 @@ export default function App() {
   })(); }, []);
   useEffect(() => { if (!session) return; const id = setInterval(() => { if (!document.hidden) reloadAll(); }, 15000); const onVis = () => { if (!document.hidden) reloadAll(); }; document.addEventListener("visibilitychange", onVis); return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); }; }, [session]);
 
-  async function loadColl(prefix) { const keys = await store.list(prefix, true); const arr = await Promise.all(keys.map(async (k) => { try { return JSON.parse(await store.get(k, true)); } catch { return null; } })); return arr.filter(Boolean); }
+  async function loadColl(prefix) {
+    const keys = await store.list(prefix, true);
+    const arr = await Promise.all(keys.map(async (k) => {
+      const raw = await store.get(k, true);
+      try { return JSON.parse(raw); } catch { return null; }
+    }));
+    return arr.filter(Boolean);
+  }
   const persistShared = async (key, value) => {
     const ok = await store.set(key, value, true);
     if (!ok) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
