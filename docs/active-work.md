@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/replace-xlsx-export-writer`
+### Active branch: none
 
-- Status: replacing the vulnerable `xlsx` export dependency with a write-only export adapter is in progress.
-- Latest synchronized `main`: `ab51cb6 docs: sync ledger after api errors (#354)`.
-- Open PRs: none at branch start.
+- Status: no product branch is active after PR #355.
+- Latest synchronized `main`: `79563b0 fix: replace xlsx export writer (#355)`.
+- Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -34,7 +34,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Current facts to preserve:
   - external Excel/CSV task import exists, but `.xlsx` import uses `read-excel-file` and CSV uses `papaparse`.
-  - Excel export generation is being moved from vulnerable `xlsx@0.18.5` to `write-excel-file`; export formula injection remains mitigated through `rowsSafe`.
+  - Excel export generation now uses `write-excel-file` through a small compatibility adapter instead of vulnerable `xlsx@0.18.5`; export formula injection remains mitigated through `rowsSafe`.
   - first-admin bootstrap is disabled by default, token-gated, and refuses a second active admin, but the deployment env does not physically disable itself after success.
   - staging smoke must therefore verify bootstrap works once, then env is disabled/removed and `/api/bootstrap/admin` returns closed.
 - Accepted v1 pilot risks:
@@ -62,6 +62,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 vulnerable `xlsx` export writer replacement is complete in PR #355.
+  - `xlsx@0.18.5` was removed and `write-excel-file` now creates generated Excel exports through `src/xlsxExportAdapter.js`.
+  - `npm audit --omit=dev` now reports `found 0 vulnerabilities`.
+  - Local tests, release checks, production build, adapter Blob test, and HTTP smoke passed.
+  - Vercel was rate-limited, not code-failed.
 - R9 minimum production API error visibility is complete in PR #353.
   - Unexpected API 500 responses now return a stable `requestId` instead of raw backend exception text.
   - Server logs include a sanitized structured error event with route, method, code, and request id.
