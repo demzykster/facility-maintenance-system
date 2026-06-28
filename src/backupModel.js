@@ -34,3 +34,9 @@ export function buildBackupPayload({ config, collections, photos = {}, exportedA
   payload.photos = photos && typeof photos === "object" ? photos : {};
   return payload;
 }
+
+export function shouldExportLegacyTicketPhoto(ticket, kind = "before") {
+  if (!ticket || typeof ticket !== "object") return false;
+  if (kind === "after") return Boolean(ticket.hasAfterPhoto && !ticket.afterPhotoPath);
+  return Boolean(ticket.hasPhoto && !ticket.photoPath);
+}
