@@ -7,9 +7,9 @@ This is the first file every Codex session must read. It is the live handoff poi
 Before answering project-status questions or starting work:
 
 1. Run `git fetch origin --prune`.
-2. Check current branch, working tree, latest `origin/main`, open PRs, and remote branches.
+2. Check current branch, working tree, latest `origin/main`, and open PRs.
 3. Read this file first.
-4. Read only the extra docs needed for the current task.
+4. Read only the extra docs needed for the current task. Check remote branches only when the task involves PR/branch sync or this file says an unmerged branch exists.
 
 If `main`, open PRs, remote branches, or docs disagree, start with:
 
@@ -21,26 +21,39 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/include-supabase-profile-scopes`
+### Active branch: none
 
-- Status: in progress after PR #346.
-- Latest synchronized `main`: `e8b3d36 fix: require app user id in production session (#346)`.
+- Status: `main` is synchronized after PR #347.
+- Latest synchronized `main`: `c4b1c2b fix: include profile scopes in production session (#347)`.
 - Open PRs: none.
 - Purpose:
-  - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - the main shared-save optimistic UI risk pass is complete.
-  - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - current branch carries Supabase profile scope fields through the production session boundary: manager zones, technician scope, and supplier.
-  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo import, and quiet heartbeat writes.
+  - continue release hardening toward a clean first staging/pilot build.
+  - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
+  - the interim Supabase KV bridge is an explicit v1 compatibility choice, not the final normalized workflow model.
+  - do not spend current release time on workflow-table normalization or old-data migration unless a launch blocker proves it is required.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
+- Current facts to preserve:
+  - external Excel/CSV task import exists, but `.xlsx` import uses `read-excel-file` and CSV uses `papaparse`; `xlsx` is currently used for generated exports/fallback export formats.
+  - first-admin bootstrap is disabled by default, token-gated, and refuses a second active admin, but the deployment env does not physically disable itself after success.
+  - staging smoke must therefore verify bootstrap works once, then env is disabled/removed and `/api/bootstrap/admin` returns closed.
+- Accepted v1 pilot risks:
+  - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
+  - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
+- Current launch blockers:
+  - isolate anonymous public complaints behind a dedicated POST-only endpoint.
+  - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users.
+  - configure daily Supabase backups and perform one restore drill.
+  - add minimum production error visibility for server/API failures.
+  - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
-  - `npm test -- --run` passed.
-  - `npm run build` passed.
-  - `npm run release:check` passed.
-  - `git diff --check` passed.
+  - Last verified after PR #347 by GitHub/Vercel before this ledger repair.
+  - This docs-only ledger repair should run `git diff --check`.
 
 ## Latest Completed Work
 
+- R9 production session profile scopes are complete in PR #347.
+  - Production session payload now carries manager zones, technician scope, and supplier through the app/API boundary.
+  - This closed the stale active-work handoff that still pointed at PR #346.
 - R9 production session app-user id guard is complete in PR #346.
   - Production session creation now rejects Supabase app profiles without a CMMS app-user id.
   - This prevents API/audit/file actor identity from becoming an empty session id.
