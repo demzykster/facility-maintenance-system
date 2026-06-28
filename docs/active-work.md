@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #364.
-- Latest synchronized `main`: after PR #364 compact role preview and sidebar version.
+- Status: no product branch is active after PR #365.
+- Latest synchronized `main`: after PR #365 fleet license import parser model.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -46,6 +46,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `.env.staging.local` is the safe local place for real staging secrets before copying them into Vercel.
   - local staging preflight must use `.env.staging.local` as the explicit source for that run, even if stale shell env exists.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
+  - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
+  - fleet Excel import treats `מס' רכב` as chassis/source identifier and must show conflicts instead of silently updating existing units.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
