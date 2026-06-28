@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: public complaint isolation is complete in PR #349; continue with staging smoke.
-- Latest synchronized `main`: `3c20d4f feat: isolate public complaint reports (#349)`.
+- Status: staging smoke preflight/runbook is complete in PR #351; continue by configuring empty staging env.
+- Latest synchronized `main`: `049acbc docs: sync live ledger after public complaints (#350)`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -40,11 +40,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users.
+  - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users. PR #351 adds a preflight command/runbook; the real smoke still requires Vercel/Supabase env to be configured.
   - configure daily Supabase backups and perform one restore drill.
   - add minimum production error visibility for server/API failures.
   - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
+  - `npm run staging:preflight` failed as expected without staging env, listing missing required env.
+  - `npm run staging:preflight` passed with a synthetic complete staging env.
   - `npm test -- --run tests/publicComplaintHandler.test.js tests/vercelApiRouteModel.test.js` passed before PR #349 merge.
   - `npm test -- --run` passed before PR #349 merge.
   - `npm run build` passed before PR #349 merge.
@@ -53,6 +55,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 staging smoke preflight is complete in PR #351.
+  - `npm run staging:preflight` checks the required production-mode API/Supabase/public-complaints env without printing secret values.
+  - `docs/staging-smoke.md` defines the empty staging smoke path and bootstrap disable check.
+  - Local test/build/release checks passed; real staging smoke is still blocked until Vercel/Supabase env is configured.
 - R9 public complaint isolation is complete in PR #349.
   - Anonymous production reports now use a dedicated `POST /api/public/complaints` endpoint instead of the generic `/api/kv` bridge.
   - The endpoint is disabled by default, server rate-limited, loads the zone server-side, ignores client status/key/zone labels, and writes exactly one pending `ccomplaint:<id>` record.
