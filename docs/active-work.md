@@ -51,6 +51,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
+  - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
@@ -64,6 +65,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - finish empty Supabase/Vercel staging smoke: browser Excel download still needs confirmation, and full transport status progression still needs a technician assignment/acceptance path.
   - configure daily Supabase backups and perform one restore drill.
+  - before loading the real fleet workbook, harden fleet Excel import for an empty catalog so imported models do not become unconfigured transport types without SLA/document/PM rules.
 - Validation:
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
   - Follow-up smoke check: the transport ticket detail opened in the UI, admin note update saved, and the cleaning UI shows the smoke public zone plus one pending report.

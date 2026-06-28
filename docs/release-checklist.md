@@ -37,6 +37,7 @@ Current notes:
 - `docs/module-growth-architecture.md` defines how future budget and safety-inspection modules should reuse shared CMMS entities.
 - `src/seedPolicyModel.js` and `docs/production-seed-policy.md` define the production empty-start and first-admin bootstrap boundary.
 - Current demo/local records are not a migration source; future imports are optional and only for real owner-provided data.
+- Before a real fleet workbook is loaded into the empty system, fleet Excel import must handle unknown vehicle models/types by previewing proposed catalog additions instead of leaving imported units with unconfigured SLA/document/PM rules.
 - `src/storageProviderModel.js`, `src/apiStorageAdapter.js`, and `docs/production-storage-provider.md` define the future backend storage path.
 - `/api/kv` route skeleton exists but remains closed until server auth and a durable backend driver are configured.
 - `npm run release:check` validates the current production storage-provider boundary.
