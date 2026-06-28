@@ -4803,6 +4803,43 @@ function FleetModule(p) {
     if (q.trim() && !`${f.code} ${f.type} ${unitTypeName(f, config)} ${f.chassis} ${f.license}`.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
+  const exportFleet = () => {
+    const data = rows.map((f) => {
+      const ds = docStatus(f, config);
+      const block = unitBlock(f, tickets, config);
+      return {
+        "מספר / קוד": f.code || "",
+        "סוג כלי": unitTypeName(f, config) || "",
+        "דגם": unitModelCode(f) || "",
+        "ספק": f.supplier || "",
+        "מחלקות": fleetDepts(f).join(", "),
+        "מספר שלדה": f.chassis || "",
+        "מספר רישוי": f.license || "",
+        "תוקף תסקיר": f.docs?.tasrir?.date || "",
+        "תוקף רישיון": f.docs?.license?.date || "",
+        "תוקף ליסינג": f.docs?.lease?.date || "",
+        "סטטוס מסמכים": ds.label || "",
+        "מסמך קרוב/בעייתי": ds.which || "",
+        "מצב שירות": block ? "מושבת" : "פעיל",
+        "סיבת השבתה": block ? `${block.level.label} · ${block.ticket.subject || ""}` : "",
+        "עלות ליסינג": f.leaseCost || 0,
+        "סוג מהייבוא": f.vehicleKind || "",
+        "סיווג": f.classification || "",
+        "ברגולציה": f.regulated ? "כן" : "לא",
+        "תחילת עסקה": f.leaseStart || "",
+        "סוף עסקה": f.leaseEnd || "",
+        "הערות": f.notes || ""
+      };
+    });
+    if (!data.length) { alert("אין כלים לייצוא"); return; }
+    try {
+      const ws = XLSX.utils.json_to_sheet(rowsSafe(data));
+      ws["!cols"] = Object.keys(data[0]).map(() => ({ wch: 16 }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "פארק כלי שינוע");
+      downloadXlsx(wb, `fleet_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) { alert("ייצוא כלי שינוע נכשל. נסו דפדפן אחר."); }
+  };
   const Sel = ({ label, value, onChange, children }) => (
     <label className="flt-field">
       <span className="flt-lbl">{label}</span>
@@ -4826,7 +4863,7 @@ function FleetModule(p) {
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
     {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} templates={p.templates} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
-    <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
+    <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportFleet} disabled={!rows.length} title={!rows.length ? "אין נתונים לייצוא" : ""}><FileSpreadsheet size={15} /> ייצוא Excel</button>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
     <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="סוג" value={type} onChange={setType}>{types.map((t) => <option key={t}>{t}</option>)}</Sel>
