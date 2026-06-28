@@ -21,10 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/record-night-staging-smoke`
+### Active branch: none
 
-- Status: docs-only sync for the fleet import/export work and night staging smoke.
-- Latest synchronized `main`: `bdecfd5` (`feat: export fleet park to Excel`), deployed to the public Vercel staging URL.
+- Status: no product branch is active after PR #382.
+- Latest synchronized `main`: after PR #382. Public Vercel staging currently serves app bundle commit `bdecfd5` (`feat: export fleet park to Excel`).
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
