@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: `main` is synchronized after PR #347.
-- Latest synchronized `main`: `c4b1c2b fix: include profile scopes in production session (#347)`.
+- Status: public complaint isolation is complete in PR #349; continue with staging smoke.
+- Latest synchronized `main` before PR #349: `0416ef5 docs: close 347 ledger tail (#348)`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -40,17 +40,23 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - isolate anonymous public complaints behind a dedicated POST-only endpoint.
   - run empty Supabase/Vercel staging smoke: bootstrap admin, login, create/update ticket, files, audit, export, and no demo seed/users.
   - configure daily Supabase backups and perform one restore drill.
   - add minimum production error visibility for server/API failures.
   - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
-  - Last verified after PR #347 by GitHub/Vercel before this ledger repair.
-  - This docs-only ledger repair should run `git diff --check`.
+  - `npm test -- --run tests/publicComplaintHandler.test.js tests/vercelApiRouteModel.test.js` passed on current branch.
+  - `npm test -- --run` passed on current branch.
+  - `npm run build` passed on current branch.
+  - `npm run release:check` passed on current branch.
+  - Browser smoke via system Chrome passed: login screen loaded and public QR/problem report overlay opened without console/network errors.
 
 ## Latest Completed Work
 
+- R9 public complaint isolation is complete in PR #349.
+  - Anonymous production reports now use a dedicated `POST /api/public/complaints` endpoint instead of the generic `/api/kv` bridge.
+  - The endpoint is disabled by default, server rate-limited, loads the zone server-side, ignores client status/key/zone labels, and writes exactly one pending `ccomplaint:<id>` record.
+  - Local tests, production build, release checks, and browser smoke passed.
 - R9 production session profile scopes are complete in PR #347.
   - Production session payload now carries manager zones, technician scope, and supplier through the app/API boundary.
   - This closed the stale active-work handoff that still pointed at PR #346.

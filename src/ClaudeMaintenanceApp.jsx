@@ -24,13 +24,14 @@ import { DEFAULT_LOCAL_NOTIFICATION_PREFS, parseLocalNotificationPrefs, parseNot
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
-import { appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
+import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
+import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -46,6 +47,7 @@ const PRODUCTION_LOGIN_CONFIG = productionLoginConfigFromEnv(import.meta.env);
 const PRODUCTION_AUTH_STORE = createProductionAuthStore();
 const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PRODUCTION_AUTH_STORE);
 const CLEANING_PHOTOS = createCleaningPhotoStorageFromEnv(import.meta.env, PRODUCTION_AUTH_STORE);
+const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 
 const TRACKS = {
   facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
@@ -1293,6 +1295,12 @@ export default function App() {
     const stored = await CLEANING_PHOTOS.saveComplaint(base);
     await persistComplaint({ ...stored, status, ownerRole, verified: trusted, ticketId, demo: false });
   };
+  const submitAnonymousComplaint = async (c) => {
+    if (APP_MODE === APP_MODES.production) {
+      return PUBLIC_COMPLAINTS.submit(c);
+    }
+    return fileComplaint(c);
+  };
   const approveComplaint = async (c) => {
     let ticketId = c.ticketId || null;
     if (c.kind === "broken" && !ticketId) ticketId = await spawnFacilityFromComplaint(c);
@@ -1502,7 +1510,7 @@ export default function App() {
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={fileComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
+        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -1655,7 +1663,12 @@ function PublicReport({ zones, onSubmit, onClose }) {
     if (!photo) return setErr("חובה לצרף תמונה — הדיווח לא יישלח בלעדיה");
     setBusy(true);
     try { const last = await store.get("anonrl"); if (isRateLimited(last)) { setBusy(false); return setErr("דיווח נשלח לאחרונה ממכשיר זה. נסו שוב בעוד דקה."); } await store.set("anonrl", String(Date.now())); } catch (e) {}
-    try { await onSubmit({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind: prob.kind, photo, text: text.trim() || prob.label, reportedById: "", reportedByName: "דיווח אנונימי", reportedByRole: "anonymous" }); } catch (e) {}
+    try {
+      await onSubmit({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind: prob.kind, photo, text: text.trim() || prob.label, reportedById: "", reportedByName: "דיווח אנונימי", reportedByRole: "anonymous" });
+    } catch (e) {
+      setBusy(false);
+      return setErr("שליחת הדיווח נכשלה. נסו שוב בעוד רגע.");
+    }
     setDone(true);
   };
   return (<div className="pub-wrap"><div className="pub-card">
