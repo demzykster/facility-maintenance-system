@@ -21,15 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/block-optimistic-config-user-save`
+### Active branch: `codex/block-optimistic-work-record-saves`
 
-- Status: this PR prevents false optimistic UI updates for configuration and user writes when shared storage persistence fails.
-- Latest synchronized `main`: `ff7f47f fix: preserve state on storage read failure (#325)`.
+- Status: this PR prevents false optimistic UI updates for secondary work-record writes when shared storage persistence fails.
+- Latest synchronized `main`: `d2ff156 fix: block optimistic config user saves (#326)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - settings, permissions, and user records must not appear saved when API persistence returns `false`.
-  - `saveConfig`, `saveUser`, and `delUser` now use the shared persistence guard before changing local React state.
+  - PM, inspection templates/results, tasks, and meetings must not appear saved when API persistence returns `false`.
+  - the save/delete functions for those records now use the shared persistence guard before changing local React state.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
   - `npm test -- --run` passed.
@@ -40,6 +40,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 optimistic config/user save guard is complete in PR #326.
+  - `saveConfig`, `saveUser`, and `delUser` no longer update local React state when shared persistence returns `false`.
+  - This protects settings, permissions, and user-management changes from looking saved when the backend write failed.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 production API read-failure guard is complete in PR #325.
   - API storage `get` / `list` now throw on timeout/read failure when memory fallback is disabled.
   - App collection loading no longer swallows storage read failures as invalid JSON.
