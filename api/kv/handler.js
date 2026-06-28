@@ -1,6 +1,6 @@
 import { createUpstashKvDriverFromEnv } from "./upstashDriver.js";
 import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
-import { kvWritePermissionError, kvWritePermissionForKey, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
+import { kvReadValueForSession, kvWritePermissionError, kvWritePermissionForKey, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { ticketStatusAuditEvent } from "../../src/auditEventModel.js";
@@ -126,7 +126,11 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
       }
 
       if (method === "GET") {
-        const value = await backendDriver.get(key, shared);
+        const value = kvReadValueForSession({
+          key,
+          value: await backendDriver.get(key, shared),
+          session: auth.user
+        });
         return json(res, 200, value === null || value === undefined ? null : { value });
       }
       if (method === "PUT") {
