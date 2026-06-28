@@ -21,25 +21,24 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/block-optimistic-cleaning-ppe-saves`
+### Active branch: none
 
-- Status: this PR prevents false optimistic UI updates for cleaning, zone, absence, and PPE writes when shared storage persistence fails.
-- Latest synchronized `main`: `434188f fix: block optimistic work record saves (#327)`.
-- Open PRs: none at branch start.
+- Status: no active product branch after PR #328.
+- Latest synchronized `main`: `31bb343 fix: block optimistic cleaning ppe saves (#328)`.
+- Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - cleaning zones/rounds/complaints/absences and PPE inventory/issuance/request/order records must not appear saved when API persistence returns `false`.
-  - the save/delete functions for those records now use the shared persistence guard before changing local React state.
+  - the main shared-save optimistic UI risk pass is complete for core records, settings/users, PM/inspections/tasks/meetings, cleaning, and PPE.
+  - remaining `store.set` / `store.del` calls are special flows and should be reviewed deliberately before changing: session/theme/login preferences, notifications, presence heartbeat, demo seed/import, anonymous rate-limit, and raw photo/cache writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
-  - `npm test -- --run` passed.
-  - `npm run build` passed.
-  - `npm run release:check` passed for default demo/local config.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - docs-only update; `git diff --check` passed.
 
 ## Latest Completed Work
 
+- R9 optimistic cleaning/PPE save guard is complete in PR #328.
+  - Cleaning zones/rounds/complaints/absences and PPE inventory/issuance/request/order records no longer update local React state when shared persistence returns `false`.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 optimistic work-record save guard is complete in PR #327.
   - PM, inspection templates/results, tasks, and meetings no longer update local React state when shared persistence returns `false`.
   - Local tests, production builds, release checks, and Vercel passed.
