@@ -14,9 +14,13 @@ The preflight fails if staging is still missing production-mode API/Supabase env
 
 ## Required Env Shape
 
+Use `.env.staging.example` as the non-secret template for Vercel environment variables.
+
 - `VITE_CMMS_APP_MODE=production`
 - `VITE_CMMS_STORAGE_PROVIDER=api`
 - `VITE_CMMS_STORAGE_API_URL=/api`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 - `CMMS_KV_AUTH=supabase`
 - `CMMS_KV_DRIVER=supabase`
 - `CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true`
