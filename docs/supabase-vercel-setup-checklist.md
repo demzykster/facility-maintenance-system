@@ -145,6 +145,7 @@ Minimum path:
 10. verify the complaint is pending and not auto-converted to an open ticket;
 11. export tickets;
 12. verify audit entries exist.
+13. run `npm run staging:smoke:live`.
 
 ## 9. Backup And Restore Drill
 
