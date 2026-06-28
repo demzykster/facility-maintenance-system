@@ -46,6 +46,14 @@ npm run staging:smoke:live
 
 This checks the public app URL, closed bootstrap endpoint, admin Supabase login, `/api/session/me`, KV read access, file route auth/metadata boundary, required Supabase table counts, and the private file bucket. It uses `.env.staging.local` plus `.staging-admin-credentials.local` when present, and must not print secret values.
 
+Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
+
+```bash
+npm run staging:smoke:live -- --expect-current-commit
+```
+
+This strict mode fails if the public app still serves an older bundle.
+
 ## Required Env Shape
 
 Use `.env.staging.example` as the non-secret template for Vercel environment variables.
@@ -88,7 +96,7 @@ After first-admin bootstrap succeeds:
 10. Verify the complaint appears as pending and does not auto-create an open ticket.
 11. Export tickets and verify the file includes lifecycle/status/waiting columns.
 12. Check audit visibility for the created ticket/status/file actions.
-13. Run `npm run staging:smoke:live` after the manual data smoke so the live automated gate has current evidence.
+13. Run `npm run staging:smoke:live -- --expect-current-commit` after the manual data smoke so the live automated gate has current evidence and the public bundle is not stale.
 14. Complete `docs/supabase-backup-restore-drill.md` against the same staging project.
 
 If any step fails, do not mark staging ready. Fix the smallest blocker first.

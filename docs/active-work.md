@@ -21,10 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/automate-staging-smoke`
+### Active branch: `codex/staging-smoke-version-check`
 
-- Status: adding a repeatable live staging smoke command for the already configured Vercel/Supabase staging environment.
-- Latest synchronized `main`: after PR #384. Public Vercel staging currently serves app bundle commit `bdecfd5` (`feat: export fleet park to Excel`) until the latest main is redeployed.
+- Status: adding an optional strict deployed-commit check to the live staging smoke command.
+- Latest synchronized `main`: after PR #385. Public Vercel staging could not be manually redeployed because the Vercel Hobby daily deploy limit was reached (`api-deployments-free-per-day`).
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -75,7 +75,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Empty staging data after smoke contains one admin user plus smoke records and smoke role users for manager, technician, worker, and cleaner; these are temporary pilot/staging records and can be cleared before owner-facing demo.
   - Mobile role preview smoke passed locally on `http://127.0.0.1:5173/`: admin mobile topbar shows the role-preview toggle, can switch into worker preview, and `יציאה` remains visible.
   - Mobile role preview fix is merged in PR #384.
-  - Live staging smoke command is being added: `npm run staging:smoke:live` checks the public app URL, closed bootstrap endpoint, admin Supabase auth/session, KV read access, file route metadata boundary, required Supabase table counts, and the private file bucket without printing secret values.
+  - Live staging smoke command is merged in PR #385: `npm run staging:smoke:live` checks the public app URL, closed bootstrap endpoint, admin Supabase auth/session, KV read access, file route metadata boundary, required Supabase table counts, and the private file bucket without printing secret values.
+  - Strict deployed-version smoke is being added: `npm run staging:smoke:live -- --expect-current-commit` should fail when Vercel still serves an older bundle.
   - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
