@@ -62,10 +62,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - finish empty Supabase/Vercel staging smoke: browser Excel download still needs confirmation, transport ticket status update still needs a UI check, and the cleaning zone was inserted directly for public complaint smoke rather than created through the UI.
+  - finish empty Supabase/Vercel staging smoke: browser Excel download still needs confirmation, and full transport status progression still needs a technician assignment/acceptance path.
   - configure daily Supabase backups and perform one restore drill.
 - Validation:
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
+  - Follow-up smoke check: the transport ticket detail opened in the UI, admin note update saved, and the cleaning UI shows the smoke public zone plus one pending report.
   - Remaining smoke caveat: in-app browser did not emit a download event for `ייצוא ל-Excel`; no UI or console error was observed, but export download is not yet proven in browser.
   - Empty staging data after smoke contains exactly one admin user plus smoke records: two tickets, one fleet item, one public complaint, one file metadata row, and audit entries.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
