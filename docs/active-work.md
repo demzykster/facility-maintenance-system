@@ -21,26 +21,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/block-optimistic-shift-presence`
+### Active branch: none
 
-- Status: this PR prevents technician shift presence from appearing changed when shared persistence fails.
-- Latest synchronized `main`: `87889c0 docs: sync active work after ledger close (#330)`.
-- Open PRs: none at branch start.
+- Status: no active product branch after PR #331.
+- Latest synchronized `main`: `2a7f960 fix: block optimistic shift presence (#331)`.
+- Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - explicit technician shift start/end actions must not update local presence state when API persistence returns `false`.
-  - technician auto-start on login now also waits for presence persistence before updating local state.
-  - the background heartbeat remains intentionally quiet to avoid noisy minute-by-minute storage errors.
+  - the main shared-save optimistic UI risk pass is complete.
+  - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
+  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, notifications, demo seed/import, anonymous rate-limit, raw photo/cache writes, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
-  - `npm test -- --run` passed.
-  - `npm run build` passed.
-  - `npm run release:check` passed for default demo/local config.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
-  - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - docs-only update; `git diff --check` passed.
 
 ## Latest Completed Work
 
+- R9 optimistic shift presence guard is complete in PR #331.
+  - Explicit technician shift start/end and technician auto-start on login now wait for shared presence persistence before updating local state.
+  - Background heartbeat remains intentionally quiet to avoid noisy minute-by-minute storage errors.
+  - Local tests, production builds, release checks, and Vercel passed.
 - R9 active-work main sync is complete in PR #330.
   - `docs/active-work.md` now points at PR #329 / `9d3d4aa` as the latest clean handoff point.
   - Vercel passed.
