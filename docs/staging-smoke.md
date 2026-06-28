@@ -18,6 +18,14 @@ For local verification before copying values into Vercel, copy `.env.staging.exa
 npm run staging:preflight:local
 ```
 
+To check whether the Vercel project already has the required variable names configured, run:
+
+```bash
+npm run staging:vercel-env
+```
+
+This command lists only missing variable names. It must not print secret values.
+
 ## Required Env Shape
 
 Use `.env.staging.example` as the non-secret template for Vercel environment variables.

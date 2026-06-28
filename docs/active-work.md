@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after worker/cleaner role-preview and logout polish.
-- Latest synchronized `main`: after worker/cleaner role-preview and logout polish.
+- Status: no product branch is active after staging/Vercel env preflight tooling.
+- Latest synchronized `main`: after staging/Vercel env preflight tooling.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -51,6 +51,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
+  - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
+  - Vercel currently has no project environment variables configured, so real empty staging smoke cannot run yet.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
@@ -76,6 +78,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Staging/Vercel env preflight tooling is complete.
+  - `npm run staging:vercel-env` checks the Vercel project for required staging env variable names without printing secret values.
+  - The command currently fails as expected because Vercel has no configured project env variables yet.
+  - Local tests, release check, production build, and diff check passed.
 - Worker/cleaner role-preview and logout polish is complete.
   - Worker and cleaner top bars now show a visible `יציאה` button instead of relying on an icon-only logout action.
   - Role preview controls are more compact and the expanded role grid uses less vertical space.
