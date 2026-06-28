@@ -294,6 +294,31 @@ describe("file API handler", () => {
     expect(driver.upload).not.toHaveBeenCalled();
   });
 
+  it("requires upload metadata when a metadata sink is configured", async () => {
+    const driver = { upload: vi.fn() };
+    const metadataDriver = { upsert: vi.fn() };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient()
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" },
+      body: {
+        contentType: "image/jpeg",
+        data: Buffer.from("photo-bytes").toString("base64")
+      }
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "file_metadata_required" });
+    expect(driver.upload).not.toHaveBeenCalled();
+    expect(metadataDriver.upsert).not.toHaveBeenCalled();
+  });
+
   it("rejects uploads that exceed the configured file size limit", async () => {
     const driver = { upload: vi.fn() };
     const metadataDriver = { upsert: vi.fn() };

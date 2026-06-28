@@ -21,16 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/require-explicit-kv-bridge-production`
+### Active branch: `codex/require-file-upload-metadata`
 
-- Status: in progress after PR #341.
-- Latest synchronized `main`: `db1973f fix: skip file-backed photos in legacy backup (#341)`.
+- Status: in progress after PR #342.
+- Latest synchronized `main`: `8ae657b fix: require explicit production kv bridge acceptance (#342)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - current branch requires explicit owner acceptance before production release checks can pass with the interim Supabase KV bridge.
+  - current branch blocks file uploads without metadata when the production file metadata sink is configured, preventing orphaned protected files.
   - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, demo seed/import, backup legacy photo import, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
@@ -41,6 +41,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 explicit KV bridge production acceptance is complete in PR #342.
+  - Production release checks now require `CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true` before accepting the interim Supabase KV bridge.
+  - This prevents confusing the monolith compatibility bridge with the final normalized RLS data model.
+  - Local tests, production build, and release checks passed. Vercel was rate-limited.
 - R9 backup legacy photo export cleanup is complete in PR #341.
   - JSON backup now reads legacy `photo:*` keys only for tickets that do not already use file-backed `photoPath` / `afterPhotoPath`.
   - This keeps file-backed production photos behind the file adapter/storage boundary instead of pretending they are bundled into JSON backup.

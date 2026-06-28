@@ -62,7 +62,7 @@ The table is created by:
 supabase/migrations/20260627201000_file_metadata.sql
 ```
 
-`/api/files` accepts optional upload metadata and persists it when the metadata sink is configured. If upload metadata is provided but the sink is not configured, the upload fails with `file_metadata_not_configured` so metadata is not silently lost.
+`/api/files` accepts upload metadata and persists it when the metadata sink is configured. If upload metadata is provided but the sink is not configured, the upload fails with `file_metadata_not_configured` so metadata is not silently lost. If the metadata sink is configured, uploads without metadata fail with `file_metadata_required` so production cannot create orphaned files.
 
 Ticket photo uploads now pass explicit file metadata through `/api/files`. Cleaning complaint main photos, cleaning complaint issue photos, and cleaning round issue photos now pass explicit file metadata through `/api/files`.
 
