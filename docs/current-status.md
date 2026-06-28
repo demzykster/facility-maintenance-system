@@ -1,6 +1,6 @@
 # Current Status
 
-This file is a status reference for Codex sessions. The live handoff point is `docs/active-work.md`.
+This file is an archive/reference snapshot for Codex sessions. It must not compete with the live handoff point: `docs/active-work.md`.
 
 ## Source Of Truth
 
@@ -14,19 +14,18 @@ This file is a status reference for Codex sessions. The live handoff point is `d
 
 The GitHub repository is now the source of truth. The old artifact/chat file is no longer the source of truth.
 
-## Session Sync Rule
+## Session Sync Reference
 
-Before answering project-status questions or starting work, every Codex session must synchronize with GitHub:
+The current lightweight startup rule lives in `docs/active-work.md`. Use that file first.
 
-- fetch/prune remote state;
-- inspect latest `origin/main`;
-- inspect open PRs if available;
-- inspect remote branches as well as PRs.
-- always read `docs/active-work.md` first for the exact active-work ledger, even if `main` looks clean.
+For normal work, check:
 
-A clean `main` and no open PRs do not prove there is no active work. A pushed branch without PR is still active work and must be checked.
+- current branch and working tree;
+- latest `origin/main`;
+- open PRs if available;
+- `docs/active-work.md`.
 
-If `main`, PRs, remote branches, and docs disagree, start with `PROBLEM:` and resolve the synchronization issue before product work.
+Check remote branches only when the task involves PR/branch sync or `docs/active-work.md` says an unmerged branch exists.
 
 ## Completed
 
