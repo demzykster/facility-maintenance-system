@@ -23,20 +23,26 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #334.
-- Latest synchronized `main`: `63ef646 refactor: clarify admin role preview state (#334)`.
+- Status: no active product branch after PR #335.
+- Latest synchronized `main`: `e76b9fe fix: read anonymous report rate limit timestamp (#335)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
   - the main shared-save optimistic UI risk pass is complete.
   - explicit technician shift start/end and auto-start presence writes also no longer update local state when shared persistence returns `false`.
-  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, notifications, demo seed/import, anonymous rate-limit, raw photo/cache writes, and quiet heartbeat writes.
+  - remaining direct storage writes are special flows and should be reviewed deliberately before changing: session/theme/login preferences, notifications, demo seed/import, raw photo/cache writes, and quiet heartbeat writes.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Validation:
   - docs-only update; `git diff --check` passed.
 
 ## Latest Completed Work
 
+- R9 anonymous report rate-limit read fix is complete in PR #335.
+  - The anonymous quick-report cooldown now reads the actual string value returned by the app store instead of expecting a legacy `{ value }` wrapper.
+  - Focused Vitest coverage was added for current and legacy timestamp shapes.
+- Admin role preview sidebar cleanup is complete in PRs #333 and #334.
+  - The floating role switcher was moved into the desktop sidebar as `תצוגת תפקיד`.
+  - The internal state name now reflects role preview instead of impersonation language.
 - R9 optimistic shift presence guard is complete in PR #331.
   - Explicit technician shift start/end and technician auto-start on login now wait for shared presence persistence before updating local state.
   - Background heartbeat remains intentionally quiet to avoid noisy minute-by-minute storage errors.
