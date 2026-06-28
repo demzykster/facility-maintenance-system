@@ -1623,7 +1623,7 @@ function WorkerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{view === "new" ? "דיווח תקלה" : view === "ppe" ? "הציוד שלי" : view === "activity" ? "יומן פעילות" : "הדיווחים שלי"}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={20} /></button></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> הציוד שלי{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
@@ -2774,7 +2774,7 @@ function CleanerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">סבבי ניקיון</div><div className="wk-sub">{session.name}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="icon-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={20} /></button></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <main className="content">
@@ -7243,16 +7243,16 @@ button.notif-perm:hover{background:#D1FAE5;}
 .ni-text{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}.ni-time{font-size:11px;color:var(--muted);margin-top:3px;}
 .side-badge{margin-inline-start:auto;background:#EF4444;color:#fff;min-width:20px;height:20px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;}
 .role-preview{margin-top:8px;}
-.rp-toggle{display:flex;align-items:center;gap:9px;width:100%;min-height:42px;border:1px solid #ffffff1a;border-radius:14px;background:#ffffff08;color:#fff;padding:7px 8px;text-align:right;}
+.rp-toggle{display:flex;align-items:center;gap:7px;width:100%;min-height:36px;border:1px solid #ffffff1a;border-radius:999px;background:#ffffff08;color:#fff;padding:5px 7px;text-align:right;}
 .rp-toggle:hover,.rp-toggle.on{background:#ffffff12;border-color:#ffffff28;}
-.rp-toggle-ic{width:30px;height:30px;border-radius:999px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
+.rp-toggle-ic{width:26px;height:26px;border-radius:999px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
 .rp-toggle-txt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;}
-.rp-toggle-txt b{font-size:12.5px;font-weight:800;line-height:1.2;}
-.rp-toggle-txt small{font-size:10.5px;font-weight:500;color:var(--side-ink);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rp-toggle-txt b{font-size:11.5px;font-weight:800;line-height:1.15;}
+.rp-toggle-txt small{font-size:10px;font-weight:500;color:var(--side-ink);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rp-toggle-chev{color:var(--side-ink);transition:transform .15s ease;flex:none;}
 .rp-toggle.on .rp-toggle-chev{transform:rotate(-90deg);}
-.rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px;padding:8px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff06;}
-.rp-btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:30px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11.5px;font-weight:600;}
+.rp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:6px;padding:7px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff06;}
+.rp-btn{display:flex;align-items:center;justify-content:center;gap:4px;min-height:28px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11px;font-weight:600;}
 .rp-btn:hover{background:#ffffff14;color:#fff;}
 .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
 .side-version{color:var(--side-ink);font-size:10.5px;text-align:center;padding:5px 4px 0;opacity:.82;}
@@ -7530,6 +7530,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .worker-shell{min-height:100vh;background:var(--bg);max-width:560px;margin:0 auto;display:flex;flex-direction:column;}
 .worker-top{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 12px;background:var(--slate);color:#fff;}
 .worker-top .icon-btn{color:#fff;}.worker-top .icon-btn:hover{background:rgba(255,255,255,.14);}
+.worker-action-btn{min-height:38px;border:1px solid #ffffff1a;border-radius:999px;background:#ffffff10;color:#fff;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:800;cursor:pointer;}
+.worker-action-btn:hover{background:#ffffff1c;}
 .worker-preview{background:var(--slate);padding:0 16px 12px;}
 .worker-preview .role-preview{margin-top:0;}
 .wk-title{font-family:var(--font-head);font-weight:700;font-size:20px;}
