@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  kvReadValueForSession,
   kvWritePermissionError,
   kvWritePermissionForKey,
+  redactUserSecrets,
   sensitiveKvWriteAuditEvent,
   sessionHasKvWritePermission,
+  sessionCanReadUserSecrets,
   sessionPermissionLevel
-} from "../api/kv/permissionPolicy.js";
+} from "../server/kv/permissionPolicy.js";
 
 describe("KV write permission policy", () => {
   it("maps sensitive record keys to the existing module permissions", () => {
@@ -34,6 +37,45 @@ describe("KV write permission policy", () => {
     expect(sessionPermissionLevel({ role: "user", permissions: { ppe: "request" } }, "ppe")).toBe("request");
     expect(kvWritePermissionError({ role: "user", permissions: { ppe: "request" } }, "ppeorder:po-1")).toBe("permission_required:ppe:manage");
     expect(kvWritePermissionError({ role: "user", permissions: { ppe: "manage" } }, "ppeorder:po-1")).toBeNull();
+  });
+
+  it("redacts user login secrets for sessions that cannot manage users or worker access", () => {
+    expect(sessionCanReadUserSecrets({ role: "admin" })).toBe(true);
+    expect(sessionCanReadUserSecrets({ role: "user", permissions: { users: "manage" } })).toBe(true);
+    expect(sessionCanReadUserSecrets({ role: "user", permissions: { workerAccess: "manage" } })).toBe(true);
+    expect(sessionCanReadUserSecrets({ role: "user", permissions: { users: "view" } })).toBe(false);
+
+    const record = {
+      id: "worker-1",
+      name: "Worker",
+      workerNo: "1042",
+      password: "secret",
+      pin: "1234",
+      activationToken: "token",
+      activationStatus: "pending"
+    };
+
+    expect(redactUserSecrets(record)).toEqual({
+      id: "worker-1",
+      name: "Worker",
+      workerNo: "1042",
+      activationStatus: "pending"
+    });
+    expect(JSON.parse(kvReadValueForSession({
+      key: "user:worker-1",
+      value: JSON.stringify(record),
+      session: { role: "user", permissions: { users: "view" } }
+    }))).toEqual({
+      id: "worker-1",
+      name: "Worker",
+      workerNo: "1042",
+      activationStatus: "pending"
+    });
+    expect(kvReadValueForSession({
+      key: "user:worker-1",
+      value: JSON.stringify(record),
+      session: { role: "admin" }
+    })).toBe(JSON.stringify(record));
   });
 
   it("builds audit events for sensitive writes without changing ordinary workflow writes", () => {

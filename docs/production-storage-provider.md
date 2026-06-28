@@ -84,12 +84,15 @@ Current server route files:
 
 - `api/kv/index.js`
 - `api/kv/[key].js`
-- `api/kv/handler.js`
-- `api/kv/supabaseDriver.js`
-- `api/kv/upstashDriver.js`
 - `api/files/index.js`
-- `api/files/handler.js`
-- `api/files/supabaseFileDriver.js`
+
+Internal route logic lives outside Vercel's route tree so helper modules are not deployed as separate Serverless Functions:
+
+- `server/kv/handler.js`
+- `server/kv/supabaseDriver.js`
+- `server/kv/upstashDriver.js`
+- `server/files/handler.js`
+- `server/files/supabaseFileDriver.js`
 
 The handler is intentionally safe by default:
 

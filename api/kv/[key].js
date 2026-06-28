@@ -1,3 +1,3 @@
-import handler from "./handler.js";
+import handler from "../../server/kv/handler.js";
 
 export default handler;

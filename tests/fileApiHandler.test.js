@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createFileApiHandler } from "../api/files/handler.js";
+import { createFileApiHandler } from "../server/files/handler.js";
 
 function createRes() {
   return {

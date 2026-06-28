@@ -53,8 +53,8 @@ The first server file API is:
 Route files:
 
 - `api/files/index.js`
-- `api/files/handler.js`
-- `api/files/supabaseFileDriver.js`
+- `server/files/handler.js`
+- `server/files/supabaseFileDriver.js`
 - `src/apiFileAdapter.js`
 
 The route is closed by default until `CMMS_FILE_DRIVER=supabase`, `CMMS_FILE_BUCKET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are configured.
@@ -65,7 +65,7 @@ The frontend adapter is `createApiFileProvider` in `src/apiFileAdapter.js`. It f
 
 Protected file bytes live in Supabase Storage. Their business ownership belongs in a future `file_metadata` database table.
 
-The first shared metadata contract is documented in `docs/production-file-metadata.md`, modeled in `src/fileMetadataModel.js`, and backed by `api/files/supabaseFileMetadataDriver.js`.
+The first shared metadata contract is documented in `docs/production-file-metadata.md`, modeled in `src/fileMetadataModel.js`, and backed by `server/files/supabaseFileMetadataDriver.js`.
 
 ## Next Implementation Step
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSupabaseFileDriver } from "../api/files/supabaseFileDriver.js";
+import { createSupabaseFileDriver } from "../server/files/supabaseFileDriver.js";
 
 describe("Supabase file driver", () => {
   it("uploads, downloads, and deletes files through Supabase Storage REST", async () => {

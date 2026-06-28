@@ -21,15 +21,17 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/file-metadata-read-guard`
+### Active branch: `codex/kv-sensitive-read-guard`
 
-- Status: this PR requires active file metadata before `/api/files` download/delete when a metadata lookup sink is configured.
-- Latest synchronized `main`: `3e37324 [skip vercel] docs: close file prefix guard ledger`.
+- Status: this PR redacts user login secrets from `/api/kv` reads for sessions that cannot manage users or worker activation.
+- Latest synchronized `main`: `d910e13 [skip vercel] feat: guard file reads with metadata (#316)`.
 - Open PRs: none at branch start.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
-  - current production step: bind protected file reads/deletes to active `file_metadata` rows instead of relying only on path prefixes.
-  - next production step: add owner/permission checks from file metadata once business table/RLS ownership is available.
+  - current production step: reduce sensitive data exposure in the temporary KV bridge without breaking the current frontend collection-loading model.
+  - also fixes the Vercel Hobby function-count blocker by keeping `api/` limited to real endpoint files and moving helper modules under `server/`.
+  - `/api/kv` write/delete guards already require manage permissions for sensitive keys; this branch protects user credential fields on reads.
+  - full read blocking for `user:`, `config:v1`, fleet, PPE, and cleaning setup keys should wait for normalized tables/RLS or a frontend loader split, because the current monolith still loads shared collections broadly.
   - production seed/bootstrap boundary is now defined; do not add frontend hardcoded production admin credentials.
   - current demo/local records are fake and are not a production migration source.
   - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
@@ -38,15 +40,21 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run release:check` now blocks production mode if storage still points at local/browser storage.
   - future broad modules such as budget and safety inspections must reuse shared CMMS entities instead of creating duplicate systems.
 - Validation:
-  - `npx vitest run tests/fileApiHandler.test.js tests/supabaseFileMetadataDriver.test.js --reporter=verbose` passed.
+  - `npx vitest run tests/kvPermissionPolicy.test.js tests/kvApiHandler.test.js --reporter=verbose` passed.
   - `npm test -- --run` passed.
   - `npm run build` passed.
   - `npm run release:check` passed for default demo/local config.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api CMMS_KV_AUTH=supabase CMMS_KV_DRIVER=supabase CMMS_AUDIT_DRIVER=supabase CMMS_FILE_DRIVER=supabase CMMS_FILE_BUCKET=cmms-files CMMS_FILE_METADATA_DRIVER=supabase SUPABASE_URL=https://supabase.example SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service npm run release:check` passed.
   - `VITE_CMMS_APP_MODE=production VITE_CMMS_STORAGE_PROVIDER=api VITE_CMMS_STORAGE_API_URL=https://cmms.example/api VITE_SUPABASE_URL=https://supabase.example VITE_SUPABASE_ANON_KEY=anon npm run build` passed.
+  - `npx vercel build --yes` passed after linking the local checkout to the existing Vercel project.
+  - `npx vercel deploy --prebuilt` passed; deployment `dpl_7z5MtgvfkafcfCjEAuLo3RtFvwoX` reached `READY`.
 
 ## Latest Completed Work
 
+- R9 file metadata read/delete guard is complete in PR #316.
+  - `/api/files` download/delete now require an active `file_metadata` row when the metadata driver supports lookup by path.
+  - Missing or soft-deleted metadata returns `file_metadata_not_found`.
+  - Local tests, production builds, and release checks passed.
 - R9 file prefix ledger sync is complete in PR #315.
   - `docs/active-work.md` now marks active work as none after PR #314.
   - This was a docs-only sync with Vercel passing.

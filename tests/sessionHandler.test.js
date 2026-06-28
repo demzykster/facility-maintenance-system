@@ -3,7 +3,7 @@ import {
   buildSessionPayload,
   createSessionMeHandler,
   createSupabaseSessionClient
-} from "../api/session/sessionHandler.js";
+} from "../server/session/sessionHandler.js";
 
 function createRes() {
   return {

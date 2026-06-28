@@ -36,6 +36,43 @@ export function sessionHasKvWritePermission(session = {}, key = "") {
   return permissionLevelRank(sessionPermissionLevel(session, rule.module)) >= permissionLevelRank(rule.minLevel);
 }
 
+export function sessionCanReadUserSecrets(session = {}) {
+  if (session.role === "admin") return true;
+  return permissionLevelRank(sessionPermissionLevel(session, "users")) >= permissionLevelRank("manage")
+    || permissionLevelRank(sessionPermissionLevel(session, "workerAccess")) >= permissionLevelRank("manage");
+}
+
+const USER_SECRET_FIELDS = Object.freeze([
+  "password",
+  "pin",
+  "activationToken",
+  "activationTokenExpiresAt",
+  "resetToken",
+  "resetCode",
+  "passwordHash",
+  "pinHash",
+  "temporaryPassword",
+  "tempPassword"
+]);
+
+export function redactUserSecrets(record = {}) {
+  const clean = { ...(record || {}) };
+  USER_SECRET_FIELDS.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(clean, field)) delete clean[field];
+  });
+  return clean;
+}
+
+export function kvReadValueForSession({ key = "", value = null, session = {} } = {}) {
+  if (!String(key || "").startsWith("user:") || sessionCanReadUserSecrets(session)) return value;
+  if (!value || typeof value !== "string") return value;
+  try {
+    return JSON.stringify(redactUserSecrets(JSON.parse(value)));
+  } catch {
+    return value;
+  }
+}
+
 export function kvWritePermissionError(session = {}, key = "") {
   const rule = kvWritePermissionForKey(key);
   if (!rule || sessionHasKvWritePermission(session, key)) return null;
