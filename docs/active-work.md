@@ -11,7 +11,7 @@ Before answering project-status questions or starting work:
 3. Read this file first.
 4. Read only the extra docs needed for the current task. Check remote branches only when the task involves PR/branch sync or this file says an unmerged branch exists.
 
-If `main`, open PRs, remote branches, or docs disagree, start with:
+If `main`, open PRs, or this live ledger disagree, start with:
 
 ```text
 PROBLEM:
@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: public complaint isolation is complete in PR #349; continue with staging smoke.
-- Latest synchronized `main` before PR #349: `0416ef5 docs: close 347 ledger tail (#348)`.
+- Latest synchronized `main`: `3c20d4f feat: isolate public complaint reports (#349)`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -45,10 +45,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - add minimum production error visibility for server/API failures.
   - decide or mitigate `xlsx@0.18.5` advisories; priority is lower than untrusted import parsing because `xlsx` is not the current `.xlsx` importer, but export is business-critical.
 - Validation:
-  - `npm test -- --run tests/publicComplaintHandler.test.js tests/vercelApiRouteModel.test.js` passed on current branch.
-  - `npm test -- --run` passed on current branch.
-  - `npm run build` passed on current branch.
-  - `npm run release:check` passed on current branch.
+  - `npm test -- --run tests/publicComplaintHandler.test.js tests/vercelApiRouteModel.test.js` passed before PR #349 merge.
+  - `npm test -- --run` passed before PR #349 merge.
+  - `npm run build` passed before PR #349 merge.
+  - `npm run release:check` passed before PR #349 merge.
   - Browser smoke via system Chrome passed: login screen loaded and public QR/problem report overlay opened without console/network errors.
 
 ## Latest Completed Work
