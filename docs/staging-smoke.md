@@ -2,6 +2,8 @@
 
 This is the first real staging/pilot gate. It is not a demo check.
 
+For the setup order before this smoke, use `docs/supabase-vercel-setup-checklist.md`.
+
 ## Preflight
 
 Run:
