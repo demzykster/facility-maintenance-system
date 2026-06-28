@@ -42,8 +42,7 @@
       const source = await fetch("/src/App.jsx").then((response) => response.text());
       const cdnSource = source
         .replace('from "react"', 'from "https://esm.sh/react@19.1.0"')
-        .replace('from "lucide-react"', 'from "https://esm.sh/lucide-react@0.468.0?deps=react@19.1.0"')
-        .replace('from "xlsx"', 'from "https://esm.sh/xlsx@0.18.5"');
+        .replace('from "lucide-react"', 'from "https://esm.sh/lucide-react@0.468.0?deps=react@19.1.0"');
       const compiled = Babel.transform(cdnSource, {
         presets: [["react", { runtime: "classic" }]],
         sourceType: "module"
