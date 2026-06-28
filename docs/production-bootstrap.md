@@ -49,6 +49,7 @@ The Auth user is only the identity. The CMMS profile is the operational source f
 - The temporary password is sent to Supabase but never returned in the API response.
 - The bootstrap response is only successful after both the Auth user and `public.app_users` profile are created.
 - If profile creation fails after Auth user creation, the response includes `authUserCreated: true` and `authUserId` for manual cleanup/retry.
+- The endpoint refuses a new bootstrap request when an active admin profile already exists.
 - After a successful bootstrap, remove `CMMS_BOOTSTRAP_ENABLED` or set it to `false`, and remove `CMMS_BOOTSTRAP_TOKEN`.
 
 ## Temporary Limitation
