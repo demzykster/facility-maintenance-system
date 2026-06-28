@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #331.
-- Latest synchronized `main`: `2a7f960 fix: block optimistic shift presence (#331)`.
+- Status: no active product branch after PR #332.
+- Latest synchronized `main`: `1b1d0a2 docs: close shift presence ledger (#332)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
