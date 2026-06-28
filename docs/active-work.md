@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no active product branch after PR #328.
-- Latest synchronized `main`: `31bb343 fix: block optimistic cleaning ppe saves (#328)`.
+- Status: no active product branch after PR #329.
+- Latest synchronized `main`: `9d3d4aa docs: close optimistic save ledger (#329)`.
 - Open PRs: none.
 - Purpose:
   - continue R9 Production Backend Foundation from `docs/production-hardening-plan.md`.
@@ -36,6 +36,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- R9 optimistic save ledger close is complete in PR #329.
+  - `docs/active-work.md` now marks no active product branch after PR #328.
+  - The remaining direct storage writes are explicitly listed as special flows for deliberate review.
 - R9 optimistic cleaning/PPE save guard is complete in PR #328.
   - Cleaning zones/rounds/complaints/absences and PPE inventory/issuance/request/order records no longer update local React state when shared persistence returns `false`.
   - Local tests, production builds, release checks, and Vercel passed.
