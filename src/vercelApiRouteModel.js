@@ -9,7 +9,8 @@ export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/public/complaints.js",
   "api/session/change-password.js",
   "api/session/profile.js",
-  "api/session/me.js"
+  "api/session/me.js",
+  "api/system-errors.js"
 ]);
 
 export function vercelApiRoutePolicy(files = [], { functionLimit = VERCEL_HOBBY_FUNCTION_LIMIT } = {}) {

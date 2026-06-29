@@ -15,7 +15,7 @@ export function createApiStorageProvider({ baseUrl, fetchImpl = globalThis.fetch
   if (typeof fetchImpl !== "function") throw new Error("storage_api_fetch_missing");
 
   const request = async (path, options = {}) => {
-    const accessToken = typeof getAccessToken === "function" ? getAccessToken() : "";
+    const accessToken = typeof getAccessToken === "function" ? await getAccessToken() : "";
     const response = await fetchImpl(`${root}${path}`, {
       ...options,
       headers: {

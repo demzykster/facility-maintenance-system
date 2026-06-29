@@ -35,6 +35,7 @@ import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
+import { fetchSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
@@ -6952,7 +6953,52 @@ function AppIssueReportModal({ session, onSave, onClose }) {
   </div>;
 }
 
+function SystemErrorsSettings() {
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [open, setOpen] = useState(null);
+  const load = async () => {
+    setBusy(true);
+    setErr("");
+    const result = await fetchSystemErrorLogs({ limit: 80 });
+    setBusy(false);
+    if (!result.ok) {
+      setErr(result.error === "access_token_required" ? "אין חיבור פעיל ליומן השגיאות." : "טעינת שגיאות המערכת נכשלה.");
+      setItems([]);
+      return;
+    }
+    setItems(result.errors || []);
+  };
+  useEffect(() => { load(); }, []);
+  const labelFor = (item) => {
+    if (item.kind === "storage_save_failed") return "שמירה נכשלה";
+    if (item.kind === "storage_delete_failed") return "מחיקה נכשלה";
+    return item.kind || "שגיאת מערכת";
+  };
+  return <>
+    <SectionTitle><AlertTriangle size={15} /> שגיאות מערכת</SectionTitle>
+    <div className="hint" style={{ marginBottom: 12 }}>רשימה קצרה של שגיאות שהמערכת תפסה בעצמה. הטכני נשאר מקופל כדי לא להפוך את המסך לרעש.</div>
+    <button className="btn-ghost sm" onClick={load} disabled={busy}><RefreshCw size={14} /> {busy ? "טוען…" : "רענון"}</button>
+    {err && <div className="err" style={{ marginTop: 10 }}>{err}</div>}
+    {!err && !busy && items.length === 0 ? <Empty text="אין שגיאות מערכת" Icon={CheckCircle2} sub="אם שמירה או פעולה תיכשל, היא תופיע כאן" /> : <div className="issue-list" style={{ marginTop: 12 }}>
+      {items.map((item) => { const rowKey = item.id || `${item.at}-${item.key}`; return <div key={rowKey} className="issue-card">
+        <div className="issue-main">
+          <div className="issue-top"><span className="issue-status open">{labelFor(item)}</span><span className="issue-date">{fmtDate(item.at)} {fmtTime(item.at)}</span></div>
+          <div className="issue-desc">{item.summary || labelFor(item)}</div>
+          <div className="issue-meta">{item.actorName || "—"} · {ROLE_LABEL[item.actorRole] || item.actorRole || "—"}{item.path ? " · " + item.path : ""}</div>
+          {open === rowKey && <div className="issue-response">
+            פעולה: {item.operation || "—"} · מפתח: {item.key || "—"} · שגיאה: {item.error || "—"}
+          </div>}
+        </div>
+        <button className="btn-ghost sm" onClick={() => setOpen((x) => x === rowKey ? null : rowKey)}>{open === rowKey ? "הסתר פרטים" : "פרטים"}</button>
+      </div>; })}
+    </div>}
+  </>;
+}
+
 function AppIssuesSettings({ issues, session, onSave }) {
+  const [view, setView] = useState("user");
   const [editing, setEditing] = useState(null);
   const sorted = [...(issues || [])].sort((a, b) => (b.at || 0) - (a.at || 0));
   const saveReaction = async () => {
@@ -6962,8 +7008,9 @@ function AppIssuesSettings({ issues, session, onSave }) {
   };
   return <>
     <SectionTitle><Bug size={15} /> דיווחי בעיות במערכת</SectionTitle>
-    <div className="hint" style={{ marginBottom: 12 }}>דיווחים שנשלחו מכפתור הגרסה בתפריט. זהו יומן פנימי לבדיקת באגים ושיפורי UI, לא קריאות אחזקה.</div>
-    {sorted.length === 0 ? <Empty text="אין דיווחי בעיות" Icon={Bug} sub="כאשר משתמש ידווח על בעיה היא תופיע כאן" /> : <div className="issue-list">
+    <div className="hint" style={{ marginBottom: 12 }}>דיווחים ידניים ממשתמשים ושגיאות אוטומטיות שהמערכת תפסה. זהו יומן איכות פנימי, לא קריאות אחזקה.</div>
+    <div className="seg-tabs" style={{ maxWidth: 520, marginBottom: 14 }}><button className={view === "user" ? "on" : ""} onClick={() => setView("user")}>דיווחי משתמשים</button><button className={view === "system" ? "on" : ""} onClick={() => setView("system")}>שגיאות מערכת</button></div>
+    {view === "system" ? <SystemErrorsSettings /> : sorted.length === 0 ? <Empty text="אין דיווחי בעיות" Icon={Bug} sub="כאשר משתמש ידווח על בעיה היא תופיע כאן" /> : <div className="issue-list">
       {sorted.map((issue) => <div key={issue.id} className="issue-card">
         <div className="issue-main">
           <div className="issue-top"><span className={"issue-status " + (issue.status || "open")}>{appIssueStatusLabel(issue.status)}</span><span className="issue-date">{fmtDate(issue.at)} {fmtTime(issue.at)}</span></div>
