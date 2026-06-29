@@ -69,7 +69,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
           if (result !== undefined) return result ? result.value : null;
         }
       } catch (e) {
-        if (!fallback) { notifyFail(shared, { operation: "get", key, error: e?.message || "" }); throw e; }
+        if (!fallback) throw e;
       }
       return fallback && Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
     },
@@ -111,7 +111,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
           if (result !== undefined) return result ? result.keys : [];
         }
       } catch (e) {
-        if (!fallback) { notifyFail(shared, { operation: "list", key: prefix, error: e?.message || "" }); throw e; }
+        if (!fallback) throw e;
       }
       return fallback ? Object.keys(mem).filter((key) => key.startsWith(prefix)) : [];
     }
