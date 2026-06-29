@@ -34,8 +34,8 @@ export function validateBootstrapAdminPayload(body = {}) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: "valid_email_required" };
   }
-  if (temporaryPassword.length < 12) {
-    return { ok: false, error: "temporary_password_min_12_chars" };
+  if (temporaryPassword.length < 6) {
+    return { ok: false, error: "temporary_password_min_6_chars" };
   }
 
   return {

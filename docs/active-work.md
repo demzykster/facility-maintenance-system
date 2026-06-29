@@ -58,6 +58,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
   - mobile admin topbar must show a visible `יציאה` action, not only an icon-only logout control.
+  - production password-change and first-admin bootstrap accept passwords from 6 characters; complexity is guidance, not a hard blocker.
+  - production login footer should stay user-facing and not expose technical Supabase/Auth wording.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
@@ -101,6 +103,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Final cleanup evidence file is local-only: `.tools/staging-backup-evidence-2026-06-29T04-34-25-956Z.json`.
   - Read-only UI smoke passed on public Vercel after cleanup: login as admin with the temporary password reached the app shell, `יציאה` was visible, smoke/demo records were not visible, and logout returned to login. Console showed pre-auth 401/init errors before login; keep as non-blocking polish follow-up.
   - Mobile admin topbar logout label polish passed locally on `http://127.0.0.1:5195/`: demo admin login reached the mobile shell, `.tb-logout` showed visible `יציאה`, `aria-label="יציאה מהמערכת"`, and a 67x38 px hit area.
+  - Login/password polish passed locally: password-change/bootstrap validation tests, full Vitest, release check, and production build all passed.
   - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
