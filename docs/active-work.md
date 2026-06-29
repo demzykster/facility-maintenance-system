@@ -73,12 +73,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
   - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
   - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
+  - local demo assets under `public/demo/` must stay out of git and Vercel uploads; they are local presentation material, not app runtime assets.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
   - Localization language-model foundation passed locally: `npm test -- --run tests/languageModel.test.js` confirms Hebrew fallback, supported language codes/names, locale normalization, and RTL/LTR direction.
   - Login footer polish passed locally in production-mode at 430px width: footer rendered as two lines (`פותח על ידי ...` and `גרסה v...`) without overflow or relevant console errors. `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
   - Cleaning save-flow hardening passed locally: new cleaning zone saved and survived reload; cleaning complaint form closed only after successful persistence; no relevant browser console errors. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.

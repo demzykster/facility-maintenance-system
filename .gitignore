@@ -10,6 +10,7 @@ vite-cache/
 _pre-sync-backup/
 _phase1-sync-state/
 .codex-remote-attachments/
+public/demo/
 
 *.local
 npm-debug.log*
