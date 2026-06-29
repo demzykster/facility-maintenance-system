@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/sidebar-logo-polish
 
-- Status: clean after PR #402; public Vercel production alias is redeployed from current `main`.
+- Status: polishing the desktop sidebar scrollbar and adding configurable brand logo upload.
 - Latest synchronized `main`: after PR #402 (`2304dcd`). Public Vercel live smoke passes for commit `2304dcd`.
-- Open PRs: none.
+- Open PRs: #404 (`codex/log-client-storage-failures`) is open and separate from this UI branch; its Vercel preview is blocked by build-rate-limit.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -50,6 +50,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
   - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
   - desktop sidebar footer must remain inside the visible viewport on shorter desktop windows; the navigation list may scroll independently.
+  - desktop sidebar navigation should scroll without showing a heavy visual scrollbar.
+  - the system logo can be configured from settings; uploaded images are resized and center-cropped to a square before saving.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
@@ -68,6 +70,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
   - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
+  - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
   - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Public Vercel production redeploy succeeded after the Hobby daily deployment limit reset. Strict live smoke passed for commit `2304dcd`.
   - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
@@ -111,6 +114,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Sidebar/logo polish is in progress.
+  - The desktop sidebar keeps scroll behavior but hides the heavy visual scrollbar.
+  - Settings > general now includes logo upload; images are resized and center-cropped automatically before saving.
 - Local browser storage fail-toast fix is complete in PR #401.
   - Failed local-only keys such as remembered login/session/theme no longer trigger the global red "save failed" toast.
   - Shared/server CMMS data failures still trigger the global save/delete warning.

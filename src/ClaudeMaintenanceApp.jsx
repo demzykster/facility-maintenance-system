@@ -55,6 +55,30 @@ const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PR
 const CLEANING_PHOTOS = createCleaningPhotoStorageFromEnv(import.meta.env, PRODUCTION_AUTH_STORE);
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 
+const imageFileToSquareDataUrl = (file, size = 320) => new Promise((resolve, reject) => {
+  if (!file) return resolve("");
+  if (!/^image\//.test(file.type || "")) return reject(new Error("not_image"));
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error("read_failed"));
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = () => reject(new Error("image_decode_failed"));
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.86));
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
 const TRACKS = {
   facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
   transport: { id: "transport", label: "כלי שינוע / מלגזות", short: "שינוע", Icon: Truck, color: "#EA580C" },
@@ -1882,7 +1906,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
     <div className="login-bg">
       <div className="login-card">
         <div className="login-card-head">
-          <div className="brand"><div className="brand-mark"><Wrench size={22} /></div><div><div className="brand-title">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
+          <div className="brand"><BrandMark logo={config?.brandLogo} /><div><div className="brand-title">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
           <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
         {activationToken ? (<>
@@ -5834,7 +5858,7 @@ function SettingsPanel(p) {
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
-  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
+  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
@@ -5862,7 +5886,19 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
+  const pickLogo = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setLogoMsg("");
+    try {
+      setBrandLogo(await imageFileToSquareDataUrl(file));
+      setLogoMsg("הלוגו הוכן לתצוגה. שמרו את ההגדרות כדי לעדכן את המערכת.");
+    } catch {
+      setLogoMsg("לא ניתן לקרוא את התמונה. נסו קובץ PNG או JPG.");
+    }
+  };
   const saveUsersCfg = async () => {
     setUserCfgMsg("");
     if (registryEmptied(depts, deptUse)) { setUserCfgMsg("לא ניתן לרוקן שם של מחלקה שנמצאת בשימוש — שנו שם או שחררו את הרשומות"); return; }
@@ -5905,6 +5941,18 @@ function SettingsPanel(p) {
 
     {tab === "general" && (<>
       <SectionTitle><Building2 size={15} /> חברה ואתר</SectionTitle>
+      <div className="brand-upload">
+        <BrandMark logo={brandLogo} />
+        <div className="brand-upload-main">
+          <div className="brand-upload-title">לוגו המערכת</div>
+          <div className="hint">העלו תמונה בכל גודל. המערכת תחתוך ותקטין אותה אוטומטית לריבוע.</div>
+          <div className="brand-upload-actions">
+            <label className="btn-ghost sm"><input type="file" accept="image/*" onChange={pickLogo} hidden /> העלאת לוגו</label>
+            {brandLogo && <button className="btn-ghost sm" onClick={() => { setBrandLogo(""); setLogoMsg("הלוגו הוסר. שמרו את ההגדרות כדי לעדכן."); }}>חזרה לאייקון ברירת מחדל</button>}
+          </div>
+          {logoMsg && <div className="hint" style={{ marginTop: 6 }}>{logoMsg}</div>}
+        </div>
+      </div>
       <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => setCoName(e.target.value)} placeholder="לדוגמה: כימיפל בע״מ" /></label>
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
@@ -6585,6 +6633,12 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
 /* ============================================================ SHARED UI */
 const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "ניקיון", Sparkles]];
 
+function BrandMark({ logo, small = false }) {
+  return <div className={"brand-mark" + (small ? " sm" : "") + (logo ? " has-logo" : "")}>
+    {logo ? <img src={logo} alt="" /> : <Wrench size={small ? 18 : 22} />}
+  </div>;
+}
+
 function RolePreviewBox({ rolePreview }) {
   const [open, setOpen] = useState(false);
   if (!rolePreview) return null;
@@ -6602,7 +6656,7 @@ function RolePreviewBox({ rolePreview }) {
 
 function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme }) {
   return (<aside className="sidebar">
-    <div className="side-brand"><div className="brand-mark sm"><Wrench size={18} /></div><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
+    <div className="side-brand"><BrandMark logo={config?.brandLogo} small /><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
     {primary && <button className="side-newbtn" onClick={primary.onClick}><Plus size={18} /> {primary.label}</button>}
     <div className="side-nav">{nav.map((n) => <button key={n.id} className={"side-item" + (n.active ? " on" : "")} onClick={n.onClick}><n.Icon size={19} /><span>{n.label}</span></button>)}<button className="side-item" onClick={onBell}><Bell size={19} /><span>התראות</span>{notif?.unread > 0 && <span className="side-badge">{notif.unread}</span>}</button></div>
     <div className="side-foot">
@@ -6765,8 +6819,10 @@ a{color:inherit;}
 .login-theme{width:40px;height:40px;border-radius:11px;color:var(--muted);background:var(--surface-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .login-theme:hover{border-color:var(--primary);color:var(--primary);}
 .brand{display:flex;align-items:center;gap:12px;min-width:0;}
-.brand-mark{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(234,88,12,.35);flex-shrink:0;}
+.brand-mark{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(234,88,12,.35);flex-shrink:0;overflow:hidden;}
 .brand-mark.sm{width:38px;height:38px;border-radius:11px;}
+.brand-mark.has-logo{background:#fff;color:transparent;}
+.brand-mark img{width:100%;height:100%;object-fit:cover;display:block;}
 .brand-title{font-family:var(--font-head);font-weight:700;font-size:24px;line-height:1;}
 .brand-title.sm{font-size:19px;color:#fff;}
 .brand-sub{color:var(--muted);font-size:13px;margin-top:3px;}.brand-sub.sm{color:var(--side-ink);font-size:11.5px;}
@@ -7339,6 +7395,10 @@ button.notif-perm:hover{background:#D1FAE5;}
 .rp-btn:hover{background:#ffffff14;color:#fff;}
 .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
 .side-version{color:var(--side-ink);font-size:10.5px;text-align:center;padding:5px 4px 0;opacity:.82;}
+.brand-upload{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:12px;}
+.brand-upload-main{min-width:0;flex:1;}
+.brand-upload-title{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:3px;}
+.brand-upload-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
 .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#EF4444;color:#fff;font-size:11px;font-weight:800;line-height:1;margin-inline-start:6px;}
 
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--slate);color:#fff;border-radius:13px;padding:13px 16px;display:flex;gap:11px;align-items:flex-start;max-width:90%;width:360px;box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:80;animation:rise .3s ease;cursor:pointer;}
@@ -7567,8 +7627,8 @@ button.notif-perm:hover{background:#D1FAE5;}
   .sidebar{display:flex;flex-direction:column;width:262px;background:var(--side);color:#fff;padding:20px 14px;position:sticky;top:0;height:100vh;height:100dvh;flex-shrink:0;overflow:hidden;}
   .side-brand{display:flex;align-items:center;gap:11px;margin-bottom:20px;padding:0 6px;}
   .side-newbtn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--primary);color:#fff;font-weight:600;font-size:14.5px;border-radius:11px;padding:12px;margin-bottom:16px;}
-  .side-nav{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:#ffffff33 transparent;}
-  .side-nav::-webkit-scrollbar{width:6px;}.side-nav::-webkit-scrollbar-thumb{background:#ffffff33;border-radius:999px;}
+  .side-nav{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:8px;scrollbar-width:none;-ms-overflow-style:none;}
+  .side-nav::-webkit-scrollbar{width:0;height:0;display:none;}
   .side-item{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:11px;color:var(--side-ink);font-weight:500;font-size:14px;text-align:right;width:100%;}
   .side-item:hover{background:#ffffff12;color:#fff;}.side-item.on{background:#ffffff18;color:#fff;}
   .side-foot{flex:0 0 auto;display:flex;flex-direction:column;gap:4px;padding-top:14px;border-top:1px solid #ffffff1a;}
