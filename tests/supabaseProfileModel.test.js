@@ -57,6 +57,7 @@ describe("supabase profile foundation", () => {
       role: "admin",
       name: "Owner",
       email: "owner@example.com",
+      phone: "",
       workerNo: null,
       department: "הנהלה",
       departments: [],

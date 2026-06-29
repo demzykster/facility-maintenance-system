@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import packageInfo from "../package.json";
@@ -26,7 +26,7 @@ import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
-import { changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession } from "./productionLoginAdapter.js";
+import { changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -1303,6 +1303,7 @@ export default function App() {
   const [ppeOrders, setPpeOrders] = useState([]);
   const [appIssues, setAppIssues] = useState([]);
   const [issueReportOpen, setIssueReportOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const snapRef = useRef({});
   const applySavedConfig = (savedConfig) => {
@@ -1526,6 +1527,41 @@ export default function App() {
     await store.set("session:v1", JSON.stringify(s), false);
   };
   const logout = async () => { setRolePreviewRole(null); setSession(null); PRODUCTION_AUTH_STORE.clear(); await store.del("session:v1", false); };
+  const saveMyProfile = async ({ email, phone, newPassword } = {}) => {
+    const realSession = session;
+    if (!realSession) return { ok: false, error: "session_missing" };
+    if (newPassword && newPassword.length < 6) return { ok: false, error: "password_min_6" };
+    try {
+      if (realSession.productionSession) {
+        const auth = PRODUCTION_AUTH_STORE.get();
+        const accessToken = auth?.accessToken || "";
+        if (!accessToken) return { ok: false, error: "access_token_required" };
+        let nextSession = realSession;
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+        const normalizedPhone = String(phone || "").trim();
+        if (normalizedEmail !== String(realSession.email || "").trim().toLowerCase() || normalizedPhone !== String(realSession.phone || "").trim()) {
+          const result = await updateProductionProfile({ accessToken, email: normalizedEmail, phone: normalizedPhone, config: PRODUCTION_LOGIN_CONFIG });
+          nextSession = { ...nextSession, ...result.session };
+        }
+        if (newPassword) {
+          const result = await changeProductionPassword({ accessToken, newPassword, config: PRODUCTION_LOGIN_CONFIG });
+          nextSession = { ...nextSession, ...result.session };
+        }
+        setSession(nextSession);
+        return { ok: true };
+      }
+      const target = users.find((u) => u.id === realSession.id) || realSession;
+      const nextUser = { ...target, email: String(email || "").trim().toLowerCase(), phone: String(phone || "").trim() };
+      if (newPassword) nextUser.password = newPassword;
+      if (!await saveUser(nextUser)) return { ok: false, error: "save_failed" };
+      const nextSession = { ...realSession, email: nextUser.email || "", phone: nextUser.phone || "" };
+      setSession(nextSession);
+      await store.set("session:v1", JSON.stringify(nextSession), false);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || "profile_save_failed" };
+    }
+  };
   const toggleTheme = async () => { const n = theme === "light" ? "dark" : "light"; setTheme(n); await store.set("theme:v1", n, false); };
 
   const techNames = users.filter((u) => u.role === "tech" && u.active !== false).map((u) => u.name);
@@ -1679,7 +1715,7 @@ export default function App() {
   }, [session && session.id, session && session.role, impersonating]);
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
@@ -1693,6 +1729,7 @@ export default function App() {
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
                   : <UserApp {...shared} key="imp-user" />}
             {issueReportOpen && <Overlay persistent panelClassName="issue-report-shell" onClose={() => setIssueReportOpen(false)}><AppIssueReportModal session={effSession} onSave={async (issue) => { const ok = await saveAppIssue(issue); if (ok) setIssueReportOpen(false); return ok; }} onClose={() => setIssueReportOpen(false)} /></Overlay>}
+            {profileOpen && <Overlay persistent onClose={() => setProfileOpen(false)}><ProfileModal session={session} onSave={saveMyProfile} onClose={() => setProfileOpen(false)} /></Overlay>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
     </div>
@@ -1729,8 +1766,8 @@ function WorkerApp(p) {
       asset: track === "transport" ? ((fleet.find((f) => f.id === forkliftId) || {}).code || "") : "",
       forkliftId: track === "transport" ? forkliftId : null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null,
       description: description.trim(), status: "pending_manager", assignee: "", routedTech: undefined, mgrExec: undefined,
-      reportedBy: { id: session.id, name: session.name, dept: session.dept || "" },
-      createdBy: { id: session.id, name: session.name, role: "worker", dept: session.dept || "" },
+      reportedBy: { id: session.id, name: session.name, dept: session.dept || "", phone: session.phone || "" },
+      createdBy: { id: session.id, name: session.name, role: "worker", dept: session.dept || "", phone: session.phone || "", email: session.email || "" },
       createdAt: now, updatedAt: now, dueAt: null, hasPhoto: !!photo, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", closure: null,
       log: [{ at: now, by: session.name, byRole: "worker", text: (!photo && noPhoto) ? `הדיווח נשלח ללא תמונה — ${noPhotoReason.trim()}` : "הדיווח נשלח לאישור מנהל המחלקה", kind: "open" }],
     };
@@ -1742,7 +1779,7 @@ function WorkerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{view === "new" ? "דיווח תקלה" : view === "ppe" ? "הציוד שלי" : view === "activity" ? "יומן פעילות" : "הדיווחים שלי"}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> הציוד שלי{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
@@ -1881,7 +1918,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
   const productionConfigured = productionLoginReady(productionLoginConfig);
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
-  const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
+  const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", phone: u.phone || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
   const activateWorker = async () => {
     if (!activationUser) return setErr("קישור ההפעלה אינו תקין או שכבר נוצל");
     if (!saveUser) return setErr("לא ניתן להשלים הפעלה בסביבה זו");
@@ -2007,7 +2044,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>חזרה</button>
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
-        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span>פותח על ידי Vadim Demchuk · 2026</span><span>גרסה v{APP_VERSION}</span></>}</div>
+        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>פותח על ידי </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>גרסה </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
         </>)}
       </div>
@@ -2045,11 +2082,11 @@ function UserApp(p) {
   const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
         nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
       <div className="main-col">
-        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
+        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeView === "tickets" ? (<>
             {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {countLabel(needAct, "קריאה דורשת", "קריאות דורשות")} פעולה שלך</div>}
@@ -2146,10 +2183,10 @@ function TechApp(p) {
   const extendShift = () => { setExtendUntil(effectiveEnd + 60 * 60000); setSessWarn(false); setWarnAt(0); };
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
         nav={[{ id: "tickets", Icon: ListChecks, label: "קריאות שינוע", active: view === "tickets", onClick: () => setView("tickets") }, { id: "pm", Icon: CalendarClock, label: "לוח טיפולים", active: view === "pm", onClick: () => setView("pm") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
       <div className="main-col">
-        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
+        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} demoActive={p.demoActive} />
         <div className="content with-nav">
           {tw.presence !== false && <div className="shift-bar"><div className="shift-info"><span className="presence-dot on" /><div><div className="shift-stat">במשמרת</div><div className="shift-sub">{myShift.since ? "מאז " + fmtTime(myShift.since) : "מחובר"} · עד {fmtTime(effectiveEnd)}{myIdle.lateMin > 0 ? " · איחור " + myIdle.lateMin + " ד׳" : ""}</div></div></div><button className="btn-ghost sm" onClick={endAndLogout}><Power size={15} /> סיום משמרת ויציאה</button></div>}
           {sessWarn && <div className="ovl-backdrop modal2" style={{ zIndex: 60 }}><div className="modal2-panel" style={{ textAlign: "center" }}><div className="modal2-body"><div style={{ fontSize: 38, marginBottom: 6 }}>⏰</div><div className="form-title" style={{ marginBottom: 6 }}>המשמרת עומדת להסתיים</div><div className="note" style={{ margin: "0 0 14px" }}>בעוד כ-10 דקות תתבצע יציאה אוטומטית. ללא בחירה תוך 5 דקות — המערכת תוציא אותך אוטומטית.</div><div className="row2"><button className="btn-ghost" onClick={extendShift}>הארכה ב-60 ד׳</button><button className="btn-primary" onClick={endAndLogout}><Power size={15} /> סיום ויציאה</button></div></div></div></div>}
@@ -2956,7 +2993,7 @@ function CleanerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">סבבי ניקיון</div><div className="wk-sub">{session.name}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <main className="content">
@@ -4540,9 +4577,9 @@ function AdminApp(p) {
   const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
-        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
+        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} demoActive={p.demoActive}
           extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => { if (e.target.value === "tickets") clearTicketFilter(); setTab(e.target.value); }}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
@@ -6198,7 +6235,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const initialPerms = normalizePerms(user);
   const initialRole = user.role || lockRole || "user";
   if (initialRole === "user" && !initialPerms.ppe) initialPerms.ppe = "request";
-  const [name, setName] = useState(user.name || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
+  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const [activationToken, setActivationToken] = useState(() => user.activationToken || (shouldSeedWorkerActivation(user, initialRole, canWorkerAccess) ? uid() : ""));
@@ -6232,7 +6269,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
     const nextPerms = role === "user" ? cleanPerms(perms) : cleanPerms(user.perms);
-    onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), role,
+    onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), phone: phone.trim(), role,
       email: (role === "tech" || role === "worker" || role === "cleaner") ? "" : email.trim().toLowerCase(), password: (role === "tech" || role === "worker" || role === "cleaner") ? "" : password,
       pin: role === "tech" ? pin.trim() : ((role === "worker" || role === "cleaner") ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : ""),
       workerNo: (role === "worker" || role === "cleaner") ? workerNo.trim() : "",
@@ -6253,6 +6290,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <label className="field"><span>טלפון</span><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
       {!lockRole && <label className="field"><span>תפקיד</span><select value={role} onChange={(e) => changeRole(e.target.value)}>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>}
       {role !== "admin" && <label className="field"><span>משמרת</span><select value={shift} onChange={(e) => setShift(e.target.value)}><option value="">ללא משמרת</option>{workShiftsOf(config).map((sh) => <option key={sh.id} value={sh.id}>{sh.label}</option>)}</select></label>}
       {role === "user" && (lockDept
@@ -6381,7 +6419,7 @@ function TicketForm(p) {
       description: description.trim(), status: "new", assignee,
       routedTech, mgrExec,
       byAdmin: isAdmin || undefined, slaHoursOverride: (isAdmin && slaOn) ? Number(slaH) : undefined,
-      createdBy: { id: session.id, name: session.name, role: session.role, dept: session.dept }, createdAt: now, updatedAt: now,
+      createdBy: { id: session.id, name: session.name, role: session.role, dept: session.dept, phone: session.phone || "", email: session.email || "" }, createdAt: now, updatedAt: now,
       dueAt: now + hrs * 3600000, hasPhoto: !!photo, closure: null,
       log: [{ at: now, by: session.name, byRole: session.role, text: routeText }],
     };
@@ -6508,7 +6546,7 @@ function TicketDetail(p) {
     if (track !== "transport" && !catId) return;
     const catLabel = track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === catId)?.label || "");
     const hrs = slaForTicket({ track, forkliftId: ticket.forkliftId, category: catId, priority: rev.prio }, config, fleet0);
-    const approver = { id: session.id, name: session.name, role: session.role, dept: session.dept };
+    const approver = { id: session.id, name: session.name, role: session.role, dept: session.dept, phone: session.phone || "", email: session.email || "" };
     let assignee = "", routedTech = track === "transport" || undefined, mgrExec = undefined, routeText = "";
     if (track === "transport") { routeText = "אושר ע״י המנהל — הועבר לטכנאי שינוע"; }
     else if (rev.route.startsWith("tech:")) { const u = (p.users || []).find((x) => x.id === rev.route.slice(5)); assignee = u?.name || ""; routedTech = true; routeText = `אושר — שויך לטכנאי ${assignee}`; }
@@ -6551,6 +6589,8 @@ function TicketDetail(p) {
   const detailPausedTotal = normalizedTicketLifecycleStages(ticket, detailLifecycleOptions)
     .filter((stage) => stage.countsOperationalSla === false)
     .reduce((sum, stage) => sum + (stage.ms || 0), 0);
+  const requesterPhone = String(ticket.createdBy?.phone || ticket.reportedBy?.phone || "").trim();
+  const requesterTel = requesterPhone.replace(/[^\d+]/g, "");
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onBack} aria-label="חזרה מרשימת הקריאה"><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">קריאה #{ticketNo(ticket)}</div>{onRepeat && <button className="icon-btn" onClick={repeat} style={{ marginInlineStart: "auto" }} title="פתח קריאה דומה" aria-label="פתיחת קריאה דומה"><Copy size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top">
@@ -6570,6 +6610,7 @@ function TicketDetail(p) {
         {ticket.asset && <Meta Icon={track === "transport" ? Truck : Package} label={track === "transport" ? "כלי" : "ציוד"} value={ticket.asset} />}
         {track === "facility" && <Meta Icon={MapPin} label="מיקום" value={ticket.zone} />}
         <Meta Icon={User} label="פותח" value={ticket.createdBy?.name} />
+        {requesterPhone && <Meta Icon={Phone} label="טלפון פותח" value={<a className="tel-link" href={`tel:${requesterTel || requesterPhone}`}>{requesterPhone}</a>} />}
         <Meta Icon={Clock} label="נפתח" value={`${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`} />
         <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || "טרם שויך"} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
@@ -6760,6 +6801,61 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
   </div></div>);
 }
 
+function ProfileModal({ session, onSave, onClose }) {
+  const [email, setEmail] = useState(session?.email || "");
+  const [phone, setPhone] = useState(session?.phone || "");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [saved, setSaved] = useState(false);
+  const canEditEmail = session?.role === "admin" || session?.role === "user" || session?.productionSession;
+  const submit = async () => {
+    setErr("");
+    setSaved(false);
+    if (canEditEmail && !email.trim()) return setErr("הזינו דוא״ל");
+    if (canEditEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setErr("הזינו דוא״ל תקין");
+    if (newPassword && newPassword.length < 6) return setErr("סיסמה חדשה חייבת לכלול לפחות 6 תווים");
+    if (newPassword && newPassword !== confirm) return setErr("הסיסמאות אינן זהות");
+    setBusy(true);
+    const result = await onSave({ email: email.trim(), phone: phone.trim(), newPassword: newPassword || "" });
+    setBusy(false);
+    if (!result?.ok) {
+      const map = {
+        password_min_6: "סיסמה חדשה חייבת לכלול לפחות 6 תווים",
+        email_invalid: "הזינו דוא״ל תקין",
+        phone_too_long: "מספר הטלפון ארוך מדי",
+        access_token_required: "נדרש להתחבר מחדש",
+      };
+      return setErr(map[result?.error] || "שמירת הפרופיל נכשלה. נסו שוב.");
+    }
+    setNewPassword("");
+    setConfirm("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
+  return <div className="modal2-panel profile-modal">
+    <div className="modal2-head"><div className="form-title"><User size={17} /> הפרופיל שלי</div><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div>
+    <div className="modal2-body">
+      <div className="profile-head">
+        <div className="avatar big">{(session?.name || "?").charAt(0)}</div>
+        <div><div className="profile-name">{session?.name || "—"}</div><div className="hint">{ROLE_LABEL[session?.role] || session?.role || ""}{session?.dept ? " · " + session.dept : ""}</div></div>
+      </div>
+      <label className="field"><span><Phone size={14} /> טלפון</span><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יופיע בקריאות חדשות כדי שאיש הטיפול יוכל להתקשר בלחיצה.</div></label>
+      {canEditEmail && <label className="field"><span><Mail size={14} /> דוא״ל</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" autoComplete="email" /></label>}
+      <div className="profile-password">
+        <SectionTitle><KeyRound size={15} /> שינוי סיסמה</SectionTitle>
+        <label className="field"><span>סיסמה חדשה</span><input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="לפחות 6 תווים" /></label>
+        <label className="field"><span>אישור סיסמה חדשה</span><input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" autoComplete="new-password" placeholder="הקלידו שוב" /></label>
+        <div className="hint">אפשר להשאיר ריק אם רוצים לעדכן רק טלפון או דוא״ל.</div>
+      </div>
+      {err && <div className="err">{err}</div>}
+      {saved && <div className="note ok">הפרופיל נשמר ✓</div>}
+      <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? "שומר…" : "שמירת פרופיל"}</button>
+    </div>
+  </div>;
+}
+
 function AppIssueReportModal({ session, onSave, onClose }) {
   const [description, setDescription] = useState("");
   const [screenshot, setScreenshot] = useState("");
@@ -6854,7 +6950,7 @@ function RolePreviewBox({ rolePreview }) {
   </div>;
 }
 
-function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme, onReportIssue }) {
+function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme, onReportIssue, onProfile }) {
   return (<aside className="sidebar">
     <div className="side-brand"><BrandMark logo={config?.brandLogo} small /><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
     {primary && <button className="side-newbtn" onClick={primary.onClick}><Plus size={18} /> {primary.label}</button>}
@@ -6862,6 +6958,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
     <div className="side-foot">
       <button className="side-item" onClick={toggleTheme}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}<span>{theme === "dark" ? "מצב בהיר" : "מצב כהה"}</span></button>
       <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>
+      {onProfile && <button className="side-profile" onClick={onProfile}><User size={15} /> הפרופיל שלי</button>}
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
       <RolePreviewBox rolePreview={rolePreview} />
       {onReportIssue && <button className="side-report" onClick={onReportIssue}><Bug size={14} /> דיווח על בעיה</button>}
@@ -6869,9 +6966,9 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
     </div>
   </aside>);
 }
-function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, toggleTheme, extra, demoActive }) {
+function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, toggleTheme, extra, demoActive, onProfile }) {
   return (<header className="topbar"><div className="tb-left"><div><div className="tb-title">{title}{demoActive && <span className="demo-badge">נתוני דמו</span>}</div>{subtitle && <div className="tb-sub">{subtitle}</div>}</div>{extra}</div>
-    <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div>
+    <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{onProfile && <button className="bell" onClick={onProfile} aria-label="הפרופיל שלי"><User size={19} /></button>}<button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div>
     {rolePreview && <div className="tb-role-preview"><RolePreviewBox rolePreview={rolePreview} /></div>}</header>);
 }
 function Overlay({ children, onClose, persistent, panelClassName = "" }) {
@@ -7038,7 +7135,7 @@ a{color:inherit;}
 .back-link{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:14px;margin-bottom:10px;}
 .login-alt{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:12px;padding:11px;border:1.5px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);font-weight:600;font-size:13.5px;}
 .login-foot{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.45;}
-.login-foot span{display:block;}
+.login-foot>span{display:block;}
 @media (min-width:900px){.login-bg{padding:36px;}.login-card{max-width:500px;padding:30px 30px 28px;}.login-q{font-size:17px;}}
 
 .field{display:block;margin-bottom:15px;}
@@ -7052,6 +7149,13 @@ a{color:inherit;}
 .notify-kind{margin:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:700;}
 .hint{font-size:12.5px;color:var(--muted);margin-top:6px;}
 .err{background:#FEE2E2;color:#B91C1C;font-size:13.5px;font-weight:500;padding:10px 12px;border-radius:10px;margin-bottom:12px;}
+.note.ok{border-color:#86EFAC;color:#166534;background:#DCFCE7;}
+.tel-link{color:var(--primary);font-weight:700;text-decoration:none;direction:ltr;unicode-bidi:isolate;}
+.profile-modal{max-width:520px;}
+.profile-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px;}
+.profile-name{font-weight:800;color:var(--ink);}
+.avatar.big{width:44px;height:44px;font-size:18px;}
+.profile-password{border-top:1px solid var(--line);padding-top:10px;margin-top:6px;}
 .btn-primary{background:var(--primary);color:#fff;font-weight:600;font-size:15px;border-radius:11px;padding:13px 18px;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.15s;}
 .btn-primary:hover:not(:disabled){background:var(--primary-d);}.btn-primary.full{width:100%;}.btn-primary.sm{padding:9px 14px;font-size:13.5px;}
 .btn-danger{background:var(--surface);color:#DC2626;border:1.5px solid #FCA5A5;font-weight:600;border-radius:11px;padding:12px 16px;display:inline-flex;align-items:center;justify-content:center;gap:7px;}
@@ -7601,6 +7705,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
 .side-report{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--side-ink);border:1px solid #ffffff14;border-radius:999px;padding:7px 10px;font-size:11.5px;font-weight:700;background:#ffffff08;}
 .side-report:hover{background:#ffffff14;color:#fff;}
+.side-profile{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--side-ink);border:1px solid #ffffff14;border-radius:999px;padding:7px 10px;font-size:11.5px;font-weight:700;background:#ffffff08;}
+.side-profile:hover{background:#ffffff14;color:#fff;}
 .side-version{color:var(--side-ink);font-size:10.5px;text-align:center;padding:5px 4px 0;opacity:.82;}
 .issue-shot{position:relative;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:12px;background:var(--surface-2);}
 .issue-shot img{display:block;width:100%;max-height:260px;object-fit:contain;}

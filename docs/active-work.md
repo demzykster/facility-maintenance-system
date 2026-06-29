@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/user-profile-contact-settings
 
-- Status: clean on `main`; Supabase Pro backup and separate-target restore drill are complete.
+- Status: profile/contact polish is in progress on a small branch; Supabase Pro backup and separate-target restore drill are complete.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -61,6 +61,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - production password-change and first-admin bootstrap accept passwords from 6 characters; complexity is guidance, not a hard blocker.
   - production login footer should stay user-facing and not expose technical Supabase/Auth wording.
   - production login footer shows author/year and app version as two quiet lines; do not collapse them into one mixed attribution/version string.
+  - production login footer attribution must isolate LTR names/years inside Hebrew text so the order stays readable on mobile.
+  - logged-in users should be able to edit their own phone; admins/managers/production users can also edit email, and logged-in production users can voluntarily change password.
+  - new tickets should capture the requester phone at creation time and show it as a tap-to-call link in ticket detail when available.
+  - applying the user-profile contact PR requires the `app_users.phone` Supabase migration before staging profile-save smoke.
   - future worker/cleaner/public-report localization should use Hebrew as the source language and support `he`, `en`, `ar`, `hi`, and `ti` (Tigrinya); this is a controlled UI dictionary direction, not browser auto-translation of business records.
   - logged-in desktop users can report internal app issues from the sidebar version area; reports are stored as `appIssue:` KV records, included in backup/restore, and managed from settings as a product-quality journal, not as maintenance tickets.
   - the internal app-issue report modal should render as one compact centered panel, without a wider empty overlay shell beside it.
@@ -84,6 +88,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
   - Localization language-model foundation passed locally: `npm test -- --run tests/languageModel.test.js` confirms Hebrew fallback, supported language codes/names, locale normalization, and RTL/LTR direction.
   - Login footer polish passed locally in production-mode at 430px width: footer rendered as two lines (`פותח על ידי ...` and `גרסה v...`) without overflow or relevant console errors. `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
+  - User profile/contact branch passed locally: `npm test -- --run tests/profileHandler.test.js tests/changePasswordHandler.test.js tests/sessionHandler.test.js tests/productionLoginAdapter.test.js tests/vercelApiRouteModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for demo login opening the profile modal and production-mode mobile login footer rendering as two contained lines.
   - Cleaning save-flow hardening passed locally: new cleaning zone saved and survived reload; cleaning complaint form closed only after successful persistence; no relevant browser console errors. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - Supabase Pro backup and restore drill passed. `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`). A temporary restore target (`cmms-cdsl-restore-drill-full-20260629094512`, ref `aakzttnqotmemukyejys`) was created, migrations were applied, one admin/Auth user, `app_users`, `file_metadata`, `audit_events`, and a real `cmms-files` storage object were restored and verified. Restored file SHA-256 matched the source. The temporary target was deleted, secret restore credentials were removed, and only sanitized local evidence remains in `.tools/restore-drill-evidence-2026-06-29T09-48-16-539Z.json`. Final source cleanup evidence `.tools/staging-backup-evidence-2026-06-29T09-48-45-484Z.json` shows `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, `storageFiles=0`; `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed.
   - Client shared-save failure logging merged in PR #404 after the Vercel Pro upgrade removed the build-rate-limit blocker. Vercel passed, and strict live smoke passed for deployed commit `89455f2`.
