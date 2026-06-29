@@ -138,12 +138,20 @@ async function mobileSmoke(browser, credentials) {
   const topLogout = await page.locator(".tb-logout").count();
   const profileIcon = await page.locator('.tb-actions button[aria-label="הפרופיל שלי"]').count();
   const issueIcon = await page.locator('.tb-actions button[aria-label="דיווח על בעיה במערכת"]').count();
+  const legacyTopSelect = await page.locator("select.mob-tab").count();
   const bottomItems = await page.locator(".bottom-nav button").evaluateAll((buttons) => buttons.map((button) => button.innerText.trim()).filter(Boolean));
+  const bottomNav = await page.locator(".bottom-nav").evaluate((node) => ({
+    className: node.className,
+    scrollWidth: node.scrollWidth,
+    clientWidth: node.clientWidth
+  }));
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (!topLogout) throw new Error("mobile_logout_missing");
   if (!profileIcon) throw new Error("mobile_profile_missing");
   if (!issueIcon) throw new Error("mobile_issue_report_missing");
+  if (legacyTopSelect) throw new Error("mobile_legacy_module_select_present");
   if (bottomItems.length < 4) throw new Error("mobile_bottom_nav_too_short");
+  if (bottomItems.length > 4 && (!String(bottomNav.className).includes("nav-scroll") || bottomNav.scrollWidth <= bottomNav.clientWidth)) throw new Error("mobile_bottom_nav_not_scrollable");
   if (Math.abs(overflow) > 2) throw new Error(`mobile_overflow:${overflow}`);
 
   await page.locator('.tb-actions button[aria-label="הפרופיל שלי"]').click();
@@ -151,6 +159,14 @@ async function mobileSmoke(browser, credentials) {
   const shell = await page.locator(".profile-shell").boundingBox();
   const modal = await page.locator(".profile-modal").boundingBox();
   if (!shell || !modal || Math.abs(shell.width - modal.width) > 2) throw new Error("mobile_profile_modal_shell_mismatch");
+  if (await page.getByText("אפשר להשאיר ריק", { exact: false }).count()) throw new Error("mobile_profile_redundant_helper_present");
+  await page.locator(".profile-modal button[aria-label='סגירה']").click();
+
+  await page.locator('.tb-actions button[aria-label="דיווח על בעיה במערכת"]').click();
+  await page.getByRole("dialog").waitFor({ timeout: 10000 });
+  const issueShell = await page.locator(".issue-report-shell").boundingBox();
+  const issueModal = await page.locator(".issue-modal").boundingBox();
+  if (!issueShell || !issueModal || Math.abs(issueShell.width - issueModal.width) > 2) throw new Error("mobile_issue_modal_shell_mismatch");
 
   if (consoleMessages.length) throw new Error(`mobile_console:${consoleMessages.slice(0, 3).join(" | ")}`);
   if (failedResponses.length) throw new Error(`mobile_responses:${failedResponses.slice(0, 3).join(" | ")}`);
