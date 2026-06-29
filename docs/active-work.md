@@ -89,6 +89,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:gate` includes `npm run staging:data:summary`, so every final staging gate shows table counts, KV key prefixes, and storage totals without printing record contents, secrets, or file paths.
   - owner cleanup command was given after the fleet/import checks. Current staging should stay empty except the admin user: latest cleanup summary showed `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`, and zero storage files.
   - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default. Red shared-save failure events include safe browser context (`online`, `visibilityState`, `focused`, `viewport`, `errorId`) to diagnose intermittent owner-visible banners.
+  - system error rows should be owner-readable by default: show the human label, time, actor, place, and short error id first; keep operation/key/raw error details collapsed.
   - mobile profile and internal issue-report modals should render as a single card with no blank side shell; mobile module navigation should stay in the bottom horizontal nav, not return to a top select.
   - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
   - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
@@ -176,6 +177,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Mobile nav/profile polish is in progress on `codex/mobile-nav-profile-polish`.
   - Profile and internal issue-report overlay shells are constrained to the actual modal card to prevent the blank side panel seen on wide/mobile browser layouts.
   - Mobile bottom navigation regression smoke now fails if the old top module select returns, if long module lists are not scrollable, or if the profile/issue modal shell is wider than its visible card.
+- System error journal polish is in progress on `codex/system-error-journal-polish`.
+  - Collapsed automatic error rows now show a human Hebrew label plus the screen path/error id; technical operation/key/error fields remain behind "פרטים".
 - Staging gate data-awareness is in progress on `codex/include-data-summary-in-gate`.
   - Adds the read-only staging data summary step into the combined `npm run staging:gate` sequence.
 - Staging data summary is in progress on `codex/staging-data-summary`.
