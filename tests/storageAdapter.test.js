@@ -76,6 +76,19 @@ describe("app storage adapter", () => {
     expect(onFail).toHaveBeenCalledTimes(1);
   });
 
+  it("does not show the global save failure toast for local browser keys", async () => {
+    const onFail = vi.fn();
+    const store = createAppStore({
+      localStorageProvider: () => ({ set: () => new Promise(() => {}) }),
+      timeoutMs: 1,
+      allowMemoryFallback: false
+    });
+    store._onFail = onFail;
+
+    await expect(store.set("login:v1", "remembered", false)).resolves.toBe(false);
+    expect(onFail).not.toHaveBeenCalled();
+  });
+
   it("can disable memory fallback for production API storage", async () => {
     const onFail = vi.fn();
     const never = () => new Promise(() => {});

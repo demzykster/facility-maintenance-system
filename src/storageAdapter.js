@@ -54,7 +54,10 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
   const mem = {};
   const canUseMemoryFallback = () => typeof allowMemoryFallback === "function" ? !!allowMemoryFallback() : !!allowMemoryFallback;
   const resolveStorage = (shared) => shared ? storageProvider() : localStorageProvider();
-  const notifyFail = () => { try { store._onFail && store._onFail(); } catch (_) {} };
+  const notifyFail = (shared) => {
+    if (!shared) return;
+    try { store._onFail && store._onFail(); } catch (_) {}
+  };
   const store = {
     async get(key, shared = false) {
       const fallback = canUseMemoryFallback();
@@ -66,7 +69,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
           if (result !== undefined) return result ? result.value : null;
         }
       } catch (e) {
-        if (!fallback) { notifyFail(); throw e; }
+        if (!fallback) { notifyFail(shared); throw e; }
       }
       return fallback && Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
     },
@@ -80,7 +83,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
         if (result === undefined) throw new Error("timeout");
         return true;
       } catch (e) {
-        notifyFail();
+        notifyFail(shared);
         return false;
       }
     },
@@ -94,7 +97,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
         if (result === undefined) throw new Error("timeout");
         return true;
       } catch (e) {
-        notifyFail();
+        notifyFail(shared);
         return false;
       }
     },
@@ -108,7 +111,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
           if (result !== undefined) return result ? result.keys : [];
         }
       } catch (e) {
-        if (!fallback) { notifyFail(); throw e; }
+        if (!fallback) { notifyFail(shared); throw e; }
       }
       return fallback ? Object.keys(mem).filter((key) => key.startsWith(prefix)) : [];
     }

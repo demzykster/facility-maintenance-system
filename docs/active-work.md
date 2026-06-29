@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/suppress-local-storage-fail-toast
 
-- Status: clean after PR #399; public Vercel production alias is temporarily stale because manual production deploy hit the Hobby daily deployment limit.
+- Status: suppressing false global save-error toasts for local browser storage keys during login/logout.
 - Latest synchronized `main`: after PR #399 (`f7f5bc3`). PR #399 preview build was green, but `https://facility-maintenance-system.vercel.app/` still serves the previous production deployment until Vercel can deploy again.
 - Open PRs: none.
 - Purpose:
@@ -68,6 +68,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
   - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
+  - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
   - PR #399 merged cleanly and its Vercel Preview check passed. Manual production redeploy failed externally with Vercel Hobby limit `api-deployments-free-per-day`, so strict live smoke for commit `f7f5bc3` is expected to fail until the deployment limit resets.
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
@@ -109,6 +110,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Local browser storage fail-toast fix is in progress.
+  - Failed local-only keys such as remembered login/session/theme no longer trigger the global red "save failed" toast.
+  - Shared/server CMMS data failures still trigger the global save/delete warning.
 - Desktop sidebar footer overflow fix is complete in PR #399.
   - The sidebar now keeps the user/logout/version footer fixed inside the viewport and lets only the navigation list scroll when the desktop window is short.
   - This addresses the large-monitor report where the footer block slid below the visible app area.
