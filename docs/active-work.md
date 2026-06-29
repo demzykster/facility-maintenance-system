@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/access-notification-summary`
+### Active branch: none
 
-- Status: first pilot-final block in progress: connect role permissions and notification preferences more clearly in the user form.
+- Status: access and notification matrix merged in PR #462. Continue the final pilot-readiness pass with mobile/PWA/push polish, user/system issue journal, fleet import/export, and final UX smoke.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
