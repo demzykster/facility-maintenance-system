@@ -20,9 +20,9 @@ The drill covers the Supabase project used by the staging/pilot deployment:
 Current staging note:
 
 - Supabase CLI is connected to project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`).
-- `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports no physical backups and `pitr_enabled=false`.
-- The Supabase dashboard states that the Free plan does not include project backups; scheduled backups require Pro.
-- Do not mark the platform backup/restore drill complete on the Free plan. Either upgrade the project/organization for managed backups, or explicitly accept a non-production pilot risk and use only the local evidence snapshot as a temporary check.
+- Supabase Pro managed database backup is enabled: `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`).
+- The backup/restore gate is still not complete until one restore has been tested against a separate restore target.
+- Supabase managed database backups cover Postgres data. Storage object bytes in `cmms-files` must be verified separately during the drill; the database backup can prove `file_metadata`, but not the actual file bytes by itself.
 
 ## Drill
 
@@ -47,6 +47,12 @@ Current staging note:
    - the uploaded photo exists in `cmms-files`;
    - audit records exist in `audit_events`;
    - login still works against the restored project after env points to the restore target.
+
+Current evidence snapshot:
+
+- `.tools/staging-backup-evidence-2026-06-29T09-24-12-434Z.json` captured source staging with `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, and `storageFiles=0`.
+- `npm run staging:supabase-schema` passed against source staging.
+- `npm run staging:smoke:live` passed against the public staging URL.
 
 ## Pass Criteria
 
