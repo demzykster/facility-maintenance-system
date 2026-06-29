@@ -21,10 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/fix-sidebar-footer-overflow
+### Active branch: none
 
-- Status: fixing the desktop sidebar footer overflow reported on a large monitor.
-- Latest synchronized `main`: after PR #397. Public Vercel staging has been redeployed from current `main` and live smoke passes for commit `b9b3d38`.
+- Status: clean after PR #399; public Vercel production alias is temporarily stale because manual production deploy hit the Hobby daily deployment limit.
+- Latest synchronized `main`: after PR #399 (`f7f5bc3`). PR #399 preview build was green, but `https://facility-maintenance-system.vercel.app/` still serves the previous production deployment until Vercel can deploy again.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -69,6 +69,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
   - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
+  - PR #399 merged cleanly and its Vercel Preview check passed. Manual production redeploy failed externally with Vercel Hobby limit `api-deployments-free-per-day`, so strict live smoke for commit `f7f5bc3` is expected to fail until the deployment limit resets.
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
   - Follow-up smoke check: the transport ticket detail opened in the UI, admin note update saved, and the cleaning UI shows the smoke public zone plus one pending report.
   - Production Vercel alias was manually redeployed from clean `main` because the public app still served stale footer commit `97c8b0f`; the public staging URL now serves bundle commit `bdecfd5`.
@@ -108,7 +109,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
-- Desktop sidebar footer overflow fix is in progress.
+- Desktop sidebar footer overflow fix is complete in PR #399.
   - The sidebar now keeps the user/logout/version footer fixed inside the viewport and lets only the navigation list scroll when the desktop window is short.
   - This addresses the large-monitor report where the footer block slid below the visible app area.
 - Playwright dev tooling is in progress.
