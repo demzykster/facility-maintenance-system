@@ -84,12 +84,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
   - local demo assets under `public/demo/` must stay out of git and Vercel uploads; they are local presentation material, not app runtime assets.
   - final pilot UI polish should keep the page body flush to the viewport, avoid horizontal overflow on analytics/settings, keep the internal issue-report modal as one compact panel, and fit uploaded logos into a square canvas without cropping wide logos.
+  - dashboard widget hide/show controls are personal display preferences. They must not write global `config:v1`, must not require `settings:manage`, and must not trigger the red shared-save failure banner.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Dashboard widget preference fix passed locally: mobile smoke clicked `התאמת לוח` and hid the first widget with no red alert and no global `config:v1` PUT. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed. Live staging global widgets were reset to visible after the earlier diagnostic click against the old deployed code.
   - Staging UI smoke gate branch passed locally: `npm run staging:smoke:ui -- --expect-current-commit` verified public Vercel commit `7dd46b2`, opened all desktop modules without overflow, and confirmed mobile logout/profile/issue actions plus full bottom navigation. `npm run staging:gate` also passed with the UI smoke included.
   - Profile/notification polish is live through PR #432, PR #433, and PR #434. Strict live smoke passed on public Vercel commit `033eaf3`; desktop read-only smoke opened all main modules with no horizontal overflow, console errors, or failed API responses; mobile smoke confirmed top logout, profile, issue-report, and full bottom navigation with no overflow.
   - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
