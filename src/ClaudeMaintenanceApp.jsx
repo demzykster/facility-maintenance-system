@@ -6978,6 +6978,21 @@ function SystemErrorsSettings() {
     if (item.kind === "storage_delete_failed") return "מחיקה נכשלה";
     return item.kind || "שגיאת מערכת";
   };
+  const placeFor = (item) => {
+    const raw = String(item.path || "").trim();
+    if (!raw) return "מיקום לא ידוע";
+    try {
+      const url = new URL(raw, window.location.origin);
+      const path = `${url.pathname || "/"}${url.search || ""}`;
+      return path === "/" ? "מסך ראשי" : path;
+    } catch {
+      return raw;
+    }
+  };
+  const summaryFor = (item) => {
+    const place = placeFor(item);
+    return place ? `${labelFor(item)} · ${place}` : labelFor(item);
+  };
   return <>
     <SectionTitle><AlertTriangle size={15} /> שגיאות מערכת</SectionTitle>
     <div className="hint" style={{ marginBottom: 12 }}>רשימה קצרה של שגיאות שהמערכת תפסה בעצמה. הטכני נשאר מקופל כדי לא להפוך את המסך לרעש.</div>
@@ -6987,10 +7002,11 @@ function SystemErrorsSettings() {
       {items.map((item) => { const rowKey = item.id || `${item.at}-${item.key}`; return <div key={rowKey} className="issue-card">
         <div className="issue-main">
           <div className="issue-top"><span className="issue-status open">{labelFor(item)}</span><span className="issue-date">{fmtDate(item.at)} {fmtTime(item.at)}</span></div>
-          <div className="issue-desc">{item.summary || labelFor(item)}</div>
-          <div className="issue-meta">{item.actorName || "—"} · {ROLE_LABEL[item.actorRole] || item.actorRole || "—"}{item.path ? " · " + item.path : ""}</div>
+          <div className="issue-desc">{summaryFor(item)}</div>
+          <div className="issue-meta">{item.actorName || "—"} · {ROLE_LABEL[item.actorRole] || item.actorRole || "—"}{item.errorId ? ` · ${item.errorId}` : ""}</div>
           {open === rowKey && <div className="issue-response">
-            פעולה: {item.operation || "—"} · מפתח: {item.key || "—"} · שגיאה: {item.error || "—"}
+            מקום: {item.path || "—"}
+            <br />פעולה: {item.operation || "—"} · מפתח: {item.key || "—"} · שגיאה: {item.error || "—"}
             <br />מצב: {item.online === false ? "לא מקוון" : item.online === true ? "מקוון" : "—"} · חלון: {item.visibilityState || "—"} · מסך: {item.viewport || "—"}{item.errorId ? ` · מזהה: ${item.errorId}` : ""}
           </div>}
         </div>
