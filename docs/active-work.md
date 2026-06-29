@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: clean after PR #410; Supabase Pro backup and separate-target restore drill are complete.
-- Latest synchronized `main`: after PR #410 (`e6ab285`). Public production alias is healthy.
+- Status: clean after PR #411; Supabase Pro backup and separate-target restore drill are complete.
+- Latest synchronized `main`: after PR #411 (`72872e4`). Public production alias is healthy.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
