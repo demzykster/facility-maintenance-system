@@ -7,7 +7,9 @@ import {
   PUSH_SUBSCRIPTIONS_KEY,
   pushPayload,
   pushRuntimeReady,
+  normalizePushNotificationRequest,
   removePushSubscription,
+  selectPushNotificationTargets,
   upsertPushSubscription
 } from "../../src/pushNotificationModel.js";
 
@@ -123,6 +125,23 @@ export function createPushHandler({
           sent += 1;
         }
         return sendJson(res, 200, { ok: true, sent });
+      }
+
+      if (action === "notify") {
+        const normalized = normalizePushNotificationRequest(body.event || body);
+        if (!normalized.ok) return sendJson(res, 400, { error: normalized.error });
+        const targets = selectPushNotificationTargets(current, normalized.targetUserIds);
+        let sent = 0;
+        for (const target of targets) {
+          await push.sendNotification(target.subscription, pushPayload({
+            title: normalized.title,
+            body: normalized.body,
+            url: normalized.url,
+            tag: normalized.tag
+          }));
+          sent += 1;
+        }
+        return sendJson(res, 200, { ok: true, sent, targets: targets.length });
       }
 
       return sendJson(res, 400, { error: "push_action_unknown" });

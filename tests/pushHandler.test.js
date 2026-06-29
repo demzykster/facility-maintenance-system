@@ -99,4 +99,42 @@ describe("push API handler", () => {
     expect(push.setVapidDetails).toHaveBeenCalledWith("mailto:owner@example.com", "public-key", "private-key");
     expect(push.sendNotification).toHaveBeenCalledWith(subscription, expect.stringContaining("התראות לטלפון הופעלו"));
   });
+
+  it("sends a business notification only to explicit subscribed targets", async () => {
+    let stored = "";
+    const driver = {
+      get: vi.fn().mockImplementation(async () => stored),
+      set: vi.fn().mockImplementation(async (_key, value) => { stored = value; })
+    };
+    const push = {
+      setVapidDetails: vi.fn(),
+      sendNotification: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createPushHandler({ driver, push, env, sessionClient: activeSessionClient });
+
+    await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { action: "subscribe", subscription }
+    });
+    const notify = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        action: "notify",
+        event: {
+          targetUserIds: ["app-user-1"],
+          title: "קריאה חדשה",
+          body: "נפתחה קריאה חדשה",
+          url: "/tickets",
+          kind: "new",
+          dedupeKey: "ticket-1"
+        }
+      }
+    });
+
+    expect(notify.statusCode).toBe(200);
+    expect(notify.json()).toEqual({ ok: true, sent: 1, targets: 1 });
+    expect(push.sendNotification).toHaveBeenLastCalledWith(subscription, expect.stringContaining("קריאה חדשה"));
+  });
 });

@@ -3,7 +3,9 @@ import {
   parsePushSubscriptions,
   pushPayload,
   pushRuntimeReady,
+  normalizePushNotificationRequest,
   removePushSubscription,
+  selectPushNotificationTargets,
   upsertPushSubscription
 } from "../src/pushNotificationModel.js";
 
@@ -53,5 +55,26 @@ describe("push notification model", () => {
       url: "/tickets",
       tag: "t"
     });
+  });
+
+  it("normalizes phone notification requests to explicit safe targets", () => {
+    expect(normalizePushNotificationRequest({ title: "A", body: "B", targetUserIds: ["u1", "u1"], url: "https://bad.example" })).toMatchObject({
+      ok: true,
+      targetUserIds: ["u1"],
+      url: "/"
+    });
+    expect(normalizePushNotificationRequest({ title: "A", body: "B", targetUserIds: [] })).toEqual({
+      ok: false,
+      error: "push_targets_required"
+    });
+  });
+
+  it("selects only subscribed target users and de-dupes endpoints", () => {
+    const list = [
+      ...upsertPushSubscription([], subscription, { id: "u1" }, 100).list,
+      ...upsertPushSubscription([], { ...subscription, endpoint: "https://push.example/device/2" }, { id: "u2" }, 100).list
+    ];
+
+    expect(selectPushNotificationTargets(list, ["u2"]).map((item) => item.userId)).toEqual(["u2"]);
   });
 });
