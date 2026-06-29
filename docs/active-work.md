@@ -87,12 +87,18 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - dashboard widget hide/show controls are personal display preferences. They must not write global `config:v1`, must not require `settings:manage`, and must not trigger the red shared-save failure banner.
   - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default.
   - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
+  - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
+  - fleet Excel import preview must block duplicate chassis/source identifiers inside the same workbook before save; the supplied `מעקב רישיונות_ 06.07.23.xlsx` preview found `total=128`, `ready=126`, `invalid=2` for duplicate `פסולתון` rows 127-128.
+  - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
+  - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
+  - production AI remains disabled for v1; AI-agent readiness is architectural preparation, not a launch feature.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Fleet import preview, controlled system-error smoke tooling, and AI-agent readiness docs passed locally on `codex/final-import-log-ai-followups`: targeted tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, live `npm run staging:smoke:system-errors`, and real attached workbook preview.
   - System error log and token refresh hardening passed targeted checks: `npm test -- --run tests/fleetLicenseImportModel.test.js tests/languageModel.test.js tests/apiStorageAdapter.test.js tests/storageAdapter.test.js tests/systemErrorsHandler.test.js tests/supabaseAuditDriver.test.js tests/vercelApiRouteModel.test.js`.
   - Dashboard widget preference fix passed locally: mobile smoke clicked `התאמת לוח` and hid the first widget with no red alert and no global `config:v1` PUT. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed. Live staging global widgets were reset to visible after the earlier diagnostic click against the old deployed code.
   - Staging UI smoke gate branch passed locally: `npm run staging:smoke:ui -- --expect-current-commit` verified public Vercel commit `7dd46b2`, opened all desktop modules without overflow, and confirmed mobile logout/profile/issue actions plus full bottom navigation. `npm run staging:gate` also passed with the UI smoke included.
@@ -159,6 +165,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Final pilot follow-ups are ready for PR on `codex/final-import-log-ai-followups`.
+  - Added a read-only fleet license import preview command for real Excel files before saving anything.
+  - Real attached fleet workbook preview passed parsing and correctly blocked duplicate `פסולתון` rows before import.
+  - Added a controlled staging system-error smoke command for the automatic error-log pipeline.
+  - Added `docs/ai-agent-readiness.md` to preserve the future AI-agent architecture without enabling production AI in v1.
 - Final pilot UI smoke/polish is in progress.
   - PR #429 is merged and live: desktop sidebar, mobile topbars, worker shell, and cleaner shell all expose app-issue reporting.
   - Production cleaning reports/rounds cannot be started by manually choosing a zone without a matching QR zone URL. This is a v1 flow gate; stronger physical-proof options such as signed rotating QR/NFC/geofence remain future hardening.

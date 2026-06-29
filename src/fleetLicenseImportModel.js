@@ -176,6 +176,20 @@ export function parseFleetLicenseSheet(aoa = [], options = {}) {
     })
     .filter(Boolean);
 
+  const chassisCounts = rows.reduce((acc, row) => {
+    const chassis = cleanText(row.unit?.chassis).toLowerCase();
+    if (!chassis) return acc;
+    acc.set(chassis, (acc.get(chassis) || 0) + 1);
+    return acc;
+  }, new Map());
+  rows.forEach((row) => {
+    const chassis = cleanText(row.unit?.chassis).toLowerCase();
+    if (!chassis || chassisCounts.get(chassis) <= 1) return;
+    row.invalid = [...new Set([...(row.invalid || []), "duplicate_chassis_in_file"])];
+    row.action = "invalid";
+    row.conflictId = "";
+  });
+
   const summary = {
     total: rows.length,
     ready: rows.filter((row) => row.action === "new").length,
