@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/log-client-storage-failures
+### Active branch: none
 
-- Status: adding audit logging for the red shared-save failure toast.
-- Latest synchronized `main`: after PR #408. Public production alias has been redeployed from current `main`; docs-only ledger commits do not require another runtime redeploy unless app code changes.
-- Open PRs: #404 (`codex/log-client-storage-failures`) is being refreshed after the Vercel Pro upgrade removed the build-rate-limit blocker.
+- Status: clean after PR #404 and the successful production strict live smoke.
+- Latest synchronized `main`: after PR #404 (`89455f2`). Public production alias serves this commit.
+- Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -71,6 +71,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
   - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
+  - Client shared-save failure logging merged in PR #404 after the Vercel Pro upgrade removed the build-rate-limit blocker. Vercel passed, and strict live smoke passed for deployed commit `89455f2`.
   - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for the deployed `main` runtime: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
   - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
   - Client shared-save failure logging passed: `npm test -- --run tests/clientErrorsHandler.test.js tests/auditEventModel.test.js tests/vercelApiRouteModel.test.js tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
@@ -117,7 +118,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
-- Client shared-save failure logging is in progress.
+- Client shared-save failure logging is complete in PR #404.
   - A new authenticated `/api/client-errors` endpoint writes sanitized browser-side storage failures into the existing audit sink.
   - The global red save-failure toast now reports shared/server storage failures with operation/key metadata; local browser-only keys stay silent.
 - Sidebar/logo polish is live on public Vercel after PR #407.
