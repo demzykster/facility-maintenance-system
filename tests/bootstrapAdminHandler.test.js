@@ -68,6 +68,14 @@ describe("bootstrap admin handler", () => {
       ok: false,
       error: "valid_email_required"
     });
+    expect(validateBootstrapAdminPayload({ email: "admin@example.com", temporaryPassword: "short" })).toEqual({
+      ok: false,
+      error: "temporary_password_min_6_chars"
+    });
+    expect(validateBootstrapAdminPayload({ email: "ADMIN@Example.COM", temporaryPassword: "simple" })).toMatchObject({
+      ok: true,
+      admin: { email: "admin@example.com", temporaryPassword: "simple" }
+    });
     expect(validateBootstrapAdminPayload({ email: "ADMIN@Example.COM", temporaryPassword: "long-password" })).toMatchObject({
       ok: true,
       admin: {

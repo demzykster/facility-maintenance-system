@@ -30,7 +30,8 @@ async function call(handler, req) {
 
 describe("change password handler", () => {
   it("validates the new production password length", () => {
-    expect(validatePasswordChangePayload({ newPassword: "short" })).toEqual({ ok: false, error: "new_password_min_12_chars" });
+    expect(validatePasswordChangePayload({ newPassword: "short" })).toEqual({ ok: false, error: "new_password_min_6_chars" });
+    expect(validatePasswordChangePayload({ newPassword: "simple" })).toEqual({ ok: true, newPassword: "simple" });
     expect(validatePasswordChangePayload({ newPassword: "long-password" })).toEqual({ ok: true, newPassword: "long-password" });
   });
 

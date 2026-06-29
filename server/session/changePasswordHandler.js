@@ -39,7 +39,7 @@ async function responseJson(response) {
 
 export function validatePasswordChangePayload(body = {}) {
   const newPassword = String(body.newPassword || body.password || "");
-  if (newPassword.length < 12) return { ok: false, error: "new_password_min_12_chars" };
+  if (newPassword.length < 6) return { ok: false, error: "new_password_min_6_chars" };
   return { ok: true, newPassword };
 }
 

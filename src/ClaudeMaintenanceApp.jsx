@@ -1910,7 +1910,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
   };
   const submitNewPassword = async () => {
     if (!passwordChange?.accessToken) return setErr("נדרש להתחבר מחדש");
-    if (newPassword.length < 12) return setErr("הסיסמה החדשה חייבת לכלול לפחות 12 תווים");
+    if (newPassword.length < 6) return setErr("הסיסמה החדשה חייבת לכלול לפחות 6 תווים");
     if (newPassword !== newPasswordConfirm) return setErr("הסיסמאות אינן זהות");
     setBusy(true);
     setErr("");
@@ -1941,7 +1941,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
         {passwordChange ? (<>
           <div className="login-q">החלפת סיסמה ראשונית</div>
           <div className="hint" style={{ marginBottom: 10 }}>נדרש להגדיר סיסמה חדשה לפני כניסה למערכת.</div>
-          <label className="field"><span>סיסמה חדשה</span><input value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" placeholder="לפחות 12 תווים" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} autoFocus /></label>
+          <label className="field"><span>סיסמה חדשה</span><input value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" placeholder="לפחות 6 תווים" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} autoFocus /><div className="hint">לפחות 6 תווים. מומלץ לשלב אות גדולה או סימן, אבל אין דרישת מורכבות קשיחה.</div></label>
           <label className="field"><span>אישור סיסמה חדשה</span><input value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" placeholder="הקלידו שוב" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} /></label>
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={submitNewPassword} disabled={busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
@@ -1963,7 +1963,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>חזרה</button>
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
-        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית — לגרסת ייצור נדרש שרת" : "מצב ייצור · הכניסה מנוהלת דרך Supabase Auth ופרופיל CMMS"}</div>
+        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : `פותח על ידי Vadim Demchuk · 2026 · v${APP_VERSION}`}</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
         </>)}
       </div>
