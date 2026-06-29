@@ -1730,7 +1730,7 @@ export default function App() {
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
                   : <UserApp {...shared} key="imp-user" />}
             {issueReportOpen && <Overlay persistent panelClassName="issue-report-shell" onClose={() => setIssueReportOpen(false)}><AppIssueReportModal session={effSession} onSave={async (issue) => { const ok = await saveAppIssue(issue); if (ok) setIssueReportOpen(false); return ok; }} onClose={() => setIssueReportOpen(false)} /></Overlay>}
-            {profileOpen && <Overlay persistent onClose={() => setProfileOpen(false)}><ProfileModal session={session} onSave={saveMyProfile} onClose={() => setProfileOpen(false)} /></Overlay>}
+            {profileOpen && <Overlay persistent panelClassName="profile-shell" onClose={() => setProfileOpen(false)}><ProfileModal session={session} onSave={saveMyProfile} onClose={() => setProfileOpen(false)} /></Overlay>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
     </div>
@@ -7194,7 +7194,7 @@ a{color:inherit;}
 .err{background:#FEE2E2;color:#B91C1C;font-size:13.5px;font-weight:500;padding:10px 12px;border-radius:10px;margin-bottom:12px;}
 .note.ok{border-color:#86EFAC;color:#166534;background:#DCFCE7;}
 .tel-link{color:var(--primary);font-weight:700;text-decoration:none;direction:ltr;unicode-bidi:isolate;}
-.profile-modal{max-width:520px;}
+.modal2-panel.profile-modal{max-width:520px;}
 .profile-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px;}
 .profile-name{font-weight:800;color:var(--ink);}
 .avatar.big{width:44px;height:44px;font-size:18px;}
@@ -7768,7 +7768,9 @@ button.notif-perm:hover{background:#D1FAE5;}
 .issue-response{margin-top:7px;font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:9px;padding:7px 9px;}
 .issue-thumb{width:74px;height:54px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2);}
 .issue-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.ovl-panel.profile-shell{align-items:center;background:transparent;box-shadow:none;max-width:520px;overflow:visible;}
 .ovl-panel.issue-report-shell{align-items:center;background:transparent;box-shadow:none;max-width:420px;overflow:visible;}
+.profile-shell .profile-modal{box-shadow:0 24px 60px rgba(0,0,0,.4);}
 .issue-report-shell .issue-modal{box-shadow:0 24px 60px rgba(0,0,0,.4);}
 .brand-upload{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:12px;}
 .brand-upload-main{min-width:0;flex:1;}
@@ -8019,6 +8021,7 @@ button.notif-perm:hover{background:#D1FAE5;}
   .meta-grid{grid-template-columns:repeat(3,1fr);}
   .ovl-backdrop{align-items:center;justify-content:center;padding:28px;}
   .ovl-panel{width:100%;max-width:680px;height:auto;max-height:92vh;border-radius:18px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45);}
+  .ovl-panel.profile-shell{max-width:520px;background:transparent;box-shadow:none;overflow:visible;}
   .ovl-panel.issue-report-shell{max-width:420px;background:transparent;box-shadow:none;overflow:visible;}
   .ymx-wrap{overflow:visible;}
   .ai-back{align-items:center;}.ai-panel{max-width:560px;height:80vh;border-radius:18px;}
