@@ -36,10 +36,13 @@ import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./pub
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs } from "./systemErrorLogAdapter.js";
+import { sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, normalizeVersionManifest, shouldShowVersionUpdate } from "./appVersionModel.js";
+import { DEFAULT_LANGUAGE, languageDirection, languageOptions, normalizeLanguageCode } from "./languageModel.js";
+import { uiText } from "./uiI18nModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -60,6 +63,20 @@ const PRODUCTION_AUTH_STORE = createProductionAuthStore();
 const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PRODUCTION_AUTH_STORE);
 const CLEANING_PHOTOS = createCleaningPhotoStorageFromEnv(import.meta.env, PRODUCTION_AUTH_STORE);
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
+
+function LanguagePicker({ value, onChange, compact = false }) {
+  const current = normalizeLanguageCode(value);
+  return (
+    <label className={`language-picker${compact ? " compact" : ""}`}>
+      {!compact && <span>{uiText(current, "language.label")}</span>}
+      <select value={current} onChange={(e) => onChange(normalizeLanguageCode(e.target.value))}>
+        {languageOptions().map((language) => (
+          <option key={language.code} value={language.code}>{language.nativeName}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 const imageFileToSquareDataUrl = (file, size = 512) => new Promise((resolve, reject) => {
   if (!file) return resolve("");
@@ -1341,7 +1358,17 @@ export default function App() {
   const [issueReportOpen, setIssueReportOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [theme, setTheme] = useState("light");
+  const [language, setLanguageState] = useState(DEFAULT_LANGUAGE);
   const snapRef = useRef({});
+  const setLanguage = (nextLanguage) => {
+    const normalized = normalizeLanguageCode(nextLanguage);
+    setLanguageState(normalized);
+    store.set("language:v1", normalized, false);
+  };
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = languageDirection(language);
+  }, [language]);
   const applySavedConfig = (savedConfig) => {
     if (!savedConfig) return;
     try {
@@ -1354,6 +1381,7 @@ export default function App() {
   useEffect(() => { (async () => {
     try {
     const th = await store.get("theme:v1", false); if (th) setTheme(th);
+    const savedLanguage = await store.get("language:v1", false); if (savedLanguage) setLanguageState(normalizeLanguageCode(savedLanguage));
     if (SEED_POLICY.requiresServerBootstrapAdmin) {
       const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
       if (restored?.session) {
@@ -1751,13 +1779,13 @@ export default function App() {
   }, [session && session.id, session && session.role, impersonating]);
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
-    <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
+    <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
+        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -1790,7 +1818,7 @@ function VersionUpdateBanner({ onRefresh, onDismiss }) {
 
 /* ============================================================ WORKER (עובד) — דיווח תקלה */
 function WorkerApp(p) {
-  const { session, config, fleet, tickets, saveTicket, onLogout, theme, toggleTheme } = p;
+  const { session, config, fleet, tickets, saveTicket, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key) } = p;
   const [view, setView] = useState("new"); // new | mine
   const [track, setTrack] = useState(null);
   const [subject, setSubject] = useState(""), [description, setDescription] = useState(""), [forkliftId, setForkliftId] = useState("");
@@ -1828,35 +1856,36 @@ function WorkerApp(p) {
     finally { setBusy(false); }
   };
   const toSign = (p.ppeReqs || []).filter((r) => r.workerId === session.id && r.status === "worker_sign");
+  const workerTitle = view === "new" ? t("worker.newReport") : view === "ppe" ? t("worker.myPpe") : view === "activity" ? t("worker.activity") : t("worker.myReports");
   return (<div className="worker-shell">
     <div className="worker-top">
-      <div><div className="wk-title">{view === "new" ? "דיווח תקלה" : view === "ppe" ? "הציוד שלי" : view === "activity" ? "יומן פעילות" : "הדיווחים שלי"}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title="דיווח על בעיה במערכת" aria-label="דיווח על בעיה במערכת"><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
+      <div><div className="wk-title">{workerTitle}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
+      <div style={{ display: "flex", gap: 8 }}><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
-    <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> הציוד שלי{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
+    <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> {t("worker.newTab")}</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> {t("worker.mineTab")}{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> {t("worker.ppeTab")}{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> {t("worker.activityTab")}</button></div>
     <div className="worker-body">
       {toSign.length > 0 && view !== "ppe" && <button type="button" onClick={() => setView("ppe")} style={{ width: "100%", textAlign: "start", display: "flex", alignItems: "center", gap: 10, background: "#B91C1C", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px", marginBottom: 12, cursor: "pointer", boxShadow: "0 2px 10px rgba(185,28,28,0.35)" }}><PenLine size={22} /><div style={{ flex: 1 }}><div style={{ fontWeight: 800, fontSize: 15 }}>יש לך {toSign.length === 1 ? "מסמך" : `${toSign.length} מסמכים`} לחתימה</div><div style={{ fontSize: 12.5, opacity: 0.92 }}>לחצו לצפייה ולחתימה על קבלת הציוד</div></div><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button>}
       
-      {sent && <div className="banner" style={{ background: "#DCFCE7", color: "#166534", borderColor: "#86EFAC" }}><CheckCircle2 size={16} /> הדיווח נשלח למנהל המחלקה. תקבלו עדכון כאן.</div>}
+      {sent && <div className="banner" style={{ background: "#DCFCE7", color: "#166534", borderColor: "#86EFAC" }}><CheckCircle2 size={16} /> {t("worker.sent")}</div>}
       {view === "new" ? (<>
-        <div className="wk-hint">דווחו על תקלה בקצרה. מנהל המחלקה יבדוק וימשיך משם.</div>
-        <div className="field"><span>על מה הדיווח?</span><div className="wk-track-row">
-          <button className={"wk-track" + (track === "facility" ? " on" : "")} onClick={() => { setTrack("facility"); setForkliftId(""); }}><Building2 size={22} /><span>מבנה / מתקן</span></button>
-          <button className={"wk-track" + (track === "transport" ? " on" : "")} onClick={() => setTrack("transport")}><Truck size={22} /><span>כלי שינוע</span></button>
+        <div className="wk-hint">{t("worker.hint")}</div>
+        <div className="field"><span>{t("worker.whatReport")}</span><div className="wk-track-row">
+          <button className={"wk-track" + (track === "facility" ? " on" : "")} onClick={() => { setTrack("facility"); setForkliftId(""); }}><Building2 size={22} /><span>{t("worker.facility")}</span></button>
+          <button className={"wk-track" + (track === "transport" ? " on" : "")} onClick={() => setTrack("transport")}><Truck size={22} /><span>{t("worker.transport")}</span></button>
         </div></div>
         {track === "transport" && (myFleet.length > 0
           ? <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={myFleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} /></div>
           : <div className="note">אין כלי שינוע המשויכים למחלקה שלך. ניתן לדווח על מבנה, או לפנות למנהל המחלקה.</div>)}
         {track && <>
-          <label className="field"><span>כותרת *</span><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="לדוגמה: דליפת מים ליד המחסן" /></label>
-          <label className="field"><span>תיאור *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="מה קרה? איפה?" /></label>
-          <div className="field"><span>תמונה {noPhoto ? "" : "* (חובה)"}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabPhoto(e.target.files?.[0])} />{!noPhoto && (photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>)}
-            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={noPhoto} onChange={(e) => { setNoPhoto(e.target.checked); if (e.target.checked) setPhoto(null); setErr(""); }} /> אין אפשרות לצרף תמונה</label>
+          <label className="field"><span>{t("worker.subject")}</span><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="לדוגמה: דליפת מים ליד המחסן" /></label>
+          <label className="field"><span>{t("worker.description")}</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="מה קרה? איפה?" /></label>
+          <div className="field"><span>{noPhoto ? "תמונה" : t("worker.photoRequired")}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabPhoto(e.target.files?.[0])} />{!noPhoto && (photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>)}
+            <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={noPhoto} onChange={(e) => { setNoPhoto(e.target.checked); if (e.target.checked) setPhoto(null); setErr(""); }} /> {t("worker.noPhoto")}</label>
             {noPhoto && <textarea rows={2} value={noPhotoReason} onChange={(e) => setNoPhotoReason(e.target.value)} placeholder="חובה לפרט: מדוע אין אפשרות לצרף תמונה? (לדוגמה: אין מצלמה במכשיר)" style={{ marginTop: 6 }} />}
           </div>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? <><span className="spinner sm" /> שולח…</> : <><Send size={16} /> שליחת דיווח</>}</button>
+          <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? <><span className="spinner sm" /> שולח…</> : <><Send size={16} /> {t("worker.send")}</>}</button>
         </>}
         {!track && err && <div className="err">{err}</div>}
         <div style={{ height: 24 }} />
@@ -1918,7 +1947,8 @@ const BUILTIN_LOGINS = [
   { id: "builtin_cleaner", name: "עובד ניקיון", role: "cleaner", workerNo: "1050", pin: "1234", dept: "" },
 ];
 const ANON_PROBLEMS = [{ label: "רצפה מלוכלכת / שלולית", kind: "dirty" }, { label: "אין סבון", kind: "dirty" }, { label: "אין נייר טואלט", kind: "dirty" }, { label: "פח מלא", kind: "dirty" }, { label: "ריח רע", kind: "dirty" }, { label: "שבר / תקלה (ברז · דלת · תאורה)", kind: "broken" }, { label: "אחר", kind: "dirty" }];
-function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false }) {
+function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false, language = DEFAULT_LANGUAGE, setLanguage = () => {} }) {
+  const t = (key, vars) => uiText(language, key, vars);
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
   const [zone, setZone] = useState(null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false);
@@ -1940,30 +1970,32 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
     setDone(true);
   };
   return (<div className="pub-wrap"><div className="pub-card">
-    <button className="icon-btn pub-x" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
-    {done ? <div className="pub-done"><CheckCircle2 size={44} color="#16A34A" /><div className="pub-done-t">הדיווח התקבל</div><div className="pub-done-s">תודה. הדיווח יועבר לבדיקת מנהל המערכת.</div><button className="btn-primary full" onClick={onClose}>סגירה</button></div>
+    <button className="icon-btn pub-x" aria-label={t("common.close")} onClick={onClose}><X size={20} /></button>
+    <LanguagePicker value={language} onChange={setLanguage} />
+    {done ? <div className="pub-done"><CheckCircle2 size={44} color="#16A34A" /><div className="pub-done-t">{t("public.received")}</div><div className="pub-done-s">{t("public.receivedSub")}</div><button className="btn-primary full" onClick={onClose}>{t("common.close")}</button></div>
       : !zone ? <>
         <div className="pub-logo"><Sparkles size={24} /></div>
-        <div className="pub-title">דיווח מהיר על בעיה</div>
-        <div className="pub-sub">כדי לדווח צריך לסרוק את קוד ה-QR שמודבק באזור. כך המערכת יודעת מאיזה מקום הדיווח נשלח.</div>
-        {active.length === 0 ? <div className="note">לא הוגדרו אזורים.</div>
+        <div className="pub-title">{t("public.title")}</div>
+        <div className="pub-sub">{t("public.scanRequired")}</div>
+        {active.length === 0 ? <div className="note">{t("public.noZones")}</div>
           : allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>
-          : <div className="note">{scannedZoneId ? "קוד ה-QR שנסרק לא מתאים לאזור פעיל. סרקו שוב את הקוד שמודבק באזור." : "פתחו את הדיווח דרך סריקת QR באזור עצמו. בחירה ידנית של אזור חסומה במצב ייצור."}</div>}
+          : <div className="note">{scannedZoneId ? t("public.wrongQr") : t("public.qrOnly")}</div>}
       </> : <>
         <div className="pub-title">{zone.name}</div>
         <div className="pub-sub">{zoneLoc(zone) || ""}</div>
-        <div className="field"><span>מה הבעיה?</span><div className="pub-chips">{ANON_PROBLEMS.map((p) => <button key={p.label} className={"pub-chip" + (prob === p ? " on" : "")} onClick={() => { setProb(p); setErr(""); }}>{p.label}</button>)}</div></div>
-        <div className="field"><span>תמונה * (חובה)</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צילום / צירוף תמונה</button>}</div>
-        <label className="field"><span>פירוט (רשות)</span><input value={text} onChange={(e) => setText(e.target.value)} placeholder="מה ראיתם?" /></label>
+        <div className="field"><span>{t("public.problem")}</span><div className="pub-chips">{ANON_PROBLEMS.map((p) => <button key={p.label} className={"pub-chip" + (prob === p ? " on" : "")} onClick={() => { setProb(p); setErr(""); }}>{p.label}</button>)}</div></div>
+        <div className="field"><span>{t("public.photoRequired")}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> {t("public.addPhoto")}</button>}</div>
+        <label className="field"><span>{t("public.detailsOptional")}</span><input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("public.detailsPlaceholder")} /></label>
         {err && <div className="err">{err}</div>}
-        <button className="btn-primary full" onClick={submit} disabled={busy}>שליחת דיווח אנונימי</button>
-        <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setZone(null); setProb(null); setPhoto(null); setText(""); }}>חזרה לבחירת אזור</button>
-        <div className="pub-foot">הדיווח האנונימי עובר לאישור מנהל המערכת לפני שהוא מגיע לטיפול.</div>
+        <button className="btn-primary full" onClick={submit} disabled={busy}>{t("public.submit")}</button>
+        <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setZone(null); setProb(null); setPhoto(null); setText(""); }}>{t("common.back")}</button>
+        <div className="pub-foot">{t("public.approvalFoot")}</div>
       </>}
   </div></div>);
 }
 
-function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
+function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
+  const t = (key, vars) => uiText(language, key, vars);
   const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -2068,6 +2100,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           <div className="brand"><BrandMark logo={config?.brandLogo} /><div><div className="brand-title">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
           <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
+        <LanguagePicker value={language} onChange={setLanguage} />
         {activationToken ? (<>
           <div className="login-q">הפעלת כניסה לעובד</div>
           {activationUser ? <div className="hint" style={{ marginBottom: 10 }}>שלום {activationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד {activationUser.workerNo || "—"}.</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
@@ -2077,35 +2110,35 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           <button className="btn-primary full" onClick={activateWorker} disabled={!activationUser}>שמירה וכניסה</button>
         </>) : (<>
         {passwordChange ? (<>
-          <div className="login-q">החלפת סיסמה ראשונית</div>
+          <div className="login-q">{t("login.firstPassword")}</div>
           <div className="hint" style={{ marginBottom: 10 }}>נדרש להגדיר סיסמה חדשה לפני כניסה למערכת.</div>
-          <label className="field"><span>סיסמה חדשה</span><input value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" placeholder="לפחות 6 תווים" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} autoFocus /><div className="hint">לפחות 6 תווים. מומלץ לשלב אות גדולה או סימן, אבל אין דרישת מורכבות קשיחה.</div></label>
-          <label className="field"><span>אישור סיסמה חדשה</span><input value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" placeholder="הקלידו שוב" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} /></label>
+          <label className="field"><span>{t("login.newPassword")}</span><input value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" placeholder="לפחות 6 תווים" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} autoFocus /><div className="hint">לפחות 6 תווים. מומלץ לשלב אות גדולה או סימן, אבל אין דרישת מורכבות קשיחה.</div></label>
+          <label className="field"><span>{t("login.confirmPassword")}</span><input value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" placeholder="הקלידו שוב" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} /></label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitNewPassword} disabled={busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
-          <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setPasswordChange(null); setResolved(null); setPassword(""); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>חזרה</button>
+          <button className="btn-primary full" onClick={submitNewPassword} disabled={busy}>{busy ? "שומר…" : t("login.saveAndEnter")}</button>
+          <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setPasswordChange(null); setResolved(null); setPassword(""); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : !resolved ? (<>
-          <div className="login-q">כניסה למערכת</div>
-          <label className="field"><span>{productionLogin ? "דוא״ל" : "דוא״ל / מספר עובד / קוד טכנאי"}</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com" : "vadim@chemipal.co.il / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
-          <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
+          <div className="login-q">{t("login.title")}</div>
+          <label className="field"><span>{productionLogin ? t("login.email") : t("login.identity")}</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com" : "vadim@chemipal.co.il / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
+          <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitIdentifier}>המשך</button>
+          <button className="btn-primary full" onClick={submitIdentifier}>{t("login.continue")}</button>
         </>) : (<>
           <div className="login-q">שלום {resolved.user.name}</div>
           <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? "הזינו סיסמה להשלמת הכניסה." : "הזינו קוד אישי להשלמת הכניסה."}</div>
-          {resolved.auth === "password" ? <label className="field"><span>סיסמה</span><input value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="••••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>
+          {resolved.auth === "password" ? <label className="field"><span>{t("login.password")}</span><input value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="••••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>
             : <label className="field"><span>קוד אישי</span><input value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
-          <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> זכור אותי במכשיר זה</label>
+          <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? "מתחבר…" : "כניסה"}</button>
-          <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>חזרה</button>
+          <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? "מתחבר…" : t("login.signIn")}</button>
+          <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>{t("login.back")}</button>
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
-        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>פותח על ידי </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>גרסה </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
-        <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
+        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>{t("login.developedBy")} </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
+        <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> {t("login.reportWithoutLogin")}</button>
         </>)}
       </div>
-      {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
+      {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} language={language} setLanguage={setLanguage} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
     </div>
   );
 }
@@ -2208,7 +2241,7 @@ function UserApp(p) {
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { await saveUser(u); setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
+      {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
@@ -2288,7 +2321,7 @@ function TechApp(p) {
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} /></Overlay>}
       {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
+      {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
@@ -3033,7 +3066,7 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose }) {
 }
 
 function CleanerApp(p) {
-  const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme, absences, saveAbsence, delAbsence } = p;
+  const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key), absences, saveAbsence, delAbsence } = p;
   const [run, setRun] = useState(null), [qrBlockedZone, setQrBlockedZone] = useState(null), [sent, setSent] = useState(false), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, [], absences);
@@ -3087,8 +3120,8 @@ function CleanerApp(p) {
   };
   return (<div className="worker-shell">
     <div className="worker-top">
-      <div><div className="wk-title">סבבי ניקיון</div><div className="wk-sub">{session.name}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title="דיווח על בעיה במערכת" aria-label="דיווח על בעיה במערכת"><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
+      <div><div className="wk-title">{t("cleaner.title")}</div><div className="wk-sub">{session.name}</div></div>
+      <div style={{ display: "flex", gap: 8 }}><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title={t("common.notifications")} aria-label={t("common.notifications")}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <main className="content">
@@ -3116,7 +3149,7 @@ function CleanerApp(p) {
     {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} onClose={() => setQrBlockedZone(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId), escalate: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId) }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onEscalate={(c) => { escalateComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
-    {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={() => setShowNotif(false)} onGo={() => setShowNotif(false)} />}
+    {showNotif && <NotifPanel notif={notif} language={language} onClose={() => setShowNotif(false)} onOpen={() => setShowNotif(false)} onGo={() => setShowNotif(false)} />}
   </div>);
 }
 
@@ -4694,7 +4727,7 @@ function AdminApp(p) {
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
@@ -7161,9 +7194,12 @@ function Overlay({ children, onClose, persistent, panelClassName = "" }) {
   return <div className="ovl-backdrop" onClick={persistent ? undefined : onClose} role="presentation"><div ref={ref} className={"ovl-panel" + (panelClassName ? ` ${panelClassName}` : "")} role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>{children}</div></div>;
 }
 function AIFab({ onClick }) { return <button className="ai-fab" aria-label="עוזר AI" title="עוזר AI" onClick={onClick}><Sparkles size={22} /></button>; }
-function NotifPanel({ notif, onClose, onOpen, onGo }) {
+function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
+  const notifLanguage = normalizeLanguageCode(language || (typeof document !== "undefined" ? document.documentElement.lang : DEFAULT_LANGUAGE));
+  const t = (key, vars) => uiText(notifLanguage, key, vars);
   const [settings, setSettings] = useState(false), [marked, setMarked] = useState(false), [perm, setPerm] = useState(""), [showAll, setShowAll] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [pushMsg, setPushMsg] = useState(""), [pushBusy, setPushBusy] = useState(false);
   const markAll = async () => {
     setMarking(true);
     await notif.markRead();
@@ -7173,6 +7209,36 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
   };
   const askPerm = () => { try { const r = Notification.requestPermission(); if (r && r.then) r.then((res) => setPerm(res || "denied")).catch(() => setPerm("blocked")); else setPerm(typeof r === "string" ? r : "blocked"); } catch (e) { setPerm("blocked"); } };
   const canAsk = typeof window !== "undefined" && "Notification" in window && Notification.permission === "default";
+  const phonePushSupported = pushSupported();
+  const enablePhonePush = async () => {
+    setPushBusy(true);
+    setPushMsg("");
+    const result = await subscribeToPhonePush();
+    setPushBusy(false);
+    if (result.ok) {
+      setPushMsg("התראות לטלפון הופעלו. אפשר לשלוח בדיקה.");
+      return;
+    }
+    const label = result.error === "push_server_disabled" || result.error === "push_not_configured"
+      ? "התראות לטלפון עדיין לא הוגדרו בשרת."
+      : result.error === "notification_permission_denied"
+        ? "ההרשאה להתראות נחסמה בדפדפן."
+        : result.error === "push_not_supported"
+          ? "המכשיר או הדפדפן לא תומכים בהתראות PWA."
+          : "הפעלת התראות לטלפון נכשלה.";
+    setPushMsg(label);
+  };
+  const testPhonePush = async () => {
+    setPushBusy(true);
+    setPushMsg("");
+    const result = await sendTestPhonePush();
+    setPushBusy(false);
+    if (result.ok) {
+      setPushMsg(result.sent ? "נשלחה התראת בדיקה לטלפון." : "אין עדיין מכשיר רשום למשתמש הזה.");
+      return;
+    }
+    setPushMsg(result.error === "push_not_configured" ? "התראות לטלפון עדיין לא הוגדרו בשרת." : "שליחת בדיקה נכשלה.");
+  };
   const { prefs, setPrefs } = notif;
   const click = async (ev) => { await notif.markRead(); if (ev.ticketId) onOpen && onOpen(ev.ticketId); else if (ev.go && onGo) onGo(ev.go, ev); };
   const item = (ev) => {
@@ -7197,6 +7263,14 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
     {!settings && (perm === "granted" ? <div className="notif-perm ok"><Check size={15} /> התראות מחשב הופעלו</div>
       : (perm === "denied" || perm === "blocked") ? <div className="notif-perm warn"><Bell size={15} /> {perm === "blocked" ? "התראות מחשב אינן זמינות בתצוגה זו" : "ההתראות נחסמו — יש לאשר בהגדרות הדפדפן"}</div>
       : canAsk ? <button className="notif-perm" onClick={askPerm}><Bell size={15} /> הפעלת התראות במחשב</button> : null)}
+    {!settings && <div className="notif-push">
+      <div className="notif-push-main"><Bell size={15} /><div><b>{t("push.title")}</b><span>{phonePushSupported ? t("push.sub") : t("push.unsupported")}</span></div></div>
+      <div className="notif-push-actions">
+        <button className="btn-ghost sm" onClick={enablePhonePush} disabled={pushBusy || !phonePushSupported}>{pushBusy ? "בודק…" : t("push.enable")}</button>
+        <button className="btn-ghost sm" onClick={testPhonePush} disabled={pushBusy}>{t("push.test")}</button>
+      </div>
+      {pushMsg && <div className="notif-push-msg">{pushMsg}</div>}
+    </div>}
     <div className="notif-list">{list.length === 0 ? <div className="empty sm"><Bell size={28} /><div className="empty-t">אין התראות</div></div>
       : grouped ? grouped.map(([k, arr]) => <div key={k.kind} className="ni-group"><div className="ni-group-h"><span className={"ni-dot " + k.kind} /> {k.label} <span className="ni-group-n">{arr.length}</span></div>{arr.map(item)}</div>)
       : list.map(item)}</div>
@@ -7296,6 +7370,11 @@ a{color:inherit;}
 .login-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;}
 .login-theme{width:40px;height:40px;border-radius:11px;color:var(--muted);background:var(--surface-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .login-theme:hover{border-color:var(--primary);color:var(--primary);}
+.language-picker{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;color:var(--muted);font-size:12px;font-weight:700;}
+.language-picker select{min-height:36px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 10px;font:inherit;font-weight:700;}
+.language-picker.compact{margin:0;min-width:82px;}
+.language-picker.compact select{min-height:38px;width:82px;background:#ffffff10;color:#fff;border-color:#ffffff26;padding:0 7px;}
+.language-picker.compact option{color:#111827;background:#fff;}
 .brand{display:flex;align-items:center;gap:12px;min-width:0;}
 .brand-mark{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(234,88,12,.35);flex-shrink:0;overflow:hidden;}
 .brand-mark.sm{width:38px;height:38px;border-radius:11px;}
@@ -7861,6 +7940,11 @@ button.notif-perm:hover{background:#D1FAE5;}
 .ni-dot.cleaning{background:#0EA5E9;}
 .notif-item.clk{cursor:pointer;}.notif-item .ni-go{color:var(--muted);align-self:center;flex-shrink:0;opacity:.6;}
 .icon-btn.on2{background:var(--primary-soft,#FFF4ED);color:var(--primary);}
+.notif-push{border-bottom:1px solid var(--line);padding:10px 14px;background:var(--surface);}
+.notif-push-main{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);}
+.notif-push-main b{display:block;font-size:13px;}.notif-push-main span{display:block;color:var(--muted);line-height:1.35;margin-top:2px;}
+.notif-push-actions{display:flex;gap:7px;margin-top:9px;}.notif-push-actions .btn-ghost{flex:1;justify-content:center;}
+.notif-push-msg{font-size:12px;color:var(--muted);line-height:1.4;margin-top:7px;}
 .notif-settings{border-bottom:1px solid var(--line);padding:10px 14px;background:var(--surface-2);}
 .ns-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;}
 .ns-row.clk{cursor:pointer;}
