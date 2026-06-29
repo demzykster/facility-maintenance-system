@@ -74,6 +74,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
+  - `npm run staging:smoke:ui` checks the live Vercel UI after login on desktop and mobile: desktop module navigation, footer version, mobile top logout/profile/issue actions, bottom navigation, and profile modal layout.
+  - `npm run staging:gate` should include the strict UI smoke so final pilot checks do not depend on a manual browser walkthrough.
   - red shared-save failure toasts should create a sanitized client-error audit event when a logged-in production session is available.
   - red shared-save failure toasts are reserved for failed shared writes/deletes; background shared reads/lists may fail/retry without showing a misleading save-failure banner.
   - cleaning zone, cleaning complaint, and cleaning round forms must await persistence before closing; failed saves keep the form open with a visible retry message instead of silently losing user input.
@@ -88,6 +90,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Staging UI smoke gate branch passed locally: `npm run staging:smoke:ui -- --expect-current-commit` verified public Vercel commit `7dd46b2`, opened all desktop modules without overflow, and confirmed mobile logout/profile/issue actions plus full bottom navigation. `npm run staging:gate` also passed with the UI smoke included.
   - Profile/notification polish is live through PR #432, PR #433, and PR #434. Strict live smoke passed on public Vercel commit `033eaf3`; desktop read-only smoke opened all main modules with no horizontal overflow, console errors, or failed API responses; mobile smoke confirmed top logout, profile, issue-report, and full bottom navigation with no overflow.
   - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
   - Mobile navigation polish passed locally: full tests, release check, build, diff check, and Playwright smoke confirmed admin has no top dropdown, full bottom scroll navigation includes all 11 available sections without page overflow, and a standard manager keeps a simple three-item bottom navigation.

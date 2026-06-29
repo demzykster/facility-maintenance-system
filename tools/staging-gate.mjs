@@ -4,7 +4,8 @@ const steps = [
   ["staging:preflight:local", ["npm", ["run", "staging:preflight:local"]]],
   ["staging:supabase-schema", ["npm", ["run", "staging:supabase-schema"]]],
   ["staging:vercel-env", ["npm", ["run", "staging:vercel-env"]]],
-  ["staging:smoke:live:strict", ["npm", ["run", "staging:smoke:live", "--", "--expect-current-commit"]]]
+  ["staging:smoke:live:strict", ["npm", ["run", "staging:smoke:live", "--", "--expect-current-commit"]]],
+  ["staging:smoke:ui:strict", ["npm", ["run", "staging:smoke:ui", "--", "--expect-current-commit"]]]
 ];
 
 function runStep(label, [command, args]) {
