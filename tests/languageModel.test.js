@@ -16,10 +16,11 @@ describe("languageModel", () => {
   });
 
   it("declares the agreed worker-facing language set", () => {
-    expect(SUPPORTED_LANGUAGES.map((language) => language.code)).toEqual(["he", "en", "ar", "hi", "ti"]);
+    expect(SUPPORTED_LANGUAGES.map((language) => language.code)).toEqual(["he", "en", "ru", "ar", "hi", "ti"]);
     expect(languageOptions().map((language) => language.nativeName)).toEqual([
       "עברית",
       "English",
+      "Русский",
       "العربية",
       "हिन्दी",
       "ትግርኛ"
@@ -28,6 +29,7 @@ describe("languageModel", () => {
 
   it("normalizes locale variants without accepting unsupported languages", () => {
     expect(normalizeLanguageCode("HE-il")).toBe("he");
+    expect(normalizeLanguageCode("ru-RU")).toBe("ru");
     expect(normalizeLanguageCode("ar_IL")).toBe("ar");
     expect(normalizeLanguageCode("hi-IN")).toBe("hi");
     expect(normalizeLanguageCode("ti-ER")).toBe("ti");
@@ -38,6 +40,7 @@ describe("languageModel", () => {
     expect(languageDirection("he")).toBe("rtl");
     expect(languageDirection("ar")).toBe("rtl");
     expect(languageDirection("en")).toBe("ltr");
+    expect(languageDirection("ru")).toBe("ltr");
     expect(languageDirection("hi")).toBe("ltr");
     expect(languageDirection("ti")).toBe("ltr");
   });

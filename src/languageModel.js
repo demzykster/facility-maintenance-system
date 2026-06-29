@@ -3,6 +3,7 @@ export const DEFAULT_LANGUAGE = "he";
 export const SUPPORTED_LANGUAGES = Object.freeze([
   { code: "he", nativeName: "עברית", englishName: "Hebrew", dir: "rtl", base: true },
   { code: "en", nativeName: "English", englishName: "English", dir: "ltr" },
+  { code: "ru", nativeName: "Русский", englishName: "Russian", dir: "ltr" },
   { code: "ar", nativeName: "العربية", englishName: "Arabic", dir: "rtl" },
   { code: "hi", nativeName: "हिन्दी", englishName: "Hindi", dir: "ltr" },
   { code: "ti", nativeName: "ትግርኛ", englishName: "Tigrinya", dir: "ltr" }
