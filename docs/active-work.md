@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: clean after PR #404 and the successful production strict live smoke.
-- Latest synchronized `main`: after PR #404 (`89455f2`). Public production alias serves this commit.
+- Status: clean after PR #409; Supabase Pro managed backup is now visible from CLI, but restore drill still needs a separate restore target.
+- Latest synchronized `main`: after PR #409 (`3d258e6`). Public production alias is healthy.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -68,9 +68,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
-  - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
+  - finish the non-automated launch gate: perform one restore drill against a separate restore target. Supabase Pro managed database backups are now visible, but the drill is not complete until restored data, auth, file metadata, file bytes, and audit trail are verified.
+  - before true production, revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
+  - Supabase Pro backup check passed: `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`). Fresh local evidence snapshot `.tools/staging-backup-evidence-2026-06-29T09-24-12-434Z.json` captured `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, `storageFiles=0`; `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed.
   - Client shared-save failure logging merged in PR #404 after the Vercel Pro upgrade removed the build-rate-limit blocker. Vercel passed, and strict live smoke passed for deployed commit `89455f2`.
   - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for the deployed `main` runtime: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
   - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
