@@ -23,7 +23,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: clean after PR #412; Supabase Pro backup and separate-target restore drill are complete.
+- Status: clean on `main`; Supabase Pro backup and separate-target restore drill are complete.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
