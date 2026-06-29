@@ -54,9 +54,9 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
   const mem = {};
   const canUseMemoryFallback = () => typeof allowMemoryFallback === "function" ? !!allowMemoryFallback() : !!allowMemoryFallback;
   const resolveStorage = (shared) => shared ? storageProvider() : localStorageProvider();
-  const notifyFail = (shared) => {
+  const notifyFail = (shared, details = {}) => {
     if (!shared) return;
-    try { store._onFail && store._onFail(); } catch (_) {}
+    try { store._onFail && store._onFail({ shared: true, ...details }); } catch (_) {}
   };
   const store = {
     async get(key, shared = false) {
@@ -69,7 +69,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
           if (result !== undefined) return result ? result.value : null;
         }
       } catch (e) {
-        if (!fallback) { notifyFail(shared); throw e; }
+        if (!fallback) { notifyFail(shared, { operation: "get", key, error: e?.message || "" }); throw e; }
       }
       return fallback && Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
     },
@@ -83,7 +83,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
         if (result === undefined) throw new Error("timeout");
         return true;
       } catch (e) {
-        notifyFail(shared);
+        notifyFail(shared, { operation: "set", key, error: e?.message || "" });
         return false;
       }
     },
@@ -97,7 +97,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
         if (result === undefined) throw new Error("timeout");
         return true;
       } catch (e) {
-        notifyFail(shared);
+        notifyFail(shared, { operation: "delete", key, error: e?.message || "" });
         return false;
       }
     },
@@ -111,7 +111,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
           if (result !== undefined) return result ? result.keys : [];
         }
       } catch (e) {
-        if (!fallback) { notifyFail(shared); throw e; }
+        if (!fallback) { notifyFail(shared, { operation: "list", key: prefix, error: e?.message || "" }); throw e; }
       }
       return fallback ? Object.keys(mem).filter((key) => key.startsWith(prefix)) : [];
     }

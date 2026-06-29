@@ -21,7 +21,8 @@ export const AUDIT_ACTIONS = Object.freeze({
   download: "download",
   login: "login",
   logout: "logout",
-  bootstrap: "bootstrap"
+  bootstrap: "bootstrap",
+  clientError: "client_error"
 });
 
 const ENTITY_TYPES = new Set(Object.values(AUDIT_ENTITY_TYPES));
