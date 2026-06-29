@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/access-notification-summary`
 
-- Status: pre-login PWA install prompt is merged and deployed. Continue from the next owner-audit or pilot-hardening item.
+- Status: first pilot-final block in progress: connect role permissions and notification preferences more clearly in the user form.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -110,6 +110,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Cleaning QR localization branch passed strict dictionary parity: `he/en/ru/ar/hi/ti` each expose 105 direct UI keys, with no missing or extra keys. Browser smoke on local `http://127.0.0.1:5173/` switched all six languages and confirmed login/public-report title text plus correct RTL/LTR direction. Full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - Worker localization polish passed locally: direct worker smoke confirmed Russian and Arabic PPE/activity screens no longer show the hardcoded Hebrew role/PPE/activity labels from the owner screenshots; admin-to-worker role-preview smoke confirmed the preview strip localizes inside the worker shell; iPhone-width worker smoke confirmed Russian/Arabic topbar and tabs stay inside the viewport and tab height does not jump while switching tabs. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - PWA login install prompt branch passed locally: generated PNG install icons (`192`, `512`, and Apple touch `180`), updated manifest/iOS meta tags, added a compact login-screen install prompt, and verified iPhone instructions plus Android `beforeinstallprompt` flow with Playwright. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
+  - Access/notification matrix branch passed locally: individual module permissions are now editable for all non-admin roles, the notification-preference list shows allowed and permission-blocked event kinds in one matrix, and worker PPE cross-role access was smoke-checked in the user form. Validation passed: targeted notification/push tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright user-form smoke.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
