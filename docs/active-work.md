@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: no product branch is active after PR #390.
-- Latest synchronized `main`: after PR #390. Public Vercel staging has been redeployed from current `main` and `npm run staging:gate` passes for commit `7367d2b`.
+- Status: clean staging is ready for owner-facing empty-system review.
+- Latest synchronized `main`: after PR #392. Public Vercel staging has been redeployed from current `main` and `npm run staging:gate` passes for commit `d28c08e`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -64,7 +64,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
   - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
-  - before owner-facing pilot, decide whether to leave the current smoke records/users in staging or clear/reseed a clean demonstration scenario.
+  - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
   - Follow-up smoke check: the transport ticket detail opened in the UI, admin note update saved, and the cleaning UI shows the smoke public zone plus one pending report.
@@ -83,6 +83,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:gate` is merged in PR #390 as the combined non-destructive staging gate. It runs local env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke.
   - Supabase CLI platform access is now authenticated with a temporary local access token for restore-drill work. The token is stored outside git and should be revoked after the drill.
   - Supabase CLI confirms project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`) is visible, but `supabase backups list` reports no physical backups and `pitr_enabled=false`; Supabase dashboard states Free plan does not include project backups.
+  - Owner-facing staging cleanup is complete: only admin `vadim@chemipal.co.il` remains, admin password is temporarily `123456`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`, and `cmms-files` has no files.
+  - Final cleanup evidence file is local-only: `.tools/staging-backup-evidence-2026-06-29T04-34-25-956Z.json`.
+  - Read-only UI smoke passed on public Vercel after cleanup: login as admin with the temporary password reached the app shell, `יציאה` was visible, smoke/demo records were not visible, and logout returned to login. Console showed pre-auth 401/init errors before login; keep as non-blocking polish follow-up.
   - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
@@ -102,6 +105,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Owner-facing empty staging cleanup is complete.
+  - Removed smoke users from Supabase Auth and `app_users`.
+  - Cleared KV records, file metadata, audit events, and storage files.
+  - Left one active admin: `vadim@chemipal.co.il`.
+  - Set the temporary admin password to `123456` for owner review.
+  - `npm run staging:gate` passed after cleanup.
+  - Read-only UI smoke passed without visible demo/smoke data.
 - Staging backup evidence tooling is complete in PR #388.
 - Combined staging gate is complete in PR #390.
   - Added `npm run staging:gate`.
