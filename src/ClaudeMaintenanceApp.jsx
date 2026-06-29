@@ -36,6 +36,7 @@ import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./pub
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
+import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -1779,7 +1780,7 @@ function WorkerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{view === "new" ? "דיווח תקלה" : view === "ppe" ? "הציוד שלי" : view === "activity" ? "יומן פעילות" : "הדיווחים שלי"}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title="דיווח על בעיה במערכת" aria-label="דיווח על בעיה במערכת"><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> דיווח חדש</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> הדיווחים שלי{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> הציוד שלי{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> יומן</button></div>
@@ -1866,10 +1867,12 @@ const BUILTIN_LOGINS = [
   { id: "builtin_cleaner", name: "עובד ניקיון", role: "cleaner", workerNo: "1050", pin: "1234", dept: "" },
 ];
 const ANON_PROBLEMS = [{ label: "רצפה מלוכלכת / שלולית", kind: "dirty" }, { label: "אין סבון", kind: "dirty" }, { label: "אין נייר טואלט", kind: "dirty" }, { label: "פח מלא", kind: "dirty" }, { label: "ריח רע", kind: "dirty" }, { label: "שבר / תקלה (ברז · דלת · תאורה)", kind: "broken" }, { label: "אחר", kind: "dirty" }];
-function PublicReport({ zones, onSubmit, onClose }) {
+function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false }) {
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
+  const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
   const [zone, setZone] = useState(null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false);
   const fileRef = useRef(null);
+  useEffect(() => { if (scannedZone && (!zone || zone.id !== scannedZone.id)) setZone(scannedZone); }, [scannedZone?.id]);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); setErr(""); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const submit = async () => {
     if (busy) return;
@@ -1891,8 +1894,10 @@ function PublicReport({ zones, onSubmit, onClose }) {
       : !zone ? <>
         <div className="pub-logo"><Sparkles size={24} /></div>
         <div className="pub-title">דיווח מהיר על בעיה</div>
-        <div className="pub-sub">בחרו את האזור. במכשיר אמיתי — סריקת ה-QR בכניסה בוחרת את האזור אוטומטית.</div>
-        {active.length === 0 ? <div className="note">לא הוגדרו אזורים.</div> : <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>}
+        <div className="pub-sub">כדי לדווח צריך לסרוק את קוד ה-QR שמודבק באזור. כך המערכת יודעת מאיזה מקום הדיווח נשלח.</div>
+        {active.length === 0 ? <div className="note">לא הוגדרו אזורים.</div>
+          : allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>
+          : <div className="note">{scannedZoneId ? "קוד ה-QR שנסרק לא מתאים לאזור פעיל. סרקו שוב את הקוד שמודבק באזור." : "פתחו את הדיווח דרך סריקת QR באזור עצמו. בחירה ידנית של אזור חסומה במצב ייצור."}</div>}
       </> : <>
         <div className="pub-title">{zone.name}</div>
         <div className="pub-sub">{zoneLoc(zone) || ""}</div>
@@ -1915,6 +1920,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
   const active = users.filter((u) => u.active !== false);
   const activationUser = activationToken ? active.find((u) => (u.role === "worker" || u.role === "cleaner") && u.activationToken === activationToken && u.activationStatus === "pending") : null;
   const productionLogin = seedPolicy.requiresServerBootstrapAdmin;
+  const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const productionConfigured = productionLoginReady(productionLoginConfig);
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
@@ -2048,7 +2054,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
         </>)}
       </div>
-      {pub && <PublicReport zones={zones} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
+      {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
     </div>
   );
 }
@@ -2086,7 +2092,7 @@ function UserApp(p) {
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
         nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
       <div className="main-col">
-        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} demoActive={p.demoActive} />
+        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeView === "tickets" ? (<>
             {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {countLabel(needAct, "קריאה דורשת", "קריאות דורשות")} פעולה שלך</div>}
@@ -2186,7 +2192,7 @@ function TechApp(p) {
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
         nav={[{ id: "tickets", Icon: ListChecks, label: "קריאות שינוע", active: view === "tickets", onClick: () => setView("tickets") }, { id: "pm", Icon: CalendarClock, label: "לוח טיפולים", active: view === "pm", onClick: () => setView("pm") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
       <div className="main-col">
-        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} demoActive={p.demoActive} />
+        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {tw.presence !== false && <div className="shift-bar"><div className="shift-info"><span className="presence-dot on" /><div><div className="shift-stat">במשמרת</div><div className="shift-sub">{myShift.since ? "מאז " + fmtTime(myShift.since) : "מחובר"} · עד {fmtTime(effectiveEnd)}{myIdle.lateMin > 0 ? " · איחור " + myIdle.lateMin + " ד׳" : ""}</div></div></div><button className="btn-ghost sm" onClick={endAndLogout}><Power size={15} /> סיום משמרת ויציאה</button></div>}
           {sessWarn && <div className="ovl-backdrop modal2" style={{ zIndex: 60 }}><div className="modal2-panel" style={{ textAlign: "center" }}><div className="modal2-body"><div style={{ fontSize: 38, marginBottom: 6 }}>⏰</div><div className="form-title" style={{ marginBottom: 6 }}>המשמרת עומדת להסתיים</div><div className="note" style={{ margin: "0 0 14px" }}>בעוד כ-10 דקות תתבצע יציאה אוטומטית. ללא בחירה תוך 5 דקות — המערכת תוציא אותך אוטומטית.</div><div className="row2"><button className="btn-ghost" onClick={extendShift}>הארכה ב-60 ד׳</button><button className="btn-primary" onClick={endAndLogout}><Power size={15} /> סיום ויציאה</button></div></div></div></div>}
@@ -2705,7 +2711,8 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
 }
 
 function ZoneTag({ zone, onClose }) {
-  const data = encodeURIComponent("czone:" + zone.id);
+  const qrUrl = cleaningQrUrlFromWindow(zone.id);
+  const data = encodeURIComponent(qrUrl || ("czone:" + zone.id));
   const [imgOk, setImgOk] = useState(true);
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">תווית להדפסה</div></div>
     <div className="body">
@@ -2716,7 +2723,7 @@ function ZoneTag({ zone, onClose }) {
         <div className="zt-code">{zone.code}</div>
         <div className="zt-hint">סריקה לדיווח או לסבב ניקיון</div>
       </div>
-      <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו בכניסה לאזור. ה-QR נוצר בשירות חיצוני — בתצוגה המוטמעת ייתכן שלא ייטען; הקוד למטה תמיד זמין כגיבוי. סריקת מצלמה אמיתית תעבוד באפליקציה העצמאית.</div>
+      <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו בכניסה לאזור. הסריקה פותחת את CMMS ישירות על האזור הזה, לדיווח בעיה או לביצוע סבב ניקיון.</div>
       <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={() => { try { window.print(); } catch (e) {} }}><Printer size={15} /> הדפסה</button>
       <div style={{ height: 16 }} />
     </div></div>);
@@ -2922,18 +2929,25 @@ function ZoneSpec({ zone, onClose }) {
     </div></div>);
 }
 
-function ReportFlow({ zones, session, onSubmit, onClose }) {
+function ReportFlow({ zones, session, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false }) {
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
-  const [stage, setStage] = useState("scan"), [zone, setZone] = useState(null);
+  const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
+  const [stage, setStage] = useState(scannedZone ? "form" : "scan"), [zone, setZone] = useState(scannedZone);
+  useEffect(() => {
+    if (scannedZone && (!zone || zone.id !== scannedZone.id)) {
+      setZone(scannedZone);
+      setStage("form");
+    }
+  }, [scannedZone?.id]);
   if (stage === "form" && zone) return <ComplaintForm zone={zone} session={session} onCancel={onClose} onSave={onSubmit} />;
   return (<div className="pub-wrap"><div className="pub-card">
     <button className="icon-btn pub-x" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
     {stage === "scan" ? <>
       <div className="pub-logo"><Camera size={24} /></div>
       <div className="pub-title">סריקת QR של האזור</div>
-      <div className="pub-sub">סרקו את ה-QR שבכניסה לאזור כדי לפתוח דיווח. במכשיר אמיתי הסריקה בוחרת את האזור אוטומטית.</div>
-      <button className="btn-primary full" style={{ marginTop: 14 }} onClick={() => setStage("pick")}><Camera size={16} /> סריקה (הדגמה)</button>
-      <div className="pub-foot">בהדגמה זו תבחרו את האזור ידנית בשלב הבא במקום סריקת מצלמה.</div>
+      <div className="pub-sub">סרקו את ה-QR שמודבק באזור כדי לפתוח דיווח. בחירה ידנית חסומה במצב ייצור כדי למנוע דיווח מרחוק.</div>
+      {allowManualZonePick ? <button className="btn-primary full" style={{ marginTop: 14 }} onClick={() => setStage("pick")}><Camera size={16} /> בחירת אזור לבדיקה</button> : <div className="note">{scannedZoneId ? "קוד ה-QR שנסרק לא שייך לאזור שבאחריותך או שאינו פעיל." : "פתחו את המסך דרך סריקת QR באזור עצמו."}</div>}
+      {allowManualZonePick && <div className="pub-foot">במצב הדגמה/בדיקה ניתן לבחור ידנית כדי לבדוק את התהליך.</div>}
     </> : <>
       <div className="pub-logo"><Sparkles size={24} /></div>
       <div className="pub-title">בחירת אזור</div>
@@ -2944,9 +2958,22 @@ function ReportFlow({ zones, session, onSubmit, onClose }) {
   </div></div>);
 }
 
+function CleaningQrRequired({ zone, scannedZoneId, onClose }) {
+  const wrong = !!scannedZoneId;
+  return (<div className="pub-wrap"><div className="pub-card">
+    <button className="icon-btn pub-x" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
+    <div className="pub-logo"><Camera size={24} /></div>
+    <div className="pub-title">נדרשת סריקת QR באזור</div>
+    <div className="pub-sub">{zone?.name ? `כדי להמשיך באזור ${zone.name}, סרקו את קוד ה-QR שמודבק באזור עצמו.` : "כדי להמשיך, סרקו את קוד ה-QR שמודבק באזור עצמו."}</div>
+    <div className="note">{wrong ? "נסרק QR של אזור אחר או אזור שאינו פעיל. סרקו את הקוד הנכון במקום." : "הפעולה חסומה בלי סריקה כדי למנוע דיווח או סבב מרחוק."}</div>
+    <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={onClose}>סגירה</button>
+  </div></div>);
+}
+
 function CleanerApp(p) {
   const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme, absences, saveAbsence, delAbsence } = p;
-  const [run, setRun] = useState(null), [sent, setSent] = useState(false), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
+  const [run, setRun] = useState(null), [qrBlockedZone, setQrBlockedZone] = useState(null), [sent, setSent] = useState(false), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
+  const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, [], absences);
   const now = Date.now();
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
@@ -2988,17 +3015,23 @@ function CleanerApp(p) {
     else st = { txt: "—", color: "var(--muted)", bg: "var(--surface-2)" };
     const border = cover ? "#A855F7" : (st.go ? st.color : (allDone ? "#16A34A" : "#0EA5E9"));
     const subMissed = !notDay && !dueNow && nextP && missed.length ? " · פוספס " + missed.map((m) => m.win.time).join(",") : "";
-    return <button key={z.id} className="tcard clk" disabled={!target} onClick={() => target && setRun({ zone: z, win: target })} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{z.cleanerName ? " · עבור " + z.cleanerName : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{oc} דיווחים</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
+    const openRound = () => {
+      if (!target) return;
+      const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id });
+      if (!qr.allowed) return setQrBlockedZone(z);
+      setRun({ zone: z, win: target });
+    };
+    return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{z.cleanerName ? " · עבור " + z.cleanerName : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{oc} דיווחים</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
   };
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">סבבי ניקיון</div><div className="wk-sub">{session.name}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
+      <div style={{ display: "flex", gap: 8 }}><button className="icon-btn" onClick={toggleTheme} title="מצב תצוגה" aria-label="החלפת מצב תצוגה">{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title="התראות" aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title="דיווח על בעיה במערכת" aria-label="דיווח על בעיה במערכת"><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title="הפרופיל שלי" aria-label="הפרופיל שלי"><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title="יציאה" aria-label="יציאה מהמערכת"><LogOut size={18} /><span>יציאה</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <main className="content">
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> הסבב נרשם</div>}
-      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> לביצוע עכשיו ({countLabel(todo.length, "סבב", "סבבים")})</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => setRun({ zone: z, win })}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}חלון {win.time} · {WIN_META[status].label}</div></div><ChevronLeft size={16} /></button>)}</div>}
+      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> לביצוע עכשיו ({countLabel(todo.length, "סבב", "סבבים")})</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}חלון {win.time} · {WIN_META[status].label}</div></div><ChevronLeft size={16} /></button>)}</div>}
       {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(myComplaints.length, "דיווח", "דיווחים")})</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
       {active.length === 0 ? <Empty text="לא הוגדרו אזורים" Icon={Sparkles} sub="מנהל המערכת מגדיר אזורי ניקיון" /> : <>
         <SectionTitle><Sparkles size={15} /> האזורים שלי ({countLabel(mine.length, "אזור", "אזורים")})</SectionTitle>
@@ -3018,6 +3051,7 @@ function CleanerApp(p) {
       </div>; })()}
     </main>
     {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
+    {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} onClose={() => setQrBlockedZone(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId), escalate: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId) }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onEscalate={(c) => { escalateComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
     {showNotif && <NotifPanel notif={notif} onClose={() => setShowNotif(false)} onOpen={() => setShowNotif(false)} onGo={() => setShowNotif(false)} />}
@@ -3026,6 +3060,7 @@ function CleanerApp(p) {
 
 function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, resolveComplaint }) {
   const [rep, setRep] = useState(null), [report, setReport] = useState(false), [showClosed, setShowClosed] = useState(false), [spec, setSpec] = useState(null), [cDetail, setCDetail] = useState(null);
+  const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const mz = session.mgrZones || [];
   const myZones = useMemo(() => (zones || []).filter((z) => mz.includes(z.id)).sort(zoneSort), [zones, mz]);
   const open = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && c.status === "open").sort((a, b) => b.at - a.at), [complaints, mz]);
@@ -3039,8 +3074,8 @@ function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, re
     {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : <div className="cards">{myZones.map((z) => { const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}</div>}
     {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(open.length, "דיווח", "דיווחים")})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>הקישו לצפייה בפרטים המלאים. דיווחי לכלוך נסגרים ע״י עובד הניקיון; דיווחים מעובד הניקיון בטיפול ההנהלה.</div><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
     {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
-    {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /></Overlay>}
-    {report && <Overlay onClose={() => setReport(false)}><ReportFlow zones={myZones} session={session} onSubmit={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setReport(false); return ok; }} onClose={() => setReport(false)} /></Overlay>}
+    {rep && <Overlay onClose={() => setRep(null)}>{cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: rep.id }).allowed ? <ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /> : <CleaningQrRequired zone={rep} scannedZoneId={scannedZoneId} onClose={() => setRep(null)} />}</Overlay>}
+    {report && <Overlay onClose={() => setReport(false)}><ReportFlow zones={myZones} session={session} scannedZoneId={scannedZoneId} allowManualZonePick={SEED_POLICY.allowDemoData} onSubmit={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setReport(false); return ok; }} onClose={() => setReport(false)} /></Overlay>}
     {spec && <Overlay onClose={() => setSpec(null)}><ZoneSpec zone={spec} onClose={() => setSpec(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && cDetail.status === "open" }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
   </>);
@@ -4579,7 +4614,7 @@ function AdminApp(p) {
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
-        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} demoActive={p.demoActive}
+        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive}
           extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => { if (e.target.value === "tickets") clearTicketFilter(); setTab(e.target.value); }}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
         <div className="content with-nav">
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
@@ -6966,9 +7001,9 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
     </div>
   </aside>);
 }
-function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, toggleTheme, extra, demoActive, onProfile }) {
+function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, toggleTheme, extra, demoActive, onProfile, onReportIssue }) {
   return (<header className="topbar"><div className="tb-left"><div><div className="tb-title">{title}{demoActive && <span className="demo-badge">נתוני דמו</span>}</div>{subtitle && <div className="tb-sub">{subtitle}</div>}</div>{extra}</div>
-    <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{onProfile && <button className="bell" onClick={onProfile} aria-label="הפרופיל שלי"><User size={19} /></button>}<button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div>
+    <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{onReportIssue && <button className="bell" onClick={onReportIssue} aria-label="דיווח על בעיה במערכת" title="דיווח על בעיה במערכת"><Bug size={19} /></button>}{onProfile && <button className="bell" onClick={onProfile} aria-label="הפרופיל שלי"><User size={19} /></button>}<button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div>
     {rolePreview && <div className="tb-role-preview"><RolePreviewBox rolePreview={rolePreview} /></div>}</header>);
 }
 function Overlay({ children, onClose, persistent, panelClassName = "" }) {
