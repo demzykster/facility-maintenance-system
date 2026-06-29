@@ -24,6 +24,9 @@ describe("uiI18nModel", () => {
   it("exposes the worker and cleaner strings used by the localized shell", () => {
     expect(uiText("en", "worker.newReport")).toBe("Problem report");
     expect(uiText("ru", "worker.newReport")).toBe("Сообщить о проблеме");
+    expect(uiText("ru", "rolePreview.title")).toBe("Предпросмотр роли");
+    expect(uiText("ru", "ppe.noneIssued")).toContain("экипировку");
+    expect(uiText("ar", "audit.title")).toBe("سجل النشاط");
     expect(uiText("ru", "cleaner.todoNow", { count: 2 })).toBe("Нужно выполнить сейчас (2)");
     expect(uiText("ar", "public.submit")).toContain("بلاغ");
     expect(uiText("ar", "cleaner.todoNow", { count: 2 })).toContain("2");
@@ -38,6 +41,9 @@ describe("uiI18nModel", () => {
     expect(uiTextOptions()).toContain("cleaner.noAssignedZones");
     expect(uiTextOptions()).toContain("cleaningQr.title");
     expect(uiTextOptions()).toContain("push.title");
+    expect(uiTextOptions()).toContain("rolePreview.title");
+    expect(uiTextOptions()).toContain("ppe.noneIssued");
+    expect(uiTextOptions()).toContain("audit.noMatches");
   });
 
   it("localizes the cleaning QR gate for Russian cleaner flows", () => {
