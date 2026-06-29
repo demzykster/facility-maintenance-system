@@ -28,8 +28,7 @@ describe("Vercel API route policy", () => {
       "api/x/2.js",
       "api/x/3.js",
       "api/x/4.js",
-      "api/x/5.js",
-      "api/x/6.js"
+      "api/x/5.js"
     ]);
 
     expect(result.ok).toBe(false);

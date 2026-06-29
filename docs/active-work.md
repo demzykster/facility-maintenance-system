@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/log-client-storage-failures
 
-- Status: clean after PR #407 and the successful production redeploy/live smoke for the sidebar/logo polish.
-- Latest synchronized `main`: after PR #407. Public production alias has been redeployed from current `main`; docs-only ledger commits do not require another runtime redeploy unless app code changes.
-- Open PRs: #404 (`codex/log-client-storage-failures`) is still open separately; its Vercel preview is blocked by build-rate-limit.
+- Status: adding audit logging for the red shared-save failure toast.
+- Latest synchronized `main`: after PR #408. Public production alias has been redeployed from current `main`; docs-only ledger commits do not require another runtime redeploy unless app code changes.
+- Open PRs: #404 (`codex/log-client-storage-failures`) is being refreshed after the Vercel Pro upgrade removed the build-rate-limit blocker.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -60,6 +60,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
+  - red shared-save failure toasts should create a sanitized client-error audit event when a logged-in production session is available.
   - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
   - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
   - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
@@ -72,6 +73,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Validation:
   - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for the deployed `main` runtime: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
   - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
+  - Client shared-save failure logging passed: `npm test -- --run tests/clientErrorsHandler.test.js tests/auditEventModel.test.js tests/vercelApiRouteModel.test.js tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Public Vercel production redeploy succeeded after the Hobby daily deployment limit reset. Strict live smoke passed for commit `2304dcd`.
   - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
@@ -115,6 +117,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Client shared-save failure logging is in progress.
+  - A new authenticated `/api/client-errors` endpoint writes sanitized browser-side storage failures into the existing audit sink.
+  - The global red save-failure toast now reports shared/server storage failures with operation/key metadata; local browser-only keys stay silent.
 - Sidebar/logo polish is live on public Vercel after PR #407.
   - Production alias `https://facility-maintenance-system.vercel.app/` has been manually redeployed from current `main`.
   - Strict live smoke passed after the manual production redeploy.

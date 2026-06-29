@@ -2,6 +2,7 @@ export const VERCEL_HOBBY_FUNCTION_LIMIT = 12;
 
 export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/bootstrap/admin.js",
+  "api/client-errors.js",
   "api/files/index.js",
   "api/kv/[key].js",
   "api/kv/index.js",

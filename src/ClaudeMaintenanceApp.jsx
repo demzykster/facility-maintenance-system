@@ -34,6 +34,7 @@ import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
+import { reportClientError } from "./clientErrorAdapter.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -1229,9 +1230,29 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
 export default function App() {
   const [ready, setReady] = useState(false);
   const [toast, setToast] = useState(null);
-  useEffect(() => { store._onFail = () => setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב"); return () => { store._onFail = null; }; }, []);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
   const [session, setSession] = useState(null);
+  const sessionRef = useRef(null);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+  useEffect(() => {
+    store._onFail = (details = {}) => {
+      setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+      const current = sessionRef.current || {};
+      reportClientError({
+        kind: "storage_save_failed",
+        message: "Shared storage operation failed",
+        operation: details.operation || "",
+        key: details.key || "",
+        shared: details.shared === true,
+        metadata: {
+          error: details.error || "",
+          actorId: current.id || "",
+          actorRole: current.role || ""
+        }
+      });
+    };
+    return () => { store._onFail = null; };
+  }, []);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
   const [rolePreviewRole, setRolePreviewRole] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   TASK_STATUS_META = config.taskStatusMeta || {};
