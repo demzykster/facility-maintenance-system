@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/add-pwa-install-prompt`
+### Active branch: none
 
-- Status: adding a compact PWA install prompt to the pre-login auth screen.
+- Status: pre-login PWA install prompt is merged in PR #459 and deployed on Vercel commit `048fdd4`. Continue from the next owner-audit or pilot-hardening item.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
