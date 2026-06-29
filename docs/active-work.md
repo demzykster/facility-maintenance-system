@@ -105,6 +105,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Production pre-auth startup polish is in PR #395.
+  - Production app startup no longer reads shared KV/config collections before a production session exists.
+  - Restored/login production sessions now load config and app collections immediately after auth is available.
+  - Local validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
 - Owner-facing empty staging cleanup is complete.
   - Removed smoke users from Supabase Auth and `app_users`.
   - Cleared KV records, file metadata, audit events, and storage files.

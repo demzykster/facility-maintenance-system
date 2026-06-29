@@ -1231,11 +1231,29 @@ export default function App() {
   const [ppeOrders, setPpeOrders] = useState([]);
   const [theme, setTheme] = useState("light");
   const snapRef = useRef({});
+  const applySavedConfig = (savedConfig) => {
+    if (!savedConfig) return;
+    try {
+      const sv = JSON.parse(savedConfig);
+      const D = DEFAULT_CONFIG;
+      setConfig({ ...D, ...sv, widgets: { ...D.widgets, ...(sv.widgets || {}) }, techWidgets: { ...D.techWidgets, ...(sv.techWidgets || {}) }, mgrWidgets: { ...D.mgrWidgets, ...(sv.mgrWidgets || {}) }, notify: { ...D.notify, ...(sv.notify || {}) }, docWarn: { ...D.docWarn, ...(sv.docWarn || {}) }, typeMeta: { ...D.typeMeta, ...(sv.typeMeta || {}) } });
+    } catch {}
+  };
 
   useEffect(() => { (async () => {
     try {
-    const c = await store.get("config:v1", true); if (c) try { const sv = JSON.parse(c); const D = DEFAULT_CONFIG; setConfig({ ...D, ...sv, widgets: { ...D.widgets, ...(sv.widgets || {}) }, techWidgets: { ...D.techWidgets, ...(sv.techWidgets || {}) }, mgrWidgets: { ...D.mgrWidgets, ...(sv.mgrWidgets || {}) }, notify: { ...D.notify, ...(sv.notify || {}) }, docWarn: { ...D.docWarn, ...(sv.docWarn || {}) }, typeMeta: { ...D.typeMeta, ...(sv.typeMeta || {}) } }); } catch {}
     const th = await store.get("theme:v1", false); if (th) setTheme(th);
+    if (SEED_POLICY.requiresServerBootstrapAdmin) {
+      const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
+      if (restored?.session) {
+        setSession(restored.session);
+        applySavedConfig(await store.get("config:v1", true));
+        setUsers(await loadColl("user:"));
+        await reloadAll();
+      }
+      return;
+    }
+    applySavedConfig(await store.get("config:v1", true));
     let us = await loadColl("user:");
     { // migrate legacy users that predate email/password login
       let migrated = false;
@@ -1263,12 +1281,7 @@ export default function App() {
     }
     setUsers(us);
     // הצי אינו נטען אוטומטית: מצב ברירת המחדל ריק. הצי האמיתי (FLEET_SEED) נטען יחד עם «טען נתוני דמו».
-    if (SEED_POLICY.requiresServerBootstrapAdmin) {
-      const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
-      if (restored?.session) setSession(restored.session);
-    } else {
-      const s = await store.get("session:v1", false); if (s) try { const ss = JSON.parse(s); if (us.find((u) => u.id === ss.id && u.active)) setSession(ss); } catch {}
-    }
+    const s = await store.get("session:v1", false); if (s) try { const ss = JSON.parse(s); if (us.find((u) => u.id === ss.id && u.active)) setSession(ss); } catch {}
     await reloadAll();
     } catch (e) { console.error("init error", e); }
     finally { setReady(true); }
@@ -1418,6 +1431,8 @@ export default function App() {
     if (s?.productionSession) {
       await store.del("session:v1", false);
       if (options.productionAuth) PRODUCTION_AUTH_STORE.set(options.productionAuth, { remember: options.remember === true });
+      applySavedConfig(await store.get("config:v1", true));
+      await reloadAll();
       return;
     }
     await store.set("session:v1", JSON.stringify(s), false);
