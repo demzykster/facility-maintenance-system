@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 const steps = [
   ["staging:preflight:local", ["npm", ["run", "staging:preflight:local"]]],
   ["staging:supabase-schema", ["npm", ["run", "staging:supabase-schema"]]],
+  ["staging:data:summary", ["npm", ["run", "staging:data:summary"]]],
   ["staging:vercel-env", ["npm", ["run", "staging:vercel-env"]]],
   ["staging:smoke:live:strict", ["npm", ["run", "staging:smoke:live", "--", "--expect-current-commit"]]],
   ["staging:smoke:ui:strict", ["npm", ["run", "staging:smoke:ui", "--", "--expect-current-commit"]]]

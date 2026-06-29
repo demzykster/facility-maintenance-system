@@ -86,7 +86,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - final pilot UI polish should keep the page body flush to the viewport, avoid horizontal overflow on analytics/settings, keep the internal issue-report modal as one compact panel, and fit uploaded logos into a square canvas without cropping wide logos.
   - dashboard widget hide/show controls are personal display preferences. They must not write global `config:v1`, must not require `settings:manage`, and must not trigger the red shared-save failure banner.
   - staging UI smoke must explicitly click dashboard widget hide/show and fail if the red `השמירה לא הושלמה` save-failure toast appears.
-  - staging data should be summarized with `npm run staging:data:summary` before cleanup/import decisions; the command reports only table counts, KV key prefixes, and storage totals, not record contents, secrets, or file paths.
+  - `npm run staging:gate` includes `npm run staging:data:summary`, so every final staging gate shows table counts, KV key prefixes, and storage totals without printing record contents, secrets, or file paths.
   - current staging is not empty after owner/import work: latest summary showed `app_users=1`, `cmms_kv_records=130`, `file_metadata=0`, `audit_events=137`, KV prefixes `fleet=128`, `czone=1`, `config=1`, and zero storage files. Do not delete or reset these records without an explicit owner cleanup command.
   - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default.
   - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
@@ -169,6 +169,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Staging gate data-awareness is in progress on `codex/include-data-summary-in-gate`.
+  - Adds the read-only staging data summary step into the combined `npm run staging:gate` sequence.
 - Staging data summary is in progress on `codex/staging-data-summary`.
   - Added a read-only `npm run staging:data:summary` command to count staging tables, KV prefixes, and storage totals without printing row contents, secrets, or file paths.
   - First run confirmed staging currently contains 1 admin user, 128 fleet KV records, 1 cleaning-zone KV record, 1 config KV record, 137 audit events, and no storage files.
