@@ -57,7 +57,7 @@ const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PR
 const CLEANING_PHOTOS = createCleaningPhotoStorageFromEnv(import.meta.env, PRODUCTION_AUTH_STORE);
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 
-const imageFileToSquareDataUrl = (file, size = 320) => new Promise((resolve, reject) => {
+const imageFileToSquareDataUrl = (file, size = 512) => new Promise((resolve, reject) => {
   if (!file) return resolve("");
   if (!/^image\//.test(file.type || "")) return reject(new Error("not_image"));
   const reader = new FileReader();
@@ -72,9 +72,9 @@ const imageFileToSquareDataUrl = (file, size = 320) => new Promise((resolve, rej
       const ctx = canvas.getContext("2d");
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, size, size);
-      const pad = Math.round(size * 0.12);
+      const pad = Math.round(size * 0.14);
       const max = size - pad * 2;
-      const scale = Math.min(max / img.width, max / img.height, 1);
+      const scale = Math.min(max / img.width, max / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
@@ -7001,6 +7001,7 @@ function Style() {
 .app-dark{--bg:#0F141B;--surface:#1A2230;--surface-2:#151C27;--ink:#E8EDF3;--muted:#8A97A8;--line:#2A3543;--input:#202A38;--slate:#0B1018;--side:#0B1018;--side-ink:#8A97A8;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{scrollbar-gutter:stable;}
+body{margin:0;overflow-x:hidden;}
 button{font-family:var(--font-body);cursor:pointer;border:none;background:none;color:inherit;}
 :focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:6px;}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}}
@@ -7024,7 +7025,7 @@ a{color:inherit;}
 .brand-mark{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(234,88,12,.35);flex-shrink:0;overflow:hidden;}
 .brand-mark.sm{width:38px;height:38px;border-radius:11px;}
 .brand-mark.has-logo{background:#fff;color:transparent;}
-.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;padding:4px;}
 .brand-title{font-family:var(--font-head);font-weight:700;font-size:24px;line-height:1;}
 .brand-title.sm{font-size:19px;color:#fff;}
 .brand-sub{color:var(--muted);font-size:13px;margin-top:3px;}.brand-sub.sm{color:var(--side-ink);font-size:11.5px;}
@@ -7866,6 +7867,7 @@ button.notif-perm:hover{background:#D1FAE5;}
   .meta-grid{grid-template-columns:repeat(3,1fr);}
   .ovl-backdrop{align-items:center;justify-content:center;padding:28px;}
   .ovl-panel{width:100%;max-width:680px;height:auto;max-height:92vh;border-radius:18px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45);}
+  .ovl-panel.issue-report-shell{max-width:420px;background:transparent;box-shadow:none;overflow:visible;}
   .ymx-wrap{overflow:visible;}
   .ai-back{align-items:center;}.ai-panel{max-width:560px;height:80vh;border-radius:18px;}
   .ai-fab{inset-inline-end:28px;bottom:28px;}.toast{bottom:24px;width:380px;}
