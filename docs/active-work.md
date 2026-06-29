@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: clean staging is ready for owner-facing empty-system review.
-- Latest synchronized `main`: after PR #392. Public Vercel staging has been redeployed from current `main` and `npm run staging:gate` passes for commit `d28c08e`.
+- Latest synchronized `main`: after PR #393. Public Vercel staging has been redeployed from current `main` and `npm run staging:gate` passes for commit `ff8dc01`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
