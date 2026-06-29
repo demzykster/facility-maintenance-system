@@ -17,6 +17,13 @@ The drill covers the Supabase project used by the staging/pilot deployment:
 3. Confirm the `cmms-files` bucket exists and is private.
 4. Record the staging project id, backup time, and restore target in the release notes.
 
+Current staging note:
+
+- Supabase CLI is connected to project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`).
+- `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports no physical backups and `pitr_enabled=false`.
+- The Supabase dashboard states that the Free plan does not include project backups; scheduled backups require Pro.
+- Do not mark the platform backup/restore drill complete on the Free plan. Either upgrade the project/organization for managed backups, or explicitly accept a non-production pilot risk and use only the local evidence snapshot as a temporary check.
+
 ## Drill
 
 1. Start from a clean staging project with migrations applied.
