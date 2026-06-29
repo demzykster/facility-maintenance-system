@@ -23,7 +23,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: main is clean after the user profile/contact settings PR; Supabase Pro backup and separate-target restore drill are complete.
+- Status: main is clean after final profile/notification polish; Supabase Pro backup and separate-target restore drill are complete.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -88,6 +88,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Profile/notification polish is live through PR #432, PR #433, and PR #434. Strict live smoke passed on public Vercel commit `033eaf3`; desktop read-only smoke opened all main modules with no horizontal overflow, console errors, or failed API responses; mobile smoke confirmed top logout, profile, issue-report, and full bottom navigation with no overflow.
   - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
   - Mobile navigation polish passed locally: full tests, release check, build, diff check, and Playwright smoke confirmed admin has no top dropdown, full bottom scroll navigation includes all 11 available sections without page overflow, and a standard manager keeps a simple three-item bottom navigation.
   - Mobile app-issue and cleaning QR gate branch passed locally: `npm test -- --run tests/cleaningQrModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for mobile admin app-issue button opening the report modal, and production-mode public report opening without manual zone buttons when no QR zone is available.
