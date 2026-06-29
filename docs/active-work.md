@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/suppress-local-storage-fail-toast
+### Active branch: none
 
-- Status: suppressing false global save-error toasts for local browser storage keys during login/logout.
+- Status: clean after PR #401; public Vercel production alias is still temporarily stale until Vercel can deploy again.
 - Latest synchronized `main`: after PR #399 (`f7f5bc3`). PR #399 preview build was green, but `https://facility-maintenance-system.vercel.app/` still serves the previous production deployment until Vercel can deploy again.
 - Open PRs: none.
 - Purpose:
@@ -110,7 +110,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
-- Local browser storage fail-toast fix is in progress.
+- Local browser storage fail-toast fix is complete in PR #401.
   - Failed local-only keys such as remembered login/session/theme no longer trigger the global red "save failed" toast.
   - Shared/server CMMS data failures still trigger the global save/delete warning.
 - Desktop sidebar footer overflow fix is complete in PR #399.
