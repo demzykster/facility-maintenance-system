@@ -1453,7 +1453,8 @@ export default function App() {
     const complaintPhoto = c.photo || await CLEANING_PHOTOS.load(c);
     const t = { id: tid, track: "facility", subject: (c.text || "").trim() || ("תקלה · " + c.zoneName), category: cat?.id || "", categoryLabel: cat?.label || "", priority: "medium", zone: c.zoneLoc || c.zoneName, asset: c.zoneName || "", forkliftId: null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null, description: `נפתח מדיווח על תקלה באזור ניקיון «${c.zoneName}»${c.zoneLoc ? " · " + c.zoneLoc : ""}.${c.text ? "\n" + c.text.trim() : ""}`, status: "new", assignee: "", routedTech: false, createdBy: { id: c.reportedById, name: c.reportedByName, role: c.reportedByRole === "anonymous" ? "user" : (c.reportedByRole || "user"), dept: "" }, createdAt: now, updatedAt: now, dueAt: now + 48 * 3600000, hasPhoto: !!complaintPhoto, closure: null, log: [{ at: now, by: c.reportedByName, byRole: c.reportedByRole || "user", text: "נפתח מדיווח על תקלה באזור ניקיון" }] };
     const rec = complaintPhoto ? { ...t, ...(await TICKET_PHOTOS.save(tid, "before", complaintPhoto)) } : t;
-    await saveTicket(rec); return tid;
+    const ok = await saveTicket(rec);
+    return ok ? tid : null;
   };
   const persistComplaint = async (comp) => { if (!await persistShared(`ccomplaint:${comp.id}`, JSON.stringify(comp))) return false; setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at)); return true; };
   const fileComplaint = async (c) => {
@@ -1464,7 +1465,7 @@ export default function App() {
     let ticketId = null;
     if (base.kind === "broken" && status === "open") ticketId = await spawnFacilityFromComplaint(base);
     const stored = await CLEANING_PHOTOS.saveComplaint(base);
-    await persistComplaint({ ...stored, status, ownerRole, verified: trusted, ticketId, demo: false });
+    return persistComplaint({ ...stored, status, ownerRole, verified: trusted, ticketId, demo: false });
   };
   const submitAnonymousComplaint = async (c) => {
     if (APP_MODE === APP_MODES.production) {
@@ -1475,12 +1476,12 @@ export default function App() {
   const approveComplaint = async (c) => {
     let ticketId = c.ticketId || null;
     if (c.kind === "broken" && !ticketId) ticketId = await spawnFacilityFromComplaint(c);
-    await persistComplaint({ ...c, status: "open", verified: true, ticketId, approvedBy: effSession.name, approvedAt: Date.now() });
+    return persistComplaint({ ...c, status: "open", verified: true, ticketId, approvedBy: effSession.name, approvedAt: Date.now() });
   };
-  const rejectComplaint = async (c) => { await persistComplaint({ ...c, status: "rejected", resolvedAt: Date.now(), resolvedBy: effSession.name }); };
-  const escalateComplaint = async (c) => { await persistComplaint({ ...c, status: "open", escalatedTo: "admin", escalatedAt: Date.now(), escalatedBy: effSession.name }); };
-  const resolveComplaint = async (c) => { await persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name }); };
-  const progressComplaint = async (c) => { await persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() }); };
+  const rejectComplaint = async (c) => persistComplaint({ ...c, status: "rejected", resolvedAt: Date.now(), resolvedBy: effSession.name });
+  const escalateComplaint = async (c) => persistComplaint({ ...c, status: "open", escalatedTo: "admin", escalatedAt: Date.now(), escalatedBy: effSession.name });
+  const resolveComplaint = async (c) => persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name });
+  const progressComplaint = async (c) => persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() });
   const delFleet = async (id) => { if (!await deleteShared(`fleet:${id}`)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
   const saveInsp = async (i) => { if (!await persistShared(`insp:${i.id}`, JSON.stringify(i))) return false; setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); return true; };
   const saveTpl = async (t) => { if (!await persistShared(`itpl:${t.id}`, JSON.stringify(t))) return false; setTemplates((s) => [...s.filter((x) => x.id !== t.id), t]); return true; };
@@ -2603,10 +2604,13 @@ function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve,
 }
 
 function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDelete }) {
+  const [zoneId] = useState(zone.id || uid());
+  const [zoneCode] = useState(zone.code || ("Z" + Math.random().toString(36).slice(2, 6).toUpperCase()));
   const [name, setName] = useState(zone.name || ""), [building, setBuilding] = useState(zone.building || ""), [floor, setFloor] = useState(zone.floor || ""), [code, setCode] = useState(zone.code || "");
   const [checklist, setChecklist] = useState(zone.checklist?.length ? zone.checklist : DEFAULT_CLEAN_CHECKLIST);
   const [windows, setWindows] = useState(zone.windows?.length ? zone.windows : [{ id: uid(), time: "06:00", tol: 60 }]);
   const [cleanerId, setCleanerId] = useState(zone.cleanerId || ""), [active, setActive] = useState(zone.active !== false), [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [activeDays, setActiveDays] = useState(Array.isArray(zone.activeDays) ? zone.activeDays : (zone.id ? [0, 1, 2, 3, 4, 5, 6] : WORK_WEEK));
   const [mgrIds, setMgrIds] = useState((managers || []).filter((m) => (m.mgrZones || []).includes(zone.id)).map((m) => m.id));
   const [openWin, setOpenWin] = useState(null);
@@ -2614,14 +2618,23 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
   const toggleWinItem = (i, id) => setWindows((s) => s.map((w, j) => { if (j !== i) return w; const valid = checklist.filter((c) => (c.label || "").trim()).map((c) => c.id); const cur = Array.isArray(w.items) ? w.items.filter((x) => valid.includes(x)) : valid.slice(); const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]; return { ...w, items: next.length >= valid.length ? null : next }; }));
   const setCl = (i, v) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, label: v } : x)));
   const setWin = (i, k, v) => setWindows((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return setErr("נא להזין שם אזור");
     const cl = checklist.filter((c) => (c.label || "").trim()).map((c) => ({ id: c.id || uid(), label: c.label.trim() }));
     if (!cl.length) return setErr("נא להוסיף לפחות פריט אחד בצ׳קליסט");
     if (!activeDays.length) return setErr("נא לבחור לפחות יום פעילות אחד");
     const cleaner = cleaners.find((c) => c.id === cleanerId);
     const clIds = new Set(cl.map((c) => c.id));
-    onSave({ id: zone.id || uid(), code: code.trim() || "Z" + Math.random().toString(36).slice(2, 6).toUpperCase(), name: name.trim(), building: building.trim(), floor: floor.trim(), checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
+    setErr("");
+    setBusy(true);
+    try {
+      const ok = await onSave({ id: zoneId, code: code.trim() || zoneCode, name: name.trim(), building: building.trim(), floor: floor.trim(), checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
+      if (ok === false) setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+    } catch {
+      setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+    } finally {
+      setBusy(false);
+    }
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{zone.id ? "עריכת אזור ניקיון" : "אזור ניקיון חדש"}</div></div>
     <div className="body">
@@ -2648,7 +2661,7 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
       {managers && <div className="field"><span>מנהלי מחלקה שרואים את האזור</span>{managers.length === 0 ? <div className="hint">אין מנהלי מחלקה. הוסיפו תחת «צוות ומשתמשים».</div> : <div className="chk-grid">{managers.map((m) => <label key={m.id} className={"chk-pill" + (mgrIds.includes(m.id) ? " on" : "")}><input type="checkbox" checked={mgrIds.includes(m.id)} onChange={() => setMgrIds((s) => s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id])} /> {m.name}</label>)}</div>}<div className="hint">אותה הגדרה כמו ב«צוות ומשתמשים» של המנהל — נשמרת לשני הכיוונים.</div></div>}
       <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> אזור פעיל</label>
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>שמירה</button>
+      <button className="btn-primary full" onClick={save} disabled={busy}>{busy ? "שומר…" : "שמירה"}</button>
       {canDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת אזור" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
@@ -2722,11 +2735,22 @@ function CleaningAdmin(p) {
         {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדי ניקיון. הוסיפו אותם תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור. בינתיים קיים עובד ניקיון לדוגמה לכניסה (מס׳ 1050 · קוד 1234).</div>}
         {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : <div className="cards">{list.map((z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}</div>}
       </>)}
-    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} managers={managers} canDelete={!!edit.id} onCancel={() => setEdit(null)} onSave={(z, mgrIds) => { saveZone(z); (managers || []).forEach((m) => { const has = (m.mgrZones || []).includes(z.id); const want = (mgrIds || []).includes(m.id); if (has !== want) saveUser({ ...m, mgrZones: want ? [...(m.mgrZones || []), z.id] : (m.mgrZones || []).filter((x) => x !== z.id) }); }); setEdit(null); }} onDelete={() => { delZone(edit.id); setEdit(null); }} /></Overlay>}
+    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} managers={managers} canDelete={!!edit.id} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
+      if (!await saveZone(z)) return false;
+      const managerResults = await Promise.all((managers || []).map((m) => {
+        const has = (m.mgrZones || []).includes(z.id);
+        const want = (mgrIds || []).includes(m.id);
+        if (has === want) return true;
+        return saveUser({ ...m, mgrZones: want ? [...(m.mgrZones || []), z.id] : (m.mgrZones || []).filter((x) => x !== z.id) });
+      }));
+      if (managerResults.some((ok) => ok === false)) return false;
+      setEdit(null);
+      return true;
+    }} onDelete={async () => { if (await delZone(edit.id)) setEdit(null); }} /></Overlay>}
     {tag && <Overlay onClose={() => setTag(null)}><ZoneTag zone={tag} onClose={() => setTag(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ approve: true, reject: true, resolve: cDetail.ownerRole === "admin" || cDetail.escalatedTo === "admin" }} onApprove={(c) => { approveComplaint(c); setCDetail(null); }} onReject={(c) => { rejectComplaint(c); setCDetail(null); }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onProgress={(c) => { progressComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
-    {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={p.session} onCancel={() => setRep(null)} onSave={(c) => { fileComplaint(c); setRep(null); }} /></Overlay>}
+    {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={p.session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /></Overlay>}
   </>);
 }
 
@@ -2741,14 +2765,24 @@ function RoundForm({ zone, win, session, onCancel, onSave }) {
   const setIssueReason = (id, v) => setIssues((s) => ({ ...s, [id]: { ...s[id], reason: v } }));
   const setIssueKind = (id, k) => setIssues((s) => ({ ...s, [id]: { ...s[id], kind: k } }));
   const grabIssuePhoto = (file) => { const id = photoTarget.current; if (!id) return; resize(file, (d) => setIssues((s) => ({ ...s, [id]: { ...s[id], photo: d } }))); };
-  const submit = () => {
+  const submit = async () => {
     if (busy) return;
     const issArr = Object.entries(issues).map(([itemId, v]) => ({ itemId, label: (cl.find((c) => c.id === itemId) || {}).label || "", reason: (v.reason || "").trim(), photo: v.photo || null, kind: v.kind === "broken" ? "broken" : "dirty" }));
     if (issArr.some((i) => !i.reason)) return setErr("יש למלא סיבה לכל פריט שסומן כבעיה (או לבטל את הסימון)");
     const unaddressed = cl.filter((c) => !done[c.id] && !issues[c.id]);
     if (unaddressed.length) return setErr("יש להתייחס לכל פריט: לסמן ✓ שבוצע, או לסמן בעיה. נותרו: " + unaddressed.map((c) => c.label).join(", "));
+    setErr("");
     setBusy(true);
-    onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr });
+    try {
+      const ok = await onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr });
+      if (ok === false) {
+        setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+        setBusy(false);
+      }
+    } catch {
+      setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+      setBusy(false);
+    }
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">סבב ניקיון{win?.time ? " · " + win.time : ""}</div></div>
     <div className="body">
@@ -2797,7 +2831,23 @@ function ComplaintForm({ zone, session, onCancel, onSave }) {
   const [noPhoto, setNoPhoto] = useState(false), [noPhotoReason, setNoPhotoReason] = useState("");
   const fileRef = useRef(null);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); setErr(""); }; img.src = e.target.result; }; r.readAsDataURL(file); };
-  const submit = () => { if (busy) return; if (!photo && !noPhoto) return setErr("צרפו תמונה, או סמנו «אין אפשרות לצרף תמונה»"); if (!photo && noPhoto && !noPhotoReason.trim()) return setErr("נא לפרט מדוע אין אפשרות לצרף תמונה"); setBusy(true); onSave({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind, photo: photo || null, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", text: text.trim(), reportedById: session.id, reportedByName: session.name, reportedByRole: session.role }); };
+  const submit = async () => {
+    if (busy) return;
+    if (!photo && !noPhoto) return setErr("צרפו תמונה, או סמנו «אין אפשרות לצרף תמונה»");
+    if (!photo && noPhoto && !noPhotoReason.trim()) return setErr("נא לפרט מדוע אין אפשרות לצרף תמונה");
+    setErr("");
+    setBusy(true);
+    try {
+      const ok = await onSave({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind, photo: photo || null, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", text: text.trim(), reportedById: session.id, reportedByName: session.name, reportedByRole: session.role });
+      if (ok === false) {
+        setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+        setBusy(false);
+      }
+    } catch {
+      setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+      setBusy(false);
+    }
+  };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">דיווח על בעיה באזור</div></div>
     <div className="body">
       <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}</div></div>
@@ -2808,7 +2858,7 @@ function ComplaintForm({ zone, session, onCancel, onSave }) {
       </div>
       <label className="field"><span>תיאור (רשות)</span><input value={text} onChange={(e) => setText(e.target.value)} placeholder="לדוגמה: שלולית על הרצפה ליד הכיור" /></label>
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={submit} disabled={busy}>שליחת דיווח</button>
+      <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? "שולח…" : "שליחת דיווח"}</button>
       <div style={{ height: 20 }} />
     </div></div>);
 }
@@ -2869,7 +2919,21 @@ function CleanerApp(p) {
   const doneToday = useMemo(() => (rounds || []).filter((r) => r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
   const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
   const myReports = useMemo(() => (complaints || []).filter((c) => c.reportedById === session.id).sort((a, b) => b.at - a.at).slice(0, 30), [complaints, session.id]);
-  const doSave = async (r) => { await saveRound(r); const iss = r.issues || []; const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${countLabel(list.length, kind === "broken" ? "תקלה" : "הערה", kind === "broken" ? "תקלות" : "הערות")} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role }); const broken = iss.filter((x) => x.kind === "broken"); const dirty = iss.filter((x) => x.kind !== "broken"); if (broken.length) await fileComplaint(mk("broken", broken)); if (dirty.length) await fileComplaint(mk("round", dirty)); setRun(null); setSent(true); setTimeout(() => setSent(false), 2600); };
+  const doSave = async (r) => {
+    if (await saveRound(r) === false) return false;
+    const iss = r.issues || [];
+    const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${countLabel(list.length, kind === "broken" ? "תקלה" : "הערה", kind === "broken" ? "תקלות" : "הערות")} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role });
+    const broken = iss.filter((x) => x.kind === "broken");
+    const dirty = iss.filter((x) => x.kind !== "broken");
+    const complaintResults = [];
+    if (broken.length) complaintResults.push(await fileComplaint(mk("broken", broken)));
+    if (dirty.length) complaintResults.push(await fileComplaint(mk("round", dirty)));
+    if (complaintResults.some((ok) => ok === false)) return false;
+    setRun(null);
+    setSent(true);
+    setTimeout(() => setSent(false), 2600);
+    return true;
+  };
   const card = (z, cover) => {
     const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds);
     const oc = (complaints || []).filter((c) => c.zoneId === z.id && c.status === "open" && c.ownerRole !== "admin").length;
@@ -2938,8 +3002,8 @@ function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, re
     {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : <div className="cards">{myZones.map((z) => { const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}</div>}
     {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(open.length, "דיווח", "דיווחים")})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>הקישו לצפייה בפרטים המלאים. דיווחי לכלוך נסגרים ע״י עובד הניקיון; דיווחים מעובד הניקיון בטיפול ההנהלה.</div><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
     {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
-    {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={(c) => { fileComplaint(c); setRep(null); }} /></Overlay>}
-    {report && <Overlay onClose={() => setReport(false)}><ReportFlow zones={myZones} session={session} onSubmit={(c) => { fileComplaint(c); setReport(false); }} onClose={() => setReport(false)} /></Overlay>}
+    {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /></Overlay>}
+    {report && <Overlay onClose={() => setReport(false)}><ReportFlow zones={myZones} session={session} onSubmit={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setReport(false); return ok; }} onClose={() => setReport(false)} /></Overlay>}
     {spec && <Overlay onClose={() => setSpec(null)}><ZoneSpec zone={spec} onClose={() => setSpec(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && cDetail.status === "open" }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
   </>);
