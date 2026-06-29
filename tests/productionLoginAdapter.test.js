@@ -7,7 +7,8 @@ import {
   loginWithProductionPassword,
   restoreProductionSession,
   productionLoginConfigFromEnv,
-  productionLoginReady
+  productionLoginReady,
+  updateProductionProfile
 } from "../src/productionLoginAdapter.js";
 
 function memoryStorage() {
@@ -25,6 +26,7 @@ describe("productionLoginAdapter", () => {
       supabaseUrl: "https://supabase.example",
       supabaseAnonKey: "anon",
       sessionApiUrl: "/api/session/me",
+      profileApiUrl: "/api/session/profile",
       changePasswordApiUrl: "/api/session/change-password"
     });
     expect(productionLoginReady(productionLoginConfigFromEnv({}))).toBe(false);
@@ -38,6 +40,7 @@ describe("productionLoginAdapter", () => {
       name: "Owner",
       role: "admin",
       email: "owner@example.com",
+      phone: "050-1234567",
       department: "הנהלה",
       departments: ["הנהלה"],
       permissions: { users: "manage" },
@@ -50,6 +53,7 @@ describe("productionLoginAdapter", () => {
       dept: "הנהלה",
       depts: ["הנהלה"],
       email: "owner@example.com",
+      phone: "050-1234567",
       perms: { users: "manage" },
       mustChangePassword: true,
       productionSession: true
@@ -161,6 +165,52 @@ describe("productionLoginAdapter", () => {
       method: "POST",
       headers: expect.objectContaining({ authorization: "Bearer access-token" }),
       body: JSON.stringify({ newPassword: "new-long-password" })
+    }));
+  });
+
+  it("updates the current production profile through the CMMS endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          user: {
+            id: "app-user-1",
+            authUserId: "auth-user-1",
+            email: "owner2@example.com",
+            phone: "050-7654321",
+            name: "Owner",
+            role: "admin",
+            permissions: {},
+            mustChangePassword: false
+          }
+        });
+      }
+    });
+
+    const result = await updateProductionProfile({
+      accessToken: "access-token",
+      email: "owner2@example.com",
+      phone: "050-7654321",
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me",
+        profileApiUrl: "/api/session/profile"
+      },
+      fetchImpl
+    });
+
+    expect(result.session).toMatchObject({
+      id: "app-user-1",
+      email: "owner2@example.com",
+      phone: "050-7654321",
+      productionSession: true
+    });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/profile", expect.objectContaining({
+      method: "PATCH",
+      headers: expect.objectContaining({ authorization: "Bearer access-token" }),
+      body: JSON.stringify({ email: "owner2@example.com", phone: "050-7654321" })
     }));
   });
 

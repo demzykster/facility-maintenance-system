@@ -86,11 +86,11 @@ describe("change password handler", () => {
     expect(passwordClient.clearMustChangePassword).toHaveBeenCalledWith("auth-user-1");
   });
 
-  it("refuses password change when the profile is not flagged", async () => {
+  it("allows voluntary password change without clearing the first-login flag", async () => {
     const passwordClient = {
       getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
       getAppUserProfile: vi.fn().mockResolvedValue({ id: "app-user-1", auth_user_id: "auth-user-1", role: "admin", name: "Owner", active: true, must_change_password: false }),
-      updateAuthPassword: vi.fn(),
+      updateAuthPassword: vi.fn().mockResolvedValue({}),
       clearMustChangePassword: vi.fn()
     };
     const handler = createChangePasswordHandler({ passwordClient });
@@ -100,9 +100,10 @@ describe("change password handler", () => {
       body: { newPassword: "new-long-password" }
     });
 
-    expect(res.statusCode).toBe(409);
-    expect(res.json()).toEqual({ error: "password_change_not_required" });
-    expect(passwordClient.updateAuthPassword).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, user: { mustChangePassword: false } });
+    expect(passwordClient.updateAuthPassword).toHaveBeenCalledWith("user-token", "new-long-password");
+    expect(passwordClient.clearMustChangePassword).not.toHaveBeenCalled();
   });
 
   it("uses anon bearer for user auth and service role only to clear the profile flag", async () => {

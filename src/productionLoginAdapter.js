@@ -16,6 +16,7 @@ export function productionLoginConfigFromEnv(env = {}) {
     supabaseUrl: trimSlash(env.VITE_SUPABASE_URL || env.SUPABASE_URL),
     supabaseAnonKey: String(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || "").trim(),
     sessionApiUrl: String(env.VITE_CMMS_SESSION_API_URL || "/api/session/me").trim() || "/api/session/me",
+    profileApiUrl: String(env.VITE_CMMS_PROFILE_API_URL || "/api/session/profile").trim() || "/api/session/profile",
     changePasswordApiUrl: String(env.VITE_CMMS_CHANGE_PASSWORD_API_URL || "/api/session/change-password").trim() || "/api/session/change-password"
   };
 }
@@ -43,6 +44,7 @@ export function cmmsSessionFromProductionUser(user = {}) {
     dept: user.department || "",
     depts: Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []),
     email: user.email || "",
+    phone: user.phone || "",
     workerNo: user.workerNo || "",
     supplier: user.supplier || "",
     shiftStart: user.shiftStart || "",
@@ -142,6 +144,25 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
         session: cmmsSessionFromProductionUser(data.user),
         mustChangePassword: data.user?.mustChangePassword === true
       };
+    },
+    async updateProfile({ accessToken, email, phone }) {
+      if (!accessToken) throw new Error("access_token_required");
+      const response = await fetchImpl(config.profileApiUrl || "/api/session/profile", {
+        method: "PATCH",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ email, phone })
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || "profile_update_failed");
+      }
+      return {
+        session: cmmsSessionFromProductionUser(data.user),
+        mustChangePassword: data.user?.mustChangePassword === true
+      };
     }
   };
 }
@@ -156,6 +177,12 @@ export async function changeProductionPassword({ accessToken, newPassword, confi
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
   return client.changePassword({ accessToken, newPassword });
+}
+
+export async function updateProductionProfile({ accessToken, email, phone, config, fetchImpl } = {}) {
+  const client = createProductionLoginClient({ config, fetchImpl });
+  if (!client) throw new Error("production_login_not_configured");
+  return client.updateProfile({ accessToken, email, phone });
 }
 
 export function createProductionAuthStore({ key = "cmms:productionAuth:v1", local = globalThis.localStorage, session = globalThis.sessionStorage } = {}) {

@@ -25,6 +25,7 @@ export function normalizeSupabaseAppUserProfile(profile = {}) {
     role,
     name: String(profile.name || "").trim(),
     email: email || null,
+    phone: String(profile.phone || "").trim(),
     workerNo: profile.workerNo || profile.worker_no || null,
     department: profile.department || profile.dept || null,
     departments: Array.isArray(profile.departments) ? profile.departments : [],
