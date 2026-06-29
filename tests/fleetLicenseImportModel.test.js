@@ -114,6 +114,20 @@ describe("fleet license import model", () => {
     });
   });
 
+  it("marks duplicate chassis inside the workbook as invalid before import", () => {
+    const result = parseFleetLicenseSheet([
+      headers,
+      ["פסלטון", "פסולתון", "פסולתון", "לא", "2027-02-09", "", "", "", "אין רישוי", "", "", "", "פסלטון", "כלי", "", "", "בבעלות", ""],
+      ["פסלטון", "פסולתון", "פסולתון", "לא", "2027-02-10", "", "", "", "אין רישוי", "", "", "", "פסלטון", "כלי", "", "", "בבעלות", ""]
+    ]);
+
+    expect(result.summary).toMatchObject({ total: 2, ready: 0, conflicts: 0, invalid: 2 });
+    expect(result.rows.map((row) => row.invalid)).toEqual([
+      ["duplicate_chassis_in_file"],
+      ["duplicate_chassis_in_file"]
+    ]);
+  });
+
   it("rejects files that do not contain the required fleet license header", () => {
     expect(parseFleetLicenseSheet([["title", "status"], ["task", "done"]])).toMatchObject({
       ok: false,
