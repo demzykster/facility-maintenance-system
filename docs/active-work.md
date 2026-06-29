@@ -149,8 +149,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ## Latest Completed Work
 
 - Final pilot UI smoke/polish is in progress.
-  - Mobile/topbar app-issue reporting and production cleaning QR gates are in progress on `codex/mobile-issue-qr-gates`.
-  - The intended behavior is: desktop sidebar, mobile topbars, worker shell, and cleaner shell all expose app-issue reporting; production cleaning reports/rounds cannot be started by manually choosing a zone without a matching QR zone URL.
+  - PR #429 is merged and live: desktop sidebar, mobile topbars, worker shell, and cleaner shell all expose app-issue reporting.
+  - Production cleaning reports/rounds cannot be started by manually choosing a zone without a matching QR zone URL. This is a v1 flow gate; stronger physical-proof options such as signed rotating QR/NFC/geofence remain future hardening.
+  - Post-merge live smoke confirmed deployed commit `b97f6e8`, mobile app-issue modal opening, and no red save-failure toast during a 45-second logged-in check.
   - Live Vercel login smoke passed on the current production URL with no alert toast or API/console errors during the checked window.
   - Local visual smoke passed after the polish changes: no horizontal overflow on home/analytics/settings, the internal app-issue report modal shell matches the panel width, and wide logo upload renders as a 512x512 contained logo preview.
   - Owner-facing staging cleanup was refreshed after smoke: only `config:v1` remains in KV and `audit_events=0`; no tickets, files, cleaning zones, or internal issue-report smoke records remain.
