@@ -21,10 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/staging-backup-evidence`
 
-- Status: no product branch is active after PR #386.
-- Latest synchronized `main`: after PR #386. Public Vercel staging could not be manually redeployed because the Vercel Hobby daily deploy limit was reached (`api-deployments-free-per-day`).
+- Status: adding a local backup/restore drill evidence command for staging.
+- Latest synchronized `main`: after PR #387. Public Vercel staging has been redeployed from current `main` and strict live smoke passes for commit `46ccf95`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -77,6 +77,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Mobile role preview fix is merged in PR #384.
   - Live staging smoke command is merged in PR #385: `npm run staging:smoke:live` checks the public app URL, closed bootstrap endpoint, admin Supabase auth/session, KV read access, file route metadata boundary, required Supabase table counts, and the private file bucket without printing secret values.
   - Strict deployed-version smoke is merged in PR #386: `npm run staging:smoke:live -- --expect-current-commit` fails when Vercel still serves an older bundle.
+  - Strict live staging smoke passed after redeploy: public Vercel serves commit `46ccf95`, bootstrap is closed, admin auth/session works, KV read works, file metadata boundary works, required Supabase tables are reachable, and `cmms-files` is private.
+  - Supabase CLI platform access is not authenticated (`LegacyPlatformAuthRequiredError`), so configuring daily platform backups and restoring into a separate target remains a manual/external launch gate.
   - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.

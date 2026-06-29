@@ -25,8 +25,15 @@ The drill covers the Supabase project used by the staging/pilot deployment:
 4. Upload one ticket photo.
 5. Change a ticket status so `audit_events` receives at least one event.
 6. Confirm all four tables and the `cmms-files` bucket have expected records/files.
-7. Restore the backup into a separate restore target, not over the active staging project.
-8. Verify:
+7. Capture local evidence before restore:
+
+   ```bash
+   npm run staging:backup:evidence
+   ```
+
+   This writes a JSON evidence file under ignored `.tools/` with the four staging tables and storage file inventory. Treat the file as sensitive staging data and do not commit it.
+8. Restore the backup into a separate restore target, not over the active staging project.
+9. Verify:
    - the admin profile exists in `app_users`;
    - the test tickets exist in `cmms_kv_records`;
    - file metadata exists in `file_metadata`;
