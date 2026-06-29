@@ -59,6 +59,13 @@ function relevantConsoleMessage(message) {
   return message.type() === "error" || /save failed|failed|exception|error/i.test(text);
 }
 
+async function assertNoSaveFailureToast(page, label) {
+  await page.waitForTimeout(1200);
+  const saveAlert = page.getByText("השמירה לא הושלמה", { exact: false });
+  if (await saveAlert.count()) throw new Error(`${label}_save_failure_toast`);
+  if (await page.locator('[role="alert"]').count()) throw new Error(`${label}_alert`);
+}
+
 async function waitForAnyVisible(page, selectors, timeout = 15000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -97,8 +104,7 @@ async function desktopSmoke(browser, credentials, expectedCommit) {
   if (await page.getByRole("button", { name: /יציאה/ }).count() < 1) throw new Error("desktop_logout_missing");
   await page.getByRole("button", { name: /התאמת לוח/ }).click();
   await page.locator(".wtoggle").first().click();
-  await page.waitForTimeout(300);
-  if (await page.locator('[role="alert"]').count()) throw new Error("desktop_dashboard_widget_toggle_alert");
+  await assertNoSaveFailureToast(page, "desktop_dashboard_widget_toggle");
   if (configWrites.length) throw new Error("desktop_dashboard_widget_toggle_wrote_global_config");
 
   const modules = [];

@@ -85,6 +85,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - local demo assets under `public/demo/` must stay out of git and Vercel uploads; they are local presentation material, not app runtime assets.
   - final pilot UI polish should keep the page body flush to the viewport, avoid horizontal overflow on analytics/settings, keep the internal issue-report modal as one compact panel, and fit uploaded logos into a square canvas without cropping wide logos.
   - dashboard widget hide/show controls are personal display preferences. They must not write global `config:v1`, must not require `settings:manage`, and must not trigger the red shared-save failure banner.
+  - staging UI smoke must explicitly click dashboard widget hide/show and fail if the red `השמירה לא הושלמה` save-failure toast appears.
   - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default.
   - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
   - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
@@ -98,6 +99,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Dashboard widget save-failure smoke guard is in progress on `codex/fix-dashboard-widget-prefs-smoke`; live `npm run staging:smoke:ui -- --expect-current-commit` passed on Vercel commit `47dda88`, including the stronger red-toast check.
   - Fleet import preview, controlled system-error smoke tooling, and AI-agent readiness docs passed locally on `codex/final-import-log-ai-followups`: targeted tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, live `npm run staging:smoke:system-errors`, and real attached workbook preview.
   - System error log and token refresh hardening passed targeted checks: `npm test -- --run tests/fleetLicenseImportModel.test.js tests/languageModel.test.js tests/apiStorageAdapter.test.js tests/storageAdapter.test.js tests/systemErrorsHandler.test.js tests/supabaseAuditDriver.test.js tests/vercelApiRouteModel.test.js`.
   - Dashboard widget preference fix passed locally: mobile smoke clicked `התאמת לוח` and hid the first widget with no red alert and no global `config:v1` PUT. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed. Live staging global widgets were reset to visible after the earlier diagnostic click against the old deployed code.
@@ -165,6 +167,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Dashboard widget save-failure smoke guard is in progress on `codex/fix-dashboard-widget-prefs-smoke`.
+  - Strengthened `npm run staging:smoke:ui` so hiding a dashboard widget must not produce the red save-failure toast and must not write global `config:v1`.
+  - Live smoke on current Vercel commit `47dda88` passed, so the owner-observed banner is not reproducing on a clean browser context after PR #439.
 - Final pilot follow-ups are ready for PR on `codex/final-import-log-ai-followups`.
   - Added a read-only fleet license import preview command for real Excel files before saving anything.
   - Real attached fleet workbook preview passed parsing and correctly blocked duplicate `פסולתון` rows before import.
