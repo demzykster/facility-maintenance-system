@@ -16,6 +16,33 @@ const defaultStorageProvider = () => (
     : (typeof window !== "undefined" ? window.storage : null)
 );
 
+const defaultLocalStorageProvider = () => {
+  const local = globalThis.localStorage;
+  if (!local) return null;
+  return {
+    async get(key) {
+      const value = local.getItem(key);
+      return value == null ? null : { value };
+    },
+    async set(key, value) {
+      local.setItem(key, value);
+      return true;
+    },
+    async delete(key) {
+      local.removeItem(key);
+      return true;
+    },
+    async list(prefix = "") {
+      const keys = [];
+      for (let i = 0; i < local.length; i += 1) {
+        const key = local.key(i);
+        if (key && key.startsWith(prefix)) keys.push(key);
+      }
+      return { keys };
+    }
+  };
+};
+
 const defaultAllowMemoryFallback = () => storageProviderFromEnv(importEnv()) !== STORAGE_PROVIDERS.api;
 
 export const withTimeout = (promise, ms = 2000) => Promise.race([
@@ -23,15 +50,16 @@ export const withTimeout = (promise, ms = 2000) => Promise.race([
   new Promise((resolve) => setTimeout(() => resolve(undefined), ms))
 ]);
 
-export function createAppStore({ storageProvider = defaultStorageProvider, timeoutMs = 2000, allowMemoryFallback = defaultAllowMemoryFallback } = {}) {
+export function createAppStore({ storageProvider = defaultStorageProvider, localStorageProvider = defaultLocalStorageProvider, timeoutMs = 2000, allowMemoryFallback = defaultAllowMemoryFallback } = {}) {
   const mem = {};
   const canUseMemoryFallback = () => typeof allowMemoryFallback === "function" ? !!allowMemoryFallback() : !!allowMemoryFallback;
+  const resolveStorage = (shared) => shared ? storageProvider() : localStorageProvider();
   const notifyFail = () => { try { store._onFail && store._onFail(); } catch (_) {} };
   const store = {
     async get(key, shared = false) {
       const fallback = canUseMemoryFallback();
       try {
-        const storage = storageProvider();
+        const storage = resolveStorage(shared);
         if (storage) {
           const result = await withTimeout(storage.get(key, shared), timeoutMs);
           if (result === undefined) throw new Error("timeout");
@@ -45,7 +73,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
     async set(key, value, shared = false) {
       const fallback = canUseMemoryFallback();
       if (fallback) mem[key] = value;
-      const storage = storageProvider();
+      const storage = resolveStorage(shared);
       if (!storage) return fallback;
       try {
         const result = await withTimeout(storage.set(key, value, shared), timeoutMs);
@@ -59,7 +87,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
     async del(key, shared = false) {
       const fallback = canUseMemoryFallback();
       if (fallback) delete mem[key];
-      const storage = storageProvider();
+      const storage = resolveStorage(shared);
       if (!storage) return fallback;
       try {
         const result = await withTimeout(storage.delete(key, shared), timeoutMs);
@@ -73,7 +101,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, timeo
     async list(prefix, shared = false) {
       const fallback = canUseMemoryFallback();
       try {
-        const storage = storageProvider();
+        const storage = resolveStorage(shared);
         if (storage) {
           const result = await withTimeout(storage.list(prefix, shared), timeoutMs);
           if (result === undefined) throw new Error("timeout");

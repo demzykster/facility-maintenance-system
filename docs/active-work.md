@@ -105,6 +105,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Local-only storage key polish is in progress after PR #395.
+  - `shared=false` app storage keys such as theme, remembered login, notification prefs, and local rate-limit state stay in browser-local storage instead of calling the production KV API.
+  - This prevents pre-login `/api/kv/...shared=0` 401 noise while keeping `shared=true` CMMS data behind the API/Supabase boundary.
+  - Local validation passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
 - Production pre-auth startup polish is in PR #395.
   - Production app startup no longer reads shared KV/config collections before a production session exists.
   - Restored/login production sessions now load config and app collections immediately after auth is available.
