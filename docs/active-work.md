@@ -24,7 +24,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ### Active branch: none
 
 - Status: clean staging is ready for owner-facing empty-system review.
-- Latest synchronized `main`: after PR #393. Public Vercel staging has been redeployed from current `main` and `npm run staging:gate` passes for commit `ff8dc01`.
+- Latest synchronized `main`: after PR #397. Public Vercel staging has been redeployed from current `main` and live smoke passes for commit `b9b3d38`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -56,6 +56,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
+  - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
   - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
   - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
   - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
