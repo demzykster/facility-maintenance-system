@@ -6691,7 +6691,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
 }
 function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, toggleTheme, extra, demoActive }) {
   return (<header className="topbar"><div className="tb-left"><div><div className="tb-title">{title}{demoActive && <span className="demo-badge">נתוני דמו</span>}</div>{subtitle && <div className="tb-sub">{subtitle}</div>}</div>{extra}</div>
-    <div className="tb-actions"><button className="bell" onClick={toggleTheme}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="tb-logout" onClick={onLogout}><LogOut size={18} /></button></div>
+    <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div>
     {rolePreview && <div className="tb-role-preview"><RolePreviewBox rolePreview={rolePreview} /></div>}</header>);
 }
 function Overlay({ children, onClose, persistent }) {
@@ -6895,6 +6895,7 @@ a{color:inherit;}
 .tb-sub{font-size:12px;color:var(--side-ink);margin-top:2px;}
 .tb-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;}
 .tb-logout,.bell{width:38px;height:38px;border-radius:10px;color:#CBD5E1;display:flex;align-items:center;justify-content:center;position:relative;}
+.tb-logout{width:auto;min-width:38px;padding:0 9px;gap:5px;font-size:12px;font-weight:700;}
 .tb-logout:hover,.bell:hover{background:#ffffff1a;color:#fff;}
 .bell .dot{position:absolute;top:4px;inset-inline-start:4px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
 .mob-tab{background:#ffffff1a;color:#fff;border:1px solid #ffffff33;border-radius:9px;padding:7px 9px;font-size:13px;max-width:140px;}
