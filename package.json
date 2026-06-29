@@ -12,6 +12,7 @@
     "staging:vercel-env": "node tools/vercel-env-preflight.mjs --scope demzyksters-projects",
     "staging:supabase-schema": "node tools/supabase-staging-schema-check.mjs",
     "staging:smoke:live": "node tools/staging-smoke-live.mjs",
+    "staging:smoke:browser": "node tools/staging-browser-smoke.mjs",
     "staging:backup:evidence": "node tools/staging-backup-evidence.mjs",
     "staging:gate": "node tools/staging-gate.mjs",
     "test": "vitest run",
@@ -28,6 +29,7 @@
     "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@vitejs/plugin-react": "^6.0.3",
     "vite": "^8.1.0",
     "vitest": "^4.1.9"
