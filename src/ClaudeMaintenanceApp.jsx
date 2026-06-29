@@ -1691,7 +1691,7 @@ export default function App() {
                 : effSession.role === "worker" ? <WorkerApp {...shared} key="imp-worker" />
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
                   : <UserApp {...shared} key="imp-user" />}
-            {issueReportOpen && <Overlay persistent onClose={() => setIssueReportOpen(false)}><AppIssueReportModal session={effSession} onSave={async (issue) => { const ok = await saveAppIssue(issue); if (ok) setIssueReportOpen(false); return ok; }} onClose={() => setIssueReportOpen(false)} /></Overlay>}
+            {issueReportOpen && <Overlay persistent panelClassName="issue-report-shell" onClose={() => setIssueReportOpen(false)}><AppIssueReportModal session={effSession} onSave={async (issue) => { const ok = await saveAppIssue(issue); if (ok) setIssueReportOpen(false); return ok; }} onClose={() => setIssueReportOpen(false)} /></Overlay>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
     </div>
@@ -6810,7 +6810,7 @@ function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, 
     <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button><button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div>
     {rolePreview && <div className="tb-role-preview"><RolePreviewBox rolePreview={rolePreview} /></div>}</header>);
 }
-function Overlay({ children, onClose, persistent }) {
+function Overlay({ children, onClose, persistent, panelClassName = "" }) {
   const ref = useRef(null);
   useEffect(() => {
     const myDepth = (document.body._ovl = (document.body._ovl || 0) + 1);
@@ -6828,7 +6828,7 @@ function Overlay({ children, onClose, persistent }) {
     document.addEventListener("keydown", onKey, true);
     return () => { clearTimeout(t); document.removeEventListener("keydown", onKey, true); const left = (document.body._ovl = Math.max(0, (document.body._ovl || 1) - 1)); if (left === 0) document.body.classList.remove("modal-open"); try { prevFocus && prevFocus.focus && prevFocus.focus(); } catch {} };
   }, []);
-  return <div className="ovl-backdrop" onClick={persistent ? undefined : onClose} role="presentation"><div ref={ref} className="ovl-panel" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>{children}</div></div>;
+  return <div className="ovl-backdrop" onClick={persistent ? undefined : onClose} role="presentation"><div ref={ref} className={"ovl-panel" + (panelClassName ? ` ${panelClassName}` : "")} role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>{children}</div></div>;
 }
 function AIFab({ onClick }) { return <button className="ai-fab" aria-label="עוזר AI" title="עוזר AI" onClick={onClick}><Sparkles size={22} /></button>; }
 function NotifPanel({ notif, onClose, onOpen, onGo }) {
@@ -7550,6 +7550,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .issue-response{margin-top:7px;font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:9px;padding:7px 9px;}
 .issue-thumb{width:74px;height:54px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2);}
 .issue-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.ovl-panel.issue-report-shell{align-items:center;background:transparent;box-shadow:none;max-width:420px;overflow:visible;}
+.issue-report-shell .issue-modal{box-shadow:0 24px 60px rgba(0,0,0,.4);}
 .brand-upload{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:12px;}
 .brand-upload-main{min-width:0;flex:1;}
 .brand-upload-title{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:3px;}
