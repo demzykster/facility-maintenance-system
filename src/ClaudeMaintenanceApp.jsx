@@ -2007,7 +2007,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, zones, on
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>חזרה</button>
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
-        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : `פותח על ידי Vadim Demchuk · 2026 · v${APP_VERSION}`}</div>
+        <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span>פותח על ידי Vadim Demchuk · 2026</span><span>גרסה v{APP_VERSION}</span></>}</div>
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> דיווח על בעיה ללא כניסה (סריקת QR)</button>
         </>)}
       </div>
@@ -7036,7 +7036,8 @@ a{color:inherit;}
 .role-chev{margin-inline-start:auto;color:var(--muted);}
 .back-link{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:14px;margin-bottom:10px;}
 .login-alt{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:12px;padding:11px;border:1.5px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);font-weight:600;font-size:13.5px;}
-.login-foot{text-align:center;color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.5;}
+.login-foot{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.45;}
+.login-foot span{display:block;}
 @media (min-width:900px){.login-bg{padding:36px;}.login-card{max-width:500px;padding:30px 30px 28px;}.login-q{font-size:17px;}}
 
 .field{display:block;margin-bottom:15px;}
