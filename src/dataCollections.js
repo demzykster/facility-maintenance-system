@@ -17,6 +17,7 @@ export const DATA_COLLECTIONS = Object.freeze([
   { key: "ppeNorms", prefix: "ppenorm:", table: "ppe_norms" },
   { key: "ppeReqs", prefix: "ppereq:", table: "ppe_requests" },
   { key: "ppeOrders", prefix: "ppeorder:", table: "ppe_orders" },
+  { key: "appIssues", prefix: "appIssue:", table: "app_issue_reports" },
 ]);
 
 export const DATA_COLLECTION_KEYS = DATA_COLLECTIONS.map((collection) => collection.key);

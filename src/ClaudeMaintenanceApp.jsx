@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import packageInfo from "../package.json";
@@ -35,6 +35,7 @@ import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
+import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -74,6 +75,28 @@ const imageFileToSquareDataUrl = (file, size = 320) => new Promise((resolve, rej
       const h = img.height * scale;
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
       resolve(canvas.toDataURL("image/jpeg", 0.86));
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+const imageFileToDataUrl = (file, maxSide = 1100, quality = 0.7) => new Promise((resolve, reject) => {
+  if (!file) return resolve("");
+  if (!/^image\//.test(file.type || "")) return reject(new Error("not_image"));
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error("read_failed"));
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = () => reject(new Error("image_decode_failed"));
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
     };
     img.src = reader.result;
   };
@@ -1274,6 +1297,8 @@ export default function App() {
   const [ppeNorms, setPpeNorms] = useState([]);
   const [ppeReqs, setPpeReqs] = useState([]);
   const [ppeOrders, setPpeOrders] = useState([]);
+  const [appIssues, setAppIssues] = useState([]);
+  const [issueReportOpen, setIssueReportOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const snapRef = useRef({});
   const applySavedConfig = (savedConfig) => {
@@ -1352,10 +1377,10 @@ export default function App() {
     return ok;
   };
   async function reloadAll() {
-    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, pp, ppit, ppn, ppreq, pord] = await Promise.all([
+    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, pp, ppit, ppn, ppreq, pord, issues] = await Promise.all([
       loadColl("ticket:"), loadColl("pm:"), loadColl("fleet:"), loadColl("insp:"),
       loadColl("itpl:"), loadColl("presence:"), loadColl("user:"),
-      loadColl("czone:"), loadColl("cround:"), loadColl("ccomplaint:"), loadColl("cabsence:"), loadColl("mtask:"), loadColl("mmeet:"), loadColl("ppe:"), loadColl("ppeitem:"), loadColl("ppenorm:"), loadColl("ppereq:"), loadColl("ppeorder:"),
+      loadColl("czone:"), loadColl("cround:"), loadColl("ccomplaint:"), loadColl("cabsence:"), loadColl("mtask:"), loadColl("mmeet:"), loadColl("ppe:"), loadColl("ppeitem:"), loadColl("ppenorm:"), loadColl("ppereq:"), loadColl("ppeorder:"), loadColl("appIssue:"),
     ]);
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
@@ -1377,6 +1402,7 @@ export default function App() {
     apply("ppenorm", ppn, setPpeNorms, null);
     apply("ppereq", ppreq, setPpeReqs, (a, b) => b.at - a.at);
     apply("ppeorder", pord, setPpeOrders, (a, b) => b.createdAt - a.createdAt);
+    apply("appIssue", issues, setAppIssues, (a, b) => (b.at || 0) - (a.at || 0));
     apply("cabsence", abs, setAbsences, (a, b) => (a.from > b.from ? 1 : -1));
     // presence: мержим хранилище с текущим стейтом по свежести lastSeen — чтобы поллинг не затирал только что записанный статус при медленном/частичном хранилище
     setPresence((cur) => {
@@ -1461,6 +1487,7 @@ export default function App() {
   const delPpeReq = async (id) => { if (!await deleteShared(`ppereq:${id}`)) return false; setPpeReqs((s) => s.filter((y) => y.id !== id)); return true; };
   const savePpeOrder = async (x) => { if (!await persistShared(`ppeorder:${x.id}`, JSON.stringify(x))) return false; setPpeOrders((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.createdAt - a.createdAt)); return true; };
   const delPpeOrder = async (id) => { if (!await deleteShared(`ppeorder:${id}`)) return false; setPpeOrders((s) => s.filter((y) => y.id !== id)); return true; };
+  const saveAppIssue = async (x) => { if (!await persistShared(`appIssue:${x.id}`, JSON.stringify(x))) return false; setAppIssues((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (b.at || 0) - (a.at || 0))); return true; };
   // авто-миграция Тип/Модель: группировка по типу; версия 2 пересобирает старый 1:1
   useEffect(() => {
     if (ready && fleet.length && config.vtMigV !== 2) {
@@ -1603,7 +1630,7 @@ export default function App() {
       config,
       collections: {
         users, fleet, tickets, pm, insp, templates, presence, zones, rounds, complaints, absences,
-        tasks, meetings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders,
+        tasks, meetings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, appIssues,
       },
       photos,
     });
@@ -1636,7 +1663,7 @@ export default function App() {
   }, [session && session.id, session && session.role, impersonating]);
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, rolePreview, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
     <div dir="rtl" lang="he" className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
@@ -1649,6 +1676,7 @@ export default function App() {
                 : effSession.role === "worker" ? <WorkerApp {...shared} key="imp-worker" />
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
                   : <UserApp {...shared} key="imp-user" />}
+            {issueReportOpen && <Overlay persistent onClose={() => setIssueReportOpen(false)}><AppIssueReportModal session={effSession} onSave={async (issue) => { const ok = await saveAppIssue(issue); if (ok) setIssueReportOpen(false); return ok; }} onClose={() => setIssueReportOpen(false)} /></Overlay>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
     </div>
@@ -2001,7 +2029,7 @@ function UserApp(p) {
   const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
         nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
       <div className="main-col">
@@ -2102,7 +2130,7 @@ function TechApp(p) {
   const extendShift = () => { setExtendUntil(effectiveEnd + 60 * 60000); setSessWarn(false); setWarnAt(0); };
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue}
         nav={[{ id: "tickets", Icon: ListChecks, label: "קריאות שינוע", active: view === "tickets", onClick: () => setView("tickets") }, { id: "pm", Icon: CalendarClock, label: "לוח טיפולים", active: view === "pm", onClick: () => setView("pm") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
       <div className="main-col">
         <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive} />
@@ -4433,7 +4461,7 @@ function AdminApp(p) {
   const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} demoActive={p.demoActive}
           extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => { if (e.target.value === "tickets") clearTicketFilter(); setTab(e.target.value); }}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
@@ -5874,7 +5902,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
 }
 
 function SettingsPanel(p) {
-  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, getBackup, importBackup } = p;
+  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, appIssues, saveAppIssue, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
@@ -5958,7 +5986,7 @@ function SettingsPanel(p) {
   const duplicateUserGroups = findUserDuplicateGroups(ulist);
   const restoreWorker = async (w) => { await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); setArcView(null); };
   return (<div className="settings-wrap">
-    {!p.only && <div className="seg-tabs"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button></div>}
+    {!p.only && <div className="seg-tabs s3"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button><button className={tab === "issues" ? "on" : ""} onClick={() => setTab("issues")}>דיווחי בעיות</button></div>}
 
     {tab === "general" && (<>
       <SectionTitle><Building2 size={15} /> חברה ואתר</SectionTitle>
@@ -6053,6 +6081,8 @@ function SettingsPanel(p) {
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveMaint}>{saved ? "נשמר ✓" : "שמירת הגדרות אחזקה"}</button>
       {maintMsg && <div className="note" style={{ color: "#DC2626" }}>{maintMsg}</div>}
     </>)}
+
+    {tab === "issues" && <AppIssuesSettings issues={appIssues || []} session={session} onSave={saveAppIssue} />}
 
 
     {tab === "users" && (!mayViewUsers ? <div className="note">אין הרשאה לצפייה בניהול משתמשים.</div> : <>
@@ -6651,6 +6681,76 @@ function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
   </div></div>);
 }
 
+function AppIssueReportModal({ session, onSave, onClose }) {
+  const [description, setDescription] = useState("");
+  const [screenshot, setScreenshot] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const pickScreenshot = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setErr("");
+    try { setScreenshot(await imageFileToDataUrl(file)); }
+    catch { setErr("לא ניתן לקרוא את התמונה. נסו קובץ PNG או JPG."); }
+  };
+  const submit = async () => {
+    setErr("");
+    setBusy(true);
+    try {
+      const location = typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "";
+      const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
+      const ok = await onSave(createAppIssue({ description, screenshot, session, location, userAgent }));
+      if (ok === false) throw new Error("save_failed");
+    } catch (e) {
+      setErr(e?.message === "description_required" ? "כתבו תיאור קצר של הבעיה" : e?.message === "description_too_long" ? "התיאור ארוך מדי" : "השמירה נכשלה. נסו שוב.");
+    } finally { setBusy(false); }
+  };
+  return <div className="modal2-panel issue-modal">
+    <div className="modal2-head"><div className="form-title"><Bug size={17} /> דיווח על בעיה במערכת</div><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div>
+    <div className="modal2-body">
+      <div className="hint" style={{ margin: "0 0 12px" }}>זה לא פותח קריאת אחזקה. זה נשמר ביומן פנימי כדי שנוכל לבדוק ולתקן את המערכת.</div>
+      <label className="field"><span>מה קרה?</span><textarea rows={5} value={description} maxLength={1200} onChange={(e) => setDescription(e.target.value)} placeholder="לדוגמה: הכפתור לא מגיב / המסך קופץ / חסר שדה…" /></label>
+      <label className="btn-ghost full" style={{ cursor: "pointer", marginBottom: 10 }}><input type="file" accept="image/*" hidden onChange={pickScreenshot} /><Camera size={16} /> צירוף צילום מסך</label>
+      {screenshot && <div className="issue-shot"><img src={screenshot} alt="צילום מסך מצורף" /><button className="photo-x" onClick={() => setScreenshot("")}><X size={16} /></button></div>}
+      {err && <div className="err">{err}</div>}
+      <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? "שומר…" : "שליחת דיווח"}</button>
+    </div>
+  </div>;
+}
+
+function AppIssuesSettings({ issues, session, onSave }) {
+  const [editing, setEditing] = useState(null);
+  const sorted = [...(issues || [])].sort((a, b) => (b.at || 0) - (a.at || 0));
+  const saveReaction = async () => {
+    if (!editing) return;
+    await onSave(updateAppIssueResponse(editing.issue, { response: editing.response, status: editing.status, actor: session }));
+    setEditing(null);
+  };
+  return <>
+    <SectionTitle><Bug size={15} /> דיווחי בעיות במערכת</SectionTitle>
+    <div className="hint" style={{ marginBottom: 12 }}>דיווחים שנשלחו מכפתור הגרסה בתפריט. זהו יומן פנימי לבדיקת באגים ושיפורי UI, לא קריאות אחזקה.</div>
+    {sorted.length === 0 ? <Empty text="אין דיווחי בעיות" Icon={Bug} sub="כאשר משתמש ידווח על בעיה היא תופיע כאן" /> : <div className="issue-list">
+      {sorted.map((issue) => <div key={issue.id} className="issue-card">
+        <div className="issue-main">
+          <div className="issue-top"><span className={"issue-status " + (issue.status || "open")}>{appIssueStatusLabel(issue.status)}</span><span className="issue-date">{fmtDate(issue.at)} {fmtTime(issue.at)}</span></div>
+          <div className="issue-desc">{issue.description}</div>
+          <div className="issue-meta">{issue.reporter?.name || "—"} · {ROLE_LABEL[issue.reporter?.role] || issue.reporter?.role || "—"}{issue.location ? " · " + issue.location : ""}</div>
+          {issue.response && <div className="issue-response">תגובה: {issue.response} {issue.responseBy ? `· ${issue.responseBy}` : ""}</div>}
+        </div>
+        {issue.screenshot && <a className="issue-thumb" href={issue.screenshot} target="_blank" rel="noreferrer"><img src={issue.screenshot} alt="צילום מסך" /></a>}
+        <button className="btn-ghost sm" onClick={() => setEditing({ issue, response: issue.response || "", status: issue.status || APP_ISSUE_STATUS.open })}>תגובה / סטטוס</button>
+      </div>)}
+    </div>}
+    {editing && <Overlay persistent onClose={() => setEditing(null)}><div className="modal2-panel"><div className="modal2-head"><div className="form-title">תגובה לדיווח</div><button className="icon-btn" aria-label="סגירה" onClick={() => setEditing(null)}><X size={20} /></button></div><div className="modal2-body">
+      <div className="note" style={{ margin: "0 0 12px" }}>{editing.issue.description}</div>
+      <label className="field"><span>סטטוס</span><select value={editing.status} onChange={(e) => setEditing((s) => ({ ...s, status: e.target.value }))}><option value={APP_ISSUE_STATUS.open}>פתוח</option><option value={APP_ISSUE_STATUS.reviewing}>בבדיקה</option><option value={APP_ISSUE_STATUS.resolved}>טופל</option></select></label>
+      <label className="field"><span>תגובה פנימית</span><textarea rows={4} value={editing.response} onChange={(e) => setEditing((s) => ({ ...s, response: e.target.value }))} placeholder="מה נעשה / מה נבדק / למה ממתין…" /></label>
+      <button className="btn-primary full" onClick={saveReaction}>שמירת תגובה</button>
+    </div></div></Overlay>}
+  </>;
+}
+
 /* ============================================================ SHARED UI */
 const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "ניקיון", Sparkles]];
 
@@ -6675,7 +6775,7 @@ function RolePreviewBox({ rolePreview }) {
   </div>;
 }
 
-function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme }) {
+function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme, onReportIssue }) {
   return (<aside className="sidebar">
     <div className="side-brand"><BrandMark logo={config?.brandLogo} small /><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
     {primary && <button className="side-newbtn" onClick={primary.onClick}><Plus size={18} /> {primary.label}</button>}
@@ -6685,6 +6785,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
       <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
       <RolePreviewBox rolePreview={rolePreview} />
+      {onReportIssue && <button className="side-report" onClick={onReportIssue}><Bug size={14} /> דיווח על בעיה</button>}
       <div className="side-version" title={APP_BUILD_TIME ? `Build ${APP_BUILD_COMMIT} · ${APP_BUILD_TIME}` : `Build ${APP_BUILD_COMMIT}`}>CMMS CDSL · v{APP_VERSION} · {APP_BUILD_COMMIT}</div>
     </div>
   </aside>);
@@ -7416,7 +7517,23 @@ button.notif-perm:hover{background:#D1FAE5;}
 .rp-btn{display:flex;align-items:center;justify-content:center;gap:4px;min-height:28px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11px;font-weight:600;}
 .rp-btn:hover{background:#ffffff14;color:#fff;}
 .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
+.side-report{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--side-ink);border:1px solid #ffffff14;border-radius:999px;padding:7px 10px;font-size:11.5px;font-weight:700;background:#ffffff08;}
+.side-report:hover{background:#ffffff14;color:#fff;}
 .side-version{color:var(--side-ink);font-size:10.5px;text-align:center;padding:5px 4px 0;opacity:.82;}
+.issue-shot{position:relative;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:12px;background:var(--surface-2);}
+.issue-shot img{display:block;width:100%;max-height:260px;object-fit:contain;}
+.issue-list{display:grid;gap:10px;}
+.issue-card{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px;}
+.issue-main{min-width:0;}
+.issue-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+.issue-status{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:800;background:#FEF3C7;color:#92400E;}
+.issue-status.reviewing{background:#DBEAFE;color:#1D4ED8;}
+.issue-status.resolved{background:#DCFCE7;color:#15803D;}
+.issue-date,.issue-meta{font-size:11.5px;color:var(--muted);}
+.issue-desc{font-size:14px;font-weight:700;line-height:1.45;color:var(--ink);}
+.issue-response{margin-top:7px;font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:9px;padding:7px 9px;}
+.issue-thumb{width:74px;height:54px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2);}
+.issue-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 .brand-upload{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:12px;}
 .brand-upload-main{min-width:0;flex:1;}
 .brand-upload-title{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:3px;}
