@@ -8480,7 +8480,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .wk-view-desc{color:var(--ink);font-size:15px;line-height:1.5;white-space:pre-wrap;}
 .badge.sm{font-size:11px;padding:3px 9px;}
 .spinner.sm{width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:-2px;}
-@media(max-width:430px){
+@media(max-width:720px){
   .worker-top{display:grid;grid-template-columns:1fr;gap:10px;padding:14px 12px 10px;}
   .worker-top-actions{justify-content:space-between;width:100%;gap:6px;}
   .worker-top .icon-btn{width:40px;height:40px;flex:0 0 40px;}
@@ -8489,12 +8489,12 @@ button.notif-perm:hover{background:#D1FAE5;}
   .language-picker.compact select{width:100%;min-height:40px;}
   .wk-title{font-size:19px;}
   .worker-preview{padding:0 12px 10px;}
-  .wk-tabs{gap:6px;padding:10px 10px 0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-snap-type:x proximity;}
+  .wk-tabs{gap:6px;padding:10px 10px 0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-snap-type:x proximity;align-items:stretch;}
   .wk-tabs::-webkit-scrollbar{display:none;}
-  .wk-tabs button{flex:0 0 108px;min-width:108px;min-height:58px;flex-direction:column;gap:4px;padding:9px 8px;font-size:12.5px;line-height:1.15;scroll-snap-align:center;}
+  .wk-tabs button{flex:0 0 112px;min-width:112px;min-height:62px;flex-direction:column;gap:4px;padding:9px 8px;font-size:12.5px;line-height:1.15;text-align:center;white-space:normal;overflow-wrap:anywhere;scroll-snap-align:center;}
   .worker-body{padding:16px 12px 40px;}
 }
-@media(max-width:360px){
+@media(max-width:390px){
   .wk-tabs button{flex-basis:96px;min-width:96px;}
   .worker-action-btn span{display:none;}
 }
