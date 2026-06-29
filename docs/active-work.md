@@ -58,6 +58,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
   - mobile admin topbar must show a visible `יציאה` action, not only an icon-only logout control.
+  - mobile navigation should not split modules between a top dropdown and the bottom bar. Roles with more than four available sections should use one horizontally scrollable bottom navigation; roles with three or four sections should keep the simple fixed bottom navigation.
   - production password-change and first-admin bootstrap accept passwords from 6 characters; complexity is guidance, not a hard blocker.
   - production login footer should stay user-facing and not expose technical Supabase/Auth wording.
   - production login footer shows author/year and app version as two quiet lines; do not collapse them into one mixed attribution/version string.
@@ -88,6 +89,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
   - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
+  - Mobile navigation polish passed locally: full tests, release check, build, diff check, and Playwright smoke confirmed admin has no top dropdown, full bottom scroll navigation includes all 11 available sections without page overflow, and a standard manager keeps a simple three-item bottom navigation.
   - Mobile app-issue and cleaning QR gate branch passed locally: `npm test -- --run tests/cleaningQrModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for mobile admin app-issue button opening the report modal, and production-mode public report opening without manual zone buttons when no QR zone is available.
   - Localization language-model foundation passed locally: `npm test -- --run tests/languageModel.test.js` confirms Hebrew fallback, supported language codes/names, locale normalization, and RTL/LTR direction.
   - Login footer polish passed locally in production-mode at 430px width: footer rendered as two lines (`פותח על ידי ...` and `גרסה v...`) without overflow or relevant console errors. `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
