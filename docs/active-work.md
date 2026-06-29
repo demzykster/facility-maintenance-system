@@ -65,6 +65,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
   - red shared-save failure toasts should create a sanitized client-error audit event when a logged-in production session is available.
+  - red shared-save failure toasts are reserved for failed shared writes/deletes; background shared reads/lists may fail/retry without showing a misleading save-failure banner.
   - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
   - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
   - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
@@ -81,6 +82,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - App issue reports passed targeted model/backup/collection/KV tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright smoke for login, issue submission, and settings history visibility.
   - Client shared-save failure logging passed: `npm test -- --run tests/clientErrorsHandler.test.js tests/auditEventModel.test.js tests/vercelApiRouteModel.test.js tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+  - Background read/list toast suppression passed locally: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Public Vercel production redeploy succeeded after the Hobby daily deployment limit reset. Strict live smoke passed for commit `2304dcd`.
   - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
   - PR #399 merged cleanly and its Vercel Preview check passed. Manual production redeploy failed externally with Vercel Hobby limit `api-deployments-free-per-day`, so strict live smoke for commit `f7f5bc3` is expected to fail until the deployment limit resets.

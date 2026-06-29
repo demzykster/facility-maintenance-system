@@ -1356,7 +1356,18 @@ export default function App() {
     } catch (e) { console.error("init error", e); }
     finally { setReady(true); }
   })(); }, []);
-  useEffect(() => { if (!session) return; const id = setInterval(() => { if (!document.hidden) reloadAll(); }, 15000); const onVis = () => { if (!document.hidden) reloadAll(); }; document.addEventListener("visibilitychange", onVis); return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); }; }, [session]);
+  useEffect(() => {
+    if (!session) return;
+    const refresh = () => {
+      if (!document.hidden) reloadAll().catch(() => {});
+    };
+    const id = setInterval(refresh, 15000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [session]);
 
   async function loadColl(prefix) {
     const keys = await store.list(prefix, true);
