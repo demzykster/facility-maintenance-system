@@ -21,6 +21,10 @@ function createRemoteStorage() {
   };
 }
 
+function createLocalStorage() {
+  return createRemoteStorage();
+}
+
 describe("app storage adapter", () => {
   it("uses memory before the external storage provider is available", async () => {
     let remote = null;
@@ -39,6 +43,24 @@ describe("app storage adapter", () => {
     await expect(store.set("ticket:2", "remote", true)).resolves.toBe(true);
     await expect(store.get("ticket:2", true)).resolves.toBe("remote");
     await expect(store.list("ticket:", true)).resolves.toEqual(["ticket:2"]);
+  });
+
+  it("keeps non-shared browser keys local even when shared storage is remote", async () => {
+    const remote = createRemoteStorage();
+    const local = createLocalStorage();
+    const store = createAppStore({
+      storageProvider: () => remote,
+      localStorageProvider: () => local,
+      allowMemoryFallback: false
+    });
+
+    await expect(store.set("theme:v1", "dark", false)).resolves.toBe(true);
+    await expect(store.set("ticket:1", "remote", true)).resolves.toBe(true);
+
+    await expect(store.get("theme:v1", false)).resolves.toBe("dark");
+    await expect(store.get("theme:v1", true)).resolves.toBe(null);
+    await expect(store.get("ticket:1", true)).resolves.toBe("remote");
+    await expect(store.get("ticket:1", false)).resolves.toBe(null);
   });
 
   it("keeps a local fallback and reports save failure when external storage times out", async () => {
