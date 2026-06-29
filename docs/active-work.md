@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: clean after PR #401; public Vercel production alias is still temporarily stale until Vercel can deploy again.
-- Latest synchronized `main`: after PR #399 (`f7f5bc3`). PR #399 preview build was green, but `https://facility-maintenance-system.vercel.app/` still serves the previous production deployment until Vercel can deploy again.
+- Status: clean after PR #402; public Vercel production alias is redeployed from current `main`.
+- Latest synchronized `main`: after PR #402 (`2304dcd`). Public Vercel live smoke passes for commit `2304dcd`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -69,6 +69,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
   - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+  - Public Vercel production redeploy succeeded after the Hobby daily deployment limit reset. Strict live smoke passed for commit `2304dcd`.
   - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
   - PR #399 merged cleanly and its Vercel Preview check passed. Manual production redeploy failed externally with Vercel Hobby limit `api-deployments-free-per-day`, so strict live smoke for commit `f7f5bc3` is expected to fail until the deployment limit resets.
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
