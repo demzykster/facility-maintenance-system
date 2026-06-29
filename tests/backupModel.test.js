@@ -22,6 +22,7 @@ describe("backup model", () => {
       "ppeNorms",
       "ppeReqs",
       "ppeOrders",
+      "appIssues",
     ]);
 
     expect(BACKUP_COLLECTIONS.map(({ key, prefix }) => ({ key, prefix }))).toEqual([
@@ -43,6 +44,7 @@ describe("backup model", () => {
       { key: "ppeNorms", prefix: "ppenorm:" },
       { key: "ppeReqs", prefix: "ppereq:" },
       { key: "ppeOrders", prefix: "ppeorder:" },
+      { key: "appIssues", prefix: "appIssue:" },
     ]);
   });
 
@@ -73,6 +75,7 @@ describe("backup model", () => {
     expect(payload.ppeItems).toEqual([]);
     expect(payload.ppeNorms).toEqual([]);
     expect(payload.ppeOrders).toEqual([]);
+    expect(payload.appIssues).toEqual([]);
   });
 
   it("detects legacy backups that are missing current collections", () => {

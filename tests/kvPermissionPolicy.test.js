@@ -24,6 +24,7 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionForKey("ppereq:req-1")).toBeNull();
     expect(kvWritePermissionForKey("cround:round-1")).toBeNull();
     expect(kvWritePermissionForKey("ccomplaint:issue-1")).toBeNull();
+    expect(kvWritePermissionForKey("appIssue:issue-1")).toBeNull();
   });
 
   it("uses admin role and stored permissions from production sessions", () => {
