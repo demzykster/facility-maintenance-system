@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/send-phone-push-events
 
-- Status: main is clean after PR #448. Empty staging is clean except the owner admin user; owner manual checks #1 and #4 are owner-closed; backup/restore remains owner-closed unless new evidence says otherwise.
+- Status: implementing automatic phone-push delivery for selected business events. Base push subscription/test infrastructure is already on main; this branch adds explicit targeted event delivery and wires ticket/cleaning complaint saves to it.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -96,6 +96,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
   - fleet Excel import preview must block duplicate chassis/source identifiers inside the same workbook before save; the supplied `מעקב רישיונות_ 06.07.23.xlsx` preview found `total=128`, `ready=126`, `invalid=2` for duplicate `פסולתון` rows 127-128.
   - phone push notifications are implemented as PWA/web-push: `/api/push`, `cmms-sw.js`, `manifest.webmanifest`, and Vercel `CMMS_PUSH_*` env are required. Users still need a supported browser/PWA install and notification permission.
+  - automatic phone push should stay targeted and low-noise: send to explicit subscribed users only, do not broadcast to all subscribers, and do not let push failures block the saved business action.
+  - next access-control iteration should combine role defaults, individual module permissions, and per-user notification preferences in one coherent user-management surface instead of adding a separate parallel permission system.
   - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
@@ -118,6 +120,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Localization language-model foundation passed locally: `npm test -- --run tests/languageModel.test.js` confirms Hebrew fallback, supported language codes/names, locale normalization, and RTL/LTR direction.
   - Login footer polish passed locally in production-mode at 430px width: footer rendered as two lines (`פותח על ידי ...` and `גרסה v...`) without overflow or relevant console errors. `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
   - User profile/contact branch passed locally: `npm test -- --run tests/profileHandler.test.js tests/changePasswordHandler.test.js tests/sessionHandler.test.js tests/productionLoginAdapter.test.js tests/vercelApiRouteModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for demo login opening the profile modal and production-mode mobile login footer rendering as two contained lines.
+  - Phone push event delivery branch passed locally: `npm test -- --run tests/pushNotificationModel.test.js tests/pushHandler.test.js`, full `npm test -- --run`, and `npm run build`.
   - User profile/contact PR #427 merged to main. Vercel passed, the `app_users.phone` migration was applied to `cmms-cdsl-staging`, `npm run staging:supabase-schema`, `npm run release:check`, and `npm run staging:smoke:live` passed. Live Playwright smoke on `https://facility-maintenance-system.vercel.app/` confirmed login with the admin account, no save-failure banner, one visible profile entry point, and a profile modal with phone/password fields.
   - Cleaning save-flow hardening passed locally: new cleaning zone saved and survived reload; cleaning complaint form closed only after successful persistence; no relevant browser console errors. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - Supabase Pro backup and restore drill passed. `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`). A temporary restore target (`cmms-cdsl-restore-drill-full-20260629094512`, ref `aakzttnqotmemukyejys`) was created, migrations were applied, one admin/Auth user, `app_users`, `file_metadata`, `audit_events`, and a real `cmms-files` storage object were restored and verified. Restored file SHA-256 matched the source. The temporary target was deleted, secret restore credentials were removed, and only sanitized local evidence remains in `.tools/restore-drill-evidence-2026-06-29T09-48-16-539Z.json`. Final source cleanup evidence `.tools/staging-backup-evidence-2026-06-29T09-48-45-484Z.json` shows `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, `storageFiles=0`; `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed.

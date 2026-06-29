@@ -71,6 +71,52 @@ export function removePushSubscription(list = [], subscription = {}) {
   return parsePushSubscriptions(list).filter((item) => item.id !== id);
 }
 
+const PUSH_EVENT_KINDS = new Set([
+  "new",
+  "upd",
+  "ready",
+  "confirm",
+  "sla",
+  "escalate",
+  "task",
+  "pm",
+  "doc",
+  "driver",
+  "ppe",
+  "cleaning",
+  "back",
+  "system"
+]);
+
+export function normalizePushNotificationRequest(input = {}) {
+  const targetUserIds = [...new Set((Array.isArray(input.targetUserIds) ? input.targetUserIds : [])
+    .map((id) => String(id || "").trim())
+    .filter(Boolean))].slice(0, 50);
+  const title = String(input.title || "CMMS CDSL").trim().slice(0, 80);
+  const body = String(input.body || "יש עדכון חדש במערכת").trim().slice(0, 180);
+  const rawUrl = String(input.url || "/").trim();
+  const url = rawUrl.startsWith("/") && !rawUrl.startsWith("//") ? rawUrl.slice(0, 220) : "/";
+  const kind = PUSH_EVENT_KINDS.has(input.kind) ? input.kind : "system";
+  const tag = String(input.tag || input.dedupeKey || `cmms-${kind}`).trim().slice(0, 80);
+  if (!targetUserIds.length) return { ok: false, error: "push_targets_required" };
+  if (!title || !body) return { ok: false, error: "push_payload_required" };
+  return { ok: true, targetUserIds, title, body, url, kind, tag };
+}
+
+export function selectPushNotificationTargets(subscriptions = [], targetUserIds = []) {
+  const allowed = new Set(targetUserIds.map((id) => String(id || "").trim()).filter(Boolean));
+  const seenEndpoints = new Set();
+  return parsePushSubscriptions(subscriptions)
+    .filter((item) => allowed.has(item.userId))
+    .filter((item) => {
+      const endpoint = item.subscription?.endpoint || "";
+      if (!endpoint || seenEndpoints.has(endpoint)) return false;
+      seenEndpoints.add(endpoint);
+      return true;
+    })
+    .slice(0, 50);
+}
+
 export function pushPayload(input = {}) {
   return JSON.stringify({
     title: String(input.title || "CMMS CDSL").slice(0, 80),

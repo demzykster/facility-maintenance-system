@@ -87,3 +87,21 @@ export async function sendTestPhonePush({
   if (!response.ok || data?.ok !== true) return { ok: false, error: data?.error || "push_test_failed" };
   return { ok: true, sent: data.sent || 0 };
 }
+
+export async function sendPhoneNotification({
+  event,
+  endpoint = "/api/push",
+  fetchImpl = globalThis.fetch,
+  getAccessToken = () => authStore.get()?.accessToken || ""
+} = {}) {
+  const accessToken = getAccessToken();
+  if (!accessToken) return { ok: false, error: "access_token_required" };
+  const response = await fetchImpl(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ action: "notify", event })
+  });
+  const data = await readJson(response);
+  if (!response.ok || data?.ok !== true) return { ok: false, error: data?.error || "push_notify_failed" };
+  return { ok: true, sent: data.sent || 0, targets: data.targets || 0 };
+}

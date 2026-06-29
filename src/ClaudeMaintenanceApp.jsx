@@ -36,7 +36,7 @@ import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./pub
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs } from "./systemErrorLogAdapter.js";
-import { sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
+import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
@@ -1495,6 +1495,67 @@ export default function App() {
     });
     apply("user", us, setUsers, null);
   }
+  const pushTargetIds = (ids) => {
+    const unique = [...new Set((ids || []).filter(Boolean).map(String))];
+    const withoutActor = unique.filter((id) => id !== session?.id);
+    return withoutActor.length ? withoutActor : unique;
+  };
+  const activeUserList = () => (users || []).filter((u) => u.active !== false && u.status !== "archived");
+  const notifyPhone = (event) => {
+    const targetUserIds = pushTargetIds(event.targetUserIds);
+    if (!targetUserIds.length) return;
+    sendPhoneNotification({ event: { ...event, targetUserIds } }).catch(() => {});
+  };
+  const ticketPhoneTargets = (ticket) => {
+    const ids = [];
+    const add = (id) => { if (id) ids.push(id); };
+    activeUserList().forEach((u) => {
+      if (u.role === "admin") add(u.id);
+      else if (u.role === "tech" && ticket.assignee && u.name === ticket.assignee) add(u.id);
+      else if (u.role === "user" && visibleTickets(u, [ticket], fleet).length) add(u.id);
+    });
+    add(ticket.createdBy?.id);
+    add(ticket.reportedBy?.id);
+    return ids;
+  };
+  const notifyTicketPhone = (ticket, prevTicket) => {
+    const targets = ticketPhoneTargets(ticket);
+    if (!targets.length) return;
+    const changedStatus = prevTicket && prevTicket.status !== ticket.status;
+    const kind = !prevTicket ? "new" : ticket.status === "pending_admin" ? "ready" : ticket.status === "pending_user" ? "confirm" : "upd";
+    const statusPart = changedStatus ? ` · ${stOf(ticket.status).label}` : "";
+    notifyPhone({
+      targetUserIds: targets,
+      kind,
+      title: !prevTicket ? `קריאה חדשה · #${ticketNo(ticket)}` : `עדכון קריאה · #${ticketNo(ticket)}`,
+      body: `${ticket.subject || "קריאה"}${statusPart}`,
+      url: "/",
+      dedupeKey: `ticket-${ticket.id}-${ticket.updatedAt || ticket.createdAt || Date.now()}`
+    });
+  };
+  const complaintPhoneTargets = (complaint) => {
+    const ids = [];
+    const add = (id) => { if (id) ids.push(id); };
+    const zone = (zones || []).find((z) => z.id === complaint.zoneId);
+    activeUserList().forEach((u) => {
+      if (u.role === "admin") add(u.id);
+      else if (u.role === "cleaner" && zone?.cleanerId === u.id) add(u.id);
+      else if (u.role === "user" && (u.mgrZones || []).includes(complaint.zoneId)) add(u.id);
+    });
+    return ids;
+  };
+  const notifyComplaintPhone = (complaint) => {
+    const targets = complaintPhoneTargets(complaint);
+    if (!targets.length) return;
+    notifyPhone({
+      targetUserIds: targets,
+      kind: "cleaning",
+      title: complaint.status === "pending" ? "דיווח ניקיון ממתין לאישור" : "דיווח ניקיון חדש",
+      body: `${complaint.zoneName || "אזור ניקיון"}${complaint.text ? " · " + complaint.text : ""}`,
+      url: "/",
+      dedupeKey: `cleaning-${complaint.id}-${complaint.at || Date.now()}`
+    });
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
@@ -1502,6 +1563,7 @@ export default function App() {
     if (!rec.num) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
     if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
     setTickets((p) => [rec, ...p.filter((x) => x.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
+    notifyTicketPhone(rec, _prev);
     return true;
   };
   const savePm = async (p) => { if (!await persistShared(`pm:${p.id}`, JSON.stringify(p))) return false; setPm((s) => [...s.filter((x) => x.id !== p.id), p].sort((a, b) => a.nextDue - b.nextDue)); return true; };
@@ -1530,7 +1592,10 @@ export default function App() {
     let ticketId = null;
     if (base.kind === "broken" && status === "open") ticketId = await spawnFacilityFromComplaint(base);
     const stored = await CLEANING_PHOTOS.saveComplaint(base);
-    return persistComplaint({ ...stored, status, ownerRole, verified: trusted, ticketId, demo: false });
+    const rec = { ...stored, status, ownerRole, verified: trusted, ticketId, demo: false };
+    const ok = await persistComplaint(rec);
+    if (ok) notifyComplaintPhone(rec);
+    return ok;
   };
   const submitAnonymousComplaint = async (c) => {
     if (APP_MODE === APP_MODES.production) {
