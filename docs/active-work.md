@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/localize-cleaning-qr-required
 
-- Status: notification access/preference block is merged through PR #452, #453, and #454. Continue from the next owner-audit or pilot-hardening item.
+- Status: tightening worker-facing localization parity. The QR-required cleaning gate is being moved from hardcoded Hebrew into the shared UI dictionary for all supported languages.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -104,7 +104,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - user forms now expose per-user notification preferences beside module permissions; only event kinds allowed by the current role/permission model are shown, and disabled kinds are saved as explicit user preferences.
   - `/api/push` refreshes target user role/permissions/notification preferences from `user:<id>` records before business notification delivery, so admin changes made after device subscription are respected.
   - cleaner-facing screens should not contain hardcoded Hebrew shell text where `uiText` keys already exist; operational record names can remain as entered by users.
+  - UI localization parity should be tested by comparing every supported language key set directly, not only by checking `uiText()` fallback output.
   - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
+  - Cleaning QR localization branch passed strict dictionary parity: `he/en/ru/ar/hi/ti` each expose 105 direct UI keys, with no missing or extra keys. Browser smoke on local `http://127.0.0.1:5173/` switched all six languages and confirmed login/public-report title text plus correct RTL/LTR direction. Full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.

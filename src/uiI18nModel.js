@@ -97,6 +97,11 @@ const UI_TEXT = {
     "cleaner.status.pending": "מתוכנן",
     "cleaner.itemsProgress": "{done}/{total} פריטים",
     "cleaner.issuesCount": "{count} הערות",
+    "cleaningQr.title": "נדרשת סריקת QR באזור",
+    "cleaningQr.forZone": "כדי להמשיך באזור {zone}, סרקו את קוד ה-QR שמודבק באזור עצמו.",
+    "cleaningQr.generic": "כדי להמשיך, סרקו את קוד ה-QR שמודבק באזור עצמו.",
+    "cleaningQr.wrong": "נסרק QR של אזור אחר או אזור שאינו פעיל. סרקו את הקוד הנכון במקום.",
+    "cleaningQr.remoteBlocked": "הפעולה חסומה בלי סריקה כדי למנוע דיווח או סבב מרחוק.",
     "push.title": "התראות לטלפון",
     "push.sub": "לאפליקציה שמותקנת למסך הבית או לדפדפן תומך.",
     "push.unsupported": "לא נתמך בדפדפן הנוכחי.",
@@ -199,6 +204,11 @@ const UI_TEXT = {
     "cleaner.status.pending": "Planned",
     "cleaner.itemsProgress": "{done}/{total} items",
     "cleaner.issuesCount": "{count} notes",
+    "cleaningQr.title": "Area QR scan required",
+    "cleaningQr.forZone": "To continue in {zone}, scan the QR code posted in that area.",
+    "cleaningQr.generic": "To continue, scan the QR code posted in the area.",
+    "cleaningQr.wrong": "A different or inactive area QR was scanned. Scan the correct code on site.",
+    "cleaningQr.remoteBlocked": "This action is blocked without a scan to prevent remote reports or rounds.",
     "push.title": "Phone notifications",
     "push.sub": "For a supported browser or an app installed to the home screen.",
     "push.unsupported": "Not supported in this browser.",
@@ -301,6 +311,11 @@ const UI_TEXT = {
     "cleaner.status.pending": "Запланировано",
     "cleaner.itemsProgress": "{done}/{total} пунктов",
     "cleaner.issuesCount": "{count} замечаний",
+    "cleaningQr.title": "Нужно отсканировать QR в зоне",
+    "cleaningQr.forZone": "Чтобы продолжить в зоне {zone}, отсканируйте QR-код, размещённый именно в этой зоне.",
+    "cleaningQr.generic": "Чтобы продолжить, отсканируйте QR-код, размещённый в зоне.",
+    "cleaningQr.wrong": "Отсканирован QR другой зоны или неактивной зоны. Отсканируйте правильный код на месте.",
+    "cleaningQr.remoteBlocked": "Действие заблокировано без сканирования, чтобы нельзя было отправить отчёт или выполнить обход удалённо.",
     "push.title": "Уведомления на телефон",
     "push.sub": "Для поддерживаемого браузера или приложения, добавленного на главный экран.",
     "push.unsupported": "Этот браузер не поддерживается.",
@@ -403,6 +418,11 @@ const UI_TEXT = {
     "cleaner.status.pending": "مخطط",
     "cleaner.itemsProgress": "{done}/{total} عناصر",
     "cleaner.issuesCount": "{count} ملاحظات",
+    "cleaningQr.title": "مطلوب مسح QR في المنطقة",
+    "cleaningQr.forZone": "للمتابعة في {zone}، امسح رمز QR الموجود في نفس المنطقة.",
+    "cleaningQr.generic": "للمتابعة، امسح رمز QR الموجود في المنطقة.",
+    "cleaningQr.wrong": "تم مسح QR لمنطقة أخرى أو غير فعالة. امسح الرمز الصحيح في المكان.",
+    "cleaningQr.remoteBlocked": "هذا الإجراء محجوب بدون مسح QR لمنع البلاغات أو الجولات عن بُعد.",
     "push.title": "تنبيهات الهاتف",
     "push.sub": "لمتصفح مدعوم أو تطبيق مثبت على الشاشة الرئيسية.",
     "push.unsupported": "غير مدعوم في هذا المتصفح.",
@@ -505,6 +525,11 @@ const UI_TEXT = {
     "cleaner.status.pending": "योजनाबद्ध",
     "cleaner.itemsProgress": "{done}/{total} आइटम",
     "cleaner.issuesCount": "{count} नोट",
+    "cleaningQr.title": "क्षेत्र का QR स्कैन ज़रूरी है",
+    "cleaningQr.forZone": "{zone} में जारी रखने के लिए उसी क्षेत्र में लगा QR कोड स्कैन करें।",
+    "cleaningQr.generic": "जारी रखने के लिए क्षेत्र में लगा QR कोड स्कैन करें।",
+    "cleaningQr.wrong": "किसी दूसरे या निष्क्रिय क्षेत्र का QR स्कैन हुआ। स्थान पर सही कोड स्कैन करें।",
+    "cleaningQr.remoteBlocked": "दूर से रिपोर्ट या राउंड रोकने के लिए स्कैन के बिना यह कार्रवाई बंद है।",
     "push.title": "फोन सूचनाएँ",
     "push.sub": "समर्थित ब्राउज़र या होम स्क्रीन पर इंस्टॉल ऐप के लिए।",
     "push.unsupported": "यह ब्राउज़र समर्थित नहीं है।",
@@ -607,6 +632,11 @@ const UI_TEXT = {
     "cleaner.status.pending": "ዝተወጠነ",
     "cleaner.itemsProgress": "{done}/{total} ነገራት",
     "cleaner.issuesCount": "{count} መዘኻኸሪታት",
+    "cleaningQr.title": "ናይቲ ቦታ QR ስካን የድሊ",
+    "cleaningQr.forZone": "ኣብ {zone} ንምቕጻል፣ ኣብቲ ቦታ ዘሎ QR ኮድ ስካን ግበር።",
+    "cleaningQr.generic": "ንምቕጻል፣ ኣብቲ ቦታ ዘሎ QR ኮድ ስካን ግበር።",
+    "cleaningQr.wrong": "ናይ ካልእ ወይ ዘይንጡፍ ቦታ QR ተስኪኑ። እቲ ትኽክለኛ ኮድ ኣብቲ ቦታ ደጊምካ ስካን ግበር።",
+    "cleaningQr.remoteBlocked": "ሪፖርት ወይ ዙርያ ካብ ርሑቕ ንኸይግበር፣ ብዘይ QR ስካን እዚ ተዓጽዩ ኣሎ።",
     "push.title": "ምልክታት ስልኪ",
     "push.sub": "ንዝድግፍ ብራውዘር ወይ ኣብ መነሻ ስክሪን ዝተተኽለ ኣፕ።",
     "push.unsupported": "እዚ ብራውዘር ኣይድግፍን።",
@@ -625,4 +655,9 @@ export function uiText(language, key, vars = {}) {
 
 export function uiTextOptions() {
   return Object.freeze(Object.keys(UI_TEXT[DEFAULT_LANGUAGE]));
+}
+
+export function uiTextOptionsForLanguage(language) {
+  const code = normalizeLanguageCode(language);
+  return Object.freeze(Object.keys(UI_TEXT[code] || {}));
 }
