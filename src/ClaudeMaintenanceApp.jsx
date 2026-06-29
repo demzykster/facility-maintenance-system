@@ -6885,13 +6885,12 @@ function ProfileModal({ session, onSave, onClose }) {
         <div className="avatar big">{(session?.name || "?").charAt(0)}</div>
         <div><div className="profile-name">{session?.name || "—"}</div><div className="hint">{ROLE_LABEL[session?.role] || session?.role || ""}{session?.dept ? " · " + session.dept : ""}</div></div>
       </div>
-      <label className="field"><span><Phone size={14} /> טלפון</span><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יופיע בקריאות חדשות כדי שאיש הטיפול יוכל להתקשר בלחיצה.</div></label>
+      <label className="field"><span><Phone size={14} /> טלפון</span><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /></label>
       {canEditEmail && <label className="field"><span><Mail size={14} /> דוא״ל</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" autoComplete="email" /></label>}
       <div className="profile-password">
         <SectionTitle><KeyRound size={15} /> שינוי סיסמה</SectionTitle>
-        <label className="field"><span>סיסמה חדשה</span><input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="לפחות 6 תווים" /></label>
-        <label className="field"><span>אישור סיסמה חדשה</span><input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" autoComplete="new-password" placeholder="הקלידו שוב" /></label>
-        <div className="hint">אפשר להשאיר ריק אם רוצים לעדכן רק טלפון או דוא״ל.</div>
+        <label className="field compact"><input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="סיסמה חדשה" /></label>
+        <label className="field compact"><input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" autoComplete="new-password" placeholder="אישור סיסמה חדשה" /></label>
       </div>
       {err && <div className="err">{err}</div>}
       {saved && <div className="note ok">הפרופיל נשמר ✓</div>}
@@ -7001,8 +7000,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
     <div className="side-nav">{nav.map((n) => <button key={n.id} className={"side-item" + (n.active ? " on" : "")} onClick={n.onClick}><n.Icon size={19} /><span>{n.label}</span></button>)}<button className="side-item" onClick={onBell}><Bell size={19} /><span>התראות</span>{notif?.unread > 0 && <span className="side-badge">{notif.unread}</span>}</button></div>
     <div className="side-foot">
       <button className="side-item" onClick={toggleTheme}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}<span>{theme === "dark" ? "מצב בהיר" : "מצב כהה"}</span></button>
-      <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>
-      {onProfile && <button className="side-profile" onClick={onProfile}><User size={15} /> הפרופיל שלי</button>}
+      {onProfile ? <button className="side-user side-user-btn" onClick={onProfile} aria-label="הפרופיל שלי"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></button> : <div className="side-user"><div className="avatar">{(session.name || "?").charAt(0)}</div><div><div className="su-name">{session.name}</div><div className="su-role">{ROLE_LABEL[session.role]}{session.dept ? " · " + session.dept : ""}</div></div></div>}
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
       <RolePreviewBox rolePreview={rolePreview} />
       {onReportIssue && <button className="side-report" onClick={onReportIssue}><Bug size={14} /> דיווח על בעיה</button>}
@@ -7184,6 +7182,7 @@ a{color:inherit;}
 
 .field{display:block;margin-bottom:15px;}
 .field>span{display:block;font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:6px;}
+.field.compact{margin-bottom:10px;}
 .field input,.field select,.field textarea,.ta{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--input);color:var(--ink);outline:none;transition:.15s;}
 .field input:focus,.field select:focus,.field textarea:focus,.ta:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(234,88,12,.12);}
 .field textarea,.ta{resize:vertical;line-height:1.5;}
@@ -7752,8 +7751,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
 .side-report{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--side-ink);border:1px solid #ffffff14;border-radius:999px;padding:7px 10px;font-size:11.5px;font-weight:700;background:#ffffff08;}
 .side-report:hover{background:#ffffff14;color:#fff;}
-.side-profile{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--side-ink);border:1px solid #ffffff14;border-radius:999px;padding:7px 10px;font-size:11.5px;font-weight:700;background:#ffffff08;}
-.side-profile:hover{background:#ffffff14;color:#fff;}
+.side-user-btn{width:100%;text-align:right;border-radius:12px;transition:.15s;}
+.side-user-btn:hover,.side-user-btn:focus-visible{background:#ffffff12;}
 .side-version{color:var(--side-ink);font-size:10.5px;text-align:center;padding:5px 4px 0;opacity:.82;}
 .issue-shot{position:relative;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:12px;background:var(--surface-2);}
 .issue-shot img{display:block;width:100%;max-height:260px;object-fit:contain;}
