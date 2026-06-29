@@ -32,6 +32,8 @@ describe("uiI18nModel", () => {
     expect(uiText("ar", "cleaner.todoNow", { count: 2 })).toContain("2");
     expect(uiText("hi", "push.enable")).toBe("चालू करें");
     expect(uiText("ti", "common.logout")).toBe("ውጻእ");
+    expect(uiText("he", "install.button")).toBe("התקן כאפליקציה");
+    expect(uiText("ru", "install.iosHint")).toContain("iPhone");
   });
 
   it("keeps a stable key list for smoke checks", () => {
@@ -41,6 +43,7 @@ describe("uiI18nModel", () => {
     expect(uiTextOptions()).toContain("cleaner.noAssignedZones");
     expect(uiTextOptions()).toContain("cleaningQr.title");
     expect(uiTextOptions()).toContain("push.title");
+    expect(uiTextOptions()).toContain("install.title");
     expect(uiTextOptions()).toContain("rolePreview.title");
     expect(uiTextOptions()).toContain("ppe.noneIssued");
     expect(uiTextOptions()).toContain("audit.noMatches");
