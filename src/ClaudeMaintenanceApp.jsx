@@ -2084,13 +2084,24 @@ function UserApp(p) {
     tickets, fleet, pm, zones, rounds, complaints, tasks: p.tasks, meetings: p.meetings,
     ppe: p.ppe, ppeItems: p.ppeItems, users
   }), [session, tickets, fleet, pm, zones, rounds, complaints, p.tasks, p.meetings, p.ppe, p.ppeItems, users]);
-  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view;
+  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "teamAdmin" && !mayViewUsers ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view;
   const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
+  const userNav = [
+    { id: "tickets", Icon: ListChecks, label: "קריאות", active: activeView === "tickets", onClick: () => setView("tickets") },
+    { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") },
+    { id: "dept", Icon: Users, label: "המחלקה", active: activeView === "dept", onClick: () => setView("dept") },
+    mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null,
+    mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null,
+    mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null,
+    mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null,
+    mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null,
+    mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן", active: activeView === "activity", onClick: () => setView("activity") } : null,
+  ].filter(Boolean);
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
-        nav={[{ id: "list", Icon: ListChecks, label: "הקריאות שלי", active: activeView === "tickets", onClick: () => setView("tickets") }, { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") }, { id: "dept", Icon: Users, label: "המחלקה שלי", active: activeView === "dept", onClick: () => setView("dept") }, mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null, mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null, mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null, mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null, mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null, mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות", active: activeView === "activity", onClick: () => setView("activity") } : null].filter(Boolean)} />
+        nav={userNav} />
       <div className="main-col">
         <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
@@ -2140,7 +2151,7 @@ function UserApp(p) {
         </div>
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
-      <nav className="bottom-nav"><NavBtn active={activeView === "tickets"} onClick={() => setView("tickets")} Icon={ListChecks} label="קריאות" /><NavBtn active={activeView === "tasks"} onClick={() => setView("tasks")} Icon={ClipboardList} label="מטלות" /><NavBtn active={activeView === "dept"} onClick={() => setView("dept")} Icon={Users} label="המחלקה" />{mayViewAudit && <NavBtn active={activeView === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" />}</nav>
+      <nav className={"bottom-nav" + (userNav.length > 4 ? " nav-scroll" : "")} aria-label="ניווט ראשי">{userNav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
@@ -4609,13 +4620,11 @@ function AdminApp(p) {
     mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות" } : null,
     mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות" } : null,
   ].filter(Boolean).map((n) => ({ ...n, active: activeTab === n.id, onClick: () => { if (n.id === "tickets") clearTicketFilter(); setTab(n.id); } }));
-  const mobileNav = nav.filter((n) => ["dash", "tickets", "assets", "insights"].includes(n.id));
   return (
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
-        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive}
-          extra={<select className="mob-tab desk-hide" value={activeTab} onChange={(e) => { if (e.target.value === "tickets") clearTicketFilter(); setTab(e.target.value); }}>{nav.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}</select>} />
+        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
@@ -4630,7 +4639,7 @@ function AdminApp(p) {
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
-      <nav className="bottom-nav">{mobileNav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
+      <nav className="bottom-nav nav-scroll" aria-label="ניווט ראשי">{nav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
@@ -7600,7 +7609,10 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .empty-t{font-weight:600;font-size:15px;margin-top:12px;color:var(--muted);}.empty-s{font-size:13px;margin-top:5px;}
 
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:var(--surface);border-top:1px solid var(--line);display:flex;padding:7px 0 max(7px,env(safe-area-inset-bottom));z-index:18;}
+.bottom-nav.nav-scroll{justify-content:flex-start;gap:2px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-inline:6px;}
+.bottom-nav.nav-scroll::-webkit-scrollbar{display:none;}
 .navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:500;padding:5px;}
+.nav-scroll .navbtn{flex:0 0 76px;min-width:76px;scroll-snap-align:center;border-radius:12px;}
 .navbtn.on{color:var(--primary);}
 
 .notif-back{align-items:center;justify-content:center;padding:16px;z-index:70;}
