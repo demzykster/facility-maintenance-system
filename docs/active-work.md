@@ -23,7 +23,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: pre-login PWA install prompt is merged in PR #459 and deployed on Vercel commit `048fdd4`. Continue from the next owner-audit or pilot-hardening item.
+- Status: pre-login PWA install prompt is merged and deployed. Continue from the next owner-audit or pilot-hardening item.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
