@@ -21,13 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/localize-russian-cleaner
+### Active branch: codex/notification-access-policy
 
-- Status: adding Russian to the controlled worker-facing localization set and finishing the cleaner shell localization that was still partially Hebrew-only.
+- Status: adding the foundation for one access-aware notification preference model before wiring the user-management UI.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
+  - keep module permissions, role defaults, and notification preferences connected instead of creating a separate parallel notification-access system.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
   - the interim Supabase KV bridge is an explicit v1 compatibility choice, not the final normalized workflow model.
   - do not spend current release time on workflow-table normalization or old-data migration unless a launch blocker proves it is required.
@@ -99,6 +100,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - automatic phone push should stay targeted and low-noise: send to explicit subscribed users only, do not broadcast to all subscribers, and do not let push failures block the saved business action.
   - next access-control iteration should combine role defaults, individual module permissions, and per-user notification preferences in one coherent user-management surface instead of adding a separate parallel permission system.
   - push delivery and notification-preference/access matrix are intentionally separate release blocks: push proves safe targeted delivery, while the next block must decide which roles/users may see modules and receive each event type.
+  - notification phone delivery now has a server-side access/preference filter foundation: subscriptions preserve user role, permissions, and notification preferences, and `/api/push` filters notify targets by event kind before sending.
   - cleaner-facing screens should not contain hardcoded Hebrew shell text where `uiText` keys already exist; operational record names can remain as entered by users.
   - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.

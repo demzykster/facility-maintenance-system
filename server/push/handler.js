@@ -130,7 +130,7 @@ export function createPushHandler({
       if (action === "notify") {
         const normalized = normalizePushNotificationRequest(body.event || body);
         if (!normalized.ok) return sendJson(res, 400, { error: normalized.error });
-        const targets = selectPushNotificationTargets(current, normalized.targetUserIds);
+        const targets = selectPushNotificationTargets(current, normalized.targetUserIds, normalized.kind);
         let sent = 0;
         for (const target of targets) {
           await push.sendNotification(target.subscription, pushPayload({
