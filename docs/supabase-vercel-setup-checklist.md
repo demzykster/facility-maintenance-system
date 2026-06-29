@@ -159,6 +159,8 @@ The pilot is not ready until restore is tested against a separate restore target
 - read restored file bytes;
 - read audit trail.
 
+Before starting the restore, run `npm run staging:backup:evidence` against the source staging project so there is a local comparison snapshot in ignored `.tools/`.
+
 ## Related Docs
 
 - `docs/staging-smoke.md`
