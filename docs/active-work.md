@@ -60,6 +60,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - mobile admin topbar must show a visible `יציאה` action, not only an icon-only logout control.
   - production password-change and first-admin bootstrap accept passwords from 6 characters; complexity is guidance, not a hard blocker.
   - production login footer should stay user-facing and not expose technical Supabase/Auth wording.
+  - production login footer shows author/year and app version as two quiet lines; do not collapse them into one mixed attribution/version string.
   - logged-in desktop users can report internal app issues from the sidebar version area; reports are stored as `appIssue:` KV records, included in backup/restore, and managed from settings as a product-quality journal, not as maintenance tickets.
   - the internal app-issue report modal should render as one compact centered panel, without a wider empty overlay shell beside it.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
@@ -77,6 +78,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Login footer polish passed locally in production-mode at 430px width: footer rendered as two lines (`פותח על ידי ...` and `גרסה v...`) without overflow or relevant console errors. `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
   - Cleaning save-flow hardening passed locally: new cleaning zone saved and survived reload; cleaning complaint form closed only after successful persistence; no relevant browser console errors. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - Supabase Pro backup and restore drill passed. `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`). A temporary restore target (`cmms-cdsl-restore-drill-full-20260629094512`, ref `aakzttnqotmemukyejys`) was created, migrations were applied, one admin/Auth user, `app_users`, `file_metadata`, `audit_events`, and a real `cmms-files` storage object were restored and verified. Restored file SHA-256 matched the source. The temporary target was deleted, secret restore credentials were removed, and only sanitized local evidence remains in `.tools/restore-drill-evidence-2026-06-29T09-48-16-539Z.json`. Final source cleanup evidence `.tools/staging-backup-evidence-2026-06-29T09-48-45-484Z.json` shows `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, `storageFiles=0`; `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed.
   - Client shared-save failure logging merged in PR #404 after the Vercel Pro upgrade removed the build-rate-limit blocker. Vercel passed, and strict live smoke passed for deployed commit `89455f2`.
