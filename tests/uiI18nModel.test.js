@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { uiText, uiTextOptions } from "../src/uiI18nModel.js";
+import { languageOptions } from "../src/languageModel.js";
+import { uiText, uiTextOptions, uiTextOptionsForLanguage } from "../src/uiI18nModel.js";
 
 describe("uiI18nModel", () => {
   it("falls back to Hebrew for unsupported languages and unknown keys", () => {
@@ -7,7 +8,20 @@ describe("uiI18nModel", () => {
     expect(uiText("en", "missing.key")).toBe("missing.key");
   });
 
-  it("exposes the worker-facing language strings used by the first localized shell", () => {
+  it("keeps every base UI key directly available in every supported language", () => {
+    const keys = uiTextOptions();
+    const languages = languageOptions().map((language) => language.code);
+
+    expect(keys.length).toBeGreaterThan(0);
+    for (const language of languages) {
+      expect([...uiTextOptionsForLanguage(language)].sort()).toEqual([...keys].sort());
+      for (const key of keys) {
+        expect(uiText(language, key, { zone: "Zone A", count: 2, time: "08:00" })).not.toBe(key);
+      }
+    }
+  });
+
+  it("exposes the worker and cleaner strings used by the localized shell", () => {
     expect(uiText("en", "worker.newReport")).toBe("Problem report");
     expect(uiText("ru", "worker.newReport")).toBe("Сообщить о проблеме");
     expect(uiText("ru", "cleaner.todoNow", { count: 2 })).toBe("Нужно выполнить сейчас (2)");
@@ -22,6 +36,13 @@ describe("uiI18nModel", () => {
     expect(uiTextOptions()).toContain("public.qrOnly");
     expect(uiTextOptions()).toContain("cleaner.todoNow");
     expect(uiTextOptions()).toContain("cleaner.noAssignedZones");
+    expect(uiTextOptions()).toContain("cleaningQr.title");
     expect(uiTextOptions()).toContain("push.title");
+  });
+
+  it("localizes the cleaning QR gate for Russian cleaner flows", () => {
+    expect(uiText("ru", "cleaningQr.title")).toBe("Нужно отсканировать QR в зоне");
+    expect(uiText("ru", "cleaningQr.forZone", { zone: "Склад" })).toContain("Склад");
+    expect(uiText("ru", "cleaningQr.remoteBlocked")).toContain("удалённо");
   });
 });
