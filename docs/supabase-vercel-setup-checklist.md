@@ -131,6 +131,12 @@ After the first admin succeeds:
 
 Follow `docs/staging-smoke.md`.
 
+For an already configured staging project, the repeatable gate is:
+
+```bash
+npm run staging:gate
+```
+
 Minimum path:
 
 1. open staging in a clean browser;

@@ -54,6 +54,14 @@ npm run staging:smoke:live -- --expect-current-commit
 
 This strict mode fails if the public app still serves an older bundle.
 
+For the normal staging release gate, run the combined command:
+
+```bash
+npm run staging:gate
+```
+
+It runs the local staging env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke. It intentionally does not run `npm run staging:backup:evidence`, because that command creates a local sensitive data snapshot for restore drills.
+
 ## Required Env Shape
 
 Use `.env.staging.example` as the non-secret template for Vercel environment variables.
