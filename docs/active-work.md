@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/localize-cleaning-qr-required
+### Active branch: none
 
-- Status: tightening worker-facing localization parity. The QR-required cleaning gate is being moved from hardcoded Hebrew into the shared UI dictionary for all supported languages.
+- Status: cleaning QR localization parity is merged in PR #456. Continue from the next owner-audit or pilot-hardening item.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
