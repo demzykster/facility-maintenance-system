@@ -63,7 +63,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill.
+  - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
   - before owner-facing pilot, decide whether to leave the current smoke records/users in staging or clear/reseed a clean demonstration scenario.
 - Validation:
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
@@ -81,7 +81,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Strict live staging smoke passed after latest redeploy: public Vercel serves commit `792d576`, bootstrap is closed, admin auth/session works, KV read works, file metadata boundary works, required Supabase tables are reachable, and `cmms-files` is private.
   - Backup/restore evidence capture is merged in PR #388. `npm run staging:backup:evidence` writes a local ignored `.tools/staging-backup-evidence-*.json` snapshot of the four staging tables and `cmms-files` inventory.
   - `npm run staging:gate` is merged in PR #390 as the combined non-destructive staging gate. It runs local env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke.
-  - Supabase CLI platform access is not authenticated (`LegacyPlatformAuthRequiredError`), so configuring daily platform backups and restoring into a separate target remains a manual/external launch gate.
+  - Supabase CLI platform access is now authenticated with a temporary local access token for restore-drill work. The token is stored outside git and should be revoked after the drill.
+  - Supabase CLI confirms project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`) is visible, but `supabase backups list` reports no physical backups and `pitr_enabled=false`; Supabase dashboard states Free plan does not include project backups.
   - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
   - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
