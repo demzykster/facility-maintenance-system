@@ -39,6 +39,7 @@ import { fetchSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
+import { VERSION_MANIFEST_PATH, normalizeVersionManifest, shouldShowVersionUpdate } from "./appVersionModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -1261,6 +1262,8 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
 export default function App() {
   const [ready, setReady] = useState(false);
   const [toast, setToast] = useState(null);
+  const [versionUpdate, setVersionUpdate] = useState(null);
+  const [dismissedVersionCommit, setDismissedVersionCommit] = useState("");
   const [session, setSession] = useState(null);
   const sessionRef = useRef(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
@@ -1286,6 +1289,33 @@ export default function App() {
     return () => { store._onFail = null; };
   }, []);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
+  useEffect(() => {
+    let cancelled = false;
+    const checkVersion = async () => {
+      try {
+        const response = await fetch(`${VERSION_MANIFEST_PATH}?t=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const latest = normalizeVersionManifest(await response.json());
+        if (cancelled) return;
+        if (shouldShowVersionUpdate({ currentCommit: APP_BUILD_COMMIT, latestCommit: latest.commit, dismissedCommit: dismissedVersionCommit })) {
+          setVersionUpdate(latest);
+        } else if (latest.commit === APP_BUILD_COMMIT) {
+          setVersionUpdate(null);
+        }
+      } catch {}
+    };
+    const onVisible = () => { if (!document.hidden) checkVersion(); };
+    checkVersion();
+    const id = setInterval(checkVersion, 60000);
+    window.addEventListener("focus", checkVersion);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      window.removeEventListener("focus", checkVersion);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [dismissedVersionCommit]);
   const [rolePreviewRole, setRolePreviewRole] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   TASK_STATUS_META = config.taskStatusMeta || {};
@@ -1738,6 +1768,22 @@ export default function App() {
             {profileOpen && <Overlay persistent panelClassName="profile-shell" onClose={() => setProfileOpen(false)}><ProfileModal session={session} onSave={saveMyProfile} onClose={() => setProfileOpen(false)} /></Overlay>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
+      {versionUpdate && <VersionUpdateBanner onRefresh={() => window.location.reload()} onDismiss={() => { setDismissedVersionCommit(versionUpdate.commit); setVersionUpdate(null); }} />}
+    </div>
+  );
+}
+
+function VersionUpdateBanner({ onRefresh, onDismiss }) {
+  return (
+    <div className="version-update-banner" role="status" aria-live="polite">
+      <div className="version-update-copy">
+        <b>גרסה חדשה זמינה</b>
+        <span>המערכת עודכנה ברקע. רענון קצר יציג את השינויים האחרונים.</span>
+      </div>
+      <div className="version-update-actions">
+        <button type="button" className="version-update-refresh" onClick={onRefresh}>רענון</button>
+        <button type="button" className="version-update-dismiss" aria-label="סגירה" onClick={onDismiss}>×</button>
+      </div>
     </div>
   );
 }
@@ -7876,6 +7922,9 @@ button.notif-perm:hover{background:#D1FAE5;}
 
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--slate);color:#fff;border-radius:13px;padding:13px 16px;display:flex;gap:11px;align-items:flex-start;max-width:90%;width:360px;box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:80;animation:rise .3s ease;cursor:pointer;}
 .toast-title{font-weight:600;font-size:13.5px;}.toast-body{font-size:12.5px;color:#CBD5E1;margin-top:2px;line-height:1.4;}
+.version-update-banner{position:fixed;inset-inline:16px;bottom:calc(86px + env(safe-area-inset-bottom));margin:0 auto;max-width:520px;z-index:9998;display:flex;flex-direction:column;align-items:stretch;gap:10px;background:#0F172A;color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;box-shadow:0 14px 36px rgba(15,23,42,.28);}
+.version-update-copy{display:flex;flex-direction:column;gap:3px;min-width:0;line-height:1.35;}.version-update-copy b{font-size:13.5px;}.version-update-copy span{font-size:12.5px;color:#CBD5E1;}
+.version-update-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}.version-update-refresh{flex:1;border:0;border-radius:10px;background:var(--orange);color:#fff;padding:9px 13px;font-weight:700;cursor:pointer;}.version-update-dismiss{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;width:34px;height:34px;border-radius:10px;font-size:20px;line-height:1;cursor:pointer;}
 
 .ai-back{align-items:flex-end;justify-content:center;z-index:72;}
 .ai-panel{background:var(--surface);width:100%;max-width:520px;height:84vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -10px 50px rgba(0,0,0,.3);}
@@ -8121,7 +8170,7 @@ button.notif-perm:hover{background:#D1FAE5;}
   .ovl-panel.issue-report-shell{max-width:420px;background:transparent;box-shadow:none;overflow:visible;}
   .ymx-wrap{overflow:visible;}
   .ai-back{align-items:center;}.ai-panel{max-width:560px;height:80vh;border-radius:18px;}
-  .ai-fab{inset-inline-end:28px;bottom:28px;}.toast{bottom:24px;width:380px;}
+  .ai-fab{inset-inline-end:28px;bottom:28px;}.toast{bottom:24px;width:380px;}.version-update-banner{bottom:24px;flex-direction:row;align-items:center;justify-content:space-between;}.version-update-refresh{flex:0 0 auto;}
   .cat-grid{grid-template-columns:repeat(3,1fr);}
 }
 @media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:0.7fr 1.4fr 1fr 1fr;}}

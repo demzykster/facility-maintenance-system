@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/add-stale-version-banner
 
-- Status: main is clean after final profile/notification polish; Supabase Pro backup and separate-target restore drill are complete.
+- Status: adding a small stale-tab update prompt after manual Vercel browser testing showed an already-open tab can keep an older bundle until reload.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -49,6 +49,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - local staging preflight must use `.env.staging.local` as the explicit source for that run, even if stale shell env exists.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
   - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
+  - production builds should emit `cmms-version.json`; an open browser tab should compare that public manifest to its bundled commit and offer a quiet refresh prompt when a newer deployed build is available.
   - desktop sidebar footer must remain inside the visible viewport on shorter desktop windows; the navigation list may scroll independently.
   - desktop sidebar navigation should scroll without showing a heavy visual scrollbar.
   - the system logo can be configured from settings; uploaded images are resized into a square logo canvas without cropping wide logos.
@@ -103,6 +104,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Stale-tab update prompt branch passed targeted version-model tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Build output includes `dist/cmms-version.json` with the same short commit as the bundled UI.
   - Dashboard widget save-failure smoke guard is in progress on `codex/fix-dashboard-widget-prefs-smoke`; live `npm run staging:smoke:ui -- --expect-current-commit` passed on Vercel commit `47dda88`, including the stronger red-toast check.
   - Fleet import preview, controlled system-error smoke tooling, and AI-agent readiness docs passed locally on `codex/final-import-log-ai-followups`: targeted tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, live `npm run staging:smoke:system-errors`, and real attached workbook preview.
   - System error log and token refresh hardening passed targeted checks: `npm test -- --run tests/fleetLicenseImportModel.test.js tests/languageModel.test.js tests/apiStorageAdapter.test.js tests/storageAdapter.test.js tests/systemErrorsHandler.test.js tests/supabaseAuditDriver.test.js tests/vercelApiRouteModel.test.js`.
@@ -171,6 +173,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Stale-tab update prompt is in progress on `codex/add-stale-version-banner`.
+  - Vite now emits a public `cmms-version.json` manifest for every production build.
+  - The app compares the open tab's bundled commit to that manifest and shows a quiet refresh banner if Vercel has a newer build.
 - Save-failure diagnostics are complete in PR #443.
   - Staging data was cleared per owner command: app admin remains, shared KV/file metadata/audit/storage are empty.
   - Red shared-save failure reports now include safe browser context for later analysis in Settings > issue reports > system errors.
