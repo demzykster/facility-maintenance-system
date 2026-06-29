@@ -107,6 +107,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 - Playwright dev tooling is in progress.
   - `@playwright/test` is installed as a dev dependency, and local Chromium smoke can run from the project.
+  - Added `npm run staging:smoke:browser` for a no-secret browser smoke of the public login screen.
   - Post-PR #396 public Vercel smoke passed with `failedCount=0`, `unauthKvCount=0`, and no relevant console errors on the login screen.
   - `npm run staging:gate` passed for public Vercel commit `31a7d07`.
 - Local-only storage key polish is in progress after PR #395.
