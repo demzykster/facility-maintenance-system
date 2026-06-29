@@ -89,6 +89,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `npm run staging:gate` includes `npm run staging:data:summary`, so every final staging gate shows table counts, KV key prefixes, and storage totals without printing record contents, secrets, or file paths.
   - owner cleanup command was given after the fleet/import checks. Current staging should stay empty except the admin user: latest cleanup summary showed `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`, and zero storage files.
   - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default. Red shared-save failure events include safe browser context (`online`, `visibilityState`, `focused`, `viewport`, `errorId`) to diagnose intermittent owner-visible banners.
+  - mobile profile and internal issue-report modals should render as a single card with no blank side shell; mobile module navigation should stay in the bottom horizontal nav, not return to a top select.
   - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
   - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
   - fleet Excel import preview must block duplicate chassis/source identifiers inside the same workbook before save; the supplied `מעקב רישיונות_ 06.07.23.xlsx` preview found `total=128`, `ready=126`, `invalid=2` for duplicate `פסולתון` rows 127-128.
@@ -169,9 +170,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
-- Save-failure diagnostics are in progress on `codex/harden-save-failure-diagnostics`.
+- Save-failure diagnostics are complete in PR #443.
   - Staging data was cleared per owner command: app admin remains, shared KV/file metadata/audit/storage are empty.
   - Red shared-save failure reports now include safe browser context for later analysis in Settings > issue reports > system errors.
+- Mobile nav/profile polish is in progress on `codex/mobile-nav-profile-polish`.
+  - Profile and internal issue-report overlay shells are constrained to the actual modal card to prevent the blank side panel seen on wide/mobile browser layouts.
+  - Mobile bottom navigation regression smoke now fails if the old top module select returns, if long module lists are not scrollable, or if the profile/issue modal shell is wider than its visible card.
 - Staging gate data-awareness is in progress on `codex/include-data-summary-in-gate`.
   - Adds the read-only staging data summary step into the combined `npm run staging:gate` sequence.
 - Staging data summary is in progress on `codex/staging-data-summary`.
