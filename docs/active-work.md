@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/final-pilot-localization-push`
+### Active branch: none
 
-- Status: final pilot hardening is in progress. Empty staging is clean except the owner admin user; owner manual checks #1 and #4 are owner-closed; backup/restore remains owner-closed unless new evidence says otherwise.
+- Status: main is clean after PR #448. Empty staging is clean except the owner admin user; owner manual checks #1 and #4 are owner-closed; backup/restore remains owner-closed unless new evidence says otherwise.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -174,12 +174,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
-- Final pilot localization and phone-push hardening is in progress on `codex/final-pilot-localization-push`.
+- Final pilot localization and phone-push hardening is complete in PR #448.
   - Staging data summary confirmed the owner-facing database is empty except one admin user, with no KV records, file metadata, audit rows, or storage files.
   - Real fleet import preview against the supplied `מעקב רישיונות_ 06.07.23.xlsx` is closed for now: the preview reads only `רישיונות`, found `total=128`, `ready=126`, and correctly blocked duplicate chassis/source identifier `פסולתון` in rows 127-128 before any write.
-  - PWA phone push code has been added locally and Vercel Production env received VAPID contact/public/private settings; a new deployment is required before the live `/api/push` route can be tested.
-  - First localization shell has been added locally for login, public QR reporting, worker, cleaner, and phone-push labels using the agreed languages `he/en/ar/hi/ti`; admin module records remain Hebrew-first for v1.
-  - Validation so far: targeted localization/push tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run staging:vercel-env` passed, `npm run build` passed, and local Playwright smoke confirmed localized public QR flow, admin login to the empty-state dashboard, no horizontal overflow, no red save-failure toast, and no console errors.
+  - PWA phone push code is deployed and Vercel Production env has VAPID contact/public/private settings. Live `/api/push` returns enabled with a public key.
+  - First localization shell is deployed for login, public QR reporting, worker, cleaner, and phone-push labels using the agreed languages `he/en/ar/hi/ti`; admin module records remain Hebrew-first for v1.
+  - Validation: targeted localization/push tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run staging:vercel-env` passed, `npm run build` passed, local Playwright smoke confirmed localized public QR flow and admin login to the empty-state dashboard, live `/api/push` enabled check passed, and `npm run staging:gate` passed on deployed commit `92e3919`.
 - Stale-tab update prompt is complete in PR #446.
   - Vite now emits a public `cmms-version.json` manifest for every production build.
   - The app compares the open tab's bundled commit to that manifest and shows a quiet refresh banner if Vercel has a newer build.
