@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: clean after PR #409; Supabase Pro managed backup is now visible from CLI, but restore drill still needs a separate restore target.
-- Latest synchronized `main`: after PR #409 (`3d258e6`). Public production alias is healthy.
+- Status: clean after PR #410; Supabase Pro backup and separate-target restore drill are complete.
+- Latest synchronized `main`: after PR #410 (`e6ab285`). Public production alias is healthy.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -68,10 +68,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
 - Current launch blockers:
-  - finish the non-automated launch gate: perform one restore drill against a separate restore target. Supabase Pro managed database backups are now visible, but the drill is not complete until restored data, auth, file metadata, file bytes, and audit trail are verified.
-  - before true production, revoke the temporary Supabase access token created for restore-drill work.
+  - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
-  - Supabase Pro backup check passed: `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`). Fresh local evidence snapshot `.tools/staging-backup-evidence-2026-06-29T09-24-12-434Z.json` captured `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, `storageFiles=0`; `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed.
+  - Supabase Pro backup and restore drill passed. `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`). A temporary restore target (`cmms-cdsl-restore-drill-full-20260629094512`, ref `aakzttnqotmemukyejys`) was created, migrations were applied, one admin/Auth user, `app_users`, `file_metadata`, `audit_events`, and a real `cmms-files` storage object were restored and verified. Restored file SHA-256 matched the source. The temporary target was deleted, secret restore credentials were removed, and only sanitized local evidence remains in `.tools/restore-drill-evidence-2026-06-29T09-48-16-539Z.json`. Final source cleanup evidence `.tools/staging-backup-evidence-2026-06-29T09-48-45-484Z.json` shows `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, `storageFiles=0`; `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed.
   - Client shared-save failure logging merged in PR #404 after the Vercel Pro upgrade removed the build-rate-limit blocker. Vercel passed, and strict live smoke passed for deployed commit `89455f2`.
   - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for the deployed `main` runtime: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
   - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
@@ -95,8 +94,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Strict live staging smoke passed after latest redeploy: public Vercel serves commit `792d576`, bootstrap is closed, admin auth/session works, KV read works, file metadata boundary works, required Supabase tables are reachable, and `cmms-files` is private.
   - Backup/restore evidence capture is merged in PR #388. `npm run staging:backup:evidence` writes a local ignored `.tools/staging-backup-evidence-*.json` snapshot of the four staging tables and `cmms-files` inventory.
   - `npm run staging:gate` is merged in PR #390 as the combined non-destructive staging gate. It runs local env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke.
-  - Supabase CLI platform access is now authenticated with a temporary local access token for restore-drill work. The token is stored outside git and should be revoked after the drill.
-  - Supabase CLI confirms project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`) is visible, but `supabase backups list` reports no physical backups and `pitr_enabled=false`; Supabase dashboard states Free plan does not include project backups.
+  - The temporary local Supabase access-token copy used for restore-drill work was removed from `.tools/`; Supabase CLI platform access still works without that local file.
+  - Supabase CLI confirms project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`) is visible; Supabase Pro managed database backup is enabled with `walg_enabled=true`, one completed physical backup, and `pitr_enabled=false`.
   - Owner-facing staging cleanup is complete: only admin `vadim@chemipal.co.il` remains, admin password is temporarily `123456`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`, and `cmms-files` has no files.
   - Final cleanup evidence file is local-only: `.tools/staging-backup-evidence-2026-06-29T04-34-25-956Z.json`.
   - Read-only UI smoke passed on public Vercel after cleanup: login as admin with the temporary password reached the app shell, `יציאה` was visible, smoke/demo records were not visible, and logout returned to login. Console showed pre-auth 401/init errors before login; keep as non-blocking polish follow-up.

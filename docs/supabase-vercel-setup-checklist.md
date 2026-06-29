@@ -157,7 +157,9 @@ Minimum path:
 
 Follow `docs/supabase-backup-restore-drill.md`.
 
-The pilot is not ready until restore is tested against a separate restore target and the restored app can:
+Status: complete for the current empty staging/pilot scope. On 2026-06-29 a temporary restore target was created, verified, and deleted after the drill.
+
+The restore drill must prove that a separate restore target can:
 
 - login;
 - load restored tickets;

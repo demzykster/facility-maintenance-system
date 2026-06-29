@@ -1,6 +1,6 @@
 # Supabase Backup And Restore Drill
 
-This is a release gate for the first empty staging/pilot build. It is not complete until one restore has actually been tested.
+This is a release gate for the first empty staging/pilot build. It is complete for the current empty staging scope.
 
 ## Scope
 
@@ -21,7 +21,7 @@ Current staging note:
 
 - Supabase CLI is connected to project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`).
 - Supabase Pro managed database backup is enabled: `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`).
-- The backup/restore gate is still not complete until one restore has been tested against a separate restore target.
+- The backup/restore gate was completed against a separate temporary restore target on 2026-06-29.
 - Supabase managed database backups cover Postgres data. Storage object bytes in `cmms-files` must be verified separately during the drill; the database backup can prove `file_metadata`, but not the actual file bytes by itself.
 
 ## Drill
@@ -48,11 +48,16 @@ Current staging note:
    - audit records exist in `audit_events`;
    - login still works against the restored project after env points to the restore target.
 
-Current evidence snapshot:
+Completed drill evidence:
 
-- `.tools/staging-backup-evidence-2026-06-29T09-24-12-434Z.json` captured source staging with `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, and `storageFiles=0`.
-- `npm run staging:supabase-schema` passed against source staging.
-- `npm run staging:smoke:live` passed against the public staging URL.
+- Temporary restore target: `cmms-cdsl-restore-drill-full-20260629094512` (`aakzttnqotmemukyejys`).
+- Source drill snapshot captured `app_users=1`, `cmms_kv_records=0`, `file_metadata=1`, `audit_events=54`, and `storageFiles=1`; the raw snapshot was removed after sanitized evidence was written.
+- Restored and verified: admin Auth login, RLS profile visibility, `app_users`, `file_metadata`, `audit_events`, private `cmms-files` bucket, and one restored storage object.
+- Restored file SHA-256 matched the source probe: `d32743ea6a99ea7a6c58a244aec48f98eddc0645f9e0e45af625d8e529fb9595`.
+- Temporary restore target was deleted after verification.
+- Secret restore credentials were removed. Sanitized local evidence remains in `.tools/restore-drill-evidence-2026-06-29T09-48-16-539Z.json`.
+- Final source cleanup snapshot: `.tools/staging-backup-evidence-2026-06-29T09-48-45-484Z.json` shows `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, and `storageFiles=0`.
+- `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed against source staging after cleanup.
 
 ## Pass Criteria
 
