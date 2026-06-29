@@ -14,7 +14,7 @@ import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
-import { NOTIFICATION_ACCESS_GROUPS, normalizeNotificationPrefs, notificationAllowedByAccess } from "./notificationAccessModel.js";
+import { NOTIFICATION_ACCESS_GROUPS, normalizeNotificationPrefs, notificationAccessRows } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
@@ -6522,9 +6522,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
   const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
   const candidateUser = useMemo(() => ({ ...user, role, perms, permissions: perms, notificationPrefs }), [user, role, perms, notificationPrefs]);
-  const availableNotificationGroups = NOTIFICATION_ACCESS_GROUPS.filter((group) => notificationAllowedByAccess(candidateUser, group.kind));
-  const disabledNotificationLabels = availableNotificationGroups.filter((group) => notificationPrefs.enabled[group.kind] === false).map((group) => group.label);
-  const notificationSummary = disabledNotificationLabels.length ? `${disabledNotificationLabels.length} כבויות` : "כל הזמינות פעילות";
+  const notificationRows = notificationAccessRows(candidateUser, NOTIFICATION_ACCESS_GROUPS);
+  const availableNotificationGroups = notificationRows.filter((group) => group.allowed);
+  const blockedNotificationCount = notificationRows.length - availableNotificationGroups.length;
+  const disabledNotificationLabels = notificationRows.filter((group) => group.explicitlyDisabled).map((group) => group.label);
+  const notificationSummary = disabledNotificationLabels.length ? `${disabledNotificationLabels.length} כבויות` : (blockedNotificationCount ? `${availableNotificationGroups.length} זמינות · ${blockedNotificationCount} חסומות` : "כל הזמינות פעילות");
   const setNotificationKind = (kind, enabled) => setNotificationPrefs((prefs) => ({ enabled: { ...prefs.enabled, [kind]: enabled } }));
   const changeRole = (nextRole) => {
     setRole(nextRole);
@@ -6546,7 +6548,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
-    const nextPerms = role === "user" ? cleanPerms(perms) : cleanPerms(user.perms);
+    const nextPerms = role === "admin" ? {} : cleanPerms(perms);
     const nextNotificationPrefs = normalizeNotificationPrefs(notificationPrefs);
     onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), phone: phone.trim(), role,
       email: (role === "tech" || role === "worker" || role === "cleaner") ? "" : email.trim().toLowerCase(), password: (role === "tech" || role === "worker" || role === "cleaner") ? "" : password,
@@ -6577,11 +6579,12 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
-          <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
-            <div className="hint">התפקיד קובע את הגישה הבסיסית. אם אותו אדם מחזיק כמה תחומי אחריות, מוסיפים כאן הרשאות מודול לפי הצורך במקום ליצור תפקיד חדש.</div>
-            {USER_PERMISSION_MODULES.map((m) => <PermSelect key={m.mod} {...m} />)}
-            <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
-          </details></div>)}
+        </div>)}
+      {role !== "admin" && <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
+        <div className="hint">התפקיד קובע את הגישה הבסיסית. אם אותו אדם מחזיק כמה תחומי אחריות, מוסיפים כאן הרשאות מודול לפי הצורך במקום ליצור תפקיד חדש.</div>
+        {USER_PERMISSION_MODULES.map((m) => <PermSelect key={m.mod} {...m} />)}
+        <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
+      </details>}
       {role === "user" && zones && (zones.length === 0
         ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
         : <div className="field"><span>אזורי ניקיון של המחלקה (המנהל יראה את מצב הניקיון והדיווחים בהם)</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (mgrZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z.id)} onChange={() => setMgrZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div></div>)}
@@ -6589,11 +6592,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון. הגדירו אזורים תחת «ניקיון».</div>
         : <div className="field"><span>אזורי הניקיון באחריותו</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (cleanZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={cleanZones.includes(z.id)} onChange={() => setCleanZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div><div className="hint">אותה הגדרה כמו «עובד אחראי» בעריכת האזור — נשמרת לשני הכיוונים. אזור משויך לעובד אחד.</div></div>)}
       <details className="perm-fold notify-pref-fold"><summary><span>התראות למשתמש</span><span className="perm-summary">{notificationSummary}</span></summary>
-        <div className="hint">הסוגים כאן מסוננים לפי התפקיד וההרשאות של המשתמש. כיבוי סוג ימנע גם התראת טלפון לאותו משתמש.</div>
-        <div className="notify-pref-grid">{availableNotificationGroups.map((group) => <label key={group.kind} className="notify-pref-row">
-          <input type="checkbox" checked={notificationPrefs.enabled[group.kind] !== false} onChange={(e) => setNotificationKind(group.kind, e.target.checked)} />
+        <div className="hint">הסוגים כאן מחוברים לתפקיד ולהרשאות המודולים. סוג חסום לא יישלח גם אם יש למכשיר הרשאת Push.</div>
+        <div className="notify-pref-grid">{notificationRows.map((group) => <label key={group.kind} className={"notify-pref-row" + (!group.allowed ? " off" : "")}>
+          <input type="checkbox" disabled={!group.allowed} checked={group.allowed && notificationPrefs.enabled[group.kind] !== false} onChange={(e) => setNotificationKind(group.kind, e.target.checked)} />
           <span className={"ni-dot " + group.kind} />
-          <span>{group.label}</span>
+          <span>{group.label}{!group.allowed && <em> · חסום</em>}</span>
         </label>)}</div>
       </details>
       {role === "worker" && (lockDept
@@ -8249,6 +8252,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .notify-pref-row{display:flex;align-items:center;gap:7px;min-height:34px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:7px 9px;font-size:12.5px;font-weight:700;cursor:pointer;}
 .notify-pref-row input{margin:0;flex-shrink:0;}
 .notify-pref-row .ni-dot{position:static;flex-shrink:0;}
+.notify-pref-row.off{opacity:.58;cursor:not-allowed;}
+.notify-pref-row.off em{font-style:normal;color:var(--muted);font-weight:600;}
 .shift-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:14px;}
 .shift-info{display:flex;align-items:center;gap:9px;}
 .shift-stat{font-weight:700;font-size:14px;}

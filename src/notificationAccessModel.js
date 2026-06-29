@@ -80,3 +80,19 @@ export function notificationEnabledForUser(user = {}, kind = "system") {
   if (Object.prototype.hasOwnProperty.call(prefs.enabled, kind)) return prefs.enabled[kind] === true;
   return true;
 }
+
+export function notificationAccessRows(user = {}, groups = NOTIFICATION_ACCESS_GROUPS) {
+  const prefs = notificationPrefsFromUser(user);
+  return groups.map((group) => {
+    const allowed = notificationAllowedByAccess(user, group.kind);
+    const explicit = Object.prototype.hasOwnProperty.call(prefs.enabled, group.kind);
+    const enabled = allowed && (!explicit || prefs.enabled[group.kind] === true);
+    return {
+      ...group,
+      allowed,
+      enabled,
+      explicitlyDisabled: allowed && explicit && prefs.enabled[group.kind] === false,
+      blockedReason: allowed ? "" : "אין גישה למודול המתאים"
+    };
+  });
+}

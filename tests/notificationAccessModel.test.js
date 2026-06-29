@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  notificationAccessRows,
   notificationAllowedByAccess,
   notificationEnabledForUser,
   normalizeNotificationPrefs
@@ -30,5 +31,21 @@ describe("notification access model", () => {
     expect(normalizeNotificationPrefs({ enabled: { cleaning: false, unknown: false, ppe: "no" } })).toEqual({
       enabled: { cleaning: false }
     });
+  });
+
+  it("builds a visible matrix of allowed, disabled, and blocked notification rows", () => {
+    const rows = notificationAccessRows({
+      role: "worker",
+      perms: { ppe: "request" },
+      notificationPrefs: { enabled: { ppe: false } }
+    });
+
+    const ppe = rows.find((row) => row.kind === "ppe");
+    const sla = rows.find((row) => row.kind === "sla");
+    const task = rows.find((row) => row.kind === "task");
+
+    expect(ppe).toMatchObject({ allowed: true, enabled: false, explicitlyDisabled: true });
+    expect(sla).toMatchObject({ allowed: false, enabled: false, blockedReason: "אין גישה למודול המתאים" });
+    expect(task).toMatchObject({ allowed: true, enabled: true, explicitlyDisabled: false });
   });
 });
