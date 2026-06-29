@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import {
+  CLEANING_QR_PARAM,
+  cleaningQrAccess,
+  cleaningQrUrl,
+  findScannedCleaningZone,
+  scannedCleaningZoneIdFromSearch
+} from "../src/cleaningQrModel.js";
+
+describe("cleaningQrModel", () => {
+  it("builds an app URL that carries only the cleaning zone id", () => {
+    const url = cleaningQrUrl({
+      origin: "https://cmms.example",
+      pathname: "/app",
+      zoneId: "zone-1"
+    });
+
+    expect(url).toBe(`https://cmms.example/app?${CLEANING_QR_PARAM}=zone-1`);
+  });
+
+  it("reads the scanned zone id from a QR URL", () => {
+    expect(scannedCleaningZoneIdFromSearch("?czone=zone-2&x=1")).toBe("zone-2");
+    expect(scannedCleaningZoneIdFromSearch("?x=1")).toBe("");
+  });
+
+  it("allows manual zone choice outside production", () => {
+    expect(cleaningQrAccess({ appMode: "demo", zoneId: "z1" })).toEqual({
+      allowed: true,
+      reason: "manual_allowed"
+    });
+  });
+
+  it("blocks production actions without a matching scanned QR zone", () => {
+    expect(cleaningQrAccess({ appMode: "production", zoneId: "z1" })).toEqual({
+      allowed: false,
+      reason: "scan_required"
+    });
+    expect(cleaningQrAccess({ appMode: "production", zoneId: "z1", scannedZoneId: "z2" })).toEqual({
+      allowed: false,
+      reason: "wrong_zone"
+    });
+    expect(cleaningQrAccess({ appMode: "production", zoneId: "z1", scannedZoneId: "z1" })).toEqual({
+      allowed: true,
+      reason: "scan_matched"
+    });
+  });
+
+  it("ignores inactive or unknown scanned zones", () => {
+    const zones = [{ id: "a", active: true }, { id: "b", active: false }];
+    expect(findScannedCleaningZone(zones, "a")).toEqual(zones[0]);
+    expect(findScannedCleaningZone(zones, "b")).toBeNull();
+    expect(findScannedCleaningZone(zones, "c")).toBeNull();
+  });
+});

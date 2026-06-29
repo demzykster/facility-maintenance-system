@@ -67,7 +67,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - the user-profile contact PR added `app_users.phone`; the staging Supabase migration has been applied and verified with a direct `select=id,phone` REST check.
   - future worker/cleaner/public-report localization should use Hebrew as the source language and support `he`, `en`, `ar`, `hi`, and `ti` (Tigrinya); this is a controlled UI dictionary direction, not browser auto-translation of business records.
   - logged-in desktop users can report internal app issues from the sidebar version area; reports are stored as `appIssue:` KV records, included in backup/restore, and managed from settings as a product-quality journal, not as maintenance tickets.
+  - logged-in users must also be able to report internal app issues from mobile/topbar shells where the desktop sidebar is hidden, including worker and cleaner views.
   - the internal app-issue report modal should render as one compact centered panel, without a wider empty overlay shell beside it.
+  - production cleaning-area QR codes open CMMS with the specific cleaning zone id; public anonymous cleaning reports, manager cleaning reports, and cleaner round start actions must require that matching scanned zone in production. Demo/test may keep manual zone selection for workflow testing.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
@@ -86,6 +88,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
   - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
+  - Mobile app-issue and cleaning QR gate branch passed locally: `npm test -- --run tests/cleaningQrModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for mobile admin app-issue button opening the report modal, and production-mode public report opening without manual zone buttons when no QR zone is available.
   - Localization language-model foundation passed locally: `npm test -- --run tests/languageModel.test.js` confirms Hebrew fallback, supported language codes/names, locale normalization, and RTL/LTR direction.
   - Login footer polish passed locally in production-mode at 430px width: footer rendered as two lines (`פותח על ידי ...` and `גרסה v...`) without overflow or relevant console errors. `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
   - User profile/contact branch passed locally: `npm test -- --run tests/profileHandler.test.js tests/changePasswordHandler.test.js tests/sessionHandler.test.js tests/productionLoginAdapter.test.js tests/vercelApiRouteModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for demo login opening the profile modal and production-mode mobile login footer rendering as two contained lines.
@@ -146,6 +149,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 ## Latest Completed Work
 
 - Final pilot UI smoke/polish is in progress.
+  - Mobile/topbar app-issue reporting and production cleaning QR gates are in progress on `codex/mobile-issue-qr-gates`.
+  - The intended behavior is: desktop sidebar, mobile topbars, worker shell, and cleaner shell all expose app-issue reporting; production cleaning reports/rounds cannot be started by manually choosing a zone without a matching QR zone URL.
   - Live Vercel login smoke passed on the current production URL with no alert toast or API/console errors during the checked window.
   - Local visual smoke passed after the polish changes: no horizontal overflow on home/analytics/settings, the internal app-issue report modal shell matches the panel width, and wide logo upload renders as a 512x512 contained logo preview.
   - Owner-facing staging cleanup was refreshed after smoke: only `config:v1` remains in KV and `audit_events=0`; no tickets, files, cleaning zones, or internal issue-report smoke records remain.
