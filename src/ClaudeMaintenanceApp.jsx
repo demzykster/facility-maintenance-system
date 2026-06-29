@@ -55,6 +55,11 @@ const APP_BUILD_TIME = typeof __CMMS_BUILD_TIME__ !== "undefined" ? __CMMS_BUILD
 
 /* ---------- domain ---------- */
 const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
+const localizedUiLabel = (language, key, fallback) => {
+  const value = uiText(language || DEFAULT_LANGUAGE, key);
+  return value && value !== key ? value : fallback;
+};
+const roleLabelFor = (role, language = DEFAULT_LANGUAGE) => localizedUiLabel(language, `role.${role}`, ROLE_LABEL[role] || role || "");
 const APP_MODE = appModeFromEnv(import.meta.env);
 const SEED_POLICY = seedPolicyForMode(APP_MODE);
 const AI_MODE = aiModeFromEnv(import.meta.env, APP_MODE);
@@ -1926,9 +1931,9 @@ function WorkerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{workerTitle}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
+      <div className="worker-top-actions"><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
     </div>
-    {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
+    {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} language={language} /></div>}
     <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> {t("worker.newTab")}</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> {t("worker.mineTab")}{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> {t("worker.ppeTab")}{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> {t("worker.activityTab")}</button></div>
     <div className="worker-body">
       {toSign.length > 0 && view !== "ppe" && <button type="button" onClick={() => setView("ppe")} style={{ width: "100%", textAlign: "start", display: "flex", alignItems: "center", gap: 10, background: "#B91C1C", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px", marginBottom: 12, cursor: "pointer", boxShadow: "0 2px 10px rgba(185,28,28,0.35)" }}><PenLine size={22} /><div style={{ flex: 1 }}><div style={{ fontWeight: 800, fontSize: 15 }}>יש לך {toSign.length === 1 ? "מסמך" : `${toSign.length} מסמכים`} לחתימה</div><div style={{ fontSize: 12.5, opacity: 0.92 }}>לחצו לצפייה ולחתימה על קבלת הציוד</div></div><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button>}
@@ -1955,8 +1960,8 @@ function WorkerApp(p) {
         </>}
         {!track && err && <div className="err">{err}</div>}
         <div style={{ height: 24 }} />
-      </>) : view === "ppe" ? (<PpeMyView ppe={p.ppe} items={p.ppeItems} norms={p.ppeNorms} session={session} reqs={p.ppeReqs} savePpeReq={p.savePpeReq} config={p.config} />) : view === "activity" ? (
-        <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={(id) => { const t = tickets.find((x) => x.id === id); if (t) setOpen(t); }} />
+      </>) : view === "ppe" ? (<PpeMyView ppe={p.ppe} items={p.ppeItems} norms={p.ppeNorms} session={session} reqs={p.ppeReqs} savePpeReq={p.savePpeReq} config={p.config} language={language} />) : view === "activity" ? (
+        <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} language={language} onOpenTicket={(id) => { const t = tickets.find((x) => x.id === id); if (t) setOpen(t); }} />
       ) : (<>
         {myReports.length === 0 ? <Empty text="עדיין לא דיווחת" Icon={ListChecks} sub="פתחו דיווח חדש בלשונית «דיווח חדש»" /> : <div className="cards">{myReports.map((t) => { const s = stOf(t.status); const tr = TRACKS[t.track] || TRACKS.facility; return <button key={t.id} className="wk-card" onClick={() => setOpen(t)}><div className="wk-card-top"><span className="wk-card-subj">{t.subject}</span><span className="badge sm" style={{ background: s.bg, color: s.color }}>{s.label}</span></div><div className="wk-card-sub"><tr.Icon size={13} /> {tr.short} · {fmtDate(t.createdAt)}</div></button>; })}</div>}
         <div style={{ height: 24 }} />
@@ -2407,7 +2412,8 @@ function TicketHistory({ ticket, onClose, onOpen }) {
     </div>
   </div>);
 }
-function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket }) {
+function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket, language = DEFAULT_LANGUAGE }) {
+  const t = (key, vars) => uiText(language, key, vars);
   const [period, setPeriod] = useState("30"), [kind, setKind] = useState("all"), [who, setWho] = useState("all"), [role, setRole] = useState("all"), [track, setTrack] = useState("all"), [dept, setDept] = useState("all"), [q, setQ] = useState(""), [mine, setMine] = useState(false);
   const [hist, setHist] = useState(null), [repHtml, setRepHtml] = useState(null);
   const entries = useMemo(() => {
@@ -2435,7 +2441,9 @@ function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket }) {
   filtered.forEach((e) => { const dk = fmtDate(e.at); if (!cur || cur.day !== dk) { cur = { day: dk, items: [] }; groups.push(cur); } cur.items.push(e); });
   const hasFilter = period !== "30" || kind !== "all" || who !== "all" || role !== "all" || track !== "all" || dept !== "all" || q.trim();
   const reset = () => { setPeriod("30"); setKind("all"); setWho("all"); setRole("all"); setTrack("all"); setDept("all"); setQ(""); };
-  const Sel = ({ label, value, onChange, children }) => (<label className="flt-field"><span className="flt-lbl">{label}</span><select value={value} onChange={(e) => onChange(e.target.value)}><option value="all">הכל</option>{children}</select></label>);
+  const kindLabel = (id) => localizedUiLabel(language, `audit.kind.${id}`, logKindMeta(id).label);
+  const roleLabel = (id) => roleLabelFor(id, language);
+  const Sel = ({ label, value, onChange, children }) => (<label className="flt-field"><span className="flt-lbl">{label}</span><select value={value} onChange={(e) => onChange(e.target.value)}><option value="all">{t("audit.all")}</option>{children}</select></label>);
   const exportXlsx = () => {
     const rows = filtered.map((e) => ({ "תאריך": fmtDate(e.at), "שעה": fmtTime(e.at), "קריאה": e.no, "פעולה": logKindMeta(e.kind).label, "תיאור": e.text, "מבצע": e.by, "תפקיד": ROLE_LABEL[e.byRole] || e.byRole || "", "כלי/ציוד": e.asset, "מחלקה": e.depts.join(", "), "מסלול": e.track === "transport" ? "שינוע" : "אחזקה" }));
     if (!rows.length) return;
@@ -2447,30 +2455,30 @@ function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket }) {
     return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>יומן פעילות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right}th{background:#F4F6F9}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}יומן פעילות</h2><div class="sub">${filtered.length} פעולות · ${fmtDate(Date.now())}</div><table><tr><th>מתי</th><th>קריאה</th><th>פעולה</th><th>תיאור</th><th>מבצע</th><th>תפקיד</th><th>כלי</th></tr>${rh}</table></body></html>`;
   };
   return (<>
-    <SectionTitle><Clock size={15} /> יומן פעילות</SectionTitle>
-    <div className="hint" style={{ marginBottom: 10 }}>תיעוד כרונולוגי של פעולות על קריאות. הקליקו על שורה לצפייה בכל היסטוריית הקריאה.</div>
-    {session.role !== "admin" && <div className="seg-tabs s2" style={{ maxWidth: 320, marginBottom: 10 }}><button className={!mine ? "on" : ""} onClick={() => setMine(false)}>כל הפעילות</button><button className={mine ? "on" : ""} onClick={() => setMine(true)}>הפעולות שלי</button></div>}
-    <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש ביומן פעילות לפי מספר קריאה, טקסט או מבצע" placeholder="חיפוש לפי מספר קריאה, טקסט, מבצע…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <SectionTitle><Clock size={15} /> {t("audit.title")}</SectionTitle>
+    <div className="hint" style={{ marginBottom: 10 }}>{t("audit.hint")}</div>
+    {session.role !== "admin" && <div className="seg-tabs s2" style={{ maxWidth: 320, marginBottom: 10 }}><button className={!mine ? "on" : ""} onClick={() => setMine(false)}>{t("audit.allActivity")}</button><button className={mine ? "on" : ""} onClick={() => setMine(true)}>{t("audit.myActivity")}</button></div>}
+    <div className="search-wrap"><Search size={18} /><input aria-label={t("audit.searchAria")} placeholder={t("audit.searchPlaceholder")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
-      <Sel label="תקופה" value={period} onChange={setPeriod}><option value="7">7 ימים</option><option value="30">30 ימים</option><option value="90">90 ימים</option><option value="365">שנה</option></Sel>
-      <Sel label="פעולה" value={kind} onChange={setKind}>{LOG_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}<option value="other">אחר</option></Sel>
-      <Sel label="מבצע" value={who} onChange={setWho}>{whoOpts.map((w) => <option key={w}>{w}</option>)}</Sel>
-      <Sel label="תפקיד" value={role} onChange={setRole}>{roleOpts.map((r) => <option key={r} value={r}>{ROLE_LABEL[r] || r}</option>)}</Sel>
-      <Sel label="מסלול" value={track} onChange={setTrack}><option value="transport">שינוע</option><option value="facility">אחזקה</option></Sel>
-      <Sel label="מחלקה" value={dept} onChange={setDept}>{(config.departments || []).map((d) => <option key={d}>{d}</option>)}</Sel>
+      <Sel label={t("audit.period")} value={period} onChange={setPeriod}><option value="7">{t("audit.days7")}</option><option value="30">{t("audit.days30")}</option><option value="90">{t("audit.days90")}</option><option value="365">{t("audit.year")}</option></Sel>
+      <Sel label={t("audit.action")} value={kind} onChange={setKind}>{LOG_KINDS.map((k) => <option key={k.id} value={k.id}>{kindLabel(k.id)}</option>)}<option value="other">{t("audit.other")}</option></Sel>
+      <Sel label={t("audit.actor")} value={who} onChange={setWho}>{whoOpts.map((w) => <option key={w}>{w}</option>)}</Sel>
+      <Sel label={t("audit.role")} value={role} onChange={setRole}>{roleOpts.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}</Sel>
+      <Sel label={t("audit.track")} value={track} onChange={setTrack}><option value="transport">{t("audit.transport")}</option><option value="facility">{t("audit.facility")}</option></Sel>
+      <Sel label={t("audit.department")} value={dept} onChange={setDept}>{(config.departments || []).map((d) => <option key={d}>{d}</option>)}</Sel>
     </div>
     <div className="fleet-results-bar">
-      <span className="fleet-count">{filtered.length} פעולות{filtered.length !== entries.length ? ` מתוך ${entries.length}` : ""}</span>
-      {hasFilter && <button className="repeat-link" onClick={reset}>נקה פילטרים</button>}
+      <span className="fleet-count">{filtered.length !== entries.length ? t("audit.countOf", { count: filtered.length, total: entries.length }) : t("audit.count", { count: filtered.length })}</span>
+      {hasFilter && <button className="repeat-link" onClick={reset}>{t("audit.clearFilters")}</button>}
     </div>
     {session.role === "admin" && <div className="export-bar" style={{ marginBottom: 10 }}><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={() => setRepHtml(buildHtml())}><Printer size={15} /> דוח / הדפסה</button></div>}
-    {groups.length === 0 ? <Empty text="אין פעילות מתאימה לפילטר" Icon={Search} sub="נסו להרחיב את התקופה או לנקות פילטרים" /> : groups.map((g) => <div key={g.day} style={{ marginBottom: 4 }}>
+    {groups.length === 0 ? <Empty text={t("audit.noMatches")} Icon={Search} sub={t("audit.noMatchesSub")} /> : groups.map((g) => <div key={g.day} style={{ marginBottom: 4 }}>
       <div className="audit-day">{g.day}</div>
       <div className="cards">{g.items.map((e) => { const k = logKindMeta(e.kind); return <button key={e.key} className={"audit-row" + (e.ticket ? " clk" : "")} onClick={() => e.ticket && setHist(e.ticket)}>
         <span className="audit-time">{fmtTime(e.at)}</span>
         <span className="audit-kdot" style={{ background: k.color }} />
-        <div className="audit-main"><div className="audit-text">{e.text}</div><div className="audit-meta">קריאה {e.no} · {e.by}{e.byRole ? " · " + (ROLE_LABEL[e.byRole] || e.byRole) : ""}{e.asset ? " · " + e.asset : ""}</div></div>
-        <span className="audit-kind" style={{ color: k.color, background: k.color + "18" }}>{k.label}</span>
+        <div className="audit-main"><div className="audit-text">{e.text}</div><div className="audit-meta">{t("audit.ticket")} {e.no} · {e.by}{e.byRole ? " · " + roleLabel(e.byRole) : ""}{e.asset ? " · " + e.asset : ""}</div></div>
+        <span className="audit-kind" style={{ color: k.color, background: k.color + "18" }}>{kindLabel(e.kind)}</span>
       </button>; })}</div>
     </div>)}
     {hist && <Overlay onClose={() => setHist(null)}><TicketHistory ticket={hist} onClose={() => setHist(null)} onOpen={onOpenTicket ? () => { const id = hist.id; setHist(null); onOpenTicket(id); } : null} /></Overlay>}
@@ -3188,9 +3196,9 @@ function CleanerApp(p) {
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{t("cleaner.title")}</div><div className="wk-sub">{session.name}</div></div>
-      <div style={{ display: "flex", gap: 8 }}><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title={t("common.notifications")} aria-label={t("common.notifications")}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
+      <div className="worker-top-actions"><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title={t("common.notifications")} aria-label={t("common.notifications")}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
     </div>
-    {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
+    {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} language={language} /></div>}
     <main className="content">
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
       {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>)}</div>}
@@ -4442,7 +4450,8 @@ function ArchiveWorkerCard({ worker, ppe, onClose, onRestore }) {
     </div></div>);
 }
 
-function PpeMyView({ ppe, items, norms, session, reqs, savePpeReq, config }) {
+function PpeMyView({ ppe, items, norms, session, reqs, savePpeReq, config, language = DEFAULT_LANGUAGE }) {
+  const t = (key, vars) => uiText(language, key, vars);
   const [signing, setSigning] = useState(null);
   const [wsig, setWsig] = useState("");
   const [rejMode, setRejMode] = useState(false);
@@ -4458,10 +4467,10 @@ function PpeMyView({ ppe, items, norms, session, reqs, savePpeReq, config }) {
   return (<div style={{ padding: 16 }}>
     {toSign.length > 0 && <div style={{ marginBottom: 14 }}>{toSign.map((r) => <div key={r.id} style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 12, padding: 14, marginBottom: 8 }}><div style={{ fontWeight: 800, marginBottom: 4 }}>מסמך הממתין לחתימתך</div><div style={{ fontSize: 13, color: "#92400E", marginBottom: 8 }}>{(r.lines || []).map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ")}</div><button className="btn-primary full" onClick={() => { setSigning(r); setWsig(""); setRejMode(false); setRejReason(""); }}><PenLine size={15} /> צפה וחתום</button></div>)}</div>}
     {signing && (() => { const w = { name: signing.workerName, workerNo: signing.workerNo, dept: signing.dept }; const dr = (signing.lines || []).map((l) => ({ itemName: l.itemName, size: l.size, qty: l.qty, category: l.category, workerCharge: l.workerCharge || 0, chargeReason: l.chargeReason || "", clawbackEligible: !!l.clawbackEligible, clawbackSnapshot: (typeof ppeClawbackTable === "function" ? ppeClawbackTable(config) : []) })); return <Overlay persistent onClose={() => setSigning(null)}><div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={() => setSigning(null)}><X size={22} /></button><div className="form-title">חתימה על קבלת ציוד</div></div><div className="body"><div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }} dangerouslySetInnerHTML={{ __html: ppeDocBody(dr, w, config) }} />{rejMode ? (<div style={{ marginTop: 12 }}><label className="field"><span>סיבת הסירוב</span><textarea value={rejReason} onChange={(e) => setRejReason(e.target.value)} placeholder="לא חובה" /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost" onClick={() => setRejMode(false)}>חזרה</button><button className="btn-danger full" onClick={() => { savePpeReq({ ...signing, status: "rejected", rejectReason: rejReason.trim(), rejectedByWorker: true, decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now() }); setSigning(null); }}>אישור סירוב</button></div></div>) : (<><SignaturePad value={wsig} onChange={setWsig} required={true} /><div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}><button className="btn-danger" onClick={() => setRejMode(true)}>סירוב לחתום</button><button className="btn-primary full" disabled={!wsig} onClick={() => { if (!wsig) return; savePpeReq({ ...signing, status: "pending", signature: wsig, workerSignedAt: Date.now(), awaitWorkerSign: false }); setSigning(null); }}><CheckCircle2 size={15} /> מאשר וחותם</button></div></>)}<div style={{ height: 20 }} /></div></div></Overlay>; })()}
-    <SectionTitle><PackageCheck size={15} /> הציוד שלי</SectionTitle>
-    {received.length === 0 ? <Empty text="טרם הונפק לך ציוד" Icon={PackageCheck} /> : <div className="task-list">{received.map((x) => <div key={x.id} className="task-row" style={{ borderInlineStartColor: "#0D9488" }}><div className="task-row-main"><div className="task-row-t">{x.itemName}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{x.qty > 1 ? ` ×${x.qty}` : ""}</div><div className="task-row-sub">{ppeCatLabel(x.category)} · {fmtDate(x.at)}</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: x.workerCharge > 0 ? "#B45309" : "#0D9488" }}>{x.workerCharge > 0 ? ils(x.workerCharge) : "חינם"}</span></div></div>)}</div>}
-    {owed > 0 && <div className="row-between" style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10, fontWeight: 700 }}><span>סה״כ לחיוב</span><span style={{ color: "#B45309" }}>{ils(owed)}</span></div>}
-    {missing.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>זכאות שטרם נוצלה</SectionTitle><div className="chips">{missing.map((it) => <span key={it.id} className="chip">{it.name}</span>)}</div></div>}
+    <SectionTitle><PackageCheck size={15} /> {t("ppe.myEquipment")}</SectionTitle>
+    {received.length === 0 ? <Empty text={t("ppe.noneIssued")} Icon={PackageCheck} /> : <div className="task-list">{received.map((x) => <div key={x.id} className="task-row" style={{ borderInlineStartColor: "#0D9488" }}><div className="task-row-main"><div className="task-row-t">{x.itemName}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{x.qty > 1 ? ` ×${x.qty}` : ""}</div><div className="task-row-sub">{ppeCatLabel(x.category)} · {fmtDate(x.at)}</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: x.workerCharge > 0 ? "#B45309" : "#0D9488" }}>{x.workerCharge > 0 ? ils(x.workerCharge) : t("ppe.free")}</span></div></div>)}</div>}
+    {owed > 0 && <div className="row-between" style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10, fontWeight: 700 }}><span>{t("ppe.totalCharge")}</span><span style={{ color: "#B45309" }}>{ils(owed)}</span></div>}
+    {missing.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>{t("ppe.unusedEntitlement")}</SectionTitle><div className="chips">{missing.map((it) => <span key={it.id} className="chip">{it.name}</span>)}</div></div>}
     <div style={{ height: 24 }} />
   </div>);
 }
@@ -7220,18 +7229,23 @@ function BrandMark({ logo, small = false }) {
   </div>;
 }
 
-function RolePreviewBox({ rolePreview }) {
+function RolePreviewBox({ rolePreview, language = DEFAULT_LANGUAGE }) {
   const [open, setOpen] = useState(false);
   if (!rolePreview) return null;
   const active = ROLE_PREVIEW_OPTIONS.find(([role]) => role === rolePreview.active);
   const ActiveIcon = active?.[2] || ShieldCheck;
+  const activeLabel = roleLabelFor(rolePreview.active, language);
   return <div className="role-preview">
-    <button className={"rp-toggle" + (open ? " on" : "")} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="פתיחת תצוגת תפקיד">
+    <button className={"rp-toggle" + (open ? " on" : "")} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={localizedUiLabel(language, "rolePreview.open", "פתיחת תצוגת תפקיד")}>
       <span className="rp-toggle-ic"><ActiveIcon size={17} /></span>
-      <span className="rp-toggle-txt"><b>תצוגת תפקיד</b><small>{active?.[1] || ROLE_LABEL[rolePreview.active] || rolePreview.active} · {rolePreview.realName}</small></span>
+      <span className="rp-toggle-txt"><b>{localizedUiLabel(language, "rolePreview.title", "תצוגת תפקיד")}</b><small>{activeLabel} · {rolePreview.realName}</small></span>
       <ChevronLeft size={15} className="rp-toggle-chev" />
     </button>
-    {open && <div className="rp-grid">{ROLE_PREVIEW_OPTIONS.map(([role, label, Icon]) => <button key={role} className={"rp-btn" + (rolePreview.active === role ? " on" : "")} title={`הצג כ-${label}`} aria-label={`הצג כ-${label}`} onClick={() => { rolePreview.onChange(role); setOpen(false); }}><Icon size={15} /><span>{label}</span></button>)}</div>}
+    {open && <div className="rp-grid">{ROLE_PREVIEW_OPTIONS.map(([role, label, Icon]) => {
+      const roleLabel = roleLabelFor(role, language) || label;
+      const title = localizedUiLabel(language, "rolePreview.showAs", "הצג כ-{role}").replace("{role}", roleLabel);
+      return <button key={role} className={"rp-btn" + (rolePreview.active === role ? " on" : "")} title={title} aria-label={title} onClick={() => { rolePreview.onChange(role); setOpen(false); }}><Icon size={15} /><span>{roleLabel}</span></button>;
+    })}</div>}
   </div>;
 }
 
@@ -8365,15 +8379,17 @@ button.notif-perm:hover{background:#D1FAE5;}
 .ymx-c{border-bottom:1px solid var(--line);padding:6px;min-width:54px;height:44px;cursor:pointer;}
 .ymx-chip{display:inline-flex;align-items:center;justify-content:center;width:40px;height:26px;border-radius:7px;border:1.5px solid;}
 .ymx-dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
-.worker-shell{min-height:100vh;background:var(--bg);max-width:560px;margin:0 auto;display:flex;flex-direction:column;}
-.worker-top{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 12px;background:var(--slate);color:#fff;}
+.worker-shell{min-height:100vh;background:var(--bg);width:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;overflow-x:hidden;}
+.worker-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 18px 12px;background:var(--slate);color:#fff;}
+.worker-top > div:first-child{min-width:0;flex:1;padding-top:2px;}
+.worker-top-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;max-width:100%;flex-wrap:wrap;}
 .worker-top .icon-btn{color:#fff;}.worker-top .icon-btn:hover{background:rgba(255,255,255,.14);}
 .worker-action-btn{min-height:38px;border:1px solid #ffffff1a;border-radius:999px;background:#ffffff10;color:#fff;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:800;cursor:pointer;}
 .worker-action-btn:hover{background:#ffffff1c;}
 .worker-preview{background:var(--slate);padding:0 16px 12px;}
 .worker-preview .role-preview{margin-top:0;}
-.wk-title{font-family:var(--font-head);font-weight:700;font-size:20px;}
-.wk-sub{color:#94A3B8;font-size:13px;margin-top:2px;}
+.wk-title{font-family:var(--font-head);font-weight:700;font-size:20px;line-height:1.16;overflow-wrap:anywhere;}
+.wk-sub{color:#94A3B8;font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
 .wk-tabs{display:flex;gap:8px;padding:12px 16px 0;background:var(--slate);}
 .wk-tabs button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border:none;border-radius:12px 12px 0 0;background:transparent;color:#94A3B8;font-weight:600;font-size:14px;cursor:pointer;}
 .wk-tabs button.on{background:var(--bg);color:var(--ink);}
@@ -8393,5 +8409,23 @@ button.notif-perm:hover{background:#D1FAE5;}
 .wk-view-desc{color:var(--ink);font-size:15px;line-height:1.5;white-space:pre-wrap;}
 .badge.sm{font-size:11px;padding:3px 9px;}
 .spinner.sm{width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:-2px;}
+@media(max-width:430px){
+  .worker-top{display:grid;grid-template-columns:1fr;gap:10px;padding:14px 12px 10px;}
+  .worker-top-actions{justify-content:space-between;width:100%;gap:6px;}
+  .worker-top .icon-btn{width:40px;height:40px;flex:0 0 40px;}
+  .worker-action-btn{min-height:40px;padding:0 10px;flex:0 0 auto;}
+  .language-picker.compact{min-width:96px;flex:1;}
+  .language-picker.compact select{width:100%;min-height:40px;}
+  .wk-title{font-size:19px;}
+  .worker-preview{padding:0 12px 10px;}
+  .wk-tabs{gap:6px;padding:10px 10px 0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-snap-type:x proximity;}
+  .wk-tabs::-webkit-scrollbar{display:none;}
+  .wk-tabs button{flex:0 0 108px;min-width:108px;min-height:58px;flex-direction:column;gap:4px;padding:9px 8px;font-size:12.5px;line-height:1.15;scroll-snap-align:center;}
+  .worker-body{padding:16px 12px 40px;}
+}
+@media(max-width:360px){
+  .wk-tabs button{flex-basis:96px;min-width:96px;}
+  .worker-action-btn span{display:none;}
+}
 `}</style>);
 }
