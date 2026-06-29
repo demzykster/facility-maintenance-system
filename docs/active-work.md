@@ -21,10 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/staging-gate-command`
+### Active branch: none
 
-- Status: adding one combined staging gate command for repeatable pre-pilot checks.
-- Latest synchronized `main`: after PR #389. Public Vercel staging has been redeployed from current `main` and strict live smoke passes for commit `3205634`.
+- Status: no product branch is active after PR #390.
+- Latest synchronized `main`: after PR #390. Public Vercel staging has been redeployed from current `main` and `npm run staging:gate` passes for commit `7367d2b`.
 - Open PRs: none.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -80,7 +80,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Strict live staging smoke passed after redeploy: public Vercel serves commit `46ccf95`, bootstrap is closed, admin auth/session works, KV read works, file metadata boundary works, required Supabase tables are reachable, and `cmms-files` is private.
   - Strict live staging smoke passed after latest redeploy: public Vercel serves commit `792d576`, bootstrap is closed, admin auth/session works, KV read works, file metadata boundary works, required Supabase tables are reachable, and `cmms-files` is private.
   - Backup/restore evidence capture is merged in PR #388. `npm run staging:backup:evidence` writes a local ignored `.tools/staging-backup-evidence-*.json` snapshot of the four staging tables and `cmms-files` inventory.
-  - `npm run staging:gate` is being added as the combined non-destructive staging gate. It should run local env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke.
+  - `npm run staging:gate` is merged in PR #390 as the combined non-destructive staging gate. It runs local env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke.
   - Supabase CLI platform access is not authenticated (`LegacyPlatformAuthRequiredError`), so configuring daily platform backups and restoring into a separate target remains a manual/external launch gate.
   - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
@@ -101,6 +101,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Staging backup evidence tooling is complete in PR #388.
+- Combined staging gate is complete in PR #390.
+  - Added `npm run staging:gate`.
+  - Production Vercel was redeployed after merge.
+  - `npm run staging:gate` passed against public Vercel commit `7367d2b`.
 - Staging backup evidence tooling is complete in PR #388.
   - Added `npm run staging:backup:evidence`, a read-only source-staging snapshot command for restore drills.
   - Captured local evidence file `.tools/staging-backup-evidence-2026-06-29T04-04-29-937Z.json` with `app_users=5`, `cmms_kv_records=12`, `file_metadata=1`, `audit_events=18`, and one storage file.
