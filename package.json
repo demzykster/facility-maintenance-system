@@ -16,6 +16,7 @@
     "staging:smoke:ui": "node tools/staging-ui-smoke.mjs",
     "staging:smoke:system-errors": "node tools/staging-system-error-smoke.mjs",
     "staging:backup:evidence": "node tools/staging-backup-evidence.mjs",
+    "staging:data:summary": "node tools/staging-data-summary.mjs",
     "staging:gate": "node tools/staging-gate.mjs",
     "fleet:import:preview": "node tools/fleet-license-import-preview.mjs",
     "test": "vitest run",
