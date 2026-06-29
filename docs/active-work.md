@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/send-phone-push-events
+### Active branch: codex/localize-russian-cleaner
 
-- Status: implementing automatic phone-push delivery for selected business events. Base push subscription/test infrastructure is already on main; this branch adds explicit targeted event delivery and wires ticket/cleaning complaint saves to it.
+- Status: adding Russian to the controlled worker-facing localization set and finishing the cleaner shell localization that was still partially Hebrew-only.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -67,7 +67,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - logged-in users should be able to edit their own phone; admins/managers/production users can also edit email, and logged-in production users can voluntarily change password.
   - new tickets should capture the requester phone at creation time and show it as a tap-to-call link in ticket detail when available.
   - the user-profile contact PR added `app_users.phone`; the staging Supabase migration has been applied and verified with a direct `select=id,phone` REST check.
-  - worker/cleaner/public-report/login localization should use Hebrew as the source language and support `he`, `en`, `ar`, `hi`, and `ti` (Tigrinya); this is a controlled UI dictionary direction, not browser auto-translation of business records.
+  - worker/cleaner/public-report/login localization should use Hebrew as the source language and support `he`, `en`, `ru`, `ar`, `hi`, and `ti` (Tigrinya); this is a controlled UI dictionary direction, not browser auto-translation of business records.
   - logged-in desktop users can report internal app issues from the sidebar version area; reports are stored as `appIssue:` KV records, included in backup/restore, and managed from settings as a product-quality journal, not as maintenance tickets.
   - logged-in users must also be able to report internal app issues from mobile/topbar shells where the desktop sidebar is hidden, including worker and cleaner views.
   - the internal app-issue report modal should render as one compact centered panel, without a wider empty overlay shell beside it.
@@ -98,6 +98,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - phone push notifications are implemented as PWA/web-push: `/api/push`, `cmms-sw.js`, `manifest.webmanifest`, and Vercel `CMMS_PUSH_*` env are required. Users still need a supported browser/PWA install and notification permission.
   - automatic phone push should stay targeted and low-noise: send to explicit subscribed users only, do not broadcast to all subscribers, and do not let push failures block the saved business action.
   - next access-control iteration should combine role defaults, individual module permissions, and per-user notification preferences in one coherent user-management surface instead of adding a separate parallel permission system.
+  - push delivery and notification-preference/access matrix are intentionally separate release blocks: push proves safe targeted delivery, while the next block must decide which roles/users may see modules and receive each event type.
+  - cleaner-facing screens should not contain hardcoded Hebrew shell text where `uiText` keys already exist; operational record names can remain as entered by users.
   - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
@@ -107,6 +109,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current launch blockers:
   - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
 - Validation:
+  - Russian/cleaner localization branch passed: targeted language/uiI18n tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local browser smoke for Russian login plus demo cleaner screen text.
   - Stale-tab update prompt branch passed targeted version-model tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Build output includes `dist/cmms-version.json` with the same short commit as the bundled UI.
   - Dashboard widget save-failure smoke guard is in progress on `codex/fix-dashboard-widget-prefs-smoke`; live `npm run staging:smoke:ui -- --expect-current-commit` passed on Vercel commit `47dda88`, including the stronger red-toast check.
   - Fleet import preview, controlled system-error smoke tooling, and AI-agent readiness docs passed locally on `codex/final-import-log-ai-followups`: targeted tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, live `npm run staging:smoke:system-errors`, and real attached workbook preview.
@@ -181,7 +184,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Staging data summary confirmed the owner-facing database is empty except one admin user, with no KV records, file metadata, audit rows, or storage files.
   - Real fleet import preview against the supplied `מעקב רישיונות_ 06.07.23.xlsx` is closed for now: the preview reads only `רישיונות`, found `total=128`, `ready=126`, and correctly blocked duplicate chassis/source identifier `פסולתון` in rows 127-128 before any write.
   - PWA phone push code is deployed and Vercel Production env has VAPID contact/public/private settings. Live `/api/push` returns enabled with a public key.
-  - First localization shell is deployed for login, public QR reporting, worker, cleaner, and phone-push labels using the agreed languages `he/en/ar/hi/ti`; admin module records remain Hebrew-first for v1.
+  - First localization shell is deployed for login, public QR reporting, worker, cleaner, and phone-push labels using the agreed languages `he/en/ar/hi/ti`; admin module records remain Hebrew-first for v1. Russian follow-up is active separately on `codex/localize-russian-cleaner`.
   - Validation: targeted localization/push tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run staging:vercel-env` passed, `npm run build` passed, local Playwright smoke confirmed localized public QR flow and admin login to the empty-state dashboard, live `/api/push` enabled check passed, and `npm run staging:gate` passed on deployed commit `92e3919`.
 - Stale-tab update prompt is complete in PR #446.
   - Vite now emits a public `cmms-version.json` manifest for every production build.

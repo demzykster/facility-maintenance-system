@@ -2189,13 +2189,13 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={submitIdentifier}>{t("login.continue")}</button>
         </>) : (<>
-          <div className="login-q">שלום {resolved.user.name}</div>
-          <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? "הזינו סיסמה להשלמת הכניסה." : "הזינו קוד אישי להשלמת הכניסה."}</div>
+          <div className="login-q">{t("login.hello", { name: resolved.user.name })}</div>
+          <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? t("login.enterPassword") : t("login.enterPin")}</div>
           {resolved.auth === "password" ? <label className="field"><span>{t("login.password")}</span><input value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="••••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>
-            : <label className="field"><span>קוד אישי</span><input value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
+            : <label className="field"><span>{t("login.pinCode")}</span><input value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? "מתחבר…" : t("login.signIn")}</button>
+          <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? t("login.connecting") : t("login.signIn")}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>{t("login.back")}</button>
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
@@ -3167,21 +3167,21 @@ function CleanerApp(p) {
     const missed = sts.filter((s) => s.status === "missed");
     const allDone = sts.length > 0 && sts.every((s) => s.status === "done");
     let st, target;
-    if (notDay) st = { txt: "לא יום ניקיון", color: "var(--muted)", bg: "var(--surface-2)" };
-    else if (dueNow) { st = { txt: "עכשיו · סבב " + dueNow.win.time, color: WIN_META[dueNow.status].color, bg: WIN_META[dueNow.status].bg, go: 1 }; target = dueNow.win; }
-    else if (allDone) st = { txt: "✓ הושלם להיום", color: "#16A34A", bg: "#DCFCE7" };
-    else if (nextP) { st = { txt: "הסבב הבא בשעה " + nextP.win.time, color: "#0369A1", bg: "#E0F2FE" }; target = nextP.win; }
-    else if (missed.length) { st = { txt: "פוספס · השלמה: " + missed[0].win.time, color: "#DC2626", bg: "#FEE2E2", go: 1 }; target = missed[0].win; }
+    if (notDay) st = { txt: t("cleaner.notCleaningDay"), color: "var(--muted)", bg: "var(--surface-2)" };
+    else if (dueNow) { st = { txt: t("cleaner.nowRound", { time: dueNow.win.time }), color: WIN_META[dueNow.status].color, bg: WIN_META[dueNow.status].bg, go: 1 }; target = dueNow.win; }
+    else if (allDone) st = { txt: t("cleaner.doneForToday"), color: "#16A34A", bg: "#DCFCE7" };
+    else if (nextP) { st = { txt: t("cleaner.nextRound", { time: nextP.win.time }), color: "#0369A1", bg: "#E0F2FE" }; target = nextP.win; }
+    else if (missed.length) { st = { txt: t("cleaner.missedRound", { time: missed[0].win.time }), color: "#DC2626", bg: "#FEE2E2", go: 1 }; target = missed[0].win; }
     else st = { txt: "—", color: "var(--muted)", bg: "var(--surface-2)" };
     const border = cover ? "#A855F7" : (st.go ? st.color : (allDone ? "#16A34A" : "#0EA5E9"));
-    const subMissed = !notDay && !dueNow && nextP && missed.length ? " · פוספס " + missed.map((m) => m.win.time).join(",") : "";
+    const subMissed = !notDay && !dueNow && nextP && missed.length ? " · " + t("cleaner.missedShort", { times: missed.map((m) => m.win.time).join(",") }) : "";
     const openRound = () => {
       if (!target) return;
       const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id });
       if (!qr.allowed) return setQrBlockedZone(z);
       setRun({ zone: z, win: target });
     };
-    return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{z.cleanerName ? " · עבור " + z.cleanerName : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{oc} דיווחים</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
+    return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{z.cleanerName ? " · " + t("cleaner.coverFor", { name: z.cleanerName }) : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{t("cleaner.reportsBadge", { count: oc })}</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? t("cleaner.cleanedAgo", { time: timeAgo(lr) }) : t("cleaner.neverCleaned")}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
   };
   return (<div className="worker-shell">
     <div className="worker-top">
@@ -3190,23 +3190,23 @@ function CleanerApp(p) {
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} /></div>}
     <main className="content">
-      {sent && <div className="toast-ok"><CheckCircle2 size={16} /> הסבב נרשם</div>}
-      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> לביצוע עכשיו ({countLabel(todo.length, "סבב", "סבבים")})</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}חלון {win.time} · {WIN_META[status].label}</div></div><ChevronLeft size={16} /></button>)}</div>}
-      {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(myComplaints.length, "דיווח", "דיווחים")})</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
-      {active.length === 0 ? <Empty text="לא הוגדרו אזורים" Icon={Sparkles} sub="מנהל המערכת מגדיר אזורי ניקיון" /> : <>
-        <SectionTitle><Sparkles size={15} /> האזורים שלי ({countLabel(mine.length, "אזור", "אזורים")})</SectionTitle>
-        {mine.length === 0 ? <Empty text="אין אזורים משויכים אליך" Icon={Sparkles} /> : <div className="cards">{mine.map(card)}</div>}
-        {others.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowCover((v) => !v)}>{showCover ? "▾" : "▸"} כיסוי עמיתים ({countLabel(others.length, "אזור", "אזורים")})</button>{showCover ? <div className="cards">{others.map((z) => card(z, true))}</div> : <div className="hint" style={{ marginInlineStart: 4 }}>מחליפים עמית היום? פִתחו כדי לבצע סבב באזור שלו — יירשם על שמכם ככיסוי.</div>}</div>}
-        {doneToday.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowDone((v) => !v)}>{showDone ? "▾" : "▸"} בוצע היום ({countLabel(doneToday.length, "סבב", "סבבים")})</button>{showDone && <div className="cards">{doneToday.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{r.doneCount}/{countLabel(r.total, "פריט", "פריטים")}{r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}{prob ? ` · ${countLabel(r.issues.length, "הערה", "הערות")}` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div>}</div>}
+      {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
+      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>)}</div>}
+      {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> {t("cleaner.openReports", { count: myComplaints.length })}</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+      {active.length === 0 ? <Empty text={t("cleaner.noZones")} Icon={Sparkles} sub={t("cleaner.managerDefinesZones")} /> : <>
+        <SectionTitle><Sparkles size={15} /> {t("cleaner.myZones", { count: mine.length })}</SectionTitle>
+        {mine.length === 0 ? <Empty text={t("cleaner.noAssignedZones")} Icon={Sparkles} /> : <div className="cards">{mine.map(card)}</div>}
+        {others.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowCover((v) => !v)}>{showCover ? "▾" : "▸"} {t("cleaner.peerCover", { count: others.length })}</button>{showCover ? <div className="cards">{others.map((z) => card(z, true))}</div> : <div className="hint" style={{ marginInlineStart: 4 }}>{t("cleaner.peerCoverHint")}</div>}</div>}
+        {doneToday.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowDone((v) => !v)}>{showDone ? "▾" : "▸"} {t("cleaner.doneToday", { count: doneToday.length })}</button>{showDone && <div className="cards">{doneToday.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{t("cleaner.itemsProgress", { done: r.doneCount, total: r.total })}{r.isCover ? " · " + t("cleaner.coverBadge") + (r.coverFor ? " " + t("cleaner.coverFor", { name: r.coverFor }) : "") : ""}{prob ? ` · ${t("cleaner.issuesCount", { count: r.issues.length })}` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div>}</div>}
       </>}
-      {myReports.length > 0 && <div style={{ marginTop: 6 }}><SectionTitle><AlertTriangle size={15} /> הדיווחים שלי ({countLabel(myReports.length, "דיווח", "דיווחים")})</SectionTitle><div className="cards">{myReports.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></div>}
+      {myReports.length > 0 && <div style={{ marginTop: 6 }}><SectionTitle><AlertTriangle size={15} /> {t("cleaner.myReports", { count: myReports.length })}</SectionTitle><div className="cards">{myReports.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></div>}
       {(() => { const myAbs = (absences || []).filter((a) => a.userId === session.id && (a.to || a.from) >= todayKey()).sort((a, b) => (a.from > b.from ? 1 : -1)); return <div style={{ marginTop: 6 }}>
-        <button className="day-toggle" onClick={() => setShowAbs((v) => !v)}>{showAbs ? "▾" : "▸"} היעדרות מתוכננת{myAbs.length ? ` (${myAbs.length})` : ""}</button>
+        <button className="day-toggle" onClick={() => setShowAbs((v) => !v)}>{showAbs ? "▾" : "▸"} {t("cleaner.plannedAbsence", { count: myAbs.length ? ` (${myAbs.length})` : "" })}</button>
         {showAbs && <div className="panel" style={{ marginTop: 6 }}>
-          <div className="hint" style={{ marginBottom: 8 }}>סמנו ימי היעדרות מראש. בימים אלה האזורים שלכם יסומנו לכיסוי והתראות «פוספס» לא יופנו אליכם.</div>
+          <div className="hint" style={{ marginBottom: 8 }}>{t("cleaner.absenceHint")}</div>
           {myAbs.map((a) => <div key={a.id} className="reg-row" style={{ marginBottom: 6 }}><span style={{ flex: 1 }}>{fmtDate(new Date(a.from).getTime())}{(a.to && a.to !== a.from) ? " – " + fmtDate(new Date(a.to).getTime()) : ""}</span><button className="reg-del" onClick={() => delAbsence(a.id)}><Trash2 size={15} /></button></div>)}
-          <div className="field-row" style={{ marginTop: 6 }}><label className="field"><span>מתאריך</span><input type="date" value={absFrom} onChange={(e) => setAbsFrom(e.target.value)} /></label><label className="field"><span>עד תאריך (רשות)</span><input type="date" value={absTo} onChange={(e) => setAbsTo(e.target.value)} /></label></div>
-          <button className="btn-ghost sm" disabled={!absFrom || (absTo && absTo < absFrom)} onClick={() => { saveAbsence({ id: uid(), userId: session.id, name: session.name, from: absFrom, to: absTo || absFrom, at: Date.now() }); setAbsFrom(""); setAbsTo(""); }}><Plus size={14} /> הוספת היעדרות</button>
+          <div className="field-row" style={{ marginTop: 6 }}><label className="field"><span>{t("cleaner.fromDate")}</span><input type="date" value={absFrom} onChange={(e) => setAbsFrom(e.target.value)} /></label><label className="field"><span>{t("cleaner.toDate")}</span><input type="date" value={absTo} onChange={(e) => setAbsTo(e.target.value)} /></label></div>
+          <button className="btn-ghost sm" disabled={!absFrom || (absTo && absTo < absFrom)} onClick={() => { saveAbsence({ id: uid(), userId: session.id, name: session.name, from: absFrom, to: absTo || absFrom, at: Date.now() }); setAbsFrom(""); setAbsTo(""); }}><Plus size={14} /> {t("cleaner.addAbsence")}</button>
         </div>}
       </div>; })()}
     </main>
