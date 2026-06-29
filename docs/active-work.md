@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: clean after PR #405; public Vercel preview for the sidebar/logo polish was green.
-- Latest synchronized `main`: after PR #405 (`6b2f28d`). Public production alias still needs redeploy/live smoke if this UI polish must be visible on the main URL immediately.
+- Status: clean after PR #406 and the successful production redeploy/live smoke for the sidebar/logo polish.
+- Latest synchronized `main`: after PR #406 (`2d50052`). Public production alias now serves this commit.
 - Open PRs: #404 (`codex/log-client-storage-failures`) is still open separately; its Vercel preview is blocked by build-rate-limit.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
@@ -70,6 +70,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
   - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
+  - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for commit `2d50052`: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
   - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
   - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Public Vercel production redeploy succeeded after the Hobby daily deployment limit reset. Strict live smoke passed for commit `2304dcd`.
@@ -114,6 +115,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Sidebar/logo polish is live on public Vercel after PR #406.
+  - Production alias `https://facility-maintenance-system.vercel.app/` now serves commit `2d50052`.
+  - Strict live smoke passed after the manual production redeploy.
 - Sidebar/logo polish is complete in PR #405.
   - The desktop sidebar keeps scroll behavior but hides the heavy visual scrollbar.
   - Settings > general now includes logo upload; images are resized and center-cropped automatically before saving.
