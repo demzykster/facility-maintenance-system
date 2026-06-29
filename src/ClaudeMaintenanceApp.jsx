@@ -1240,6 +1240,7 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
   const unreadKeys = useMemo(() => readState == null ? new Set() : unreadNotificationKeySet(visible, readState), [visible, readState]);
+  const unreadEvents = useMemo(() => events.filter((event) => unreadKeys.has(event.key)), [events, unreadKeys]);
   const unread = unreadKeys.size;
   useEffect(() => {
     if (!visible.length) return; const max = visible[0].at;
@@ -1251,7 +1252,7 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
     setReadState(next);
     await store.set(skey, JSON.stringify(next), false);
   };
-  return { events, unread, unreadKeys, markRead, toast, dismissToast: () => setToast(null), prefs, setPrefs, presentKinds: [...new Set(rawEvents.map((e) => e.kind))] };
+  return { events, unread, unreadKeys, unreadEvents, markRead, toast, dismissToast: () => setToast(null), prefs, setPrefs, presentKinds: [...new Set(rawEvents.map((e) => e.kind))] };
 }
 
 /* ============================================================ ROOT */
@@ -7036,7 +7037,14 @@ function Overlay({ children, onClose, persistent, panelClassName = "" }) {
 function AIFab({ onClick }) { return <button className="ai-fab" aria-label="עוזר AI" title="עוזר AI" onClick={onClick}><Sparkles size={22} /></button>; }
 function NotifPanel({ notif, onClose, onOpen, onGo }) {
   const [settings, setSettings] = useState(false), [marked, setMarked] = useState(false), [perm, setPerm] = useState(""), [showAll, setShowAll] = useState(false);
-  const markAll = () => { notif.markRead(); setMarked(true); setTimeout(() => setMarked(false), 1600); };
+  const [marking, setMarking] = useState(false);
+  const markAll = async () => {
+    setMarking(true);
+    await notif.markRead();
+    setMarked(true);
+    setMarking(false);
+    setTimeout(() => setMarked(false), 1600);
+  };
   const askPerm = () => { try { const r = Notification.requestPermission(); if (r && r.then) r.then((res) => setPerm(res || "denied")).catch(() => setPerm("blocked")); else setPerm(typeof r === "string" ? r : "blocked"); } catch (e) { setPerm("blocked"); } };
   const canAsk = typeof window !== "undefined" && "Notification" in window && Notification.permission === "default";
   const { prefs, setPrefs } = notif;
@@ -7048,9 +7056,11 @@ function NotifPanel({ notif, onClose, onOpen, onGo }) {
   const hiddenCount = Math.max(0, notif.events.length - 60);
   const list = showAll ? notif.events : notif.events.slice(0, 60);
   const grouped = prefs.group ? NOTIF_KINDS.map((k) => [k, list.filter((e) => e.kind === k.kind)]).filter(([, arr]) => arr.length) : null;
+  const unreadPreview = (notif.unreadEvents || []).slice(0, 3);
   return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" onClick={(e) => e.stopPropagation()}>
     <div className="notif-head"><div><div className="notif-title"><Bell size={18} /> התראות</div><div className="notif-count">{notif.events.length ? (notif.unread ? `${notif.unread} חדשות · ${notif.events.length} מוצגות` : `${notif.events.length} מוצגות · הכל נקרא`) : "אין פריטים להצגה"}</div></div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה" aria-label="הגדרות תצוגת התראות"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
-    {list.length > 0 && <button className="notif-markall" onClick={markAll}><Check size={14} /> {marked ? "סומן הכל כנקרא ✓" : "סמן הכל כנקרא"}</button>}
+    {notif.unread > 0 && <div className="notif-unread-summary"><div className="nus-title">חדשות שלא נקראו</div>{unreadPreview.map((ev) => <div key={ev.key} className="nus-row"><span className={"ni-dot " + ev.kind} />{ev.title}</div>)}{notif.unread > unreadPreview.length && <div className="nus-more">ועוד {notif.unread - unreadPreview.length}</div>}</div>}
+    {list.length > 0 && <button className="notif-markall" onClick={markAll} disabled={marking || notif.unread === 0}><Check size={14} /> {marking ? "מסמן…" : marked ? "סומן הכל כנקרא ✓" : notif.unread ? "סמן הכל כנקרא" : "הכל כבר נקרא"}</button>}
     {settings && <div className="notif-settings">
       <div className="ns-row"><span className="ns-lbl">מיון</span><div className="seg-tabs s2 mini"><button className={prefs.sort === "newest" ? "on" : ""} onClick={() => setPrefs({ sort: "newest" })}>חדש→ישן</button><button className={prefs.sort === "oldest" ? "on" : ""} onClick={() => setPrefs({ sort: "oldest" })}>ישן→חדש</button></div></div>
       <label className="ns-row clk"><span className="ns-lbl">קיבוץ לפי קטגוריה</span><input type="checkbox" checked={!!prefs.group} onChange={(e) => setPrefs({ group: e.target.checked })} /></label>
@@ -7625,6 +7635,13 @@ button.notif-perm:hover{background:#D1FAE5;}
 .notif-perm.ok{cursor:default;}
 .notif-markall{display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);margin:10px 16px 0;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
 .notif-markall:hover{border-color:var(--primary);color:var(--primary);}
+.notif-markall:disabled{opacity:.65;cursor:default;border-color:var(--line);color:var(--muted);}
+.notif-unread-summary{margin:10px 16px 0;border:1px solid #FED7AA;background:#FFF7ED;border-radius:12px;padding:10px 12px;}
+.app-dark .notif-unread-summary{background:#2a1d10;border-color:#7c2d12;}
+.nus-title{font-size:12px;font-weight:800;color:#C2410C;margin-bottom:6px;}
+.app-dark .nus-title{color:#FDBA74;}
+.nus-row{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink);padding:3px 0;}
+.nus-more{font-size:11.5px;color:var(--muted);margin-top:4px;}
 /* cleaning track */
 .icon-btn.light{color:#fff;}
 .icon-btn.sm{width:32px;height:32px;}
