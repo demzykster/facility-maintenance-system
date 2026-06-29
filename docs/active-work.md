@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/fix-sidebar-footer-overflow
 
-- Status: clean staging is ready for owner-facing empty-system review.
+- Status: fixing the desktop sidebar footer overflow reported on a large monitor.
 - Latest synchronized `main`: after PR #397. Public Vercel staging has been redeployed from current `main` and live smoke passes for commit `b9b3d38`.
 - Open PRs: none.
 - Purpose:
@@ -49,6 +49,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - local staging preflight must use `.env.staging.local` as the explicit source for that run, even if stale shell env exists.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
   - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
+  - desktop sidebar footer must remain inside the visible viewport on shorter desktop windows; the navigation list may scroll independently.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
@@ -67,6 +68,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - finish the non-automated launch gate: configure daily Supabase backups and perform one restore drill. Current Supabase project is on the Free plan, where dashboard says project backups are unavailable; managed backup/restore requires Pro or an explicit accepted pilot risk.
   - before true production, replace the temporary simple admin password and revoke the temporary Supabase access token created for restore-drill work.
 - Validation:
+  - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
   - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
   - Follow-up smoke check: the transport ticket detail opened in the UI, admin note update saved, and the cleaning UI shows the smoke public zone plus one pending report.
   - Production Vercel alias was manually redeployed from clean `main` because the public app still served stale footer commit `97c8b0f`; the public staging URL now serves bundle commit `bdecfd5`.
@@ -106,6 +108,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Desktop sidebar footer overflow fix is in progress.
+  - The sidebar now keeps the user/logout/version footer fixed inside the viewport and lets only the navigation list scroll when the desktop window is short.
+  - This addresses the large-monitor report where the footer block slid below the visible app area.
 - Playwright dev tooling is in progress.
   - `@playwright/test` is installed as a dev dependency, and local Chromium smoke can run from the project.
   - Added `npm run staging:smoke:browser` for a no-secret browser smoke of the public login screen.
