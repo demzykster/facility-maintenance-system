@@ -1,0 +1,102 @@
+import { describe, expect, it, vi } from "vitest";
+import { createPushHandler } from "../server/push/handler.js";
+
+function createRes() {
+  return {
+    headers: {},
+    statusCode: 0,
+    body: "",
+    setHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    },
+    end(body) {
+      this.body = body;
+    },
+    json() {
+      return this.body ? JSON.parse(this.body) : null;
+    }
+  };
+}
+
+async function call(handler, req) {
+  const res = createRes();
+  await handler({ headers: {}, method: "GET", ...req }, res);
+  return res;
+}
+
+const env = {
+  CMMS_PUSH_VAPID_PUBLIC_KEY: "public-key",
+  CMMS_PUSH_VAPID_PRIVATE_KEY: "private-key",
+  CMMS_PUSH_CONTACT: "mailto:owner@example.com"
+};
+
+const activeSessionClient = {
+  getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com" }),
+  getAppUserProfile: vi.fn().mockResolvedValue({
+    id: "app-user-1",
+    auth_user_id: "auth-user-1",
+    role: "admin",
+    name: "Owner",
+    email: "admin@example.com",
+    active: true,
+    permissions: {},
+    must_change_password: false
+  })
+};
+
+const subscription = {
+  endpoint: "https://push.example/device/1",
+  keys: { p256dh: "p256", auth: "auth" }
+};
+
+describe("push API handler", () => {
+  it("publishes whether web push is configured without exposing private keys", async () => {
+    const handler = createPushHandler({ env, push: { setVapidDetails: vi.fn() } });
+
+    const res = await call(handler, {});
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, enabled: true, publicKey: "public-key" });
+  });
+
+  it("stays disabled safely when VAPID env is missing", async () => {
+    const handler = createPushHandler({ env: {}, push: { setVapidDetails: vi.fn() } });
+
+    const config = await call(handler, {});
+    const post = await call(handler, { method: "POST", headers: { authorization: "Bearer token" }, body: { action: "test" } });
+
+    expect(config.json()).toEqual({ ok: true, enabled: false, publicKey: "" });
+    expect(post.statusCode).toBe(503);
+    expect(post.json()).toEqual({ error: "push_not_configured" });
+  });
+
+  it("stores a user subscription and sends a test notification", async () => {
+    let stored = "";
+    const driver = {
+      get: vi.fn().mockImplementation(async () => stored),
+      set: vi.fn().mockImplementation(async (_key, value) => { stored = value; })
+    };
+    const push = {
+      setVapidDetails: vi.fn(),
+      sendNotification: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createPushHandler({ driver, push, env, sessionClient: activeSessionClient });
+
+    const subscribe = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { action: "subscribe", subscription }
+    });
+    const test = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { action: "test" }
+    });
+
+    expect(subscribe.statusCode).toBe(200);
+    expect(subscribe.json()).toMatchObject({ ok: true, id: expect.any(String) });
+    expect(test.json()).toEqual({ ok: true, sent: 1 });
+    expect(push.setVapidDetails).toHaveBeenCalledWith("mailto:owner@example.com", "public-key", "private-key");
+    expect(push.sendNotification).toHaveBeenCalledWith(subscription, expect.stringContaining("התראות לטלפון הופעלו"));
+  });
+});

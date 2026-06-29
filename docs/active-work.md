@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/final-pilot-localization-push`
 
-- Status: main is clean after the stale-tab update prompt; Supabase Pro backup and separate-target restore drill are complete.
+- Status: final pilot hardening is in progress. Empty staging is clean except the owner admin user; owner manual checks #1 and #4 are owner-closed; backup/restore remains owner-closed unless new evidence says otherwise.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -67,7 +67,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - logged-in users should be able to edit their own phone; admins/managers/production users can also edit email, and logged-in production users can voluntarily change password.
   - new tickets should capture the requester phone at creation time and show it as a tap-to-call link in ticket detail when available.
   - the user-profile contact PR added `app_users.phone`; the staging Supabase migration has been applied and verified with a direct `select=id,phone` REST check.
-  - future worker/cleaner/public-report localization should use Hebrew as the source language and support `he`, `en`, `ar`, `hi`, and `ti` (Tigrinya); this is a controlled UI dictionary direction, not browser auto-translation of business records.
+  - worker/cleaner/public-report/login localization should use Hebrew as the source language and support `he`, `en`, `ar`, `hi`, and `ti` (Tigrinya); this is a controlled UI dictionary direction, not browser auto-translation of business records.
   - logged-in desktop users can report internal app issues from the sidebar version area; reports are stored as `appIssue:` KV records, included in backup/restore, and managed from settings as a product-quality journal, not as maintenance tickets.
   - logged-in users must also be able to report internal app issues from mobile/topbar shells where the desktop sidebar is hidden, including worker and cleaner views.
   - the internal app-issue report modal should render as one compact centered panel, without a wider empty overlay shell beside it.
@@ -95,6 +95,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
   - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
   - fleet Excel import preview must block duplicate chassis/source identifiers inside the same workbook before save; the supplied `מעקב רישיונות_ 06.07.23.xlsx` preview found `total=128`, `ready=126`, `invalid=2` for duplicate `פסולתון` rows 127-128.
+  - phone push notifications are implemented as PWA/web-push: `/api/push`, `cmms-sw.js`, `manifest.webmanifest`, and Vercel `CMMS_PUSH_*` env are required. Users still need a supported browser/PWA install and notification permission.
   - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
@@ -173,6 +174,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Final pilot localization and phone-push hardening is in progress on `codex/final-pilot-localization-push`.
+  - Staging data summary confirmed the owner-facing database is empty except one admin user, with no KV records, file metadata, audit rows, or storage files.
+  - Real fleet import preview against the supplied `מעקב רישיונות_ 06.07.23.xlsx` is closed for now: the preview reads only `רישיונות`, found `total=128`, `ready=126`, and correctly blocked duplicate chassis/source identifier `פסולתון` in rows 127-128 before any write.
+  - PWA phone push code has been added locally and Vercel Production env received VAPID contact/public/private settings; a new deployment is required before the live `/api/push` route can be tested.
+  - First localization shell has been added locally for login, public QR reporting, worker, cleaner, and phone-push labels using the agreed languages `he/en/ar/hi/ti`; admin module records remain Hebrew-first for v1.
+  - Validation so far: targeted localization/push tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run staging:vercel-env` passed, `npm run build` passed, and local Playwright smoke confirmed localized public QR flow, admin login to the empty-state dashboard, no horizontal overflow, no red save-failure toast, and no console errors.
 - Stale-tab update prompt is complete in PR #446.
   - Vite now emits a public `cmms-version.json` manifest for every production build.
   - The app compares the open tab's bundled commit to that manifest and shows a quiet refresh banner if Vercel has a newer build.
