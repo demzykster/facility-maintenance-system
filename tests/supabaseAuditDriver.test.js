@@ -76,4 +76,45 @@ describe("Supabase audit driver", () => {
 
     await expect(driver.write({ id: "audit-1", at: 1000, entityType: "settings", action: "update" })).rejects.toThrow("duplicate key");
   });
+
+  it("lists client error events from audit_events", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([
+          {
+            id: "audit-1",
+            at: "1970-01-01T00:00:01.000Z",
+            actor_id: "app-user-1",
+            actor_name: "Owner",
+            actor_role: "admin",
+            entity_type: "system",
+            entity_id: "client-error",
+            action: "client_error",
+            summary: "Shared storage operation failed",
+            metadata: { kind: "storage_save_failed" }
+          }
+        ]);
+      }
+    });
+    const driver = createSupabaseAuditDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    const rows = await driver.listClientErrors({ limit: 25 });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://supabase.example/rest/v1/audit_events?select=id,at,actor_id,actor_name,actor_role,entity_type,entity_id,action,summary,metadata&entity_type=eq.system&action=eq.client_error&order=at.desc&limit=25",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(rows).toEqual([expect.objectContaining({
+      id: "audit-1",
+      at: 1000,
+      actorName: "Owner",
+      action: "client_error",
+      metadata: { kind: "storage_save_failed" }
+    })]);
+  });
 });

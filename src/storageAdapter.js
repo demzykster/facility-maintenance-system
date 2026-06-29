@@ -1,13 +1,35 @@
 import { createApiStorageProvider } from "./apiStorageAdapter.js";
-import { createProductionAuthStore } from "./productionLoginAdapter.js";
+import { createProductionAuthStore, createProductionLoginClient, productionLoginConfigFromEnv, productionLoginReady } from "./productionLoginAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 
 const importEnv = () => import.meta.env || {};
 const productionAuthStore = createProductionAuthStore();
+let authRefreshPromise = null;
+
+async function productionAccessToken() {
+  const auth = productionAuthStore.get();
+  if (!auth?.accessToken) return "";
+  if (!auth.expiresAt || auth.expiresAt > Date.now() + 60_000) return auth.accessToken;
+  if (!auth.refreshToken) return auth.accessToken;
+
+  const config = productionLoginConfigFromEnv(importEnv());
+  if (!productionLoginReady(config)) return auth.accessToken;
+  const client = createProductionLoginClient({ config });
+  if (!client) return auth.accessToken;
+
+  authRefreshPromise ||= client.refreshAuth(auth.refreshToken)
+    .then((refreshed) => {
+      productionAuthStore.set(refreshed, { remember: auth.remember === true });
+      return refreshed.accessToken || auth.accessToken;
+    })
+    .catch(() => auth.accessToken)
+    .finally(() => { authRefreshPromise = null; });
+  return authRefreshPromise;
+}
 
 const apiProvider = () => createApiStorageProvider({
   baseUrl: storageApiBaseUrlFromEnv(importEnv()),
-  getAccessToken: () => productionAuthStore.get()?.accessToken || ""
+  getAccessToken: productionAccessToken
 });
 
 const defaultStorageProvider = () => (

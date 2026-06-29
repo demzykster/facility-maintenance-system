@@ -54,6 +54,23 @@ describe("apiStorageAdapter", () => {
     }));
   });
 
+  it("supports asynchronously refreshed production access tokens", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(ok({ value: "ticket-json" }));
+    const provider = createApiStorageProvider({
+      baseUrl: "https://cmms.example/api",
+      getAccessToken: async () => "fresh-access-token",
+      fetchImpl
+    });
+
+    await provider.get("ticket:1", true);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/kv/ticket%3A1?shared=1", expect.objectContaining({
+      headers: expect.objectContaining({
+        authorization: "Bearer fresh-access-token"
+      })
+    }));
+  });
+
   it("does not add an empty authorization header", async () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce(ok({ value: "ticket-json" }));
     const provider = createApiStorageProvider({
