@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import packageInfo from "../package.json";
@@ -44,6 +44,7 @@ import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidge
 import { VERSION_MANIFEST_PATH, normalizeVersionManifest, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { DEFAULT_LANGUAGE, languageDirection, languageOptions, normalizeLanguageCode } from "./languageModel.js";
 import { uiText } from "./uiI18nModel.js";
+import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -2065,6 +2066,60 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
   </div></div>);
 }
 
+function InstallAppPrompt({ language = DEFAULT_LANGUAGE }) {
+  const t = (key, vars) => uiText(language, key, vars);
+  const [installEvent, setInstallEvent] = useState(null);
+  const [dismissed, setDismissed] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const [standalone, setStandalone] = useState(() => isStandaloneDisplay({ matchMedia: window.matchMedia?.bind(window), navigator: window.navigator }));
+  useEffect(() => {
+    const updateStandalone = () => setStandalone(isStandaloneDisplay({ matchMedia: window.matchMedia?.bind(window), navigator: window.navigator }));
+    const media = window.matchMedia?.("(display-mode: standalone)");
+    media?.addEventListener?.("change", updateStandalone);
+    const onBeforeInstall = (event) => {
+      event.preventDefault();
+      setInstallEvent(event);
+      setDismissed(false);
+    };
+    const onInstalled = () => {
+      setAccepted(true);
+      setInstallEvent(null);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      media?.removeEventListener?.("change", updateStandalone);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+  if (dismissed || accepted) return null;
+  const mode = pwaInstallPromptMode({
+    beforeInstallPromptEvent: installEvent,
+    isStandalone: standalone,
+    userAgent: window.navigator?.userAgent || "",
+    platform: window.navigator?.platform || "",
+    maxTouchPoints: window.navigator?.maxTouchPoints || 0,
+  });
+  if (mode === "hidden") return null;
+  const install = async () => {
+    if (!installEvent) return;
+    installEvent.prompt();
+    const choice = await installEvent.userChoice.catch(() => null);
+    if (choice?.outcome === "accepted") setAccepted(true);
+    setInstallEvent(null);
+  };
+  return <div className="install-prompt">
+    <div className="install-ic"><Smartphone size={18} /></div>
+    <div className="install-copy">
+      <b>{t("install.title")}</b>
+      <span>{mode === "ios" ? t("install.iosHint") : t("install.androidHint")}</span>
+    </div>
+    {mode === "android" && <button className="install-btn" type="button" onClick={install}><Download size={15} /> {t("install.button")}</button>}
+    <button className="install-x" type="button" onClick={() => setDismissed(true)} aria-label={t("common.close")}><X size={15} /></button>
+  </div>;
+}
+
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const t = (key, vars) => uiText(language, key, vars);
   const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
@@ -2206,6 +2261,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
         <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>{t("login.developedBy")} </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
+        <InstallAppPrompt language={language} />
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> {t("login.reportWithoutLogin")}</button>
         </>)}
       </div>
@@ -7489,6 +7545,16 @@ a{color:inherit;}
 .login-alt{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:12px;padding:11px;border:1.5px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);font-weight:600;font-size:13.5px;}
 .login-foot{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.45;}
 .login-foot>span{display:block;}
+.install-prompt{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:9px;margin-top:12px;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink);text-align:start;}
+.install-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(234,88,12,.09);color:var(--primary);flex-shrink:0;}
+.install-copy{min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.35;}
+.install-copy b{font-size:13px;font-weight:800;}
+.install-copy span{font-size:12px;color:var(--muted);}
+.install-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;border-radius:9px;background:var(--primary);color:#fff;padding:0 10px;font-size:12px;font-weight:800;white-space:nowrap;}
+.install-btn:hover{background:var(--primary-d);}
+.install-x{width:30px;height:30px;border-radius:8px;color:var(--muted);display:flex;align-items:center;justify-content:center;}
+.install-x:hover{background:var(--line);color:var(--ink);}
+@media(max-width:430px){.install-prompt{grid-template-columns:auto minmax(0,1fr) auto;}.install-btn{grid-column:2 / span 2;width:100%;margin-top:2px;}.install-x{align-self:start;}}
 @media (min-width:900px){.login-bg{padding:36px;}.login-card{max-width:500px;padding:30px 30px 28px;}.login-q{font-size:17px;}}
 
 .field{display:block;margin-bottom:15px;}

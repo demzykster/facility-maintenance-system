@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/add-pwa-install-prompt`
 
-- Status: cleaning QR localization parity is merged in PR #456. Continue from the next owner-audit or pilot-hardening item.
+- Status: adding a compact PWA install prompt to the pre-login auth screen.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -109,6 +109,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
   - Cleaning QR localization branch passed strict dictionary parity: `he/en/ru/ar/hi/ti` each expose 105 direct UI keys, with no missing or extra keys. Browser smoke on local `http://127.0.0.1:5173/` switched all six languages and confirmed login/public-report title text plus correct RTL/LTR direction. Full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - Worker localization polish passed locally: direct worker smoke confirmed Russian and Arabic PPE/activity screens no longer show the hardcoded Hebrew role/PPE/activity labels from the owner screenshots; admin-to-worker role-preview smoke confirmed the preview strip localizes inside the worker shell; iPhone-width worker smoke confirmed Russian/Arabic topbar and tabs stay inside the viewport and tab height does not jump while switching tabs. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
+  - PWA login install prompt branch passed locally: generated PNG install icons (`192`, `512`, and Apple touch `180`), updated manifest/iOS meta tags, added a compact login-screen install prompt, and verified iPhone instructions plus Android `beforeinstallprompt` flow with Playwright. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
