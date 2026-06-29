@@ -51,7 +51,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
   - desktop sidebar footer must remain inside the visible viewport on shorter desktop windows; the navigation list may scroll independently.
   - desktop sidebar navigation should scroll without showing a heavy visual scrollbar.
-  - the system logo can be configured from settings; uploaded images are resized and center-cropped to a square before saving.
+  - the system logo can be configured from settings; uploaded images are resized into a square logo canvas without cropping wide logos.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
@@ -80,6 +80,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for the deployed `main` runtime: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
   - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
   - App issue reports passed targeted model/backup/collection/KV tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright smoke for login, issue submission, and settings history visibility.
+  - Logo fit and page-width stability passed locally: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for wide-logo upload plus stable scrollbar gutter.
   - Client shared-save failure logging passed: `npm test -- --run tests/clientErrorsHandler.test.js tests/auditEventModel.test.js tests/vercelApiRouteModel.test.js tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Background read/list toast suppression passed locally: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.

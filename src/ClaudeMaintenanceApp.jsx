@@ -70,11 +70,15 @@ const imageFileToSquareDataUrl = (file, size = 320) => new Promise((resolve, rej
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext("2d");
-      const scale = Math.max(size / img.width, size / img.height);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, size, size);
+      const pad = Math.round(size * 0.12);
+      const max = size - pad * 2;
+      const scale = Math.min(max / img.width, max / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.86));
+      resolve(canvas.toDataURL("image/png"));
     };
     img.src = reader.result;
   };
@@ -6005,7 +6009,7 @@ function SettingsPanel(p) {
         <BrandMark logo={brandLogo} />
         <div className="brand-upload-main">
           <div className="brand-upload-title">לוגו המערכת</div>
-          <div className="hint">העלו תמונה בכל גודל. המערכת תחתוך ותקטין אותה אוטומטית לריבוע.</div>
+          <div className="hint">העלו תמונה בכל גודל. המערכת תתאים אותה לריבוע בלי לחתוך לוגו רחב.</div>
           <div className="brand-upload-actions">
             <label className="btn-ghost sm"><input type="file" accept="image/*" onChange={pickLogo} hidden /> העלאת לוגו</label>
             {brandLogo && <button className="btn-ghost sm" onClick={() => { setBrandLogo(""); setLogoMsg("הלוגו הוסר. שמרו את ההגדרות כדי לעדכן."); }}>חזרה לאייקון ברירת מחדל</button>}
@@ -6932,6 +6936,7 @@ function Style() {
 --primary:#EA580C;--primary-d:#C2410C;--accent:#F59E0B;--slate:#16202E;--side:#16202E;--side-ink:#94A3B8;}
 .app-dark{--bg:#0F141B;--surface:#1A2230;--surface-2:#151C27;--ink:#E8EDF3;--muted:#8A97A8;--line:#2A3543;--input:#202A38;--slate:#0B1018;--side:#0B1018;--side-ink:#8A97A8;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scrollbar-gutter:stable;}
 button{font-family:var(--font-body);cursor:pointer;border:none;background:none;color:inherit;}
 :focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:6px;}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}}
@@ -6955,7 +6960,7 @@ a{color:inherit;}
 .brand-mark{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(234,88,12,.35);flex-shrink:0;overflow:hidden;}
 .brand-mark.sm{width:38px;height:38px;border-radius:11px;}
 .brand-mark.has-logo{background:#fff;color:transparent;}
-.brand-mark img{width:100%;height:100%;object-fit:cover;display:block;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;}
 .brand-title{font-family:var(--font-head);font-weight:700;font-size:24px;line-height:1;}
 .brand-title.sm{font-size:19px;color:#fff;}
 .brand-sub{color:var(--muted);font-size:13px;margin-top:3px;}.brand-sub.sm{color:var(--side-ink);font-size:11.5px;}
