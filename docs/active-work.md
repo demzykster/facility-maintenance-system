@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/sidebar-logo-polish
+### Active branch: none
 
-- Status: polishing the desktop sidebar scrollbar and adding configurable brand logo upload.
-- Latest synchronized `main`: after PR #402 (`2304dcd`). Public Vercel live smoke passes for commit `2304dcd`.
-- Open PRs: #404 (`codex/log-client-storage-failures`) is open and separate from this UI branch; its Vercel preview is blocked by build-rate-limit.
+- Status: clean after PR #405; public Vercel preview for the sidebar/logo polish was green.
+- Latest synchronized `main`: after PR #405 (`6b2f28d`). Public production alias still needs redeploy/live smoke if this UI polish must be visible on the main URL immediately.
+- Open PRs: #404 (`codex/log-client-storage-failures`) is still open separately; its Vercel preview is blocked by build-rate-limit.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
@@ -114,7 +114,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
-- Sidebar/logo polish is in progress.
+- Sidebar/logo polish is complete in PR #405.
   - The desktop sidebar keeps scroll behavior but hides the heavy visual scrollbar.
   - Settings > general now includes logo upload; images are resized and center-cropped automatically before saving.
 - Local browser storage fail-toast fix is complete in PR #401.
