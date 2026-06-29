@@ -74,7 +74,14 @@ describe("system errors API handler", () => {
             operation: "set",
             key: "config:v1",
             path: "https://app.example/settings",
-            metadata: { error: "storage_api_error" }
+            metadata: {
+              error: "storage_api_error",
+              online: false,
+              visibilityState: "visible",
+              focused: true,
+              viewport: "390x844",
+              errorId: "client-abc123"
+            }
           }
         }
       ])
@@ -100,7 +107,12 @@ describe("system errors API handler", () => {
         operation: "set",
         key: "config:v1",
         path: "https://app.example/settings",
-        error: "storage_api_error"
+        error: "storage_api_error",
+        online: false,
+        visibilityState: "visible",
+        focused: true,
+        viewport: "390x844",
+        errorId: "client-abc123"
       }]
     });
   });

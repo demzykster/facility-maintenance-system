@@ -1266,6 +1266,7 @@ export default function App() {
   useEffect(() => { sessionRef.current = session; }, [session]);
   useEffect(() => {
     store._onFail = (details = {}) => {
+      const errorId = `client-${Date.now().toString(36)}`;
       setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
       const current = sessionRef.current || {};
       reportClientError({
@@ -1277,7 +1278,8 @@ export default function App() {
         metadata: {
           error: details.error || "",
           actorId: current.id || "",
-          actorRole: current.role || ""
+          actorRole: current.role || "",
+          errorId
         }
       });
     };
@@ -6989,6 +6991,7 @@ function SystemErrorsSettings() {
           <div className="issue-meta">{item.actorName || "—"} · {ROLE_LABEL[item.actorRole] || item.actorRole || "—"}{item.path ? " · " + item.path : ""}</div>
           {open === rowKey && <div className="issue-response">
             פעולה: {item.operation || "—"} · מפתח: {item.key || "—"} · שגיאה: {item.error || "—"}
+            <br />מצב: {item.online === false ? "לא מקוון" : item.online === true ? "מקוון" : "—"} · חלון: {item.visibilityState || "—"} · מסך: {item.viewport || "—"}{item.errorId ? ` · מזהה: ${item.errorId}` : ""}
           </div>}
         </div>
         <button className="btn-ghost sm" onClick={() => setOpen((x) => x === rowKey ? null : rowKey)}>{open === rowKey ? "הסתר פרטים" : "פרטים"}</button>
