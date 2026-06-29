@@ -61,6 +61,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - production password-change and first-admin bootstrap accept passwords from 6 characters; complexity is guidance, not a hard blocker.
   - production login footer should stay user-facing and not expose technical Supabase/Auth wording.
   - logged-in desktop users can report internal app issues from the sidebar version area; reports are stored as `appIssue:` KV records, included in backup/restore, and managed from settings as a product-quality journal, not as maintenance tickets.
+  - the internal app-issue report modal should render as one compact centered panel, without a wider empty overlay shell beside it.
   - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
   - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
   - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
@@ -80,6 +81,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for the deployed `main` runtime: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
   - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
   - App issue reports passed targeted model/backup/collection/KV tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright smoke for login, issue submission, and settings history visibility.
+  - App issue report modal shell fix passed locally: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout smoke confirming shell width equals modal width with no shell shadow.
   - Logo fit and page-width stability passed locally: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for wide-logo upload plus stable scrollbar gutter.
   - Client shared-save failure logging passed: `npm test -- --run tests/clientErrorsHandler.test.js tests/auditEventModel.test.js tests/vercelApiRouteModel.test.js tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
   - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
