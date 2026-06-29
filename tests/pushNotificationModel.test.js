@@ -25,8 +25,8 @@ describe("push notification model", () => {
   });
 
   it("upserts one subscription per endpoint and preserves user metadata", () => {
-    const first = upsertPushSubscription([], subscription, { id: "u1", name: "Vadim", role: "admin" }, 100);
-    const second = upsertPushSubscription(first.list, subscription, { id: "u1", name: "Vadim", role: "admin" }, 200);
+    const first = upsertPushSubscription([], subscription, { id: "u1", name: "Vadim", role: "admin", perms: { settings: "full" }, notificationPrefs: { enabled: { sla: false } } }, 100);
+    const second = upsertPushSubscription(first.list, subscription, { id: "u1", name: "Vadim", role: "admin", perms: { settings: "full" }, notificationPrefs: { enabled: { sla: false } } }, 200);
 
     expect(second.ok).toBe(true);
     expect(second.list).toHaveLength(1);
@@ -34,6 +34,8 @@ describe("push notification model", () => {
       userId: "u1",
       userName: "Vadim",
       userRole: "admin",
+      userPermissions: { settings: "full" },
+      notificationPrefs: { enabled: { sla: false } },
       createdAt: 100,
       updatedAt: 200,
       subscription
@@ -76,5 +78,17 @@ describe("push notification model", () => {
     ];
 
     expect(selectPushNotificationTargets(list, ["u2"]).map((item) => item.userId)).toEqual(["u2"]);
+  });
+
+  it("filters push targets by access and individual notification preferences", () => {
+    const list = [
+      ...upsertPushSubscription([], subscription, { id: "cleaner", role: "cleaner", notificationPrefs: { enabled: { cleaning: false } } }, 100).list,
+      ...upsertPushSubscription([], { ...subscription, endpoint: "https://push.example/device/2" }, { id: "worker", role: "worker" }, 100).list,
+      ...upsertPushSubscription([], { ...subscription, endpoint: "https://push.example/device/3" }, { id: "ppe", role: "worker", perms: { ppe: "request" } }, 100).list
+    ];
+
+    expect(selectPushNotificationTargets(list, ["cleaner"], "cleaning")).toEqual([]);
+    expect(selectPushNotificationTargets(list, ["worker"], "sla")).toEqual([]);
+    expect(selectPushNotificationTargets(list, ["ppe"], "ppe").map((item) => item.userId)).toEqual(["ppe"]);
   });
 });

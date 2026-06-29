@@ -1,3 +1,5 @@
+import { notificationEnabledForUser, notificationSessionFromSubscription, notificationPrefsFromUser } from "./notificationAccessModel.js";
+
 export const PUSH_SUBSCRIPTIONS_KEY = "pushSubscriptions:v1";
 
 export function pushRuntimeReady(env = {}) {
@@ -33,6 +35,8 @@ export function parsePushSubscriptions(raw) {
         userId: String(item.userId || "").trim(),
         userName: String(item.userName || "").trim(),
         userRole: String(item.userRole || "").trim(),
+        userPermissions: item.userPermissions && typeof item.userPermissions === "object" ? item.userPermissions : {},
+        notificationPrefs: notificationPrefsFromUser(item),
         createdAt: Number(item.createdAt || 0),
         updatedAt: Number(item.updatedAt || item.createdAt || 0),
         subscription: normalizePushSubscription(item.subscription || item)
@@ -53,6 +57,8 @@ export function upsertPushSubscription(list = [], subscription = {}, user = {}, 
     userId: String(user.id),
     userName: String(user.name || ""),
     userRole: String(user.role || ""),
+    userPermissions: user.permissions || user.perms || {},
+    notificationPrefs: notificationPrefsFromUser(user),
     createdAt: existing.find((item) => item.id === id)?.createdAt || now,
     updatedAt: now,
     subscription: normalized
@@ -103,11 +109,15 @@ export function normalizePushNotificationRequest(input = {}) {
   return { ok: true, targetUserIds, title, body, url, kind, tag };
 }
 
-export function selectPushNotificationTargets(subscriptions = [], targetUserIds = []) {
+export function selectPushNotificationTargets(subscriptions = [], targetUserIds = [], kind = "system") {
   const allowed = new Set(targetUserIds.map((id) => String(id || "").trim()).filter(Boolean));
   const seenEndpoints = new Set();
   return parsePushSubscriptions(subscriptions)
     .filter((item) => allowed.has(item.userId))
+    .filter((item) => notificationEnabledForUser({
+      ...notificationSessionFromSubscription(item),
+      notificationPrefs: item.notificationPrefs
+    }, kind))
     .filter((item) => {
       const endpoint = item.subscription?.endpoint || "";
       if (!endpoint || seenEndpoints.has(endpoint)) return false;

@@ -125,6 +125,7 @@ Current implementation note:
 - Admin navigation gates management screens with `analytics:view`, `suppliers:view`, `settings:manage`, and `audit:view`; admin role still receives full access through role defaults.
 - Supplier screen access is split: `suppliers:view` can read the supplier list/details, while `suppliers:manage` is required for adding, renaming, editing, or deleting supplier records.
 - Settings screen access is split: `settings:manage` can edit ordinary configuration, while `settings:full` is required for sensitive system actions such as backup/restore and demo data load/clear controls.
+- Phone notification preferences should use the same access model, not a parallel role system. Event kinds map to module permissions in `src/notificationAccessModel.js`, and push delivery filters targets by role, permissions, and per-user notification preferences before sending.
 
 Possible grouping:
 
