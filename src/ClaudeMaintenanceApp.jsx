@@ -37,6 +37,7 @@ import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./f
 import { reportClientError } from "./clientErrorAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
+import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -4675,10 +4676,19 @@ function computeInsights(tickets, fleet, pm, config) {
   if (pmOver.length >= 3) out.push({ sev: "warn", text: `${countLabel(pmOver.length, "טיפול תקופתי באיחור", "טיפולים תקופתיים באיחור")}.`, go: "pm" });
   return out.slice(0, 6);
 }
-function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presence, saveConfig, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo, clearDemo }) {
+function Dashboard({ session, tickets: allTickets, pm, fleet, insp, config, users, presence, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo, clearDemo }) {
   const [cfgOpen, setCfgOpen] = useState(false);
   const [demoBusy, setDemoBusy] = useState("");
   const [dashTrackLocal, setDashTrackLocal] = useState("all");
+  const [widgetPrefs, setWidgetPrefs] = useState({});
+  const widgetPrefsKey = dashboardWidgetPrefsKey(session);
+  useEffect(() => {
+    let cancelled = false;
+    store.get(widgetPrefsKey, false)
+      .then((raw) => { if (!cancelled) setWidgetPrefs(parseDashboardWidgetPrefs(raw)); })
+      .catch(() => { if (!cancelled) setWidgetPrefs({}); });
+    return () => { cancelled = true; };
+  }, [widgetPrefsKey]);
   const dashTrack = setCtx ? (ctx || "all") : dashTrackLocal;
   const setDashTrack = setCtx || setDashTrackLocal;
   const isTransport = (t) => t.track === "transport" || (!t.track && t.forkliftId);
@@ -4688,7 +4698,7 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
     const focus = next.focus || (label ? { label } : null);
     return onFilter ? onFilter(focus ? { ...next, focus } : next) : setTab("tickets");
   };
-  const w = config.widgets || DEFAULT_CONFIG.widgets;
+  const w = dashboardWidgetsWithPrefs(DEFAULT_CONFIG.widgets, config.widgets, widgetPrefs);
   const open = tickets.filter(isOpen), breach = tickets.filter(isOverdue);
   const transOpen = open.filter(isTransport);
   const facilityOpen = open.filter((t) => !isTransport(t));
@@ -4737,7 +4747,11 @@ function Dashboard({ tickets: allTickets, pm, fleet, insp, config, users, presen
   const attention = [];
   for (const r of attnRules) for (const t of open) { if (seen.has(t.id)) continue; if (r.test(t)) { seen.add(t.id); attention.push({ t, tag: r.tag, color: r.color }); } }
   const attnShown = attention.slice(0, 10);
-  const toggle = (id) => saveConfig({ ...config, widgets: { ...w, [id]: !w[id] } });
+  const toggle = (id) => {
+    const next = toggleDashboardWidgetPref(widgetPrefs, id, w[id]);
+    setWidgetPrefs(next);
+    store.set(widgetPrefsKey, JSON.stringify(next), false).catch(() => {});
+  };
   const _now = Date.now();
   const lowPpe = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
   const ppeReqPend = (ppeReqs || []).filter(ppeRequestNeedsAction);

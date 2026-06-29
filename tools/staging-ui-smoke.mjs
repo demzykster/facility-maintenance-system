@@ -83,14 +83,23 @@ async function desktopSmoke(browser, credentials, expectedCommit) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const consoleMessages = [];
   const failedResponses = [];
+  const configWrites = [];
   page.on("console", (msg) => { if (relevantConsoleMessage(msg)) consoleMessages.push(`${msg.type()}: ${msg.text()}`); });
-  page.on("response", (response) => { if (relevantResponse(response)) failedResponses.push(`${response.status()} ${response.url()}`); });
+  page.on("response", (response) => {
+    if (response.request().method() === "PUT" && response.url().includes("/api/kv/config%3Av1")) configWrites.push(response.url());
+    if (relevantResponse(response)) failedResponses.push(`${response.status()} ${response.url()}`);
+  });
 
   await login(page, credentials);
   const version = await page.locator(".side-version").innerText().catch(() => "");
   if (expectedCommit && !version.includes(expectedCommit)) throw new Error(`desktop_version_mismatch:${version}`);
   if (await page.locator(".side-user-btn").count() < 1) throw new Error("desktop_profile_entry_missing");
   if (await page.getByRole("button", { name: /יציאה/ }).count() < 1) throw new Error("desktop_logout_missing");
+  await page.getByRole("button", { name: /התאמת לוח/ }).click();
+  await page.locator(".wtoggle").first().click();
+  await page.waitForTimeout(300);
+  if (await page.locator('[role="alert"]').count()) throw new Error("desktop_dashboard_widget_toggle_alert");
+  if (configWrites.length) throw new Error("desktop_dashboard_widget_toggle_wrote_global_config");
 
   const modules = [];
   for (const label of DESKTOP_MODULES) {
