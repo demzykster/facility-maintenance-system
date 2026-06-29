@@ -74,6 +74,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
   - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
   - local demo assets under `public/demo/` must stay out of git and Vercel uploads; they are local presentation material, not app runtime assets.
+  - final pilot UI polish should keep the page body flush to the viewport, avoid horizontal overflow on analytics/settings, keep the internal issue-report modal as one compact panel, and fit uploaded logos into a square canvas without cropping wide logos.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
@@ -138,6 +139,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Final pilot UI smoke/polish is in progress.
+  - Live Vercel login smoke passed on the current production URL with no alert toast or API/console errors during the checked window.
+  - Local visual smoke passed after the polish changes: no horizontal overflow on home/analytics/settings, the internal app-issue report modal shell matches the panel width, and wide logo upload renders as a 512x512 contained logo preview.
 - Client shared-save failure logging is complete in PR #404.
   - A new authenticated `/api/client-errors` endpoint writes sanitized browser-side storage failures into the existing audit sink.
   - The global red save-failure toast now reports shared/server storage failures with operation/key metadata; local browser-only keys stay silent.
