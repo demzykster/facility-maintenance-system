@@ -105,6 +105,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Playwright dev tooling is in progress.
+  - `@playwright/test` is installed as a dev dependency, and local Chromium smoke can run from the project.
+  - Post-PR #396 public Vercel smoke passed with `failedCount=0`, `unauthKvCount=0`, and no relevant console errors on the login screen.
+  - `npm run staging:gate` passed for public Vercel commit `31a7d07`.
 - Local-only storage key polish is in progress after PR #395.
   - `shared=false` app storage keys such as theme, remembered login, notification prefs, and local rate-limit state stay in browser-local storage instead of calling the production KV API.
   - This prevents pre-login `/api/kv/...shared=0` 401 noise while keeping `shared=true` CMMS data behind the API/Supabase boundary.
