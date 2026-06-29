@@ -87,8 +87,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - dashboard widget hide/show controls are personal display preferences. They must not write global `config:v1`, must not require `settings:manage`, and must not trigger the red shared-save failure banner.
   - staging UI smoke must explicitly click dashboard widget hide/show and fail if the red `השמירה לא הושלמה` save-failure toast appears.
   - `npm run staging:gate` includes `npm run staging:data:summary`, so every final staging gate shows table counts, KV key prefixes, and storage totals without printing record contents, secrets, or file paths.
-  - current staging is not empty after owner/import work: latest summary showed `app_users=1`, `cmms_kv_records=130`, `file_metadata=0`, `audit_events=137`, KV prefixes `fleet=128`, `czone=1`, `config=1`, and zero storage files. Do not delete or reset these records without an explicit owner cleanup command.
-  - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default.
+  - owner cleanup command was given after the fleet/import checks. Current staging should stay empty except the admin user: latest cleanup summary showed `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`, and zero storage files.
+  - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default. Red shared-save failure events include safe browser context (`online`, `visibilityState`, `focused`, `viewport`, `errorId`) to diagnose intermittent owner-visible banners.
   - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
   - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
   - fleet Excel import preview must block duplicate chassis/source identifiers inside the same workbook before save; the supplied `מעקב רישיונות_ 06.07.23.xlsx` preview found `total=128`, `ready=126`, `invalid=2` for duplicate `פסולתון` rows 127-128.
@@ -169,6 +169,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
+- Save-failure diagnostics are in progress on `codex/harden-save-failure-diagnostics`.
+  - Staging data was cleared per owner command: app admin remains, shared KV/file metadata/audit/storage are empty.
+  - Red shared-save failure reports now include safe browser context for later analysis in Settings > issue reports > system errors.
 - Staging gate data-awareness is in progress on `codex/include-data-summary-in-gate`.
   - Adds the read-only staging data summary step into the combined `npm run staging:gate` sequence.
 - Staging data summary is in progress on `codex/staging-data-summary`.

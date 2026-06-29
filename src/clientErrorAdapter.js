@@ -10,6 +10,19 @@ const safePath = () => {
   }
 };
 
+const clientContext = () => {
+  try {
+    return {
+      online: typeof navigator !== "undefined" && "onLine" in navigator ? navigator.onLine : null,
+      visibilityState: typeof document !== "undefined" ? document.visibilityState : "",
+      focused: typeof document !== "undefined" && typeof document.hasFocus === "function" ? document.hasFocus() : null,
+      viewport: typeof window !== "undefined" ? `${window.innerWidth || 0}x${window.innerHeight || 0}` : ""
+    };
+  } catch {
+    return {};
+  }
+};
+
 export async function reportClientError(event = {}, {
   endpoint = "/api/client-errors",
   fetchImpl = globalThis.fetch,
@@ -34,7 +47,10 @@ export async function reportClientError(event = {}, {
         shared: event.shared === true,
         path: event.path || safePath(),
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-        metadata: event.metadata || {}
+        metadata: {
+          ...clientContext(),
+          ...(event.metadata || {})
+        }
       })
     });
     return response.ok;

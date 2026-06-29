@@ -40,7 +40,12 @@ const safeMetadata = (value) => {
   return {
     error: text(value.error, 120),
     actorRole: text(value.actorRole, 40),
-    actorId: text(value.actorId, 80)
+    actorId: text(value.actorId, 80),
+    online: typeof value.online === "boolean" ? value.online : null,
+    visibilityState: text(value.visibilityState, 24),
+    focused: typeof value.focused === "boolean" ? value.focused : null,
+    viewport: text(value.viewport, 32),
+    errorId: text(value.errorId, 40)
   };
 };
 

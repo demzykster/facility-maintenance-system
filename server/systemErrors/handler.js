@@ -52,7 +52,12 @@ const normalizeSystemError = (event = {}) => ({
   operation: text(event.metadata?.operation, 32),
   key: text(event.metadata?.key, 80),
   path: text(event.metadata?.path, 220),
-  error: text(event.metadata?.metadata?.error || event.metadata?.error, 120)
+  error: text(event.metadata?.metadata?.error || event.metadata?.error, 120),
+  online: event.metadata?.metadata?.online,
+  visibilityState: text(event.metadata?.metadata?.visibilityState, 24),
+  focused: event.metadata?.metadata?.focused,
+  viewport: text(event.metadata?.metadata?.viewport, 32),
+  errorId: text(event.metadata?.metadata?.errorId, 40)
 });
 
 export function createSystemErrorsHandler({ auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {

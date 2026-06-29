@@ -65,7 +65,16 @@ describe("client errors API handler", () => {
         shared: true,
         path: "https://app.example/tickets?secret=remove-me",
         userAgent: "Browser/1.0",
-        metadata: { error: "storage_api_error", actorRole: "admin", password: "must-not-log" }
+        metadata: {
+          error: "storage_api_error",
+          actorRole: "admin",
+          password: "must-not-log",
+          online: false,
+          visibilityState: "visible",
+          focused: true,
+          viewport: "390x844",
+          errorId: "client-abc123"
+        }
       }
     });
 
@@ -88,7 +97,12 @@ describe("client errors API handler", () => {
         metadata: {
           error: "storage_api_error",
           actorRole: "admin",
-          actorId: ""
+          actorId: "",
+          online: false,
+          visibilityState: "visible",
+          focused: true,
+          viewport: "390x844",
+          errorId: "client-abc123"
         }
       })
     }));
