@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/add-stale-version-banner
+### Active branch: none
 
-- Status: adding a small stale-tab update prompt after manual Vercel browser testing showed an already-open tab can keep an older bundle until reload.
+- Status: main is clean after the stale-tab update prompt; Supabase Pro backup and separate-target restore drill are complete.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -173,7 +173,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Latest Completed Work
 
-- Stale-tab update prompt is in progress on `codex/add-stale-version-banner`.
+- Stale-tab update prompt is complete in PR #446.
   - Vite now emits a public `cmms-version.json` manifest for every production build.
   - The app compares the open tab's bundled commit to that manifest and shows a quiet refresh banner if Vercel has a newer build.
 - Save-failure diagnostics are complete in PR #443.
