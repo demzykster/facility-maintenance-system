@@ -33,6 +33,36 @@ const readBody = async (req) => {
   return text ? JSON.parse(text) : {};
 };
 
+const parseStoredUser = (raw) => {
+  if (!raw) return null;
+  try {
+    const value = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return value && typeof value === "object" ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+async function enrichSubscriptionsWithUsers(driver, subscriptions = []) {
+  const userIds = [...new Set(subscriptions.map((item) => item.userId).filter(Boolean))];
+  if (!driver?.get || !userIds.length) return subscriptions;
+  const usersById = new Map();
+  await Promise.all(userIds.map(async (userId) => {
+    const stored = parseStoredUser(await driver.get(`user:${userId}`, true));
+    if (stored) usersById.set(userId, stored);
+  }));
+  return subscriptions.map((item) => {
+    const user = usersById.get(item.userId);
+    if (!user) return item;
+    return {
+      ...item,
+      userRole: user.role || item.userRole,
+      userPermissions: user.permissions || user.perms || item.userPermissions,
+      notificationPrefs: user.notificationPrefs || user.notificationPreferences || user.notifyPrefs || item.notificationPrefs
+    };
+  });
+}
+
 async function authorize(req, env, fetchImpl, sessionClient) {
   const token = bearerToken(req);
   if (!token) return { ok: false, status: 401, error: "supabase_access_token_required" };
@@ -130,7 +160,8 @@ export function createPushHandler({
       if (action === "notify") {
         const normalized = normalizePushNotificationRequest(body.event || body);
         if (!normalized.ok) return sendJson(res, 400, { error: normalized.error });
-        const targets = selectPushNotificationTargets(current, normalized.targetUserIds, normalized.kind);
+        const subscriptions = await enrichSubscriptionsWithUsers(backendDriver, current);
+        const targets = selectPushNotificationTargets(subscriptions, normalized.targetUserIds, normalized.kind);
         let sent = 0;
         for (const target of targets) {
           await push.sendNotification(target.subscription, pushPayload({
