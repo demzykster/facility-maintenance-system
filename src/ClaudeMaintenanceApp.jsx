@@ -35,6 +35,7 @@ import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
+import { vehicleCatalogBase } from "./fleetCatalogModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -536,7 +537,12 @@ const flattenVehicleTypes = (vts) => {
   return { vehicleTypes: vts, forkliftTypes, typeSla, typeMeta, modelSupplier, modelType };
 };
 const mergeFleetCatalogAdditions = (config, fleet, additions) => {
-  const list = ((config.vehicleTypes && config.vehicleTypes.length) ? config.vehicleTypes : buildVehicleTypes(config, fleet)).map((v) => ({ ...v, models: [...(v.models || [])] }));
+  const list = vehicleCatalogBase({
+    config,
+    fleet,
+    productionStartsEmpty: SEED_POLICY.productionStartsEmpty,
+    buildVehicleTypes
+  });
   (additions || []).forEach((add) => {
     let type = list.find((v) => (v.name || "").trim() === add.name);
     if (!type) {
@@ -5231,7 +5237,12 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
 /* ============================================================ FLEET */
 function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   const [saved, setSaved] = useState(false), [typeMsg, setTypeMsg] = useState(""), [openType, setOpenType] = useState(null);
-  const [vtypes, setVtypes] = useState((config.vehicleTypes && config.vehicleTypes.length) ? config.vehicleTypes.map((v) => ({ ...v, models: [...(v.models || [])] })) : buildVehicleTypes(config, fleet));
+  const [vtypes, setVtypes] = useState(() => vehicleCatalogBase({
+    config,
+    fleet,
+    productionStartsEmpty: SEED_POLICY.productionStartsEmpty,
+    buildVehicleTypes
+  }));
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
   const save = async () => {
     setTypeMsg("");
@@ -5246,6 +5257,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   return (<div className="settings-wrap">
     <SectionTitle>סוגי כלי שינוע</SectionTitle>
     <div className="hint" style={{ marginBottom: 8 }}>«סוג» מגדיר ספק, SLA, מסמכים, תדירות טיפול ושאלון — ותחתיו הדגמים השייכים אליו. הכול נשמר בלחיצה על «שמירה».</div>
+    {vtypes.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין קטלוג סוגי כלי שינוע שמור במערכת. ייבוא Excel יציע ליצור סוגים ודגמים מתוך גיליון הרישיונות לפני שמירת הכלים.</div>}
     {vtypes.map((t, i) => { const op = openType === i; const docFlags = [["insurance", "מנוהל ביטוח"], ["tasrir", "מנוהל תסקיר"], ["license", "מנוהל רישיון רכב"], ["lease", "מנוהל ליזינג"]]; return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}{(t.models || []).length ? <span className="reg-count">{t.models.length} {t.models.length === 1 ? "דגם" : "דגמים"}</span> : null}</span>}<button className="reg-edit" onClick={() => setOpenType(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setVtypes((s) => s.filter((_, j) => j !== i)); if (op) setOpenType(null); }}><Trash2 size={15} /></button></div>{op && <>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>זמני יעד SLA (שעות):</div>{slaRow(t, (k, v) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>מסמכים שמנוהלים לסוג זה:</div>{docFlags.map(([k, lbl]) => <label key={k} className="chk-line"><input type="checkbox" checked={!!t[k]} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: e.target.checked } : x))} /> {lbl}</label>)}

@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/honest-empty-fleet-catalog
 
-- Status: batch fleet Excel import save batching is the current completed pilot-hardening item. Importing a large workbook now writes fleet rows through one `/api/kv` batch request instead of many separate PUT calls. Goal: reduce Vercel function spikes and avoid misleading red shared-save banners during valid imports.
+- Status: hardening the production empty fleet/catalog state. Direct Supabase and live API checks showed `cmms_kv_records=0` and `fleet:* = 0`; the visible `סוגי כלי שינוע` rows came from built-in defaults, not saved pilot data. This branch prevents an empty production database from displaying built-in fleet catalog defaults as if they were persisted records, while keeping demo/test fallback behavior.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
@@ -59,6 +59,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - fleet Excel import must keep `סוג כלי` as the vehicle type/category and `דגם` as the manufacturer/model; many models can belong to one vehicle type.
+  - production empty fleet/catalog state must be honest: if no fleet records and no saved `vehicleTypes` catalog exist, the settings screen must not display built-in `DEFAULT_CONFIG` forklift models as real saved data.
   - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
