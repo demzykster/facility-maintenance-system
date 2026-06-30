@@ -52,6 +52,36 @@ describe("fleetImportSaveModel", () => {
     ]);
   });
 
+  it("can save catalog additions without creating fleet units", async () => {
+    const calls = [];
+    const additions = [{ name: "מלגזת היגש", models: ["RRE200H"] }];
+    const result = await saveFleetImportAtomically({
+      units: [],
+      catalogAdditions: additions,
+      saveMany: async () => {
+        calls.push(["fleet"]);
+        return true;
+      },
+      saveCatalog: async () => {
+        calls.push(["catalog"]);
+        return true;
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual([["catalog"]]);
+  });
+
+  it("reports catalog-only save failure", async () => {
+    const result = await saveFleetImportAtomically({
+      units: [],
+      catalogAdditions: [{ name: "מלגזת היגש", models: ["RRE200H"] }],
+      saveCatalog: async () => false
+    });
+
+    expect(result).toMatchObject({ ok: false, savedIds: [], rolledBackIds: [], error: "catalog_save_failed" });
+  });
+
   it("rolls back already saved fleet units when a later batch fails", async () => {
     const rolledBack = [];
     const result = await saveFleetImportAtomically({

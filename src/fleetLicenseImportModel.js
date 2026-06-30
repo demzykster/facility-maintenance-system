@@ -77,17 +77,33 @@ const existingConflict = (unit, existingFleet = []) => {
   }) || null;
 };
 
-export function planFleetLicenseCatalogAdditions(rows = [], config = {}) {
-  const existingModels = new Set();
-  (config.forkliftTypes || []).forEach((model) => { const m = cleanText(model); if (m) existingModels.add(m); });
-  (config.vehicleTypes || []).forEach((type) => (type.models || []).forEach((model) => { const m = cleanText(model); if (m) existingModels.add(m); }));
+export function planFleetLicenseCatalogAdditions(rows = [], config = {}, options = {}) {
+  const includeActions = new Set(options.includeActions || ["new"]);
+  const structuredTypes = (config.vehicleTypes || []).filter((type) => cleanText(type?.name));
+  const hasStructuredTypes = structuredTypes.length > 0;
+  const existingLegacyModels = new Set();
+  (config.forkliftTypes || []).forEach((model) => { const m = cleanText(model); if (m) existingLegacyModels.add(m); });
+  const existingTypeModels = new Map();
+  structuredTypes.forEach((type) => {
+    const name = cleanText(type.name);
+    if (!existingTypeModels.has(name)) existingTypeModels.set(name, new Set());
+    (type.models || []).forEach((model) => {
+      const m = cleanText(model);
+      if (m) existingTypeModels.get(name).add(m);
+    });
+  });
   const byType = new Map();
 
-  (rows || []).filter((row) => row?.action === "new").forEach((row) => {
+  (rows || []).filter((row) => includeActions.has(row?.action)).forEach((row) => {
     const unit = row.unit || {};
     const model = cleanText(unit.model || (unit.vehicleKind ? "" : unit.type));
-    if (!model || existingModels.has(model)) return;
     const name = cleanText(unit.vehicleKind || unit.type || unit.notes || model) || model;
+    if (!model || !name) return;
+    if (hasStructuredTypes) {
+      if (existingTypeModels.get(name)?.has(model)) return;
+    } else if (existingLegacyModels.has(model)) {
+      return;
+    }
     if (!byType.has(name)) byType.set(name, { name, models: [], docs: { tasrir: false, license: false, lease: false } });
     const entry = byType.get(name);
     if (!entry.models.includes(model)) entry.models.push(model);

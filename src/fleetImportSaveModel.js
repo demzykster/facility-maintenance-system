@@ -26,6 +26,14 @@ export async function saveFleetImportAtomically({
 
   try {
     report();
+    if (!list.length) {
+      if ((catalogAdditions || []).length && typeof saveCatalog === "function") {
+        const catalogOk = await saveCatalog();
+        if (catalogOk === false) throw new Error("catalog_save_failed");
+      }
+      return { ok: true, savedIds };
+    }
+
     if (typeof saveMany === "function" && (catalogAdditions || []).length) {
       const ok = await saveMany(list, catalogAdditions);
       if (ok === false) throw new Error("fleet_import_save_failed");

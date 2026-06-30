@@ -21,13 +21,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/fix-supabase-kv-pagination
+### Active branch: codex/fix-fleet-catalog-reconcile
 
-- In progress: harden the Supabase KV bridge against silent PostgREST row truncation. `server/kv/supabaseDriver.js` now paginates `list` and `listValues` reads and changes `listValuesMany` to fetch only requested prefixes instead of scanning the entire `cmms_kv_records` table in one unbounded request.
-- Validation so far: targeted KV/storage tests passed, full `npm test -- --run` passed, `npm run release:check` passed, and `npm run build` passed.
+- In progress: fix fleet Excel import catalog reconciliation so `סוג כלי` remains the vehicle type/category and `דגם` remains the model under that type. Catalog planning now works by `(vehicle type, model)` pairs and can repair missing catalog entries from conflict rows when fleet units already exist.
+- Validation so far: targeted fleet import tests passed, full `npm test -- --run` passed, `npm run release:check` passed, and `npm run build` passed. The supplied `רישיונות` workbook preview reads 128 rows, keeps 126 importable rows, rejects the two duplicate `פסולתון` chassis rows, and proposes 12 vehicle-type catalog groups from the valid rows.
 
-- Latest completed work: PR #497 reduces `/api/kv` load/read fragility by adding a multi-prefix collection read and wiring `reloadAll()` to use it. This targets pilot symptoms where the server still has `fleet:` records but the UI can remain empty if one of many parallel collection reads fails or times out.
-- Validation for PR #497: targeted storage/KV tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and `npm run staging:gate` passed against production commit `d40e930` with live staging data summary showing `fleet: 126`. A local Vercel-dev Playwright smoke on branch commit `1e28515` logged into the staging Supabase account, opened `כלי שינוע`, saw `פארק כלי שינוע (126)`, used one batched `/api/kv?prefixes=...` request, made zero per-prefix collection reads, and showed no console/API errors.
+- Latest completed work: PR #498 hardens the Supabase KV bridge against silent PostgREST row truncation. `server/kv/supabaseDriver.js` now paginates `list` and `listValues` reads and changes `listValuesMany` to fetch only requested prefixes instead of scanning the entire `cmms_kv_records` table in one unbounded request.
+- Validation for PR #498: targeted KV/storage tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and Vercel preview checks passed before merge.
 - Current staging/pilot data is live and may change as the owner imports/edits real data. Verify with `npm run staging:data:summary` before making assumptions. Do not clear, reseed, or overwrite owner-entered data unless explicitly asked for destructive cleanup.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
