@@ -1290,11 +1290,14 @@ export default function App() {
   const [dismissedVersionCommit, setDismissedVersionCommit] = useState("");
   const [session, setSession] = useState(null);
   const sessionRef = useRef(null);
+  const quietSharedFailureKeysRef = useRef(new Set());
   useEffect(() => { sessionRef.current = session; }, [session]);
   useEffect(() => {
     store._onFail = (details = {}) => {
       const errorId = `client-${Date.now().toString(36)}`;
-      setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+      if (!quietSharedFailureKeysRef.current.has(details.key)) {
+        setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+      }
       const current = sessionRef.current || {};
       reportClientError({
         kind: "storage_save_failed",
@@ -1453,9 +1456,13 @@ export default function App() {
     }));
     return arr.filter(Boolean);
   }
-  const persistShared = async (key, value) => {
-    const ok = await store.set(key, value, true);
-    if (!ok) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+  const persistShared = async (key, value, options = {}) => {
+    const toastOnFail = options.toastOnFail !== false;
+    if (!toastOnFail) quietSharedFailureKeysRef.current.add(key);
+    const ok = await store.set(key, value, true).finally(() => {
+      if (!toastOnFail) quietSharedFailureKeysRef.current.delete(key);
+    });
+    if (!ok && toastOnFail) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
     return ok;
   };
   const deleteShared = async (key) => {
@@ -1576,7 +1583,7 @@ export default function App() {
   const savePm = async (p) => { if (!await persistShared(`pm:${p.id}`, JSON.stringify(p))) return false; setPm((s) => [...s.filter((x) => x.id !== p.id), p].sort((a, b) => a.nextDue - b.nextDue)); return true; };
   const delPm = async (id) => { if (!await deleteShared(`pm:${id}`)) return false; setPm((s) => s.filter((x) => x.id !== id)); return true; };
   const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
-  const saveFleet = async (f) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f))) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
+  const saveFleet = async (f, options = {}) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
   const saveZone = async (z) => { if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false; setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); return true; };
   const delZone = async (id) => { if (!await deleteShared(`czone:${id}`)) return false; setZones((s) => s.filter((x) => x.id !== id)); return true; };
   const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); if (!await persistShared(`cround:${rec.id}`, JSON.stringify(rec))) return false; setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); return true; };
@@ -1625,7 +1632,7 @@ export default function App() {
   const delTpl = async (id) => { if (!await deleteShared(`itpl:${id}`)) return false; setTemplates((s) => s.filter((x) => x.id !== id)); return true; };
   const saveUser = async (u) => { if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false; setUsers((s) => [...s.filter((x) => x.id !== u.id), u]); return true; };
   const delUser = async (id) => { if (!await deleteShared(`user:${id}`)) return false; setUsers((s) => s.filter((x) => x.id !== id)); return true; };
-  const saveConfig = async (n) => { if (!await persistShared("config:v1", JSON.stringify(n))) return false; setConfig(n); return true; };
+  const saveConfig = async (n, options = {}) => { if (!await persistShared("config:v1", JSON.stringify(n), options)) return false; setConfig(n); return true; };
   const saveTask = async (t) => { if (!await persistShared(`mtask:${t.id}`, JSON.stringify(t))) return false; setTasks((s) => [t, ...s.filter((x) => x.id !== t.id)].sort((a, b) => b.createdAt - a.createdAt)); return true; };
   const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
   const saveMeeting = async (m) => { if (!await persistShared(`mmeet:${m.id}`, JSON.stringify(m))) return false; setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); return true; };
@@ -5194,6 +5201,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog })
   const [result, setResult] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [done, setDone] = useState(false);
   const [confirmSkipConflicts, setConfirmSkipConflicts] = useState(false);
   const [confirmCatalog, setConfirmCatalog] = useState(false);
+  const [importError, setImportError] = useState("");
   const readyRows = (result?.rows || []).filter((row) => row.action === "new");
   const conflictRows = (result?.rows || []).filter((row) => row.action === "conflict");
   const invalidRows = (result?.rows || []).filter((row) => row.action === "invalid");
@@ -5203,7 +5211,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog })
     const file = e.target.files?.[0]; if (!file) return;
     if (!/\.xlsx$/i.test(file.name || "")) { setErr("בחרו קובץ Excel מסוג XLSX."); e.target.value = ""; return; }
     if (file.size > 10 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 10MB."); e.target.value = ""; return; }
-    setBusy(true); setErr(""); setDone(false); setConfirmSkipConflicts(false); setConfirmCatalog(false);
+    setBusy(true); setErr(""); setImportError(""); setDone(false); setConfirmSkipConflicts(false); setConfirmCatalog(false);
     try {
       const parsed = parseFleetLicenseWorkbook(await readExcelFile(file), { existingFleet: fleet });
       if (!parsed.ok) { setResult(null); setErr(parsed.error === "fleet_license_sheet_not_found" ? "לא נמצא גיליון בשם רישיונות." : "לא נמצאה טבלת רישיונות תקינה בקובץ."); return; }
@@ -5214,7 +5222,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog })
   const save = async () => {
     if (!readyRows.length) return setErr("אין שורות חדשות לייבוא.");
     if (conflictRows.length && !confirmSkipConflicts) return setErr("יש קונפליקטים. אשרו במפורש לייבא רק את הכלים החדשים ולהשאיר את הקונפליקטים ללא שינוי.");
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setImportError("");
     try {
       const now = Date.now();
       if (catalogAdditions.length && onSaveCatalog) {
@@ -5222,10 +5230,11 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog })
         if (catalogOk === false) throw new Error("catalog_save_failed");
       }
       for (const [i, row] of readyRows.entries()) {
-        await onImport({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i });
+        const ok = await onImport({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i });
+        if (ok === false) throw new Error("fleet_import_save_failed");
       }
       setDone(true);
-    } catch (ex) { setErr("הייבוא נכשל באמצע. בדקו את הרשומות ונסו שוב."); }
+    } catch (ex) { setImportError("הייבוא נעצר כי חלק מהרשומות לא נשמרו. בדקו חיבור ונסו שוב."); }
     finally { setBusy(false); }
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">ייבוא כלי שינוע מ-Excel</div></div>
@@ -5253,6 +5262,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog })
         {invalidRows.length > 0 && <div className="err">{invalidRows.length} שורות חסרות מספר/ספק/דגם ולא ייובאו.</div>}
         <div className="imp-prev">{result.rows.slice(0, 45).map((row) => <div key={row.sourceRow} className="imp-row" style={row.action !== "new" ? { opacity: 0.62 } : {}}><div className="imp-t"><span className={"act-tag " + (row.action === "new" ? "new" : row.action === "conflict" ? "update" : "nochange")}>{row.action === "new" ? "חדשה" : row.action === "conflict" ? "קונפליקט" : "שגויה"}</span>{row.unit.code || "—"} · {row.unit.vehicleKind || row.unit.type || "—"}</div><div className="imp-meta">{row.unit.supplier || "—"} · דגם {row.unit.type || "—"} · שלדה {row.unit.chassis || "—"} · מסמכים {Object.keys(row.unit.docs || {}).length}</div></div>)}</div>
         {result.rows.length > 45 && <div className="hint">…ועוד {result.rows.length - 45} שורות</div>}
+        {importError && <div className="err">{importError}</div>}
         {done ? <div className="toast-ok"><CheckCircle2 size={16} /> יובאו {readyRows.length} כלים חדשים</div> : <button className="btn-primary full" disabled={busy || !canImport} onClick={save}>ייבוא {readyRows.length} כלים חדשים</button>}
       </>}
     </div></div>);
@@ -5365,7 +5375,7 @@ function FleetModule(p) {
         </div>}
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
-    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={saveFleet} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds))} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
   </>);
 }
