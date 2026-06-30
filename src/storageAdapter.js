@@ -109,7 +109,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
         return false;
       }
     },
-    async setMany(records = [], shared = false) {
+    async setMany(records = [], shared = false, options = {}) {
       const fallback = canUseMemoryFallback();
       const safeRecords = (Array.isArray(records) ? records : []).filter((record) => record?.key);
       if (fallback) safeRecords.forEach((record) => { mem[record.key] = record.value; });
@@ -117,7 +117,7 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
       if (!storage) return fallback;
       try {
         if (storage.setMany) {
-          const result = await withTimeout(storage.setMany(safeRecords, shared), timeoutMs);
+          const result = await withTimeout(storage.setMany(safeRecords, shared, options), options.timeoutMs || timeoutMs);
           if (result === undefined) throw new Error("timeout");
           return true;
         }

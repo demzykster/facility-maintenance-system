@@ -89,6 +89,39 @@ describe("kv API handler", () => {
     expect(driver.set).toHaveBeenCalledWith("fleet:2", "{\"id\":\"fleet-2\"}", true);
   });
 
+  it("rolls back an atomic batch when a later write fails", async () => {
+    const driver = {
+      get: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce("{\"id\":\"old\"}"),
+      set: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("write_failed"))
+        .mockResolvedValueOnce(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createKvApiHandler({ driver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const res = await call(handler, {
+      method: "POST",
+      body: {
+        shared: true,
+        atomic: true,
+        records: [
+          { key: "fleet:1", value: "{\"id\":\"fleet-1\"}" },
+          { key: "fleet:2", value: "{\"id\":\"fleet-2\"}" }
+        ]
+      }
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: "atomic_batch_failed", rolledBack: 1 });
+    expect(driver.get).toHaveBeenCalledWith("fleet:1", true);
+    expect(driver.get).toHaveBeenCalledWith("fleet:2", true);
+    expect(driver.delete).toHaveBeenCalledWith("fleet:1", true);
+    expect(driver.set).not.toHaveBeenCalledWith("fleet:2", "{\"id\":\"old\"}", true);
+  });
+
   it("can return matching key values in one collection response", async () => {
     const driver = {
       listValues: vi.fn().mockResolvedValue([

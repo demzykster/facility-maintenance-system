@@ -43,7 +43,21 @@ describe("apiStorageAdapter", () => {
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual({ value: "ticket-json", shared: true });
     expect(JSON.parse(fetchImpl.mock.calls[2][1].body)).toEqual({
       records: [{ key: "ticket:2", value: "ticket-json-2" }],
-      shared: true
+      shared: true,
+      atomic: false
+    });
+  });
+
+  it("can request an atomic batch write", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(ok({ ok: true, count: 2, atomic: true }));
+    const provider = createApiStorageProvider({ baseUrl: "https://cmms.example/api", fetchImpl });
+
+    await expect(provider.setMany([{ key: "fleet:1", value: "{}" }], true, { atomic: true })).resolves.toBe(true);
+
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
+      records: [{ key: "fleet:1", value: "{}" }],
+      shared: true,
+      atomic: true
     });
   });
 
