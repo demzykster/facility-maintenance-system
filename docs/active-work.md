@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/fix-fleet-type-model-import`
+### Active branch: none
 
-- Status: fixing owner-reported fleet import/data-model bug where `סוג כלי` and `דגם` were effectively collapsed into one field.
+- Status: owner-reported fleet import/data-model bug closed in PR #474. No active product branch. Continue with the next owner-facing bug, final pilot polish, or post-pilot hardening item.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
-- Open PRs: #471 docs audit packet; current fleet fix PR not opened yet.
+- Open PRs: #471 docs audit packet.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - keep module permissions, role defaults, and notification preferences connected instead of creating a separate parallel notification-access system.
