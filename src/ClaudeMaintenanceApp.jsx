@@ -1514,7 +1514,7 @@ export default function App() {
       keys.forEach((key) => quietSharedFailureKeysRef.current.add(key));
       if (failKey) quietSharedFailureKeysRef.current.add(failKey);
     }
-    const ok = await store.setMany(records, true).finally(() => {
+    const ok = await store.setMany(records, true, { atomic: !!options.atomic, timeoutMs: options.timeoutMs }).finally(() => {
       if (!toastOnFail) {
         keys.forEach((key) => quietSharedFailureKeysRef.current.delete(key));
         if (failKey) quietSharedFailureKeysRef.current.delete(failKey);
@@ -1652,6 +1652,21 @@ export default function App() {
       const ids = new Set(units.map((f) => f.id));
       return [...s.filter((x) => !ids.has(x.id)), ...units].sort((a, b) => (a.code > b.code ? 1 : -1));
     });
+    return true;
+  };
+  const saveFleetImportBatch = async (items, catalogAdditions = [], options = {}) => {
+    const units = (items || []).filter((f) => f?.id);
+    if (!units.length) return true;
+    const mergedConfig = catalogAdditions?.length ? mergeFleetCatalogAdditions(config, fleet, catalogAdditions) : config;
+    const records = units.map((f) => ({ key: `fleet:${f.id}`, value: JSON.stringify(f) }));
+    if (catalogAdditions?.length) records.push({ key: "config:v1", value: JSON.stringify(mergedConfig) });
+    const ok = await persistSharedMany(records, { ...options, atomic: true, timeoutMs: 60000 });
+    if (!ok) return false;
+    setFleet((s) => {
+      const ids = new Set(units.map((f) => f.id));
+      return [...s.filter((x) => !ids.has(x.id)), ...units].sort((a, b) => (a.code > b.code ? 1 : -1));
+    });
+    if (catalogAdditions?.length) setConfig(mergedConfig);
     return true;
   };
   const saveZone = async (z) => { if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false; setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); return true; };
@@ -5306,10 +5321,11 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
       const units = readyRows.map((row, i) => ({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i }));
       const importResult = await saveFleetImportAtomically({
         units,
-        saveMany: null,
+        batchSize: units.length || 1,
+        saveMany: typeof onImportMany === "function" ? (chunk) => onImportMany(chunk, catalogAdditions) : null,
         saveOne: onImport,
         rollbackOne: onDelete,
-        saveCatalog: catalogAdditions.length && onSaveCatalog ? () => onSaveCatalog(catalogAdditions) : null,
+        saveCatalog: typeof onImportMany === "function" ? null : (catalogAdditions.length && onSaveCatalog ? () => onSaveCatalog(catalogAdditions) : null),
         onProgress: setImportProgress
       });
       if (!importResult.ok) {
@@ -5457,7 +5473,7 @@ function FleetModule(p) {
         </div>}
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
-    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units) => saveFleetMany(units, { toastOnFail: false })} onDelete={(id) => delFleet(id, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units, adds) => saveFleetImportBatch(units, adds, { toastOnFail: false })} onDelete={(id) => delFleet(id, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
   </>);
 }

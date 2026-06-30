@@ -23,6 +23,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
+- In progress now: harden fleet Excel import after the owner's latest retry left a partial Supabase KV state (`config:v1` plus two `fleet:*` records). The root cause is that the previous rollback still depended on the browser staying alive while it saved many fleet units one by one.
 - Status: fleet Excel import atomic-save hardening is complete in PR #483. The import no longer saves catalog/config before fleet units; it saves units first with tracked rollback, saves catalog only after fleet succeeds, and shows an inline "not partially saved" message on failure.
 - Validation for PR #483: targeted fleet import/catalog tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, `git diff --check` passed, and Vercel preview passed before merge.
 - Post-merge cleanup: the partial `config:v1` left by the failed owner import was removed from staging. Live smoke on deployed commit `8616dda` passed with `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=1`, and an empty `cmms-files` bucket.
@@ -61,6 +62,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
   - fleet Excel import must keep `סוג כלי` as the vehicle type/category and `דגם` as the manufacturer/model; many models can belong to one vehicle type.
+  - fleet Excel import must save fleet units and catalog additions as one server-side atomic batch. Browser-side one-by-one rollback is not reliable enough for real pilot data entry because the tab/network can stop before rollback completes.
   - production empty fleet/catalog state must be honest: if no fleet records and no saved `vehicleTypes` catalog exist, the settings screen must not display built-in `DEFAULT_CONFIG` forklift models as real saved data.
   - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".

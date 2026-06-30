@@ -80,8 +80,23 @@ describe("app storage adapter", () => {
 
     await expect(store.setMany(records, true)).resolves.toBe(true);
 
-    expect(remote.setMany).toHaveBeenCalledWith(records, true);
+    expect(remote.setMany).toHaveBeenCalledWith(records, true, {});
     expect(remote.set).not.toHaveBeenCalled();
+  });
+
+  it("passes atomic batch options to shared storage", async () => {
+    const remote = {
+      setMany: vi.fn().mockResolvedValue(true)
+    };
+    const store = createAppStore({
+      storageProvider: () => remote,
+      allowMemoryFallback: false
+    });
+    const records = [{ key: "fleet:1", value: "{}" }];
+
+    await expect(store.setMany(records, true, { atomic: true, timeoutMs: 5000 })).resolves.toBe(true);
+
+    expect(remote.setMany).toHaveBeenCalledWith(records, true, { atomic: true, timeoutMs: 5000 });
   });
 
   it("reports a single shared failure when batch save times out", async () => {
