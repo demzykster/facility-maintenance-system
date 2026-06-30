@@ -1487,9 +1487,7 @@ export default function App() {
   async function loadColl(prefix) {
     const records = typeof store.listValues === "function" ? await store.listValues(prefix, true) : null;
     if (Array.isArray(records)) {
-      return records.map((record) => {
-        try { return JSON.parse(record.value); } catch { return null; }
-      }).filter(Boolean);
+      return parseCollRecords(records);
     }
     const keys = await store.list(prefix, true);
     const arr = await Promise.all(keys.map(async (k) => {
@@ -1497,6 +1495,20 @@ export default function App() {
       try { return JSON.parse(raw); } catch { return null; }
     }));
     return arr.filter(Boolean);
+  }
+  const parseCollRecords = (records) => (records || []).map((record) => {
+    try { return JSON.parse(record.value); } catch { return null; }
+  }).filter(Boolean);
+  async function loadCollections(prefixes) {
+    if (typeof store.listManyValues === "function") {
+      try {
+        const grouped = await store.listManyValues(prefixes, true);
+        if (grouped && prefixes.every((prefix) => Array.isArray(grouped[prefix]))) {
+          return prefixes.map((prefix) => parseCollRecords(grouped[prefix]));
+        }
+      } catch {}
+    }
+    return Promise.all(prefixes.map((prefix) => loadColl(prefix)));
   }
   const persistShared = async (key, value, options = {}) => {
     const toastOnFail = options.toastOnFail !== false;
@@ -1531,10 +1543,10 @@ export default function App() {
     return ok;
   };
   async function reloadAll() {
-    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, pp, ppit, ppn, ppreq, pord, issues] = await Promise.all([
-      loadColl("ticket:"), loadColl("pm:"), loadColl("fleet:"), loadColl("insp:"),
-      loadColl("itpl:"), loadColl("presence:"), loadColl("user:"),
-      loadColl("czone:"), loadColl("cround:"), loadColl("ccomplaint:"), loadColl("cabsence:"), loadColl("mtask:"), loadColl("mmeet:"), loadColl("ppe:"), loadColl("ppeitem:"), loadColl("ppenorm:"), loadColl("ppereq:"), loadColl("ppeorder:"), loadColl("appIssue:"),
+    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
+      "ticket:", "pm:", "fleet:", "insp:",
+      "itpl:", "presence:", "user:",
+      "czone:", "cround:", "ccomplaint:", "cabsence:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;

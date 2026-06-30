@@ -21,6 +21,10 @@ const readBody = async (req) => {
 };
 
 const parseBool = (value) => value === true || value === "1" || value === "true";
+const parsePrefixes = (value) => {
+  const raw = Array.isArray(value) ? value.join(",") : String(value || "");
+  return [...new Set(raw.split(",").map((prefix) => prefix.trim()).filter(Boolean))];
+};
 
 const getHeader = (headers = {}, name) => {
   const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
@@ -204,6 +208,37 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
       if (!key && method === "GET") {
         const prefix = String(query.prefix || "");
         if (parseBool(query.includeValues)) {
+          const prefixes = parsePrefixes(query.prefixes);
+          if (prefixes.length) {
+            if (prefixes.length > 50 || prefixes.some((item) => item.length > 128)) {
+              return json(res, 400, { error: "prefixes_invalid" });
+            }
+            const grouped = typeof backendDriver.listValuesMany === "function"
+              ? await backendDriver.listValuesMany(prefixes, shared)
+              : Object.fromEntries(await Promise.all(prefixes.map(async (item) => [
+                item,
+                typeof backendDriver.listValues === "function"
+                  ? await backendDriver.listValues(item, shared)
+                  : await Promise.all((await backendDriver.list(item, shared)).map(async (recordKey) => ({
+                    key: recordKey,
+                    value: await backendDriver.get(recordKey, shared)
+                  })))
+              ])));
+            const collections = {};
+            for (const item of prefixes) {
+              collections[item] = (grouped[item] || [])
+                .map((record) => ({
+                  key: record.key,
+                  value: kvReadValueForSession({
+                    key: record.key,
+                    value: record.value,
+                    session: auth.user
+                  })
+                }))
+                .filter((record) => record.key && record.value !== null && record.value !== undefined);
+            }
+            return json(res, 200, { collections });
+          }
           const records = typeof backendDriver.listValues === "function"
             ? await backendDriver.listValues(prefix, shared)
             : await Promise.all((await backendDriver.list(prefix, shared)).map(async (recordKey) => ({

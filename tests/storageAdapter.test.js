@@ -68,6 +68,29 @@ describe("app storage adapter", () => {
     expect(remote.get).not.toHaveBeenCalled();
   });
 
+  it("loads multiple collections in one provider call when supported", async () => {
+    const remote = {
+      listManyValues: vi.fn().mockResolvedValue({
+        collections: {
+          "ticket:": [{ key: "ticket:1", value: "{\"id\":\"ticket-1\"}" }],
+          "fleet:": [{ key: "fleet:1", value: "{\"id\":\"fleet-1\"}" }]
+        }
+      }),
+      listValues: vi.fn()
+    };
+    const store = createAppStore({
+      storageProvider: () => remote,
+      allowMemoryFallback: false
+    });
+
+    await expect(store.listManyValues(["ticket:", "fleet:"], true)).resolves.toEqual({
+      "ticket:": [{ key: "ticket:1", value: "{\"id\":\"ticket-1\"}" }],
+      "fleet:": [{ key: "fleet:1", value: "{\"id\":\"fleet-1\"}" }]
+    });
+    expect(remote.listManyValues).toHaveBeenCalledWith(["ticket:", "fleet:"], true);
+    expect(remote.listValues).not.toHaveBeenCalled();
+  });
+
   it("saves multiple shared records in one provider call when supported", async () => {
     const remote = {
       setMany: vi.fn().mockResolvedValue(true),
