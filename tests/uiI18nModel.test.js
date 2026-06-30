@@ -32,7 +32,8 @@ describe("uiI18nModel", () => {
     expect(uiText("ar", "cleaner.todoNow", { count: 2 })).toContain("2");
     expect(uiText("hi", "push.enable")).toBe("चालू करें");
     expect(uiText("ti", "common.logout")).toBe("ውጻእ");
-    expect(uiText("he", "install.button")).toBe("התקן כאפליקציה");
+    expect(uiText("he", "install.button")).toBe("התקנה");
+    expect(uiText("he", "install.browserHint")).toContain("התראות");
     expect(uiText("ru", "install.iosHint")).toContain("iPhone");
   });
 

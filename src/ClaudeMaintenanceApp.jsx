@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import packageInfo from "../package.json";
@@ -2144,13 +2144,14 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE }) {
     if (choice?.outcome === "accepted") setAccepted(true);
     setInstallEvent(null);
   };
+  const installIcon = mode === "ios" ? <Smartphone size={18} /> : <MonitorDown size={18} />;
   return <div className="install-prompt">
-    <div className="install-ic"><Smartphone size={18} /></div>
+    <div className="install-ic">{installIcon}</div>
     <div className="install-copy">
       <b>{t("install.title")}</b>
-      <span>{mode === "ios" ? t("install.iosHint") : t("install.androidHint")}</span>
+      <span>{mode === "ios" ? t("install.iosHint") : t("install.browserHint")}</span>
     </div>
-    {mode === "android" && <button className="install-btn" type="button" onClick={install}><Download size={15} /> {t("install.button")}</button>}
+    {mode === "browser" && <button className="install-btn" type="button" onClick={install} aria-label={t("install.button")} title={t("install.button")}><Download size={16} /></button>}
     <button className="install-x" type="button" onClick={() => setDismissed(true)} aria-label={t("common.close")}><X size={15} /></button>
   </div>;
 }
@@ -7593,11 +7594,11 @@ a{color:inherit;}
 .install-copy{min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.35;}
 .install-copy b{font-size:13px;font-weight:800;}
 .install-copy span{font-size:12px;color:var(--muted);}
-.install-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;border-radius:9px;background:var(--primary);color:#fff;padding:0 10px;font-size:12px;font-weight:800;white-space:nowrap;}
+.install-btn{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;background:var(--primary);color:#fff;padding:0;white-space:nowrap;}
 .install-btn:hover{background:var(--primary-d);}
 .install-x{width:30px;height:30px;border-radius:8px;color:var(--muted);display:flex;align-items:center;justify-content:center;}
 .install-x:hover{background:var(--line);color:var(--ink);}
-@media(max-width:430px){.install-prompt{grid-template-columns:auto minmax(0,1fr) auto;}.install-btn{grid-column:2 / span 2;width:100%;margin-top:2px;}.install-x{align-self:start;}}
+@media(max-width:430px){.install-prompt{grid-template-columns:auto minmax(0,1fr) auto auto;}.install-copy b{font-size:12.5px;}.install-copy span{font-size:11.5px;}.install-btn{width:32px;height:32px;}.install-x{align-self:center;}}
 @media (min-width:900px){.login-bg{padding:36px;}.login-card{max-width:500px;padding:30px 30px 28px;}.login-q{font-size:17px;}}
 
 .field{display:block;margin-bottom:15px;}

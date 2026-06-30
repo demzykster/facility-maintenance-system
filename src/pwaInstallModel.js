@@ -12,7 +12,7 @@ export function isIosDevice(userAgent = "", platform = "", maxTouchPoints = 0) {
 
 export function pwaInstallPromptMode({ beforeInstallPromptEvent, isStandalone = false, userAgent = "", platform = "", maxTouchPoints = 0 } = {}) {
   if (isStandalone) return "hidden";
-  if (beforeInstallPromptEvent) return "android";
+  if (beforeInstallPromptEvent) return isIosDevice(userAgent, platform, maxTouchPoints) ? "ios" : "browser";
   if (isIosDevice(userAgent, platform, maxTouchPoints)) return "ios";
   return "hidden";
 }
