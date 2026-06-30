@@ -62,6 +62,17 @@ export function createSupabaseAuditDriver({ url, serviceRoleKey, table = "audit_
       const data = await readJsonOrText(response);
       if (!response.ok) throw new Error(errorMessage(data, `supabase_audit_${response.status}`));
     },
+    async writeMany(events = []) {
+      const rows = (Array.isArray(events) ? events : []).filter(Boolean).map(toRow);
+      if (!rows.length) return;
+      const response = await fetchImpl(base, {
+        method: "POST",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "return=minimal" }),
+        body: JSON.stringify(rows)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_audit_${response.status}`));
+    },
     async listClientErrors({ limit = 50 } = {}) {
       const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
       const query = [

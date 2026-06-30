@@ -75,6 +75,13 @@ const writeAuditEvent = async (auditDriver, event) => {
   if (typeof auditDriver.set === "function") return auditDriver.set(event);
 };
 
+const writeAuditEvents = async (auditDriver, events = []) => {
+  const cleanEvents = (events || []).filter(Boolean);
+  if (!auditDriver || !cleanEvents.length) return;
+  if (typeof auditDriver.writeMany === "function") return auditDriver.writeMany(cleanEvents);
+  for (const event of cleanEvents) await writeAuditEvent(auditDriver, event);
+};
+
 const parseStoredJson = (value) => {
   if (!value || typeof value !== "string") return null;
   try {
@@ -142,22 +149,34 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         const atomic = parseBool(body?.atomic);
         const written = [];
         try {
-          for (const record of normalizedRecords) {
+          const recordsWithBefore = await Promise.all(normalizedRecords.map(async (record) => {
             const shouldAudit = backendAuditDriver && kvWritePermissionForKey(record.key);
             const shouldAuditTicketStatus = backendAuditDriver && String(record.key).startsWith("ticket:");
             const before = (atomic || shouldAudit || shouldAuditTicketStatus) ? await backendDriver.get?.(record.key, writeShared) : null;
-            await backendDriver.set(record.key, record.value, writeShared);
-            if (atomic) written.push({ key: record.key, before });
-            await writeAuditEvent(backendAuditDriver, shouldAudit && sensitiveKvWriteAuditEvent({
+            return { ...record, before, shouldAudit, shouldAuditTicketStatus };
+          }));
+          if (typeof backendDriver.setMany === "function") {
+            await backendDriver.setMany(normalizedRecords, writeShared);
+            if (atomic) written.push(...recordsWithBefore.map((record) => ({ key: record.key, before: record.before })));
+          } else {
+            for (const record of recordsWithBefore) {
+              await backendDriver.set(record.key, record.value, writeShared);
+              if (atomic) written.push({ key: record.key, before: record.before });
+            }
+          }
+          const auditEvents = [];
+          for (const record of recordsWithBefore) {
+            auditEvents.push(record.shouldAudit && sensitiveKvWriteAuditEvent({
               key: record.key,
               method,
               actor: auth.user,
-              before,
+              before: record.before,
               after: record.value,
               shared: writeShared
             }));
-            await writeAuditEvent(backendAuditDriver, ticketStatusEventFromKv(record.key, before, record.value, auth.user));
+            auditEvents.push(ticketStatusEventFromKv(record.key, record.before, record.value, auth.user));
           }
+          await writeAuditEvents(backendAuditDriver, auditEvents);
         } catch (error) {
           if (atomic) {
             await restoreBatchWrites({ driver: backendDriver, written, shared: writeShared });
