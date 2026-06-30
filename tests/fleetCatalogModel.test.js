@@ -3,7 +3,9 @@ import {
   cloneVehicleTypeCatalog,
   hasSavedVehicleTypeCatalog,
   shouldUseBuiltInVehicleCatalog,
-  vehicleCatalogBase
+  vehicleCatalogBase,
+  vehicleTypeInUseCodes,
+  vehicleTypeModelCodes
 } from "../src/fleetCatalogModel.js";
 
 describe("fleetCatalogModel", () => {
@@ -64,5 +66,22 @@ describe("fleetCatalogModel", () => {
     cloned[0].models.push("RRE200H");
 
     expect(source[0].models).toEqual(["OSE250"]);
+  });
+
+  it("detects fleet units that still use a vehicle type before catalog deletion", () => {
+    const type = { name: "מלקטת", models: ["OSE250", "LPE200"] };
+    expect(vehicleTypeModelCodes(type)).toEqual(["OSE250", "LPE200"]);
+    expect(vehicleTypeInUseCodes(type, [
+      { code: "6882002", type: "OSE250" },
+      { code: "6882003", model: "OSE250" },
+      { code: "194335", type: "RRE200H" }
+    ])).toEqual(["6882002", "6882003"]);
+  });
+
+  it("falls back to the type name when a legacy catalog row has no explicit models", () => {
+    expect(vehicleTypeInUseCodes({ name: "פסולתון", models: [] }, [
+      { code: "111", type: "פסולתון" },
+      { code: "222", type: "OSE250" }
+    ])).toEqual(["111"]);
   });
 });

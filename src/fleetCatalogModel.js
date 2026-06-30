@@ -9,6 +9,23 @@ export function cloneVehicleTypeCatalog(vehicleTypes = []) {
   }));
 }
 
+export function vehicleTypeModelCodes(vehicleType) {
+  const models = (vehicleType?.models || []).map((model) => String(model || "").trim()).filter(Boolean);
+  const fallback = String(vehicleType?.name || "").trim();
+  return models.length ? models : (fallback ? [fallback] : []);
+}
+
+export function vehicleTypeInUseCodes(vehicleType, fleet = []) {
+  const models = new Set(vehicleTypeModelCodes(vehicleType));
+  if (!models.size) return [];
+  const codes = [];
+  (fleet || []).forEach((unit) => {
+    const model = String(unit?.model || unit?.type || "").trim();
+    if (models.has(model)) codes.push(String(unit?.code || model));
+  });
+  return [...new Set(codes)];
+}
+
 export function shouldUseBuiltInVehicleCatalog({ productionStartsEmpty = false, hasSavedCatalog = false, fleetCount = 0 } = {}) {
   if (hasSavedCatalog) return true;
   if (fleetCount > 0) return true;
