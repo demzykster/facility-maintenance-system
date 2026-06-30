@@ -21,12 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/speed-up-fleet-import-batch
+### Active branch: none
 
-- In progress now: fix the owner-visible fleet Excel import stop after preview. Direct live API checks showed the server can save the 128-row payload atomically, but the real Excel payload path took about 45 seconds because `/api/kv` wrote KV rows and audit rows one by one.
-- Status: current branch changes server batch writes to use Supabase bulk KV upsert and bulk audit insert when available, keeping the same atomic rollback behavior and data model.
-- Validation for current branch: targeted storage/audit/KV/fleet import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally.
-- Staging cleanup state before this fix: owner explicitly allowed clearing fleet/settings pilot data; latest checked summary after cleanup had one admin user and no KV/file records. Do not clear new owner-entered data after the next successful import unless explicitly asked.
+- Latest completed work: PR #487 fixed the owner-visible fleet Excel import stop after preview by changing `/api/kv` batch saves to use Supabase bulk KV upsert and bulk audit insert when available. The same real Excel payload that previously took about 45 seconds now saves atomically through live Vercel in about 3.5 seconds.
+- Validation for PR #487: targeted storage/audit/KV/fleet import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, strict live smoke, and live real-payload batch check passed.
+- Current staging/pilot data state after cleanup: one admin user remains; `cmms_kv_records=0`, `file_metadata=0`, storage files `0`. Audit history contains non-business operational history. Do not clear new owner-entered data after the next successful import unless explicitly asked.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
