@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/mobile-worker-shell-polish`
+### Active branch: `codex/final-pilot-checkpoint`
 
-- Status: mobile worker shell polish in progress: keep worker/cleaner topbar and tabs stable on phone-width screens across supported worker languages.
+- Status: final pilot checkpoint in progress: record completed access/notification, mobile shell, fleet import preview, system-error journal, dashboard-widget smoke, and staging gate checks before continuing the remaining final work.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
@@ -112,6 +112,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PWA login install prompt branch passed locally: generated PNG install icons (`192`, `512`, and Apple touch `180`), updated manifest/iOS meta tags, added a compact login-screen install prompt, and verified iPhone instructions plus Android `beforeinstallprompt` flow with Playwright. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
   - Access/notification matrix branch passed locally: individual module permissions are now editable for all non-admin roles, the notification-preference list shows allowed and permission-blocked event kinds in one matrix, and worker PPE cross-role access was smoke-checked in the user form. Validation passed: targeted notification/push tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright user-form smoke.
   - Mobile worker shell polish passed locally: worker top actions and tabs now use the mobile scroll/tab layout across phone and narrow tablet widths, preventing long translated labels from pushing content sideways. Playwright smoke at iPhone width confirmed `ru/ar/hi/ti` worker screens have no horizontal overflow, stable equal tab heights, and no console errors. `npm test -- --run tests/uiI18nModel.test.js`, `npm run build`, and `git diff --check` passed.
+  - Final pilot checkpoint passed after PR #464: `npm run staging:gate -- --expect-current-commit` passed on deployed commit `b744872`; live smoke confirmed bootstrap closed, admin auth/profile, KV bridge, private file route boundary, Supabase schema/bucket, desktop/mobile UI shell, and version footer. Staging currently has one admin user, no file metadata, no storage files, no tickets/fleet/config/history KV records; only service KV prefixes `presence` and `pushSubscriptions` remain and should not be deleted automatically because `pushSubscriptions` may be a real device opt-in.
+  - Dashboard widget hide/show smoke passed on local current main after PR #464: clicking `התאמת לוח` and hiding a widget writes only a personal `dashboardWidgets:*` local preference, shows no red save-failure banner, logs no console errors, and creates no horizontal overflow.
+  - Fleet license Excel preview passed on the supplied `מעקב רישיונות_ 06.07.23.xlsx`: reads only the `רישיונות` sheet, `total=128`, `ready=126`, `conflicts=0`, `invalid=2` duplicate `פסולתון` rows, and proposes catalog additions before any save. No staging write was performed.
+  - System-error journal smoke passed live: `npm run staging:smoke:system-errors` wrote one controlled sanitized `client_error` audit event and read it back through `/api/system-errors`, confirming the admin-visible operational error list works.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
