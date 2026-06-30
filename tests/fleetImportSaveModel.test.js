@@ -29,6 +29,29 @@ describe("fleetImportSaveModel", () => {
     ]);
   });
 
+  it("saves fleet and catalog additions in one bulk operation", async () => {
+    const calls = [];
+    const additions = [{ kind: "מדחס", model: "אקדה פנאומטי" }];
+    const result = await saveFleetImportAtomically({
+      units: units(3),
+      catalogAdditions: additions,
+      batchSize: 2,
+      saveMany: async (chunk, catalogAdditions) => {
+        calls.push(["bulk", chunk.map((unit) => unit.id), catalogAdditions]);
+        return true;
+      },
+      saveCatalog: async () => {
+        calls.push(["catalog"]);
+        return true;
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toEqual([
+      ["bulk", ["fleet-1", "fleet-2", "fleet-3"], additions]
+    ]);
+  });
+
   it("rolls back already saved fleet units when a later batch fails", async () => {
     const rolledBack = [];
     const result = await saveFleetImportAtomically({
