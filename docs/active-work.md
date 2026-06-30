@@ -23,7 +23,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: owner-reported fleet import/data-model bug closed in PR #474. No active product branch. Continue with the next owner-facing bug, final pilot polish, or post-pilot hardening item.
+- Status: soft app-cache reset is ready in PR #476. No active destructive or data-migration work. Continue with owner-facing UI/data-confidence bugs or the next final pilot polish item.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
@@ -51,6 +51,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
   - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
   - production builds should emit `cmms-version.json`; an open browser tab should compare that public manifest to its bundled commit and offer a quiet refresh prompt when a newer deployed build is available.
+  - stale-tab refresh must be a soft cache reset only: clear browser CacheStorage and local UI-only state, but preserve production auth, session, remembered login, language, theme, push setup, and all Supabase-backed business data.
   - desktop sidebar footer must remain inside the visible viewport on shorter desktop windows; the navigation list may scroll independently.
   - desktop sidebar navigation should scroll without showing a heavy visual scrollbar.
   - the system logo can be configured from settings; uploaded images are resized into a square logo canvas without cropping wide logos.

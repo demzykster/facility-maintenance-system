@@ -42,6 +42,7 @@ import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueRe
 import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, normalizeVersionManifest, shouldShowVersionUpdate } from "./appVersionModel.js";
+import { softResetAppCache } from "./appCacheResetModel.js";
 import { DEFAULT_LANGUAGE, languageDirection, languageOptions, normalizeLanguageCode } from "./languageModel.js";
 import { uiText } from "./uiI18nModel.js";
 import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js";
@@ -1364,6 +1365,12 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [dismissedVersionCommit]);
+  const refreshAppCache = async () => {
+    try {
+      await softResetAppCache();
+    } catch {}
+    window.location.reload();
+  };
   const [rolePreviewRole, setRolePreviewRole] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   TASK_STATUS_META = config.taskStatusMeta || {};
@@ -1896,7 +1903,7 @@ export default function App() {
             {profileOpen && <Overlay persistent panelClassName="profile-shell" onClose={() => setProfileOpen(false)}><ProfileModal session={session} onSave={saveMyProfile} onClose={() => setProfileOpen(false)} /></Overlay>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
-      {versionUpdate && <VersionUpdateBanner onRefresh={() => window.location.reload()} onDismiss={() => { setDismissedVersionCommit(versionUpdate.commit); setVersionUpdate(null); }} />}
+      {versionUpdate && <VersionUpdateBanner onRefresh={refreshAppCache} onDismiss={() => { setDismissedVersionCommit(versionUpdate.commit); setVersionUpdate(null); }} />}
     </div>
   );
 }
