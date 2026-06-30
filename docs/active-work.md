@@ -23,8 +23,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Latest completed work: PR #494 fixes fleet Excel import persistence for empty/pilot databases by saving imported fleet units and missing catalog additions as one server-side atomic batch.
-- Validation for PR #494: `npm test -- --run tests/fleetImportSaveModel.test.js`, full `npm test -- --run`, `npm run release:check`, and `npm run build` passed locally.
+- Latest completed work: PR #495 fixes the fleet Excel import UI wiring by passing the existing batch import saver into the fleet module. Production commit `1499f03` live-smoked with a one-row probe Excel import: `/api/kv` POST returned 200, the probe record was created, then the probe record was deleted and `config:v1` restored.
+- Validation for PR #495: `npm test -- --run tests/fleetImportWiring.test.js tests/fleetImportSaveModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, local Playwright Excel import smoke, and production Playwright probe import/cleanup smoke passed.
 - Current staging/pilot data is live and may change as the owner imports/edits real data. Verify with `npm run staging:data:summary` before making assumptions. Do not clear, reseed, or overwrite owner-entered data unless explicitly asked for destructive cleanup.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
