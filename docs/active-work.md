@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fix-fleet-type-catalog-persistence`.
-- In progress: fix `סוגי כלי שינוע` catalog persistence so deleted catalogs stay deleted and imported catalog additions are saved as real owner data, without touching pilot fleet records directly.
-- Current PR scope: add an explicit saved-catalog marker for vehicle types. A non-empty `vehicleTypes` catalog still counts as saved; an intentionally empty catalog counts as saved only when `vehicleTypesSaved: true`, so default/demo empty arrays do not suppress fallback behavior by accident.
-- Current correction: `flattenVehicleTypes()` now marks catalog saves with `vehicleTypesSaved: true` and `vtMigV: 2`. This prevents old legacy `forkliftTypes`/fleet fallback migration from rebuilding deleted types after navigation.
-- Validation so far: targeted fleet catalog/import tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, and `npm run build` passed.
+- Active branch: none. Continue from `origin/main`.
+- In progress: continue the flexible fleet maintenance / inspection policy redesign without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data.
+- Current next candidate: redesign the periodic-maintenance rule/settings UX so owner-defined TO regulations, periods in months, applicable vehicle types/models, and PM-specific checklist items are clear and separate from `בקרת כלים` inspection questionnaires.
+- Latest completed work: PR #508 fixed `סוגי כלי שינוע` catalog persistence. Catalog saves now mark owner state with `vehicleTypesSaved: true` and `vtMigV: 2`, so an intentionally empty catalog does not get rebuilt from legacy `forkliftTypes`/fleet fallback after navigation.
+- Validation for PR #508: targeted fleet catalog/import tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, `npm run build` passed, and GitHub Actions/Vercel passed before merge.
 - Latest completed work: PR #507 made periodic-maintenance checklist items their own rule-level data, separate from `בקרת כלים` inspection questionnaires. PM rules can define their own treatment checklist, generated/manual PM entries carry that checklist snapshot, and PM completion history records checked items.
 - Validation for PR #507: targeted fleet maintenance policy tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, `npm run build` passed, local Playwright smoke confirmed the app renders without console/page errors, and GitHub Actions/Vercel passed before merge.
 - Latest completed work: PR #506 added bulk generation/update of periodic-maintenance schedule entries from owner-defined maintenance regulations. The owner can generate PM entries for all matching fleet units without selecting every vehicle one by one. Existing `vehicle + regulation` entries are updated without duplication; new entries receive the chosen first due date.
