@@ -36,6 +36,7 @@ import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { vehicleCatalogBase } from "./fleetCatalogModel.js";
+import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -1522,9 +1523,10 @@ export default function App() {
     if (!ok && toastOnFail) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
     return ok;
   };
-  const deleteShared = async (key) => {
+  const deleteShared = async (key, options = {}) => {
+    const toastOnFail = options.toastOnFail !== false;
     const ok = await store.del(key, true);
-    if (!ok) setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+    if (!ok && toastOnFail) setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
     return ok;
   };
   async function reloadAll() {
@@ -1694,7 +1696,7 @@ export default function App() {
   const escalateComplaint = async (c) => persistComplaint({ ...c, status: "open", escalatedTo: "admin", escalatedAt: Date.now(), escalatedBy: effSession.name });
   const resolveComplaint = async (c) => persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name });
   const progressComplaint = async (c) => persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() });
-  const delFleet = async (id) => { if (!await deleteShared(`fleet:${id}`)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
+  const delFleet = async (id, options = {}) => { if (!await deleteShared(`fleet:${id}`, options)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
   const saveInsp = async (i) => { if (!await persistShared(`insp:${i.id}`, JSON.stringify(i))) return false; setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); return true; };
   const saveTpl = async (t) => { if (!await persistShared(`itpl:${t.id}`, JSON.stringify(t))) return false; setTemplates((s) => [...s.filter((x) => x.id !== t.id), t]); return true; };
   const delTpl = async (id) => { if (!await deleteShared(`itpl:${id}`)) return false; setTemplates((s) => s.filter((x) => x.id !== id)); return true; };
@@ -5272,11 +5274,12 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   </div>);
 }
 
-function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, onSaveCatalog }) {
+function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, onDelete, onSaveCatalog }) {
   const [result, setResult] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [done, setDone] = useState(false);
   const [confirmSkipConflicts, setConfirmSkipConflicts] = useState(false);
   const [confirmCatalog, setConfirmCatalog] = useState(false);
   const [importError, setImportError] = useState("");
+  const [importProgress, setImportProgress] = useState(null);
   const readyRows = (result?.rows || []).filter((row) => row.action === "new");
   const conflictRows = (result?.rows || []).filter((row) => row.action === "conflict");
   const invalidRows = (result?.rows || []).filter((row) => row.action === "invalid");
@@ -5286,7 +5289,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
     const file = e.target.files?.[0]; if (!file) return;
     if (!/\.xlsx$/i.test(file.name || "")) { setErr("בחרו קובץ Excel מסוג XLSX."); e.target.value = ""; return; }
     if (file.size > 10 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 10MB."); e.target.value = ""; return; }
-    setBusy(true); setErr(""); setImportError(""); setDone(false); setConfirmSkipConflicts(false); setConfirmCatalog(false);
+    setBusy(true); setErr(""); setImportError(""); setImportProgress(null); setDone(false); setConfirmSkipConflicts(false); setConfirmCatalog(false);
     try {
       const parsed = parseFleetLicenseWorkbook(await readExcelFile(file), { existingFleet: fleet });
       if (!parsed.ok) { setResult(null); setErr(parsed.error === "fleet_license_sheet_not_found" ? "לא נמצא גיליון בשם רישיונות." : "לא נמצאה טבלת רישיונות תקינה בקובץ."); return; }
@@ -5297,32 +5300,30 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
   const save = async () => {
     if (!readyRows.length) return setErr("אין שורות חדשות לייבוא.");
     if (conflictRows.length && !confirmSkipConflicts) return setErr("יש קונפליקטים. אשרו במפורש לייבא רק את הכלים החדשים ולהשאיר את הקונפליקטים ללא שינוי.");
-    setBusy(true); setErr(""); setImportError("");
+    setBusy(true); setErr(""); setImportError(""); setImportProgress({ saved: 0, total: readyRows.length });
     try {
       const now = Date.now();
-      if (catalogAdditions.length && onSaveCatalog) {
-        const catalogOk = await onSaveCatalog(catalogAdditions);
-        if (catalogOk === false) throw new Error("catalog_save_failed");
-      }
       const units = readyRows.map((row, i) => ({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i }));
-      if (onImportMany) {
-        const ok = await onImportMany(units);
-        if (ok === false) throw new Error("fleet_import_save_failed");
-      } else {
-        for (const unit of units) {
-          const ok = await onImport(unit);
-          if (ok === false) throw new Error("fleet_import_save_failed");
-        }
+      const importResult = await saveFleetImportAtomically({
+        units,
+        saveMany: null,
+        saveOne: onImport,
+        rollbackOne: onDelete,
+        saveCatalog: catalogAdditions.length && onSaveCatalog ? () => onSaveCatalog(catalogAdditions) : null,
+        onProgress: setImportProgress
+      });
+      if (!importResult.ok) {
+        throw new Error(importResult.error || "fleet_import_save_failed");
       }
       setDone(true);
-    } catch (ex) { setImportError("הייבוא נעצר כי חלק מהרשומות לא נשמרו. בדקו חיבור ונסו שוב."); }
-    finally { setBusy(false); }
+    } catch (ex) { setImportError("הייבוא נעצר ולא נשמר חלקית. בדקו חיבור ונסו שוב."); }
+    finally { setBusy(false); setImportProgress(null); }
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">ייבוא כלי שינוע מ-Excel</div></div>
     <div className="body">
       <div className="note">הייבוא קורא רק את הגיליון <b>רישיונות</b>. קישורי קבצים ישנים וגיליון DB לא מיובאים. שורות שכבר קיימות יוצגו כקונפליקט ולא יעודכנו אוטומטית.</div>
       <label className="btn-primary full" style={{ marginTop: 14, cursor: "pointer", justifyContent: "center" }}><FileSpreadsheet size={16} /> בחירת קובץ רישיונות<input type="file" accept=".xlsx" onChange={onFile} style={{ display: "none" }} /></label>
-      {busy && <div className="note"><span className="spinner sm dark" /> קורא קובץ…</div>}
+      {busy && <div className="note"><span className="spinner sm dark" /> {importProgress ? `שומר ${importProgress.saved} מתוך ${importProgress.total} כלים…` : "קורא קובץ…"}</div>}
       {err && <div className="err">{err}</div>}
       {result && <><SectionTitle>תצוגה מקדימה</SectionTitle>
         <div className="stat-strip">
@@ -5456,7 +5457,7 @@ function FleetModule(p) {
         </div>}
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
-    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units) => saveFleetMany(units, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units) => saveFleetMany(units, { toastOnFail: false })} onDelete={(id) => delFleet(id, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
   </>);
 }

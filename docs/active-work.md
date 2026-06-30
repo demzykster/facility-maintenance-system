@@ -21,9 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/harden-fleet-import-atomic
 
-- Status: production empty fleet/catalog hardening is complete in PR #481. Direct Supabase and live API checks showed `cmms_kv_records=0` and `fleet:* = 0`; the visible `סוגי כלי שינוע` rows came from built-in defaults, not saved pilot data. Production now shows an honest empty catalog state instead of displaying built-in forklift models as saved records, while demo/test fallback behavior remains available.
+- Status: hardening real fleet Excel import after owner saw `הייבוא נעצר כי חלק מהרשומות לא נשמרו` during final import. Investigation showed the wizard can save catalog/config before fleet units, leaving partial `config:v1` if fleet save fails. This branch makes the import atomic from the UI perspective: fleet units save first with tracked rollback, catalog saves only after fleet succeeds, and failures show an inline "not partially saved" message.
+- Validation on this branch so far: targeted fleet import/catalog tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and `git diff --check` passed.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
