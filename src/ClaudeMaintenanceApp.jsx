@@ -52,6 +52,7 @@ import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js"
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
 const APP_BUILD_TIME = typeof __CMMS_BUILD_TIME__ !== "undefined" ? __CMMS_BUILD_TIME__ : "";
+const SAVE_FAILED_MESSAGE = "השמירה נכשלה. בדקו חיבור ונסו שוב.";
 
 /* ============================================================
    אחזקה — CMMS · roles(admin/tech/user) · 2 flows · fleet · inspections · AI
@@ -2015,7 +2016,7 @@ function WorkerApp(p) {
       createdAt: now, updatedAt: now, dueAt: null, hasPhoto: !!photo, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", closure: null,
       log: [{ at: now, by: session.name, byRole: "worker", text: (!photo && noPhoto) ? `הדיווח נשלח ללא תמונה — ${noPhotoReason.trim()}` : "הדיווח נשלח לאישור מנהל המחלקה", kind: "open" }],
     };
-    try { const rec = photo ? { ...t, ...(await TICKET_PHOTOS.save(id, "before", photo)) } : t; await saveTicket(rec); reset(); setSent(true); setTimeout(() => setSent(false), 3500); setView("mine"); }
+    try { const rec = photo ? { ...t, ...(await TICKET_PHOTOS.save(id, "before", photo)) } : t; if (await saveTicket(rec) === false) { setErr(SAVE_FAILED_MESSAGE); return; } reset(); setSent(true); setTimeout(() => setSent(false), 3500); setView("mine"); }
     catch (e) { setErr("שגיאה בשליחה."); }
     finally { setBusy(false); }
   };
@@ -2075,7 +2076,7 @@ function WorkerReportView({ report, session, saveTicket, onClose }) {
     try {
       const photoMeta = newPhoto ? await TICKET_PHOTOS.save(report.id, "before", newPhoto) : {};
       const text = "העובד שלח שוב לאחר תיקון" + (note.trim() ? `: ${note.trim()}` : "");
-      await saveTicket({ ...report, ...photoMeta, status: "pending_manager", updatedAt: Date.now(), log: [...(report.log || []), { at: Date.now(), by: session.name, byRole: "worker", text, kind: "reopen" }] });
+      if (await saveTicket({ ...report, ...photoMeta, status: "pending_manager", updatedAt: Date.now(), log: [...(report.log || []), { at: Date.now(), by: session.name, byRole: "worker", text, kind: "reopen" }] }) === false) throw new Error("save_failed");
       onClose();
     } finally { setBusy(false); }
   };
@@ -2457,10 +2458,10 @@ function UserApp(p) {
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
       <nav className={"bottom-nav" + (userNav.length > 4 ? " nav-scroll" : "")} aria-label="ניווט ראשי">{userNav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
-      {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
+      {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
-      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { await saveUser(u); setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
+      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return ok; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
@@ -2695,28 +2696,39 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
   const [catF, setCatF] = useState("all"), [presF, setPresF] = useState("all"), [deptF, setDeptF] = useState("all"), [q, setQ] = useState(""), [focus, setFocus] = useState(null);
   const [form, setForm] = useState(null), [move, setMove] = useState(null), [conflict, setConflict] = useState(null), [relocateA, setRelocateA] = useState(null), [access, setAccess] = useState(null), [msg, setMsg] = useState("");
   const myDept = userDepts(session)[0] || "";
-  const writeDriver = async (unit, cat, d, evt) => { await saveFleet({ ...unit, drivers: { ...(unit.drivers || {}), [cat]: d } }); if (evt) await saveConfig(pushDriverEvent(config, evt)); };
-  const dropDriver = async (unit, cat, evt) => { const drivers = { ...(unit.drivers || {}) }; delete drivers[cat]; await saveFleet({ ...unit, drivers }); if (evt) await saveConfig(pushDriverEvent(config, evt)); };
+  const writeDriver = async (unit, cat, d, evt) => {
+    if (await saveFleet({ ...unit, drivers: { ...(unit.drivers || {}), [cat]: d } }) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
+    if (evt && await saveConfig(pushDriverEvent(config, evt)) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
+    return true;
+  };
+  const dropDriver = async (unit, cat, evt) => {
+    const drivers = { ...(unit.drivers || {}) }; delete drivers[cat];
+    if (await saveFleet({ ...unit, drivers }) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
+    if (evt && await saveConfig(pushDriverEvent(config, evt)) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
+    return true;
+  };
   const submitForm = async (v) => {
     const { unit, existing } = form; const cat = existing ? form.cat : v.category;
-    if (existing) { await writeDriver(unit, cat, { ...existing, name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || existing.userId || "" }, { type: "edited", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, byUid: session.id, byName: session.name, byDept: myDept }); }
+    let ok = true;
+    if (existing) { ok = await writeDriver(unit, cat, { ...existing, name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || existing.userId || "" }, { type: "edited", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, byUid: session.id, byName: session.name, byDept: myDept }); }
     else { const base = { name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || "", addedByUid: session.id, addedByName: session.name, addedByDept: isAdmin ? "הנהלה" : myDept, at: Date.now(), needsChip: !!v.needsChip };
       const immediate = isAdmin || !v.needsChip; // менеджер без чипа → сразу; с чипом → запрос
-      if (immediate) await writeDriver(unit, cat, { ...base, status: "active" }, { type: "add", status: "active", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: !!v.needsChip, byUid: session.id, byName: session.name, byDept: isAdmin ? "הנהלה" : myDept });
-      else await writeDriver(unit, cat, { ...base, status: "pending_add", reqAt: Date.now() }, { type: "add_req", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: true, byUid: session.id, byName: session.name, byDept: myDept }); }
+      if (immediate) ok = await writeDriver(unit, cat, { ...base, status: "active" }, { type: "add", status: "active", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: !!v.needsChip, byUid: session.id, byName: session.name, byDept: isAdmin ? "הנהלה" : myDept });
+      else ok = await writeDriver(unit, cat, { ...base, status: "pending_add", reqAt: Date.now() }, { type: "add_req", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: true, byUid: session.id, byName: session.name, byDept: myDept }); }
+    if (ok === false) return;
     setForm(null);
   };
-  const submitMove = async (b, toUnit, toCat) => { const { unit, cat, driver } = b; await writeDriver(unit, cat, { ...driver, status: "pending_move", moveTo: { unitId: toUnit.id, unitCode: toUnit.code, category: toCat }, reqAt: Date.now() }, { type: "move_req", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: toUnit.code, toCategory: toCat, driverName: driver.name, workNo: driver.workNo, needsChip: !!driver.needsChip, byUid: session.id, byName: session.name, byDept: myDept }); };
-  const handleBTarget = async (toUnit, toCat) => { const b = move; const occ = driverOf(toUnit, toCat); if (driverActive(occ) || driverPending(occ)) { setConflict({ b, toUnit, toCat, occ }); setMove(null); } else { await submitMove(b, toUnit, toCat); setMove(null); } };
-  const doDeletePrev = async () => { const c = conflict; await del(c.toUnit, c.toCat, c.occ); await submitMove(c.b, c.toUnit, c.toCat); setConflict(null); };
-  const doSwap = async (zUnit, zCat) => { const r = relocateA; await submitMove(r.bMove.b, r.bMove.toUnit, r.bMove.toCat); await submitMove({ unit: r.a.unit, cat: r.a.cat, driver: r.a.driver }, zUnit, zCat); setRelocateA(null); };
-  const del = async (unit, cat, d) => { await dropDriver(unit, cat, { type: "deleted", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, workNo: d.workNo, byUid: session.id, byName: session.name, byDept: myDept }); };
-  const submitAccess = async (list) => { const { unit, cat, driver } = access; await writeDriver(unit, cat, { ...driver, access: list }, { type: "access", unitId: unit.id, unitCode: unit.code, category: cat, driverName: driver.name, workNo: driver.workNo, byUid: session.id, byName: session.name, byDept: myDept, sub: String(list.length) }); setAccess(null); };
+  const submitMove = async (b, toUnit, toCat) => { const { unit, cat, driver } = b; return writeDriver(unit, cat, { ...driver, status: "pending_move", moveTo: { unitId: toUnit.id, unitCode: toUnit.code, category: toCat }, reqAt: Date.now() }, { type: "move_req", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: toUnit.code, toCategory: toCat, driverName: driver.name, workNo: driver.workNo, needsChip: !!driver.needsChip, byUid: session.id, byName: session.name, byDept: myDept }); };
+  const handleBTarget = async (toUnit, toCat) => { const b = move; const occ = driverOf(toUnit, toCat); if (driverActive(occ) || driverPending(occ)) { setConflict({ b, toUnit, toCat, occ }); setMove(null); } else if (await submitMove(b, toUnit, toCat) !== false) { setMove(null); } };
+  const doDeletePrev = async () => { const c = conflict; if (await del(c.toUnit, c.toCat, c.occ) === false) return; if (await submitMove(c.b, c.toUnit, c.toCat) === false) return; setConflict(null); };
+  const doSwap = async (zUnit, zCat) => { const r = relocateA; if (await submitMove(r.bMove.b, r.bMove.toUnit, r.bMove.toCat) === false) return; if (await submitMove({ unit: r.a.unit, cat: r.a.cat, driver: r.a.driver }, zUnit, zCat) === false) return; setRelocateA(null); };
+  const del = async (unit, cat, d) => dropDriver(unit, cat, { type: "deleted", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, workNo: d.workNo, byUid: session.id, byName: session.name, byDept: myDept });
+  const submitAccess = async (list) => { const { unit, cat, driver } = access; if (await writeDriver(unit, cat, { ...driver, access: list }, { type: "access", unitId: unit.id, unitCode: unit.code, category: cat, driverName: driver.name, workNo: driver.workNo, byUid: session.id, byName: session.name, byDept: myDept, sub: String(list.length) }) !== false) setAccess(null); };
   const approve = async (unit, cat) => {
     setMsg("");
     const d = driverOf(unit, cat); if (!d) return;
     if (d.status === "pending_add") await writeDriver(unit, cat, { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }, { type: "approved", sub: "add", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName });
-    else if (d.status === "pending_move" && d.moveTo) { const tgt = fleet.find((x) => x.id === d.moveTo.unitId); const occ = tgt ? driverOf(tgt, d.moveTo.category) : null; if (occ && occ !== d && (driverActive(occ) || driverPending(occ))) { setMsg(`היעד תפוס (${tgt?.code} · ${driverShiftMeta(d.moveTo.category).label}) — יש לאשר/לטפל קודם בהעברת ${occ.name}`); return; } const src = { ...(unit.drivers || {}) }; delete src[cat]; await saveFleet({ ...unit, drivers: src }); if (tgt) { const nd = { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }; delete nd.moveTo; await saveFleet({ ...tgt, drivers: { ...(tgt.drivers || {}), [d.moveTo.category]: nd } }); } await saveConfig(pushDriverEvent(config, { type: "approved", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: d.moveTo.unitCode, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName })); }
+    else if (d.status === "pending_move" && d.moveTo) { const tgt = fleet.find((x) => x.id === d.moveTo.unitId); const occ = tgt ? driverOf(tgt, d.moveTo.category) : null; if (occ && occ !== d && (driverActive(occ) || driverPending(occ))) { setMsg(`היעד תפוס (${tgt?.code} · ${driverShiftMeta(d.moveTo.category).label}) — יש לאשר/לטפל קודם בהעברת ${occ.name}`); return; } const src = { ...(unit.drivers || {}) }; delete src[cat]; if (await saveFleet({ ...unit, drivers: src }) === false) return setMsg(SAVE_FAILED_MESSAGE); if (tgt) { const nd = { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }; delete nd.moveTo; if (await saveFleet({ ...tgt, drivers: { ...(tgt.drivers || {}), [d.moveTo.category]: nd } }) === false) return setMsg(SAVE_FAILED_MESSAGE); } if (await saveConfig(pushDriverEvent(config, { type: "approved", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: d.moveTo.unitCode, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName })) === false) return setMsg(SAVE_FAILED_MESSAGE); }
   };
   const reject = async (unit, cat) => { const d = driverOf(unit, cat); if (!d) return; if (d.status === "pending_add") await dropDriver(unit, cat, { type: "rejected", sub: "add", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); else if (d.status === "pending_move") { const nd = { ...d, status: "active", decidedAt: Date.now() }; delete nd.moveTo; await writeDriver(unit, cat, nd, { type: "rejected", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); } };
   const myShift = session.shift || "";
@@ -3608,14 +3620,23 @@ function PeoplePicker({ users, value, onChange, placeholder = "— בחרו אח
 function TaskForm({ task, users, session, onCancel, onSave }) {
   const [f, setF] = useState({ title: task.title || "", desc: task.desc || "", responsibleIds: task.responsibleIds || (task.id ? [] : [session.id]), priority: task.priority || "medium", status: task.status || "todo", mode: task.mode || "deadline", dueAt: task.dueAt || null, recur: task.recur || "weekly", nextActionAt: task.nextActionAt || null, category: task.category || "", locationText: task.locationText || "", waitingFor: task.waitingFor || "", isPrivate: !!task.isPrivate });
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [showMore, setShowMore] = useState(!!task.id);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const save = () => {
+  const save = async () => {
+    if (busy) return false;
     if (!f.title.trim()) return setErr("נא להזין כותרת");
     if (!f.responsibleIds.length) return setErr("נא לבחור לפחות אחראי אחד");
     const now = Date.now();
     const dueAt = (f.mode === "deadline" || f.mode === "recurring") ? f.dueAt : null;
-    onSave({ id: task.id || uid(), title: f.title.trim(), desc: f.desc.trim(), responsibleIds: f.responsibleIds, participantIds: task.participantIds || [], priority: f.priority, status: f.status, mode: f.mode, dueAt, recur: f.mode === "recurring" ? f.recur : null, nextActionAt: f.nextActionAt || null, category: f.category.trim(), locationText: (f.locationText || "").trim(), waitingFor: f.status === "waiting" ? f.waitingFor : "", isPrivate: f.isPrivate, meetingId: task.meetingId || null, linkedMeetingIds: task.linkedMeetingIds || [], origin: task.origin || "manual", ownerId: task.ownerId || session.id, createdBy: task.createdBy || { name: session.name, role: session.role }, createdAt: task.createdAt || now, updatedAt: now, log: task.log || [{ at: now, by: session.name, byRole: session.role, text: "המטלה נוצרה", kind: "open" }] });
+    setBusy(true); setErr("");
+    const ok = await onSave({ id: task.id || uid(), title: f.title.trim(), desc: f.desc.trim(), responsibleIds: f.responsibleIds, participantIds: task.participantIds || [], priority: f.priority, status: f.status, mode: f.mode, dueAt, recur: f.mode === "recurring" ? f.recur : null, nextActionAt: f.nextActionAt || null, category: f.category.trim(), locationText: (f.locationText || "").trim(), waitingFor: f.status === "waiting" ? f.waitingFor : "", isPrivate: f.isPrivate, meetingId: task.meetingId || null, linkedMeetingIds: task.linkedMeetingIds || [], origin: task.origin || "manual", ownerId: task.ownerId || session.id, createdBy: task.createdBy || { name: session.name, role: session.role }, createdAt: task.createdAt || now, updatedAt: now, log: task.log || [{ at: now, by: session.name, byRole: session.role, text: "המטלה נוצרה", kind: "open" }] });
+    setBusy(false);
+    if (ok === false) {
+      setErr("השמירה נכשלה. בדקו חיבור ונסו שוב.");
+      return false;
+    }
+    return true;
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{task.id ? "עריכת מטלה" : "מטלה חדשה"}</div></div>
     <div className="body">
@@ -3640,7 +3661,7 @@ function TaskForm({ task, users, session, onCancel, onSave }) {
         <label className="chk-line"><input type="checkbox" checked={f.isPrivate} onChange={(e) => set("isPrivate", e.target.checked)} /> פרטית — רק אני רואה</label>
       </div>}
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>שמירה</button><div style={{ height: 24 }} />
+      <button className="btn-primary full" onClick={save} disabled={busy}>{busy ? "שומר..." : "שמירה"}</button><div style={{ height: 24 }} />
     </div></div>);
 }
 function TaskCard({ task, users, session, meetings, saveMeeting, onClose, onSave, onEdit, onDelete, onOpenMeeting }) {
@@ -3874,18 +3895,23 @@ function TasksModule(p) {
     {rows.length === 0 ? <Empty text="אין מטלות" Icon={ClipboardList} sub="לחצו «מטלה» כדי להוסיף" />
       : groups ? <div className="fleet-groups">{groups.map(([k, items]) => { const open = !coll[k]; return <div key={k} className="fgroup"><button className="fgroup-head" onClick={() => setColl((c) => ({ ...c, [k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{k}</span><span className="fgroup-count">{items.length}</span></button>{open && <div className="task-list">{items.map(taskRow)}</div>}</div>; })}</div>
       : <div className="task-list">{rows.map(taskRow)}</div>}
-    {edit && <Overlay persistent onClose={() => setEdit(null)}><TaskForm task={edit} users={users} session={session} onCancel={() => setEdit(null)} onSave={async (t) => { await saveTask(t); setEdit(null); }} /></Overlay>}
-    {imp && <Overlay persistent onClose={() => setImp(false)}><TaskImportWizard users={users} session={session} existing={tasks} meetings={(meetings || []).filter((m) => m.status === "planned")} onCancel={() => setImp(false)} onImport={async (arr) => { for (const t of arr) await saveTask(t); setImp(false); }} /></Overlay>}
-    {ai && <Overlay persistent onClose={() => setAi(false)}><AIExtractView users={users} session={session} meetings={(meetings || []).filter((m) => m.status === "planned")} onCancel={() => setAi(false)} onImport={async (arr) => { for (const t of arr) await saveTask(t); setAi(false); }} /></Overlay>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><TaskCard task={tasks.find((x) => x.id === openId)} users={users} session={session} meetings={meetings} saveMeeting={p.saveMeeting} onClose={() => setOpenId(null)} onSave={saveTask} onEdit={() => { setEdit(tasks.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delTask(openId); setOpenId(null); }} onOpenMeeting={(mid) => { setOpenId(null); setOpenMeetingId(mid); }} /></Overlay>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><TaskForm task={edit} users={users} session={session} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await saveTask(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><TaskImportWizard users={users} session={session} existing={tasks} meetings={(meetings || []).filter((m) => m.status === "planned")} onCancel={() => setImp(false)} onImport={async (arr) => { for (const t of arr) { const ok = await saveTask(t); if (ok === false) return false; } setImp(false); return true; }} /></Overlay>}
+    {ai && <Overlay persistent onClose={() => setAi(false)}><AIExtractView users={users} session={session} meetings={(meetings || []).filter((m) => m.status === "planned")} onCancel={() => setAi(false)} onImport={async (arr) => { for (const t of arr) { const ok = await saveTask(t); if (ok === false) return false; } setAi(false); return true; }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><TaskCard task={tasks.find((x) => x.id === openId)} users={users} session={session} meetings={meetings} saveMeeting={p.saveMeeting} onClose={() => setOpenId(null)} onSave={saveTask} onEdit={() => { setEdit(tasks.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { if (await delTask(openId) !== false) setOpenId(null); }} onOpenMeeting={(mid) => { setOpenId(null); setOpenMeetingId(mid); }} /></Overlay>}
     {openMeetingId && meetings.find((x) => x.id === openMeetingId) && <Overlay persistent onClose={() => setOpenMeetingId(null)}><MeetingCard meeting={meetings.find((x) => x.id === openMeetingId)} users={users} tasks={tasks} session={session} onClose={() => setOpenMeetingId(null)} onSave={saveMeeting} onSaveTask={saveTask} onNewTask={(mtg) => { setOpenMeetingId(null); setEdit({ meetingId: mtg.id, responsibleIds: [], participantIds: mtg.participantIds || [], origin: "meeting" }); }} onOpenTask={(tid) => { setOpenMeetingId(null); setOpenId(tid); }} /></Overlay>}
   </>);
 }
 function TaskStatusSettings({ config, saveConfig }) {
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
   const [taskMeta, setTaskMeta] = useState(() => { const m = config.taskStatusMeta || {}; return TASK_STATUS.reduce((a, s) => { a[s.id] = { label: m[s.id]?.label || s.label, color: m[s.id]?.color || s.color }; return a; }, {}); });
   const save = async () => {
-    await saveConfig({ ...config, taskStatusMeta: taskMeta });
+    setErr("");
+    if (await saveConfig({ ...config, taskStatusMeta: taskMeta }) === false) {
+      setErr(SAVE_FAILED_MESSAGE);
+      return;
+    }
     setSaved(true); setTimeout(() => setSaved(false), 1800);
   };
   return (<div className="settings-wrap">
@@ -3896,6 +3922,7 @@ function TaskStatusSettings({ config, saveConfig }) {
       <div className="pal">{DT_PALETTE.map((c) => <button key={c} type="button" className={"pal-sw" + ((taskMeta[s.id]?.color || s.color) === c ? " on" : "")} style={{ background: c }} title={c} onClick={() => setTaskMeta((m) => ({ ...m, [s.id]: { ...m[s.id], color: c } }))} />)}</div>
     </div></div>)}
     <button className="btn-primary full" style={{ marginTop: 16 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת הגדרות מטלות"}</button>
+    {err && <div className="err">{err}</div>}
   </div>);
 }
 function MeetingForm({ meeting, users, session, onCancel, onSave }) {
@@ -4017,10 +4044,10 @@ function MeetingsModule(p) {
     {upcoming.length === 0 ? <Empty text="אין פגישות מתוכננות" Icon={CalendarClock} sub="לחצו «פגישה» כדי לקבוע" /> : <div className="task-list">{upcoming.map((m) => row(m))}</div>}
     {toSummarize.length > 0 && <><SectionTitle>להשלמה — התקיימו וטרם סוכמו ({toSummarize.length})</SectionTitle><div className="task-list">{toSummarize.map((m) => row(m, true))}</div></>}
     {past.length > 0 && <><SectionTitle>אחרונות ({past.length})</SectionTitle><div className="task-list">{past.slice(0, 12).map((m) => row(m))}</div>{past.length > 12 && <div className="hint" style={{ textAlign: "center", marginTop: 6 }}>מוצגות 12 האחרונות מתוך {past.length}. לדוח מלא — «ייצוא ל-Excel».</div>}</>}
-    {edit && <Overlay persistent onClose={() => setEdit(null)}><MeetingForm meeting={edit} users={users} session={session} onCancel={() => setEdit(null)} onSave={async (m) => { await saveMeeting(m); setEdit(null); }} /></Overlay>}
-    {taskEdit && <Overlay persistent onClose={() => setTaskEdit(null)}><TaskForm task={taskEdit} users={users} session={session} onCancel={() => setTaskEdit(null)} onSave={async (t) => { await saveTask(t); setTaskEdit(null); }} /></Overlay>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><MeetingCard meeting={meetings.find((x) => x.id === openId)} users={users} tasks={tasks} session={session} onClose={() => setOpenId(null)} onSave={saveMeeting} onSaveTask={saveTask} onEdit={() => { setEdit(meetings.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delMeeting(openId); setOpenId(null); }} onNewTask={(mtg) => { setOpenId(null); setTaskEdit({ meetingId: mtg.id, responsibleIds: [], participantIds: mtg.participantIds || [], origin: "meeting" }); }} onOpenTask={(tid) => setOpenTaskId(tid)} /></Overlay>}
-    {openTaskId && tasks.find((x) => x.id === openTaskId) && <Overlay persistent onClose={() => setOpenTaskId(null)}><TaskCard task={tasks.find((x) => x.id === openTaskId)} users={users} session={session} meetings={meetings} saveMeeting={saveMeeting} onClose={() => setOpenTaskId(null)} onSave={saveTask} onEdit={() => { setTaskEdit(tasks.find((x) => x.id === openTaskId)); setOpenTaskId(null); }} onDelete={async () => { await delTask(openTaskId); setOpenTaskId(null); }} onOpenMeeting={(mid) => { setOpenTaskId(null); setOpenId(mid); }} /></Overlay>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><MeetingForm meeting={edit} users={users} session={session} onCancel={() => setEdit(null)} onSave={async (m) => { const ok = await saveMeeting(m); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
+    {taskEdit && <Overlay persistent onClose={() => setTaskEdit(null)}><TaskForm task={taskEdit} users={users} session={session} onCancel={() => setTaskEdit(null)} onSave={async (t) => { const ok = await saveTask(t); if (ok !== false) setTaskEdit(null); return ok; }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><MeetingCard meeting={meetings.find((x) => x.id === openId)} users={users} tasks={tasks} session={session} onClose={() => setOpenId(null)} onSave={saveMeeting} onSaveTask={saveTask} onEdit={() => { setEdit(meetings.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { if (await delMeeting(openId) !== false) setOpenId(null); }} onNewTask={(mtg) => { setOpenId(null); setTaskEdit({ meetingId: mtg.id, responsibleIds: [], participantIds: mtg.participantIds || [], origin: "meeting" }); }} onOpenTask={(tid) => setOpenTaskId(tid)} /></Overlay>}
+    {openTaskId && tasks.find((x) => x.id === openTaskId) && <Overlay persistent onClose={() => setOpenTaskId(null)}><TaskCard task={tasks.find((x) => x.id === openTaskId)} users={users} session={session} meetings={meetings} saveMeeting={saveMeeting} onClose={() => setOpenTaskId(null)} onSave={saveTask} onEdit={() => { setTaskEdit(tasks.find((x) => x.id === openTaskId)); setOpenTaskId(null); }} onDelete={async () => { if (await delTask(openTaskId) !== false) setOpenTaskId(null); }} onOpenMeeting={(mid) => { setOpenTaskId(null); setOpenId(mid); }} /></Overlay>}
   </>);
 }
 function ManageHub(p) {
@@ -4132,6 +4159,7 @@ function PpeItemForm({ item, onCancel, onSave, onDelete }) {
   const [returnable, setReturnable] = useState(it.returnable != null ? !!it.returnable : !!PPE_RETURNABLE_DEFAULT[it.category || "clothing"]);
   const [active, setActive] = useState(it.active !== false);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const sizes = sizesStr.split(",").map((s) => s.trim()).filter(Boolean);
   const effSizes = sizes.length ? sizes : ["אחיד"];
   const setOne = (sz, v) => setStock((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
@@ -4139,10 +4167,18 @@ function PpeItemForm({ item, onCancel, onSave, onDelete }) {
   const setMinOne = (sz, v) => setMinB((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
   const setMaxOne = (sz, v) => setMaxB((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
   const onCat = (c) => { setCategory(c); const m = PPE_CATS.find((x) => x.id === c); if (m) setClawback(m.clawback !== false); };
-  const save = () => {
+  const save = async () => {
+    if (busy) return false;
     if (!name.trim()) return setErr("נא להזין שם פריט");
     const sb = {}, mb = {}, mxb = {}; effSizes.forEach((sz) => { sb[sz] = Math.max(0, parseInt(stock[sz] || 0, 10) || 0); const m = Math.max(0, parseInt(minB[sz] || 0, 10) || 0); if (m > 0) mb[sz] = m; const mx = Math.max(0, parseInt(maxB[sz] || 0, 10) || 0); if (mx > 0) mxb[sz] = mx; });
-    onSave({ id: it.id || uid(), name: name.trim(), category, sizes: effSizes, stockBySize: sb, unitCost: Math.max(0, parseFloat(unitCost || "0") || 0), minBySize: mb, maxBySize: mxb, minStock: Object.values(mb).reduce((a, b) => a + b, 0), clawbackEligible: !!clawback, returnable: !!returnable, sku: sku.trim(), active, createdAt: it.createdAt || Date.now(), demo: it.demo || false });
+    setBusy(true); setErr("");
+    const ok = await onSave({ id: it.id || uid(), name: name.trim(), category, sizes: effSizes, stockBySize: sb, unitCost: Math.max(0, parseFloat(unitCost || "0") || 0), minBySize: mb, maxBySize: mxb, minStock: Object.values(mb).reduce((a, b) => a + b, 0), clawbackEligible: !!clawback, returnable: !!returnable, sku: sku.trim(), active, createdAt: it.createdAt || Date.now(), demo: it.demo || false });
+    setBusy(false);
+    if (ok === false) {
+      setErr("השמירה נכשלה. הפריט לא נסגר כדי שלא יאבד מידע.");
+      return false;
+    }
+    return true;
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{it.id ? "עריכת פריט" : "פריט חדש"}</div></div>
     <div className="body">
@@ -4156,7 +4192,7 @@ function PpeItemForm({ item, onCancel, onSave, onDelete }) {
       <div style={{ marginTop: 2 }}><label className="chk-line"><input type="checkbox" checked={returnable} onChange={(e) => setReturnable(e.target.checked)} /> נאסף בחזרה בעזיבה</label><div className="hint" style={{ marginInlineStart: 26 }}>פריט שנאסף בעזיבה וחוזר למלאי (קסדה/אוזניות/אפוד). פריטים אישיים כמו נעליים ובגדים אינם נאספים.</div></div>
       <div style={{ marginTop: 2 }}><label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> פריט פעיל</label><div className="hint" style={{ marginInlineStart: 26 }}>פריט פעיל מופיע בקטלוג, בהנפקות ובהזמנות. כיבוי מסתיר אותו מבלי למחוק היסטוריה.</div></div>
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>שמירה</button>
+      <button className="btn-primary full" onClick={save} disabled={busy}>{busy ? "שומר..." : "שמירה"}</button>
       {it.id && onDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת פריט" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
@@ -4164,12 +4200,34 @@ function PpeItemForm({ item, onCancel, onSave, onDelete }) {
 
 function PpeRestock({ item, onCancel, onSave, session, onLog }) {
   const [add, setAdd] = useState({});
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const sizes = ppeSizes(item);
   const setOne = (sz, v) => setAdd((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
-  const save = () => { const sb = { ...(item.stockBySize || {}) }; sizes.forEach((sz) => { sb[sz] = (sb[sz] || 0) + (add[sz] || 0); }); onSave({ ...item, stockBySize: sb }); if (onLog) { const moves = sizes.filter((sz) => (add[sz] || 0) > 0).map((sz) => ({ id: uid(), origin: "restock", itemId: item.id, itemName: item.name, category: item.category, size: sz, qty: add[sz], at: Date.now(), by: session ? { id: session.id, name: session.name } : null, unitCost: item.unitCost || 0, workerCharge: 0, note: "" })); if (moves.length) onLog(moves); } };
+  const save = async () => {
+    if (busy) return false;
+    const sb = { ...(item.stockBySize || {}) };
+    sizes.forEach((sz) => { sb[sz] = (sb[sz] || 0) + (add[sz] || 0); });
+    setBusy(true); setErr("");
+    const ok = await onSave({ ...item, stockBySize: sb });
+    setBusy(false);
+    if (ok === false) {
+      setErr("עדכון המלאי נכשל. הנתונים נשארו פתוחים כדי לנסות שוב.");
+      return false;
+    }
+    if (onLog) {
+      const moves = sizes.filter((sz) => (add[sz] || 0) > 0).map((sz) => ({ id: uid(), origin: "restock", itemId: item.id, itemName: item.name, category: item.category, size: sz, qty: add[sz], at: Date.now(), by: session ? { id: session.id, name: session.name } : null, unitCost: item.unitCost || 0, workerCharge: 0, note: "" }));
+      if (moves.length && await onLog(moves) === false) {
+        setErr("המלאי עודכן, אך יומן התנועה לא נשמר. בדקו חיבור ונסו לרענן.");
+        return false;
+      }
+    }
+    return true;
+  };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">הוספת מלאי · {item.name}</div></div>
     <div className="body"><div className="field"><span>כמות להוספה לפי מידה</span><div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>{sizes.map((sz) => <label key={sz} style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 96 }}><span style={{ fontSize: 12, color: "var(--muted)" }}>{szLbl(sz)} (כעת {ppeStockOf(item, sz)})</span><input type="number" min="0" value={add[sz] ?? 0} onChange={(e) => setOne(sz, e.target.value)} style={{ width: 96 }} /></label>)}</div></div>
-      <button className="btn-primary full" onClick={save}>עדכון מלאי</button><div style={{ height: 24 }} /></div></div>);
+      {err && <div className="err">{err}</div>}
+      <button className="btn-primary full" onClick={save} disabled={busy}>{busy ? "שומר..." : "עדכון מלאי"}</button><div style={{ height: 24 }} /></div></div>);
 }
 
 function UserPicker({ users, config, saveUser, value, onChange, label, pool, lockRole, hint, suggestName, canManageWorkerAccess: canWorkerAccess = false }) {
@@ -4190,7 +4248,7 @@ function UserPicker({ users, config, saveUser, value, onChange, label, pool, loc
       {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא «{q.trim()}» במערכת.</div>}
       {saveUser && <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור חדש"}</button>}
     </div> : (hint ? <div className="hint">{hint}</div> : null)}
-    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole={lockRole || "worker"} canManageWorkerAccess={canWorkerAccess} onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u); setCreating(false); setQ(""); }} /></Overlay>}
+    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole={lockRole || "worker"} canManageWorkerAccess={canWorkerAccess} onCancel={() => setCreating(false)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) { setCreated(u); onChange(u); setCreating(false); setQ(""); } return ok; }} /></Overlay>}
   </div>);
 }
 
@@ -4263,7 +4321,7 @@ function PpeWorkerPicker({ users, config, session, saveUser, value, onChange, de
       {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא עובד «{q.trim()}» במערכת.</div>}
       <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור עובד חדש"}</button>
     </div> : <div className="hint">הקלידו מספר עובד — המערכת תאתר אותו. לא קיים? תוכלו ליצור אותו כאן (חיפוש לפי מספר מונע כפילות).</div>}
-    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole="worker" canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setCreating(false)} onSave={async (u) => { await saveUser(u); setCreated(u); onChange(u.id); setCreating(false); setQ(""); }} /></Overlay>}
+    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})} config={config} users={users} canDelete={false} lockRole="worker" canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setCreating(false)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) { setCreated(u); onChange(u.id); setCreating(false); setQ(""); } return ok; }} /></Overlay>}
   </div>);
 }
 
@@ -4274,6 +4332,7 @@ function PpeIssueForm({ users, items, norms, ppe, config, session, saveUser, dep
   const [note, setNote] = useState(initial?.note || "");
   const [lines, setLines] = useState(() => (initial?.lines || []).map((l) => ({ key: uid(), itemId: l.itemId, size: l.size, qty: String(l.qty || 1), charge: "0", chargeTouched: false })));
   const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
   const worker = ppeRecipients(users).find((u) => u.id === workerId);
   const reset = (worker && worker.ppeResetAt) || 0;
   useEffect(() => { if (worker) setEmp(empOf(worker)); }, [workerId]);
@@ -4290,7 +4349,8 @@ function PpeIssueForm({ users, items, norms, ppe, config, session, saveUser, dep
   const [sig, setSig] = useState(initial && initial.signature ? initial.signature : "");
   const [sigMode, setSigMode] = useState(null);
   const [docRecs, setDocRecs] = useState(null);
-  const save = (opts = {}) => {
+  const save = async (opts = {}) => {
+    if (saving) return;
     if (!worker) return setErr("בחרו עובד");
     if (!filled.length) return setErr("הוסיפו לפחות פריט אחד");
     if (!sig && !opts.remote) return setErr("נדרשת חתימת העובד לפני ההמשך");
@@ -4298,12 +4358,22 @@ function PpeIssueForm({ users, items, norms, ppe, config, session, saveUser, dep
     const extra = [];
     filled.forEach((l) => { const it = itemOf(l.itemId); if (l.retPrev && ppeReturnable(it) && worker) { const prev = ppeLastHeldIssue(ppe, worker.id, it.id, reset); if (prev) extra.push({ id: uid(), workerId: worker.id, workerName: worker.name, workerNo: worker.workerNo || "", dept: ppeWorkerDept(worker), employmentType: emp, itemId: prev.itemId, itemName: prev.itemName, category: prev.category, size: prev.size, qty: prev.qty || 1, restocked: true, at: Date.now(), by: { id: session.id, name: session.name }, unitCost: prev.unitCost || 0, workerCharge: 0, note: "הוחזר עם הנפקה חדשה", origin: "return", linkedIssueId: prev.id }); } });
     const __all = [...recs, ...extra];
-    if (!requester && sig) setDocRecs(__all); else onIssue(__all);
+    if (!requester && sig) setDocRecs(__all);
+    else {
+      setSaving(true);
+      try {
+        const ok = await onIssue(__all);
+        if (ok === false) setErr(SAVE_FAILED_MESSAGE);
+      } finally {
+        setSaving(false);
+      }
+    }
   };
   if (docRecs) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="חזרה" onClick={() => setDocRecs(null)}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">אישור קבלת ציוד</div></div>
     <div className="body">
       <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }} dangerouslySetInnerHTML={{ __html: ppeDocBody(docRecs, worker, config) }} />
-      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}><button className="btn-ghost" onClick={() => setDocRecs(null)}><ChevronLeft size={16} style={{ transform: "scaleX(-1)" }} /> חזרה לתיקון</button><button className="btn-ghost full" onClick={() => ppePrintDoc(docRecs, worker, config)}><Printer size={16} /> הדפס / שמור PDF</button><button className="btn-primary full" onClick={() => onIssue(docRecs)}>סיום ושמירה</button></div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}><button className="btn-ghost" onClick={() => setDocRecs(null)}><ChevronLeft size={16} style={{ transform: "scaleX(-1)" }} /> חזרה לתיקון</button><button className="btn-ghost full" onClick={() => ppePrintDoc(docRecs, worker, config)}><Printer size={16} /> הדפס / שמור PDF</button><button className="btn-primary full" disabled={saving} onClick={async () => { setSaving(true); try { const ok = await onIssue(docRecs); if (ok === false) setErr(SAVE_FAILED_MESSAGE); } finally { setSaving(false); } }}>{saving ? "שומר..." : "סיום ושמירה"}</button></div>
+      {err && <div className="err">{err}</div>}
       <div className="hint" style={{ marginTop: 8 }}>אם ההדפסה חסומה בתצוגה המוטמעת — המסמך מוצג כאן לצילום; בגרסה המותקנת ההדפסה / שמירה ל-PDF תעבוד.</div>
       <div style={{ height: 20 }} />
     </div></div>);
@@ -4315,7 +4385,7 @@ function PpeIssueForm({ users, items, norms, ppe, config, session, saveUser, dep
         <SectionTitle>פריטים להנפקה</SectionTitle>
         {allowed.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>{allowed.flatMap((it) => { const l = lines.find((x) => x.itemId === it.id); const sel = !!l; const IconC = ppeCatIcon(it.category); const up = ppeIsUpgrade(it, items); const out = ppeTotalStock(it) <= 0; const els = [<button key={it.id + "-t"} type="button" onClick={() => toggleItem(it)} disabled={out && !sel} style={{ position: "relative", flex: "1 1 96px", maxWidth: 150, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "10px 6px", borderRadius: 10, border: sel ? "2px solid #0D9488" : "1px solid var(--border)", background: sel ? "rgba(13,148,136,0.08)" : "var(--surface)", cursor: (out && !sel) ? "not-allowed" : "pointer", opacity: (out && !sel) ? 0.45 : 1 }}><IconC size={22} color={sel ? "#0D9488" : "var(--muted)"} />{up && <span style={{ position: "absolute", top: 4, insetInlineEnd: 6, color: "#D97706", fontSize: 12 }}>★</span>}<span style={{ fontSize: 12, fontWeight: 600, textAlign: "center", lineHeight: 1.2 }}>{it.name}</span><span style={{ fontSize: 11, color: "var(--muted)" }}>{ppeTotalStock(it)} במלאי</span>{(() => { const el = worker ? ppeEligibility(ppe, worker.id, it, ppeNormFor(norms, ppeWorkerDept(worker), it.id), Date.now(), reset) : null; return el && el.last ? <span style={{ position: "absolute", top: 4, insetInlineStart: 6, fontSize: 10, fontWeight: 700, color: el.withinPeriod ? "#B45309" : "#0D9488" }} title={el.withinPeriod ? "בתוקף" : "זכאי"}>{el.withinPeriod ? "● בתוקף" : "✓"}</span> : null; })()}</button>]; if (sel) { const sizes = ppeSizes(it); const curSize = l.size || sizes[0]; const stockHere = ppeStockOf(it, curSize); els.push(<div key={it.id + "-d"} style={{ flexBasis: "100%", border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--surface)" }}><div className="chips">{sizes.map((sz) => { const st = ppeStockOf(it, sz); return <button key={sz} className={"chip" + (curSize === sz ? " on" : "")} onClick={() => setLine(l.key, { size: sz })}>{szLbl(sz)} · {st}</button>; })}</div><div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}><div><div style={{ fontWeight: 700 }}>חיוב: {Number(l.charge) > 0 ? ils(Number(l.charge)) : "חינם"}</div><div className="hint">{chargeInfo(it, l.qty).reason}{l.chargeTouched ? " · תוקן ידנית" : ""}</div></div>{!requester && (l.chargeTouched ? <input type="number" min="0" step="0.5" value={l.charge} onChange={(e) => setLine(l.key, { charge: e.target.value, chargeTouched: true })} style={{ width: 90 }} /> : <button className="btn-ghost sm" onClick={() => setLine(l.key, { chargeTouched: true })}>תיקון ידני</button>)}</div>{!requester && ppeReturnable(it) && worker && ppeHeldCount(ppe, worker.id, it.id, reset) > 0 && <label className="chk-line" style={{ margin: "6px 0 0", fontSize: 13 }}><input type="checkbox" checked={!!l.retPrev} onChange={(e) => setLine(l.key, { retPrev: e.target.checked, charge: String(autoCharge(it, l.qty, e.target.checked)), chargeTouched: false })} /> העובד החזיר את הפריט הקודם (אחרת — חיוב מלא)</label>}{(() => { const el = worker ? ppeEligibility(ppe, worker.id, it, ppeNormFor(norms, ppeWorkerDept(worker), it.id), Date.now(), reset) : null; return el && el.last ? <div className="hint" style={{ marginTop: 4, color: el.withinPeriod ? "#B45309" : "var(--muted)" }}>{el.withinPeriod ? `כבר הונפק לפני ${el.days} ימים · זכאות מתחדשת בעוד ${el.remainDays} ימים — הנפקה חוזרת בחיוב מלא` : `הונפק לאחרונה לפני ${el.days} ימים · בתוקף לזכאות`}</div> : null; })()}{stockHere < 1 && <div className="hint" style={{ color: "#B45309" }}>אין מלאי במידה זו — יתאפס בהנפקה.</div>}</div>); } return els; })}</div>}
         <label className="field" style={{ marginTop: 10 }}><span>הערה (משותפת)</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="לא חובה" /></label>
-        {requester ? (sigMode === "here" ? (<><SignaturePad value={sig} onChange={setSig} required={true} />{err && <div className="err">{err}</div>}<div style={{ display: "flex", gap: 8 }}><button className="btn-ghost" onClick={() => { setSigMode(null); setSig(""); }}>חזרה</button><button className="btn-primary full" onClick={() => save()}>{submitLabel || "שליחת בקשה לאישור"}</button></div></>) : (<div style={{ marginTop: 12 }}><div className="hint" style={{ marginBottom: 8 }}>נדרשת חתימת העובד. בחרו כיצד להחתים:</div>{err && <div className="err">{err}</div>}<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="btn-primary full" onClick={() => save({ remote: true })}><Send size={15} /> שלח לעובד לחתימה</button><button className="btn-ghost full" onClick={() => setSigMode("here")}><PenLine size={15} /> החתם את העובד כאן</button></div></div>)) : (<><SignaturePad value={sig} onChange={setSig} required={true} />{err && <div className="err">{err}</div>}<button className="btn-primary full" onClick={() => save()}>{submitLabel || ("רישום הנפקה" + (filled.length > 1 ? ` (${filled.length} פריטים)` : ""))}</button></>)}
+        {requester ? (sigMode === "here" ? (<><SignaturePad value={sig} onChange={setSig} required={true} />{err && <div className="err">{err}</div>}<div style={{ display: "flex", gap: 8 }}><button className="btn-ghost" onClick={() => { setSigMode(null); setSig(""); }}>חזרה</button><button className="btn-primary full" disabled={saving} onClick={() => save()}>{saving ? "שומר..." : (submitLabel || "שליחת בקשה לאישור")}</button></div></>) : (<div style={{ marginTop: 12 }}><div className="hint" style={{ marginBottom: 8 }}>נדרשת חתימת העובד. בחרו כיצד להחתים:</div>{err && <div className="err">{err}</div>}<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="btn-primary full" disabled={saving} onClick={() => save({ remote: true })}><Send size={15} /> {saving ? "שומר..." : "שלח לעובד לחתימה"}</button><button className="btn-ghost full" onClick={() => setSigMode("here")}><PenLine size={15} /> החתם את העובד כאן</button></div></div>)) : (<><SignaturePad value={sig} onChange={setSig} required={true} />{err && <div className="err">{err}</div>}<button className="btn-primary full" disabled={saving} onClick={() => save()}>{saving ? "שומר..." : (submitLabel || ("רישום הנפקה" + (filled.length > 1 ? ` (${filled.length} פריטים)` : "")))}</button></>)}
       </>}
       {!worker && err && <div className="err">{err}</div>}
       <div style={{ height: 24 }} />
@@ -4369,7 +4439,7 @@ function PpeItemCard({ item, ppe, onEdit, onClose, onRestock }) {
 function PpeCatalog({ items, ppe, onSave, onDelete, session, savePpe }) {
   const [edit, setEdit] = useState(null), [view, setView] = useState(null), [restock, setRestock] = useState(null);
   const list = [...(items || [])].sort((a, b) => ((a.active === false ? 1 : 0) - (b.active === false ? 1 : 0)) || (a.name > b.name ? 1 : -1));
-  const del = async (it) => { await onDelete(it.id); setEdit(null); setView(null); };
+  const del = async (it) => { const ok = await onDelete(it.id); if (ok !== false) { setEdit(null); setView(null); } return ok; };
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> קטלוג ציוד</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> הוסף פריט</button></div>
     {list.length === 0 ? <Empty text="הקטלוג ריק" Icon={Package} sub="הוסיפו פריט ציוד מגן/בגדי עבודה" /> : <div className="cards">{list.map((it) => { const low = ppeLow(it); return <button key={it.id} className="tcard" onClick={() => setView(it)} style={{ borderInlineStartColor: it.active === false ? "var(--muted)" : (low ? "#DC2626" : "#0D9488"), cursor: "pointer", textAlign: "start" }}>
@@ -4381,7 +4451,7 @@ function PpeCatalog({ items, ppe, onSave, onDelete, session, savePpe }) {
     </button>; })}</div>}
     {view && <Overlay onClose={() => setView(null)}><PpeItemCard item={view} ppe={ppe} onEdit={() => { setEdit(view); setView(null); }} onRestock={() => { setRestock(view); setView(null); }} onClose={() => setView(null)} /></Overlay>}
     {restock && <Overlay persistent onClose={() => setRestock(null)}><PpeRestockFlow items={items} preItem={restock} session={session} savePpe={savePpe} savePpeItem={onSave} onClose={() => setRestock(null)} /></Overlay>}
-    {edit && <Overlay persistent onClose={() => setEdit(null)}><PpeItemForm item={edit.id ? edit : null} onCancel={() => setEdit(null)} onSave={async (x) => { await onSave(x); setEdit(null); }} onDelete={edit.id ? (() => del(edit)) : null} /></Overlay>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><PpeItemForm item={edit.id ? edit : null} onCancel={() => setEdit(null)} onSave={async (x) => { const ok = await onSave(x); if (ok !== false) setEdit(null); return ok; }} onDelete={edit.id ? (() => del(edit)) : null} /></Overlay>}
   </>);
 }
 
@@ -4414,7 +4484,7 @@ function PpeRestockFlow({ items, session, savePpe, savePpeItem, onClose, preItem
   const [selId, setSelId] = useState(preItem ? preItem.id : ""), [q, setQ] = useState("");
   const active = (items || []).filter((x) => x.active !== false);
   const sel = active.find((x) => x.id === selId);
-  if (sel) return <PpeRestock item={sel} session={session} onLog={async (moves) => { for (const m of moves) await savePpe(m); }} onCancel={() => { if (preItem) onClose(); else setSelId(""); }} onSave={async (x) => { await savePpeItem(x); onClose(); }} />;
+  if (sel) return <PpeRestock item={sel} session={session} onLog={async (moves) => { for (const m of moves) if (await savePpe(m) === false) return false; return true; }} onCancel={() => { if (preItem) onClose(); else setSelId(""); }} onSave={async (x) => { const ok = await savePpeItem(x); if (ok !== false) onClose(); return ok; }} />;
   const ql = q.trim().toLowerCase();
   const shown = ql ? active.filter((x) => (x.name || "").toLowerCase().includes(ql) || String(x.sku || "").toLowerCase().includes(ql)) : active;
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">חידוש מלאי — בחירת פריט</div></div>
@@ -4470,8 +4540,16 @@ function PpeLog({ ppe, items, norms, users, config, session, deptScope, canIssue
   const restockQty30 = last30.filter((x) => x.origin === "restock").reduce((s, x) => s + (x.qty || 0), 0);
   const ret30 = last30.filter((x) => x.origin === "return").length;
   const lowItems = (items || []).filter((x) => x.active !== false && ppeLow(x));
-  const issue = async (recs) => { await ppeIssueRecs(recs, items, savePpeItem, savePpe); setEdit(false); };
-  const removeIssue = async (rec) => { const it = (items || []).find((x) => x.id === rec.itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; sb[rec.size] = (sb[rec.size] || 0) + rec.qty; await savePpeItem({ ...it, stockBySize: sb }); } await delPpe(rec.id); setOpenId(null); };
+  const issue = async (recs) => { if (await ppeIssueRecs(recs, items, savePpeItem, savePpe) !== false) setEdit(false); };
+  const removeIssue = async (rec) => {
+    const it = (items || []).find((x) => x.id === rec.itemId);
+    if (it) {
+      const sb = { ...(it.stockBySize || {}) };
+      sb[rec.size] = (sb[rec.size] || 0) + rec.qty;
+      if (await savePpeItem({ ...it, stockBySize: sb }) === false) return;
+    }
+    if (await delPpe(rec.id) !== false) setOpenId(null);
+  };
   const wfWorker = wf ? (users || []).find((u) => u.id === wf) : null;
   const TYPES = [["all", "הכל"], ["issue", "הנפקות"], ["restock", "חידושי מלאי"], ["return", "החזרות"], ["clawback", "קיזוזים"]];
   const movQty = (x) => { const t = ppeMoveType(x); if (t === "issue") return "−" + (x.qty || 1); if (t === "restock") return "＋" + (x.qty || 0); if (t === "return") return x.restocked ? "＋" + (x.qty || 1) : (x.qty || 1) + " · נמחק"; return ""; };
@@ -4498,10 +4576,12 @@ function PpeLog({ ppe, items, norms, users, config, session, deptScope, canIssue
 function PpeSignTemplate({ config, onSave }) {
   const [txt, setTxt] = useState(config.ppeSignText || PPE_SIGN_DEFAULT);
   const [saved, setSaved] = useState(false);
-  const save = async () => { await onSave({ ...config, ppeSignText: txt }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const [err, setErr] = useState("");
+  const save = async () => { setErr(""); const ok = await onSave({ ...config, ppeSignText: txt }); if (ok === false) return setErr(SAVE_FAILED_MESSAGE); setSaved(true); setTimeout(() => setSaved(false), 1500); };
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><FileText size={15} /> תבנית אישור קבלת ציוד (חתימה)</SectionTitle></div>
     <div className="hint" style={{ marginBottom: 6 }}>ההצהרה שהעובד חותם עליה באישור הקבלה. שדות אוטומטיים: {"{שם}, {מספר}, {מחלקה}, {תאריך}"}. טבלת הפריטים ותנאי הקיזוז מתווספים אוטומטית.</div>
+    {err && <div className="note" style={{ color: "#DC2626", marginBottom: 6 }}>{err}</div>}
     <textarea rows={5} aria-label="תבנית אישור קבלת ציוד" value={txt} onChange={(e) => setTxt(e.target.value)} style={{ width: "100%" }} />
     <button className="btn-primary" style={{ marginTop: 10 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת תבנית"}</button>
   </>);
@@ -4509,13 +4589,15 @@ function PpeSignTemplate({ config, onSave }) {
 function PpeClawbackSettings({ config, onSave }) {
   const [rows, setRows] = useState(ppeClawbackTable(config).map((r) => ({ maxDays: String(r.maxDays), pct: String(r.pct) })));
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
   const setOne = (i, k, v) => setRows((s) => s.map((r, j) => j === i ? { ...r, [k]: v } : r));
   const add = () => setRows((s) => [...s, { maxDays: "", pct: "" }]);
   const rm = (i) => setRows((s) => s.filter((_, j) => j !== i));
-  const save = async () => { const clean = rows.map((r) => ({ maxDays: Math.max(0, parseInt(r.maxDays || "0", 10) || 0), pct: Math.max(0, Math.min(100, parseInt(r.pct || "0", 10) || 0)) })).filter((r) => r.maxDays > 0).sort((a, b) => a.maxDays - b.maxDays); await onSave({ ...config, ppeClawback: clean }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const save = async () => { setErr(""); const clean = rows.map((r) => ({ maxDays: Math.max(0, parseInt(r.maxDays || "0", 10) || 0), pct: Math.max(0, Math.min(100, parseInt(r.pct || "0", 10) || 0)) })).filter((r) => r.maxDays > 0).sort((a, b) => a.maxDays - b.maxDays); const ok = await onSave({ ...config, ppeClawback: clean }); if (ok === false) return setErr(SAVE_FAILED_MESSAGE); setSaved(true); setTimeout(() => setSaved(false), 1500); };
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardCheck size={15} /> קיזוז בעזיבה — מדרגות לפי ותק</SectionTitle></div>
     <div className="hint" style={{ marginBottom: 10 }}>כמה אחוז מהיתרה (מחיר מלא פחות מה ששולם) ינוכה מעובד שעוזב, לפי כמה ימים עברו מההנפקה. מעבר למדרגה האחרונה — 0%. דוגמה: עד 30 יום 100%, עד 90 יום 75%, וכו׳.</div>
+    {err && <div className="note" style={{ color: "#DC2626", marginBottom: 6 }}>{err}</div>}
     <div className="cards">{rows.map((r, i) => <div key={i} className="tcard" style={{ cursor: "default" }}><div className="tcard-main" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>עד <input type="number" min="1" value={r.maxDays} onChange={(e) => setOne(i, "maxDays", e.target.value)} style={{ width: 80 }} /> ימים</label>
       <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>ניכוי <input type="number" min="0" max="100" value={r.pct} onChange={(e) => setOne(i, "pct", e.target.value)} style={{ width: 70 }} />%</label>
@@ -4530,16 +4612,17 @@ const ppeArchiveWorker = async (worker, plan, deps) => {
   const { items, savePpe, savePpeItem, saveUser, session } = deps;
   const now = Date.now();
   const base = { workerId: worker.id, workerName: worker.name, workerNo: worker.workerNo || "", dept: worker.dept || "", employmentType: worker.employmentType || "direct", qty: 0, at: now, exitId: ("exit_" + now + "_" + worker.id), by: { id: session.id, name: session.name }, clawbackEligible: false };
-  for (const r of (plan.keep || [])) await savePpe({ id: uid(), ...base, itemId: r.iss.itemId, itemName: r.iss.itemName, category: r.iss.category, size: r.iss.size, unitCost: r.iss.unitCost || 0, workerCharge: r.amount, note: "קיזוז בעזיבה", origin: "clawback", linkedIssueId: r.iss.id });
+  for (const r of (plan.keep || [])) if (await savePpe({ id: uid(), ...base, itemId: r.iss.itemId, itemName: r.iss.itemName, category: r.iss.category, size: r.iss.size, unitCost: r.iss.unitCost || 0, workerCharge: r.amount, note: "קיזוז בעזיבה", origin: "clawback", linkedIssueId: r.iss.id }) === false) return false;
   for (const r of (plan.returns || [])) {
-    await savePpe({ id: uid(), ...base, itemId: r.iss.itemId, itemName: r.iss.itemName, category: r.iss.category, size: r.iss.size, unitCost: r.iss.unitCost || 0, qty: r.iss.qty || 1, restocked: true, workerCharge: 0, note: "הוחזר למלאי בעזיבה", origin: "return", linkedIssueId: r.iss.id });
-    const it = (items || []).find((x) => x.id === r.iss.itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; sb[r.iss.size] = (sb[r.iss.size] || 0) + (r.iss.qty || 1); await savePpeItem({ ...it, stockBySize: sb }); }
+    if (await savePpe({ id: uid(), ...base, itemId: r.iss.itemId, itemName: r.iss.itemName, category: r.iss.category, size: r.iss.size, unitCost: r.iss.unitCost || 0, qty: r.iss.qty || 1, restocked: true, workerCharge: 0, note: "הוחזר למלאי בעזיבה", origin: "return", linkedIssueId: r.iss.id }) === false) return false;
+    const it = (items || []).find((x) => x.id === r.iss.itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; sb[r.iss.size] = (sb[r.iss.size] || 0) + (r.iss.qty || 1); if (await savePpeItem({ ...it, stockBySize: sb }) === false) return false; }
   }
-  await saveUser({ ...worker, active: false, status: "archived", exitAt: now });
+  if (await saveUser({ ...worker, active: false, status: "archived", exitAt: now }) === false) return false;
+  return true;
 };
 
 function PpeExitSettlement({ ppe, users, items, config, session, savePpe, savePpeItem, saveUser, onClose, initialWid }) {
-  const [q, setQ] = useState(""), [wid, setWid] = useState(initialWid || ""), [ret, setRet] = useState({}), [done, setDone] = useState(false);
+  const [q, setQ] = useState(""), [wid, setWid] = useState(initialWid || ""), [ret, setRet] = useState({}), [done, setDone] = useState(false), [err, setErr] = useState("");
   const now = Date.now(), table = ppeClawbackTable(config);
   const recips = (users || []).filter((u) => ["worker", "cleaner", "tech"].includes(u.role) && u.active !== false);
   const ql = q.trim().toLowerCase();
@@ -4551,7 +4634,7 @@ function PpeExitSettlement({ ppe, users, items, config, session, savePpe, savePp
   const returns = rows.filter((r) => r.retbl && r.returned).map((r) => ({ iss: r.iss }));
   const total = keep.reduce((s, r) => s + r.amount, 0);
   const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "9px 12px", background: "var(--surface)", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", textAlign: "start" };
-  const confirm = async () => { await ppeArchiveWorker(worker, { keep, returns }, { items, savePpe, savePpeItem, saveUser, session }); setDone(true); };
+  const confirm = async () => { setErr(""); const ok = await ppeArchiveWorker(worker, { keep, returns }, { items, savePpe, savePpeItem, saveUser, session }); if (ok !== false) setDone(true); else setErr(SAVE_FAILED_MESSAGE); };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">עזיבת עובד — החזרת ציוד וקיזוז</div></div>
     <div className="body">
       {!worker ? <>
@@ -4559,6 +4642,7 @@ function PpeExitSettlement({ ppe, users, items, config, session, savePpe, savePp
         {q.trim() && <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>{matches.map((u) => <button key={u.id} style={rowStyle} onClick={() => { setWid(u.id); setQ(""); }}><span style={{ fontWeight: 600 }}>{u.name}</span><span style={{ color: "var(--muted)", fontSize: 12 }}>{u.workerNo ? `מס׳ ${u.workerNo}` : ""}{u.dept ? ` · ${u.dept}` : ""}</span></button>)}{matches.length === 0 && <div className="hint" style={{ padding: "10px 12px" }}>לא נמצא עובד פעיל תואם.</div>}</div>}
       </> : done ? <div className="note" style={{ marginTop: 4, color: "#0D9488" }}>העובד הועבר לארכיון. קיזוז/החזרות נרשמו ביומן.</div> : <>
         <div className="row-between" style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}><span style={{ fontWeight: 600 }}>{worker.name}{worker.workerNo ? ` · מס׳ ${worker.workerNo}` : ""}{worker.dept ? ` · ${worker.dept}` : ""}</span><button className="btn-ghost sm" onClick={() => setWid("")}>שנה</button></div>
+        {err && <div className="err" style={{ marginBottom: 8 }}>{err}</div>}
         {rows.length === 0 ? <div className="note" style={{ marginTop: 4 }}>לא הונפק לעובד ציוד הדורש טיפול — ניתן לארכב ישירות.</div> : <>
           <SectionTitle>ציוד שהונפק — החזרה / קיזוז</SectionTitle>
           <div className="task-list">{rows.map((r) => <div key={r.iss.id} className="task-row" style={{ borderInlineStartColor: r.returned ? "#0D9488" : (r.amount > 0 ? "#B45309" : "var(--muted)"), cursor: "default" }}>
@@ -4605,6 +4689,7 @@ function PpeMyView({ ppe, items, norms, session, reqs, savePpeReq, config, langu
   const [wsig, setWsig] = useState("");
   const [rejMode, setRejMode] = useState(false);
   const [rejReason, setRejReason] = useState("");
+  const [signErr, setSignErr] = useState("");
   const toSign = (reqs || []).filter((r) => r.workerId === session.id && r.status === "worker_sign").sort((a, b) => b.at - a.at);
   const reset = (session && session.ppeResetAt) || 0;
   const mine = (ppe || []).filter((x) => x.workerId === session.id && x.at >= reset);
@@ -4614,8 +4699,8 @@ function PpeMyView({ ppe, items, norms, session, reqs, savePpeReq, config, langu
   const have = new Set(received.map((x) => x.itemId));
   const missing = myNorms.filter((n) => !have.has(n.itemId)).map((n) => (items || []).find((it) => it.id === n.itemId)).filter(Boolean);
   return (<div style={{ padding: 16 }}>
-    {toSign.length > 0 && <div style={{ marginBottom: 14 }}>{toSign.map((r) => <div key={r.id} style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 12, padding: 14, marginBottom: 8 }}><div style={{ fontWeight: 800, marginBottom: 4 }}>מסמך הממתין לחתימתך</div><div style={{ fontSize: 13, color: "#92400E", marginBottom: 8 }}>{(r.lines || []).map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ")}</div><button className="btn-primary full" onClick={() => { setSigning(r); setWsig(""); setRejMode(false); setRejReason(""); }}><PenLine size={15} /> צפה וחתום</button></div>)}</div>}
-    {signing && (() => { const w = { name: signing.workerName, workerNo: signing.workerNo, dept: signing.dept }; const dr = (signing.lines || []).map((l) => ({ itemName: l.itemName, size: l.size, qty: l.qty, category: l.category, workerCharge: l.workerCharge || 0, chargeReason: l.chargeReason || "", clawbackEligible: !!l.clawbackEligible, clawbackSnapshot: (typeof ppeClawbackTable === "function" ? ppeClawbackTable(config) : []) })); return <Overlay persistent onClose={() => setSigning(null)}><div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={() => setSigning(null)}><X size={22} /></button><div className="form-title">חתימה על קבלת ציוד</div></div><div className="body"><div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }} dangerouslySetInnerHTML={{ __html: ppeDocBody(dr, w, config) }} />{rejMode ? (<div style={{ marginTop: 12 }}><label className="field"><span>סיבת הסירוב</span><textarea value={rejReason} onChange={(e) => setRejReason(e.target.value)} placeholder="לא חובה" /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost" onClick={() => setRejMode(false)}>חזרה</button><button className="btn-danger full" onClick={() => { savePpeReq({ ...signing, status: "rejected", rejectReason: rejReason.trim(), rejectedByWorker: true, decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now() }); setSigning(null); }}>אישור סירוב</button></div></div>) : (<><SignaturePad value={wsig} onChange={setWsig} required={true} /><div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}><button className="btn-danger" onClick={() => setRejMode(true)}>סירוב לחתום</button><button className="btn-primary full" disabled={!wsig} onClick={() => { if (!wsig) return; savePpeReq({ ...signing, status: "pending", signature: wsig, workerSignedAt: Date.now(), awaitWorkerSign: false }); setSigning(null); }}><CheckCircle2 size={15} /> מאשר וחותם</button></div></>)}<div style={{ height: 20 }} /></div></div></Overlay>; })()}
+    {toSign.length > 0 && <div style={{ marginBottom: 14 }}>{toSign.map((r) => <div key={r.id} style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 12, padding: 14, marginBottom: 8 }}><div style={{ fontWeight: 800, marginBottom: 4 }}>מסמך הממתין לחתימתך</div><div style={{ fontSize: 13, color: "#92400E", marginBottom: 8 }}>{(r.lines || []).map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ")}</div><button className="btn-primary full" onClick={() => { setSigning(r); setWsig(""); setRejMode(false); setRejReason(""); setSignErr(""); }}><PenLine size={15} /> צפה וחתום</button></div>)}</div>}
+    {signing && (() => { const w = { name: signing.workerName, workerNo: signing.workerNo, dept: signing.dept }; const dr = (signing.lines || []).map((l) => ({ itemName: l.itemName, size: l.size, qty: l.qty, category: l.category, workerCharge: l.workerCharge || 0, chargeReason: l.chargeReason || "", clawbackEligible: !!l.clawbackEligible, clawbackSnapshot: (typeof ppeClawbackTable === "function" ? ppeClawbackTable(config) : []) })); return <Overlay persistent onClose={() => setSigning(null)}><div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={() => setSigning(null)}><X size={22} /></button><div className="form-title">חתימה על קבלת ציוד</div></div><div className="body"><div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }} dangerouslySetInnerHTML={{ __html: ppeDocBody(dr, w, config) }} />{rejMode ? (<div style={{ marginTop: 12 }}><label className="field"><span>סיבת הסירוב</span><textarea value={rejReason} onChange={(e) => setRejReason(e.target.value)} placeholder="לא חובה" /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost" onClick={() => setRejMode(false)}>חזרה</button><button className="btn-danger full" onClick={async () => { setSignErr(""); const ok = await savePpeReq({ ...signing, status: "rejected", rejectReason: rejReason.trim(), rejectedByWorker: true, decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now() }); if (ok !== false) setSigning(null); else setSignErr(SAVE_FAILED_MESSAGE); }}>אישור סירוב</button></div></div>) : (<><SignaturePad value={wsig} onChange={setWsig} required={true} /><div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}><button className="btn-danger" onClick={() => setRejMode(true)}>סירוב לחתום</button><button className="btn-primary full" disabled={!wsig} onClick={async () => { if (!wsig) return; setSignErr(""); const ok = await savePpeReq({ ...signing, status: "pending", signature: wsig, workerSignedAt: Date.now(), awaitWorkerSign: false }); if (ok !== false) setSigning(null); else setSignErr(SAVE_FAILED_MESSAGE); }}><CheckCircle2 size={15} /> מאשר וחותם</button></div></>)}{signErr && <div className="err" style={{ marginTop: 8 }}>{signErr}</div>}<div style={{ height: 20 }} /></div></div></Overlay>; })()}
     <SectionTitle><PackageCheck size={15} /> {t("ppe.myEquipment")}</SectionTitle>
     {received.length === 0 ? <Empty text={t("ppe.noneIssued")} Icon={PackageCheck} /> : <div className="task-list">{received.map((x) => <div key={x.id} className="task-row" style={{ borderInlineStartColor: "#0D9488" }}><div className="task-row-main"><div className="task-row-t">{x.itemName}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{x.qty > 1 ? ` ×${x.qty}` : ""}</div><div className="task-row-sub">{ppeCatLabel(x.category)} · {fmtDate(x.at)}</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: x.workerCharge > 0 ? "#B45309" : "#0D9488" }}>{x.workerCharge > 0 ? ils(x.workerCharge) : t("ppe.free")}</span></div></div>)}</div>}
     {owed > 0 && <div className="row-between" style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10, fontWeight: 700 }}><span>{t("ppe.totalCharge")}</span><span style={{ color: "#B45309" }}>{ils(owed)}</span></div>}
@@ -4668,8 +4753,9 @@ const ppeIssueRecs = async (recs, items, savePpeItem, savePpe) => {
   const arr = Array.isArray(recs) ? recs : [recs];
   const delta = {};
   arr.forEach((r) => { const sgn = r.origin === "return" ? 1 : (ppeIsIssue(r) ? -1 : 0); if (!sgn) return; delta[r.itemId] = delta[r.itemId] || {}; delta[r.itemId][r.size] = (delta[r.itemId][r.size] || 0) + sgn * (r.qty || 1); });
-  for (const itemId of Object.keys(delta)) { const it = (items || []).find((x) => x.id === itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; Object.entries(delta[itemId]).forEach(([sz, d]) => { sb[sz] = Math.max(0, (sb[sz] || 0) + d); }); await savePpeItem({ ...it, stockBySize: sb }); } }
-  for (const r of arr) await savePpe(r);
+  for (const itemId of Object.keys(delta)) { const it = (items || []).find((x) => x.id === itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; Object.entries(delta[itemId]).forEach(([sz, d]) => { sb[sz] = Math.max(0, (sb[sz] || 0) + d); }); if (await savePpeItem({ ...it, stockBySize: sb }) === false) return false; } }
+  for (const r of arr) if (await savePpe(r) === false) return false;
+  return true;
 };
 
 function PpeRequester({ ppe, items, norms, reqs, users, config, session, saveUser, savePpeReq, delPpeReq, deptScope }) {
@@ -4677,12 +4763,12 @@ function PpeRequester({ ppe, items, norms, reqs, users, config, session, saveUse
   const mine = (reqs || []).filter((r) => r.by && r.by.id === session.id).sort((a, b) => b.at - a.at);
   const pend = mine.filter(ppeRequestNeedsAction);
   const done = mine.filter((r) => !ppeRequestNeedsAction(r));
-  const submit = (recs) => {
+  const submit = async (recs) => {
     const arr = Array.isArray(recs) ? recs : [recs];
     if (!arr.length) return;
     const r0 = arr[0];
     const req = { id: uid(), status: (r0.awaitWorkerSign ? "worker_sign" : "pending"), awaitWorkerSign: !!r0.awaitWorkerSign, workerId: r0.workerId, workerName: r0.workerName, workerNo: r0.workerNo || "", dept: r0.dept || "", lines: arr.map((r) => ({ itemId: r.itemId, itemName: r.itemName, category: r.category, size: r.size, qty: r.qty, workerCharge: r.workerCharge || 0, chargeReason: r.chargeReason || "", clawbackEligible: !!r.clawbackEligible, unitCost: r.unitCost || 0 })), note: (r0.note || "").trim(), signature: r0.signature || "", by: { id: session.id, name: session.name }, at: Date.now() };
-    savePpeReq(req); setForm(false);
+    if (await savePpeReq(req) !== false) setForm(false);
   };
   const chip = (r) => r.status === "approved" ? <span className="badge sm" style={{ background: "#DCFCE7", color: "#166534" }}>{ppeRequestStatusLabel(r.status)}</span> : r.status === "rejected" ? <span className="badge sm" style={{ background: "#FEE2E2", color: "#B91C1C" }}>{ppeRequestStatusLabel(r.status)}</span> : r.status === "worker_sign" ? <span className="badge sm" style={{ background: "#FEF9C3", color: "#854D0E" }}>{ppeRequestStatusLabel(r.status)}</span> : <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>{ppeRequestStatusLabel(r.status)}</span>;
   const lineTxt = ppeRequestLineSummary;
@@ -4710,14 +4796,16 @@ function PpeRequests({ ppe, reqs, items, norms, users, config, session, savePpe,
   const done = all.filter((r) => !ppeRequestNeedsAction(r)).sort((a, b) => (b.decidedAt || b.at) - (a.decidedAt || a.at));
   const onApprove = async (recs) => {
     const arr = (Array.isArray(recs) ? recs : [recs]).map((x) => ({ ...x, initiatedByName: (approve && approve.by && approve.by.name) || x.initiatedByName || "", initiatedAt: (approve && approve.at) || x.initiatedAt || Date.now() }));
-    await ppeIssueRecs(arr, items, savePpeItem, savePpe);
+    if (await ppeIssueRecs(arr, items, savePpeItem, savePpe) === false) return false;
     const r = approve;
-    if (r) await savePpeReq({ ...r, status: "approved", decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now(), issueIds: arr.map((x) => x.id) });
+    if (r && await savePpeReq({ ...r, status: "approved", decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now(), issueIds: arr.map((x) => x.id) }) === false) return false;
     setApprove(null);
+    return true;
   };
   const doReject = async (r) => {
-    await savePpeReq({ ...r, status: "rejected", rejectReason: reason.trim(), decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now() });
-    setRejId(null); setReason("");
+    if (await savePpeReq({ ...r, status: "rejected", rejectReason: reason.trim(), decidedBy: { id: session.id, name: session.name }, decidedAt: Date.now() }) !== false) {
+      setRejId(null); setReason("");
+    }
   };
   const lineTxt = (r) => r.lines.map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ");
   return (<>
@@ -4747,6 +4835,7 @@ function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config 
   const [lines, setLines] = useState(() => (o.lines || []).map((l) => ({ ...l })));
   const [pid, setPid] = useState("");
   const [sizeQty, setSizeQty] = useState({});
+  const [err, setErr] = useState("");
   const pickItem = active.find((x) => x.id === pid);
   const psizes = pickItem ? ppeSizes(pickItem) : [];
   const setSQ = (sz, v) => setSizeQty((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
@@ -4754,9 +4843,10 @@ function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config 
   const addLines = () => { if (!pickItem) return; setLines((s) => { const c = [...s]; psizes.forEach((sz) => { const q = sizeQty[sz] || 0; if (q <= 0) return; const i = c.findIndex((l) => l.itemId === pickItem.id && l.size === sz); if (i >= 0) c[i] = { ...c[i], qty: (c[i].qty || 0) + q }; else c.push({ itemId: pickItem.id, itemName: pickItem.name, sku: pickItem.sku || "", category: pickItem.category, size: sz, qty: q, received: 0 }); }); return c; }); setPid(""); setSizeQty({}); };
   const rm = (i) => setLines((s) => s.filter((_, k) => k !== i));
   const setQty = (i, v) => setLines((s) => s.map((l, k) => k === i ? { ...l, qty: Math.max(1, parseInt(v || "1", 10) || 1) } : l));
-  const save = () => { if (!lines.length) return; onSave({ id: o.id || uid(), status: o.status || "draft", supplier: supplier.trim(), note: note.trim(), lines, createdBy: o.createdBy || { id: session.id, name: session.name }, createdAt: o.createdAt || Date.now(), sentAt: o.sentAt || null, expectedAt: o.expectedAt || null, closedAt: o.closedAt || null }); };
+  const save = async () => { if (!lines.length) return; setErr(""); const ok = await onSave({ id: o.id || uid(), status: o.status || "draft", supplier: supplier.trim(), note: note.trim(), lines, createdBy: o.createdBy || { id: session.id, name: session.name }, createdAt: o.createdAt || Date.now(), sentAt: o.sentAt || null, expectedAt: o.expectedAt || null, closedAt: o.closedAt || null }); if (ok === false) setErr(SAVE_FAILED_MESSAGE); };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{o.id ? "עריכת הזמנה" : "הזמנת רכש חדשה"}</div></div>
     <div className="body">
+      {err && <div className="note" style={{ color: "#DC2626", marginBottom: 8 }}>{err}</div>}
       <label className="field"><span>ספק</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— בחר ספק —</option>{(((config && config.suppliers) || []).filter((n) => { const mi = supMeta(config, n).industries; return !mi || mi.length === 0 || mi.includes("clothing"); })).map((n) => <option key={n} value={n}>{n}</option>)}{supplier && !((config && config.suppliers) || []).includes(supplier) && <option value={supplier}>{supplier}</option>}</select></label>
       <SectionTitle>פריטים בהזמנה</SectionTitle>
       {!o.id && (o.lines || []).length > 0 && <div className="hint" style={{ marginBottom: 8 }}>מולא אוטומטית לפי חוסרים — אפשר לערוך כמויות, להוסיף או למחוק.</div>}
@@ -4775,6 +4865,7 @@ function PpeOrderCard({ order, items, session, savePpeOrder, delPpeOrder, savePp
   const [recv, setRecv] = useState(null);
   const [sendMode, setSendMode] = useState(false);
   const [expected, setExpected] = useState("");
+  const [err, setErr] = useState("");
   const st = PPE_ORDER_ST[order.status] || PPE_ORDER_ST.draft;
   const q = ppeOrderQty(order), r = ppeOrderRecv(order);
   const lead = (order.sentAt && order.closedAt) ? Math.max(0, Math.round((order.closedAt - order.sentAt) / 86400000)) : null;
@@ -4782,22 +4873,24 @@ function PpeOrderCard({ order, items, session, savePpeOrder, delPpeOrder, savePp
   const orderXlsx = () => { const rows = (order.lines || []).map((l) => ({ "פריט": l.itemName, "מק״ט": l.sku || "", "מידה": l.size, "כמות": l.qty || 0 })); if (!rows.length) return; try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 10 }, { wch: 8 }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "הזמנה"); downloadXlsx(wb, `order_${(order.supplier || "ppe").replace(/[^\w\u0590-\u05FF]+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {} };
   const orderText = "הזמנה" + (order.supplier ? ` — ${order.supplier}` : "") + "\n" + fmtDate(order.createdAt) + "\n————————\n" + (order.lines || []).map((l) => `${l.itemName}${l.sku ? ` | מק״ט ${l.sku}` : ""}${l.size && l.size !== "אחיד" ? ` | מידה ${l.size}` : ""} | כמות ${l.qty}`).join("\n");
   const copyText = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(orderText); return; } } catch (e) {} try { const ta = document.getElementById("ordtxt-" + order.id); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
-  const send = async () => { await savePpeOrder({ ...order, status: "sent", sentAt: Date.now(), expectedAt: expected ? new Date(expected).getTime() : null }); setSendMode(false); onClose(); };
-  const cancel = async () => { await savePpeOrder({ ...order, status: "cancelled", closedAt: Date.now() }); onClose(); };
+  const send = async () => { setErr(""); const ok = await savePpeOrder({ ...order, status: "sent", sentAt: Date.now(), expectedAt: expected ? new Date(expected).getTime() : null }); if (ok === false) return setErr(SAVE_FAILED_MESSAGE); setSendMode(false); onClose(); };
+  const cancel = async () => { setErr(""); const ok = await savePpeOrder({ ...order, status: "cancelled", closedAt: Date.now() }); if (ok === false) return setErr(SAVE_FAILED_MESSAGE); onClose(); };
   const startRecv = () => { const m = {}; (order.lines || []).forEach((l, i) => { m[i] = Math.max(0, (l.qty || 0) - (l.received || 0)); }); setRecv(m); };
   const doReceive = async () => {
     const now = Date.now();
     const newLines = order.lines.map((l, i) => ({ ...l, received: Math.min(l.qty || 0, (l.received || 0) + (recv[i] || 0)) }));
     const adds = {};
     order.lines.forEach((l, i) => { const a = recv[i] || 0; if (a > 0) { adds[l.itemId] = adds[l.itemId] || {}; adds[l.itemId][l.size] = (adds[l.itemId][l.size] || 0) + a; } });
-    for (const itemId of Object.keys(adds)) { const it = (items || []).find((x) => x.id === itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; Object.entries(adds[itemId]).forEach(([sz, a]) => { sb[sz] = (sb[sz] || 0) + a; }); await savePpeItem({ ...it, stockBySize: sb }); } }
-    for (let i = 0; i < order.lines.length; i++) { const l = order.lines[i]; const a = recv[i] || 0; if (a > 0) await savePpe({ id: uid(), origin: "restock", itemId: l.itemId, itemName: l.itemName, category: l.category, size: l.size, qty: a, at: now, by: { id: session.id, name: session.name }, unitCost: 0, workerCharge: 0, note: "קבלת הזמנה" + (order.supplier ? ` · ${order.supplier}` : ""), orderId: order.id }); }
+    setErr("");
+    for (const itemId of Object.keys(adds)) { const it = (items || []).find((x) => x.id === itemId); if (it) { const sb = { ...(it.stockBySize || {}) }; Object.entries(adds[itemId]).forEach(([sz, a]) => { sb[sz] = (sb[sz] || 0) + a; }); if (await savePpeItem({ ...it, stockBySize: sb }) === false) return setErr(SAVE_FAILED_MESSAGE); } }
+    for (let i = 0; i < order.lines.length; i++) { const l = order.lines[i]; const a = recv[i] || 0; if (a > 0 && await savePpe({ id: uid(), origin: "restock", itemId: l.itemId, itemName: l.itemName, category: l.category, size: l.size, qty: a, at: now, by: { id: session.id, name: session.name }, unitCost: 0, workerCharge: 0, note: "קבלת הזמנה" + (order.supplier ? ` · ${order.supplier}` : ""), orderId: order.id }) === false) return setErr(SAVE_FAILED_MESSAGE); }
     const fully = newLines.every((l) => (l.received || 0) >= (l.qty || 0));
-    await savePpeOrder({ ...order, lines: newLines, status: fully ? "received" : "sent", closedAt: fully ? now : order.closedAt });
+    if (await savePpeOrder({ ...order, lines: newLines, status: fully ? "received" : "sent", closedAt: fully ? now : order.closedAt }) === false) return setErr(SAVE_FAILED_MESSAGE);
     setRecv(null); onClose();
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">הזמנת רכש</div></div>
     <div className="body">
+      {err && <div className="note" style={{ color: "#DC2626", marginBottom: 8 }}>{err}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}><div style={{ fontWeight: 800, fontSize: 17 }}>{order.supplier || "ללא ספק"}</div><span className="badge sm" style={{ background: st.color + "22", color: st.color }}>{st.label}</span></div>
       <div>
         <Row k="נוצר" v={fmtDate(order.createdAt)} />
@@ -4838,8 +4931,8 @@ function PpeOrders({ orders, items, config, session, savePpeOrder, delPpeOrder, 
     {!embedded && <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle><button className="btn-primary sm" onClick={fromDeficit}><Plus size={15} /> צור הזמנת רכש</button></div>}
     {live.length === 0 ? <Empty text="אין הזמנות פתוחות" Icon={Package} sub={emptySub} /> : <div className="task-list">{live.map((o) => <Card key={o.id} o={o} />)}</div>}
     {done.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>היסטוריית הזמנות</SectionTitle><div className="task-list">{done.slice(0, 30).map((o) => <Card key={o.id} o={o} />)}</div></div>}
-    {form && <Overlay persistent onClose={() => setForm(null)}><PpeOrderForm order={form} items={items} orders={orders} session={session} config={config} onCancel={() => setForm(null)} onSave={async (o) => { await savePpeOrder(o); setForm(null); }} /></Overlay>}
-    {open && <Overlay onClose={() => setOpenId(null)}><PpeOrderCard order={open} items={items} session={session} savePpeOrder={savePpeOrder} delPpeOrder={async () => { await delPpeOrder(open.id); setOpenId(null); }} savePpeItem={savePpeItem} savePpe={savePpe} onEdit={() => { setForm(open); setOpenId(null); }} onClose={() => setOpenId(null)} /></Overlay>}
+    {form && <Overlay persistent onClose={() => setForm(null)}><PpeOrderForm order={form} items={items} orders={orders} session={session} config={config} onCancel={() => setForm(null)} onSave={async (o) => { const ok = await savePpeOrder(o); if (ok !== false) setForm(null); return ok; }} /></Overlay>}
+    {open && <Overlay onClose={() => setOpenId(null)}><PpeOrderCard order={open} items={items} session={session} savePpeOrder={savePpeOrder} delPpeOrder={async () => { const ok = await delPpeOrder(open.id); if (ok !== false) setOpenId(null); return ok; }} savePpeItem={savePpeItem} savePpe={savePpe} onEdit={() => { setForm(open); setOpenId(null); }} onClose={() => setOpenId(null)} /></Overlay>}
   </>);
 }
 
@@ -4888,7 +4981,7 @@ function PpeHub(p) {
       : tab === "catalog" ? <PpeCatalog items={ppeItems} ppe={ppe} session={session} savePpe={savePpe} onSave={savePpeItem} onDelete={delPpeItem} />
       : tab === "settings" ? <><PpeNorms items={ppeItems} norms={ppeNorms} config={config} onSave={saveNorm} onDelete={delNorm} /><div style={{ height: 18 }} /><PpeClawbackSettings config={config} onSave={saveConfig} /><div style={{ height: 18 }} /><PpeSignTemplate config={config} onSave={saveConfig} /></>
       : <PpeLog ppe={ppe} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} deptScope={deptScope} canIssue={true} canExit={true} reqMode={false} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} />}
-    {orderForm && <Overlay persistent onClose={() => setOrderForm(null)}><PpeOrderForm order={orderForm} items={ppeItems} orders={ppeOrders} session={session} config={config} onCancel={() => setOrderForm(null)} onSave={async (o) => { await savePpeOrder(o); setOrderForm(null); }} /></Overlay>}
+    {orderForm && <Overlay persistent onClose={() => setOrderForm(null)}><PpeOrderForm order={orderForm} items={ppeItems} orders={ppeOrders} session={session} config={config} onCancel={() => setOrderForm(null)} onSave={async (o) => { const ok = await savePpeOrder(o); if (ok !== false) setOrderForm(null); return ok; }} /></Overlay>}
   </>);
 }
 
@@ -4951,7 +5044,7 @@ function AdminApp(p) {
       <nav className="bottom-nav nav-scroll" aria-label="ניווט ראשי">{nav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
-      {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { await saveTicket(t); setOverlay(null); }} /></Overlay>}
+      {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
@@ -5268,7 +5361,10 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); }));
     const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type));
     if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${countLabel(orphan.length, "כלי משויך", "כלים משויכים")} לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; }
-    await saveConfig({ ...config, ...flattenVehicleTypes(list) });
+    if (await saveConfig({ ...config, ...flattenVehicleTypes(list) }) === false) {
+      setTypeMsg(SAVE_FAILED_MESSAGE);
+      return;
+    }
     setSaved(true); setTimeout(() => setSaved(false), 1800);
   };
   return (<div className="settings-wrap">
@@ -5321,11 +5417,11 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
       const units = readyRows.map((row, i) => ({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i }));
       const importResult = await saveFleetImportAtomically({
         units,
-        batchSize: units.length || 1,
-        saveMany: typeof onImportMany === "function" ? (chunk) => onImportMany(chunk, catalogAdditions) : null,
+        batchSize: 25,
+        saveMany: typeof onImportMany === "function" ? (chunk) => onImportMany(chunk, []) : null,
         saveOne: onImport,
         rollbackOne: onDelete,
-        saveCatalog: typeof onImportMany === "function" ? null : (catalogAdditions.length && onSaveCatalog ? () => onSaveCatalog(catalogAdditions) : null),
+        saveCatalog: catalogAdditions.length && onSaveCatalog ? () => onSaveCatalog(catalogAdditions) : null,
         onProgress: setImportProgress
       });
       if (!importResult.ok) {
@@ -5472,9 +5568,9 @@ function FleetModule(p) {
           {rows.map(renderRow)}
         </div>}
     </>}
-    {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { const ok = await saveFleet(x); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
     {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units, adds) => saveFleetImportBatch(units, adds, { toastOnFail: false })} onDelete={(id) => delFleet(id, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { if (await delFleet(openId) !== false) setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) if (await saveTicket(t) === false) return false; return true; }} onBlock={async (reason) => saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason))} /></Overlay>}
   </>);
 }
 function FleetForm({ item, config, onCancel, onSave }) {
@@ -5485,12 +5581,22 @@ function FleetForm({ item, config, onCancel, onSave }) {
   const [typeId, setTypeId] = useState(initType?.id || "");
   const [f, setF] = useState({ code: item.code || "", supplier: item.supplier || "", type: vts ? (initType?.name || currentTypeName || "") : (item.type || FORKLIFT_TYPES[0]), model: currentModel || (vts ? ((initType?.models || []).filter(Boolean)[0] || "") : ""), vehicleKind: vts ? (initType?.name || currentTypeName || "") : (item.vehicleKind || ""), chassis: item.chassis || "", license: item.license || "", depts: item.depts || (item.dept ? [item.dept] : []), notes: item.notes || "", docs: item.docs || {} });
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const curType = vts ? (vts.find((v) => v.id === typeId) || null) : null;
   const setDoc = (id, k, v) => setF((s) => ({ ...s, docs: { ...s.docs, [id]: { ...s.docs[id], [k]: v } } }));
   const toggleDept = (d) => setF((s) => ({ ...s, depts: s.depts.includes(d) ? s.depts.filter((x) => x !== d) : [...s.depts, d] }));
   const pickType = (id) => { const nt = vts.find((v) => v.id === id); const typeName = nt?.name || ""; setTypeId(id); setF((s) => ({ ...s, type: typeName, vehicleKind: typeName, model: (nt?.models || []).filter(Boolean)[0] || "" })); };
   const showLicense = vts ? !!curType?.license : true;
-  const save = () => { if (!f.code.trim()) return setErr("נא להזין מספר/מזהה כלי"); const typeName = vts ? (curType?.name || f.vehicleKind || f.type) : (f.vehicleKind || modelTypeName(f.type, config) || f.notes || ""); onSave({ id: item.id || uid(), ...f, type: vts ? typeName : f.type, model: vts ? f.model : (f.model || f.type), vehicleKind: typeName, dept: f.depts[0] || "", code: f.code.trim(), createdAt: item.createdAt || Date.now() }); };
+  const save = async () => {
+    if (busy) return;
+    if (!f.code.trim()) return setErr("נא להזין מספר/מזהה כלי");
+    const typeName = vts ? (curType?.name || f.vehicleKind || f.type) : (f.vehicleKind || modelTypeName(f.type, config) || f.notes || "");
+    setErr("");
+    setBusy(true);
+    const ok = await onSave({ id: item.id || uid(), ...f, type: vts ? typeName : f.type, model: vts ? f.model : (f.model || f.type), vehicleKind: typeName, dept: f.depts[0] || "", code: f.code.trim(), createdAt: item.createdAt || Date.now() });
+    setBusy(false);
+    if (ok === false) setErr(SAVE_FAILED_MESSAGE);
+  };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{item.id ? "עריכת כלי" : "כלי שינוע חדש"}</div></div>
     <div className="body">
       <label className="field"><span>מספר / מזהה פנימי *</span><input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="מלגזה 14" /></label>
@@ -5508,7 +5614,7 @@ function FleetForm({ item, config, onCancel, onSave }) {
       {machineDocs(f, config).length === 0 ? <div className="hint">לסוג זה לא הוגדרו מסמכים מנוהלים. ניתן להגדיר בהגדרות → כלי שינוע.</div> : machineDocs(f, config).map((d) => <div key={d.id} className="doc-edit"><div className="doc-edit-lbl">{d.label}</div><div className="doc-edit-row"><input type="date" value={f.docs[d.id]?.date || ""} onChange={(e) => setDoc(d.id, "date", e.target.value)} /><input value={f.docs[d.id]?.link || ""} onChange={(e) => setDoc(d.id, "link", e.target.value)} placeholder="קישור לקובץ (Drive/SharePoint)" /></div></div>)}
       <label className="field" style={{ marginTop: 14 }}><span>הערות</span><textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>שמירה</button><div style={{ height: 24 }} />
+      <button className="btn-primary full" disabled={busy} onClick={save}>{busy ? "שומר..." : "שמירה"}</button><div style={{ height: 24 }} />
     </div></div>);
 }
 function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, onReturnService, onBlock, canDocs = true, canTickets = true }) {
@@ -5591,8 +5697,8 @@ function InspectionsModule(p) {
       )}
     </>)}
     {detail && <Overlay onClose={() => setDetail(null)}><InspDetail rec={detail} fleet={fleet} templates={templates} onClose={() => setDetail(null)} /></Overlay>}
-    {tplEdit && <Overlay persistent onClose={() => setTplEdit(null)}><TemplateForm tpl={tplEdit} onCancel={() => setTplEdit(null)} onSave={async (t) => { await saveTpl(t); setTplEdit(null); }} onDelete={tplEdit.id ? async () => { await delTpl(tplEdit.id); setTplEdit(null); } : null} /></Overlay>}
-    {run && <Overlay persistent onClose={() => setRun(null)}><InspectionRun fleet={run.fleet} forcedTemplateId={run.tplId} templates={templates} session={session} config={config} onClose={() => setRun(null)} onFinish={async (record, ticket) => { await saveInsp(record); if (ticket) await saveTicket(ticket); setRun(null); }} /></Overlay>}
+    {tplEdit && <Overlay persistent onClose={() => setTplEdit(null)}><TemplateForm tpl={tplEdit} onCancel={() => setTplEdit(null)} onSave={async (t) => { const ok = await saveTpl(t); if (ok !== false) setTplEdit(null); return ok; }} onDelete={tplEdit.id ? async () => { const ok = await delTpl(tplEdit.id); if (ok !== false) setTplEdit(null); return ok; } : null} /></Overlay>}
+    {run && <Overlay persistent onClose={() => setRun(null)}><InspectionRun fleet={run.fleet} forcedTemplateId={run.tplId} templates={templates} session={session} config={config} onClose={() => setRun(null)} onFinish={async (record, ticket) => { if (await saveInsp(record) === false) return false; if (ticket && await saveTicket(ticket) === false) return false; setRun(null); return true; }} /></Overlay>}
   </>);
 }
 function InspHistory({ pool, insp, templates, onRun, onView, config }) {
@@ -5738,8 +5844,8 @@ function PMModule(p) {
   return (<>
     <div className="row-between"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div>
     <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} />
-    {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { await savePm(t); setEdit(null); }} /></Overlay>}
-    {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { await delPm(run.id); setRun(null); }} /></Overlay>}
+    {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await savePm(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
+    {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
   </>);
 }
 function PMSchedule({ items, fleet, onOpen, allPm, config }) {
@@ -6345,13 +6451,28 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
   const [notes, setNotes] = useState(meta.notes || "");
   const [contacts, setContacts] = useState((meta.contacts || []).map((c) => ({ ...c })));
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [nm, setNm] = useState(name);
   const [cd, setCd] = useState(false);
   const toggleInd = (id) => canManage && setInd((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
   const addContact = () => canManage && setContacts((c) => [...c, { id: uid(), name: "", phone: "", email: "", role: "" }]);
   const updContact = (i, patch) => canManage && setContacts((c) => c.map((x, j) => j === i ? { ...x, ...patch } : x));
   const delContact = (i) => canManage && setContacts((c) => c.filter((_, j) => j !== i));
-  const saveMeta = () => { const m = { ...(config.supplierMeta || {}) }; m[name] = { industries: ind, hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) }; saveConfig({ ...config, supplierMeta: m }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const saveMeta = async () => {
+    if (busy) return false;
+    const m = { ...(config.supplierMeta || {}) };
+    m[name] = { industries: ind, hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) };
+    setBusy(true); setErr("");
+    const ok = await saveConfig({ ...config, supplierMeta: m });
+    setBusy(false);
+    if (ok === false) {
+      setErr("השמירה נכשלה. הפרטים נשארו פתוחים כדי לנסות שוב.");
+      return false;
+    }
+    setSaved(true); setTimeout(() => setSaved(false), 1500);
+    return true;
+  };
   const relOrders = (orders || []).filter((o) => o.supplier === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const relFleet = (fleet || []).filter((f) => f.supplier === name);
   const stLbl = (st) => st === "draft" ? "טיוטה" : st === "sent" ? "נשלחה" : st === "received" ? "התקבלה" : st || "—";
@@ -6370,7 +6491,8 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
         {contacts.length === 0 ? <div className="hint">{canManage ? "אפשר להוסיף שם וטלפון בלבד (פרטי), או מספר אנשי קשר עם תפקיד (חברה)." : "אין אנשי קשר שמורים."}</div> : <div className="task-list">{contacts.map((c, i) => <div key={c.id || i} className="task-row" style={{ cursor: "default" }}><div className="task-row-main" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><input value={c.name} onChange={(e) => updContact(i, { name: e.target.value })} readOnly={!canManage} placeholder="שם" style={{ flex: "1 1 110px" }} /><input value={c.phone} onChange={(e) => updContact(i, { phone: e.target.value })} readOnly={!canManage} placeholder="טלפון" style={{ flex: "1 1 110px" }} /><input value={c.email || ""} onChange={(e) => updContact(i, { email: e.target.value })} readOnly={!canManage} placeholder="אימייל (לא חובה)" style={{ flex: "1 1 110px" }} /><input value={c.role} onChange={(e) => updContact(i, { role: e.target.value })} readOnly={!canManage} placeholder="תפקיד (לא חובה)" style={{ flex: "1 1 110px" }} /></div>{canManage && <div className="task-row-side"><button className="btn-ghost sm" onClick={() => delContact(i)}><X size={14} /></button></div>}</div>)}</div>}
       </div>
       <label className="field"><span>הערות</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} readOnly={!canManage} rows={2} /></label>
-      {canManage && <button className="btn-primary full" onClick={saveMeta}>{saved ? "נשמר ✓" : "שמירה"}</button>}
+      {err && <div className="err">{err}</div>}
+      {canManage && <button className="btn-primary full" onClick={saveMeta} disabled={busy}>{busy ? "שומר..." : (saved ? "נשמר ✓" : "שמירה")}</button>}
       {canManage && onDelete && (!cd ? <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C" }} onClick={() => setCd(true)}><Trash2 size={14} /> מחיקת ספק</button> : <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C", fontWeight: 800 }} onClick={() => onDelete(name)}>לחצו שוב לאישור מחיקה</button>)}
     </div>}
     {tab === "activity" && <div>
@@ -6387,15 +6509,40 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
   const [sel, setSel] = useState(null);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState("");
+  const [err, setErr] = useState("");
   const names = config.suppliers || [];
-  const renameSup = async (oldN, newN) => { newN = (newN || "").trim(); if (!newN || newN === oldN) return; const names2 = names.map((x) => x === oldN ? newN : x); const meta2 = { ...(config.supplierMeta || {}) }; if (meta2[oldN]) { meta2[newN] = meta2[oldN]; delete meta2[oldN]; } saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }); for (const f of (fleet || [])) if (f.supplier === oldN && saveFleet) await saveFleet({ ...f, supplier: newN }); for (const u of (users || [])) if (u.supplier === oldN && saveUser) await saveUser({ ...u, supplier: newN }); for (const o of (orders || [])) if (o.supplier === oldN && savePpeOrder) await savePpeOrder({ ...o, supplier: newN }); setSel(newN); };
-  const delSup = (n) => { const names2 = names.filter((x) => x !== n); const meta2 = { ...(config.supplierMeta || {}) }; delete meta2[n]; saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }); setSel(null); };
-  const add = () => { const n = adding.trim(); if (!n) return; if (!names.includes(n)) saveConfig({ ...config, suppliers: [...names, n] }); setAdding(""); setSel(n); };
+  const renameSup = async (oldN, newN) => {
+    newN = (newN || "").trim(); if (!newN || newN === oldN) return;
+    setErr("");
+    const names2 = names.map((x) => x === oldN ? newN : x);
+    const meta2 = { ...(config.supplierMeta || {}) };
+    if (meta2[oldN]) { meta2[newN] = meta2[oldN]; delete meta2[oldN]; }
+    if (await saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }) === false) return setErr("שינוי שם הספק לא נשמר. נסו שוב.");
+    for (const f of (fleet || [])) if (f.supplier === oldN && saveFleet && await saveFleet({ ...f, supplier: newN }) === false) return setErr("שם הספק נשמר, אך עדכון כלי מקושר נכשל. נסו שוב.");
+    for (const u of (users || [])) if (u.supplier === oldN && saveUser && await saveUser({ ...u, supplier: newN }) === false) return setErr("שם הספק נשמר, אך עדכון משתמש מקושר נכשל. נסו שוב.");
+    for (const o of (orders || [])) if (o.supplier === oldN && savePpeOrder && await savePpeOrder({ ...o, supplier: newN }) === false) return setErr("שם הספק נשמר, אך עדכון הזמנה מקושרת נכשל. נסו שוב.");
+    setSel(newN);
+  };
+  const delSup = async (n) => {
+    setErr("");
+    const names2 = names.filter((x) => x !== n);
+    const meta2 = { ...(config.supplierMeta || {}) };
+    delete meta2[n];
+    if (await saveConfig({ ...config, suppliers: names2, supplierMeta: meta2 }) === false) return setErr("מחיקת הספק לא נשמרה. נסו שוב.");
+    setSel(null);
+  };
+  const add = async () => {
+    const n = adding.trim(); if (!n) return;
+    setErr("");
+    if (!names.includes(n) && await saveConfig({ ...config, suppliers: [...names, n] }) === false) return setErr("הוספת הספק לא נשמרה. נסו שוב.");
+    setAdding(""); setSel(n);
+  };
   if (sel && names.includes(sel)) return <div style={{ padding: 4 }}><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} canManage={canManage} /></div>;
   const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
   return (<div style={{ padding: 4 }}>
     <SectionTitle><Building2 size={16} /> ספקים / קבלנים</SectionTitle>
     <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש ספק או קבלן" placeholder="חיפוש ספק" style={{ flex: "1 1 160px" }} />{canManage && <><input value={adding} onChange={(e) => setAdding(e.target.value)} aria-label="שם ספק או קבלן חדש" placeholder="ספק חדש" style={{ flex: "1 1 140px" }} /><button className="btn-primary sm" onClick={add}><Plus size={15} /> הוסף</button></>}</div>
+    {err && <div className="err" style={{ marginBottom: 10 }}>{err}</div>}
     {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>{shown.map((n) => { const m = supMeta(config, n); const oN = (orders || []).filter((o) => o.supplier === n).length; const fN = (fleet || []).filter((f) => f.supplier === n).length; const cN = (m.contacts || []).length; return <button key={n} onClick={() => setSel(n)} style={{ textAlign: "start", border: "1px solid var(--border)", borderRadius: 12, padding: 14, background: "var(--surface)", cursor: "pointer" }}><div style={{ fontWeight: 800, marginBottom: 6 }}>{n}</div><div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8, minHeight: 20 }}>{(m.industries || []).length === 0 ? <span className="hint">ללא תחום</span> : (m.industries || []).map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id)}</span>)}</div><div className="hint">{countLabel(oN, "הזמנה", "הזמנות")} · {countLabel(fN, "כלי", "כלים")}{cN ? ` · ${countLabel(cN, "איש קשר", "אנשי קשר")}` : ""}</div></button>; })}</div>}
   </div>);
 }
@@ -6434,7 +6581,7 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }); flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
   const pickLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -6452,16 +6599,16 @@ function SettingsPanel(p) {
     if (registryEmptied(depts, deptUse)) { setUserCfgMsg("לא ניתן לרוקן שם של מחלקה שנמצאת בשימוש — שנו שם או שחררו את הרשומות"); return; }
     try {
       for (const r of registryRenames(depts)) { const o = r._orig, n = r.name.trim();
-        for (const u of users) if (u.dept === o) await saveUser({ ...u, dept: n });
-        for (const f of (fleet || [])) { let ch = false; const nf = { ...f }; if (Array.isArray(f.depts) && f.depts.includes(o)) { nf.depts = f.depts.map((d) => d === o ? n : d); ch = true; } if (f.dept === o) { nf.dept = n; ch = true; } if (ch) await saveFleet(nf); }
-        for (const t of (tickets || [])) if (t.reportedBy?.dept === o) await saveTicket({ ...t, reportedBy: { ...t.reportedBy, dept: n } }); }
+        for (const u of users) if (u.dept === o && await saveUser({ ...u, dept: n }) === false) throw new Error("save_failed");
+        for (const f of (fleet || [])) { let ch = false; const nf = { ...f }; if (Array.isArray(f.depts) && f.depts.includes(o)) { nf.depts = f.depts.map((d) => d === o ? n : d); ch = true; } if (f.dept === o) { nf.dept = n; ch = true; } if (ch && await saveFleet(nf) === false) throw new Error("save_failed"); }
+        for (const t of (tickets || [])) if (t.reportedBy?.dept === o && await saveTicket({ ...t, reportedBy: { ...t.reportedBy, dept: n } }) === false) throw new Error("save_failed"); }
       const grace = Math.max(0, Number(shiftGrace) || 0);
-      await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw, workShifts: cleanWorkShifts(), departments: cleanRegistry(depts), lateGraceMin: grace, earlyGraceMin: grace });
+      if (await saveConfig({ ...config, techWidgets: tw, mgrWidgets: mw, workShifts: cleanWorkShifts(), departments: cleanRegistry(depts), lateGraceMin: grace, earlyGraceMin: grace }) === false) throw new Error("save_failed");
       setDepts((s) => s.map((r) => ({ ...r, _orig: r.name.trim() })));
       flash();
     } catch (e) { setUserCfgMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
   };
-  const saveMaint = async () => { setMaintMsg(""); if (registryEmptied(zones, zoneUse)) { setMaintMsg("לא ניתן לרוקן שם של אזור שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return; } try { const list = cats.filter((c) => c.label.trim()); for (const r of registryRenames(zones)) { const o = r._orig, n = r.name.trim(); for (const f of (fleet || [])) if (f.zone === o) await saveFleet({ ...f, zone: n }); for (const t of (tickets || [])) if (t.zone === o) await saveTicket({ ...t, zone: n }); } await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); flash(); } catch (e) { setMaintMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); } };
+  const saveMaint = async () => { setMaintMsg(""); if (registryEmptied(zones, zoneUse)) { setMaintMsg("לא ניתן לרוקן שם של אזור שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return; } try { const list = cats.filter((c) => c.label.trim()); for (const r of registryRenames(zones)) { const o = r._orig, n = r.name.trim(); for (const f of (fleet || [])) if (f.zone === o && await saveFleet({ ...f, zone: n }) === false) throw new Error("save_failed"); for (const t of (tickets || [])) if (t.zone === o && await saveTicket({ ...t, zone: n }) === false) throw new Error("save_failed"); } if (await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }) === false) throw new Error("save_failed"); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); flash(); } catch (e) { setMaintMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); } };
   const adminCount = users.filter((u) => u.role === "admin" && u.active).length;
   const mayViewUsers = p.only === "users" ? canViewUsers(session) : true;
   const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
@@ -6483,7 +6630,7 @@ function SettingsPanel(p) {
   </>);
   const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim())));
   const duplicateUserGroups = findUserDuplicateGroups(ulist);
-  const restoreWorker = async (w) => { await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); setArcView(null); };
+  const restoreWorker = async (w) => { const ok = await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); if (ok !== false) setArcView(null); return ok; };
   return (<div className="settings-wrap">
     {!p.only && <div className="seg-tabs s3"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button><button className={tab === "issues" ? "on" : ""} onClick={() => setTab("issues")}>דיווחי בעיות</button></div>}
 
@@ -6609,7 +6756,7 @@ function SettingsPanel(p) {
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
       {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} /></Overlay>}
-      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { await saveUser(u); if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want) await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }); } } setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); }} onDelete={async () => { await delUser(uEdit.id); setUEdit(null); }} /></Overlay>}
+      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { if (await saveUser(u) === false) return false; if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want && await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }) === false) return false; } } setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return true; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       </>}
     </>)}
   </div>);
@@ -6825,7 +6972,15 @@ function TicketForm(p) {
       log: [{ at: now, by: session.name, byRole: session.role, text: routeText }],
     };
   };
-  const finalize = async (t) => { const rec = photo ? { ...t, ...(await TICKET_PHOTOS.save(t.id, "before", photo)) } : t; await onCreate(rec); };
+  const finalize = async (t) => {
+    const rec = photo ? { ...t, ...(await TICKET_PHOTOS.save(t.id, "before", photo)) } : t;
+    return onCreate(rec);
+  };
+  const failSave = () => {
+    setErr(SAVE_FAILED_MESSAGE);
+    busyRef.current = false;
+    setBusy(false);
+  };
   const submit = async () => {
     if (busyRef.current) return;
     if (!subject.trim()) return setErr("נא להזין נושא");
@@ -6838,9 +6993,9 @@ function TicketForm(p) {
     const review = transportDuplicateReview(t, tickets || []);
     if (review.mode !== "none") { setPendingT(t); setDupeReview(review); return; }
     busyRef.current = true; setBusy(true);
-    try { await finalize(t); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); }
+    try { if (await finalize(t) === false) failSave(); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); }
   };
-  const proceedAnyway = async () => { const t = pendingT; setDupeReview(null); setPendingT(null); busyRef.current = true; setBusy(true); try { await finalize(t); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); } };
+  const proceedAnyway = async () => { const t = pendingT; setDupeReview(null); setPendingT(null); busyRef.current = true; setBusy(true); try { if (await finalize(t) === false) failSave(); } catch (e) { setErr("שגיאה בשמירה."); busyRef.current = false; setBusy(false); } };
   if (!track) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">פתיחת קריאה</div></div>
     <div className="body"><div className="track-q">על מה הקריאה?</div>
       {Object.values(TRACKS).map((tr) => <button key={tr.id} className="track-pick" onClick={() => setTrack(tr.id)} style={{ borderColor: tr.color }}><span className="track-ic" style={{ background: tr.color + "22", color: tr.color }}><tr.Icon size={24} /></span><div><div className="track-name">{tr.label}</div><div className="track-desc">{tr.id === "transport" ? "מלגזות וכלי שינוע — מועבר לטכנאי" : "מבנה, חשמל, אינסטלציה, IT ועוד"}</div></div><ChevronLeft size={18} className="role-chev" /></button>)}

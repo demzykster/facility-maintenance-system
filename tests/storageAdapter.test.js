@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAppStore } from "../src/storageAdapter.js";
+import { DEFAULT_SHARED_STORAGE_TIMEOUT_MS, createAppStore } from "../src/storageAdapter.js";
 
 function createRemoteStorage() {
   const data = {};
@@ -26,6 +26,10 @@ function createLocalStorage() {
 }
 
 describe("app storage adapter", () => {
+  it("keeps the default shared write timeout long enough for server-backed staging", () => {
+    expect(DEFAULT_SHARED_STORAGE_TIMEOUT_MS).toBeGreaterThanOrEqual(8000);
+  });
+
   it("uses memory before the external storage provider is available", async () => {
     let remote = null;
     const store = createAppStore({ storageProvider: () => remote });
