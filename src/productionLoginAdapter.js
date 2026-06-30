@@ -25,12 +25,19 @@ export function productionLoginReady(config = {}) {
   return !!(config.supabaseUrl && config.supabaseAnonKey && config.sessionApiUrl);
 }
 
+export function normalizeAuthExpiresAt(value) {
+  const numeric = Number(value || 0);
+  if (!numeric) return 0;
+  return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+}
+
 export function productionAuthFromSupabase(data = {}, now = Date.now()) {
   const expiresIn = Number(data.expires_in || 0);
+  const expiresAt = normalizeAuthExpiresAt(data.expires_at);
   return {
     accessToken: data.access_token || "",
     refreshToken: data.refresh_token || "",
-    expiresAt: Number(data.expires_at || 0) || (expiresIn ? now + expiresIn * 1000 : 0),
+    expiresAt: expiresAt || (expiresIn ? now + expiresIn * 1000 : 0),
     tokenType: data.token_type || "bearer"
   };
 }
@@ -189,7 +196,8 @@ export function createProductionAuthStore({ key = "cmms:productionAuth:v1", loca
   const read = (storage) => {
     try {
       const raw = storage?.getItem?.(key);
-      return raw ? JSON.parse(raw) : null;
+      const auth = raw ? JSON.parse(raw) : null;
+      return auth ? { ...auth, expiresAt: normalizeAuthExpiresAt(auth.expiresAt) } : null;
     } catch {
       return null;
     }

@@ -21,10 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/fix-production-auth-expiry
 
-- Latest completed work: PR #490 fixed the remaining production fleet Excel import failure by adding bulk `getMany` prefetch for atomic/audited `/api/kv` batches. This preserves audit/rollback before-values without creating one Supabase GET per imported fleet row.
-- Validation for PR #490: targeted KV/Supabase/fleet-import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and a live production probe of 126 temporary `fleet:` records passed with `200 ok`; temporary probe KV/audit rows were cleaned up.
+- Active issue: production auth expiry was stored from Supabase `expires_at` seconds and compared to `Date.now()` milliseconds, causing access tokens to look expired immediately and triggering repeated refresh attempts during long sessions/imports.
+- Fix in this branch: normalize Supabase and legacy stored auth expiry values to milliseconds before storage/use, so existing browser sessions do not need manual localStorage cleanup.
+- Validation for this branch so far: targeted auth/storage tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` pass.
 - Current staging/pilot data is live and may change as the owner imports/edits real data. Verify with `npm run staging:data:summary` before making assumptions. Do not clear, reseed, or overwrite owner-entered data unless explicitly asked for destructive cleanup.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.

@@ -6,6 +6,7 @@ import {
   createProductionLoginClient,
   loginWithProductionPassword,
   restoreProductionSession,
+  productionAuthFromSupabase,
   productionLoginConfigFromEnv,
   productionLoginReady,
   updateProductionProfile
@@ -229,6 +230,37 @@ describe("productionLoginAdapter", () => {
 
     authStore.clear();
     expect(authStore.get()).toBe(null);
+  });
+
+  it("stores Supabase expires_at seconds as milliseconds", () => {
+    expect(productionAuthFromSupabase({
+      access_token: "access-token",
+      refresh_token: "refresh-token",
+      expires_at: 1_800_000_000
+    }, 1_700_000_000_000)).toMatchObject({
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      expiresAt: 1_800_000_000_000
+    });
+  });
+
+  it("normalizes legacy stored auth expiry from seconds", () => {
+    const local = memoryStorage();
+    const session = memoryStorage();
+    local.setItem("auth", JSON.stringify({
+      accessToken: "legacy-token",
+      refreshToken: "legacy-refresh",
+      expiresAt: 1_800_000_000,
+      remember: true
+    }));
+    const authStore = createProductionAuthStore({ key: "auth", local, session });
+
+    expect(authStore.get()).toMatchObject({
+      accessToken: "legacy-token",
+      refreshToken: "legacy-refresh",
+      expiresAt: 1_800_000_000_000,
+      remember: true
+    });
   });
 
   it("restores a production session through the session endpoint", async () => {
