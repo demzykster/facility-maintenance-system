@@ -27,7 +27,7 @@ import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
-import { changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile } from "./productionLoginAdapter.js";
+import { activateProductionWorker, changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionWorkerActivation } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -2243,6 +2243,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   const t = (key, vars) => uiText(language, key, vars);
   const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
+  const [activationServerUser, setActivationServerUser] = useState(null), [activationLookup, setActivationLookup] = useState("idle");
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
@@ -2250,14 +2251,52 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   const productionLogin = seedPolicy.requiresServerBootstrapAdmin;
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const productionConfigured = productionLoginReady(productionLoginConfig);
+  const displayedActivationUser = activationServerUser || activationUser;
+  const activationIsLoading = activationToken && productionLogin && activationLookup === "loading";
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    setActivationServerUser(null);
+    if (!activationToken || !productionLogin || !productionConfigured) {
+      setActivationLookup("idle");
+      return () => { cancelled = true; };
+    }
+    setActivationLookup("loading");
+    validateProductionWorkerActivation({ token: activationToken, config: productionLoginConfig })
+      .then((user) => {
+        if (cancelled) return;
+        setActivationServerUser(user);
+        setActivationLookup("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setActivationServerUser(null);
+        setActivationLookup("invalid");
+      });
+    return () => { cancelled = true; };
+  }, [activationToken, productionLogin, productionConfigured]);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
   const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", phone: u.phone || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
   const activateWorker = async () => {
-    if (!activationUser) return setErr("קישור ההפעלה אינו תקין או שכבר נוצל");
-    if (!saveUser) return setErr("לא ניתן להשלים הפעלה בסביבה זו");
+    if (!displayedActivationUser) return setErr("קישור ההפעלה אינו תקין או שכבר נוצל");
     if (actCode.trim().length < 4) return setErr("בחרו קוד אישי בן 4 ספרות לפחות");
     if (actCode.trim() !== actConfirm.trim()) return setErr("הקודים אינם זהים");
+    if (productionLogin) {
+      setBusy(true);
+      setErr("");
+      try {
+        const result = await activateProductionWorker({ token: activationToken, pin: actCode.trim(), config: productionLoginConfig });
+        try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
+        remember_save({ workerNo: result.session?.workerNo || "", mode: "worker" });
+        finish(result.session);
+      } catch (error) {
+        setErr(error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : "קישור ההפעלה אינו תקין או שכבר נוצל");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (!saveUser) return setErr("לא ניתן להשלים הפעלה בסביבה זו");
     const u = { ...activationUser, pin: actCode.trim(), activationToken: "", activationStatus: "activated", activatedAt: Date.now() };
     await saveUser(u);
     try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
@@ -2348,11 +2387,11 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         <LanguagePicker value={language} onChange={setLanguage} />
         {activationToken ? (<>
           <div className="login-q">הפעלת כניסה לעובד</div>
-          {activationUser ? <div className="hint" style={{ marginBottom: 10 }}>שלום {activationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד {activationUser.workerNo || "—"}.</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
-          <label className="field"><span>קוד אישי חדש</span><input value={actCode} onChange={(e) => { setActCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" disabled={!activationUser} /></label>
-          <label className="field"><span>אישור קוד</span><input value={actConfirm} onChange={(e) => { setActConfirm(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && activateWorker()} disabled={!activationUser} /></label>
+          {activationIsLoading ? <div className="hint" style={{ marginBottom: 10 }}>בודק קישור הפעלה…</div> : displayedActivationUser ? <div className="hint" style={{ marginBottom: 10 }}>שלום {displayedActivationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד {displayedActivationUser.workerNo || "—"}.</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
+          <label className="field"><span>קוד אישי חדש</span><input value={actCode} onChange={(e) => { setActCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
+          <label className="field"><span>אישור קוד</span><input value={actConfirm} onChange={(e) => { setActConfirm(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && activateWorker()} disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={activateWorker} disabled={!activationUser}>שמירה וכניסה</button>
+          <button className="btn-primary full" onClick={activateWorker} disabled={!displayedActivationUser || activationIsLoading || busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
         </>) : (<>
         {passwordChange ? (<>
           <div className="login-q">{t("login.firstPassword")}</div>

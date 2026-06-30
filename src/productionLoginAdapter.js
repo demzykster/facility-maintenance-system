@@ -17,7 +17,8 @@ export function productionLoginConfigFromEnv(env = {}) {
     supabaseAnonKey: String(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || "").trim(),
     sessionApiUrl: String(env.VITE_CMMS_SESSION_API_URL || "/api/session/me").trim() || "/api/session/me",
     profileApiUrl: String(env.VITE_CMMS_PROFILE_API_URL || "/api/session/profile").trim() || "/api/session/profile",
-    changePasswordApiUrl: String(env.VITE_CMMS_CHANGE_PASSWORD_API_URL || "/api/session/change-password").trim() || "/api/session/change-password"
+    changePasswordApiUrl: String(env.VITE_CMMS_CHANGE_PASSWORD_API_URL || "/api/session/change-password").trim() || "/api/session/change-password",
+    workerActivationApiUrl: String(env.VITE_CMMS_WORKER_ACTIVATION_API_URL || "/api/session/worker-activation").trim() || "/api/session/worker-activation"
   };
 }
 
@@ -170,6 +171,32 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
         session: cmmsSessionFromProductionUser(data.user),
         mustChangePassword: data.user?.mustChangePassword === true
       };
+    },
+    async validateWorkerActivation({ token }) {
+      const response = await fetchImpl(config.workerActivationApiUrl || "/api/session/worker-activation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "validate", token })
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || "worker_activation_validate_failed");
+      }
+      return data.user;
+    },
+    async activateWorker({ token, pin }) {
+      const response = await fetchImpl(config.workerActivationApiUrl || "/api/session/worker-activation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "activate", token, pin })
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || "worker_activation_failed");
+      }
+      return {
+        session: data.user ? cmmsSessionFromProductionUser(data.user) : null
+      };
     }
   };
 }
@@ -190,6 +217,18 @@ export async function updateProductionProfile({ accessToken, email, phone, confi
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
   return client.updateProfile({ accessToken, email, phone });
+}
+
+export async function validateProductionWorkerActivation({ token, config, fetchImpl } = {}) {
+  const client = createProductionLoginClient({ config, fetchImpl });
+  if (!client) throw new Error("production_login_not_configured");
+  return client.validateWorkerActivation({ token });
+}
+
+export async function activateProductionWorker({ token, pin, config, fetchImpl } = {}) {
+  const client = createProductionLoginClient({ config, fetchImpl });
+  if (!client) throw new Error("production_login_not_configured");
+  return client.activateWorker({ token, pin });
 }
 
 export function createProductionAuthStore({ key = "cmms:productionAuth:v1", local = globalThis.localStorage, session = globalThis.sessionStorage } = {}) {

@@ -21,12 +21,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/close-kv-unknown-write-gap`.
-- In progress: close the remaining `/api/kv` fallback where unknown shared KV prefixes were implicitly writable by any authenticated production user. Known workflow prefixes stay covered by explicit role/module rules; unknown shared prefixes now require settings management.
-- Current validation: targeted KV permission/API tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally.
+- Active branch: `codex/fix-worker-activation-link`.
+- In progress: fix worker/cleaner activation links opened in a clean browser by adding a narrow server-side activation endpoint. This does not start monolith/module splitting.
+- Current validation: targeted worker activation/login tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally.
 - Next exact action: commit, push, open PR, wait for GitHub/Vercel checks, then merge if green.
-- Latest completed work: PR #514 hardened `/api/kv` workflow write permissions so ordinary logged-in users cannot write unrelated workflow prefixes by default. Ticket, PPE-request, cleaning, presence, task/meeting, and app-issue flows remain available to the roles/modules that actually use them. The separate public complaint endpoint was not changed.
-- Validation for PR #514: targeted permission/API tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, GitHub Actions, and Vercel passed before merge.
+- Latest completed work: PR #515 closed the remaining `/api/kv` fallback where unknown shared KV prefixes were implicitly writable by any authenticated production user. Known workflow prefixes stay covered by explicit role/module rules; unknown shared prefixes now require settings management.
+- Validation for PR #515: targeted KV permission/API tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, GitHub Actions, and Vercel passed before merge.
 - Product design note recorded but not active in this branch: continue the flexible fleet maintenance / inspection policy redesign later without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data.
 - Current next candidate: continue the periodic-maintenance settings redesign only after verifying the owner workflow. Keep maintenance programs, inspection questionnaires, fleet catalog, calendar entries, exports, and follow-up tickets as separate but connected concepts.
 - Owner clarification recorded: periodic-maintenance TO programs are not `בקרת כלים` inspection checklists. They must stay owner-defined by flexible name, frequency in months, type/model targets, and their own PM checklist; if a PM/check result finds a fault, follow-up tickets must attach to the specific affected vehicle only.
