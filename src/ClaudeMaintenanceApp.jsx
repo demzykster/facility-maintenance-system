@@ -8489,13 +8489,14 @@ button.notif-perm:hover{background:#D1FAE5;}
   .language-picker.compact select{width:100%;min-height:40px;}
   .wk-title{font-size:19px;}
   .worker-preview{padding:0 12px 10px;}
-  .wk-tabs{gap:6px;padding:10px 10px 0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-snap-type:x proximity;align-items:stretch;}
-  .wk-tabs::-webkit-scrollbar{display:none;}
-  .wk-tabs button{flex:0 0 112px;min-width:112px;min-height:62px;flex-direction:column;gap:4px;padding:9px 8px;font-size:12.5px;line-height:1.15;text-align:center;white-space:normal;overflow-wrap:anywhere;scroll-snap-align:center;}
+  .wk-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:10px 8px 0;align-items:stretch;}
+  .wk-tabs button{min-width:0;min-height:64px;flex-direction:column;gap:4px;padding:8px 4px;font-size:12px;line-height:1.12;text-align:center;white-space:normal;overflow-wrap:anywhere;}
+  .wk-tabs button svg{width:15px;height:15px;flex-shrink:0;}
   .worker-body{padding:16px 12px 40px;}
 }
 @media(max-width:390px){
-  .wk-tabs button{flex-basis:96px;min-width:96px;}
+  .wk-tabs{gap:3px;padding-inline:6px;}
+  .wk-tabs button{min-height:62px;padding:7px 3px;font-size:11.5px;}
   .worker-action-btn span{display:none;}
 }
 `}</style>);
