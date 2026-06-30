@@ -83,6 +83,26 @@ Avoid:
 - photos stored outside the shared file model;
 - analytics that cannot drill down to the exact underlying finding or ticket.
 
+## Fleet Maintenance And Inspection Policy
+
+Fleet periodic work should be configured as reusable policy, not copied per vehicle.
+
+The stable model is:
+
+- vehicle type/category is separate from model code;
+- one vehicle type can have multiple named maintenance rules, such as `TO 500` and `TO 1000`;
+- each rule has an owner-defined interval in months;
+- rules target all fleet, vehicle types, model codes, or explicit selected fleet units;
+- inspection/checklist templates target the same fleet groups and can be reused by many vehicles;
+- execution results can still create tickets for a specific failed unit without blocking a group checklist for the other units.
+
+Avoid:
+
+- hard-coded monthly/yearly maintenance names as the only configuration;
+- separate checklist copies for every vehicle when the checklist belongs to a type/group;
+- group inspections that cannot identify which specific vehicle had a fault;
+- changes that break the existing periodic calendar, management exports, or ticket creation from maintenance/inspection failures.
+
 ## Monolith Modernization Rule
 
 Do not split `src/ClaudeMaintenanceApp.jsx` by visual screen first.

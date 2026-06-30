@@ -21,12 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/add-github-actions-ci
+### Active branch: codex/fleet-maintenance-policy-model
 
-- In progress: add GitHub Actions CI so pull requests and pushes to `main` automatically run the same core gates used locally: unit tests, release checks, and production build.
-- Validation so far: not run yet for this branch.
+- In progress: start the flexible fleet maintenance / inspection policy redesign without breaking the existing periodic calendar, exports, or ticket creation flows.
+- Current PR scope: add a pure domain model for owner-defined maintenance rules and reusable checklist targets. UI wiring is intentionally a later PR.
+- Validation so far: targeted fleet maintenance policy tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, and `npm run build` passed locally.
 
-- Latest completed work: PR #501 added baseline Vercel security headers without a strict CSP, keeping QR camera, file/blob, Supabase, push, and PWA flows unblocked.
+- Latest completed work: PR #502 added GitHub Actions CI for pull requests and pushes to `main`, running `npm ci`, unit tests, `release:check`, and production build.
+- Validation for PR #502: full local tests passed, `release:check` passed, `git diff --check` passed, production build passed, GitHub Actions `test-build` passed, and Vercel checks passed before merge.
+- Previous completed work: PR #501 added baseline Vercel security headers without a strict CSP, keeping QR camera, file/blob, Supabase, push, and PWA flows unblocked.
 - Validation for PR #501: targeted Vercel header tests passed, `npm run release:check` passed, `git diff --check` passed, `npm run build` passed, and Vercel preview checks passed before merge.
 - Previous completed work: PR #500 added bulk actions to `פארק כלי שינוע`: select all filtered rows, update department, update one document expiry date, and delete selected units with a second confirmation.
 - Validation for PR #500: targeted bulk model tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, `git diff --check` passed, Vercel preview checks passed, and local browser smoke confirmed fleet row selection opens the bulk-action panel without a red save-failure toast.
