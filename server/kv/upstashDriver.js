@@ -33,6 +33,12 @@ export function createUpstashKvDriver({ url, token, fetchImpl } = {}) {
     async get(key, shared = false) {
       return command(["GET", storageKey(key, shared)]);
     },
+    async getMany(keys = [], shared = false) {
+      const cleanKeys = (Array.isArray(keys) ? keys : []).map((key) => String(key || "")).filter(Boolean);
+      if (!cleanKeys.length) return [];
+      const values = await command(["MGET", ...cleanKeys.map((key) => storageKey(key, shared))]);
+      return cleanKeys.map((key, index) => ({ key, value: Array.isArray(values) ? values[index] : null }));
+    },
     async set(key, value, shared = false) {
       await command(["SET", storageKey(key, shared), value]);
     },

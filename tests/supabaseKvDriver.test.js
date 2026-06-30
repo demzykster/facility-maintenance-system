@@ -76,6 +76,30 @@ describe("supabase KV driver", () => {
     });
   });
 
+  it("bulk reads multiple KV records in one Supabase request", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok([
+      { record_key: "fleet:1", value: "fleet-json-1" },
+      { record_key: "fleet:2", value: "fleet-json-2" }
+    ]));
+    const driver = createSupabaseKvDriver({
+      url: "https://supabase.example/",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    await expect(driver.getMany(["fleet:1", "fleet:2"], true)).resolves.toEqual([
+      { key: "fleet:1", value: "fleet-json-1" },
+      { key: "fleet:2", value: "fleet-json-2" }
+    ]);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=in.(fleet%3A1,fleet%3A2)&select=record_key,value", {
+      method: "GET",
+      headers: expect.objectContaining({
+        authorization: "Bearer service-key"
+      })
+    });
+  });
+
   it("supports server Supabase env variable names", () => {
     expect(createSupabaseKvDriverFromEnv({
       SUPABASE_URL: "https://supabase.example",

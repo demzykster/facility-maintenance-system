@@ -13,6 +13,11 @@ const serviceHeaders = (serviceRoleKey, extra = {}) => ({
 });
 
 const errorMessage = (data, fallback) => data?.message || data?.details || data?.hint || data?.code || data?.error || fallback;
+const chunk = (items = [], size = 100) => {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+};
 
 export function createSupabaseKvDriver({ url, serviceRoleKey, table = "cmms_kv_records", fetchImpl = globalThis.fetch } = {}) {
   if (!url || !serviceRoleKey || !fetchImpl) return null;
@@ -33,6 +38,20 @@ export function createSupabaseKvDriver({ url, serviceRoleKey, table = "cmms_kv_r
         headers: serviceHeaders(serviceRoleKey)
       });
       return Array.isArray(rows) && rows[0] ? rows[0].value : null;
+    },
+    async getMany(keys = [], shared = false) {
+      const cleanKeys = [...new Set((Array.isArray(keys) ? keys : []).map((key) => String(key || "")).filter(Boolean))];
+      if (!cleanKeys.length) return [];
+      const rows = [];
+      for (const group of chunk(cleanKeys)) {
+        const keyList = group.map((key) => encodeURIComponent(key)).join(",");
+        const data = await request(`?scope=eq.${scopeOf(shared)}&record_key=in.(${keyList})&select=record_key,value`, {
+          method: "GET",
+          headers: serviceHeaders(serviceRoleKey)
+        });
+        if (Array.isArray(data)) rows.push(...data);
+      }
+      return rows.map((row) => ({ key: row.record_key, value: row.value })).filter((row) => row.key);
     },
     async set(key, value, shared = false) {
       await request("?on_conflict=scope,record_key", {

@@ -149,11 +149,25 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         const atomic = parseBool(body?.atomic);
         const written = [];
         try {
-          const recordsWithBefore = await Promise.all(normalizedRecords.map(async (record) => {
+          const recordsWithFlags = normalizedRecords.map((record) => {
             const shouldAudit = backendAuditDriver && kvWritePermissionForKey(record.key);
             const shouldAuditTicketStatus = backendAuditDriver && String(record.key).startsWith("ticket:");
-            const before = (atomic || shouldAudit || shouldAuditTicketStatus) ? await backendDriver.get?.(record.key, writeShared) : null;
-            return { ...record, before, shouldAudit, shouldAuditTicketStatus };
+            return { ...record, shouldAudit, shouldAuditTicketStatus };
+          });
+          const recordsNeedingBefore = recordsWithFlags.filter((record) => atomic || record.shouldAudit || record.shouldAuditTicketStatus);
+          const beforeByKey = new Map();
+          if (recordsNeedingBefore.length && typeof backendDriver.getMany === "function") {
+            const beforeRows = await backendDriver.getMany(recordsNeedingBefore.map((record) => record.key), writeShared);
+            for (const row of beforeRows || []) beforeByKey.set(row.key, row.value);
+          } else {
+            await Promise.all(recordsNeedingBefore.map(async (record) => {
+              beforeByKey.set(record.key, await backendDriver.get?.(record.key, writeShared));
+            }));
+          }
+          const keysNeedingBefore = new Set(recordsNeedingBefore.map((record) => record.key));
+          const recordsWithBefore = recordsWithFlags.map((record) => ({
+            ...record,
+            before: keysNeedingBefore.has(record.key) ? beforeByKey.get(record.key) ?? null : null
           }));
           if (typeof backendDriver.setMany === "function") {
             await backendDriver.setMany(normalizedRecords, writeShared);

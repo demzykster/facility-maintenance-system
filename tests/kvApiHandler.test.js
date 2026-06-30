@@ -92,6 +92,10 @@ describe("kv API handler", () => {
   it("uses bulk KV and audit drivers for atomic batches when available", async () => {
     const driver = {
       get: vi.fn().mockResolvedValue(null),
+      getMany: vi.fn().mockResolvedValue([
+        { key: "fleet:1", value: "{\"id\":\"old-fleet-1\"}" },
+        { key: "fleet:2", value: "{\"id\":\"old-fleet-2\"}" }
+      ]),
       set: vi.fn(),
       setMany: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn()
@@ -116,7 +120,8 @@ describe("kv API handler", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true, count: 2, atomic: true });
-    expect(driver.get).toHaveBeenCalledTimes(2);
+    expect(driver.getMany).toHaveBeenCalledWith(["fleet:1", "fleet:2"], true);
+    expect(driver.get).not.toHaveBeenCalled();
     expect(driver.setMany).toHaveBeenCalledWith([
       { key: "fleet:1", value: "{\"id\":\"fleet-1\"}" },
       { key: "fleet:2", value: "{\"id\":\"fleet-2\"}" }
@@ -127,6 +132,41 @@ describe("kv API handler", () => {
       expect.objectContaining({ entityId: "fleet:2" })
     ]);
     expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
+  it("prefetches a large fleet import batch with one bulk read", async () => {
+    const fleetRecords = Array.from({ length: 126 }, (_, index) => ({
+      key: `fleet:${index + 1}`,
+      value: JSON.stringify({ id: `fleet-${index + 1}` })
+    }));
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      getMany: vi.fn().mockResolvedValue([]),
+      setMany: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn()
+    };
+    const auditDriver = {
+      write: vi.fn(),
+      writeMany: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createKvApiHandler({ driver, auditDriver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const res = await call(handler, {
+      method: "POST",
+      body: {
+        shared: true,
+        atomic: true,
+        records: fleetRecords
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, count: 126, atomic: true });
+    expect(driver.getMany).toHaveBeenCalledTimes(1);
+    expect(driver.getMany).toHaveBeenCalledWith(fleetRecords.map((record) => record.key), true);
+    expect(driver.get).not.toHaveBeenCalled();
+    expect(driver.setMany).toHaveBeenCalledTimes(1);
+    expect(auditDriver.writeMany).toHaveBeenCalledTimes(1);
   });
 
   it("rolls back an atomic batch when a later write fails", async () => {
