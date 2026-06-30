@@ -117,6 +117,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Fleet license Excel preview passed on the supplied `מעקב רישיונות_ 06.07.23.xlsx`: reads only the `רישיונות` sheet, `total=128`, `ready=126`, `conflicts=0`, `invalid=2` duplicate `פסולתון` rows, and proposes catalog additions before any save. No staging write was performed.
   - System-error journal smoke passed live: `npm run staging:smoke:system-errors` wrote one controlled sanitized `client_error` audit event and read it back through `/api/system-errors`, confirming the admin-visible operational error list works.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
+  - AI intake foundation starts with a provider-free `src/aiIntakeModel.js` contract: it classifies free-text reports across CMMS modules, extracts risk/missing-info signals, produces clarifying questions and a user reply, and keeps `writePolicy=human_confirmation_required` with no direct writes.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
