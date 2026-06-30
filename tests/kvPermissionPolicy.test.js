@@ -19,12 +19,12 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionForKey("czone:north")).toMatchObject({ module: "settings", minLevel: "manage" });
   });
 
-  it("leaves ordinary workflow records open to the current authenticated writer bridge", () => {
-    expect(kvWritePermissionForKey("ticket:T-001")).toBeNull();
-    expect(kvWritePermissionForKey("ppereq:req-1")).toBeNull();
-    expect(kvWritePermissionForKey("cround:round-1")).toBeNull();
-    expect(kvWritePermissionForKey("ccomplaint:issue-1")).toBeNull();
-    expect(kvWritePermissionForKey("appIssue:issue-1")).toBeNull();
+  it("maps ordinary workflow records to explicit role or module rules", () => {
+    expect(kvWritePermissionForKey("ticket:T-001")).toMatchObject({ roles: ["admin", "user", "tech", "worker"], auditSensitive: false });
+    expect(kvWritePermissionForKey("ppereq:req-1")).toMatchObject({ module: "ppe", minLevel: "request", auditSensitive: false });
+    expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user", "cleaner"], auditSensitive: false });
+    expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user", "cleaner"], auditSensitive: false });
+    expect(kvWritePermissionForKey("appIssue:issue-1")).toMatchObject({ roles: expect.arrayContaining(["worker", "cleaner"]), auditSensitive: false });
   });
 
   it("uses admin role and stored permissions from production sessions", () => {
@@ -38,6 +38,24 @@ describe("KV write permission policy", () => {
     expect(sessionPermissionLevel({ role: "user", permissions: { ppe: "request" } }, "ppe")).toBe("request");
     expect(kvWritePermissionError({ role: "user", permissions: { ppe: "request" } }, "ppeorder:po-1")).toBe("permission_required:ppe:manage");
     expect(kvWritePermissionError({ role: "user", permissions: { ppe: "manage" } }, "ppeorder:po-1")).toBeNull();
+  });
+
+  it("allows only expected roles or module levels to write workflow records", () => {
+    expect(sessionHasKvWritePermission({ role: "worker" }, "ticket:T-001")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "cleaner" }, "ticket:T-001")).toBe(false);
+    expect(kvWritePermissionError({ role: "cleaner" }, "ticket:T-001")).toBe("permission_required:role:admin|user|tech|worker");
+
+    expect(sessionHasKvWritePermission({ role: "user", permissions: { ppe: "request" } }, "ppereq:req-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "worker" }, "ppereq:req-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "tech", permissions: { ppe: "view" } }, "ppereq:req-1")).toBe(false);
+
+    expect(sessionHasKvWritePermission({ role: "cleaner" }, "cround:round-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "tech" }, "ccomplaint:issue-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ role: "tech" }, "presence:tech-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "worker" }, "presence:worker-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ role: "user" }, "mtask:task-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "worker" }, "mtask:task-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ role: "cleaner" }, "appIssue:issue-1")).toBe(true);
   });
 
   it("redacts user login secrets for sessions that cannot manage users or worker access", () => {
@@ -79,8 +97,10 @@ describe("KV write permission policy", () => {
     })).toBe(JSON.stringify(record));
   });
 
-  it("builds audit events for sensitive writes without changing ordinary workflow writes", () => {
+  it("builds audit events for sensitive writes without auditing ordinary workflow writes", () => {
     expect(sensitiveKvWriteAuditEvent({ key: "ticket:T-001" })).toBeNull();
+    expect(sensitiveKvWriteAuditEvent({ key: "ppereq:req-1" })).toBeNull();
+    expect(sensitiveKvWriteAuditEvent({ key: "ccomplaint:issue-1" })).toBeNull();
 
     expect(sensitiveKvWriteAuditEvent({
       key: "config:v1",

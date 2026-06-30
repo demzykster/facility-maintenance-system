@@ -8,12 +8,20 @@ const LEVEL_RANK = Object.freeze({
   full: 4
 });
 
+const ACTIVE_ROLES = Object.freeze(["admin", "user", "tech", "worker", "cleaner"]);
+
 const WRITE_RULES = Object.freeze([
   { prefixes: ["user:"], module: "users", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.user },
   { prefixes: ["config:v1"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings },
-  { prefixes: ["fleet:", "pm:", "insp:", "itpl:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
+  { prefixes: ["fleet:", "pm:", "insp:", "itpl:", "photo:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
   { prefixes: ["ppe:", "ppeitem:", "ppenorm:", "ppeorder:"], module: "ppe", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.ppe },
-  { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning }
+  { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning },
+  { prefixes: ["ticket:"], roles: ["admin", "user", "tech", "worker"], entityType: AUDIT_ENTITY_TYPES.ticket, auditSensitive: false },
+  { prefixes: ["ppereq:"], module: "ppe", minLevel: "request", roles: ["worker", "cleaner"], entityType: AUDIT_ENTITY_TYPES.ppe, auditSensitive: false },
+  { prefixes: ["cround:", "ccomplaint:"], roles: ["admin", "user", "cleaner"], entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
+  { prefixes: ["presence:"], roles: ["admin", "tech"], entityType: AUDIT_ENTITY_TYPES.user, auditSensitive: false },
+  { prefixes: ["mtask:", "mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
+  { prefixes: ["appIssue:"], roles: ACTIVE_ROLES, entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false }
 ]);
 
 export function kvWritePermissionForKey(key = "") {
@@ -33,7 +41,12 @@ export function sessionPermissionLevel(session = {}, module) {
 export function sessionHasKvWritePermission(session = {}, key = "") {
   const rule = kvWritePermissionForKey(key);
   if (!rule) return true;
-  return permissionLevelRank(sessionPermissionLevel(session, rule.module)) >= permissionLevelRank(rule.minLevel);
+  if (session.role === "admin") return true;
+  const hasModulePermission = rule.module
+    ? permissionLevelRank(sessionPermissionLevel(session, rule.module)) >= permissionLevelRank(rule.minLevel)
+    : false;
+  const hasRolePermission = Array.isArray(rule.roles) && rule.roles.includes(session.role);
+  return hasModulePermission || hasRolePermission;
 }
 
 export function sessionCanReadUserSecrets(session = {}) {
@@ -76,13 +89,15 @@ export function kvReadValueForSession({ key = "", value = null, session = {} } =
 export function kvWritePermissionError(session = {}, key = "") {
   const rule = kvWritePermissionForKey(key);
   if (!rule || sessionHasKvWritePermission(session, key)) return null;
-  return `permission_required:${rule.module}:${rule.minLevel}`;
+  if (rule.module) return `permission_required:${rule.module}:${rule.minLevel}`;
+  return `permission_required:role:${(rule.roles || []).join("|")}`;
 }
 
 export function sensitiveKvWriteAuditEvent({ key = "", method = "PUT", actor = {}, before = null, after = null, shared = false, at } = {}) {
   const rule = kvWritePermissionForKey(key);
-  if (!rule) return null;
+  if (!rule || rule.auditSensitive === false) return null;
   const action = String(method).toUpperCase() === "DELETE" ? AUDIT_ACTIONS.delete : AUDIT_ACTIONS.update;
+  const requiredPermission = rule.module ? `${rule.module}:${rule.minLevel}` : `role:${(rule.roles || []).join("|")}`;
   return normalizeAuditEvent({
     at,
     actorId: actor.id,
@@ -94,6 +109,6 @@ export function sensitiveKvWriteAuditEvent({ key = "", method = "PUT", actor = {
     summary: `Sensitive KV ${action}: ${key}`,
     before: before === null || before === undefined ? {} : { value: before },
     after: after === null || after === undefined ? {} : { value: after },
-    metadata: { key: String(key || ""), shared: Boolean(shared), requiredPermission: `${rule.module}:${rule.minLevel}` }
+    metadata: { key: String(key || ""), shared: Boolean(shared), requiredPermission }
   });
 }

@@ -863,7 +863,7 @@ describe("kv API handler", () => {
         role: "user",
         name: "Reporter",
         active: true,
-        permissions: {},
+        permissions: { ppe: "request" },
         must_change_password: false
       })
     };
@@ -890,5 +890,37 @@ describe("kv API handler", () => {
     expect(ppeRequest.statusCode).toBe(200);
     expect(driver.set).toHaveBeenCalledWith("ticket:T-001", "{\"id\":\"T-001\"}", true);
     expect(driver.set).toHaveBeenCalledWith("ppereq:req-1", "{\"id\":\"req-1\"}", true);
+  });
+
+  it("blocks workflow writes outside the expected role or module permission", async () => {
+    const driver = { set: vi.fn().mockResolvedValue(undefined) };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "tech",
+        name: "Technician",
+        active: true,
+        permissions: { ppe: "view" },
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "ppereq:req-1", shared: "1" },
+      body: { value: "{\"id\":\"req-1\"}" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:ppe:request" });
+    expect(driver.set).not.toHaveBeenCalled();
   });
 });
