@@ -37,6 +37,7 @@ import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./pub
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { vehicleCatalogBase } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
+import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -1956,7 +1957,7 @@ export default function App() {
   }, [session && session.id, session && session.role, impersonating]);
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
@@ -5476,13 +5477,20 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
 }
 
 function FleetModule(p) {
-  const { fleet, config, tickets, insp, saveFleet, saveFleetImportBatch, delFleet, saveTicket, session, saveConfig } = p;
+  const { fleet, config, tickets, insp, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units"), [imp, setImp] = useState(false);
   const canEditSettings = canManageSettings(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
   useEffect(() => { if (p.openFleetId) { setFtab("units"); setOpenId(p.openFleetId); } }, [p.navT]);
   const [type, setType] = useState("all"), [sup, setSup] = useState("all"), [doc, setDoc] = useState("all"), [dept, setDept] = useState("all"), [hyd, setHyd] = useState("all"), [q, setQ] = useState("");
   const [groupBy, setGroupBy] = useState("none"), [collapsed, setCollapsed] = useState({});
+  const [selectedFleetIds, setSelectedFleetIds] = useState([]);
+  const [bulkDept, setBulkDept] = useState("");
+  const [bulkDoc, setBulkDoc] = useState("license");
+  const [bulkDate, setBulkDate] = useState("");
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState("");
   const suppliers = [...new Set(fleet.map((f) => f.supplier).filter(Boolean))];
   const types = [...new Set(fleet.map((f) => unitTypeName(f, config)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
   const depts = config.departments || [];
@@ -5497,6 +5505,55 @@ function FleetModule(p) {
     if (q.trim() && !`${f.code} ${unitModelCode(f)} ${unitTypeName(f, config)} ${f.chassis} ${f.license}`.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
+  const rowIds = rows.map((f) => f.id);
+  const selectedUnits = selectedFleetUnits(rows, selectedFleetIds);
+  const selectedCount = selectedUnits.length;
+  const allFilteredSelected = rowIds.length > 0 && rowIds.every((id) => selectedFleetIds.includes(id));
+  useEffect(() => {
+    setSelectedFleetIds((ids) => ids.filter((id) => fleet.some((f) => f.id === id)));
+  }, [fleet]);
+  useEffect(() => { setBulkDeleteConfirm(false); }, [selectedFleetIds.length]);
+  const toggleFleetSelection = (id) => setSelectedFleetIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  const toggleAllFiltered = () => setSelectedFleetIds((ids) => {
+    if (allFilteredSelected) return ids.filter((id) => !rowIds.includes(id));
+    return [...new Set([...ids, ...rowIds])];
+  });
+  const persistFleetBulk = async (units) => {
+    if (!units.length) return false;
+    setBulkBusy(true);
+    setBulkMsg("");
+    const ok = saveFleetMany
+      ? await saveFleetMany(units, { toastOnFail: false })
+      : (await Promise.all(units.map((unit) => saveFleet(unit, { toastOnFail: false })))).every((x) => x !== false);
+    setBulkBusy(false);
+    if (!ok) setBulkMsg(SAVE_FAILED_MESSAGE);
+    else setBulkMsg(`עודכנו ${countLabel(units.length, "כלי", "כלים")}`);
+    return ok;
+  };
+  const applyBulkDept = async () => {
+    const updated = applyFleetBulkDepartment(selectedUnits, bulkDept);
+    if (await persistFleetBulk(updated)) setBulkDept("");
+  };
+  const applyBulkDoc = async () => {
+    const updated = applyFleetBulkDocumentDate(selectedUnits, bulkDoc, bulkDate);
+    if (await persistFleetBulk(updated)) setBulkDate("");
+  };
+  const deleteSelectedFleet = async () => {
+    if (!bulkDeleteConfirm) { setBulkDeleteConfirm(true); return; }
+    setBulkBusy(true);
+    setBulkMsg("");
+    for (const unit of selectedUnits) {
+      const ok = await delFleet(unit.id, { toastOnFail: false });
+      if (ok === false) {
+        setBulkBusy(false);
+        setBulkMsg("המחיקה נעצרה. בדקו חיבור ונסו שוב.");
+        return;
+      }
+    }
+    setBulkBusy(false);
+    setSelectedFleetIds([]);
+    setBulkMsg("הכלים שנבחרו נמחקו");
+  };
   const exportFleet = () => {
     const data = rows.map((f) => {
       const ds = docStatus(f, config);
@@ -5544,12 +5601,13 @@ function FleetModule(p) {
     </label>
   );
   const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const col = docWarnColor(dl, config); return <span key={d.id} className="doc-chip"><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{d.label}</span><span className="doc-chip-days" style={{ color: col }}>{docDaysLabel(dl)}</span></span>; };
-  const renderRow = (f) => { const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
+  const renderRow = (f) => { const blk = unitBlock(f, tickets, config); const selected = selectedFleetIds.includes(f.id); return <div key={f.id} role="button" tabIndex={0} className={"ftable-row" + (blk ? " blocked" : "") + (selected ? " selected" : "")} onClick={() => setOpenId(f.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(f.id); } }} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
+    <label className="ft-select" aria-label={`בחר ${f.code}`} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleFleetSelection(f.id)} /></label>
     <span className="ft-code">{f.code}</span>
     <span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span>
     <span className="ft-sup">{f.supplier || "—"}</span>
     <span className="ft-doc"><span className="doc-chip-stack">{DOC_DEFS.map((d) => docChip(f, d))}</span></span>
-  </button>; };
+  </div>; };
   const STATUS_ORDER = ["מושבת", "מסמך פג תוקף", "מסמך קרוב לפקיעה", "תקין"];
   const groupKeyOf = (f) => { if (groupBy === "type") return unitTypeName(f, config) || "אחר"; if (groupBy === "supplier") return f.supplier || "ללא ספק"; if (unitBlock(f, tickets, config)) return "מושבת"; const s = docStatus(f, config); return s.d == null ? "תקין" : s.d < 0 ? "מסמך פג תוקף" : s.d <= 30 ? "מסמך קרוב לפקיעה" : "תקין"; };
   const groups = (() => { if (groupBy === "none") return null; const m = new Map(); rows.forEach((f) => { const k = groupKeyOf(f); if (!m.has(k)) m.set(k, []); m.get(k).push(f); }); let arr = [...m.entries()].map(([k, items]) => ({ k, items, blocked: items.filter((f) => unitBlock(f, tickets, config)).length })); if (groupBy === "status") arr.sort((a, b) => STATUS_ORDER.indexOf(a.k) - STATUS_ORDER.indexOf(b.k)); else arr.sort((a, b) => b.items.length - a.items.length || a.k.localeCompare(b.k, "he")); return arr; })();
@@ -5571,13 +5629,37 @@ function FleetModule(p) {
       <div className="group-seg"><span className="group-lbl">קבץ לפי</span>{GROUP_OPTS.map(([id, lbl]) => <button key={id} className={groupBy === id ? "on" : ""} onClick={() => setGroupBy(id)}>{lbl}</button>)}</div>
       {hasFilter && <button className="repeat-link" onClick={resetFilters}>נקה פילטרים</button>}
     </div>
+    {rows.length > 0 && <div className="fleet-bulk-panel">
+      <div className="fleet-bulk-top">
+        <label className="bulk-check"><input type="checkbox" checked={allFilteredSelected} onChange={toggleAllFiltered} /> {allFilteredSelected ? "בטל בחירה מסוננת" : "בחר את כל המסוננים"}</label>
+        <span className="fleet-bulk-count">{selectedCount ? `${countLabel(selectedCount, "כלי נבחר", "כלים נבחרו")}` : "בחרו כלים כדי לבצע שינוי מרוכז"}</span>
+      </div>
+      {selectedCount > 0 && <div className="fleet-bulk-actions">
+        <div className="bulk-action">
+          <select value={bulkDept} onChange={(e) => setBulkDept(e.target.value)} aria-label="מחלקה לעדכון מרוכז">
+            <option value="">מחלקה...</option>
+            {depts.map((d) => <option key={d}>{d}</option>)}
+          </select>
+          <button className="btn-ghost sm" disabled={bulkBusy || !bulkDept} onClick={applyBulkDept}>עדכן מחלקה</button>
+        </div>
+        <div className="bulk-action">
+          <select value={bulkDoc} onChange={(e) => setBulkDoc(e.target.value)} aria-label="מסמך לעדכון מרוכז">
+            {DOC_DEFS.map((d) => <option key={d.id} value={d.id}>{bulkFleetDocumentLabels[d.id] || d.label}</option>)}
+          </select>
+          <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} aria-label="תאריך תוקף לעדכון מרוכז" />
+          <button className="btn-ghost sm" disabled={bulkBusy || !bulkDate} onClick={applyBulkDoc}>עדכן תוקף</button>
+        </div>
+        {canEditSettings && <button className={"btn-ghost sm" + (bulkDeleteConfirm ? " danger" : "")} disabled={bulkBusy} onClick={deleteSelectedFleet}>{bulkDeleteConfirm ? "לחצו שוב למחיקה" : "מחיקת נבחרים"}</button>}
+        {bulkMsg && <span className={bulkMsg === SAVE_FAILED_MESSAGE || bulkMsg.includes("נעצרה") ? "bulk-msg err" : "bulk-msg"}>{bulkMsg}</span>}
+      </div>}
+    </div>}
     {rows.length === 0 ? <Empty text={fleet.length ? "אין תוצאות לפילטר הנוכחי" : "הפארק ריק"} sub={fleet.length ? "נסו לנקות את הפילטרים" : "הוסיפו כלי שינוע ראשון"} />
       : groups ? <div className="fleet-groups">{groups.map((g) => { const open = !collapsed[g.k]; return <div key={g.k} className="fgroup">
           <button className="fgroup-head" onClick={() => setCollapsed((c) => ({ ...c, [g.k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{g.k}</span><span className="fgroup-count">{g.items.length}</span>{g.blocked > 0 && <span className="fgroup-blk"><ShieldAlert size={11} /> {g.blocked} מושבתים</span>}</button>
-          {open && <div className="ftable"><div className="ftable-head"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>{g.items.map(renderRow)}</div>}
+          {open && <div className="ftable"><div className="ftable-head"><span></span><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>{g.items.map(renderRow)}</div>}
         </div>; })}</div>
       : <div className="ftable">
-          <div className="ftable-head"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>
+          <div className="ftable-head"><span></span><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>
           {rows.map(renderRow)}
         </div>}
     </>}
@@ -8094,6 +8176,17 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .flt-field select{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;}
 .fleet-results-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;}
 .fleet-count{color:var(--muted);font-weight:600;}
+.fleet-bulk-panel{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin:0 0 10px;display:flex;flex-direction:column;gap:9px;}
+.fleet-bulk-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.bulk-check{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;}
+.bulk-check input,.ft-select input{width:16px;height:16px;accent-color:var(--primary);}
+.fleet-bulk-count{font-size:12px;color:var(--muted);font-weight:700;}
+.fleet-bulk-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:9px;}
+.bulk-action{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.bulk-action select,.bulk-action input{height:34px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font-size:12.5px;padding:0 9px;}
+.btn-ghost.danger{border-color:#FCA5A5;color:#B91C1C;background:#FEF2F2;}
+.bulk-msg{font-size:12px;font-weight:700;color:#15803D;}
+.bulk-msg.err{color:#B91C1C;}
 .group-seg{display:inline-flex;align-items:center;gap:4px;margin-inline-start:auto;}
 .group-lbl{color:var(--muted);font-size:12px;margin-inline-end:2px;}
 .insp-grp-bar{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
@@ -8202,9 +8295,11 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .more-menu{position:absolute;top:calc(100% + 4px);inset-inline-end:0;z-index:31;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.16);padding:6px;min-width:190px;display:flex;flex-direction:column;gap:2px;}
 .more-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:right;background:none;border:none;padding:9px 11px;border-radius:8px;font-size:13px;color:var(--ink);cursor:pointer;}
 .more-menu button:hover{background:var(--surface-2);}
-.ftable-head{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
-.ftable-row{display:grid;grid-template-columns:0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;}
+.ftable-head{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
+.ftable-row{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;cursor:pointer;}
 .ftable-row:hover{background:var(--surface-2);}
+.ftable-row.selected{background:rgba(249,115,22,0.08);}
+.ft-select{display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .ftable-row.blocked{border-inline-start:4px solid var(--muted);background:linear-gradient(90deg,rgba(220,38,38,0.06),transparent 60%);}
 .doc-chip-stack{display:grid;grid-template-columns:1fr;gap:4px;align-items:start;}
 .doc-chip{display:grid;grid-template-columns:8px minmax(70px,1fr) minmax(42px,auto);align-items:center;gap:6px;line-height:1.2;font-size:11.5px;color:var(--muted);}
@@ -8711,7 +8806,7 @@ button.notif-perm:hover{background:#D1FAE5;}
   .ai-fab{inset-inline-end:28px;bottom:28px;}.toast{bottom:24px;width:380px;}.version-update-banner{bottom:24px;flex-direction:row;align-items:center;justify-content:space-between;}.version-update-refresh{flex:0 0 auto;}
   .cat-grid{grid-template-columns:repeat(3,1fr);}
 }
-@media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:0.7fr 1.4fr 1fr 1fr;}}
+@media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:34px 0.7fr 1.4fr 1fr 1fr;}}
 .ymx-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
 .ymx-nav{display:flex;align-items:center;gap:6px;}
 .ymx-year{font-family:var(--font-head);font-weight:700;font-size:18px;min-width:54px;text-align:center;}
