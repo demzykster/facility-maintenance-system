@@ -21,10 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/harden-fleet-import-atomic
+### Active branch: none
 
-- Status: hardening real fleet Excel import after owner saw `הייבוא נעצר כי חלק מהרשומות לא נשמרו` during final import. Investigation showed the wizard can save catalog/config before fleet units, leaving partial `config:v1` if fleet save fails. This branch makes the import atomic from the UI perspective: fleet units save first with tracked rollback, catalog saves only after fleet succeeds, and failures show an inline "not partially saved" message.
-- Validation on this branch so far: targeted fleet import/catalog tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and `git diff --check` passed.
+- Status: fleet Excel import atomic-save hardening is complete in PR #483. The import no longer saves catalog/config before fleet units; it saves units first with tracked rollback, saves catalog only after fleet succeeds, and shows an inline "not partially saved" message on failure.
+- Validation for PR #483: targeted fleet import/catalog tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, `git diff --check` passed, and Vercel preview passed before merge.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
