@@ -95,6 +95,30 @@ export function maintenanceRulesForUnit(rules = [], unitRef = {}) {
     .filter((rule) => rule.active && fleetRuleTargetMatchesUnit(rule.target, unitRef));
 }
 
+export function maintenanceRuleForTask(task = {}, rules = []) {
+  const ruleId = trim(task.maintenanceRuleId || task.ruleId);
+  if (!ruleId) return null;
+  return normalizeMaintenanceRules(rules).find((rule) => rule.id === ruleId) || null;
+}
+
+export function maintenanceIntervalMonthsForTask(task = {}, rules = [], fallbackMonths = 1) {
+  const storedInterval = normalizeIntervalMonths(task.intervalMonths);
+  if (storedInterval) return storedInterval;
+
+  const rule = maintenanceRuleForTask(task, rules);
+  if (rule?.intervalMonths) return rule.intervalMonths;
+
+  return normalizeIntervalMonths(fallbackMonths) || 1;
+}
+
+export function maintenanceTitleForTask(task = {}, rules = [], fallback = "טיפול תקופתי") {
+  const storedTitle = trim(task.title || task.maintenanceRuleName);
+  if (storedTitle) return storedTitle;
+
+  const rule = maintenanceRuleForTask(task, rules);
+  return rule?.name || fallback;
+}
+
 export function buildMaintenanceAssignments(rules = [], fleetRefs = []) {
   return (Array.isArray(fleetRefs) ? fleetRefs : [])
     .filter((unit) => unit?.id)
