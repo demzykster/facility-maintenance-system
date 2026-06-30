@@ -89,6 +89,46 @@ describe("kv API handler", () => {
     expect(driver.set).toHaveBeenCalledWith("fleet:2", "{\"id\":\"fleet-2\"}", true);
   });
 
+  it("uses bulk KV and audit drivers for atomic batches when available", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn(),
+      setMany: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn()
+    };
+    const auditDriver = {
+      write: vi.fn(),
+      writeMany: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createKvApiHandler({ driver, auditDriver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const res = await call(handler, {
+      method: "POST",
+      body: {
+        shared: true,
+        atomic: true,
+        records: [
+          { key: "fleet:1", value: "{\"id\":\"fleet-1\"}" },
+          { key: "fleet:2", value: "{\"id\":\"fleet-2\"}" }
+        ]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, count: 2, atomic: true });
+    expect(driver.get).toHaveBeenCalledTimes(2);
+    expect(driver.setMany).toHaveBeenCalledWith([
+      { key: "fleet:1", value: "{\"id\":\"fleet-1\"}" },
+      { key: "fleet:2", value: "{\"id\":\"fleet-2\"}" }
+    ], true);
+    expect(driver.set).not.toHaveBeenCalled();
+    expect(auditDriver.writeMany).toHaveBeenCalledWith([
+      expect.objectContaining({ entityId: "fleet:1" }),
+      expect.objectContaining({ entityId: "fleet:2" })
+    ]);
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
   it("rolls back an atomic batch when a later write fails", async () => {
     const driver = {
       get: vi.fn()

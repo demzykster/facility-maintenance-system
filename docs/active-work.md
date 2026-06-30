@@ -21,12 +21,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/speed-up-fleet-import-batch
 
-- In progress now: harden fleet Excel import after the owner's latest retry left a partial Supabase KV state (`config:v1` plus two `fleet:*` records). The root cause is that the previous rollback still depended on the browser staying alive while it saved many fleet units one by one.
-- Status: fleet Excel import atomic-save hardening is complete in PR #483. The import no longer saves catalog/config before fleet units; it saves units first with tracked rollback, saves catalog only after fleet succeeds, and shows an inline "not partially saved" message on failure.
-- Validation for PR #483: targeted fleet import/catalog tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, `git diff --check` passed, and Vercel preview passed before merge.
-- Post-merge cleanup: the partial `config:v1` left by the failed owner import was removed from staging. Live smoke on deployed commit `8616dda` passed with `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=1`, and an empty `cmms-files` bucket.
+- In progress now: fix the owner-visible fleet Excel import stop after preview. Direct live API checks showed the server can save the 128-row payload atomically, but the real Excel payload path took about 45 seconds because `/api/kv` wrote KV rows and audit rows one by one.
+- Status: current branch changes server batch writes to use Supabase bulk KV upsert and bulk audit insert when available, keeping the same atomic rollback behavior and data model.
+- Validation for current branch: targeted storage/audit/KV/fleet import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally.
+- Staging cleanup state before this fix: owner explicitly allowed clearing fleet/settings pilot data; latest checked summary after cleanup had one admin user and no KV/file records. Do not clear new owner-entered data after the next successful import unless explicitly asked.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:

@@ -45,6 +45,21 @@ export function createSupabaseKvDriver({ url, serviceRoleKey, table = "cmms_kv_r
         })
       });
     },
+    async setMany(records = [], shared = false) {
+      const rows = (Array.isArray(records) ? records : [])
+        .filter((record) => record?.key)
+        .map((record) => ({
+          scope: scopeOf(shared),
+          record_key: String(record.key),
+          value: String(record.value ?? "")
+        }));
+      if (!rows.length) return;
+      await request("?on_conflict=scope,record_key", {
+        method: "POST",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "resolution=merge-duplicates,return=minimal" }),
+        body: JSON.stringify(rows)
+      });
+    },
     async delete(key, shared = false) {
       await request(`?scope=eq.${scopeOf(shared)}&record_key=eq.${encodeURIComponent(key)}`, {
         method: "DELETE",

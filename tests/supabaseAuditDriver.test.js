@@ -77,6 +77,38 @@ describe("Supabase audit driver", () => {
     await expect(driver.write({ id: "audit-1", at: 1000, entityType: "settings", action: "update" })).rejects.toThrow("duplicate key");
   });
 
+  it("bulk writes audit rows in one Supabase request", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return "";
+      }
+    });
+    const driver = createSupabaseAuditDriver({
+      url: "https://supabase.example/",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    await driver.writeMany([
+      { id: "audit-1", at: 1000, entityType: "fleet", entityId: "fleet:1", action: "update" },
+      { id: "audit-2", at: 2000, entityType: "fleet", entityId: "fleet:2", action: "update" }
+    ]);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/audit_events", {
+      method: "POST",
+      headers: expect.objectContaining({
+        authorization: "Bearer service-key",
+        prefer: "return=minimal"
+      }),
+      body: expect.any(String)
+    });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual([
+      expect.objectContaining({ id: "audit-1", entity_id: "fleet:1" }),
+      expect.objectContaining({ id: "audit-2", entity_id: "fleet:2" })
+    ]);
+  });
+
   it("lists client error events from audit_events", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
