@@ -136,6 +136,28 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
         if (!fallback) throw e;
       }
       return fallback ? Object.keys(mem).filter((key) => key.startsWith(prefix)) : [];
+    },
+    async listValues(prefix, shared = false) {
+      const fallback = canUseMemoryFallback();
+      try {
+        const storage = resolveStorage(shared);
+        if (storage?.listValues) {
+          const result = await withTimeout(storage.listValues(prefix, shared), timeoutMs);
+          if (result === undefined) throw new Error("timeout");
+          if (result !== undefined) return result ? result.records : [];
+        }
+        if (storage?.list) {
+          const result = await withTimeout(storage.list(prefix, shared), timeoutMs);
+          if (result === undefined) throw new Error("timeout");
+          const keys = result ? result.keys : [];
+          return Promise.all(keys.map(async (key) => ({ key, value: await this.get(key, shared) })));
+        }
+      } catch (e) {
+        if (!fallback) throw e;
+      }
+      return fallback
+        ? Object.keys(mem).filter((key) => key.startsWith(prefix)).map((key) => ({ key, value: mem[key] }))
+        : [];
     }
   };
   return store;

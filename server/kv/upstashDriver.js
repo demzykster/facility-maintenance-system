@@ -52,6 +52,11 @@ export function createUpstashKvDriver({ url, token, fetchImpl } = {}) {
 
       const scope = storageKey("", shared);
       return keys.map((key) => String(key).startsWith(scope) ? String(key).slice(scope.length) : String(key));
+    },
+    async listValues(prefix = "", shared = false) {
+      const keys = await this.list(prefix, shared);
+      const values = await Promise.all(keys.map(async (key) => ({ key, value: await this.get(key, shared) })));
+      return values;
     }
   };
 }

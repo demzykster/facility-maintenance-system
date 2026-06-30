@@ -116,6 +116,25 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
 
       if (!key && method === "GET") {
         const prefix = String(query.prefix || "");
+        if (parseBool(query.includeValues)) {
+          const records = typeof backendDriver.listValues === "function"
+            ? await backendDriver.listValues(prefix, shared)
+            : await Promise.all((await backendDriver.list(prefix, shared)).map(async (recordKey) => ({
+              key: recordKey,
+              value: await backendDriver.get(recordKey, shared)
+            })));
+          const readable = records
+            .map((record) => ({
+              key: record.key,
+              value: kvReadValueForSession({
+                key: record.key,
+                value: record.value,
+                session: auth.user
+              })
+            }))
+            .filter((record) => record.key && record.value !== null && record.value !== undefined);
+          return json(res, 200, { records: readable });
+        }
         const keys = await backendDriver.list(prefix, shared);
         return json(res, 200, { keys });
       }
