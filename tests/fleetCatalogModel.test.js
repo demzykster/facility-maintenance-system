@@ -9,6 +9,7 @@ import {
 describe("fleetCatalogModel", () => {
   it("treats only saved vehicleTypes as a saved catalog", () => {
     expect(hasSavedVehicleTypeCatalog({ vehicleTypes: [] })).toBe(false);
+    expect(hasSavedVehicleTypeCatalog({ vehicleTypes: [], vehicleTypesSaved: true })).toBe(true);
     expect(hasSavedVehicleTypeCatalog({ forkliftTypes: ["OSE250"] })).toBe(false);
     expect(hasSavedVehicleTypeCatalog({ vehicleTypes: [{ name: "מלגזה" }] })).toBe(true);
   });
@@ -39,6 +40,17 @@ describe("fleetCatalogModel", () => {
       config: { forkliftTypes: ["OSE250"] },
       fleet: [],
       productionStartsEmpty: true,
+      buildVehicleTypes: () => [{ name: "default", models: ["OSE250"] }]
+    });
+
+    expect(built).toEqual([]);
+  });
+
+  it("respects an explicitly saved empty catalog instead of rebuilding from fleet or legacy defaults", () => {
+    const built = vehicleCatalogBase({
+      config: { vehicleTypes: [], vehicleTypesSaved: true, forkliftTypes: ["OSE250"] },
+      fleet: [{ id: "f1", type: "OSE250" }],
+      productionStartsEmpty: false,
       buildVehicleTypes: () => [{ name: "default", models: ["OSE250"] }]
     });
 
