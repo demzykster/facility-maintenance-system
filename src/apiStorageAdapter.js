@@ -57,6 +57,11 @@ export function createApiStorageProvider({ baseUrl, fetchImpl = globalThis.fetch
     async listValues(prefix = "", shared = false) {
       const response = await request(`/kv?prefix=${encodeURIComponent(prefix)}&shared=${shared ? "1" : "0"}&includeValues=1`);
       return parseJson(response);
+    },
+    async listManyValues(prefixes = [], shared = false) {
+      const joined = (Array.isArray(prefixes) ? prefixes : []).filter(Boolean).join(",");
+      const response = await request(`/kv?prefixes=${encodeURIComponent(joined)}&shared=${shared ? "1" : "0"}&includeValues=1`);
+      return parseJson(response);
     }
   };
 }

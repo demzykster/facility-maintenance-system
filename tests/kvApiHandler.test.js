@@ -225,6 +225,29 @@ describe("kv API handler", () => {
     expect(driver.listValues).toHaveBeenCalledWith("ticket:", true);
   });
 
+  it("can return multiple collection value groups in one response", async () => {
+    const driver = {
+      listValuesMany: vi.fn().mockResolvedValue({
+        "ticket:": [{ key: "ticket:1", value: "{\"id\":\"ticket-1\"}" }],
+        "fleet:": [{ key: "fleet:1", value: "{\"id\":\"fleet-1\"}" }]
+      })
+    };
+    const handler = createKvApiHandler({ driver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const res = await call(handler, {
+      query: { prefixes: "ticket:,fleet:", shared: "1", includeValues: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      collections: {
+        "ticket:": [{ key: "ticket:1", value: "{\"id\":\"ticket-1\"}" }],
+        "fleet:": [{ key: "fleet:1", value: "{\"id\":\"fleet-1\"}" }]
+      }
+    });
+    expect(driver.listValuesMany).toHaveBeenCalledWith(["ticket:", "fleet:"], true);
+  });
+
   it("redacts sensitive user records in collection value responses", async () => {
     const driver = {
       listValues: vi.fn().mockResolvedValue([
