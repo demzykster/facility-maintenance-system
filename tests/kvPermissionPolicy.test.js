@@ -40,6 +40,13 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionError({ role: "user", permissions: { ppe: "manage" } }, "ppeorder:po-1")).toBeNull();
   });
 
+  it("requires settings management for unknown shared KV prefixes", () => {
+    expect(kvWritePermissionForKey("experimental:record-1")).toMatchObject({ module: "settings", minLevel: "manage", unknown: true });
+    expect(sessionHasKvWritePermission({ role: "user", permissions: { settings: "view" } }, "experimental:record-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ role: "user", permissions: { settings: "manage" } }, "experimental:record-1")).toBe(true);
+    expect(kvWritePermissionError({ role: "worker" }, "experimental:record-1")).toBe("permission_required:settings:manage");
+  });
+
   it("allows only expected roles or module levels to write workflow records", () => {
     expect(sessionHasKvWritePermission({ role: "worker" }, "ticket:T-001")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "cleaner" }, "ticket:T-001")).toBe(false);
@@ -126,6 +133,13 @@ describe("KV write permission policy", () => {
       entityId: "ppeorder:po-1",
       action: "delete",
       metadata: { requiredPermission: "ppe:manage" }
+    });
+
+    expect(sensitiveKvWriteAuditEvent({ key: "experimental:record-1", method: "PUT" })).toMatchObject({
+      entityType: "settings",
+      entityId: "experimental:record-1",
+      action: "update",
+      metadata: { requiredPermission: "settings:manage" }
     });
   });
 });

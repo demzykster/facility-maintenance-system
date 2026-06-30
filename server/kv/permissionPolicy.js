@@ -24,9 +24,17 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["appIssue:"], roles: ACTIVE_ROLES, entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false }
 ]);
 
+const DEFAULT_WRITE_RULE = Object.freeze({
+  prefixes: [],
+  module: "settings",
+  minLevel: "manage",
+  entityType: AUDIT_ENTITY_TYPES.settings,
+  unknown: true
+});
+
 export function kvWritePermissionForKey(key = "") {
   const recordKey = String(key || "");
-  return WRITE_RULES.find((rule) => rule.prefixes.some((prefix) => recordKey.startsWith(prefix))) || null;
+  return WRITE_RULES.find((rule) => rule.prefixes.some((prefix) => recordKey.startsWith(prefix))) || DEFAULT_WRITE_RULE;
 }
 
 export function permissionLevelRank(level) {

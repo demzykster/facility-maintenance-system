@@ -923,4 +923,36 @@ describe("kv API handler", () => {
     expect(res.json()).toEqual({ error: "permission_required:ppe:request" });
     expect(driver.set).not.toHaveBeenCalled();
   });
+
+  it("blocks unknown shared KV prefixes for ordinary production users", async () => {
+    const driver = { set: vi.fn().mockResolvedValue(undefined) };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "worker",
+        name: "Worker",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "experimental:record-1", shared: "1" },
+      body: { value: "{\"id\":\"record-1\"}" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:settings:manage" });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
 });
