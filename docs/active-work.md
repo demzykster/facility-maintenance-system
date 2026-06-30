@@ -21,12 +21,14 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/fix-fleet-catalog-reconcile
+### Active branch: codex/add-fleet-bulk-actions
 
-- In progress: fix fleet Excel import catalog reconciliation so `סוג כלי` remains the vehicle type/category and `דגם` remains the model under that type. Catalog planning now works by `(vehicle type, model)` pairs and can repair missing catalog entries from conflict rows when fleet units already exist.
-- Validation so far: targeted fleet import tests passed, full `npm test -- --run` passed, `npm run release:check` passed, and `npm run build` passed. The supplied `רישיונות` workbook preview reads 128 rows, keeps 126 importable rows, rejects the two duplicate `פסולתון` chassis rows, and proposes 12 vehicle-type catalog groups from the valid rows.
+- In progress: add bulk actions to `פארק כלי שינוע` so filtered/selected transport units can be updated together. First scope: select all filtered, update department, update one document expiry date, and delete selected units with a second confirmation.
+- Validation so far: targeted bulk model tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, `git diff --check` passed, and local browser smoke confirmed fleet row selection opens the bulk-action panel without a red save-failure toast.
 
-- Latest completed work: PR #498 hardens the Supabase KV bridge against silent PostgREST row truncation. `server/kv/supabaseDriver.js` now paginates `list` and `listValues` reads and changes `listValuesMany` to fetch only requested prefixes instead of scanning the entire `cmms_kv_records` table in one unbounded request.
+- Latest completed work: PR #499 fixed fleet Excel import catalog reconciliation so `סוג כלי` remains the vehicle type/category and `דגם` remains the model under that type. The import preview now plans catalog additions by `(vehicle type, model)` pairs and can repair missing catalog entries from conflict rows when fleet units already exist.
+- Validation for PR #499: targeted fleet import tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, Vercel preview checks passed, and the supplied `רישיונות` workbook preview read 128 rows, kept 126 importable rows, rejected the two duplicate `פסולתון` chassis rows, and proposed 12 vehicle-type catalog groups from valid rows.
+- Previous completed work: PR #498 hardens the Supabase KV bridge against silent PostgREST row truncation. `server/kv/supabaseDriver.js` now paginates `list` and `listValues` reads and changes `listValuesMany` to fetch only requested prefixes instead of scanning the entire `cmms_kv_records` table in one unbounded request.
 - Validation for PR #498: targeted KV/storage tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and Vercel preview checks passed before merge.
 - Current staging/pilot data is live and may change as the owner imports/edits real data. Verify with `npm run staging:data:summary` before making assumptions. Do not clear, reseed, or overwrite owner-entered data unless explicitly asked for destructive cleanup.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
