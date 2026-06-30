@@ -39,6 +39,13 @@ export function createApiStorageProvider({ baseUrl, fetchImpl = globalThis.fetch
       });
       return true;
     },
+    async setMany(records = [], shared = false) {
+      await request("/kv", {
+        method: "POST",
+        body: JSON.stringify({ records, shared: !!shared })
+      });
+      return true;
+    },
     async delete(key, shared = false) {
       await request(`/kv/${encodeURIComponent(key)}?shared=${shared ? "1" : "0"}`, { method: "DELETE" });
       return true;

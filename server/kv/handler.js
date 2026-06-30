@@ -114,6 +114,40 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
       const key = Array.isArray(query.key) ? query.key.join("/") : query.key;
       const shared = parseBool(query.shared);
 
+      if (!key && method === "POST") {
+        const body = await readBody(req);
+        const records = Array.isArray(body?.records) ? body.records : [];
+        const writeShared = parseBool(body?.shared ?? shared);
+        if (!records.length) return json(res, 400, { error: "records_required" });
+        if (records.length > 250) return json(res, 413, { error: "records_limit_exceeded" });
+        const normalizedRecords = records.map((record) => ({
+          key: String(record?.key || ""),
+          value: record?.value ?? ""
+        }));
+        const badRecord = normalizedRecords.find((record) => !record.key || record.key.length > 512);
+        if (badRecord) return json(res, 400, { error: "record_key_invalid" });
+        if (auth.user) {
+          const permissionError = normalizedRecords.map((record) => kvWritePermissionError(auth.user, record.key)).find(Boolean);
+          if (permissionError) return json(res, 403, { error: permissionError });
+        }
+        for (const record of normalizedRecords) {
+          const shouldAudit = backendAuditDriver && kvWritePermissionForKey(record.key);
+          const shouldAuditTicketStatus = backendAuditDriver && String(record.key).startsWith("ticket:");
+          const before = (shouldAudit || shouldAuditTicketStatus) ? await backendDriver.get?.(record.key, writeShared) : null;
+          await backendDriver.set(record.key, record.value, writeShared);
+          await writeAuditEvent(backendAuditDriver, shouldAudit && sensitiveKvWriteAuditEvent({
+            key: record.key,
+            method,
+            actor: auth.user,
+            before,
+            after: record.value,
+            shared: writeShared
+          }));
+          await writeAuditEvent(backendAuditDriver, ticketStatusEventFromKv(record.key, before, record.value, auth.user));
+        }
+        return json(res, 200, { ok: true, count: normalizedRecords.length });
+      }
+
       if (!key && method === "GET") {
         const prefix = String(query.prefix || "");
         if (parseBool(query.includeValues)) {

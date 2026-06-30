@@ -19,6 +19,7 @@ describe("apiStorageAdapter", () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(ok({ value: "ticket-json" }))
       .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(ok({ ok: true, count: 1 }))
       .mockResolvedValueOnce(ok())
       .mockResolvedValueOnce(ok({ keys: ["ticket:1"] }))
       .mockResolvedValueOnce(ok({ records: [{ key: "ticket:1", value: "ticket-json" }] }));
@@ -26,6 +27,7 @@ describe("apiStorageAdapter", () => {
 
     await expect(provider.get("ticket:1", true)).resolves.toEqual({ value: "ticket-json" });
     await expect(provider.set("ticket:1", "ticket-json", true)).resolves.toBe(true);
+    await expect(provider.setMany([{ key: "ticket:2", value: "ticket-json-2" }], true)).resolves.toBe(true);
     await expect(provider.delete("ticket:1", true)).resolves.toBe(true);
     await expect(provider.list("ticket:", true)).resolves.toEqual({ keys: ["ticket:1"] });
     await expect(provider.listValues("ticket:", true)).resolves.toEqual({ records: [{ key: "ticket:1", value: "ticket-json" }] });
@@ -33,11 +35,16 @@ describe("apiStorageAdapter", () => {
     expect(fetchImpl.mock.calls.map(([url, options]) => [url, options.method || "GET"])).toEqual([
       ["https://cmms.example/api/kv/ticket%3A1?shared=1", "GET"],
       ["https://cmms.example/api/kv/ticket%3A1", "PUT"],
+      ["https://cmms.example/api/kv", "POST"],
       ["https://cmms.example/api/kv/ticket%3A1?shared=1", "DELETE"],
       ["https://cmms.example/api/kv?prefix=ticket%3A&shared=1", "GET"],
       ["https://cmms.example/api/kv?prefix=ticket%3A&shared=1&includeValues=1", "GET"]
     ]);
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual({ value: "ticket-json", shared: true });
+    expect(JSON.parse(fetchImpl.mock.calls[2][1].body)).toEqual({
+      records: [{ key: "ticket:2", value: "ticket-json-2" }],
+      shared: true
+    });
   });
 
   it("adds the production access token when available", async () => {

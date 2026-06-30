@@ -64,6 +64,44 @@ describe("app storage adapter", () => {
     expect(remote.get).not.toHaveBeenCalled();
   });
 
+  it("saves multiple shared records in one provider call when supported", async () => {
+    const remote = {
+      setMany: vi.fn().mockResolvedValue(true),
+      set: vi.fn()
+    };
+    const store = createAppStore({
+      storageProvider: () => remote,
+      allowMemoryFallback: false
+    });
+    const records = [
+      { key: "fleet:1", value: "{\"id\":\"fleet-1\"}" },
+      { key: "fleet:2", value: "{\"id\":\"fleet-2\"}" }
+    ];
+
+    await expect(store.setMany(records, true)).resolves.toBe(true);
+
+    expect(remote.setMany).toHaveBeenCalledWith(records, true);
+    expect(remote.set).not.toHaveBeenCalled();
+  });
+
+  it("reports a single shared failure when batch save times out", async () => {
+    const onFail = vi.fn();
+    const store = createAppStore({
+      storageProvider: () => ({ setMany: () => new Promise(() => {}) }),
+      timeoutMs: 1,
+      allowMemoryFallback: false
+    });
+    store._onFail = onFail;
+
+    await expect(store.setMany([{ key: "fleet:1", value: "{}" }], true)).resolves.toBe(false);
+
+    expect(onFail).toHaveBeenCalledTimes(1);
+    expect(onFail).toHaveBeenCalledWith(expect.objectContaining({
+      operation: "setMany",
+      key: "fleet:1"
+    }));
+  });
+
   it("keeps non-shared browser keys local even when shared storage is remote", async () => {
     const remote = createRemoteStorage();
     const local = createLocalStorage();
