@@ -21,15 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/fix-fleet-import-prefetch
+### Active branch: none
 
-- Active issue: real fleet Excel import still fails on production after preview. The likely server bottleneck is `/api/kv` atomic batch prefetch doing one read per imported record before the bulk write/audit path.
-- Fix in this branch: add `getMany` to KV drivers and use one bulk before-read for atomic/audited batches, preserving audit/rollback data without creating 126 parallel Supabase GET requests during fleet import.
-- Validation for this branch so far: targeted KV/Supabase/fleet-import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` pass.
-
-- Latest completed work: PR #487 fixed the owner-visible fleet Excel import stop after preview by changing `/api/kv` batch saves to use Supabase bulk KV upsert and bulk audit insert when available. The same real Excel payload that previously took about 45 seconds now saves atomically through live Vercel in about 3.5 seconds.
-- Validation for PR #487: targeted storage/audit/KV/fleet import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, strict live smoke, and live real-payload batch check passed.
-- Current staging/pilot data state after cleanup: one admin user remains; `cmms_kv_records=0`, `file_metadata=0`, storage files `0`. Audit history contains non-business operational history. Do not clear new owner-entered data after the next successful import unless explicitly asked.
+- Latest completed work: PR #490 fixed the remaining production fleet Excel import failure by adding bulk `getMany` prefetch for atomic/audited `/api/kv` batches. This preserves audit/rollback before-values without creating one Supabase GET per imported fleet row.
+- Validation for PR #490: targeted KV/Supabase/fleet-import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and a live production probe of 126 temporary `fleet:` records passed with `200 ok`; temporary probe KV/audit rows were cleaned up.
+- Current staging/pilot data is live and may change as the owner imports/edits real data. Verify with `npm run staging:data:summary` before making assumptions. Do not clear, reseed, or overwrite owner-entered data unless explicitly asked for destructive cleanup.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
