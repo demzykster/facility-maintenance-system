@@ -67,12 +67,14 @@ const defaultLocalStorageProvider = () => {
 
 const defaultAllowMemoryFallback = () => storageProviderFromEnv(importEnv()) !== STORAGE_PROVIDERS.api;
 
-export const withTimeout = (promise, ms = 2000) => Promise.race([
+export const DEFAULT_SHARED_STORAGE_TIMEOUT_MS = 10000;
+
+export const withTimeout = (promise, ms = DEFAULT_SHARED_STORAGE_TIMEOUT_MS) => Promise.race([
   promise,
   new Promise((resolve) => setTimeout(() => resolve(undefined), ms))
 ]);
 
-export function createAppStore({ storageProvider = defaultStorageProvider, localStorageProvider = defaultLocalStorageProvider, timeoutMs = 2000, allowMemoryFallback = defaultAllowMemoryFallback } = {}) {
+export function createAppStore({ storageProvider = defaultStorageProvider, localStorageProvider = defaultLocalStorageProvider, timeoutMs = DEFAULT_SHARED_STORAGE_TIMEOUT_MS, allowMemoryFallback = defaultAllowMemoryFallback } = {}) {
   const mem = {};
   const canUseMemoryFallback = () => typeof allowMemoryFallback === "function" ? !!allowMemoryFallback() : !!allowMemoryFallback;
   const resolveStorage = (shared) => shared ? storageProvider() : localStorageProvider();
