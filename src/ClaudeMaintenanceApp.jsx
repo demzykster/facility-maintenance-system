@@ -36,7 +36,7 @@ import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
-import { fetchSystemErrorLogs } from "./systemErrorLogAdapter.js";
+import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
@@ -7269,21 +7269,25 @@ function SystemErrorsSettings() {
     const place = placeFor(item);
     return place ? `${labelFor(item)} · ${place}` : labelFor(item);
   };
+  const groups = useMemo(() => groupSystemErrorLogs(items), [items]);
   return <>
     <SectionTitle><AlertTriangle size={15} /> שגיאות מערכת</SectionTitle>
-    <div className="hint" style={{ marginBottom: 12 }}>רשימה קצרה של שגיאות שהמערכת תפסה בעצמה. הטכני נשאר מקופל כדי לא להפוך את המסך לרעש.</div>
+    <div className="hint" style={{ marginBottom: 12 }}>שגיאות דומות מקובצות יחד כדי לראות מה באמת חוזר. הטכני נשאר מקופל כדי לא להפוך את המסך לרעש.</div>
     <button className="btn-ghost sm" onClick={load} disabled={busy}><RefreshCw size={14} /> {busy ? "טוען…" : "רענון"}</button>
     {err && <div className="err" style={{ marginTop: 10 }}>{err}</div>}
     {!err && !busy && items.length === 0 ? <Empty text="אין שגיאות מערכת" Icon={CheckCircle2} sub="אם שמירה או פעולה תיכשל, היא תופיע כאן" /> : <div className="issue-list" style={{ marginTop: 12 }}>
-      {items.map((item) => { const rowKey = item.id || `${item.at}-${item.key}`; return <div key={rowKey} className="issue-card">
+      {groups.map((group) => { const item = group.latest || group; const rowKey = group.key; return <div key={rowKey} className="issue-card">
         <div className="issue-main">
-          <div className="issue-top"><span className="issue-status open">{labelFor(item)}</span><span className="issue-date">{fmtDate(item.at)} {fmtTime(item.at)}</span></div>
+          <div className="issue-top"><span className="issue-status open">{labelFor(item)}</span><span className="issue-status">{group.count === 1 ? "אירוע אחד" : `${group.count} אירועים`}</span><span className="issue-date">אחרון: {fmtDate(group.latestAt)} {fmtTime(group.latestAt)}</span></div>
           <div className="issue-desc">{summaryFor(item)}</div>
           <div className="issue-meta">{item.actorName || "—"} · {ROLE_LABEL[item.actorRole] || item.actorRole || "—"}{item.errorId ? ` · ${item.errorId}` : ""}</div>
           {open === rowKey && <div className="issue-response">
             מקום: {item.path || "—"}
             <br />פעולה: {item.operation || "—"} · מפתח: {item.key || "—"} · שגיאה: {item.error || "—"}
             <br />מצב: {item.online === false ? "לא מקוון" : item.online === true ? "מקוון" : "—"} · חלון: {item.visibilityState || "—"} · מסך: {item.viewport || "—"}{item.errorId ? ` · מזהה: ${item.errorId}` : ""}
+            {group.items.length > 1 && <div className="system-error-samples">
+              {group.items.slice(0, 5).map((sample) => <div key={sample.id || `${sample.at}-${sample.errorId || ""}`}>{fmtDate(sample.at)} {fmtTime(sample.at)} · {sample.actorName || "—"}{sample.errorId ? ` · ${sample.errorId}` : ""}</div>)}
+            </div>}
           </div>}
         </div>
         <button className="btn-ghost sm" onClick={() => setOpen((x) => x === rowKey ? null : rowKey)}>{open === rowKey ? "הסתר פרטים" : "פרטים"}</button>
@@ -8205,6 +8209,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .issue-date,.issue-meta{font-size:11.5px;color:var(--muted);}
 .issue-desc{font-size:14px;font-weight:700;line-height:1.45;color:var(--ink);}
 .issue-response{margin-top:7px;font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:9px;padding:7px 9px;}
+.system-error-samples{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);display:grid;gap:3px;font-size:11.5px;}
 .issue-thumb{width:74px;height:54px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2);}
 .issue-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 .ovl-panel.profile-shell{align-items:center;justify-content:center;background:transparent;box-shadow:none;width:min(520px,calc(100% - 24px));height:auto;max-width:none;max-height:calc(100dvh - 24px);overflow:visible;padding:0;}
