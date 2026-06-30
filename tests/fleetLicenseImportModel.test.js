@@ -166,4 +166,49 @@ describe("fleet license import model", () => {
       }
     ]);
   });
+
+  it("keeps vehicle type and model as separate catalog dimensions", () => {
+    const parsed = parseFleetLicenseSheet([
+      headers,
+      ["טויוטה", "178039", "8FBE15T", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת משקל נגדי", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
+      ["טויוטה", "213580", "8FBE15T", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלגזת משקל נגדי (דיזל)", "כלי שטח תפעולי", "", "2027-08-18", 2810, ""]
+    ]);
+
+    expect(planFleetLicenseCatalogAdditions(parsed.rows, { vehicleTypes: [] })).toEqual([
+      {
+        name: "מלגזת משקל נגדי",
+        models: ["8FBE15T"],
+        docs: { tasrir: true, license: true, lease: true }
+      },
+      {
+        name: "מלגזת משקל נגדי (דיזל)",
+        models: ["8FBE15T"],
+        docs: { tasrir: true, license: true, lease: true }
+      }
+    ]);
+  });
+
+  it("plans catalog repair from conflict rows when fleet already exists", () => {
+    const parsed = parseFleetLicenseSheet([
+      headers,
+      ["טויוטה", "194335", "RRE200H", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
+      ["טויוטה", "6882002", "OSE250", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלקטת (כפולה)", "כלי שטח תפעולי", "", "", "בבעלות", ""]
+    ], {
+      existingFleet: [
+        { id: "fleet-1", code: "194335", chassis: "194335" },
+        { id: "fleet-2", code: "6882002", chassis: "6882002" }
+      ]
+    });
+
+    expect(parsed.summary).toMatchObject({ ready: 0, conflicts: 2, invalid: 0 });
+    expect(planFleetLicenseCatalogAdditions(parsed.rows, {
+      vehicleTypes: [{ name: "מלקטת (כפולה)", models: ["OSE250"], tasrir: true, license: true, lease: false }]
+    }, { includeActions: ["new", "conflict"] })).toEqual([
+      {
+        name: "מלגזת היגש",
+        models: ["RRE200H"],
+        docs: { tasrir: true, license: true, lease: true }
+      }
+    ]);
+  });
 });

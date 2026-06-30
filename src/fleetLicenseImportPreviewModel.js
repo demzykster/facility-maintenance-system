@@ -26,7 +26,7 @@ export function buildFleetLicenseImportPreview(sheets = [], { existingFleet = []
     };
   }
 
-  const catalogAdditions = planFleetLicenseCatalogAdditions(parsed.rows, config);
+  const catalogAdditions = planFleetLicenseCatalogAdditions(parsed.rows, config, { includeActions: ["new", "conflict"] });
   return {
     ok: true,
     sheet: parsed.sheet,
