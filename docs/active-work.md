@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: `codex/fix-fleet-type-model-import`
 
-- Status: final pilot checkpoint recorded. No active product branch. Continue only with newly discovered owner-facing bugs, optional remote-branch cleanup by PR history, or post-pilot hardening items.
+- Status: fixing owner-reported fleet import/data-model bug where `סוג כלי` and `דגם` were effectively collapsed into one field.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
-- Open PRs: none.
+- Open PRs: #471 docs audit packet; current fleet fix PR not opened yet.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
   - keep module permissions, role defaults, and notification preferences connected instead of creating a separate parallel notification-access system.
@@ -56,6 +56,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - the system logo can be configured from settings; uploaded images are resized into a square logo canvas without cropping wide logos.
   - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
   - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
+  - fleet Excel import must keep `סוג כלי` as the vehicle type/category and `דגם` as the manufacturer/model; many models can belong to one vehicle type.
   - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
   - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
   - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.

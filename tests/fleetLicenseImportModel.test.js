@@ -42,7 +42,7 @@ describe("fleet license import model", () => {
     expect(detected.ignored).toEqual(expect.arrayContaining(["ימי לבדיקה תסקיר", "סטאטוס", "=TODAY()"]));
   });
 
-  it("maps rows into fleet import drafts without reading DB links or formula status fields", () => {
+  it("maps rows into fleet import drafts with separate vehicle type and model fields", () => {
     const result = parseFleetLicenseSheet([
       headers,
       [
@@ -76,11 +76,11 @@ describe("fleet license import model", () => {
         code: "194335",
         chassis: "194335",
         supplier: "טויוטה",
-        type: "RRE200H",
+        type: "מלגזת היגש",
         model: "RRE200H",
         license: "",
         leaseCost: 2810,
-        notes: "מלגזת היגש",
+        notes: "",
         vehicleKind: "מלגזת היגש",
         classification: "כלי שטח תפעולי",
         regulated: true,

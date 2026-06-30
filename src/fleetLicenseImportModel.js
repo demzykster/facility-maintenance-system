@@ -85,9 +85,9 @@ export function planFleetLicenseCatalogAdditions(rows = [], config = {}) {
 
   (rows || []).filter((row) => row?.action === "new").forEach((row) => {
     const unit = row.unit || {};
-    const model = cleanText(unit.model || unit.type);
+    const model = cleanText(unit.model || (unit.vehicleKind ? "" : unit.type));
     if (!model || existingModels.has(model)) return;
-    const name = cleanText(unit.vehicleKind || unit.notes || model) || model;
+    const name = cleanText(unit.vehicleKind || unit.type || unit.notes || model) || model;
     if (!byType.has(name)) byType.set(name, { name, models: [], docs: { tasrir: false, license: false, lease: false } });
     const entry = byType.get(name);
     if (!entry.models.includes(model)) entry.models.push(model);
@@ -140,13 +140,13 @@ export function parseFleetLicenseSheet(aoa = [], options = {}) {
         code: chassis,
         chassis,
         supplier,
-        type: model,
+        type: vehicleKind,
         model,
         license: "",
         leaseCost,
         depts: [],
         dept: "",
-        notes: vehicleKind,
+        notes: "",
         docs,
         importSource: "fleet-license-sheet",
         vehicleKind,
