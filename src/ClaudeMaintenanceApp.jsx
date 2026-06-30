@@ -38,6 +38,7 @@ import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./f
 import { vehicleCatalogBase } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
+import { normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -363,7 +364,7 @@ const DEFAULT_CONFIG = {
   mgrWidgets: { tickets: true, pm: true, sla: true },
   notify: { ...DEFAULT_NOTIFY_CONFIG },
   defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
-  vehicleTypes: [], modelSupplier: {}, modelType: {}, shifts: [], workShifts: [],
+  vehicleTypes: [], modelSupplier: {}, modelType: {}, maintenanceRules: [], shifts: [], workShifts: [],
 };
 
 /* ---------- helpers ---------- */
@@ -5360,21 +5361,58 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
 /* ============================================================ FLEET */
 function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   const [saved, setSaved] = useState(false), [typeMsg, setTypeMsg] = useState(""), [openType, setOpenType] = useState(null);
+  const [openRule, setOpenRule] = useState(null);
   const [vtypes, setVtypes] = useState(() => vehicleCatalogBase({
     config,
     fleet,
     productionStartsEmpty: SEED_POLICY.productionStartsEmpty,
     buildVehicleTypes
   }));
+  const [rules, setRules] = useState(() => normalizeMaintenanceRules(config.maintenanceRules || []));
+  const vehicleTypeNames = [...new Set(vtypes.map((t) => (t.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+  const modelCodes = [...new Set(vtypes.flatMap((t) => (t.models || []).map((m) => (m || "").trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "he"));
+  const ruleHasTarget = (rule) => !!rule?.target?.allFleet || !!rule?.target?.vehicleTypeNames?.length || !!rule?.target?.modelCodes?.length || !!rule?.target?.fleetIds?.length;
+  const setRule = (idx, patch) => setRules((s) => s.map((r, j) => j === idx ? { ...r, ...patch } : r));
+  const toggleRuleTarget = (idx, group, value) => setRules((s) => s.map((r, j) => {
+    if (j !== idx) return r;
+    const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(r.target || {}) };
+    const current = new Set(target[group] || []);
+    current.has(value) ? current.delete(value) : current.add(value);
+    return { ...r, target: { ...target, allFleet: false, [group]: [...current] } };
+  }));
+  const addRule = () => {
+    const nextIndex = rules.length;
+    setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, active: true, checklistTemplateId: "", target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] } }]);
+    setOpenRule(nextIndex);
+  };
+  const ruleTargetText = (rule) => {
+    const t = rule.target || {};
+    if (t.allFleet) return "כל הפארק";
+    const parts = [];
+    if (t.vehicleTypeNames?.length) parts.push(`${t.vehicleTypeNames.length} סוגים`);
+    if (t.modelCodes?.length) parts.push(`${t.modelCodes.length} דגמים`);
+    if (t.fleetIds?.length) parts.push(`${t.fleetIds.length} כלים`);
+    return parts.join(" · ") || "ללא יעד";
+  };
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
   const save = async () => {
     setTypeMsg("");
     const list = vtypes.filter((t) => (t.name || "").trim());
+    const ruleDrafts = rules.filter((rule) => (rule.name || "").trim() || rule.checklistTemplateId || ruleHasTarget(rule));
+    const cleanRules = normalizeMaintenanceRules(ruleDrafts);
+    if (ruleDrafts.length !== cleanRules.length) {
+      setTypeMsg("בדקו שכל רגולציית טיפול כוללת שם ותדירות בחודשים.");
+      return;
+    }
+    if (cleanRules.some((rule) => !ruleHasTarget(rule))) {
+      setTypeMsg("לכל רגולציית טיפול צריך לבחור יעד: כל הפארק, סוג כלי או דגם.");
+      return;
+    }
     const newModels = new Set();
     list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); }));
     const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type));
     if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${countLabel(orphan.length, "כלי משויך", "כלים משויכים")} לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; }
-    if (await saveConfig({ ...config, ...flattenVehicleTypes(list) }) === false) {
+    if (await saveConfig({ ...config, ...flattenVehicleTypes(list), maintenanceRules: cleanRules }) === false) {
       setTypeMsg(SAVE_FAILED_MESSAGE);
       return;
     }
@@ -5393,6 +5431,24 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
       <button className="btn-ghost sm" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: [...(x.models || []), ""] } : x))}><Plus size={14} /> דגם</button>
     </>}</div>; })}
     <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
+    <SectionTitle>רגולציות טיפול תקופתי</SectionTitle>
+    <div className="hint" style={{ marginBottom: 8 }}>הגדירו רגולציות כמו TO 500 או TO 1000 לפי חודשים ולפי סוגי כלי או דגמים. החיבור ללוח הטיפולים יבוצע בשלב הבא.</div>
+    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = (templates || []).find((tp) => tp.id === rule.checklistTemplateId); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם רגולציה, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "רגולציה ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)}{checklist ? ` · ${checklist.name}` : ""}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
+      <div className="row2">
+        <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={rule.intervalMonths || 1} onChange={(e) => setRule(i, { intervalMonths: e.target.value })} /></label>
+        <label className="field"><span>צ'ק ליסט</span><select value={rule.checklistTemplateId || ""} onChange={(e) => setRule(i, { checklistTemplateId: e.target.value })}><option value="">— ללא —</option>{(templates || []).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}</select></label>
+      </div>
+      <label className="chk-line"><input type="checkbox" checked={rule.active !== false} onChange={(e) => setRule(i, { active: e.target.checked })} /> פעיל</label>
+      <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>חל על:</div>
+      <label className="chk-line"><input type="checkbox" checked={!!target.allFleet} onChange={(e) => setRule(i, { target: { allFleet: e.target.checked, vehicleTypeNames: [], modelCodes: [], fleetIds: [] } })} /> כל הפארק</label>
+      {!target.allFleet && <>
+        <div className="hint" style={{ marginTop: 8, marginBottom: 4 }}>סוגי כלי</div>
+        {vehicleTypeNames.length ? vehicleTypeNames.map((name) => <label key={name} className="chk-line"><input type="checkbox" checked={(target.vehicleTypeNames || []).includes(name)} onChange={() => toggleRuleTarget(i, "vehicleTypeNames", name)} /> {name}</label>) : <div className="hint">אין סוגים בקטלוג.</div>}
+        <div className="hint" style={{ marginTop: 8, marginBottom: 4 }}>דגמים ספציפיים</div>
+        {modelCodes.length ? modelCodes.map((code) => <label key={code} className="chk-line"><input type="checkbox" checked={(target.modelCodes || []).includes(code)} onChange={() => toggleRuleTarget(i, "modelCodes", code)} /> {code}</label>) : <div className="hint">אין דגמים בקטלוג.</div>}
+      </>}
+    </>}</div>; })}
+    <button className="btn-ghost full" onClick={addRule}><Plus size={15} /> רגולציית טיפול</button>
     <button className="btn-primary full" style={{ marginTop: 16 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת הגדרות כלי שינוע"}</button>
     {typeMsg && <div className="note" style={{ color: "#DC2626" }}>{typeMsg}</div>}
   </div>);
