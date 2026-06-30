@@ -13,6 +13,8 @@ const serviceHeaders = (serviceRoleKey, extra = {}) => ({
 });
 
 const errorMessage = (data, fallback) => data?.message || data?.details || data?.hint || data?.code || data?.error || fallback;
+const PAGE_SIZE = 1000;
+
 const chunk = (items = [], size = 100) => {
   const chunks = [];
   for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
@@ -29,6 +31,22 @@ export function createSupabaseKvDriver({ url, serviceRoleKey, table = "cmms_kv_r
     const data = await readJson(response);
     if (!response.ok) throw new Error(errorMessage(data, `supabase_kv_${response.status}`));
     return data;
+  }
+
+  async function requestPages(path) {
+    const rows = [];
+    let offset = 0;
+    while (true) {
+      const separator = path.includes("?") ? "&" : "?";
+      const data = await request(`${path}${separator}order=record_key.asc&limit=${PAGE_SIZE}&offset=${offset}`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      if (Array.isArray(data)) rows.push(...data);
+      if (!Array.isArray(data) || data.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+    return rows;
   }
 
   return {
@@ -86,17 +104,11 @@ export function createSupabaseKvDriver({ url, serviceRoleKey, table = "cmms_kv_r
       });
     },
     async list(prefix = "", shared = false) {
-      const rows = await request(`?scope=eq.${scopeOf(shared)}&record_key=like.${encodeURIComponent(`${prefix}%`)}&select=record_key`, {
-        method: "GET",
-        headers: serviceHeaders(serviceRoleKey)
-      });
+      const rows = await requestPages(`?scope=eq.${scopeOf(shared)}&record_key=like.${encodeURIComponent(`${prefix}%`)}&select=record_key`);
       return Array.isArray(rows) ? rows.map((row) => row.record_key).filter(Boolean) : [];
     },
     async listValues(prefix = "", shared = false) {
-      const rows = await request(`?scope=eq.${scopeOf(shared)}&record_key=like.${encodeURIComponent(`${prefix}%`)}&select=record_key,value`, {
-        method: "GET",
-        headers: serviceHeaders(serviceRoleKey)
-      });
+      const rows = await requestPages(`?scope=eq.${scopeOf(shared)}&record_key=like.${encodeURIComponent(`${prefix}%`)}&select=record_key,value`);
       return Array.isArray(rows)
         ? rows.map((row) => ({ key: row.record_key, value: row.value })).filter((row) => row.key)
         : [];
@@ -107,14 +119,8 @@ export function createSupabaseKvDriver({ url, serviceRoleKey, table = "cmms_kv_r
         .filter(Boolean))];
       const grouped = Object.fromEntries(cleanPrefixes.map((prefix) => [prefix, []]));
       if (!cleanPrefixes.length) return grouped;
-      const rows = await request(`?scope=eq.${scopeOf(shared)}&select=record_key,value`, {
-        method: "GET",
-        headers: serviceHeaders(serviceRoleKey)
-      });
-      for (const row of Array.isArray(rows) ? rows : []) {
-        const key = String(row?.record_key || "");
-        const prefix = cleanPrefixes.find((candidate) => key.startsWith(candidate));
-        if (prefix) grouped[prefix].push({ key, value: row.value });
+      for (const prefix of cleanPrefixes) {
+        grouped[prefix] = await this.listValues(prefix, shared);
       }
       return grouped;
     }

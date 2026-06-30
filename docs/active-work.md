@@ -21,7 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: none
+### Active branch: codex/fix-supabase-kv-pagination
+
+- In progress: harden the Supabase KV bridge against silent PostgREST row truncation. `server/kv/supabaseDriver.js` now paginates `list` and `listValues` reads and changes `listValuesMany` to fetch only requested prefixes instead of scanning the entire `cmms_kv_records` table in one unbounded request.
+- Validation so far: targeted KV/storage tests passed, full `npm test -- --run` passed, `npm run release:check` passed, and `npm run build` passed.
 
 - Latest completed work: PR #497 reduces `/api/kv` load/read fragility by adding a multi-prefix collection read and wiring `reloadAll()` to use it. This targets pilot symptoms where the server still has `fleet:` records but the UI can remain empty if one of many parallel collection reads fails or times out.
 - Validation for PR #497: targeted storage/KV tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and `npm run staging:gate` passed against production commit `d40e930` with live staging data summary showing `fleet: 126`. A local Vercel-dev Playwright smoke on branch commit `1e28515` logged into the staging Supabase account, opened `כלי שינוע`, saw `פארק כלי שינוע (126)`, used one batched `/api/kv?prefixes=...` request, made zero per-prefix collection reads, and showed no console/API errors.
