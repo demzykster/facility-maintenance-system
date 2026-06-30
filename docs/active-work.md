@@ -21,11 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/batch-kv-collections
+### Active branch: none
 
-- Current work: reduce `/api/kv` load/read fragility by adding a multi-prefix collection read and wiring `reloadAll()` to use it. This targets pilot symptoms where the server still has `fleet:` records but the UI can remain empty if one of many parallel collection reads fails or times out.
-- Latest completed work: PR #495 fixes the fleet Excel import UI wiring by passing the existing batch import saver into the fleet module. Production commit `1499f03` live-smoked with a one-row probe Excel import: `/api/kv` POST returned 200, the probe record was created, then the probe record was deleted and `config:v1` restored.
-- Validation for current branch so far: targeted storage/KV tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and `npm run staging:gate` passed against the still-current production commit `d40e930` with live staging data summary showing `fleet: 126`.
+- Latest completed work: PR #497 reduces `/api/kv` load/read fragility by adding a multi-prefix collection read and wiring `reloadAll()` to use it. This targets pilot symptoms where the server still has `fleet:` records but the UI can remain empty if one of many parallel collection reads fails or times out.
+- Validation for PR #497: targeted storage/KV tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and `npm run staging:gate` passed against production commit `d40e930` with live staging data summary showing `fleet: 126`. A local Vercel-dev Playwright smoke on branch commit `1e28515` logged into the staging Supabase account, opened `כלי שינוע`, saw `פארק כלי שינוע (126)`, used one batched `/api/kv?prefixes=...` request, made zero per-prefix collection reads, and showed no console/API errors.
 - Current staging/pilot data is live and may change as the owner imports/edits real data. Verify with `npm run staging:data:summary` before making assumptions. Do not clear, reseed, or overwrite owner-entered data unless explicitly asked for destructive cleanup.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
