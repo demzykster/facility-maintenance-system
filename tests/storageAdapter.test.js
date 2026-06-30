@@ -45,6 +45,25 @@ describe("app storage adapter", () => {
     await expect(store.list("ticket:", true)).resolves.toEqual(["ticket:2"]);
   });
 
+  it("loads key values in one provider call when the storage supports it", async () => {
+    const remote = {
+      listValues: vi.fn().mockResolvedValue({
+        records: [{ key: "ticket:1", value: "{\"id\":\"ticket-1\"}" }]
+      }),
+      get: vi.fn()
+    };
+    const store = createAppStore({
+      storageProvider: () => remote,
+      allowMemoryFallback: false
+    });
+
+    await expect(store.listValues("ticket:", true)).resolves.toEqual([
+      { key: "ticket:1", value: "{\"id\":\"ticket-1\"}" }
+    ]);
+    expect(remote.listValues).toHaveBeenCalledWith("ticket:", true);
+    expect(remote.get).not.toHaveBeenCalled();
+  });
+
   it("keeps non-shared browser keys local even when shared storage is remote", async () => {
     const remote = createRemoteStorage();
     const local = createLocalStorage();

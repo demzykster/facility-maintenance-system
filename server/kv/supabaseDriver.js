@@ -57,6 +57,15 @@ export function createSupabaseKvDriver({ url, serviceRoleKey, table = "cmms_kv_r
         headers: serviceHeaders(serviceRoleKey)
       });
       return Array.isArray(rows) ? rows.map((row) => row.record_key).filter(Boolean) : [];
+    },
+    async listValues(prefix = "", shared = false) {
+      const rows = await request(`?scope=eq.${scopeOf(shared)}&record_key=like.${encodeURIComponent(`${prefix}%`)}&select=record_key,value`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      return Array.isArray(rows)
+        ? rows.map((row) => ({ key: row.record_key, value: row.value })).filter((row) => row.key)
+        : [];
     }
   };
 }

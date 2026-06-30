@@ -66,6 +66,76 @@ describe("kv API handler", () => {
     expect(driver.list).toHaveBeenCalledWith("ticket:", true);
   });
 
+  it("can return matching key values in one collection response", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([
+        { key: "ticket:1", value: "{\"id\":\"ticket-1\"}" },
+        { key: "ticket:2", value: "{\"id\":\"ticket-2\"}" }
+      ])
+    };
+    const handler = createKvApiHandler({ driver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const res = await call(handler, {
+      query: { prefix: "ticket:", shared: "1", includeValues: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      records: [
+        { key: "ticket:1", value: "{\"id\":\"ticket-1\"}" },
+        { key: "ticket:2", value: "{\"id\":\"ticket-2\"}" }
+      ]
+    });
+    expect(driver.listValues).toHaveBeenCalledWith("ticket:", true);
+  });
+
+  it("redacts sensitive user records in collection value responses", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([
+        {
+          key: "user:worker-1",
+          value: JSON.stringify({
+            id: "worker-1",
+            name: "Worker",
+            pin: "1234",
+            password: "secret",
+            activationToken: "token",
+            activationStatus: "pending"
+          })
+        }
+      ])
+    };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "user",
+        name: "Viewer",
+        active: true,
+        permissions: { users: "view" },
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { prefix: "user:", shared: "1", includeValues: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.json().records[0].value)).toEqual({
+      id: "worker-1",
+      name: "Worker",
+      activationStatus: "pending"
+    });
+  });
+
   it("hides unexpected backend failures behind a request id", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const driver = {

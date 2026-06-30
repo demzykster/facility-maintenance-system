@@ -21,7 +21,9 @@ describe("upstash KV driver", () => {
       .mockResolvedValueOnce(ok("ticket-json"))
       .mockResolvedValueOnce(ok("OK"))
       .mockResolvedValueOnce(ok(1))
-      .mockResolvedValueOnce(ok(["0", ["shared:ticket:1"]]));
+      .mockResolvedValueOnce(ok(["0", ["shared:ticket:1"]]))
+      .mockResolvedValueOnce(ok(["0", ["shared:ticket:1"]]))
+      .mockResolvedValueOnce(ok("ticket-json"));
     const driver = createUpstashKvDriver({
       url: "https://redis.example/",
       token: "secret",
@@ -32,12 +34,15 @@ describe("upstash KV driver", () => {
     await expect(driver.set("ticket:1", "ticket-json", true)).resolves.toBeUndefined();
     await expect(driver.delete("ticket:1", true)).resolves.toBeUndefined();
     await expect(driver.list("ticket:", true)).resolves.toEqual(["ticket:1"]);
+    await expect(driver.listValues("ticket:", true)).resolves.toEqual([{ key: "ticket:1", value: "ticket-json" }]);
 
     expect(fetchImpl.mock.calls.map(([url, options]) => [url, JSON.parse(options.body)])).toEqual([
       ["https://redis.example", ["GET", "shared:ticket:1"]],
       ["https://redis.example", ["SET", "shared:ticket:1", "ticket-json"]],
       ["https://redis.example", ["DEL", "shared:ticket:1"]],
-      ["https://redis.example", ["SCAN", "0", "MATCH", "shared:ticket:*", "COUNT", "100"]]
+      ["https://redis.example", ["SCAN", "0", "MATCH", "shared:ticket:*", "COUNT", "100"]],
+      ["https://redis.example", ["SCAN", "0", "MATCH", "shared:ticket:*", "COUNT", "100"]],
+      ["https://redis.example", ["GET", "shared:ticket:1"]]
     ]);
     expect(fetchImpl.mock.calls[0][1].headers.authorization).toBe("Bearer secret");
   });

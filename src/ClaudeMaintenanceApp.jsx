@@ -1477,6 +1477,12 @@ export default function App() {
   }, [session]);
 
   async function loadColl(prefix) {
+    const records = typeof store.listValues === "function" ? await store.listValues(prefix, true) : null;
+    if (Array.isArray(records)) {
+      return records.map((record) => {
+        try { return JSON.parse(record.value); } catch { return null; }
+      }).filter(Boolean);
+    }
     const keys = await store.list(prefix, true);
     const arr = await Promise.all(keys.map(async (k) => {
       const raw = await store.get(k, true);
