@@ -25,6 +25,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 - Status: fleet Excel import atomic-save hardening is complete in PR #483. The import no longer saves catalog/config before fleet units; it saves units first with tracked rollback, saves catalog only after fleet succeeds, and shows an inline "not partially saved" message on failure.
 - Validation for PR #483: targeted fleet import/catalog tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, `git diff --check` passed, and Vercel preview passed before merge.
+- Post-merge cleanup: the partial `config:v1` left by the failed owner import was removed from staging. Live smoke on deployed commit `8616dda` passed with `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=1`, and an empty `cmms-files` bucket.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
