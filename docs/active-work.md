@@ -21,11 +21,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/fix-production-auth-expiry
+### Active branch: none
 
-- Active issue: production auth expiry was stored from Supabase `expires_at` seconds and compared to `Date.now()` milliseconds, causing access tokens to look expired immediately and triggering repeated refresh attempts during long sessions/imports.
-- Fix in this branch: normalize Supabase and legacy stored auth expiry values to milliseconds before storage/use, so existing browser sessions do not need manual localStorage cleanup.
-- Validation for this branch so far: targeted auth/storage tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` pass.
+- Latest completed work: PR #492 fixed production auth expiry normalization. Supabase `expires_at` seconds and legacy stored auth seconds are now normalized to milliseconds before use, preventing immediate refresh loops during long sessions/imports.
+- Validation for PR #492: targeted auth/storage tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and live production login smoke passed with auth expiry about 60 minutes in the future, zero immediate refresh-token calls, and zero relevant API/Auth failures.
 - Current staging/pilot data is live and may change as the owner imports/edits real data. Verify with `npm run staging:data:summary` before making assumptions. Do not clear, reseed, or overwrite owner-entered data unless explicitly asked for destructive cleanup.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
