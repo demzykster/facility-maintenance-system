@@ -39,8 +39,8 @@ describe("supabase KV driver", () => {
       ["https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=eq.ticket%3A1&select=value&limit=1", "GET"],
       ["https://supabase.example/rest/v1/cmms_kv_records?on_conflict=scope,record_key", "POST"],
       ["https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=eq.ticket%3A1", "DELETE"],
-      ["https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.ticket%3A%25&select=record_key", "GET"],
-      ["https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.ticket%3A%25&select=record_key,value", "GET"]
+      ["https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.ticket%3A%25&select=record_key&order=record_key.asc&limit=1000&offset=0", "GET"],
+      ["https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.ticket%3A%25&select=record_key,value&order=record_key.asc&limit=1000&offset=0", "GET"]
     ]);
     expect(fetchImpl.mock.calls[1][1].headers.authorization).toBe("Bearer service-key");
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual({
@@ -100,12 +100,14 @@ describe("supabase KV driver", () => {
     });
   });
 
-  it("groups multiple prefix reads from one Supabase request", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(ok([
-      { record_key: "ticket:1", value: "ticket-json-1" },
-      { record_key: "fleet:1", value: "fleet-json-1" },
-      { record_key: "config:v1", value: "config-json" }
-    ]));
+  it("groups multiple prefix reads without scanning unrelated KV records", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(ok([
+        { record_key: "ticket:1", value: "ticket-json-1" }
+      ]))
+      .mockResolvedValueOnce(ok([
+        { record_key: "fleet:1", value: "fleet-json-1" }
+      ]));
     const driver = createSupabaseKvDriver({
       url: "https://supabase.example/",
       serviceRoleKey: "service-key",
@@ -117,12 +119,43 @@ describe("supabase KV driver", () => {
       "fleet:": [{ key: "fleet:1", value: "fleet-json-1" }]
     });
 
-    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&select=record_key,value", {
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.ticket%3A%25&select=record_key,value&order=record_key.asc&limit=1000&offset=0", {
       method: "GET",
       headers: expect.objectContaining({
         authorization: "Bearer service-key"
       })
     });
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.fleet%3A%25&select=record_key,value&order=record_key.asc&limit=1000&offset=0", {
+      method: "GET",
+      headers: expect.objectContaining({
+        authorization: "Bearer service-key"
+      })
+    });
+  });
+
+  it("paginates collection reads past the Supabase default row limit", async () => {
+    const firstPage = Array.from({ length: 1000 }, (_, index) => ({
+      record_key: `fleet:${String(index + 1).padStart(4, "0")}`,
+      value: `fleet-json-${index + 1}`
+    }));
+    const secondPage = [
+      { record_key: "fleet:1001", value: "fleet-json-1001" }
+    ];
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(ok(firstPage))
+      .mockResolvedValueOnce(ok(secondPage));
+    const driver = createSupabaseKvDriver({
+      url: "https://supabase.example/",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    await expect(driver.listValues("fleet:", true)).resolves.toHaveLength(1001);
+
+    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+      "https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.fleet%3A%25&select=record_key,value&order=record_key.asc&limit=1000&offset=0",
+      "https://supabase.example/rest/v1/cmms_kv_records?scope=eq.shared&record_key=like.fleet%3A%25&select=record_key,value&order=record_key.asc&limit=1000&offset=1000"
+    ]);
   });
 
   it("supports server Supabase env variable names", () => {
