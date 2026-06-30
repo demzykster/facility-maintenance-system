@@ -1944,7 +1944,7 @@ export default function App() {
   }, [session && session.id, session && session.role, impersonating]);
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
@@ -5464,7 +5464,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
 }
 
 function FleetModule(p) {
-  const { fleet, config, tickets, insp, saveFleet, delFleet, saveTicket, session, saveConfig } = p;
+  const { fleet, config, tickets, insp, saveFleet, saveFleetImportBatch, delFleet, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units"), [imp, setImp] = useState(false);
   const canEditSettings = canManageSettings(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
