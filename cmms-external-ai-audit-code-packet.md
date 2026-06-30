@@ -1,5 +1,18 @@
 # CMMS External AI Audit Code Packet
 Generated from repository files without modifying source files.
+Generated from git commit: 8fe6c3e
+
+## Included Files
+- src/ClaudeMaintenanceApp.jsx
+- src/permissionModel.js
+- src/ticketTransitionModel.js
+- src/storageAdapter.js
+- src/apiStorageAdapter.js
+- src/notificationModel.js
+- docs/module-growth-architecture.md
+- docs/active-work.md
+- docs/production-data-model.md
+- docs/ai-agent-readiness.md
 
 ## src/ClaudeMaintenanceApp.jsx
 
@@ -8965,5 +8978,1112 @@ Before adding a new module, define:
 - how records link back to tickets/assets/users/suppliers/files.
 
 If a module cannot answer these questions, it is not ready to build yet.
+
+```
+
+## docs/active-work.md
+
+```md
+# Active Work Ledger
+
+This is the first file every Codex session must read. It is the live handoff point, not the project history.
+
+## Required Rule
+
+Before answering project-status questions or starting work:
+
+1. Run `git fetch origin --prune`.
+2. Check current branch, working tree, latest `origin/main`, and open PRs.
+3. Read this file first.
+4. Read only the extra docs needed for the current task. Check remote branches only when the task involves PR/branch sync or this file says an unmerged branch exists.
+
+If `main`, open PRs, or this live ledger disagree, start with:
+
+```text
+PROBLEM:
+```
+
+Then explain what is inconsistent, why it is risky, and the safe options.
+
+## Current Active Item
+
+### Active branch: none
+
+- Status: final pilot checkpoint recorded. No active product branch. Continue only with newly discovered owner-facing bugs, optional remote-branch cleanup by PR history, or post-pilot hardening items.
+- Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
+- Open PRs: none.
+- Purpose:
+  - continue release hardening toward a clean first staging/pilot build.
+  - keep module permissions, role defaults, and notification preferences connected instead of creating a separate parallel notification-access system.
+  - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
+  - the interim Supabase KV bridge is an explicit v1 compatibility choice, not the final normalized workflow model.
+  - do not spend current release time on workflow-table normalization or old-data migration unless a launch blocker proves it is required.
+  - target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
+- Current facts to preserve:
+  - if Supabase `Automatically expose new tables` is disabled, the server-side REST checks require explicit `service_role` grants on CMMS tables.
+  - production login also requires `authenticated` select privilege on `public.app_users`; RLS still limits users to their own/allowed rows.
+  - external Excel/CSV task import exists, but `.xlsx` import uses `read-excel-file` and CSV uses `papaparse`.
+  - Excel export generation now uses `write-excel-file` through a small compatibility adapter instead of vulnerable `xlsx@0.18.5`; export formula injection remains mitigated through `rowsSafe`.
+  - first-admin bootstrap is disabled by default, token-gated, and refuses a second active admin, but the deployment env does not physically disable itself after success.
+  - staging smoke must therefore verify bootstrap works once, then env is disabled/removed and `/api/bootstrap/admin` returns closed.
+  - admin role preview must remain usable from role screens that do not render the desktop sidebar, especially worker and cleaner views.
+  - notification unread badges must identify unread items and clear through explicit user actions, not rely on opening the panel.
+  - staging requires both public `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` for browser login and server-only Supabase env for API routes.
+  - the `cmms-files` Supabase Storage bucket must exist before file/photo smoke can pass.
+  - public and server Supabase env must point at the same project/key pair.
+  - `.env.staging.example` must stay aligned with the staging smoke preflight env contract.
+  - `.env.staging.local` is the safe local place for real staging secrets before copying them into Vercel.
+  - local staging preflight must use `.env.staging.local` as the explicit source for that run, even if stale shell env exists.
+  - role preview should stay available for admin preview on desktop and worker/cleaner mobile shells without taking over the footer.
+  - sidebar footer shows app version and short build commit so stale Vercel deployments can be identified from the UI.
+  - production builds should emit `cmms-version.json`; an open browser tab should compare that public manifest to its bundled commit and offer a quiet refresh prompt when a newer deployed build is available.
+  - desktop sidebar footer must remain inside the visible viewport on shorter desktop windows; the navigation list may scroll independently.
+  - desktop sidebar navigation should scroll without showing a heavy visual scrollbar.
+  - the system logo can be configured from settings; uploaded images are resized into a square logo canvas without cropping wide logos.
+  - fleet Excel import source is the `רישיונות` sheet only; ignore the workbook `DB` sheet and old file links.
+  - fleet Excel import treats `מס' רכב` as chassis/source identifier and requires explicit confirmation before importing only new rows while leaving conflicts unchanged.
+  - before real fleet Excel import into an empty system, add a preview step for missing vehicle catalog entries: unknown models/types from `רישיונות` should be proposed as new vehicle-type/model settings, with document flags inferred from imported document dates and confirmed before saving.
+  - notification read-state now stores stable event keys as well as a legacy timestamp, so dynamic notifications do not reappear as unread after "mark all read".
+  - worker and cleaner shells show a visible `יציאה` action; role preview remains available there and is visually more compact.
+  - mobile admin topbar must show a visible `יציאה` action, not only an icon-only logout control.
+  - mobile navigation should not split modules between a top dropdown and the bottom bar. Roles with more than four available sections should use one horizontally scrollable bottom navigation; roles with three or four sections should keep the simple fixed bottom navigation.
+  - production password-change and first-admin bootstrap accept passwords from 6 characters; complexity is guidance, not a hard blocker.
+  - production login footer should stay user-facing and not expose technical Supabase/Auth wording.
+  - production login footer shows author/year and app version as two quiet lines; do not collapse them into one mixed attribution/version string.
+  - production login footer attribution must isolate LTR names/years inside Hebrew text so the order stays readable on mobile.
+  - logged-in users should be able to edit their own phone; admins/managers/production users can also edit email, and logged-in production users can voluntarily change password.
+  - new tickets should capture the requester phone at creation time and show it as a tap-to-call link in ticket detail when available.
+  - the user-profile contact PR added `app_users.phone`; the staging Supabase migration has been applied and verified with a direct `select=id,phone` REST check.
+  - worker/cleaner/public-report/login localization should use Hebrew as the source language and support `he`, `en`, `ru`, `ar`, `hi`, and `ti` (Tigrinya); this is a controlled UI dictionary direction, not browser auto-translation of business records.
+  - logged-in desktop users can report internal app issues from the sidebar version area; reports are stored as `appIssue:` KV records, included in backup/restore, and managed from settings as a product-quality journal, not as maintenance tickets.
+  - logged-in users must also be able to report internal app issues from mobile/topbar shells where the desktop sidebar is hidden, including worker and cleaner views.
+  - the internal app-issue report modal should render as one compact centered panel, without a wider empty overlay shell beside it.
+  - production cleaning-area QR codes open CMMS with the specific cleaning zone id; public anonymous cleaning reports, manager cleaning reports, and cleaner round start actions must require that matching scanned zone in production. Demo/test may keep manual zone selection for workflow testing.
+  - `npm run staging:vercel-env` checks Vercel project env names without printing secret values.
+  - `npm run staging:supabase-schema` checks required Supabase tables and the private file bucket without printing secret values.
+  - `npm run staging:smoke:browser` checks the public login screen with Playwright and fails on pre-login `/api/kv` 401 or relevant console errors.
+  - `npm run staging:smoke:ui` checks the live Vercel UI after login on desktop and mobile: desktop module navigation, footer version, mobile top logout/profile/issue actions, bottom navigation, and profile modal layout.
+  - `npm run staging:gate` should include the strict UI smoke so final pilot checks do not depend on a manual browser walkthrough.
+  - red shared-save failure toasts should create a sanitized client-error audit event when a logged-in production session is available.
+  - red shared-save failure toasts are reserved for failed shared writes/deletes; background shared reads/lists may fail/retry without showing a misleading save-failure banner.
+  - cleaning zone, cleaning complaint, and cleaning round forms must await persistence before closing; failed saves keep the form open with a visible retry message instead of silently losing user input.
+  - staging preflight rejects copied placeholder env values such as `YOUR_PROJECT`, `REPLACE_WITH...`, and `CHANGE_ME`.
+  - `docs/supabase-vercel-setup-checklist.md` is the single setup order before real empty staging smoke.
+  - Vercel Production environment variables are now configured for the empty staging/pilot smoke; bootstrap env was removed after the first admin was created.
+  - local demo assets under `public/demo/` must stay out of git and Vercel uploads; they are local presentation material, not app runtime assets.
+  - final pilot UI polish should keep the page body flush to the viewport, avoid horizontal overflow on analytics/settings, keep the internal issue-report modal as one compact panel, and fit uploaded logos into a square canvas without cropping wide logos.
+  - dashboard widget hide/show controls are personal display preferences. They must not write global `config:v1`, must not require `settings:manage`, and must not trigger the red shared-save failure banner.
+  - staging UI smoke must explicitly click dashboard widget hide/show and fail if the red `השמירה לא הושלמה` save-failure toast appears.
+  - `npm run staging:gate` includes `npm run staging:data:summary`, so every final staging gate shows table counts, KV key prefixes, and storage totals without printing record contents, secrets, or file paths.
+  - owner has switched the Supabase/Vercel environment from disposable empty staging into pilot/prod-candidate data entry. From this point forward, owner-entered zones, fleet units, users, settings, tickets, files, and history are protected working data. Do not clear or reseed staging/pilot data unless the owner explicitly asks for a destructive cleanup. Baseline before owner data entry: `2026-06-30T06:15Z` summary showed `app_users=1`, `cmms_kv_records=2` (`presence`, `pushSubscriptions`), `file_metadata=0`, `audit_events=1`, and zero storage files; sanitized evidence is local-only at `.tools/staging-backup-evidence-2026-06-30T06-15-54-236Z.json`.
+  - settings issue-report screen should distinguish manual user reports from automatic system errors. Admins/settings managers can view sanitized `client_error` audit events as a short operational list, with technical details collapsed by default. Red shared-save failure events include safe browser context (`online`, `visibilityState`, `focused`, `viewport`, `errorId`) to diagnose intermittent owner-visible banners.
+  - system error rows should be owner-readable by default: show the human label, time, actor, place, and short error id first; keep operation/key/raw error details collapsed.
+  - mobile profile and internal issue-report modals should render as a single card with no blank side shell; mobile module navigation should stay in the bottom horizontal nav, not return to a top select.
+  - production shared-storage API calls should use a refreshed Supabase access token when the stored token is close to expiry, so long owner sessions do not create avoidable red save-failure toasts.
+  - real fleet Excel import should be previewed before saving: `npm run fleet:import:preview -- <file.xlsx>` reads only the `רישיונות` sheet, reports new/conflict/invalid rows and missing catalog additions, and does not write to Supabase.
+  - fleet Excel import preview must block duplicate chassis/source identifiers inside the same workbook before save; the supplied `מעקב רישיונות_ 06.07.23.xlsx` preview found `total=128`, `ready=126`, `invalid=2` for duplicate `פסולתון` rows 127-128.
+  - phone push notifications are implemented as PWA/web-push: `/api/push`, `cmms-sw.js`, `manifest.webmanifest`, and Vercel `CMMS_PUSH_*` env are required. Users still need a supported browser/PWA install and notification permission.
+  - automatic phone push should stay targeted and low-noise: send to explicit subscribed users only, do not broadcast to all subscribers, and do not let push failures block the saved business action.
+  - next access-control iteration should combine role defaults, individual module permissions, and per-user notification preferences in one coherent user-management surface instead of adding a separate parallel permission system.
+  - push delivery and notification-preference/access matrix are intentionally separate release blocks: push proves safe targeted delivery, while the next block must decide which roles/users may see modules and receive each event type.
+  - notification phone delivery now has a server-side access/preference filter foundation: subscriptions preserve user role, permissions, and notification preferences, and `/api/push` filters notify targets by event kind before sending.
+  - user forms now expose per-user notification preferences beside module permissions; only event kinds allowed by the current role/permission model are shown, and disabled kinds are saved as explicit user preferences.
+  - `/api/push` refreshes target user role/permissions/notification preferences from `user:<id>` records before business notification delivery, so admin changes made after device subscription are respected.
+  - cleaner-facing screens should not contain hardcoded Hebrew shell text where `uiText` keys already exist; operational record names can remain as entered by users.
+  - UI localization parity should be tested by comparing every supported language key set directly, not only by checking `uiText()` fallback output.
+  - worker-facing localization now covers the role-preview strip, "my equipment" PPE empty state, and activity-log shell/filter labels in `he/en/ru/ar/hi/ti`. Admin screens remain Hebrew-first for v1 unless explicitly selected for future localization.
+  - automatic client-error logging can be smoke-checked with `npm run staging:smoke:system-errors`; it writes one controlled sanitized audit event and confirms it is visible through `/api/system-errors`.
+  - Cleaning QR localization branch passed strict dictionary parity: `he/en/ru/ar/hi/ti` each expose 105 direct UI keys, with no missing or extra keys. Browser smoke on local `http://127.0.0.1:5173/` switched all six languages and confirmed login/public-report title text plus correct RTL/LTR direction. Full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
+  - Worker localization polish passed locally: direct worker smoke confirmed Russian and Arabic PPE/activity screens no longer show the hardcoded Hebrew role/PPE/activity labels from the owner screenshots; admin-to-worker role-preview smoke confirmed the preview strip localizes inside the worker shell; iPhone-width worker smoke confirmed Russian/Arabic topbar and tabs stay inside the viewport and tab height does not jump while switching tabs. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
+  - PWA login install prompt branch passed locally: generated PNG install icons (`192`, `512`, and Apple touch `180`), updated manifest/iOS meta tags, added a compact login-screen install prompt, and verified iPhone instructions plus Android `beforeinstallprompt` flow with Playwright. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
+  - Access/notification matrix branch passed locally: individual module permissions are now editable for all non-admin roles, the notification-preference list shows allowed and permission-blocked event kinds in one matrix, and worker PPE cross-role access was smoke-checked in the user form. Validation passed: targeted notification/push tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright user-form smoke.
+  - Mobile worker shell polish passed locally: worker top actions and tabs stay inside phone-width screens. The worker tabs now fit as four compact equal columns instead of exposing a clipped horizontal-scroll tab edge. Playwright smoke at iPhone width confirmed `ru/ar/hi/ti/he/en` worker tabs have no document or tab overflow. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
+  - Final pilot checkpoint passed after PR #464: `npm run staging:gate -- --expect-current-commit` passed on deployed commit `b744872`; live smoke confirmed bootstrap closed, admin auth/profile, KV bridge, private file route boundary, Supabase schema/bucket, desktop/mobile UI shell, and version footer. Staging was initially empty except one admin user and service KV prefixes `presence` and `pushSubscriptions`; after the owner starts data entry, treat new records as protected pilot/prod-candidate data.
+  - Dashboard widget hide/show smoke passed on local current main after PR #464: clicking `התאמת לוח` and hiding a widget writes only a personal `dashboardWidgets:*` local preference, shows no red save-failure banner, logs no console errors, and creates no horizontal overflow.
+  - Fleet license Excel preview passed on the supplied `מעקב רישיונות_ 06.07.23.xlsx`: reads only the `רישיונות` sheet, `total=128`, `ready=126`, `conflicts=0`, `invalid=2` duplicate `פסולתון` rows, and proposes catalog additions before any save. No staging write was performed.
+  - System-error journal smoke passed live: `npm run staging:smoke:system-errors` wrote one controlled sanitized `client_error` audit event and read it back through `/api/system-errors`, confirming the admin-visible operational error list works.
+  - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
+  - AI intake foundation starts with a provider-free `src/aiIntakeModel.js` contract: it classifies free-text reports across CMMS modules, extracts risk/missing-info signals, produces clarifying questions and a user reply, and keeps `writePolicy=human_confirmation_required` with no direct writes.
+  - `POST /api/ai/intake` is the first shared server boundary for AI intake drafts. It is POST-only, provider-free, returns read-only drafts, and must not write KV/Supabase/files or mutate business state.
+  - `npm run staging:gate` includes a live AI-intake smoke check so the shared draft endpoint cannot silently break before pilot/release checks.
+- Accepted v1 pilot risks:
+  - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
+  - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.
+  - production AI remains disabled for v1; AI-agent readiness is architectural preparation, not a launch feature.
+- Current launch blockers:
+  - none known for the empty staging/pilot build after the Supabase Pro backup and restore drill.
+- Validation:
+  - Russian/cleaner localization branch passed: targeted language/uiI18n tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local browser smoke for Russian login plus demo cleaner screen text.
+  - Stale-tab update prompt branch passed targeted version-model tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Build output includes `dist/cmms-version.json` with the same short commit as the bundled UI.
+  - Dashboard widget save-failure smoke guard is in progress on `codex/fix-dashboard-widget-prefs-smoke`; live `npm run staging:smoke:ui -- --expect-current-commit` passed on Vercel commit `47dda88`, including the stronger red-toast check.
+  - Fleet import preview, controlled system-error smoke tooling, and AI-agent readiness docs passed locally on `codex/final-import-log-ai-followups`: targeted tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, live `npm run staging:smoke:system-errors`, and real attached workbook preview.
+  - System error log and token refresh hardening passed targeted checks: `npm test -- --run tests/fleetLicenseImportModel.test.js tests/languageModel.test.js tests/apiStorageAdapter.test.js tests/storageAdapter.test.js tests/systemErrorsHandler.test.js tests/supabaseAuditDriver.test.js tests/vercelApiRouteModel.test.js`.
+  - Dashboard widget preference fix passed locally: mobile smoke clicked `התאמת לוח` and hid the first widget with no red alert and no global `config:v1` PUT. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed. Live staging global widgets were reset to visible after the earlier diagnostic click against the old deployed code.
+  - Staging UI smoke gate branch passed locally: `npm run staging:smoke:ui -- --expect-current-commit` verified public Vercel commit `7dd46b2`, opened all desktop modules without overflow, and confirmed mobile logout/profile/issue actions plus full bottom navigation. `npm run staging:gate` also passed with the UI smoke included.
+  - Profile/notification polish is live through PR #432, PR #433, and PR #434. Strict live smoke passed on public Vercel commit `033eaf3`; desktop read-only smoke opened all main modules with no horizontal overflow, console errors, or failed API responses; mobile smoke confirmed top logout, profile, issue-report, and full bottom navigation with no overflow.
+  - Local demo asset ignore guard passed: `public/demo/` is ignored by git and Vercel upload, keeping manual production deploys from accidentally bundling presentation videos.
+  - Mobile navigation polish passed locally: full tests, release check, build, diff check, and Playwright smoke confirmed admin has no top dropdown, full bottom scroll navigation includes all 11 available sections without page overflow, and a standard manager keeps a simple three-item bottom navigation.
+  - Mobile app-issue and cleaning QR gate branch passed locally: `npm test -- --run tests/cleaningQrModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for mobile admin app-issue button opening the report modal, and production-mode public report opening without manual zone buttons when no QR zone is available.
+  - Localization language-model foundation passed locally: `npm test -- --run tests/languageModel.test.js` confirms Hebrew fallback, supported language codes/names, locale normalization, and RTL/LTR direction.
+  - Login footer polish passed locally in production-mode at 430px width: footer rendered as two lines (`פותח על ידי ...` and `גרסה v...`) without overflow or relevant console errors. `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
+  - User profile/contact branch passed locally: `npm test -- --run tests/profileHandler.test.js tests/changePasswordHandler.test.js tests/sessionHandler.test.js tests/productionLoginAdapter.test.js tests/vercelApiRouteModel.test.js`, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Browser smoke passed for demo login opening the profile modal and production-mode mobile login footer rendering as two contained lines.
+  - Phone push event delivery branch passed locally: `npm test -- --run tests/pushNotificationModel.test.js tests/pushHandler.test.js`, full `npm test -- --run`, and `npm run build`.
+  - Notification preference UI branch passed targeted notification/permission tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright smoke opening `צוות ומשתמשים` -> `הוסף משתמש` -> `התראות למשתמש` with 12 visible preference rows and no red save-failure toast.
+  - Fresh push user-preference branch passed targeted push/access tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+  - User profile/contact PR #427 merged to main. Vercel passed, the `app_users.phone` migration was applied to `cmms-cdsl-staging`, `npm run staging:supabase-schema`, `npm run release:check`, and `npm run staging:smoke:live` passed. Live Playwright smoke on `https://facility-maintenance-system.vercel.app/` confirmed login with the admin account, no save-failure banner, one visible profile entry point, and a profile modal with phone/password fields.
+  - Cleaning save-flow hardening passed locally: new cleaning zone saved and survived reload; cleaning complaint form closed only after successful persistence; no relevant browser console errors. `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed.
+  - Supabase Pro backup and restore drill passed. `supabase backups list --project-ref ofwcdifzofzzucizpxqy` reports `walg_enabled=true`, `pitr_enabled=false`, and one completed physical backup (`id=992302023`, `inserted_at=2026-06-28T16:12:54.505Z`). A temporary restore target (`cmms-cdsl-restore-drill-full-20260629094512`, ref `aakzttnqotmemukyejys`) was created, migrations were applied, one admin/Auth user, `app_users`, `file_metadata`, `audit_events`, and a real `cmms-files` storage object were restored and verified. Restored file SHA-256 matched the source. The temporary target was deleted, secret restore credentials were removed, and only sanitized local evidence remains in `.tools/restore-drill-evidence-2026-06-29T09-48-16-539Z.json`. Final source cleanup evidence `.tools/staging-backup-evidence-2026-06-29T09-48-45-484Z.json` shows `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=54`, `storageFiles=0`; `npm run staging:supabase-schema` and `npm run staging:smoke:live` passed.
+  - Client shared-save failure logging merged in PR #404 after the Vercel Pro upgrade removed the build-rate-limit blocker. Vercel passed, and strict live smoke passed for deployed commit `89455f2`.
+  - Public Vercel production redeploy succeeded after the sidebar/logo polish and ledger sync. Strict live smoke passed for the deployed `main` runtime: app shell, deployed commit, closed bootstrap, admin auth/session, KV read access, file route auth boundary, required Supabase tables, and private `cmms-files` bucket all passed.
+  - Sidebar/logo polish passed: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for hidden sidebar scrollbar plus logo upload/save.
+  - App issue reports passed targeted model/backup/collection/KV tests, full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and local Playwright smoke for login, issue submission, and settings history visibility.
+  - App issue report modal shell fix passed locally: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout smoke confirming shell width equals modal width with no shell shadow.
+  - Logo fit and page-width stability passed locally: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright smoke for wide-logo upload plus stable scrollbar gutter.
+  - Client shared-save failure logging passed: `npm test -- --run tests/clientErrorsHandler.test.js tests/auditEventModel.test.js tests/vercelApiRouteModel.test.js tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+  - Local browser storage fail-toast fix passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+  - Background read/list toast suppression passed locally: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+  - Public Vercel production redeploy succeeded after the Hobby daily deployment limit reset. Strict live smoke passed for commit `2304dcd`.
+  - Desktop sidebar footer overflow fix passed local checks: `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, and Playwright layout probes at `1366x768`, `1920x1080`, and `1280x720`.
+  - PR #399 merged cleanly and its Vercel Preview check passed. Manual production redeploy failed externally with Vercel Hobby limit `api-deployments-free-per-day`, so strict live smoke for commit `f7f5bc3` is expected to fail until the deployment limit resets.
+  - Empty staging smoke progress on `https://facility-maintenance-system.vercel.app/`: Vercel env preflight passed, Supabase schema preflight passed, bootstrap admin succeeded, bootstrap was disabled again, UI login/password-change reached the app shell, one facility ticket and one transport ticket were created, file upload/download through `/api/files` passed with metadata and audit, and anonymous `/api/public/complaints` created a pending complaint without creating a ticket.
+  - Follow-up smoke check: the transport ticket detail opened in the UI, admin note update saved, and the cleaning UI shows the smoke public zone plus one pending report.
+  - Production Vercel alias was manually redeployed from clean `main` because the public app still served stale footer commit `97c8b0f`; the public staging URL now serves bundle commit `bdecfd5`.
+  - Ticket Excel export is proven in a real Chrome download smoke on `https://facility-maintenance-system.vercel.app/`: `קריאות_2026-06-28.xlsx` downloaded successfully with no relevant console errors.
+  - Fleet park Excel export is proven in a real Chrome download smoke on the same public staging URL: `fleet_2026-06-28.xlsx` downloaded successfully with no relevant console errors.
+  - Transport lifecycle smoke is proven through the real Vercel/Supabase API: the smoke transport ticket passed `new -> in_progress -> waiting:no_equipment -> in_progress -> pending_user -> pending_admin -> done`, including technician assignment, equipment-wait timing, manager confirmation, admin closure, status duration keys, and six ticket status audit events.
+  - Empty staging data after smoke contains one admin user plus smoke records and smoke role users for manager, technician, worker, and cleaner; these are temporary pilot/staging records and can be cleared before owner-facing demo.
+  - Mobile role preview smoke passed locally on `http://127.0.0.1:5173/`: admin mobile topbar shows the role-preview toggle, can switch into worker preview, and `יציאה` remains visible.
+  - Mobile role preview fix is merged in PR #384.
+  - Live staging smoke command is merged in PR #385: `npm run staging:smoke:live` checks the public app URL, closed bootstrap endpoint, admin Supabase auth/session, KV read access, file route metadata boundary, required Supabase table counts, and the private file bucket without printing secret values.
+  - Strict deployed-version smoke is merged in PR #386: `npm run staging:smoke:live -- --expect-current-commit` fails when Vercel still serves an older bundle.
+  - Strict live staging smoke passed after redeploy: public Vercel serves commit `46ccf95`, bootstrap is closed, admin auth/session works, KV read works, file metadata boundary works, required Supabase tables are reachable, and `cmms-files` is private.
+  - Strict live staging smoke passed after latest redeploy: public Vercel serves commit `792d576`, bootstrap is closed, admin auth/session works, KV read works, file metadata boundary works, required Supabase tables are reachable, and `cmms-files` is private.
+  - Backup/restore evidence capture is merged in PR #388. `npm run staging:backup:evidence` writes a local ignored `.tools/staging-backup-evidence-*.json` snapshot of the four staging tables and `cmms-files` inventory.
+  - `npm run staging:gate` is merged in PR #390 as the combined non-destructive staging gate. It runs local env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke.
+  - The temporary local Supabase access-token copy used for restore-drill work was removed from `.tools/`; Supabase CLI platform access still works without that local file.
+  - Supabase CLI confirms project `cmms-cdsl-staging` (`ofwcdifzofzzucizpxqy`) is visible; Supabase Pro managed database backup is enabled with `walg_enabled=true`, one completed physical backup, and `pitr_enabled=false`.
+  - Owner-facing staging cleanup is complete: only admin `vadim@chemipal.co.il` remains, admin password is temporarily `123456`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`, and `cmms-files` has no files.
+  - Final cleanup evidence file is local-only: `.tools/staging-backup-evidence-2026-06-29T04-34-25-956Z.json`.
+  - Read-only UI smoke passed on public Vercel after cleanup: login as admin with the temporary password reached the app shell, `יציאה` was visible, smoke/demo records were not visible, and logout returned to login. Console showed pre-auth 401/init errors before login; keep as non-blocking polish follow-up.
+  - Mobile admin topbar logout label polish passed locally on `http://127.0.0.1:5195/`: demo admin login reached the mobile shell, `.tb-logout` showed visible `יציאה`, `aria-label="יציאה מהמערכת"`, and a 67x38 px hit area.
+  - Login/password polish passed locally: password-change/bootstrap validation tests, full Vitest, release check, and production build all passed.
+  - Fleet park Excel export is complete locally: the `כלי שינוע` list now exports the currently filtered fleet rows with identifiers, type/model, supplier, departments, document dates/status, service state, lease fields, import classification, and notes. Validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+  - Fleet import catalog preview is complete locally: real fleet Excel import now detects missing vehicle types/models, requires explicit confirmation, saves inferred document rules before importing vehicles, and passed `npm test -- --run tests/fleetLicenseImportModel.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`. Vercel preview was blocked by Hobby build-rate-limit, not a code failure.
+  - `npm audit --omit=dev` reported high severity advisories only for `xlsx@0.18.5`; `npm uninstall xlsx` then reported `found 0 vulnerabilities`.
+  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed during export writer replacement; build output dropped from roughly 377 kB gzip to roughly 301 kB gzip.
+  - HTTP smoke on `http://127.0.0.1:5173/` returned `200 OK` and the `CMMS CDSL` app shell; in-app browser smoke timed out in browser-control before page inspection, with no CLI build/runtime failure observed.
+  - Production AI guard was re-checked from code: `aiModeFromEnv` defaults production to disabled, `BROWSER_AI_ENABLED` gates browser AI UI/calls, and production config gate rejects browser AI mode.
+  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #353 production error visibility.
+  - `npm test -- --run`, `npm run release:check`, and `npm run build` passed for PR #352 export-boundary hardening.
+  - Browser smoke for PR #352 was attempted, but browser-control timed out while reading the local tab; no app runtime failure was observed by CLI checks.
+  - `npm run staging:preflight` failed as expected without staging env, listing missing required env.
+  - `npm run staging:preflight` passed with a synthetic complete staging env.
+  - `npm test -- --run tests/publicComplaintHandler.test.js tests/vercelApiRouteModel.test.js` passed before PR #349 merge.
+  - `npm test -- --run` passed before PR #349 merge.
+  - `npm run build` passed before PR #349 merge.
+  - `npm run release:check` passed before PR #349 merge.
+  - Browser smoke via system Chrome passed: login screen loaded and public QR/problem report overlay opened without console/network errors.
+
+## Latest Completed Work
+
+- Final pilot localization and phone-push hardening is complete in PR #448.
+  - Staging data summary confirmed the owner-facing database is empty except one admin user, with no KV records, file metadata, audit rows, or storage files.
+  - Real fleet import preview against the supplied `מעקב רישיונות_ 06.07.23.xlsx` is closed for now: the preview reads only `רישיונות`, found `total=128`, `ready=126`, and correctly blocked duplicate chassis/source identifier `פסולתון` in rows 127-128 before any write.
+  - PWA phone push code is deployed and Vercel Production env has VAPID contact/public/private settings. Live `/api/push` returns enabled with a public key.
+  - First localization shell is deployed for login, public QR reporting, worker, cleaner, and phone-push labels using the agreed languages `he/en/ar/hi/ti`; admin module records remain Hebrew-first for v1. Russian follow-up is active separately on `codex/localize-russian-cleaner`.
+  - Validation: targeted localization/push tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run staging:vercel-env` passed, `npm run build` passed, local Playwright smoke confirmed localized public QR flow and admin login to the empty-state dashboard, live `/api/push` enabled check passed, and `npm run staging:gate` passed on deployed commit `92e3919`.
+- Stale-tab update prompt is complete in PR #446.
+  - Vite now emits a public `cmms-version.json` manifest for every production build.
+  - The app compares the open tab's bundled commit to that manifest and shows a quiet refresh banner if Vercel has a newer build.
+- Save-failure diagnostics are complete in PR #443.
+  - Staging data was cleared per owner command: app admin remains, shared KV/file metadata/audit/storage are empty.
+  - Red shared-save failure reports now include safe browser context for later analysis in Settings > issue reports > system errors.
+- Mobile nav/profile polish is in progress on `codex/mobile-nav-profile-polish`.
+  - Profile and internal issue-report overlay shells are constrained to the actual modal card to prevent the blank side panel seen on wide/mobile browser layouts.
+  - Mobile bottom navigation regression smoke now fails if the old top module select returns, if long module lists are not scrollable, or if the profile/issue modal shell is wider than its visible card.
+- System error journal polish is in progress on `codex/system-error-journal-polish`.
+  - Collapsed automatic error rows now show a human Hebrew label plus the screen path/error id; technical operation/key/error fields remain behind "פרטים".
+- Staging gate data-awareness is in progress on `codex/include-data-summary-in-gate`.
+  - Adds the read-only staging data summary step into the combined `npm run staging:gate` sequence.
+- Staging data summary is in progress on `codex/staging-data-summary`.
+  - Added a read-only `npm run staging:data:summary` command to count staging tables, KV prefixes, and storage totals without printing row contents, secrets, or file paths.
+  - First run confirmed staging currently contains 1 admin user, 128 fleet KV records, 1 cleaning-zone KV record, 1 config KV record, 137 audit events, and no storage files.
+- Dashboard widget save-failure smoke guard is in progress on `codex/fix-dashboard-widget-prefs-smoke`.
+  - Strengthened `npm run staging:smoke:ui` so hiding a dashboard widget must not produce the red save-failure toast and must not write global `config:v1`.
+  - Live smoke on current Vercel commit `47dda88` passed, so the owner-observed banner is not reproducing on a clean browser context after PR #439.
+- Final pilot follow-ups are ready for PR on `codex/final-import-log-ai-followups`.
+  - Added a read-only fleet license import preview command for real Excel files before saving anything.
+  - Real attached fleet workbook preview passed parsing and correctly blocked duplicate `פסולתון` rows before import.
+  - Added a controlled staging system-error smoke command for the automatic error-log pipeline.
+  - Added `docs/ai-agent-readiness.md` to preserve the future AI-agent architecture without enabling production AI in v1.
+- Final pilot UI smoke/polish is in progress.
+  - PR #429 is merged and live: desktop sidebar, mobile topbars, worker shell, and cleaner shell all expose app-issue reporting.
+  - Production cleaning reports/rounds cannot be started by manually choosing a zone without a matching QR zone URL. This is a v1 flow gate; stronger physical-proof options such as signed rotating QR/NFC/geofence remain future hardening.
+  - Post-merge live smoke confirmed deployed commit `b97f6e8`, mobile app-issue modal opening, and no red save-failure toast during a 45-second logged-in check.
+  - Live Vercel login smoke passed on the current production URL with no alert toast or API/console errors during the checked window.
+  - Local visual smoke passed after the polish changes: no horizontal overflow on home/analytics/settings, the internal app-issue report modal shell matches the panel width, and wide logo upload renders as a 512x512 contained logo preview.
+  - Owner-facing staging cleanup was refreshed after smoke: only `config:v1` remains in KV and `audit_events=0`; no tickets, files, cleaning zones, or internal issue-report smoke records remain.
+- Client shared-save failure logging is complete in PR #404.
+  - A new authenticated `/api/client-errors` endpoint writes sanitized browser-side storage failures into the existing audit sink.
+  - The global red save-failure toast now reports shared/server storage failures with operation/key metadata; local browser-only keys stay silent.
+- Sidebar/logo polish is live on public Vercel after PR #407.
+  - Production alias `https://facility-maintenance-system.vercel.app/` has been manually redeployed from current `main`.
+  - Strict live smoke passed after the manual production redeploy.
+- Sidebar/logo polish is complete in PR #405.
+  - The desktop sidebar keeps scroll behavior but hides the heavy visual scrollbar.
+  - Settings > general now includes logo upload; images are resized and center-cropped automatically before saving.
+- Local browser storage fail-toast fix is complete in PR #401.
+  - Failed local-only keys such as remembered login/session/theme no longer trigger the global red "save failed" toast.
+  - Shared/server CMMS data failures still trigger the global save/delete warning.
+- Desktop sidebar footer overflow fix is complete in PR #399.
+  - The sidebar now keeps the user/logout/version footer fixed inside the viewport and lets only the navigation list scroll when the desktop window is short.
+  - This addresses the large-monitor report where the footer block slid below the visible app area.
+- Playwright dev tooling is in progress.
+  - `@playwright/test` is installed as a dev dependency, and local Chromium smoke can run from the project.
+  - Added `npm run staging:smoke:browser` for a no-secret browser smoke of the public login screen.
+  - Post-PR #396 public Vercel smoke passed with `failedCount=0`, `unauthKvCount=0`, and no relevant console errors on the login screen.
+  - `npm run staging:gate` passed for public Vercel commit `31a7d07`.
+- Local-only storage key polish is in progress after PR #395.
+  - `shared=false` app storage keys such as theme, remembered login, notification prefs, and local rate-limit state stay in browser-local storage instead of calling the production KV API.
+  - This prevents pre-login `/api/kv/...shared=0` 401 noise while keeping `shared=true` CMMS data behind the API/Supabase boundary.
+  - Local validation passed: `npm test -- --run tests/storageAdapter.test.js`, `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+- Production pre-auth startup polish is in PR #395.
+  - Production app startup no longer reads shared KV/config collections before a production session exists.
+  - Restored/login production sessions now load config and app collections immediately after auth is available.
+  - Local validation passed: `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check`.
+- Owner-facing empty staging cleanup is complete.
+  - Removed smoke users from Supabase Auth and `app_users`.
+  - Cleared KV records, file metadata, audit events, and storage files.
+  - Left one active admin: `vadim@chemipal.co.il`.
+  - Set the temporary admin password to `123456` for owner review.
+  - `npm run staging:gate` passed after cleanup.
+  - Read-only UI smoke passed without visible demo/smoke data.
+- Staging backup evidence tooling is complete in PR #388.
+- Combined staging gate is complete in PR #390.
+  - Added `npm run staging:gate`.
+  - Production Vercel was redeployed after merge.
+  - `npm run staging:gate` passed against public Vercel commit `7367d2b`.
+- Staging backup evidence tooling is complete in PR #388.
+  - Added `npm run staging:backup:evidence`, a read-only source-staging snapshot command for restore drills.
+  - Captured local evidence file `.tools/staging-backup-evidence-2026-06-29T04-04-29-937Z.json` with `app_users=5`, `cmms_kv_records=12`, `file_metadata=1`, `audit_events=18`, and one storage file.
+  - The evidence file is ignored by git and must be treated as sensitive staging data.
+  - Production Vercel was redeployed after merge, and strict live smoke passed for commit `792d576`.
+- Night staging hardening is complete through PR #386.
+  - PR #384 exposed the existing role-preview switcher in the mobile topbar so admin preview remains reachable when the desktop sidebar is hidden.
+  - PR #385 added `npm run staging:smoke:live`, a read-only live Vercel/Supabase smoke that checks app shell, closed bootstrap, admin auth/session, KV read access, file metadata boundary, Supabase table counts, and the private file bucket without printing secrets.
+  - PR #386 added strict deployed-commit verification to that smoke through `-- --expect-current-commit`.
+  - `npm audit --omit=dev` reports `found 0 vulnerabilities`.
+  - Current normal live smoke passes; strict live smoke intentionally fails until Vercel can deploy current `main` after the daily Hobby deploy limit resets.
+- Staging Supabase service-role REST grants are complete.
+  - Added the explicit `service_role` grants required when Supabase `Automatically expose new tables` is disabled.
+  - Applied the grant SQL to `cmms-cdsl-staging`; `npm run staging:supabase-schema` now passes against the real staging project and private `cmms-files` bucket.
+  - Local tests, release check, production build, and diff check passed.
+- Staging authenticated app-user profile grant is complete.
+  - Supabase Auth login worked directly, but `/api/session/me` returned `session_lookup_failed` until `authenticated` could select `public.app_users`.
+  - Added and applied a focused grant migration so production login can read the current app-user profile through RLS.
+  - First admin was bootstrapped, bootstrap env was removed, final Vercel redeploy completed, and `/api/bootstrap/admin` again returns `bootstrap_disabled`.
+  - UI login reached the first-password-change screen, password change completed, and the admin reached the app shell.
+  - Empty staging data check: `app_users=1`, `cmms_kv_records=0`, `file_metadata=0`, `audit_events=0`.
+- Pre-Supabase local sanity and setup checklist is complete.
+  - Local login smoke on `http://127.0.0.1:5190/` reached the empty app shell and showed footer commit `5b78721`.
+  - Add a short setup checklist for Supabase project, migrations, Vercel env, bootstrap, smoke, and restore drill.
+  - Local tests, release check, production build, and diff check passed.
+- Staging placeholder env guard is complete.
+  - Prevent copied `.env.staging.example` placeholder values from passing staging preflight.
+  - Local tests, release check, production build, and diff check passed.
+- Staging Supabase schema preflight tooling is complete.
+  - Add a command to check `app_users`, `cmms_kv_records`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket before manual smoke.
+  - The command uses staging env but must not print secret values.
+  - The command currently fails as expected without `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `CMMS_FILE_BUCKET`.
+  - Local tests, release check, production build, and diff check passed.
+- Staging/Vercel env preflight tooling is complete.
+  - `npm run staging:vercel-env` checks the Vercel project for required staging env variable names without printing secret values.
+  - The command currently fails as expected because Vercel has no configured project env variables yet.
+  - Local tests, release check, production build, and diff check passed.
+- Worker/cleaner role-preview and logout polish is complete.
+  - Worker and cleaner top bars now show a visible `יציאה` button instead of relying on an icon-only logout action.
+  - Role preview controls are more compact and the expanded role grid uses less vertical space.
+  - This is UI-only; permissions and role logic did not change.
+- Build commit footer is complete.
+  - The sidebar footer now shows `CMMS CDSL · v... · <commit>` and a build-time tooltip.
+  - Vite injects the short Git commit locally and uses `VERCEL_GIT_COMMIT_SHA` when Vercel provides it.
+  - Local tests, release checks, production build, and diff check passed.
+- Fleet import conflict confirmation is complete.
+  - If imported Excel rows conflict with existing fleet units, the import button stays disabled until the user explicitly confirms importing only new rows.
+  - Existing units are still not silently updated.
+  - Local tests, release checks, production build, and diff check passed.
+- Notification read-state fix is complete.
+  - "Mark all read" now stores the currently visible notification keys, not only a timestamp.
+  - Legacy timestamp-only read state remains compatible.
+  - Local notification model tests, full tests, release checks, production build, and diff check passed.
+- R9 vulnerable `xlsx` export writer replacement is complete in PR #355.
+  - `xlsx@0.18.5` was removed and `write-excel-file` now creates generated Excel exports through `src/xlsxExportAdapter.js`.
+  - `npm audit --omit=dev` now reports `found 0 vulnerabilities`.
+  - Local tests, release checks, production build, adapter Blob test, and HTTP smoke passed.
+  - Vercel was rate-limited, not code-failed.
+- R9 minimum production API error visibility is complete in PR #353.
+  - Unexpected API 500 responses now return a stable `requestId` instead of raw backend exception text.
+  - Server logs include a sanitized structured error event with route, method, code, and request id.
+  - Bootstrap profile-creation failures still report `authUserCreated` and `authUserId`, but now use a stable error code and request id.
+  - Local tests, release checks, production build, and Vercel passed.
+- R9 non-admin analytics export scoping is complete in PR #352.
+  - Non-admin `InsightsHub` now receives scoped tickets, fleet, PM, tasks, meetings, cleaning, PPE, and user data instead of the full admin dataset.
+  - Local tests, release checks, and production build passed.
+  - Vercel preview was blocked by Hobby build-rate-limit, not by a code build failure.
+- R9 staging smoke preflight is complete in PR #351.
+  - `npm run staging:preflight` checks the required production-mode API/Supabase/public-complaints env without printing secret values.
+  - `docs/staging-smoke.md` defines the empty staging smoke path and bootstrap disable check.
+  - Local test/build/release checks passed; real staging smoke is still blocked until Vercel/Supabase env is configured.
+- R9 public complaint isolation is complete in PR #349.
+  - Anonymous production reports now use a dedicated `POST /api/public/complaints` endpoint instead of the generic `/api/kv` bridge.
+  - The endpoint is disabled by default, server rate-limited, loads the zone server-side, ignores client status/key/zone labels, and writes exactly one pending `ccomplaint:<id>` record.
+  - Local tests, production build, release checks, and browser smoke passed.
+- R9 production session profile scopes are complete in PR #347.
+  - Production session payload now carries manager zones, technician scope, and supplier through the app/API boundary.
+  - This closed the stale active-work handoff that still pointed at PR #346.
+- R9 production session app-user id guard is complete in PR #346.
+  - Production session creation now rejects Supabase app profiles without a CMMS app-user id.
+  - This prevents API/audit/file actor identity from becoming an empty session id.
+  - Local tests, production build, release checks, and Vercel passed.
+- R9 active file metadata owner/path validation is complete in PR #345.
+  - `/api/files` now rejects active file metadata rows whose known owner IDs do not match their storage paths before download/delete.
+  - This prevents corrupted metadata rows from authorizing protected file reads or deletes.
+  - Local tests, production build, and release checks passed. Vercel was rate-limited.
+- R9 file metadata upload owner/path validation is complete in PR #344.
+  - Known file metadata owner IDs must match their storage paths before upload.
+  - This prevents, for example, `ownerId=T-1` metadata from being saved for a `tickets/T-2/...` file path.
+  - Local tests, production build, release checks, and Vercel passed.
+- R9 file upload metadata requirement is complete in PR #343.
+  - `/api/files` now rejects uploads without metadata when the production file metadata sink is configured.
+  - This prevents orphaned protected files that cannot be tied back to `file_metadata`.
+  - Local tests, production build, release checks, and Vercel passed.
+- R9 explicit KV bridge production acceptance is complete in PR #342.
+  - Production release checks now require `CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true` before accepting the interim Supabase KV bridge.
+  - This prevents confusing the monolith compatibility bridge with the final normalized RLS data model.
+  - Local tests, production build, and release checks passed. Vercel was rate-limited.
+- R9 backup legacy photo export cleanup is complete in PR #341.
+  - JSON backup now reads legacy `photo:*` keys only for tickets that do not already use file-backed `photoPath` / `afterPhotoPath`.
+  - This keeps file-backed production photos behind the file adapter/storage boundary instead of pretending they are bundled into JSON backup.
+  - Local tests, production build, and release checks passed. Vercel was rate-limited.
+- R9 special storage flow ledger close is complete in PR #340.
+  - `docs/active-work.md` recorded the remaining deliberate direct-storage exceptions after worker report photo adapter routing.
+  - This was a docs-only sync.
+- R9 worker report photo adapter routing is complete in PR #339.
+  - Worker report photo reload/resubmit now uses `TICKET_PHOTOS` instead of direct `photo:*` storage.
+  - This keeps production+API replacement photos on the same file adapter boundary as normal ticket photos.
+- R9 notification local-state cleanup is complete in PRs #337 and #338.
+  - Notification display preferences reset to defaults when the user/profile key changes.
+  - Notification read-state also resets while the new profile's `seen:*` timestamp loads, preventing stale role-preview reads from leaking across profiles.
+- R9 anonymous report rate-limit read fix is complete in PR #335.
+  - The anonymous quick-report cooldown now reads the actual string value returned by the app store instead of expecting a legacy `{ value }` wrapper.
+  - Focused Vitest coverage was added for current and legacy timestamp shapes.
+- Admin role preview sidebar cleanup is complete in PRs #333 and #334.
+  - The floating role switcher was moved into the desktop sidebar as `תצוגת תפקיד`.
+  - The internal state name now reflects role preview instead of impersonation language.
+- R9 optimistic shift presence guard is complete in PR #331.
+  - Explicit technician shift start/end and technician auto-start on login now wait for shared presence persistence before updating local state.
+  - Background heartbeat remains intentionally quiet to avoid noisy minute-by-minute storage errors.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 active-work main sync is complete in PR #330.
+  - `docs/active-work.md` now points at PR #329 / `9d3d4aa` as the latest clean handoff point.
+  - Vercel passed.
+- R9 optimistic save ledger close is complete in PR #329.
+  - `docs/active-work.md` now marks no active product branch after PR #328.
+  - The remaining direct storage writes are explicitly listed as special flows for deliberate review.
+- R9 optimistic cleaning/PPE save guard is complete in PR #328.
+  - Cleaning zones/rounds/complaints/absences and PPE inventory/issuance/request/order records no longer update local React state when shared persistence returns `false`.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 optimistic work-record save guard is complete in PR #327.
+  - PM, inspection templates/results, tasks, and meetings no longer update local React state when shared persistence returns `false`.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 optimistic config/user save guard is complete in PR #326.
+  - `saveConfig`, `saveUser`, and `delUser` no longer update local React state when shared persistence returns `false`.
+  - This protects settings, permissions, and user-management changes from looking saved when the backend write failed.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 production API read-failure guard is complete in PR #325.
+  - API storage `get` / `list` now throw on timeout/read failure when memory fallback is disabled.
+  - App collection loading no longer swallows storage read failures as invalid JSON.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 optimistic ticket/fleet save guard is complete in PR #324.
+  - Ticket and fleet save/delete flows no longer update local UI state when shared persistence returns `false`.
+  - The existing Hebrew storage failure toast remains the user-visible signal.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 repeat first-admin bootstrap guard is complete in PR #323.
+  - `/api/bootstrap-admin` now refuses to create another admin when an active admin profile already exists.
+  - This reduces damage if bootstrap env remains enabled accidentally after first setup.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 active-work ledger close is complete in PR #322.
+  - `docs/active-work.md` now marks no active product branch after PR #321.
+  - It records the current Vercel Hobby build-rate-limit condition and next R9 candidates.
+- R9 production API storage memory fallback guard is complete in PR #321.
+  - API storage no longer silently falls back to browser memory.
+  - Demo/local memory fallback remains available for review work.
+  - Local tests, production builds, and release checks passed. Vercel was rate-limited, so the PR used `[skip vercel]`.
+- R9 production backup import guard is complete in PR #320.
+  - JSON backup restore/import is hidden in production mode while export remains available.
+  - Demo/test still allow backup restore for local review workflows.
+  - Local tests, production builds, and release checks passed. Vercel was rate-limited, so the PR used `[skip vercel]`.
+- R9 production builtin user guard is complete in PR #319.
+  - The frontend no longer auto-creates builtin demo users in production mode.
+  - Demo/test still keep builtin demo identities for local review.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 Vercel API route gate is complete in PR #318.
+  - `npm run release:check` now fails if helper modules are placed under `api/`.
+  - The current route allowlist keeps Vercel endpoint files at 6/12 for the Hobby function limit.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 KV user secret redaction and Vercel route trimming are complete in PR #317.
+  - `/api/kv` redacts password/pin/activation tokens from user reads unless the session can manage users or worker activation.
+  - API helper modules moved from `api/` to `server/`, leaving only real Vercel endpoint files under `api/`.
+  - This fixed the Vercel Hobby deployment failure caused by helper modules being counted as Serverless Functions.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 file metadata read/delete guard is complete in PR #316.
+  - `/api/files` download/delete now require an active `file_metadata` row when the metadata driver supports lookup by path.
+  - Missing or soft-deleted metadata returns `file_metadata_not_found`.
+  - Local tests, production builds, and release checks passed.
+- R9 file prefix ledger sync is complete in PR #315.
+  - `docs/active-work.md` now marks active work as none after PR #314.
+  - This was a docs-only sync with Vercel passing.
+- R9 file path prefix guard is complete in PR #314.
+  - `/api/files` now rejects paths outside `CMMS_FILE_ALLOWED_PREFIXES`, defaulting to `tickets/,cleaning/`.
+  - This prevents active users from reading or writing arbitrary Supabase Storage bucket paths before final metadata/RLS-based file authorization.
+  - Local tests, production builds, and release checks passed.
+- R9 file upload size limit is complete in PR #313.
+  - `/api/files` now rejects uploads larger than `CMMS_FILE_MAX_BYTES`, defaulting to 10 MB.
+  - Oversized files are rejected before Supabase Storage or file metadata writes.
+  - Local tests, production builds, and release checks passed.
+- R9 file metadata soft-delete is complete in PR #312.
+  - `/api/files` DELETE now marks matching file metadata rows with `deleted_at` by storage path.
+  - File ownership history is retained instead of leaving deleted files looking active.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 file metadata release gate is complete in PR #311.
+  - Production `npm run release:check` now requires `CMMS_FILE_METADATA_DRIVER=supabase` once API storage and file storage are selected.
+  - The gate fails clearly with `production_requires_supabase_file_metadata_driver` when file metadata storage is missing.
+  - Local tests, production builds, and release checks passed.
+- R9 cleaning complaint issue file metadata is complete in PR #310.
+  - Nested cleaning complaint issue photos now have a dedicated `cleaning_complaint_issue_photo` metadata kind.
+  - Production+API cleaning complaint issue photo uploads now include explicit file metadata.
+  - Local tests, production builds, and release checks passed.
+- R9 cleaning photo metadata upload is complete in PR #309.
+  - Production+API cleaning complaint main photos and cleaning round issue photos now include explicit file metadata.
+  - Nested cleaning complaint issue photos were intentionally left for a dedicated metadata kind.
+  - Local tests, production builds, and release checks passed.
+- R9 ticket photo metadata upload is complete in PR #308.
+  - Production+API ticket before/after photo uploads now include explicit file metadata.
+  - `/api/files` can persist ticket photo ownership rows through the configured metadata sink.
+  - Local tests, production builds, and release checks passed.
+- R9 file API metadata upsert is complete in PR #307.
+  - `/api/files` accepts optional upload metadata and persists it when a metadata sink is configured.
+  - Uploads with metadata fail with `file_metadata_not_configured` instead of silently losing metadata when the sink is missing.
+  - Existing callers that do not send metadata remain unchanged.
+  - Local tests, production builds, and release checks passed.
+- R9 Supabase file metadata sink is complete in PR #306.
+  - `api/files/supabaseFileMetadataDriver.js` can upsert and soft-delete `public.file_metadata` rows.
+  - `supabase/migrations/20260627201000_file_metadata.sql` creates `public.file_metadata`.
+  - Upload flows are not yet passing metadata automatically.
+  - Local tests, production builds, release checks, and Vercel passed.
+- R9 ticket status audit is complete in PR #305.
+  - `/api/kv` writes audit events when stored `ticket:*` records change `status`.
+  - Ticket saves without a status change do not create audit noise.
+  - Local tests, production builds, and release checks passed.
+- R9 file upload/delete audit is complete in PR #304.
+  - `/api/files` writes audit events for upload and delete when an audit sink is configured.
+  - File downloads are intentionally not audited yet to avoid noisy/private read logs without a separate product decision.
+  - Local tests, production builds, and release checks passed.
+- R9 production audit release gate is complete in PR #303.
+  - Production `npm run release:check` now requires `CMMS_AUDIT_DRIVER=supabase` once API storage is selected.
+  - Demo/local release checks remain unchanged.
+  - Gate feedback stays readable: audit errors are not shown until production API storage is otherwise selected.
+  - Local tests, production build, release checks, and Vercel passed.
+- R9 Supabase audit sink is complete in PR #302.
+  - `api/audit/supabaseAuditDriver.js` writes normalized audit rows through Supabase REST using server-only service role credentials.
+  - `supabase/migrations/20260627200000_audit_events.sql` creates `public.audit_events`.
+  - `/api/kv` can wire the Supabase audit sink with `CMMS_AUDIT_DRIVER=supabase`.
+  - Local tests, production builds, and release checks passed.
+- R9 sensitive KV audit sink wiring is complete in PR #301.
+  - `/api/kv` can send audit events for successful sensitive `PUT`/`DELETE` writes when an audit sink is configured.
+  - Ordinary workflow bridge records remain outside this sensitive audit bridge.
+  - Without an audit sink, existing storage behavior stays unchanged.
+  - Local tests, production builds, and release checks passed.
+- R9 sensitive KV audit contract is complete in PR #300.
+  - The existing sensitive KV write rules now map protected key families to audit entity types.
+  - `sensitiveKvWriteAuditEvent` builds audit events for protected KV writes without changing runtime API behavior.
+  - Ordinary workflow records such as tickets and PPE requests remain outside this sensitive KV audit bridge.
+  - Local tests, production builds, and release checks passed.
+- R9 production audit event contract is complete in PR #299.
+  - `src/auditEventModel.js` defines the first shared audit event shape for sensitive production changes.
+  - `docs/production-audit-events.md` documents the future `audit_events` table fields.
+  - This is a contract step only; it does not yet persist audit rows server-side.
+  - Local tests, production builds, and release checks passed.
+- R9 production file metadata contract is complete in this PR.
+  - `src/fileMetadataModel.js` defines the first shared ownership metadata shape for protected files.
+  - `docs/production-file-metadata.md` documents the future `file_metadata` table fields.
+  - This is a contract step only; it does not yet persist metadata rows server-side.
+  - Local tests, production builds, and release checks passed.
+- R9 cleaning photo file-adapter wiring is complete.
+  - Production+API mode stores cleaning complaint photos and cleaning round issue photos through `/api/files`.
+  - Cleaning records now keep `photoPath` / `hasPhoto` metadata instead of embedded production base64.
+  - Demo/test/local mode still keeps existing inline cleaning photos so current local review data remains compatible.
+  - Facility tickets spawned from cleaning complaints can still receive the complaint photo, including when the complaint was already stored by path.
+  - Local tests, production build, release checks, and browser smoke-check passed.
+- R9 first ticket photo file-adapter wiring is complete.
+  - Production+API mode now stores ticket before/after photos through `/api/files` and keeps `photoPath` / `afterPhotoPath` metadata on ticket records.
+  - Demo/test/local mode still uses the existing `photo:*` records, so current local review data and backup behavior stay compatible.
+  - Cleaning complaint/round photos are now handled by the same file API boundary.
+  - Local tests and production build passed.
+- R9 API file adapter is complete.
+  - `src/apiFileAdapter.js` adds upload/download/delete calls for `/api/files` and sends the production Supabase access token when available.
+  - The adapter is now used by ticket photo flows and cleaning photo flows.
+  - Local tests, production build, production-mode API build, and release checks passed.
+- R9 server file API foundation is complete.
+  - `/api/files` now requires a Supabase user bearer token, blocks disabled users and first-password-change users, and is closed until Supabase Storage env is configured.
+  - `api/files/supabaseFileDriver.js` uploads, downloads, and deletes objects through Supabase Storage using server-only service role credentials.
+  - Ticket and cleaning photo writes/reads now use `/api/files` in production+API mode; demo/local review data remains compatible.
+  - Local tests, production build, production-mode API build, and release checks passed.
+- R9 production AI boundary is complete.
+  - Production defaults AI mode to `disabled`; direct browser AI provider calls are forbidden by the release gate.
+  - Browser AI controls are hidden unless frontend AI mode is explicitly `client`, which remains a demo/local mode.
+  - `docs/production-ai.md` documents the safe production modes: disabled now, server endpoint later.
+  - Local tests, production build, production-mode API build, and release checks passed.
+- R9 production file-storage gate is complete.
+  - `npm run release:check` now blocks production mode unless file/photo storage is explicitly configured with `CMMS_FILE_DRIVER=supabase` and `CMMS_FILE_BUCKET`.
+  - `docs/production-file-storage.md` documents that current `photo:*` KV/base64 flows remain demo/local only and must move to server-side Supabase Storage before real production use.
+  - Local tests, production build, production-mode API build, and release checks passed.
+- R9 production server KV config gate is complete.
+  - `npm run release:check` now blocks production API storage unless the server-side KV bridge is configured for Supabase auth, Supabase driver, URL, anon key, and service role key.
+  - The gate reports storage API URL problems before server env problems, so release feedback stays readable.
+  - Local tests, production build, production-mode API build, and release checks passed.
+- R9 sensitive KV write guard is complete.
+  - `/api/kv` now checks existing module permission levels before Supabase-authenticated `PUT`/`DELETE` on sensitive bridge keys.
+  - User records require `users:manage`; system/fleet/settings bridge records require `settings:manage`; PPE catalog/order records require `ppe:manage`.
+  - Ordinary workflow records such as tickets, PPE requests, cleaning rounds, and cleaning complaints remain available to active authenticated users until those flows move to normalized tables/RLS.
+  - Local tests, production build, production-mode API build, and release checks passed.
+- R9 first-admin bootstrap contract is complete.
+  - `POST /api/bootstrap/admin` is disabled by default and requires `CMMS_BOOTSTRAP_ENABLED=true`, `CMMS_BOOTSTRAP_TOKEN`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`.
+  - The endpoint creates the initial admin through Supabase Auth Admin semantics and never returns the temporary password.
+  - `docs/production-bootstrap.md` documents the one-time bootstrap flow and the requirement to disable bootstrap after success.
+  - Local tests passed.
+- R9 Supabase Auth/RLS foundation has started.
+  - `supabase/migrations/20260627173000_app_users_permissions.sql` creates `public.app_users`, permission helper functions, and initial RLS policies.
+  - `src/supabaseProfileModel.js` records the app-user/profile contract and keeps permission levels aligned with the current UI permission model.
+  - `docs/supabase-auth-rls-foundation.md` documents the identity/profile split.
+  - Local tests, production build, production-mode API build, and release check passed.
+- R9 first-admin bootstrap now creates the CMMS app-user profile.
+  - `POST /api/bootstrap/admin` creates both the Supabase Auth user and the matching `public.app_users` profile.
+  - The endpoint only returns success after both records exist.
+  - If profile creation fails after Auth creation, it reports `authUserCreated` and `authUserId` for manual cleanup/retry instead of pretending bootstrap succeeded.
+  - Local tests, production build, production-mode API build, and release check passed.
+- R9 server session adapter is complete.
+  - `GET /api/session/me` accepts a Supabase access token, verifies the Auth user through Supabase, then reads the matching `public.app_users` profile.
+  - The endpoint uses `SUPABASE_ANON_KEY` and the user's bearer token, not the service role key.
+  - Missing, disabled, unlinked, or mismatched profiles are rejected.
+  - Local tests, production build, production-mode API build, and release check passed.
+- R9 production login adapter is complete.
+  - Production mode uses Supabase password login and then calls `/api/session/me` to create a normalized CMMS session.
+  - Demo/test login remains unchanged and still uses local/demo identities.
+  - Production session payload now carries the `public.app_users.id` as the CMMS session id and keeps `authUserId` separately.
+  - Local tests, production build, production-mode API build, release check, and browser smoke-check passed.
+- R9 production password-change enforcement is complete.
+  - `POST /api/session/change-password` changes a flagged user's Supabase password and clears `public.app_users.must_change_password`.
+  - Production login blocks normal app entry while `mustChangePassword` is true and shows a first-password-change form.
+  - Demo/test login remains unchanged.
+  - Local tests, production build, production-mode build, release check, and browser smoke-check passed.
+- R9 production session persistence is complete.
+  - Production login stores Supabase access/refresh tokens in browser storage according to the Remember checkbox.
+  - App startup restores production sessions through `/api/session/me`, not by trusting the old local CMMS session object.
+  - Expired access tokens are refreshed through Supabase before session restore.
+  - Demo/test session restore remains unchanged.
+  - Local tests, production build, production-mode build, release check, and browser smoke-check passed.
+- R9 Supabase KV bridge driver is complete.
+  - `/api/kv` gains a `CMMS_KV_DRIVER=supabase` path backed by `public.cmms_kv_records`.
+  - This is a Postgres bridge for shared durable storage before final normalized business tables are wired.
+  - Local tests, production build, production-mode build, and release check passed.
+- R9 API storage auth header is complete.
+  - The frontend API storage adapter sends the production Supabase access token as `Authorization: Bearer ...` when available.
+  - This prepares `/api/kv` to move from temporary bearer-token auth to Supabase user-session auth.
+  - Local tests, production build, production-mode build, and release check passed.
+- R9 Supabase KV auth is complete.
+  - `/api/kv` gains `CMMS_KV_AUTH=supabase` to verify Supabase user bearer tokens before storage access.
+  - Disabled users and users still requiring first-password change are blocked.
+  - Local tests, production build, production-mode build, and release check passed.
+- R9 production data collection mapping is complete in PR #269.
+  - `src/dataCollections.js` maps current backup keys and storage prefixes to future production table names.
+  - `src/backupModel.js` now uses the same collection map, so backup coverage and production metadata share one source of truth.
+  - `docs/production-data-model.md` documents the first database table map.
+  - Local tests, production build, and browser smoke-check passed.
+- R9 modular growth architecture is being documented.
+  - Future budget and safety-inspection modules should reuse shared CMMS users, departments, tickets, assets, suppliers, files, lifecycle/status history, notifications, permissions, analytics, and audit.
+  - The goal is comfortable modernization without duplicate module-specific islands.
+- R9 production seed policy is complete.
+  - `src/seedPolicyModel.js` defines demo/test/production seed behavior.
+  - `VITE_CMMS_APP_MODE=production` disables demo seed loading and built-in demo identities.
+  - `docs/production-seed-policy.md` documents that the first production admin must come from a server/bootstrap process, not frontend source code.
+  - Owner clarified that current demo/local users, tickets, fleet, PPE, cleaning, suppliers, and history are fake data and must not be migrated into production.
+  - Local tests, default production build, production-mode build, and browser smoke-check passed.
+- R9 production storage provider policy is complete.
+  - `src/storageProviderModel.js` defines local/api storage provider policy and marks production+local storage as not production-data-ready.
+  - `src/apiStorageAdapter.js` defines the first REST key/value storage client contract for a future backend.
+  - `/api/kv` route skeleton exists and is closed by default without server auth/backend storage.
+  - `/api/kv` can now use an Upstash/Vercel Redis REST driver through server-only env.
+  - Upstash/Vercel Redis REST is the first selected durable `/api/kv` driver path.
+  - Upstash is a bridge/cache path, not the final CMMS database.
+  - `docs/production-platform-decision.md` selects Supabase Postgres/Auth/RLS/Storage as the target production platform.
+  - `docs/production-storage-provider.md` documents the env variables and API contract.
+  - Local tests, default production build, production API-provider build, and browser smoke-check passed.
+- R9 production config gate is complete.
+  - `src/productionConfigGateModel.js` and `tools/production-config-gate.mjs` provide `npm run release:check`.
+  - The gate allows demo/local development but blocks `VITE_CMMS_APP_MODE=production` when storage is still local/browser storage.
+  - The gate warns that server Auth/RLS/files/AI still require backend implementation.
+- R9 Production Backend Foundation has started in PR #268.
+  - The frontend storage adapter was extracted from `src/ClaudeMaintenanceApp.jsx` to `src/storageAdapter.js`.
+  - The adapter stays lazy so it can use `window.storage` after module import and later be swapped for a backend provider.
+  - Adapter tests cover memory fallback, late external storage availability, and timeout failure handling.
+  - `docs/production-hardening-plan.md` now tracks the production risk order: database, Auth/RLS, files/photos, server-side AI, migration, and monolith extraction policy.
+  - Local tests, production build, browser smoke-check, and Vercel passed.
+- R8 Ticket Lifecycle, Export And Analytics Trust is complete in PR #264.
+  - Transport duplicate review was checked: it is scoped to the same transport unit, prioritizes open tickets, and only shows recent closed tickets when no open same-unit ticket exists.
+  - Ticket Excel export and Analytics use shared lifecycle helpers for both transport (`שינוע`) and facility/building (`מבנה`) tickets.
+  - Backdated transport equipment receipt now uses the factual transition time, so waiting time is not overcounted in lifecycle analytics/export.
+  - Local tests, production build, browser smoke-check, and Vercel passed.
+- Final R5 closure pass: Screen Audit And Visual Noise is complete.
+  - Browser pass covered `קריאות`, `אנליטיקה`, `ביגוד עובדים`, `הגדרות`, `צוות ומשתמשים`, `כלי שינוע`, and `בקרת ניקיון`.
+  - Visible controls on those screens had text, an accessible label, a title, or a clear field label/placeholder context.
+  - No product-code change was needed in the final pass.
+- R6 worker onboarding polish is complete.
+  - New worker/cleaner activation links explain that the worker must be saved before the link can be copied.
+  - Existing worker/cleaner activation/reset links explain that the new link must be saved before copying.
+  - Browser smoke-check covered new worker and existing temporary-code worker flows.
+  - Local tests and production build passed.
+- R7 pre-production guardrails are complete.
+  - `docs/pre-production-readiness.md` names Vercel as demo/staging and documents localStorage/demo-only limits.
+  - Backup/restore coverage was verified against `BACKUP_COLLECTIONS` and the backup model tests.
+  - Supabase/Auth/RLS/database/Railway/broad modular split remain out of scope until the owner starts that phase.
+- PR #257: Driver-board warning dismiss icon now has an explicit label.
+  - The warning close icon exposes `סגירת הודעה`.
+  - Warning dismiss behavior stayed unchanged.
+  - Local tests/build/browser smoke-check/source-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #256: Pending driver request approve/reject icon buttons now have explicit labels.
+  - Labels include the driver name and unit code.
+  - Driver request approval/rejection behavior stayed unchanged.
+  - Local tests/build/browser smoke-check/source-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #255: PPE purchase-order manual suggestions now use net deficits.
+  - Manual item quantity suggestions account for already-open PPE orders.
+  - Purchase-order saving, receiving, and stock movement behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #254: PPE purchase-order remove-line icon buttons now have explicit labels.
+  - Labels include the item name and size where relevant.
+  - Order line removal behavior and order data stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #253: PPE purchase-order empty form now explains manual order creation.
+  - Empty order forms now tell the user to choose an item/size and add quantities.
+  - PPE order data, stock calculations, and save behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #252: Team/User Management now warns about possible duplicate login identities.
+  - Active users sharing the same email, worker number, or technician code are counted in a visible warning.
+  - User records, login behavior, editing, and rendering stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #251: Active work ledger was closed after the permissions summary pass.
+  - No active product branch remained after PR #250.
+  - Next exact action points to the `צוות ומשתמשים` user tree/group-list pass.
+  - Docs-only validation passed; Vercel was blocked by build-rate limit.
+- PR #250: User form personal-permissions block now shows a compact collapsed summary.
+  - Manager forms show whether extra module permissions are present without opening the block.
+  - Permission storage and editing behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #249: Remaining smaller icon-only buttons now expose descriptive labels.
+  - Driver actions, ticket wizard back, duplicate modal close, checklist issue toggle, and notification settings are named.
+  - Behavior and layout stayed unchanged.
+  - Local tests/build/source-check passed before merge; notification settings browser smoke-check passed. Vercel was blocked by build-rate limit.
+- PR #248: PM calendar/year navigation icon buttons now expose descriptive labels.
+  - Calendar month navigation exposes `חודש קודם` and `חודש הבא`.
+  - Yearly view navigation exposes `שנה קודמת` and `שנה הבאה`.
+  - Calendar/matrix navigation behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-checks passed before merge; Vercel was blocked by build-rate limit.
+- PR #247: Fleet and periodic-maintenance detail edit icon buttons now expose descriptive labels.
+  - Fleet edit exposes `עריכת כלי`; PM edit exposes `עריכת טיפול תקופתי`.
+  - Edit behavior and modal layout stayed unchanged.
+  - Local tests/build/browser smoke-checks passed before merge; Vercel was blocked by build-rate limit.
+- PR #246: Ticket-detail header icon buttons now expose descriptive labels.
+  - Back exposes `חזרה מרשימת הקריאה`; repeat exposes `פתיחת קריאה דומה`.
+  - Back/repeat behavior and modal layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #245: Task and meeting detail edit icon buttons now expose descriptive labels.
+  - Task edit exposes `עריכת מטלה`; meeting edit exposes `עריכת פגישה`.
+  - Edit behavior and modal layout stayed unchanged.
+  - Local tests/build/browser smoke-check/source-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #244: Cleaner/manager zone card action buttons now expose descriptive labels.
+  - Zone spec and report issue actions include the zone name.
+  - Zone action behavior and layout stayed unchanged.
+  - Local tests/build/source-check passed before merge; Vercel was green.
+- PR #243: Cleaning-zone admin card action buttons now expose descriptive labels.
+  - Report issue, QR label, and edit actions include the zone name.
+  - Cleaning-zone action behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #242: Ticket note send icon button now exposes a descriptive label.
+  - The admin ticket update send action is named for assistive tech/browser inspection.
+  - Note submission behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #241: Worker topbar icon buttons now expose descriptive labels.
+  - Theme toggle and logout icon-only controls are named for assistive tech/browser inspection.
+  - Theme toggle, logout behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #240: Active work ledger closed the search-label pass.
+  - No active product branch remained after PR #239.
+  - Docs-only validation passed; Vercel was blocked by build-rate limit.
+- PR #239: Driver-access search field now exposes a descriptive label.
+  - The hidden AccessPicker search no longer relies only on placeholder text.
+  - Driver access filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/code-search passed before merge; Vercel was blocked by build-rate limit.
+- PR #238: Task people-picker search field now exposes a descriptive label.
+  - The responsible-person picker search no longer relies only on placeholder text.
+  - People-picker filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #237: Driver coverage search field now exposes a descriptive label.
+  - The visible `נהגים / כיסוי` search input no longer relies only on placeholder text.
+  - Driver coverage filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #236: Activity-log search field now exposes a descriptive label.
+  - The `יומן פעילות` search input no longer relies only on placeholder text.
+  - Activity-log filtering/export behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #235: Task search field now exposes a descriptive label.
+  - The main `מטלות` search input no longer relies only on placeholder text.
+  - Task filtering, search behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #234: PM/unit picker search field now exposes a descriptive label.
+  - The unit picker search used by PM scheduling no longer relies only on placeholder text.
+  - Unit-picker filtering, selection behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #233: Fleet search field now exposes a descriptive label.
+  - The main `כלי שינוע` search input no longer relies only on placeholder text.
+  - Fleet filtering, search behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #232: Supplier search/add fields now expose descriptive labels.
+  - Supplier search and add-new fields no longer rely only on placeholder text.
+  - Supplier filtering, add behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was blocked by build-rate limit.
+- PR #231: Cleaning-zone delete icon buttons now expose descriptive labels.
+  - Checklist item deletes and round-window deletes are named by item/time.
+  - Cleaning-zone form behavior, save logic, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #230: General settings delete icon buttons now expose descriptive labels.
+  - Wait-reason and downtime-level delete actions are named by item.
+  - Wait-reason/downtime behavior, blocking, and save logic stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #229: PPE movement search field now exposes a stable descriptive label.
+  - The `ביגוד עובדים -> תנועות מלאי` search input no longer relies only on placeholder text.
+  - Movement search, filtering, export, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #228: Analytics asset wording now uses clearer Hebrew.
+  - Visible `אקטיב/אקטיבים` wording was replaced with `כלים/ציוד`.
+  - Analytics calculations, filters, and drill-down behavior stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #227: Ticket search field now exposes a stable descriptive label.
+  - The `קריאות` search input no longer relies only on placeholder text.
+  - Search behavior and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #226: Bottom role-switch icon buttons now expose descriptive labels.
+  - Each demo role button has Hebrew `aria-label` text.
+  - Role-switch behavior and placement stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #225: Floating AI action now exposes a descriptive label.
+  - The AI button has Hebrew `aria-label` and tooltip text.
+  - AI behavior and placement stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #224: Team/settings delete icon buttons now expose descriptive labels.
+  - Worker-shift deletes and shared registry deletes are named by item.
+  - Delete blocking, save behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #223: Worker-shift color pickers now expose descriptive labels.
+  - Color inputs in `צוות ומשתמשים -> הגדרות` are labeled by shift name.
+  - Worker-shift data, save behavior, and layout stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #222: Worker exit/equipment return action now uses a clearer icon.
+  - The misleading hard-hat icon was replaced with the existing package/check icon.
+  - Offboarding behavior and copy stayed unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #221: Active work ledger closed the #220 ledger gap.
+  - `docs/active-work.md` now points at PR #220 as the latest synchronized main before this pass.
+  - Docs-only validation passed; Vercel was green.
+- PR #220: Active work ledger closed the user-tree group PR.
+  - No active product branch remained after PR #219.
+  - Docs-only validation passed; Vercel was green.
+- PR #219: User-tree group toggles now expose expanded/collapsed state.
+  - Group buttons use `type="button"` and `aria-expanded`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #218: Read-only user cards no longer show clickable hover feedback.
+  - Non-actionable user cards get an `inert` class.
+  - The inert hover state no longer lifts or shadows the card.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #217: Read-only user cards are no longer dead buttons.
+  - User tree rows render as buttons only when the viewer can edit users.
+  - Read-only rows render as non-actionable cards.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #215: Active work ledger closed the permission-select PR.
+  - No active product branch remained after PR #213.
+  - Vercel was green.
+- PR #213: User permission selects are now self-describing.
+  - Personal permission selects expose Hebrew `הרשאה: ...` labels.
+  - Permission behavior remains unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #212: UserForm save action now names what is saved.
+  - User forms show `שמירת משתמש`; worker-locked forms show `שמירת עובד`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #211: Active work ledger now reflects the merged add-user polish.
+  - No active product branch remains after PR #210.
+  - Docs-only validation passed; Vercel was green.
+- PR #210: User-management add action now reads clearly.
+  - The button changed from generic `משתמש` to `הוסף משתמש`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #209: PPE signature template textarea is now labeled.
+  - The field exposes `תבנית אישור קבלת ציוד` for assistive tech and browser inspection.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #208: PPE clawback remove action is now labeled.
+  - The icon-only remove-row buttons expose `הסר מדרגת קיזוז` as both `aria-label` and tooltip.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #207: PPE department requirement counts now ignore inactive/missing catalog items.
+  - The department label no longer reports stale hidden norms as active setup.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #205: Empty PPE movement export is no longer a dead action.
+  - The export button is disabled when there are no movement rows.
+  - The disabled button exposes `אין נתונים לייצוא`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #204: PPE purchase-order empty copy now matches its embedded location.
+  - The movement-log order block no longer references unavailable `הזמנה/מהחוסרים` actions.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #203: PPE catalog add action now reads clearly.
+  - The catalog button changed from generic `פריט` to `הוסף פריט`.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #202: Empty PPE catalog now guides users to catalog setup.
+  - The dashboard shows `הוסף פריט לקטלוג` instead of a visible purchase-order action when there are no active catalog items.
+  - The purchase-order action now redirects to catalog setup if no active items exist.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #201: PPE month picker icon controls now have clear labels/tooltips.
+  - Month, year, and chooser icon buttons expose Hebrew `title` and `aria-label` text.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was rate-limited.
+- PR #200: Lifecycle analytics/export labels now distinguish technician acceptance.
+  - Routed-but-unaccepted technician tickets use the `ממתין לקבלה` lifecycle stage.
+  - Analytics drill-down opens the exact matching ticket list.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was rate-limited.
+- PR #199: Ticket cards now show technician-acceptance state clearly.
+  - Cards waiting for a technician to accept show `ממתין לקבלה` instead of the misleading raw `חדשה` badge.
+  - Underlying ticket status/data remains unchanged.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was green.
+- PR #198: Ticket drill-down filters are easier to understand and clear.
+  - Dashboard/analytics drill-down banner now has an explicit `נקה סינון` action.
+  - The admin ticket filter row now keeps four filters in one balanced row at desktop width.
+  - Local tests/build/browser smoke-check passed before merge; Vercel was rate-limited.
+- PR #196: Admin role-switch now prefers an assigned cleaner when available.
+  - Role-smoke passed for admin, manager, technician, and worker.
+  - Cleaner shell rendered cleanly; when no assigned cleaner exists in current local data, the empty-zone state is expected.
+  - Vercel was rate-limited, but local tests/build/browser role-smoke passed before merge.
+- PR #194: Manager/user PPE management access is now directly visible when permitted.
+  - `ביגוד עובדים` appears in the manager/user sidebar only for `ppe:manage` or `ppe:full`.
+  - Ordinary request-only managers remain on the existing department/PPE request path to avoid sidebar noise.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
+- PR #193: Manager/user Settings access is now visible when permitted.
+  - `הגדרות` appears only when the session has `settings:manage`.
+  - Sensitive settings actions remain behind `settings:full`.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
+- PR #192: Manager/user Analytics access is now visible when permitted.
+  - `אנליטיקה` appears only when the session has `analytics:view`.
+  - Manager/user analytics opens in read-only mode; damage report edit controls do not save from this route.
+  - Vercel was green before merge.
+- PR #191: Manager/user Suppliers access is now visible when permitted.
+  - `ספקים / קבלנים` appears only when the session has `suppliers:view`.
+  - Editing remains gated by `suppliers:manage`.
+  - Vercel was blocked by deployment rate limit; local tests/build/browser smoke-check passed before merge.
+- PR #190: Manager/user Audit Log access is now gated.
+  - `יומן פעילות` appears only when the session has `audit:view`.
+  - Vercel was green before merge.
+- PR #189: R3 notification release package was closed.
+  - `docs/release-checklist.md` now marks Notifications End-To-End done in PRs #180-#188.
+  - Docs-only validation: `git diff --check`.
+- PR #188: Department notifications now focus exact fleet cards.
+  - Manager/user PM and driver outcome notifications pass `fleetId` into department fleet navigation.
+  - Vercel was rate-limited, but local tests/build/browser smoke-check passed before merge.
+- PR #187: PPE notifications now focus relevant sub-tabs.
+  - Admin PPE pending/low-stock notifications open the PPE dashboard; open-order notifications open the inventory movement/order tab.
+  - Local tests/build/browser smoke-check passed before merge.
+- PR #185: Fleet notifications now focus the exact unit card.
+  - Admin fleet document and driver request notifications pass `fleetId` into Fleet navigation.
+  - Local tests/build/browser smoke-check passed before merge.
+- PR #184: Notification matrix ledger was closed.
+  - `docs/active-work.md` returned to the current R3 route.
+  - Vercel was green before merge.
+- PR #183: Department notification route matrix was corrected.
+  - The route map now reflects the actual department equipment target.
+  - Docs-only validation: `git diff --check`.
+- PR #182: Cleaner notifications now route to Cleaning.
+  - Cleaning due/overdue and complaint notifications open `בקרת ניקיון`.
+  - Local tests/build/browser smoke-check passed before merge.
+- PR #181: Team notifications now route to Users.
+  - Technician shift notifications open `צוות ומשתמשים`.
+  - Local tests/build/browser smoke-check passed before merge.
+
+Older completed work is available in GitHub history and, when needed, in:
+
+- `docs/archive/progress-log.md`
+- `docs/archive/validation-log.md`
+
+## Next Exact Action
+
+1. Ask the owner for the next product priority, or fix the next owner-reported critical bug.
+2. If no critical bug is reported, start a new explicit release package before broad work.
+3. Do not start Supabase/Auth/RLS/database/Railway/broad modular split until the owner explicitly opens that phase.
+
+## Documentation Policy
+
+- Keep this file short: current state, last few PRs, next action, blockers.
+- Do not use this file as a full PR history. GitHub already does that.
+- Update `docs/active-work.md` when:
+  - work pauses with an unmerged branch;
+  - a product strategy or next action changes;
+  - a major block closes;
+  - the current contents would mislead the next session.
+- Do not update it for every tiny merged PR if `main` is clean and the next step is obvious.
+- Update `docs/backlog.md` only when a task is opened, closed, or reprioritized.
+
+## Validation Policy
+
+For code changes:
+
+- `npm test -- --run`
+- `npm run build`
+- browser smoke-check for UI behavior changes
+
+For docs-only changes:
+
+- `git diff --check` is enough unless package/config/code behavior changes.
+
+## Current Product Direction
+
+- Continue Phase 2 stabilization.
+- Current focus: focused UI audit/polish, permissions/onboarding only when explicitly selected, and CMMS workflow correctness.
+- Do not add new one-off user-card checkboxes.
+- Use `perms` and helpers from `src/permissionModel.js` for access work.
+- Worker activation/reset remains gated by `workerAccess:manage`.
+- Do not start Supabase/Auth/RLS/Railway/database work.
+- Do not do a broad modular split.
+- Do not replace `src/ClaudeMaintenanceApp.jsx` as a whole file.
+
+## Handoff Back Rule
+
+When handing work back:
+
+- state the branch;
+- state the latest commit;
+- state whether it is merged into `main`;
+- state the next exact action;
+- state which checks passed or were not run;
+- state blockers using `PROBLEM:`.
+
+```
+
+## docs/production-data-model.md
+
+```md
+# Production Data Model
+
+This is the first production mapping from current browser storage collections to future database tables.
+
+The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
+
+| Current backup key | Current storage prefix | Future table |
+|---|---|---|
+| `users` | `user:` | `app_users` |
+| `fleet` | `fleet:` | `fleet_units` |
+| `tickets` | `ticket:` | `tickets` |
+| `pm` | `pm:` | `periodic_maintenance` |
+| `insp` | `insp:` | `fleet_inspections` |
+| `templates` | `itpl:` | `inspection_templates` |
+| `presence` | `presence:` | `technician_presence` |
+| `zones` | `czone:` | `cleaning_zones` |
+| `rounds` | `cround:` | `cleaning_rounds` |
+| `complaints` | `ccomplaint:` | `cleaning_complaints` |
+| `absences` | `cabsence:` | `worker_absences` |
+| `tasks` | `mtask:` | `maintenance_tasks` |
+| `meetings` | `mmeet:` | `maintenance_meetings` |
+| `ppe` | `ppe:` | `ppe_movements` |
+| `ppeItems` | `ppeitem:` | `ppe_items` |
+| `ppeNorms` | `ppenorm:` | `ppe_norms` |
+| `ppeReqs` | `ppereq:` | `ppe_requests` |
+| `ppeOrders` | `ppeorder:` | `ppe_orders` |
+| protected file metadata | `/api/files` paths | `file_metadata` |
+| production audit events | server-side write events | `audit_events` |
+
+## Migration Notes
+
+- Existing backup JSON can be read collection-by-collection using the `key` column.
+- Existing local records can be read by `prefix`.
+- Future tables should keep the existing record `id` as the primary migration key.
+- User identity lives in Supabase Auth (`auth.users`). CMMS profile, role, active status, departments, and module permissions live in `public.app_users`.
+- Demo/local backup photos may still appear under `photo:*` or inline cleaning photo fields for review compatibility.
+- Production file bytes belong in Supabase Storage and production file ownership belongs in `file_metadata`; see `docs/production-file-metadata.md`.
+- Production-sensitive changes need durable `audit_events`; see `docs/production-audit-events.md`.
+- `config:v1`, `session:v1`, `theme:v1`, `login:v1`, and notification preferences are not business collections. They need separate treatment as configuration, session, or user preference data.
+- `public.cmms_kv_records` is a temporary Postgres bridge for the existing key/value storage contract. It is not the final normalized business schema.
+
+```
+
+## docs/ai-agent-readiness.md
+
+```md
+# AI Agent Readiness
+
+This is a post-pilot architecture note, not a v1 production AI feature.
+
+## Principle
+
+Future AI assistance must use the same product operations as the UI. It must not become a separate chatbot path that edits data without the normal permission, validation, audit, and storage boundaries.
+
+## Operation Contract
+
+Every future agent-capable operation should have:
+
+- `actor`: authenticated user or anonymous public channel identity.
+- `intent`: the requested business action, such as create ticket, classify problem, route work, update status, attach file, or summarize history.
+- `input`: raw user text/files plus structured context such as module, zone, asset, priority, and language.
+- `validation`: deterministic checks before writing.
+- `authorization`: the same role/module/object permission checks as the UI/API.
+- `audit`: one business audit event for accepted changes and one safe system error event for rejected or failed operations where useful.
+- `result`: structured data for UI, mobile, API clients, and later agent replies.
+
+## Universal Intake Contract
+
+The first safe AI layer is an intake engine for all CMMS modules, not a free-form chatbot.
+
+Input:
+
+- raw user text, optional files/photos, QR/location context, actor, language, and source channel;
+- current data-driven settings such as categories, zones, vehicle types, departments, priorities, SLA, and routing rules.
+
+Output:
+
+- module: facility, transport, cleaning, PPE, safety, task, supplier, system issue, or unknown;
+- severity and risk signals, including people risk, production impact, exact location, asset hint, photo hint, and QR hint;
+- missing information and clarifying questions;
+- a user-facing reply that explains what is known, what is risky, and what else is needed;
+- a draft action, such as draft ticket, draft cleaning report, draft PPE request, draft safety inspection, route to human, or ask clarification.
+
+Guardrails:
+
+- intake drafts are read-only by default;
+- `writePolicy` is `human_confirmation_required`;
+- the AI layer must not write directly to KV, Supabase tables, files, or status history;
+- accepted actions must be executed through the same server/product operations as the UI, with validation, authorization, and audit.
+
+The initial code contract lives in `src/aiIntakeModel.js`. It is deterministic and provider-free so it can be tested before connecting any model.
+
+The first server entrypoint is `POST /api/ai/intake`. It returns the same read-only draft contract and does not call an AI provider, read/write KV, write Supabase rows, or mutate files. It exists so future UI, mobile, public-report, and model-provider work can share one intake boundary.
+
+## V1 Boundary
+
+For the first pilot:
+
+- production AI remains disabled;
+- categories, routing, priority, SLA, departments, zones, and vehicle types stay data-driven;
+- public reports, tickets, files, cleaning rounds, and settings should keep moving toward shared server-side operations.
+
+This keeps the product ready for an AI agent later without delaying the empty staging pilot.
 
 ```
