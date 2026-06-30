@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/fix-shared-save-confirmation
+### Active branch: codex/fix-fleet-import-prefetch
 
-- Active issue: owner-visible pilot data writes are failing or appearing to fail across multiple modules (fleet import, tasks, PPE catalog, supplier metadata). Direct live `/api/kv` write/read/delete with the admin session succeeds, so the current investigation/fix focuses on browser storage timeouts and UI flows that close or continue without checking the `false` result from shared `save*` calls.
-- Fix candidate in this branch: shared storage default timeout raised for server-backed staging; user-facing create/edit/import flows now wait for `save*`/`delete*` results and keep forms open with a clear error when persistence fails; fleet import saves smaller chunks and writes catalog additions once after row batches.
-- Validation for this branch so far: direct live `/api/kv` write/read/delete passed with admin session; `git diff --check`, `npm test -- --run`, `npm run release:check`, and `npm run build` pass.
+- Active issue: real fleet Excel import still fails on production after preview. The likely server bottleneck is `/api/kv` atomic batch prefetch doing one read per imported record before the bulk write/audit path.
+- Fix in this branch: add `getMany` to KV drivers and use one bulk before-read for atomic/audited batches, preserving audit/rollback data without creating 126 parallel Supabase GET requests during fleet import.
+- Validation for this branch so far: targeted KV/Supabase/fleet-import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` pass.
 
 - Latest completed work: PR #487 fixed the owner-visible fleet Excel import stop after preview by changing `/api/kv` batch saves to use Supabase bulk KV upsert and bulk audit insert when available. The same real Excel payload that previously took about 45 seconds now saves atomically through live Vercel in about 3.5 seconds.
 - Validation for PR #487: targeted storage/audit/KV/fleet import tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, strict live smoke, and live real-payload batch check passed.
