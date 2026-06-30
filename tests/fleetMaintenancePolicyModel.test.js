@@ -11,6 +11,7 @@ import {
   maintenanceTitleForTask,
   nextMaintenanceDueFrom,
   normalizeFleetUnitRef,
+  normalizeMaintenanceChecklistItems,
   normalizeMaintenanceRules
 } from "../src/fleetMaintenancePolicyModel.js";
 
@@ -70,6 +71,37 @@ describe("fleetMaintenancePolicyModel", () => {
 
     expect(checklistTemplateMatchesUnit(checklist, fleet[0])).toBe(true);
     expect(checklistTemplateMatchesUnit(checklist, fleet[1])).toBe(false);
+  });
+
+  it("keeps periodic-maintenance checklist items separate from inspection templates", () => {
+    const rules = normalizeMaintenanceRules([
+      {
+        id: "to-500",
+        name: "TO 500",
+        intervalMonths: 3,
+        vehicleTypeNames: ["מלגזת היגש"],
+        checklistTemplateId: "inspection-template-should-not-be-used",
+        checklistItems: [{ id: "inspection-row", label: "לא לקחת מבקרת כלים" }],
+        maintenanceChecklistItems: [
+          { id: "oil", label: "בדיקת שמן" },
+          { id: "brakes", label: "בדיקת בלמים" },
+          { id: "duplicate", label: "בדיקת שמן" }
+        ]
+      }
+    ]);
+
+    expect(rules[0].maintenanceChecklistItems).toEqual([
+      { id: "oil", label: "בדיקת שמן" },
+      { id: "brakes", label: "בדיקת בלמים" }
+    ]);
+    expect(rules[0].checklistTemplateId).toBeUndefined();
+  });
+
+  it("normalizes periodic-maintenance checklist items without borrowing inspection data", () => {
+    expect(normalizeMaintenanceChecklistItems(["שמן", "", { id: "brake", label: "בלמים" }, { label: "שמן" }])).toEqual([
+      expect.objectContaining({ label: "שמן" }),
+      { id: "brake", label: "בלמים" }
+    ]);
   });
 
   it("can derive a normalized fleet reference from current fleet records and catalog mappings", () => {
@@ -134,5 +166,26 @@ describe("fleetMaintenancePolicyModel", () => {
       ["f-3", "to-500", 222]
     ]);
     expect(result.tasks.find((task) => task.id === "old")?.history).toEqual([{ type: "done" }]);
+    expect(result.tasks.find((task) => task.maintenanceRuleId === "to-500" && task.forkliftId === "f-3")?.maintenanceChecklistItems).toEqual([]);
+  });
+
+  it("carries the dedicated periodic-maintenance checklist into generated schedules", () => {
+    const result = buildMaintenanceScheduleFromRules({
+      rules: [{
+        id: "to-500",
+        name: "TO 500",
+        intervalMonths: 3,
+        vehicleTypeNames: ["מלגזת היגש"],
+        maintenanceChecklistItems: [{ id: "oil", label: "בדיקת שמן" }]
+      }],
+      fleetRefs: fleet,
+      existingTasks: [],
+      startAt: 222,
+      now: 333
+    });
+
+    expect(result.tasks.map((task) => task.maintenanceChecklistItems)).toEqual([
+      [{ id: "oil", label: "בדיקת שמן" }]
+    ]);
   });
 });

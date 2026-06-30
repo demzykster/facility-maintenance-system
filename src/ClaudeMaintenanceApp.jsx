@@ -5391,9 +5391,24 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     current.has(value) ? current.delete(value) : current.add(value);
     return { ...r, target: { ...target, allFleet: false, [group]: [...current] } };
   }));
+  const setRuleChecklistItem = (ruleIdx, itemIdx, label) => setRules((s) => s.map((r, j) => {
+    if (j !== ruleIdx) return r;
+    const items = Array.isArray(r.maintenanceChecklistItems) ? r.maintenanceChecklistItems : [];
+    return { ...r, maintenanceChecklistItems: items.map((item, k) => k === itemIdx ? { ...item, label } : item) };
+  }));
+  const addRuleChecklistItem = (ruleIdx) => setRules((s) => s.map((r, j) => {
+    if (j !== ruleIdx) return r;
+    const items = Array.isArray(r.maintenanceChecklistItems) ? r.maintenanceChecklistItems : [];
+    return { ...r, maintenanceChecklistItems: [...items, { id: "pmci" + Date.now().toString(36), label: "" }] };
+  }));
+  const removeRuleChecklistItem = (ruleIdx, itemIdx) => setRules((s) => s.map((r, j) => {
+    if (j !== ruleIdx) return r;
+    const items = Array.isArray(r.maintenanceChecklistItems) ? r.maintenanceChecklistItems : [];
+    return { ...r, maintenanceChecklistItems: items.filter((_, k) => k !== itemIdx) };
+  }));
   const addRule = () => {
     const nextIndex = rules.length;
-    setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, active: true, target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] } }]);
+    setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, active: true, target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] }, maintenanceChecklistItems: [] }]);
     setOpenRule(nextIndex);
   };
   const ruleTargetText = (rule) => {
@@ -5443,11 +5458,16 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     </>}</div>; })}
     <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
     <SectionTitle>רגולציות טיפול תקופתי</SectionTitle>
-    <div className="hint" style={{ marginBottom: 8 }}>הגדירו רגולציות כמו TO 500 או TO 1000 לפי חודשים ולפי סוגי כלי או דגמים. החיבור ללוח הטיפולים יבוצע בשלב הבא.</div>
-    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם רגולציה, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "רגולציה ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
+    <div className="hint" style={{ marginBottom: 8 }}>הגדירו רגולציות כמו TO 500 או TO 1000 לפי חודשים ולפי סוגי כלי או דגמים. לאחר מכן ניתן להפיק מהן שיבוצים בלוח הטיפולים.</div>
+    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם רגולציה, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "רגולציה ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)}{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
       <div className="row2">
         <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={rule.intervalMonths || 1} onChange={(e) => setRule(i, { intervalMonths: e.target.value })} /></label>
-        <div className="note">צ׳ק-ליסט טיפול תקופתי ינוהל בנפרד מצ׳ק-ליסט בקרת כלים.</div>
+        <div className="note">צ׳ק-ליסט טיפול תקופתי הוא נפרד מבקרת כלים. הוא לא נלקח משאלוני הבקרה.</div>
+      </div>
+      <div className="field" style={{ marginTop: 10 }}><span>צ׳ק-ליסט טיפול תקופתי</span>
+        {checklist.length === 0 && <div className="hint">אפשר להשאיר ריק, או להגדיר סעיפים ייעודיים לטיפול הזה.</div>}
+        {checklist.map((item, itemIdx) => <div key={item.id || itemIdx} className="reg-row" style={{ marginBottom: 6 }}><input className="reg-name" value={item.label || ""} placeholder="סעיף טיפול תקופתי" onChange={(e) => setRuleChecklistItem(i, itemIdx, e.target.value)} /><button className="reg-del" onClick={() => removeRuleChecklistItem(i, itemIdx)}><Trash2 size={15} /></button></div>)}
+        <button className="btn-ghost sm" onClick={() => addRuleChecklistItem(i)}><Plus size={14} /> סעיף טיפול</button>
       </div>
       <label className="chk-line"><input type="checkbox" checked={rule.active !== false} onChange={(e) => setRule(i, { active: e.target.checked })} /> פעיל</label>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>חל על:</div>
@@ -6186,7 +6206,8 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
   const [date, setDate] = useState(tsToDate(toWorkday(Date.now())));
   const [err, setErr] = useState("");
   const rules = pmRules(config);
-  const startAt = toWorkday(dateToTs(date));
+  const rawStartAt = dateToTs(date);
+  const startAt = rawStartAt ? toWorkday(rawStartAt) : null;
   const fleetRefs = useMemo(() => (fleet || []).map((unit) => normalizeFleetUnitRef(unit, { modelType: config?.modelType || {} })), [fleet, config]);
   const plan = useMemo(() => buildMaintenanceScheduleFromRules({
     rules,
@@ -6213,7 +6234,7 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
         <div className="metric"><b>{plan.updated}</b><span>שיבוצים קיימים לעדכון</span></div>
       </div>
       <div className="note" style={{ marginTop: 12 }}><CalendarClock size={13} /> {rules.length} רגולציות פעילות · {affectedUnits} כלים מתאימים · {plan.total} שיבוצים בסך הכל.</div>
-      <div className="hint" style={{ marginTop: 10 }}>צ׳ק-ליסטים של טיפול תקופתי אינם נלקחים מ־בקרת כלים; הם ינוהלו בנפרד כדי לא לערבב בין ביקורת כלי לבין טיפול תקופתי.</div>
+      <div className="hint" style={{ marginTop: 10 }}>צ׳ק-ליסטים של טיפול תקופתי נשמרים בתוך רגולציות הטיפול בלבד, ולא נלקחים משאלוני בקרת כלים.</div>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>שמירת לוח טיפולים</button><div style={{ height: 24 }} />
     </div></div>);
@@ -6244,14 +6265,14 @@ function PMForm({ task, fleet, config, onCancel, onSave }) {
       maintenanceRuleId: selectedRule.id,
       maintenanceRuleName: selectedRule.name,
       intervalMonths: selectedRule.intervalMonths,
-      checklistTemplateId: ""
+      maintenanceChecklistItems: selectedRule.maintenanceChecklistItems || []
     } : {
       frequency: freq,
       title: task.title || freqOf(freq).label,
       maintenanceRuleId: "",
       maintenanceRuleName: "",
       intervalMonths: null,
-      checklistTemplateId: ""
+      maintenanceChecklistItems: []
     };
     onSave({ id: task.id || uid(), forkliftId, ...ruleFields, nextDue: toWorkday(ts), active, createdAt: task.createdAt || now, lastDone: task.lastDone || null, history: task.history || [] });
   };
@@ -6275,6 +6296,14 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
   const [followUp, setFollowUp] = useState(false), [paidNote, setPaidNote] = useState("");
   const [fuWear, setFuWear] = useState(null), [fuStatus, setFuStatus] = useState("in_progress"), [fuWaitReason, setFuWaitReason] = useState(null);
   const isTech = session.role === "tech";
+  const ruleChecklist = (pmRules(config).find((rule) => rule.id === (task.maintenanceRuleId || task.ruleId))?.maintenanceChecklistItems) || [];
+  const maintenanceChecklist = (Array.isArray(task.maintenanceChecklistItems) && task.maintenanceChecklistItems.length ? task.maintenanceChecklistItems : ruleChecklist).filter((item) => item?.id && item?.label);
+  const checklistKey = maintenanceChecklist.map((item) => item.id).join("|");
+  const [pmChecks, setPmChecks] = useState({});
+  useEffect(() => {
+    setPmChecks((prev) => Object.fromEntries(maintenanceChecklist.map((item) => [item.id, !!prev[item.id]])));
+  }, [task.id, checklistKey]);
+  const checkedPmCount = maintenanceChecklist.filter((item) => pmChecks[item.id]).length;
   const markDone = () => {
     const now = Date.now();
     let ticketId = null;
@@ -6293,7 +6322,8 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
       });
     }
     const nextDue = nextMaintenanceDueFrom(now, pmIntervalMonths(task, config), { adjustToWorkday: toWorkday }) || toWorkday(now + freqOf(task.frequency).days * 86400000);
-    onSave({ ...task, lastDone: now, nextDue, history: [...(task.history || []), { type: "done", at: now, by: session.name, hadPaid: !!followUp, paidNote: paidNote.trim(), ticketId }] });
+    const checklistResults = maintenanceChecklist.map((item) => ({ id: item.id, label: item.label, done: !!pmChecks[item.id] }));
+    onSave({ ...task, maintenanceChecklistItems: maintenanceChecklist, lastDone: now, nextDue, history: [...(task.history || []), { type: "done", at: now, by: session.name, hadPaid: !!followUp, paidNote: paidNote.trim(), ticketId, maintenanceChecklist: checklistResults }] });
     onClose();
   };
   const markMissed = () => {
@@ -6314,6 +6344,10 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
 
       {isTech ? (<>
         <SectionTitle>עדכון</SectionTitle>
+        {maintenanceChecklist.length > 0 && <div className="field"><span>צ׳ק-ליסט טיפול תקופתי · {checkedPmCount}/{maintenanceChecklist.length}</span>
+          <div className="round-cl">{maintenanceChecklist.map((item) => <label key={item.id} className="round-item"><span className="ri-box" style={pmChecks[item.id] ? {} : { borderColor: "var(--muted)" }}>{pmChecks[item.id] && <Check size={14} />}</span><input type="checkbox" checked={!!pmChecks[item.id]} onChange={(e) => setPmChecks((s) => ({ ...s, [item.id]: e.target.checked }))} style={{ position: "absolute", opacity: 0, pointerEvents: "none" }} />{item.label}</label>)}</div>
+          <div className="hint">זה צ׳ק-ליסט ייעודי לטיפול תקופתי, לא שאלון בקרת כלים.</div>
+        </div>}
         <button className="btn-pm-toggle" onClick={() => setFollowUp((v) => !v)} style={followUp ? { background: "#16202E", color: "#fff", borderColor: "#16202E" } : {}}><Wrench size={15} /> {followUp ? "בטל — אין עבודות המשך" : "יש עבודות המשך (תיפתח קריאה)"}</button>
         {followUp && <div className="fu-box">
           <SectionTitle>סיווג מקור התקלה</SectionTitle>
@@ -6335,7 +6369,7 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
         <div className="note" style={{ marginTop: 6 }}>יש להוציא את הכלי לטיפול במועד. הטכנאי יעדכן את הביצוע.</div>
       )}
 
-      {(task.history || []).length > 0 && <><SectionTitle>היסטוריה</SectionTitle><div className="timeline">{[...task.history].reverse().map((h, i) => <div className="tl-item" key={i}><div className="tl-dot" style={{ background: h.type === "missed" ? "#CA8A04" : "#16A34A" }} /><div className="tl-body"><div className="tl-text">{h.type === "missed" ? "לא הגיע — נדחה" : "בוצע" + (h.hadPaid ? " · עבודות המשך" : "")}</div><div className="tl-meta">{h.by} · {fmtDate(h.at)}</div>{h.paidNote && <div className="tl-meta">{h.paidNote}</div>}</div></div>)}</div></>}
+      {(task.history || []).length > 0 && <><SectionTitle>היסטוריה</SectionTitle><div className="timeline">{[...task.history].reverse().map((h, i) => { const checklistDone = Array.isArray(h.maintenanceChecklist) ? h.maintenanceChecklist.filter((item) => item.done).length : 0; const checklistTotal = Array.isArray(h.maintenanceChecklist) ? h.maintenanceChecklist.length : 0; return <div className="tl-item" key={i}><div className="tl-dot" style={{ background: h.type === "missed" ? "#CA8A04" : "#16A34A" }} /><div className="tl-body"><div className="tl-text">{h.type === "missed" ? "לא הגיע — נדחה" : "בוצע" + (h.hadPaid ? " · עבודות המשך" : "")}</div><div className="tl-meta">{h.by} · {fmtDate(h.at)}</div>{checklistTotal > 0 && <div className="tl-meta">צ׳ק-ליסט טיפול: {checklistDone}/{checklistTotal}</div>}{h.paidNote && <div className="tl-meta">{h.paidNote}</div>}</div></div>; })}</div></>}
       <div style={{ height: 24 }} />
     </div></div>);
 }
