@@ -79,7 +79,6 @@ export function normalizeMaintenanceRule(rule = {}) {
     name,
     intervalMonths,
     active: rule.active !== false,
-    checklistTemplateId: trim(rule.checklistTemplateId || rule.templateId),
     target: normalizeFleetRuleTarget(rule.target || rule)
   };
 }
@@ -126,6 +125,64 @@ export function buildMaintenanceAssignments(rules = [], fleetRefs = []) {
       unit,
       rules: maintenanceRulesForUnit(rules, unit)
     }));
+}
+
+function scheduleIdForRule(unitId, ruleId) {
+  const safe = (value) => trim(value).replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `pm-${safe(unitId) || "unit"}-${safe(ruleId) || "rule"}`;
+}
+
+function taskRuleKey(task = {}) {
+  const unitId = trim(task.forkliftId || task.equipmentId);
+  const ruleId = trim(task.maintenanceRuleId || task.ruleId);
+  return unitId && ruleId ? `${unitId}::${ruleId}` : "";
+}
+
+export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], existingTasks = [], startAt, now, idFactory } = {}) {
+  const cleanRules = normalizeMaintenanceRules(rules);
+  const units = (Array.isArray(fleetRefs) ? fleetRefs : [])
+    .map((unit) => normalizeFleetUnitRef(unit))
+    .filter((unit) => unit.id);
+  const byRuleKey = new Map();
+  (Array.isArray(existingTasks) ? existingTasks : []).forEach((task) => {
+    const key = taskRuleKey(task);
+    if (key && !byRuleKey.has(key)) byRuleKey.set(key, task);
+  });
+
+  const firstDue = Number(startAt) || Date.now();
+  const createdAt = Number(now) || Date.now();
+  const tasks = [];
+  let created = 0;
+  let updated = 0;
+
+  units.forEach((unit) => {
+    maintenanceRulesForUnit(cleanRules, unit).forEach((rule) => {
+      const key = `${unit.id}::${rule.id}`;
+      const existing = byRuleKey.get(key);
+      const base = existing || {};
+      const id = base.id || (typeof idFactory === "function" ? idFactory(unit, rule) : scheduleIdForRule(unit.id, rule.id));
+      const task = {
+        ...base,
+        id,
+        forkliftId: unit.id,
+        frequency: "custom_months",
+        title: rule.name,
+        maintenanceRuleId: rule.id,
+        maintenanceRuleName: rule.name,
+        intervalMonths: rule.intervalMonths,
+        nextDue: base.nextDue || firstDue,
+        active: base.active !== false,
+        createdAt: base.createdAt || createdAt,
+        lastDone: base.lastDone || null,
+        history: Array.isArray(base.history) ? base.history : []
+      };
+      tasks.push(task);
+      if (existing) updated += 1;
+      else created += 1;
+    });
+  });
+
+  return { tasks, created, updated, total: tasks.length };
 }
 
 export function normalizeChecklistTemplate(template = {}) {

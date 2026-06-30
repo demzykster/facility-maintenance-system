@@ -38,7 +38,7 @@ import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./f
 import { vehicleCatalogBase } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
-import { maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
+import { buildMaintenanceScheduleFromRules, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -1655,6 +1655,17 @@ export default function App() {
     return true;
   };
   const savePm = async (p) => { if (!await persistShared(`pm:${p.id}`, JSON.stringify(p))) return false; setPm((s) => [...s.filter((x) => x.id !== p.id), p].sort((a, b) => a.nextDue - b.nextDue)); return true; };
+  const savePmMany = async (items, options = {}) => {
+    const tasks = (items || []).filter((p) => p?.id);
+    if (!tasks.length) return true;
+    const ok = await persistSharedMany(tasks.map((p) => ({ key: `pm:${p.id}`, value: JSON.stringify(p) })), { ...options, atomic: true, timeoutMs: 60000 });
+    if (!ok) return false;
+    setPm((s) => {
+      const ids = new Set(tasks.map((p) => p.id));
+      return [...s.filter((x) => !ids.has(x.id)), ...tasks].sort((a, b) => a.nextDue - b.nextDue);
+    });
+    return true;
+  };
   const delPm = async (id) => { if (!await deleteShared(`pm:${id}`)) return false; setPm((s) => s.filter((x) => x.id !== id)); return true; };
   const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
   const saveFleet = async (f, options = {}) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
@@ -1958,7 +1969,7 @@ export default function App() {
   }, [session && session.id, session && session.role, impersonating]);
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
 
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
@@ -5382,7 +5393,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   }));
   const addRule = () => {
     const nextIndex = rules.length;
-    setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, active: true, checklistTemplateId: "", target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] } }]);
+    setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, active: true, target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] } }]);
     setOpenRule(nextIndex);
   };
   const ruleTargetText = (rule) => {
@@ -5398,7 +5409,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   const save = async () => {
     setTypeMsg("");
     const list = vtypes.filter((t) => (t.name || "").trim());
-    const ruleDrafts = rules.filter((rule) => (rule.name || "").trim() || rule.checklistTemplateId || ruleHasTarget(rule));
+    const ruleDrafts = rules.filter((rule) => (rule.name || "").trim() || ruleHasTarget(rule));
     const cleanRules = normalizeMaintenanceRules(ruleDrafts);
     if (ruleDrafts.length !== cleanRules.length) {
       setTypeMsg("בדקו שכל רגולציית טיפול כוללת שם ותדירות בחודשים.");
@@ -5433,10 +5444,10 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
     <SectionTitle>רגולציות טיפול תקופתי</SectionTitle>
     <div className="hint" style={{ marginBottom: 8 }}>הגדירו רגולציות כמו TO 500 או TO 1000 לפי חודשים ולפי סוגי כלי או דגמים. החיבור ללוח הטיפולים יבוצע בשלב הבא.</div>
-    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = (templates || []).find((tp) => tp.id === rule.checklistTemplateId); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם רגולציה, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "רגולציה ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)}{checklist ? ` · ${checklist.name}` : ""}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
+    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם רגולציה, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "רגולציה ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
       <div className="row2">
         <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={rule.intervalMonths || 1} onChange={(e) => setRule(i, { intervalMonths: e.target.value })} /></label>
-        <label className="field"><span>צ'ק ליסט</span><select value={rule.checklistTemplateId || ""} onChange={(e) => setRule(i, { checklistTemplateId: e.target.value })}><option value="">— ללא —</option>{(templates || []).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}</select></label>
+        <div className="note">צ׳ק-ליסט טיפול תקופתי ינוהל בנפרד מצ׳ק-ליסט בקרת כלים.</div>
       </div>
       <label className="chk-line"><input type="checkbox" checked={rule.active !== false} onChange={(e) => setRule(i, { active: e.target.checked })} /> פעיל</label>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>חל על:</div>
@@ -5989,12 +6000,13 @@ const pmVisible = (session, pm, fleet) => {
 };
 const techCanSeeFleet = (session, f) => { if (!f) return false; if (!session.supplier) return true; return f.supplier === session.supplier; };
 function PMModule(p) {
-  const { pm, fleet, config, savePm, delPm, saveTicket, session } = p;
-  const [edit, setEdit] = useState(null), [run, setRun] = useState(null);
+  const { pm, fleet, config, savePm, savePmMany, delPm, saveTicket, session } = p;
+  const [edit, setEdit] = useState(null), [run, setRun] = useState(null), [bulkRules, setBulkRules] = useState(false);
   const items = pm.filter((x) => x.active !== false);
   return (<>
-    <div className="row-between"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div>
+    <div className="row-between"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={() => setBulkRules(true)}><ClipboardList size={15} /> הפקה מרגולציות</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div></div>
     <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} />
+    {bulkRules && <Overlay persistent onClose={() => setBulkRules(false)}><PMRuleBulkScheduleForm pm={pm} fleet={fleet} config={config} onCancel={() => setBulkRules(false)} onSave={async (tasks) => { const ok = await savePmMany(tasks); if (ok !== false) setBulkRules(false); return ok; }} /></Overlay>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await savePm(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
     {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
   </>);
@@ -6170,6 +6182,42 @@ function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "—
     </div>}
   </>);
 }
+function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
+  const [date, setDate] = useState(tsToDate(toWorkday(Date.now())));
+  const [err, setErr] = useState("");
+  const rules = pmRules(config);
+  const startAt = toWorkday(dateToTs(date));
+  const fleetRefs = useMemo(() => (fleet || []).map((unit) => normalizeFleetUnitRef(unit, { modelType: config?.modelType || {} })), [fleet, config]);
+  const plan = useMemo(() => buildMaintenanceScheduleFromRules({
+    rules,
+    fleetRefs,
+    existingTasks: pm,
+    startAt,
+    now: Date.now()
+  }), [rules, fleetRefs, pm, startAt]);
+  const affectedUnits = new Set(plan.tasks.map((task) => task.forkliftId)).size;
+  const save = async () => {
+    setErr("");
+    if (!startAt) return setErr("נא לבחור תאריך ראשון תקין");
+    if (!rules.length) return setErr("אין רגולציות טיפול תקופתי פעילות בהגדרות כלי השינוע");
+    if (!plan.tasks.length) return setErr("לא נמצאו כלים שמתאימים לרגולציות שהוגדרו");
+    const ok = await onSave(plan.tasks);
+    if (ok === false) setErr(SAVE_FAILED_MESSAGE);
+  };
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">הפקת לוח טיפולים מרגולציות</div></div>
+    <div className="body">
+      <div className="note">המערכת תיצור שיבוצי טיפול לפי רגולציות הטיפול שהוגדרו בסוגי כלי השינוע. שיבוצים קיימים לא יוכפלו; הם רק יעודכנו בשם/תדירות הרגולציה.</div>
+      <label className="field" style={{ marginTop: 12 }}><span>תאריך ראשון לשיבוצים חדשים</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><div className="hint">שיבוצים קיימים ישמרו את מועד הטיפול הבא שכבר נקבע להם.</div></label>
+      <div className="grid2" style={{ marginTop: 12 }}>
+        <div className="metric"><b>{plan.created}</b><span>שיבוצים חדשים</span></div>
+        <div className="metric"><b>{plan.updated}</b><span>שיבוצים קיימים לעדכון</span></div>
+      </div>
+      <div className="note" style={{ marginTop: 12 }}><CalendarClock size={13} /> {rules.length} רגולציות פעילות · {affectedUnits} כלים מתאימים · {plan.total} שיבוצים בסך הכל.</div>
+      <div className="hint" style={{ marginTop: 10 }}>צ׳ק-ליסטים של טיפול תקופתי אינם נלקחים מ־בקרת כלים; הם ינוהלו בנפרד כדי לא לערבב בין ביקורת כלי לבין טיפול תקופתי.</div>
+      {err && <div className="err">{err}</div>}
+      <button className="btn-primary full" onClick={save}>שמירת לוח טיפולים</button><div style={{ height: 24 }} />
+    </div></div>);
+}
 function PMForm({ task, fleet, config, onCancel, onSave }) {
   const [forkliftId, setFork] = useState(task.forkliftId || task.equipmentId || ""), [date, setDate] = useState(task.nextDue ? tsToDate(task.nextDue) : tsToDate(toWorkday(Date.now()))), [active, setActive] = useState(task.active !== false), [err, setErr] = useState("");
   const [ruleId, setRuleId] = useState(task.maintenanceRuleId || "");
@@ -6196,14 +6244,14 @@ function PMForm({ task, fleet, config, onCancel, onSave }) {
       maintenanceRuleId: selectedRule.id,
       maintenanceRuleName: selectedRule.name,
       intervalMonths: selectedRule.intervalMonths,
-      checklistTemplateId: selectedRule.checklistTemplateId || ""
+      checklistTemplateId: ""
     } : {
       frequency: freq,
       title: task.title || freqOf(freq).label,
       maintenanceRuleId: "",
       maintenanceRuleName: "",
       intervalMonths: null,
-      checklistTemplateId: task.checklistTemplateId || ""
+      checklistTemplateId: ""
     };
     onSave({ id: task.id || uid(), forkliftId, ...ruleFields, nextDue: toWorkday(ts), active, createdAt: task.createdAt || now, lastDone: task.lastDone || null, history: task.history || [] });
   };
