@@ -158,7 +158,13 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
             const shouldAuditTicketStatus = backendAuditDriver && String(record.key).startsWith("ticket:");
             return { ...record, shouldAudit, shouldAuditTicketStatus };
           });
-          const recordsNeedingBefore = recordsWithFlags.filter((record) => atomic || record.shouldAudit || record.shouldAuditTicketStatus);
+          const canUseBulkSet = typeof backendDriver.setMany === "function";
+          const shouldPrefetchForRollback = atomic && !canUseBulkSet;
+          const recordsNeedingBefore = recordsWithFlags.filter((record) => (
+            shouldPrefetchForRollback
+              || record.shouldAuditTicketStatus
+              || (record.shouldAudit && (!atomic || !canUseBulkSet))
+          ));
           const beforeByKey = new Map();
           if (recordsNeedingBefore.length && typeof backendDriver.getMany === "function") {
             const beforeRows = await backendDriver.getMany(recordsNeedingBefore.map((record) => record.key), writeShared);
@@ -173,7 +179,7 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
             ...record,
             before: keysNeedingBefore.has(record.key) ? beforeByKey.get(record.key) ?? null : null
           }));
-          if (typeof backendDriver.setMany === "function") {
+          if (canUseBulkSet) {
             await backendDriver.setMany(normalizedRecords, writeShared);
             if (atomic) written.push(...recordsWithBefore.map((record) => ({ key: record.key, before: record.before })));
           } else {
