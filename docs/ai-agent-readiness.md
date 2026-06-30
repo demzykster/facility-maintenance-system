@@ -44,6 +44,8 @@ Guardrails:
 
 The initial code contract lives in `src/aiIntakeModel.js`. It is deterministic and provider-free so it can be tested before connecting any model.
 
+The first server entrypoint is `POST /api/ai/intake`. It returns the same read-only draft contract and does not call an AI provider, read/write KV, write Supabase rows, or mutate files. It exists so future UI, mobile, public-report, and model-provider work can share one intake boundary.
+
 ## V1 Boundary
 
 For the first pilot:
