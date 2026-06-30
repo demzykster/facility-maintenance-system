@@ -119,6 +119,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
   - AI intake foundation starts with a provider-free `src/aiIntakeModel.js` contract: it classifies free-text reports across CMMS modules, extracts risk/missing-info signals, produces clarifying questions and a user reply, and keeps `writePolicy=human_confirmation_required` with no direct writes.
   - `POST /api/ai/intake` is the first shared server boundary for AI intake drafts. It is POST-only, provider-free, returns read-only drafts, and must not write KV/Supabase/files or mutate business state.
+  - `npm run staging:gate` includes a live AI-intake smoke check so the shared draft endpoint cannot silently break before pilot/release checks.
 - Accepted v1 pilot risks:
   - object-level authorization between trusted logged-in roles can be tightened after the closed pilot.
   - last-write-wins can ship for v1; optimistic versioning belongs to a post-pilot hardening pass.

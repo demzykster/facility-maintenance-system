@@ -14,6 +14,7 @@
     "staging:smoke:live": "node tools/staging-smoke-live.mjs",
     "staging:smoke:browser": "node tools/staging-browser-smoke.mjs",
     "staging:smoke:ui": "node tools/staging-ui-smoke.mjs",
+    "staging:smoke:ai-intake": "node tools/staging-ai-intake-smoke.mjs",
     "staging:smoke:system-errors": "node tools/staging-system-error-smoke.mjs",
     "staging:backup:evidence": "node tools/staging-backup-evidence.mjs",
     "staging:data:summary": "node tools/staging-data-summary.mjs",
