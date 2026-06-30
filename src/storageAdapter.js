@@ -109,6 +109,28 @@ export function createAppStore({ storageProvider = defaultStorageProvider, local
         return false;
       }
     },
+    async setMany(records = [], shared = false) {
+      const fallback = canUseMemoryFallback();
+      const safeRecords = (Array.isArray(records) ? records : []).filter((record) => record?.key);
+      if (fallback) safeRecords.forEach((record) => { mem[record.key] = record.value; });
+      const storage = resolveStorage(shared);
+      if (!storage) return fallback;
+      try {
+        if (storage.setMany) {
+          const result = await withTimeout(storage.setMany(safeRecords, shared), timeoutMs);
+          if (result === undefined) throw new Error("timeout");
+          return true;
+        }
+        for (const record of safeRecords) {
+          const result = await withTimeout(storage.set(record.key, record.value, shared), timeoutMs);
+          if (result === undefined) throw new Error("timeout");
+        }
+        return true;
+      } catch (e) {
+        notifyFail(shared, { operation: "setMany", key: safeRecords.map((record) => record.key).slice(0, 5).join(","), error: e?.message || "" });
+        return false;
+      }
+    },
     async del(key, shared = false) {
       const fallback = canUseMemoryFallback();
       if (fallback) delete mem[key];

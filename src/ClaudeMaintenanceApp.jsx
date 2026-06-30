@@ -1499,6 +1499,23 @@ export default function App() {
     if (!ok && toastOnFail) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
     return ok;
   };
+  const persistSharedMany = async (records, options = {}) => {
+    const toastOnFail = options.toastOnFail !== false;
+    const keys = (records || []).map((record) => record.key).filter(Boolean);
+    const failKey = keys.slice(0, 5).join(",");
+    if (!toastOnFail) {
+      keys.forEach((key) => quietSharedFailureKeysRef.current.add(key));
+      if (failKey) quietSharedFailureKeysRef.current.add(failKey);
+    }
+    const ok = await store.setMany(records, true).finally(() => {
+      if (!toastOnFail) {
+        keys.forEach((key) => quietSharedFailureKeysRef.current.delete(key));
+        if (failKey) quietSharedFailureKeysRef.current.delete(failKey);
+      }
+    });
+    if (!ok && toastOnFail) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+    return ok;
+  };
   const deleteShared = async (key) => {
     const ok = await store.del(key, true);
     if (!ok) setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
@@ -1618,6 +1635,17 @@ export default function App() {
   const delPm = async (id) => { if (!await deleteShared(`pm:${id}`)) return false; setPm((s) => s.filter((x) => x.id !== id)); return true; };
   const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
   const saveFleet = async (f, options = {}) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
+  const saveFleetMany = async (items, options = {}) => {
+    const units = (items || []).filter((f) => f?.id);
+    if (!units.length) return true;
+    const ok = await persistSharedMany(units.map((f) => ({ key: `fleet:${f.id}`, value: JSON.stringify(f) })), options);
+    if (!ok) return false;
+    setFleet((s) => {
+      const ids = new Set(units.map((f) => f.id));
+      return [...s.filter((x) => !ids.has(x.id)), ...units].sort((a, b) => (a.code > b.code ? 1 : -1));
+    });
+    return true;
+  };
   const saveZone = async (z) => { if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false; setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); return true; };
   const delZone = async (id) => { if (!await deleteShared(`czone:${id}`)) return false; setZones((s) => s.filter((x) => x.id !== id)); return true; };
   const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); if (!await persistShared(`cround:${rec.id}`, JSON.stringify(rec))) return false; setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); return true; };
@@ -5232,7 +5260,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   </div>);
 }
 
-function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog }) {
+function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, onSaveCatalog }) {
   const [result, setResult] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [done, setDone] = useState(false);
   const [confirmSkipConflicts, setConfirmSkipConflicts] = useState(false);
   const [confirmCatalog, setConfirmCatalog] = useState(false);
@@ -5264,9 +5292,15 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onSaveCatalog })
         const catalogOk = await onSaveCatalog(catalogAdditions);
         if (catalogOk === false) throw new Error("catalog_save_failed");
       }
-      for (const [i, row] of readyRows.entries()) {
-        const ok = await onImport({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i });
+      const units = readyRows.map((row, i) => ({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i }));
+      if (onImportMany) {
+        const ok = await onImportMany(units);
         if (ok === false) throw new Error("fleet_import_save_failed");
+      } else {
+        for (const unit of units) {
+          const ok = await onImport(unit);
+          if (ok === false) throw new Error("fleet_import_save_failed");
+        }
       }
       setDone(true);
     } catch (ex) { setImportError("הייבוא נעצר כי חלק מהרשומות לא נשמרו. בדקו חיבור ונסו שוב."); }
@@ -5410,7 +5444,7 @@ function FleetModule(p) {
         </div>}
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { await saveFleet(x); setEdit(null); }} /></Overlay>}
-    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
+    {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units) => saveFleetMany(units, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { await delFleet(openId); setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) await saveTicket(t); }} onBlock={async (reason) => { await saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
   </>);
 }

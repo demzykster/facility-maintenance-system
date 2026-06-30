@@ -66,6 +66,29 @@ describe("kv API handler", () => {
     expect(driver.list).toHaveBeenCalledWith("ticket:", true);
   });
 
+  it("saves multiple records through the configured backend driver", async () => {
+    const driver = {
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createKvApiHandler({ driver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const res = await call(handler, {
+      method: "POST",
+      body: {
+        shared: true,
+        records: [
+          { key: "fleet:1", value: "{\"id\":\"fleet-1\"}" },
+          { key: "fleet:2", value: "{\"id\":\"fleet-2\"}" }
+        ]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, count: 2 });
+    expect(driver.set).toHaveBeenCalledWith("fleet:1", "{\"id\":\"fleet-1\"}", true);
+    expect(driver.set).toHaveBeenCalledWith("fleet:2", "{\"id\":\"fleet-2\"}", true);
+  });
+
   it("can return matching key values in one collection response", async () => {
     const driver = {
       listValues: vi.fn().mockResolvedValue([
@@ -308,6 +331,40 @@ describe("kv API handler", () => {
       headers: { authorization: "Bearer user-token" },
       query: { key: "user:worker-1", shared: "1" },
       body: { value: "{}" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:users:manage" });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("blocks sensitive Supabase-authenticated batch writes without the matching module permission", async () => {
+    const driver = { set: vi.fn() };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "user",
+        name: "Manager",
+        active: true,
+        permissions: { users: "view" },
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        shared: true,
+        records: [{ key: "user:worker-1", value: "{}" }]
+      }
     });
 
     expect(res.statusCode).toBe(403);

@@ -23,11 +23,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ### Active branch: none
 
-- Status: KV collection-load batching is the current PR-level task to reduce repeated `/api/kv` calls during app refresh and lower Vercel invocation noise. After it merges, continue with owner-facing UI/data-confidence bugs or the next final pilot polish item.
+- Status: batch fleet Excel import save batching is the current completed pilot-hardening item. Importing a large workbook now writes fleet rows through one `/api/kv` batch request instead of many separate PUT calls. Goal: reduce Vercel function spikes and avoid misleading red shared-save banners during valid imports.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
   - continue release hardening toward a clean first staging/pilot build.
+  - owner is now entering/validating real pilot data. Do not clear, reseed, or overwrite Supabase staging/pilot data unless explicitly asked for destructive cleanup.
   - keep module permissions, role defaults, and notification preferences connected instead of creating a separate parallel notification-access system.
   - production starts empty: no migration of demo/local tickets, fleet, users, history, or old records.
   - the interim Supabase KV bridge is an explicit v1 compatibility choice, not the final normalized workflow model.
