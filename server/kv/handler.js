@@ -154,7 +154,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         const written = [];
         try {
           const recordsWithFlags = normalizedRecords.map((record) => {
-            const shouldAudit = backendAuditDriver && kvWritePermissionForKey(record.key);
+            const permissionRule = kvWritePermissionForKey(record.key);
+            const shouldAudit = backendAuditDriver && permissionRule && permissionRule.auditSensitive !== false;
             const shouldAuditTicketStatus = backendAuditDriver && String(record.key).startsWith("ticket:");
             return { ...record, shouldAudit, shouldAuditTicketStatus };
           });
@@ -285,7 +286,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         const body = await readBody(req);
         const value = body?.value ?? "";
         const writeShared = parseBool(body?.shared ?? shared);
-        const shouldAudit = backendAuditDriver && kvWritePermissionForKey(key);
+        const permissionRule = kvWritePermissionForKey(key);
+        const shouldAudit = backendAuditDriver && permissionRule && permissionRule.auditSensitive !== false;
         const shouldAuditTicketStatus = backendAuditDriver && String(key).startsWith("ticket:");
         const before = (shouldAudit || shouldAuditTicketStatus) ? await backendDriver.get?.(key, writeShared) : null;
         await backendDriver.set(key, value, writeShared);
@@ -301,7 +303,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         return json(res, 200, { ok: true });
       }
       if (method === "DELETE") {
-        const shouldAudit = backendAuditDriver && kvWritePermissionForKey(key);
+        const permissionRule = kvWritePermissionForKey(key);
+        const shouldAudit = backendAuditDriver && permissionRule && permissionRule.auditSensitive !== false;
         const before = shouldAudit ? await backendDriver.get?.(key, shared) : null;
         await backendDriver.delete(key, shared);
         await writeAuditEvent(backendAuditDriver, shouldAudit && sensitiveKvWriteAuditEvent({

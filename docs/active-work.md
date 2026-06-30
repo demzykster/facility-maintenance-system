@@ -21,8 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none. Continue from `origin/main`.
-- In progress: continue the flexible fleet maintenance / inspection policy redesign without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data.
+- Active branch: `codex/harden-kv-workflow-permissions`.
+- In progress: harden `/api/kv` workflow write permissions so ordinary logged-in users cannot write unrelated workflow prefixes by default. Keep normal ticket, PPE-request, cleaning, presence, task/meeting, and app-issue flows available to the roles/modules that actually use them; do not touch the separate public complaint endpoint in this branch.
+- Current validation: targeted permission/API tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally.
+- Next exact action: open PR for the KV workflow permission hardening, wait for checks, then merge if green.
+- Product design note recorded but not active in this branch: continue the flexible fleet maintenance / inspection policy redesign later without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data.
 - Current next candidate: continue the periodic-maintenance settings redesign only after verifying the owner workflow. Keep maintenance programs, inspection questionnaires, fleet catalog, calendar entries, exports, and follow-up tickets as separate but connected concepts.
 - Owner clarification recorded: periodic-maintenance TO programs are not `בקרת כלים` inspection checklists. They must stay owner-defined by flexible name, frequency in months, type/model targets, and their own PM checklist; if a PM/check result finds a fault, follow-up tickets must attach to the specific affected vehicle only.
 - Latest completed work: protected `סוגי כלי שינוע` catalog editing from false-success deletes. A vehicle type or model that is still used by fleet units now stays in place and explains which units must be updated/deleted first, instead of disappearing locally and reappearing after navigation.
