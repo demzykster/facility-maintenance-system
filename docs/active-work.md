@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: `codex/final-pilot-checkpoint`
+### Active branch: none
 
-- Status: final pilot checkpoint in progress: record completed access/notification, mobile shell, fleet import preview, system-error journal, dashboard-widget smoke, and staging gate checks before continuing the remaining final work.
+- Status: final pilot checkpoint recorded. No active product branch. Continue only with newly discovered owner-facing bugs, optional remote-branch cleanup by PR history, or post-pilot hardening items.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: none.
 - Purpose:
