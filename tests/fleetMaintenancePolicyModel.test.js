@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addMonthsClamped,
   buildMaintenanceAssignments,
+  buildMaintenanceScheduleFromRules,
   checklistTemplateMatchesUnit,
   fleetRuleTargetMatchesUnit,
   maintenanceIntervalMonthsForTask,
@@ -31,7 +32,7 @@ const localYmd = (timestamp) => {
 describe("fleetMaintenancePolicyModel", () => {
   it("allows multiple owner-defined maintenance rules for the same vehicle type", () => {
     const rules = normalizeMaintenanceRules([
-      { id: "to-500", name: "TO 500", intervalMonths: 3, vehicleTypeNames: ["מלגזת היגש"] },
+      { id: "to-500", name: "TO 500", intervalMonths: 3, vehicleTypeNames: ["מלגזת היגש"], modelCodes: ["MX-X"] },
       { id: "to-1000", name: "TO 1000", intervalMonths: 12, vehicleTypeNames: ["מלגזת היגש"] },
       { id: "picker-to", name: "Picker check", intervalMonths: 2, vehicleTypeNames: ["מלקטת כפולה"] }
     ]);
@@ -106,5 +107,32 @@ describe("fleetMaintenancePolicyModel", () => {
     expect(maintenanceIntervalMonthsForTask(task, rules, 12)).toBe(4);
     expect(maintenanceTitleForTask(task, rules)).toBe("TO 500");
     expect(maintenanceIntervalMonthsForTask({ frequency: "legacy" }, rules, 6)).toBe(6);
+  });
+
+  it("builds bulk maintenance schedules by vehicle rule without duplicating existing tasks", () => {
+    const rules = normalizeMaintenanceRules([
+      { id: "to-500", name: "TO 500", intervalMonths: 3, vehicleTypeNames: ["מלגזת היגש"], modelCodes: ["MX-X"] },
+      { id: "to-1000", name: "TO 1000", intervalMonths: 12, vehicleTypeNames: ["מלגזת היגש"] },
+      { id: "picker", name: "Picker", intervalMonths: 2, modelCodes: ["OSE250"] }
+    ]);
+    const existing = [{ id: "old", forkliftId: "f-1", maintenanceRuleId: "to-500", nextDue: 111, history: [{ type: "done" }] }];
+
+    const result = buildMaintenanceScheduleFromRules({
+      rules,
+      fleetRefs: fleet,
+      existingTasks: existing,
+      startAt: 222,
+      now: 333
+    });
+
+    expect(result.created).toBe(3);
+    expect(result.updated).toBe(1);
+    expect(result.tasks.map((task) => [task.forkliftId, task.maintenanceRuleId, task.nextDue]).sort()).toEqual([
+      ["f-1", "to-1000", 222],
+      ["f-1", "to-500", 111],
+      ["f-2", "picker", 222],
+      ["f-3", "to-500", 222]
+    ]);
+    expect(result.tasks.find((task) => task.id === "old")?.history).toEqual([{ type: "done" }]);
   });
 });
