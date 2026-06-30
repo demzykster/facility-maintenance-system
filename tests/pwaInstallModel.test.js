@@ -14,9 +14,10 @@ describe("pwaInstallModel", () => {
     expect(isIosDevice("Mozilla/5.0 (Linux; Android 14)", "Linux armv8", 5)).toBe(false);
   });
 
-  it("prefers browser install prompt over iOS instructions and hides installed apps", () => {
+  it("uses browser install prompt when available and hides installed apps", () => {
     expect(pwaInstallPromptMode({ isStandalone: true, beforeInstallPromptEvent: {} })).toBe("hidden");
-    expect(pwaInstallPromptMode({ beforeInstallPromptEvent: {}, userAgent: "iPhone" })).toBe("android");
+    expect(pwaInstallPromptMode({ beforeInstallPromptEvent: {}, userAgent: "Desktop Chrome" })).toBe("browser");
+    expect(pwaInstallPromptMode({ beforeInstallPromptEvent: {}, userAgent: "iPhone" })).toBe("ios");
     expect(pwaInstallPromptMode({ userAgent: "iPhone" })).toBe("ios");
     expect(pwaInstallPromptMode({ userAgent: "Desktop Chrome" })).toBe("hidden");
   });
