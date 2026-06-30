@@ -21,9 +21,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/honest-empty-fleet-catalog
+### Active branch: none
 
-- Status: hardening the production empty fleet/catalog state. Direct Supabase and live API checks showed `cmms_kv_records=0` and `fleet:* = 0`; the visible `סוגי כלי שינוע` rows came from built-in defaults, not saved pilot data. This branch prevents an empty production database from displaying built-in fleet catalog defaults as if they were persisted records, while keeping demo/test fallback behavior.
+- Status: production empty fleet/catalog hardening is complete in PR #481. Direct Supabase and live API checks showed `cmms_kv_records=0` and `fleet:* = 0`; the visible `סוגי כלי שינוע` rows came from built-in defaults, not saved pilot data. Production now shows an honest empty catalog state instead of displaying built-in forklift models as saved records, while demo/test fallback behavior remains available.
 - Latest synchronized `main`: verify with `git log origin/main` at session start; this live ledger no longer pins a commit SHA because docs-only sync PRs otherwise make the ledger stale immediately after merge.
 - Open PRs: #471 docs audit packet.
 - Purpose:
