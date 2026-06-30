@@ -5391,6 +5391,11 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     current.has(value) ? current.delete(value) : current.add(value);
     return { ...r, target: { ...target, allFleet: false, [group]: [...current] } };
   }));
+  const setRuleTargetValues = (idx, group, values) => setRules((s) => s.map((r, j) => {
+    if (j !== idx) return r;
+    const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(r.target || {}) };
+    return { ...r, target: { ...target, allFleet: false, [group]: values } };
+  }));
   const setRuleChecklistItem = (ruleIdx, itemIdx, label) => setRules((s) => s.map((r, j) => {
     if (j !== ruleIdx) return r;
     const items = Array.isArray(r.maintenanceChecklistItems) ? r.maintenanceChecklistItems : [];
@@ -5419,6 +5424,20 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     if (t.modelCodes?.length) parts.push(`${t.modelCodes.length} דגמים`);
     if (t.fleetIds?.length) parts.push(`${t.fleetIds.length} כלים`);
     return parts.join(" · ") || "ללא יעד";
+  };
+  const ruleAffectedCount = (rule) => {
+    const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule?.target || {}) };
+    if (target.allFleet) return (fleet || []).length;
+    const fleetIds = new Set((target.fleetIds || []).map((x) => String(x).toLowerCase()));
+    const types = new Set((target.vehicleTypeNames || []).map((x) => String(x).toLowerCase()));
+    const models = new Set((target.modelCodes || []).map((x) => String(x).toLowerCase()));
+    if (!fleetIds.size && !types.size && !models.size) return 0;
+    return (fleet || []).filter((unit) => {
+      const id = String(unit.id || "").toLowerCase();
+      const typeName = String(unitTypeName(unit, config) || "").toLowerCase();
+      const model = String(unitModelCode(unit) || unit.model || unit.type || "").toLowerCase();
+      return (id && fleetIds.has(id)) || (typeName && types.has(typeName)) || (model && models.has(model));
+    }).length;
   };
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
   const save = async () => {
@@ -5451,18 +5470,22 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     {vtypes.map((t, i) => { const op = openType === i; const docFlags = [["insurance", "מנוהל ביטוח"], ["tasrir", "מנוהל תסקיר"], ["license", "מנוהל רישיון רכב"], ["lease", "מנוהל ליזינג"]]; return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}{(t.models || []).length ? <span className="reg-count">{t.models.length} {t.models.length === 1 ? "דגם" : "דגמים"}</span> : null}</span>}<button className="reg-edit" onClick={() => setOpenType(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setVtypes((s) => s.filter((_, j) => j !== i)); if (op) setOpenType(null); }}><Trash2 size={15} /></button></div>{op && <>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>זמני יעד SLA (שעות):</div>{slaRow(t, (k, v) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>מסמכים שמנוהלים לסוג זה:</div>{docFlags.map(([k, lbl]) => <label key={k} className="chk-line"><input type="checkbox" checked={!!t[k]} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: e.target.checked } : x))} /> {lbl}</label>)}
-      <label className="field" style={{ marginTop: 8 }}><span>תדירות טיפול תקופתי</span><select value={t.pmFreq || "monthly"} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, pmFreq: e.target.value } : x))}>{FREQS.map((fr) => <option key={fr.id} value={fr.id}>{fr.label}</option>)}</select></label>
+      <details className="legacy-fold">
+        <summary>תאימות ישנה לשיבוץ ידני</summary>
+        <div className="hint" style={{ marginTop: 8, marginBottom: 8 }}>התכניות הגמישות למטה הן הדרך הראשית להגדיר TO 500, TO 1000 ותדירויות לפי חודשים. השדה הזה נשאר רק לשיבוצים ישנים שלא נוצרו מתכנית.</div>
+        <label className="field"><span>תדירות טיפול תקופתי ישנה</span><select value={t.pmFreq || "monthly"} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, pmFreq: e.target.value } : x))}>{FREQS.map((fr) => <option key={fr.id} value={fr.id}>{fr.label}</option>)}</select></label>
+      </details>
       <label className="field" style={{ marginTop: 8 }}><span>שאלון בקרה ברירת מחדל</span><select value={t.inspTpl || ""} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, inspTpl: e.target.value } : x))}><option value="">— ללא —</option>{(templates || []).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}</select></label>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>דגמים בסוג זה:</div>{(t.models || []).map((m, mi) => <div key={mi} className="reg-row" style={{ marginBottom: 6 }}><input className="reg-name" value={m} placeholder="דגם" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.map((mm, k) => k === mi ? e.target.value : mm) } : x))} /><button className="reg-del" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.filter((_, k) => k !== mi) } : x))}><Trash2 size={15} /></button></div>)}
       <button className="btn-ghost sm" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: [...(x.models || []), ""] } : x))}><Plus size={14} /> דגם</button>
     </>}</div>; })}
     <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
-    <SectionTitle>רגולציות טיפול תקופתי</SectionTitle>
-    <div className="hint" style={{ marginBottom: 8 }}>הגדירו רגולציות כמו TO 500 או TO 1000 לפי חודשים ולפי סוגי כלי או דגמים. לאחר מכן ניתן להפיק מהן שיבוצים בלוח הטיפולים.</div>
-    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם רגולציה, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "רגולציה ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)}{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
+    <SectionTitle>תכניות טיפול תקופתי</SectionTitle>
+    <div className="note" style={{ marginBottom: 10 }}>כאן מגדירים תכניות כמו TO 500 או TO 1000: שם חופשי, תדירות בחודשים, סוגי כלי/דגמים שעליהם זה חל, וצ׳ק-ליסט טיפול ייעודי. זה נפרד לגמרי מ-בקרת כלים.</div>
+    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; const affectedCount = ruleAffectedCount(rule); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם תכנית, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "תכנית ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)} · {affectedCount} כלים{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
       <div className="row2">
         <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={rule.intervalMonths || 1} onChange={(e) => setRule(i, { intervalMonths: e.target.value })} /></label>
-        <div className="note">צ׳ק-ליסט טיפול תקופתי הוא נפרד מבקרת כלים. הוא לא נלקח משאלוני הבקרה.</div>
+        <div className="note">הצ׳ק-ליסט כאן שייך לתכנית הטיפול הזו בלבד. אם נמצא ליקוי בזמן ביצוע הטיפול, הקריאה נוצרת לכלי הספציפי שבוצע עליו הטיפול.</div>
       </div>
       <div className="field" style={{ marginTop: 10 }}><span>צ׳ק-ליסט טיפול תקופתי</span>
         {checklist.length === 0 && <div className="hint">אפשר להשאיר ריק, או להגדיר סעיפים ייעודיים לטיפול הזה.</div>}
@@ -5474,12 +5497,12 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
       <label className="chk-line"><input type="checkbox" checked={!!target.allFleet} onChange={(e) => setRule(i, { target: { allFleet: e.target.checked, vehicleTypeNames: [], modelCodes: [], fleetIds: [] } })} /> כל הפארק</label>
       {!target.allFleet && <>
         <div className="hint" style={{ marginTop: 8, marginBottom: 4 }}>סוגי כלי</div>
-        {vehicleTypeNames.length ? vehicleTypeNames.map((name) => <label key={name} className="chk-line"><input type="checkbox" checked={(target.vehicleTypeNames || []).includes(name)} onChange={() => toggleRuleTarget(i, "vehicleTypeNames", name)} /> {name}</label>) : <div className="hint">אין סוגים בקטלוג.</div>}
+        {vehicleTypeNames.length ? <><div className="target-tools"><button type="button" onClick={() => setRuleTargetValues(i, "vehicleTypeNames", vehicleTypeNames)}>כל הסוגים</button><button type="button" onClick={() => setRuleTargetValues(i, "vehicleTypeNames", [])}>נקה סוגים</button></div>{vehicleTypeNames.map((name) => <label key={name} className="chk-line"><input type="checkbox" checked={(target.vehicleTypeNames || []).includes(name)} onChange={() => toggleRuleTarget(i, "vehicleTypeNames", name)} /> {name}</label>)}</> : <div className="hint">אין סוגים בקטלוג.</div>}
         <div className="hint" style={{ marginTop: 8, marginBottom: 4 }}>דגמים ספציפיים</div>
-        {modelCodes.length ? modelCodes.map((code) => <label key={code} className="chk-line"><input type="checkbox" checked={(target.modelCodes || []).includes(code)} onChange={() => toggleRuleTarget(i, "modelCodes", code)} /> {code}</label>) : <div className="hint">אין דגמים בקטלוג.</div>}
+        {modelCodes.length ? <><div className="target-tools"><button type="button" onClick={() => setRuleTargetValues(i, "modelCodes", modelCodes)}>כל הדגמים</button><button type="button" onClick={() => setRuleTargetValues(i, "modelCodes", [])}>נקה דגמים</button></div>{modelCodes.map((code) => <label key={code} className="chk-line"><input type="checkbox" checked={(target.modelCodes || []).includes(code)} onChange={() => toggleRuleTarget(i, "modelCodes", code)} /> {code}</label>)}</> : <div className="hint">אין דגמים בקטלוג.</div>}
       </>}
     </>}</div>; })}
-    <button className="btn-ghost full" onClick={addRule}><Plus size={15} /> רגולציית טיפול</button>
+    <button className="btn-ghost full" onClick={addRule}><Plus size={15} /> תכנית טיפול</button>
     <button className="btn-primary full" style={{ marginTop: 16 }} onClick={save}>{saved ? "נשמר ✓" : "שמירת הגדרות כלי שינוע"}</button>
     {typeMsg && <div className="note" style={{ color: "#DC2626" }}>{typeMsg}</div>}
   </div>);
@@ -8826,6 +8849,11 @@ button.notif-perm:hover{background:#D1FAE5;}
 .reg-name:disabled{opacity:.55;cursor:not-allowed;}
 .reg-del:disabled{opacity:.35;cursor:not-allowed;}
 .reg-use{flex-shrink:0;font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:3px 8px;white-space:nowrap;}
+.legacy-fold{margin-top:8px;border:1px dashed var(--line);border-radius:10px;background:var(--surface-2);padding:8px 10px;}
+.legacy-fold summary{cursor:pointer;font-weight:700;font-size:12.5px;color:var(--muted);}
+.target-tools{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;}
+.target-tools button{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;}
+.target-tools button:hover{border-color:var(--primary);color:var(--primary);}
 .dev-toggle{display:inline-flex;align-items:center;gap:6px;margin-top:16px;font-size:12.5px;font-weight:600;color:var(--muted);}
 .dev-box{margin-top:10px;padding:14px;border:1px dashed var(--line);border-radius:12px;}
 .rep-wrap{display:flex;flex-direction:column;height:78vh;max-height:78vh;}
