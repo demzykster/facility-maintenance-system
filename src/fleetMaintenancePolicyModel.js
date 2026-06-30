@@ -68,6 +68,22 @@ export function normalizeIntervalMonths(value) {
   return rounded;
 }
 
+export function normalizeMaintenanceChecklistItems(items = []) {
+  const seen = new Set();
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => {
+      const label = trim(typeof item === "string" ? item : item?.label || item?.name);
+      if (!label) return null;
+      const key = label.toLowerCase();
+      if (seen.has(key)) return null;
+      seen.add(key);
+      const id = trim(typeof item === "string" ? "" : item?.id) ||
+        `pm-check-${index}-${label.toLowerCase().replace(/[^a-z0-9\u0590-\u05ff]+/gi, "-").replace(/^-+|-+$/g, "")}`;
+      return { id, label };
+    })
+    .filter(Boolean);
+}
+
 export function normalizeMaintenanceRule(rule = {}) {
   const name = trim(rule.name || rule.title);
   const intervalMonths = normalizeIntervalMonths(rule.intervalMonths ?? rule.months);
@@ -79,7 +95,8 @@ export function normalizeMaintenanceRule(rule = {}) {
     name,
     intervalMonths,
     active: rule.active !== false,
-    target: normalizeFleetRuleTarget(rule.target || rule)
+    target: normalizeFleetRuleTarget(rule.target || rule),
+    maintenanceChecklistItems: normalizeMaintenanceChecklistItems(rule.maintenanceChecklistItems)
   };
 }
 
@@ -170,6 +187,7 @@ export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], 
         maintenanceRuleId: rule.id,
         maintenanceRuleName: rule.name,
         intervalMonths: rule.intervalMonths,
+        maintenanceChecklistItems: rule.maintenanceChecklistItems || [],
         nextDue: base.nextDue || firstDue,
         active: base.active !== false,
         createdAt: base.createdAt || createdAt,
