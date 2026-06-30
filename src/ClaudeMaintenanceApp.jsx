@@ -38,7 +38,7 @@ import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./f
 import { vehicleCatalogBase } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
-import { normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
+import { maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -6014,7 +6014,7 @@ function PMHistory({ pm, fleet, onOpen, config }) {
   const [fFleet, setFFleet] = useState("all"), [fType, setFType] = useState("all"), [fResult, setFResult] = useState("all"), [sort, setSort] = useState("date_desc"), [report, setReport] = useState(null);
   // flatten history entries
   const rows = [];
-  (pm || []).forEach((x) => { const f = pmFleet(x, fleet); (x.history || []).forEach((h, i) => rows.push({ ...h, pm: x, f, key: x.id + "-" + i })); });
+  (pm || []).forEach((x) => { const f = pmFleet(x, fleet); (x.history || []).forEach((h, i) => rows.push({ ...h, pm: x, f, ruleTitle: pmRuleTitle(x, config), key: x.id + "-" + i })); });
   const types = [...new Set((fleet || []).map((f) => unitTypeName(f, config)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
   let filtered = rows.filter((r) => {
     if (fFleet !== "all" && r.pm.forkliftId !== fFleet) return false;
@@ -6026,12 +6026,12 @@ function PMHistory({ pm, fleet, onOpen, config }) {
   });
   filtered.sort((a, b) => sort === "date_asc" ? a.at - b.at : b.at - a.at);
   const exportXlsx = async () => {
-    const data = filtered.map((r) => ({ "תאריך": fmtDate(r.at), "כלי": r.f ? r.f.code : "", "סוג": r.f ? unitTypeName(r.f, config) : "", "דגם": r.f ? unitModelCode(r.f) : "", "תוצאה": r.type === "missed" ? "לא הגיע" : "בוצע", "עבודות המשך": r.hadPaid ? "כן" : "", "בוצע ע״י": r.by || "", "הערה": r.paidNote || "" }));
+    const data = filtered.map((r) => ({ "תאריך": fmtDate(r.at), "כלי": r.f ? r.f.code : "", "רגולציה": r.ruleTitle || "", "סוג": r.f ? unitTypeName(r.f, config) : "", "דגם": r.f ? unitModelCode(r.f) : "", "תוצאה": r.type === "missed" ? "לא הגיע" : "בוצע", "עבודות המשך": r.hadPaid ? "כן" : "", "בוצע ע״י": r.by || "", "הערה": r.paidNote || "" }));
     const ws = XLSX.utils.json_to_sheet(rowsSafe(data)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "היסטוריית טיפולים"); downloadXlsx(wb, "pm-history.xlsx");
   };
   const exportPdf = () => {
-    const rowsHtml = filtered.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${r.f ? esc(unitLabel(r.f, config)) : ""}</td><td>${r.type === "missed" ? "לא הגיע" : "בוצע"}</td><td>${r.hadPaid ? "כן" : ""}</td><td>${esc(r.by || "")}</td><td>${esc(r.paidNote || "")}</td></tr>`).join("");
-    const html = `<html dir="rtl"><head><meta charset="utf8"><style>body{font-family:Arial;padding:20px}h2{color:#16202E}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f3f4f6}</style></head><body><h2>היסטוריית טיפולים תקופתיים</h2><div>${config?.companyName ? esc(config.companyName) + (config?.siteName ? " · " + esc(config.siteName) : "") + " · " : ""}${filtered.length} רשומות · ${fmtDate(Date.now())}</div><table><tr><th>תאריך</th><th>כלי</th><th>תוצאה</th><th>עבודות המשך</th><th>בוצע ע״י</th><th>הערה</th></tr>${rowsHtml}</table></body></html>`;
+    const rowsHtml = filtered.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${r.f ? esc(unitLabel(r.f, config)) : ""}</td><td>${esc(r.ruleTitle || "")}</td><td>${r.type === "missed" ? "לא הגיע" : "בוצע"}</td><td>${r.hadPaid ? "כן" : ""}</td><td>${esc(r.by || "")}</td><td>${esc(r.paidNote || "")}</td></tr>`).join("");
+    const html = `<html dir="rtl"><head><meta charset="utf8"><style>body{font-family:Arial;padding:20px}h2{color:#16202E}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f3f4f6}</style></head><body><h2>היסטוריית טיפולים תקופתיים</h2><div>${config?.companyName ? esc(config.companyName) + (config?.siteName ? " · " + esc(config.siteName) : "") + " · " : ""}${filtered.length} רשומות · ${fmtDate(Date.now())}</div><table><tr><th>תאריך</th><th>כלי</th><th>רגולציה</th><th>תוצאה</th><th>עבודות המשך</th><th>בוצע ע״י</th><th>הערה</th></tr>${rowsHtml}</table></body></html>`;
     setReport(html);
   };
   return (<>
@@ -6043,7 +6043,7 @@ function PMHistory({ pm, fleet, onOpen, config }) {
     </div>
     <div className="fleet-results-bar"><span className="fleet-count">{filtered.length} רשומות</span><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportXlsx}><FileText size={14} /> Excel</button><button className="btn-ghost sm" onClick={exportPdf}><FileText size={14} /> PDF</button></div></div>
     {filtered.length === 0 ? <Empty text="אין היסטוריית טיפולים" Icon={CalendarClock} sub="לאחר ביצוע טיפול הוא יירשם כאן" />
-      : <div className="cards">{filtered.map((r) => { const done = r.type !== "missed"; return <button key={r.key} className="tl-item insp-hist-item" onClick={() => onOpen(r.pm)}><div className="tl-dot" style={{ background: done ? "#16A34A" : "#CA8A04" }} /><div className="tl-body"><div className="tl-text">{fmtDate(r.at)} · {r.f ? `${unitLabel(r.f, config)}` : "כלי"} · {done ? "בוצע" : "לא הגיע"}{r.hadPaid ? " · עבודות המשך" : ""}</div><div className="tl-meta">{r.by || "—"}{r.paidNote ? ` · ${r.paidNote}` : ""}</div></div><ChevronLeft size={15} className="tl-chev" /></button>; })}</div>}
+      : <div className="cards">{filtered.map((r) => { const done = r.type !== "missed"; return <button key={r.key} className="tl-item insp-hist-item" onClick={() => onOpen(r.pm)}><div className="tl-dot" style={{ background: done ? "#16A34A" : "#CA8A04" }} /><div className="tl-body"><div className="tl-text">{fmtDate(r.at)} · {r.f ? `${unitLabel(r.f, config)}` : "כלי"} · {r.ruleTitle || "טיפול תקופתי"} · {done ? "בוצע" : "לא הגיע"}{r.hadPaid ? " · עבודות המשך" : ""}</div><div className="tl-meta">{r.by || "—"}{r.paidNote ? ` · ${r.paidNote}` : ""}</div></div><ChevronLeft size={15} className="tl-chev" /></button>; })}</div>}
     {report && <ReportView html={report} onClose={() => setReport(null)} />}
   </>);
 }
@@ -6056,6 +6056,12 @@ const PM_STAT = {
   planned: { c: "#6366F1", lbl: "מתוכנן" },
 };
 const FREQ_MONTHS = { daily: 1, weekly: 1, monthly: 1, quarterly: 3, yearly: 12 };
+const pmRules = (config) => normalizeMaintenanceRules(config?.maintenanceRules || []);
+const pmIntervalMonths = (task, config) => maintenanceIntervalMonthsForTask(task, pmRules(config), FREQ_MONTHS[task?.frequency] || 1);
+const pmRuleTitle = (task, config) => maintenanceTitleForTask(task, pmRules(config), task?.title || "טיפול תקופתי");
+const pmIntervalLabel = (task, config) => task?.maintenanceRuleId || task?.intervalMonths
+  ? (pmIntervalMonths(task, config) === 1 ? "כל חודש" : `כל ${pmIntervalMonths(task, config)} חודשים`)
+  : freqOf(task?.frequency).label;
 function PMYearMatrix({ items, fleet, onOpen, config }) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [onlyIssues, setOnlyIssues] = useState(false);
@@ -6071,7 +6077,7 @@ function PMYearMatrix({ items, fleet, onOpen, config }) {
       if (months[m] !== "missed") months[m] = h.type === "missed" ? "missed" : "done";
     });
     // 2. nextDue + проекция плана вперёд
-    const stepM = FREQ_MONTHS[x.frequency] || 1;
+    const stepM = pmIntervalMonths(x, config);
     let occ = new Date(startOfDay(x.nextDue));
     for (let i = 0; i < 60 && occ.getFullYear() <= year; i++) {
       if (occ.getFullYear() === year) {
@@ -6079,10 +6085,12 @@ function PMYearMatrix({ items, fleet, onOpen, config }) {
         const isPast = occ.getTime() < today;
         if (!months[m]) { if (!isPast) months[m] = "planned"; else if (i === 0) months[m] = "overdue"; }
       }
-      occ = new Date(occ.getFullYear(), occ.getMonth() + stepM, occ.getDate());
+      const nextOcc = nextMaintenanceDueFrom(occ.getTime(), stepM, { adjustToWorkday: toWorkday });
+      if (!nextOcc || nextOcc <= occ.getTime()) break;
+      occ = new Date(startOfDay(nextOcc));
     }
     return { x, f, months };
-  }), [items, fleet, year, today]);
+  }), [items, fleet, config, year, today]);
   const filtered = onlyIssues ? rows.filter((r) => Object.values(r.months).some((s) => s === "missed" || s === "overdue")) : rows;
   const sorted = [...filtered].sort((a, b) => (a.f?.code || "").localeCompare(b.f?.code || "", "he", { numeric: true }));
   const grouped = (() => { const m = new Map(); sorted.forEach((r) => { const t = unitTypeName(r.f, config) || r.f?.type || "אחר"; if (!m.has(t)) m.set(t, []); m.get(t).push(r); }); return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "he")); })();
@@ -6123,7 +6131,7 @@ function PMList({ items, fleet, onOpen, config }) {
   return (<div className="cards">{sorted.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); const last = (x.history || [])[x.history.length - 1]; return (
     <div key={x.id} className="pm-card" onClick={() => onOpen(x)}>
       <span className="pm-bar" style={{ background: pmColor(d) }} />
-      <div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי לא ידוע"}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{freqOf(x.frequency).label}</span></div>
+      <div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי לא ידוע"}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{pmRuleTitle(x, config)} · {pmIntervalLabel(x, config)}</span></div>
         <div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)}{fleetDepts(f).length ? <> · <Users size={12} /> {fleetDepts(f).join(", ")}</> : null}</div>
         <div className="tcard-badges"><span className="badge sm" style={{ color: pmColor(d), background: "var(--surface-2)" }}>{d < 0 ? `באיחור ${-d} י׳` : d === 0 ? "היום" : `בעוד ${d} ימים`}</span>{last && <span className="tcard-time">{last.type === "missed" ? "לא הגיע " : "בוצע "}{fmtDate(last.at)}</span>}</div>
       </div></div>); })}</div>);
@@ -6164,17 +6172,50 @@ function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "—
 }
 function PMForm({ task, fleet, config, onCancel, onSave }) {
   const [forkliftId, setFork] = useState(task.forkliftId || task.equipmentId || ""), [date, setDate] = useState(task.nextDue ? tsToDate(task.nextDue) : tsToDate(toWorkday(Date.now()))), [active, setActive] = useState(task.active !== false), [err, setErr] = useState("");
+  const [ruleId, setRuleId] = useState(task.maintenanceRuleId || "");
   const selFleet = fleet.find((f) => f.id === forkliftId);
+  const applicableRules = useMemo(() => selFleet ? maintenanceRulesForUnit(pmRules(config), normalizeFleetUnitRef(selFleet, { modelType: config?.modelType || {} })) : [], [selFleet, config]);
+  useEffect(() => {
+    if (!selFleet) return;
+    if (!applicableRules.length) {
+      if (ruleId) setRuleId("");
+      return;
+    }
+    if (!applicableRules.some((rule) => rule.id === ruleId)) setRuleId(applicableRules[0].id);
+  }, [selFleet, applicableRules, ruleId]);
+  const selectedRule = applicableRules.find((rule) => rule.id === ruleId) || null;
   const freq = selFleet ? pmFreqForUnit(selFleet, config) : "monthly";
-  const save = () => { if (!forkliftId) return setErr("נא לבחור כלי"); const ts = dateToTs(date); if (!ts) return setErr("נא לבחור תאריך"); const now = Date.now(); onSave({ id: task.id || uid(), forkliftId, frequency: freq, nextDue: toWorkday(ts), active, createdAt: task.createdAt || now, lastDone: task.lastDone || null, history: task.history || [] }); };
+  const save = () => {
+    if (!forkliftId) return setErr("נא לבחור כלי");
+    const ts = dateToTs(date);
+    if (!ts) return setErr("נא לבחור תאריך");
+    const now = Date.now();
+    const ruleFields = selectedRule ? {
+      frequency: "custom_months",
+      title: selectedRule.name,
+      maintenanceRuleId: selectedRule.id,
+      maintenanceRuleName: selectedRule.name,
+      intervalMonths: selectedRule.intervalMonths,
+      checklistTemplateId: selectedRule.checklistTemplateId || ""
+    } : {
+      frequency: freq,
+      title: task.title || freqOf(freq).label,
+      maintenanceRuleId: "",
+      maintenanceRuleName: "",
+      intervalMonths: null,
+      checklistTemplateId: task.checklistTemplateId || ""
+    };
+    onSave({ id: task.id || uid(), forkliftId, ...ruleFields, nextDue: toWorkday(ts), active, createdAt: task.createdAt || now, lastDone: task.lastDone || null, history: task.history || [] });
+  };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{task.id ? "עריכת שיבוץ" : "שיבוץ טיפול תקופתי"}</div></div>
     <div className="body">
-      <div className="note">בחרו כלי ומועד הטיפול הבא. התדירות והמועדים העתידיים נקבעים אוטומטית לפי סוג הכלי (נקבע בהגדרות → כלי שינוע).</div>
+      <div className="note">בחרו כלי, רגולציית טיפול ומועד ראשון. המועדים הבאים יחושבו לפי חודשים מתוך הגדרות כלי השינוע.</div>
       <div className="field" style={{ marginTop: 12 }}><span>כלי *</span>
         <UnitPicker fleet={fleet} config={config} value={forkliftId} onChange={(id) => { setFork(id); setErr(""); }} />
       </div>
+      {selFleet && applicableRules.length > 0 && <label className="field"><span>רגולציית טיפול *</span><select value={ruleId} onChange={(e) => setRuleId(e.target.value)}>{applicableRules.map((rule) => <option key={rule.id} value={rule.id}>{rule.name} · כל {rule.intervalMonths} חודשים</option>)}</select></label>}
       <label className="field"><span>מועד הטיפול הבא *</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><div className="hint">ימי עבודה: ראשון–חמישי. תאריך שיחול בשישי/שבת יוזז ליום העבודה הקרוב.</div></label>
-      {selFleet && <div className="note" style={{ borderColor: "var(--primary)" }}><CalendarClock size={13} /> תדירות לפי סוג {unitTypeName(selFleet, config)}: <b>{freqOf(freq).label}</b> · הטיפול הבא יחושב אוטומטית כל {freqOf(freq).days} ימים.</div>}
+      {selFleet && <div className="note" style={{ borderColor: "var(--primary)" }}><CalendarClock size={13} /> {selectedRule ? <>נבחר: <b>{selectedRule.name}</b> · כל {selectedRule.intervalMonths} חודשים.</> : <>לא נמצאה רגולציה מתאימה לכלי זה. נשמרת תאימות ישנה לפי סוג {unitTypeName(selFleet, config)}: <b>{freqOf(freq).label}</b>.</>}</div>}
       <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> שיבוץ פעיל</label>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>שמירה</button><div style={{ height: 24 }} />
@@ -6203,7 +6244,8 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
         log: [{ at: now, by: session.name, byRole: session.role, kind: "open", text: `נפתח מטיפול תקופתי — עבודות המשך${fuWear ? " · סיווג: " + (WEAR.find((w) => w.id === fuWear)?.label || "") : ""} · ${waiting ? "ממתין · " + waitReasonLabel(fuWaitReason || "parts", config) : "בעבודה"}` }],
       });
     }
-    onSave({ ...task, lastDone: now, nextDue: toWorkday(now + freqOf(task.frequency).days * 86400000), history: [...(task.history || []), { type: "done", at: now, by: session.name, hadPaid: !!followUp, paidNote: paidNote.trim(), ticketId }] });
+    const nextDue = nextMaintenanceDueFrom(now, pmIntervalMonths(task, config), { adjustToWorkday: toWorkday }) || toWorkday(now + freqOf(task.frequency).days * 86400000);
+    onSave({ ...task, lastDone: now, nextDue, history: [...(task.history || []), { type: "done", at: now, by: session.name, hadPaid: !!followUp, paidNote: paidNote.trim(), ticketId }] });
     onClose();
   };
   const markMissed = () => {
@@ -6213,7 +6255,7 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">טיפול תקופתי</div>{canManage && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }} aria-label="עריכת טיפול תקופתי"><PenLine size={18} /></button>}</div>
     <div className="body">
-      <div className="detail-top"><span className="badge" style={{ color: pmColor(d), background: "var(--surface-2)" }}>{d < 0 ? `באיחור ${-d} י׳` : d === 0 ? "היום" : `בעוד ${d} ימים`}</span><span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{freqOf(task.frequency).label}</span></div>
+      <div className="detail-top"><span className="badge" style={{ color: pmColor(d), background: "var(--surface-2)" }}>{d < 0 ? `באיחור ${-d} י׳` : d === 0 ? "היום" : `בעוד ${d} ימים`}</span><span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{pmRuleTitle(task, config)} · {pmIntervalLabel(task, config)}</span></div>
       <h2 className="detail-subj">{f ? `${unitLabel(f, config)}` : "כלי לא ידוע"}</h2>
       <div className="meta-grid">
         <Meta Icon={Truck} label="סוג" value={f?.type || "—"} />
@@ -6285,7 +6327,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
   const withCost = closedP.filter((t) => t.closure?.costAmount);
   const totalCost = withCost.reduce((a, t) => a + t.closure.costAmount, 0);
   const avgCost = withCost.length ? Math.round(totalCost / withCost.length) : 0;
-  const pmHist = (pm || []).flatMap((x) => { const f = pmFleet(x, fleet); return (x.history || []).map((h) => ({ ...h, code: f ? f.code : "—" })); }).filter((h) => inP(h.at));
+  const pmHist = (pm || []).flatMap((x) => { const f = pmFleet(x, fleet); return (x.history || []).map((h) => ({ ...h, code: f ? f.code : "—", ruleTitle: pmRuleTitle(x, config) })); }).filter((h) => inP(h.at));
   const pmDone = pmHist.filter((h) => h.type === "done").length;
   const pmMissed = pmHist.filter((h) => h.type === "missed").length;
   const pmPaid = pmHist.filter((h) => h.type === "done" && h.hadPaid).length;
@@ -6402,7 +6444,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(sum)), "סיכום");
       if (pmHist.length) {
         const pmRows = pmHist.sort((a, b) => b.at - a.at).map((h) => ({
-          "כלי": h.code, "פעולה": h.type === "missed" ? "לא הגיע" : "בוצע", "תאריך": fmtDate(h.at), "ע״י": h.by,
+          "כלי": h.code, "רגולציה": h.ruleTitle || "", "פעולה": h.type === "missed" ? "לא הגיע" : "בוצע", "תאריך": fmtDate(h.at), "ע״י": h.by,
           "עבודות בתשלום": h.hadPaid ? "כן" : "", "הערה": h.paidNote || "",
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(pmRows)), "טיפולים תקופתיים");

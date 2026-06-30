@@ -21,11 +21,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-### Active branch: codex/add-fleet-maintenance-rule-settings
-
-- In progress: continue the flexible fleet maintenance / inspection policy redesign without breaking the existing periodic calendar, exports, or ticket creation flows.
-- Current PR scope: add the first UI settings surface for owner-defined maintenance regulations in `כלי שינוע → הגדרות`. This stores rule names, month intervals, checklist links, and type/model targets while keeping the old periodic calendar wiring intact for the next PR.
-- Validation so far: targeted fleet maintenance policy tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, `npm run build` passed, and local Playwright smoke confirmed the fleet settings screen renders the new maintenance-regulation block, can add/save a `TO 500` rule in demo mode, shows no red save-failure banner, and has no horizontal overflow.
+- Active branch: `codex/connect-maintenance-rules-calendar`.
+- In progress: continue the flexible fleet maintenance / inspection policy redesign without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data.
+- Current PR scope: connect owner-defined maintenance regulations from `כלי שינוע → הגדרות` to the periodic maintenance schedule. New schedule entries can select a matching rule, store its name/month interval/checklist link, calculate the next due date by calendar months, and show the rule name in lists/history/exports. Legacy `pmFreq` entries remain readable as a fallback.
+- Validation so far: targeted fleet maintenance policy tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, `npm run build` passed, and local Playwright smoke confirmed `כלי שינוע → לוח טיפולים` plus the periodic-maintenance scheduling form render without a red save-failure banner, console errors, or horizontal overflow.
+- Latest completed work: PR #504 added the first UI settings surface for owner-defined maintenance regulations in `כלי שינוע → הגדרות`. This stores rule names, month intervals, checklist links, and type/model targets while keeping the old periodic calendar wiring intact for the next PR.
+- Validation for PR #504: targeted fleet maintenance policy tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, `npm run build` passed, and local Playwright smoke confirmed the fleet settings screen renders the new maintenance-regulation block, can add/save a `TO 500` rule in demo mode, shows no red save-failure banner, and has no horizontal overflow.
 
 - Latest completed work: PR #502 added GitHub Actions CI for pull requests and pushes to `main`, running `npm ci`, unit tests, `release:check`, and production build.
 - Validation for PR #502: full local tests passed, `release:check` passed, `git diff --check` passed, production build passed, GitHub Actions `test-build` passed, and Vercel checks passed before merge.

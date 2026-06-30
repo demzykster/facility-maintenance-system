@@ -4,7 +4,10 @@ import {
   buildMaintenanceAssignments,
   checklistTemplateMatchesUnit,
   fleetRuleTargetMatchesUnit,
+  maintenanceIntervalMonthsForTask,
+  maintenanceRuleForTask,
   maintenanceRulesForUnit,
+  maintenanceTitleForTask,
   nextMaintenanceDueFrom,
   normalizeFleetUnitRef,
   normalizeMaintenanceRules
@@ -91,5 +94,17 @@ describe("fleetMaintenancePolicyModel", () => {
     const jan31 = new Date(2026, 0, 31).getTime();
     expect(localYmd(addMonthsClamped(jan31, 1))).toBe("2026-02-28");
     expect(localYmd(nextMaintenanceDueFrom(jan31, 12))).toBe("2027-01-31");
+  });
+
+  it("resolves schedule details from a stored maintenance rule while keeping a fallback", () => {
+    const rules = normalizeMaintenanceRules([
+      { id: "to-500", name: "TO 500", intervalMonths: 4, vehicleTypeNames: ["מלגזת היגש"] }
+    ]);
+    const task = { maintenanceRuleId: "to-500" };
+
+    expect(maintenanceRuleForTask(task, rules)?.name).toBe("TO 500");
+    expect(maintenanceIntervalMonthsForTask(task, rules, 12)).toBe(4);
+    expect(maintenanceTitleForTask(task, rules)).toBe("TO 500");
+    expect(maintenanceIntervalMonthsForTask({ frequency: "legacy" }, rules, 6)).toBe(6);
   });
 });
