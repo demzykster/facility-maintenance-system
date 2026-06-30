@@ -21,17 +21,24 @@ describe("Vercel API route policy", () => {
     expect(result.errors[0]).toContain("unexpected_api_route_files");
   });
 
-  it("keeps the Hobby function limit visible", () => {
+  it("keeps the API route budget visible", () => {
     const result = vercelApiRoutePolicy([
       ...VERCEL_API_ROUTE_FILES,
       "api/x/1.js",
       "api/x/2.js",
       "api/x/3.js",
       "api/x/4.js",
-      "api/x/5.js"
+      "api/x/5.js",
+      "api/x/6.js",
+      "api/x/7.js",
+      "api/x/8.js",
+      "api/x/9.js",
+      "api/x/10.js",
+      "api/x/11.js",
+      "api/x/12.js"
     ]);
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toContain("api_route_count_exceeds_limit:17/12");
+    expect(result.errors).toContain("api_route_count_exceeds_limit:25/24");
   });
 });

@@ -28,7 +28,8 @@ describe("productionLoginAdapter", () => {
       supabaseAnonKey: "anon",
       sessionApiUrl: "/api/session/me",
       profileApiUrl: "/api/session/profile",
-      changePasswordApiUrl: "/api/session/change-password"
+      changePasswordApiUrl: "/api/session/change-password",
+      workerActivationApiUrl: "/api/session/worker-activation"
     });
     expect(productionLoginReady(productionLoginConfigFromEnv({}))).toBe(false);
     expect(productionLoginReady(productionLoginConfigFromEnv({ VITE_SUPABASE_URL: "https://supabase.example", VITE_SUPABASE_ANON_KEY: "anon" }))).toBe(true);

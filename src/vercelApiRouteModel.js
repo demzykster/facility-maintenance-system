@@ -1,4 +1,4 @@
-export const VERCEL_HOBBY_FUNCTION_LIMIT = 12;
+export const VERCEL_API_ROUTE_FUNCTION_BUDGET = 24;
 
 export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/ai/intake.js",
@@ -10,12 +10,13 @@ export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/public/complaints.js",
   "api/push.js",
   "api/session/change-password.js",
+  "api/session/worker-activation.js",
   "api/session/profile.js",
   "api/session/me.js",
   "api/system-errors.js"
 ]);
 
-export function vercelApiRoutePolicy(files = [], { functionLimit = VERCEL_HOBBY_FUNCTION_LIMIT } = {}) {
+export function vercelApiRoutePolicy(files = [], { functionLimit = VERCEL_API_ROUTE_FUNCTION_BUDGET } = {}) {
   const apiFiles = [...new Set((files || []).map((file) => String(file || "").replace(/\\/g, "/")))]
     .filter((file) => file.startsWith("api/") && file.endsWith(".js"))
     .sort();
