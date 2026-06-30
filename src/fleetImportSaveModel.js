@@ -10,6 +10,7 @@ export const chunkFleetImportUnits = (units = [], size = FLEET_IMPORT_BATCH_SIZE
 
 export async function saveFleetImportAtomically({
   units = [],
+  catalogAdditions = [],
   saveMany = null,
   saveOne = null,
   saveCatalog = null,
@@ -25,6 +26,14 @@ export async function saveFleetImportAtomically({
 
   try {
     report();
+    if (typeof saveMany === "function" && (catalogAdditions || []).length) {
+      const ok = await saveMany(list, catalogAdditions);
+      if (ok === false) throw new Error("fleet_import_save_failed");
+      savedIds.push(...list.map((unit) => unit.id));
+      report();
+      return { ok: true, savedIds };
+    }
+
     for (const chunk of chunkFleetImportUnits(list, batchSize)) {
       if (typeof saveMany === "function") {
         const ok = await saveMany(chunk);

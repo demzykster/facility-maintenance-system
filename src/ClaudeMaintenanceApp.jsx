@@ -5414,11 +5414,12 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
     setBusy(true); setErr(""); setImportError(""); setImportProgress({ saved: 0, total: readyRows.length });
     try {
       const now = Date.now();
-      const units = readyRows.map((row, i) => ({ id: uid(), ...row.unit, createdAt: now + i, updatedAt: now + i }));
+      const units = readyRows.map((row, i) => ({ ...row.unit, id: uid(), createdAt: now + i, updatedAt: now + i }));
       const importResult = await saveFleetImportAtomically({
         units,
+        catalogAdditions,
         batchSize: 25,
-        saveMany: typeof onImportMany === "function" ? (chunk) => onImportMany(chunk, []) : null,
+        saveMany: typeof onImportMany === "function" ? (chunk, additions = []) => onImportMany(chunk, additions) : null,
         saveOne: onImport,
         rollbackOne: onDelete,
         saveCatalog: catalogAdditions.length && onSaveCatalog ? () => onSaveCatalog(catalogAdditions) : null,
