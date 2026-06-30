@@ -1,5 +1,5 @@
 export function hasSavedVehicleTypeCatalog(config) {
-  return Array.isArray(config?.vehicleTypes) && config.vehicleTypes.length > 0;
+  return Array.isArray(config?.vehicleTypes) && (config.vehicleTypes.length > 0 || config.vehicleTypesSaved === true);
 }
 
 export function cloneVehicleTypeCatalog(vehicleTypes = []) {

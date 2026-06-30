@@ -538,7 +538,7 @@ const flattenVehicleTypes = (vts) => {
       modelSupplier[m] = vt.supplier || ""; modelType[m] = (vt.name || "").trim();
     });
   });
-  return { vehicleTypes: vts, forkliftTypes, typeSla, typeMeta, modelSupplier, modelType };
+  return { vehicleTypes: vts, vehicleTypesSaved: true, vtMigV: 2, forkliftTypes, typeSla, typeMeta, modelSupplier, modelType };
 };
 const mergeFleetCatalogAdditions = (config, fleet, additions) => {
   const list = vehicleCatalogBase({
