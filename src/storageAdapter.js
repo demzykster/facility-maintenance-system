@@ -6,11 +6,19 @@ const importEnv = () => import.meta.env || {};
 const productionAuthStore = createProductionAuthStore();
 let authRefreshPromise = null;
 
+export function shouldClearExpiredNonRefreshAuth(auth, now = Date.now()) {
+  if (!auth?.accessToken || !auth.expiresAt || auth.refreshToken) return false;
+  return auth.expiresAt <= now + 60_000;
+}
+
 async function productionAccessToken() {
   const auth = productionAuthStore.get();
   if (!auth?.accessToken) return "";
   if (!auth.expiresAt || auth.expiresAt > Date.now() + 60_000) return auth.accessToken;
-  if (!auth.refreshToken) return auth.accessToken;
+  if (!auth.refreshToken) {
+    productionAuthStore.clear();
+    return "";
+  }
 
   const config = productionLoginConfigFromEnv(importEnv());
   if (!productionLoginReady(config)) return auth.accessToken;

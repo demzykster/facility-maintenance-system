@@ -202,7 +202,9 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       }
       return {
         session: data.user ? cmmsSessionFromProductionUser(data.user) : null,
-        auth: null
+        auth: data.pinSessionToken
+          ? { accessToken: data.pinSessionToken, refreshToken: null, expiresAt: data.pinSessionExpiresAt || 0, tokenType: "cmms-pin" }
+          : null
       };
     },
     async completeInitialPassword({ identifier, pin, password }) {
@@ -217,7 +219,11 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       }
       return {
         session: data.user ? cmmsSessionFromProductionUser(data.user) : null,
-        auth: data.auth ? productionAuthFromSupabase(data.auth) : null
+        auth: data.auth
+          ? productionAuthFromSupabase(data.auth)
+          : (data.pinSessionToken
+            ? { accessToken: data.pinSessionToken, refreshToken: null, expiresAt: data.pinSessionExpiresAt || 0, tokenType: "cmms-pin" }
+            : null)
       };
     }
   };

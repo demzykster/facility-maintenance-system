@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildCmmsPinSessionPayload,
   buildSessionPayload,
   createSessionMeHandler,
   createSupabaseSessionClient
 } from "../server/session/sessionHandler.js";
+import { signCmmsSessionToken } from "../server/session/cmmsSessionToken.js";
 
 function createRes() {
   return {
@@ -93,6 +95,40 @@ describe("session handler", () => {
     expect(buildSessionPayload({ id: "auth-user-1" }, { id: "app-user-1", auth_user_id: "auth-user-1", role: "admin", name: "Owner", active: false })).toEqual({ ok: false, error: "app_user_disabled" });
   });
 
+  it("builds a session from a valid CMMS PIN token and stored worker profile", () => {
+    expect(buildCmmsPinSessionPayload({
+      id: "worker-1",
+      role: "worker",
+      workerNo: "1042"
+    }, {
+      id: "worker-1",
+      role: "worker",
+      name: "Worker",
+      workerNo: "1042",
+      active: true,
+      dept: "נפחי",
+      perms: { cleaning: "request" }
+    })).toEqual({
+      ok: true,
+      user: {
+        id: "worker-1",
+        authUserId: "",
+        email: "",
+        phone: "",
+        role: "worker",
+        name: "Worker",
+        workerNo: "1042",
+        department: "נפחי",
+        departments: ["נפחי"],
+        mgrZones: [],
+        techScope: "transport",
+        supplier: "",
+        permissions: { cleaning: "request" },
+        mustChangePassword: false
+      }
+    });
+  });
+
   it("serves the current session through the injected server client", async () => {
     const sessionClient = {
       getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1", email: "admin@example.com" }),
@@ -123,6 +159,46 @@ describe("session handler", () => {
     });
     expect(sessionClient.getAuthUser).toHaveBeenCalledWith("user-token");
     expect(sessionClient.getAppUserProfile).toHaveBeenCalledWith("user-token", "auth-user-1");
+  });
+
+  it("serves a current worker session through a CMMS PIN token", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([{
+        key: "user:worker-1",
+        value: JSON.stringify({
+          id: "worker-1",
+          role: "worker",
+          name: "Worker",
+          workerNo: "1042",
+          active: true
+        })
+      }])
+    };
+    const sessionClient = {
+      getAuthUser: vi.fn(),
+      getAppUserProfile: vi.fn()
+    };
+    const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;
+    const handler = createSessionMeHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_SESSION_SECRET: "session-secret" }
+    });
+
+    const res = await call(handler, { headers: { authorization: `Bearer ${token}` } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      user: {
+        id: "worker-1",
+        role: "worker",
+        name: "Worker",
+        workerNo: "1042"
+      }
+    });
+    expect(driver.listValues).toHaveBeenCalledWith("user:", true);
+    expect(sessionClient.getAuthUser).not.toHaveBeenCalled();
   });
 
   it("calls Supabase Auth and app_users REST with anon key plus user bearer token", async () => {

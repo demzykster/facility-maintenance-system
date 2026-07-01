@@ -26,6 +26,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: none.
 - No active product PR is paused.
 - Latest completed product work:
+  - Worker/cleaner PIN sessions now use a signed CMMS session token so first login, repeat login, `/api/session/me`, and `/api/kv` all work without a Supabase password session. Production requires `CMMS_SESSION_SECRET`.
   - Repeat worker/cleaner login after first PIN setup now routes to a server-side PIN login action instead of treating `initial_secret_already_configured` as a fatal first-login error.
   - PR #542 replaced generated activation-link onboarding with first-login password/PIN setup: new login-capable users are saved without generated secrets, then create their own password/PIN after entering email or worker number.
   - PR #541 restored activation-link creation from saved user profiles, but that direction is now superseded by the owner-approved first-login setup model implemented in PR #542.
@@ -61,6 +62,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - `npm run staging:data:summary` is the safe way to inspect table/key counts without printing secrets or record contents.
 - Last checked staging data summary on 2026-07-01: `app_users=1`, `cmms_kv_records=15`, `file_metadata=0`, `audit_events=1346`; KV prefixes included `appIssue=3`, `config=1`, `czone=1`, `fleet=1`, `itpl=2`, `mtask=1`, `ppeitem=1`, `presence=1`, `pushSubscriptions=1`, `user=3`.
 - Public and server Supabase env must point at the same project/key pair.
+- `CMMS_SESSION_SECRET` must be present in Vercel Production for worker/cleaner PIN sessions, because those roles do not receive Supabase refresh tokens.
 - Phone push notifications are PWA/web-push. Users still need a supported browser/PWA install and notification permission.
 - Role defaults, individual module permissions, and notification preferences should stay one coherent access-control surface.
 - Production AI remains disabled for v1; AI readiness is architectural preparation.

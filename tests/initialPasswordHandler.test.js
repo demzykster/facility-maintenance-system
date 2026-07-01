@@ -72,7 +72,7 @@ describe("initial password handler", () => {
       listValues: vi.fn().mockResolvedValue([{ key: "user:worker-1", value: JSON.stringify(newWorker) }]),
       set: vi.fn().mockResolvedValue(undefined)
     };
-    const handler = createInitialPasswordHandler({ driver, now: () => 123456 });
+    const handler = createInitialPasswordHandler({ driver, env: { CMMS_SESSION_SECRET: "session-secret" }, now: () => 123456 });
 
     const res = await call(handler, { body: { action: "complete", identifier: "1042", pin: "6789" } });
 
@@ -80,8 +80,10 @@ describe("initial password handler", () => {
     expect(res.json()).toMatchObject({
       ok: true,
       user: { id: "worker-1", name: "Worker One", role: "worker", workerNo: "1042" },
-      auth: null
+      auth: null,
+      pinSessionExpiresAt: 86523000
     });
+    expect(res.json().pinSessionToken).toEqual(expect.stringContaining("."));
     expect(driver.set).toHaveBeenCalledWith("user:worker-1", JSON.stringify({
       ...newWorker,
       pin: "6789",
@@ -149,7 +151,7 @@ describe("initial password handler", () => {
       listValues: vi.fn().mockResolvedValue([{ key: "user:worker-1", value: JSON.stringify({ ...newWorker, pin: "1234" }) }]),
       set: vi.fn()
     };
-    const handler = createInitialPasswordHandler({ driver });
+    const handler = createInitialPasswordHandler({ driver, env: { CMMS_SESSION_SECRET: "session-secret" }, now: () => 123456 });
 
     const res = await call(handler, { body: { action: "validate", identifier: "1042" } });
 
@@ -167,7 +169,7 @@ describe("initial password handler", () => {
       listValues: vi.fn().mockResolvedValue([{ key: "user:worker-1", value: JSON.stringify({ ...newWorker, pin: "1234" }) }]),
       set: vi.fn()
     };
-    const handler = createInitialPasswordHandler({ driver });
+    const handler = createInitialPasswordHandler({ driver, env: { CMMS_SESSION_SECRET: "session-secret" }, now: () => 123456 });
 
     const res = await call(handler, { body: { action: "login", identifier: "1042", pin: "1234" } });
 
@@ -175,8 +177,10 @@ describe("initial password handler", () => {
     expect(res.json()).toMatchObject({
       ok: true,
       auth: null,
+      pinSessionExpiresAt: 86523000,
       user: { id: "worker-1", name: "Worker One", role: "worker", workerNo: "1042" }
     });
+    expect(res.json().pinSessionToken).toEqual(expect.stringContaining("."));
     expect(driver.set).not.toHaveBeenCalled();
   });
 
