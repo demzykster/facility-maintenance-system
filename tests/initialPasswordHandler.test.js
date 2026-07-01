@@ -154,7 +154,43 @@ describe("initial password handler", () => {
     const res = await call(handler, { body: { action: "validate", identifier: "1042" } });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toMatchObject({ error: "initial_secret_already_configured" });
+    expect(res.json()).toMatchObject({
+      error: "initial_secret_already_configured",
+      auth: "pin",
+      user: { name: "Worker One", role: "worker", workerNo: "1042" }
+    });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("logs in an existing worker with a configured PIN", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([{ key: "user:worker-1", value: JSON.stringify({ ...newWorker, pin: "1234" }) }]),
+      set: vi.fn()
+    };
+    const handler = createInitialPasswordHandler({ driver });
+
+    const res = await call(handler, { body: { action: "login", identifier: "1042", pin: "1234" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      auth: null,
+      user: { id: "worker-1", name: "Worker One", role: "worker", workerNo: "1042" }
+    });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("rejects an existing worker login with the wrong PIN", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([{ key: "user:worker-1", value: JSON.stringify({ ...newWorker, pin: "1234" }) }]),
+      set: vi.fn()
+    };
+    const handler = createInitialPasswordHandler({ driver });
+
+    const res = await call(handler, { body: { action: "login", identifier: "1042", pin: "9999" } });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({ error: "pin_login_failed" });
     expect(driver.set).not.toHaveBeenCalled();
   });
 });
