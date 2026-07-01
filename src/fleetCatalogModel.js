@@ -34,6 +34,32 @@ export function vehicleTypeInUseCodes(vehicleType, fleet = []) {
   return [...new Set(codes)];
 }
 
+export function fleetUnitsMissingFromVehicleCatalog(fleet = [], vehicleTypes = []) {
+  const typeNames = new Set();
+  const modelCodes = new Set();
+
+  (vehicleTypes || []).forEach((vehicleType) => {
+    const typeName = String(vehicleType?.name || "").trim();
+    if (typeName) typeNames.add(typeName);
+    vehicleTypeModelCodes(vehicleType).forEach((model) => modelCodes.add(model));
+  });
+
+  const missing = [];
+  (fleet || []).forEach((unit) => {
+    const explicitKind = String(unit?.vehicleKind || "").trim();
+    const model = String(unit?.model || (explicitKind ? "" : unit?.type) || "").trim();
+
+    if (explicitKind) {
+      if (!typeNames.has(explicitKind)) missing.push(unit);
+      return;
+    }
+
+    if (model && !modelCodes.has(model)) missing.push(unit);
+  });
+
+  return missing;
+}
+
 export function shouldUseBuiltInVehicleCatalog({ productionStartsEmpty = false, hasSavedCatalog = false, fleetCount = 0 } = {}) {
   if (hasSavedCatalog) return true;
   if (fleetCount > 0) return true;
