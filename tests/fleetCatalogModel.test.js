@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  catalogAwareTypeMaps,
   cloneVehicleTypeCatalog,
   fleetUnitsMissingFromVehicleCatalog,
   hasSavedVehicleTypeCatalog,
   shouldUseBuiltInVehicleCatalog,
   vehicleCatalogBase,
+  vehicleTypeExistsInConfig,
   vehicleTypeInUseCodes,
   vehicleTypeModelCodes
 } from "../src/fleetCatalogModel.js";
@@ -58,6 +60,52 @@ describe("fleetCatalogModel", () => {
     });
 
     expect(built).toEqual([]);
+  });
+
+  it("does not merge built-in type maps back into an explicitly saved empty catalog", () => {
+    const maps = catalogAwareTypeMaps({
+      vehicleTypes: [],
+      vehicleTypesSaved: true
+    }, {
+      forkliftTypes: ["OSE250"],
+      typeSla: { OSE250: { high: 4 } },
+      typeMeta: { OSE250: { tasrir: true } }
+    });
+
+    expect(maps).toEqual({
+      forkliftTypes: [],
+      typeSla: {},
+      typeMeta: {}
+    });
+  });
+
+  it("keeps legacy default type maps only when no structured catalog was saved", () => {
+    const maps = catalogAwareTypeMaps({
+      typeMeta: { LPE200: { license: true } }
+    }, {
+      forkliftTypes: ["OSE250"],
+      typeSla: { OSE250: { high: 4 } },
+      typeMeta: { OSE250: { tasrir: true } }
+    });
+
+    expect(maps.forkliftTypes).toEqual(["OSE250"]);
+    expect(maps.typeMeta).toEqual({
+      OSE250: { tasrir: true },
+      LPE200: { license: true }
+    });
+  });
+
+  it("does not treat legacy typeMeta as a real type after a structured catalog was saved", () => {
+    expect(vehicleTypeExistsInConfig("OSE250", {
+      vehicleTypes: [],
+      vehicleTypesSaved: true,
+      typeMeta: { OSE250: { tasrir: true } }
+    })).toBe(false);
+
+    expect(vehicleTypeExistsInConfig("OSE250", {
+      vehicleTypes: [],
+      typeMeta: { OSE250: { tasrir: true } }
+    })).toBe(true);
   });
 
   it("clones saved catalog models before editing", () => {

@@ -35,7 +35,7 @@ import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
-import { fleetUnitsMissingFromVehicleCatalog, vehicleCatalogBase, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
+import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatalogBase, vehicleTypeExistsInConfig, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
@@ -564,7 +564,7 @@ const mergeFleetCatalogAdditions = (config, fleet, additions) => {
 const modelTypeName = (model, cfg) => (cfg?.modelType?.[model]) || "";
 const modelSupplierOf = (model, cfg) => (cfg?.modelSupplier?.[model]) || "";
 // --- Единый фундамент идентификации юнита: внутр.№ · тип · модель ---
-const vehicleTypeExists = (name, cfg) => !!name && ((cfg?.vehicleTypes || []).some((v) => (v.name || "").trim() === name) || !!cfg?.typeMeta?.[name]);
+const vehicleTypeExists = vehicleTypeExistsInConfig;
 const unitModelCode = (f) => (f && (f.model || f.type)) || "";                         // модель (код производителя), legacy: f.type
 const unitTypeName = (f, cfg) => {
   if (!f) return "";
@@ -1429,6 +1429,7 @@ export default function App() {
     try {
       const sv = JSON.parse(savedConfig);
       const D = DEFAULT_CONFIG;
+      const typeMaps = catalogAwareTypeMaps(sv, D);
       setConfig({
         ...D,
         ...sv,
@@ -1438,8 +1439,7 @@ export default function App() {
         notify: { ...D.notify, ...(sv.notify || {}) },
         docWarn: { ...D.docWarn, ...(sv.docWarn || {}) },
         catSla: { ...D.catSla, ...(sv.catSla || {}) },
-        typeSla: { ...D.typeSla, ...(sv.typeSla || {}) },
-        typeMeta: { ...D.typeMeta, ...(sv.typeMeta || {}) }
+        ...typeMaps
       });
     } catch {}
   };
