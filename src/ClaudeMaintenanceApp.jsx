@@ -1764,7 +1764,7 @@ export default function App() {
   const syncAdminProfileUser = async (u) => {
     if (!u?.authUserId) return;
     const accessToken = PRODUCTION_AUTH_STORE.get()?.accessToken;
-    if (!accessToken) return;
+    if (!accessToken) throw new Error("admin_profile_sync_missing_token");
     const patch = {
       name: u.name || "",
       role: u.role || "user",
@@ -1792,8 +1792,13 @@ export default function App() {
     }
   };
   const saveUser = async (u) => {
+    try {
+      await syncAdminProfileUser(u);
+    } catch (error) {
+      console.warn("admin profile sync failed", error);
+      return false;
+    }
     if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false;
-    syncAdminProfileUser(u).catch((error) => console.warn("admin profile sync failed", error));
     setUsers((s) => [...s.filter((x) => x.id !== u.id), u]);
     return true;
   };
@@ -7402,7 +7407,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
     return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select aria-label={`הרשאה: ${label}`} value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
   };
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return setErr("נא להזין שם");
     if (role === "tech") {
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
@@ -7416,7 +7421,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
     const nextPin = roleUsesPin ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : "";
     const nextPassword = roleUsesPassword ? (canWorkerAccess ? password : (user.password || "")) : "";
-    onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), phone: phone.trim(), role,
+    const ok = await onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
       workerNo: (role === "worker" || role === "cleaner") ? workerNo.trim() : "",
@@ -7434,6 +7439,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       activationStatus: roleUsesLogin && (nextPin || nextPassword || user.authUserId) ? "activated" : "",
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
+    if (ok === false) setErr(SAVE_FAILED_MESSAGE);
   };
   const ActivationControls = () => {
     if (!roleUsesLogin) return null;
