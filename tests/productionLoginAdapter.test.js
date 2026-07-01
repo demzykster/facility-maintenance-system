@@ -4,13 +4,14 @@ import {
   cmmsSessionFromProductionUser,
   createProductionAuthStore,
   createProductionLoginClient,
-  activateProductionWorker,
+  completeProductionInitialPassword,
   loginWithProductionPassword,
   restoreProductionSession,
   productionAuthFromSupabase,
   productionLoginConfigFromEnv,
   productionLoginReady,
-  updateProductionProfile
+  updateProductionProfile,
+  validateProductionInitialPassword
 } from "../src/productionLoginAdapter.js";
 
 function memoryStorage() {
@@ -30,7 +31,7 @@ describe("productionLoginAdapter", () => {
       sessionApiUrl: "/api/session/me",
       profileApiUrl: "/api/session/profile",
       changePasswordApiUrl: "/api/session/change-password",
-      workerActivationApiUrl: "/api/session/worker-activation"
+      initialPasswordApiUrl: "/api/session/initial-password"
     });
     expect(productionLoginReady(productionLoginConfigFromEnv({}))).toBe(false);
     expect(productionLoginReady(productionLoginConfigFromEnv({ VITE_SUPABASE_URL: "https://supabase.example", VITE_SUPABASE_ANON_KEY: "anon" }))).toBe(true);
@@ -339,7 +340,39 @@ describe("productionLoginAdapter", () => {
     }));
   });
 
-  it("activates a password-link user and returns production auth", async () => {
+  it("validates a first-password setup request by identifier", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          needsSetup: true,
+          auth: "password",
+          identifierType: "email",
+          user: { name: "Manager", role: "user", email: "manager@example.com" }
+        });
+      }
+    });
+
+    const result = await validateProductionInitialPassword({
+      identifier: "manager@example.com",
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me",
+        initialPasswordApiUrl: "/api/session/initial-password"
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({ ok: true, needsSetup: true, auth: "password" });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/initial-password", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ action: "validate", identifier: "manager@example.com" })
+    }));
+  });
+
+  it("completes first-password setup and returns production auth", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
       async text() {
@@ -363,14 +396,14 @@ describe("productionLoginAdapter", () => {
       }
     });
 
-    const result = await activateProductionWorker({
-      token: "activation-token",
+    const result = await completeProductionInitialPassword({
+      identifier: "manager@example.com",
       password: "123456",
       config: {
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon-key",
         sessionApiUrl: "/api/session/me",
-        workerActivationApiUrl: "/api/session/worker-activation"
+        initialPasswordApiUrl: "/api/session/initial-password"
       },
       fetchImpl
     });
@@ -381,13 +414,10 @@ describe("productionLoginAdapter", () => {
       role: "user",
       productionSession: true
     });
-    expect(result.auth).toMatchObject({
-      accessToken: "access-token",
-      refreshToken: "refresh-token"
-    });
-    expect(fetchImpl).toHaveBeenCalledWith("/api/session/worker-activation", expect.objectContaining({
+    expect(result.auth).toMatchObject({ accessToken: "access-token" });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/initial-password", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ action: "activate", token: "activation-token", password: "123456" })
+      body: JSON.stringify({ action: "complete", identifier: "manager@example.com", password: "123456" })
     }));
   });
 });

@@ -1,8 +1,8 @@
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
 import { createUpstashKvDriverFromEnv } from "../kv/upstashDriver.js";
 
-const ACTIVATION_PIN_ROLES = new Set(["worker", "cleaner", "tech"]);
-const ACTIVATION_PASSWORD_ROLES = new Set(["admin", "user"]);
+const PIN_ROLES = new Set(["worker", "cleaner"]);
+const PASSWORD_ROLES = new Set(["admin", "user"]);
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -18,6 +18,15 @@ const readBody = async (req) => {
   return text ? JSON.parse(text) : {};
 };
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeIdentifier = (value) => String(value || "").trim();
+const trimSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
+
+function createDefaultDriver(env, fetchImpl) {
+  return (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
+    || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
+}
+
 const parseStoredUser = (record) => {
   if (!record?.value) return null;
   try {
@@ -28,31 +37,25 @@ const parseStoredUser = (record) => {
   }
 };
 
-const isPinActivationRole = (role) => ACTIVATION_PIN_ROLES.has(String(role || ""));
-const isPasswordActivationRole = (role) => ACTIVATION_PASSWORD_ROLES.has(String(role || ""));
-const isActivationLinkRole = (role) => isPinActivationRole(role) || isPasswordActivationRole(role);
+const secretKind = (role) => PASSWORD_ROLES.has(String(role || "")) ? "password" : (PIN_ROLES.has(String(role || "")) ? "pin" : "");
+const hasLoginSecret = (user = {}) => secretKind(user.role) === "password"
+  ? !!String(user.password || user.authUserId || "").trim()
+  : !!String(user.pin || "").trim();
 
-const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-const trimSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
+function publicInitialUser(user = {}) {
+  return {
+    name: user.name || "",
+    role: user.role || "user",
+    email: user.email || "",
+    workerNo: user.workerNo || ""
+  };
+}
 
-const isActivatableUser = (user, token) => (
-  isActivationLinkRole(user?.role)
-  && user.active !== false
-  && user.activationStatus === "pending"
-  && user.activationToken === token
-);
-
-const publicActivationUser = (user = {}) => ({
-  name: user.name || "",
-  role: user.role || "worker",
-  email: user.email || "",
-  workerNo: user.workerNo || ""
-});
-
-const publicActivatedSession = (user = {}) => ({
+const publicSession = (user = {}) => ({
   id: user.id || "",
+  authUserId: user.authUserId || "",
   name: user.name || "",
-  role: user.role || "worker",
+  role: user.role || "user",
   dept: user.dept || "",
   depts: Array.isArray(user.depts) ? user.depts : (user.dept ? [user.dept] : []),
   email: user.email || "",
@@ -66,23 +69,36 @@ const publicActivatedSession = (user = {}) => ({
   techCats: Array.isArray(user.techCats) ? user.techCats : [],
   mgrZones: Array.isArray(user.mgrZones) ? user.mgrZones : [],
   shift: user.shift || "",
-  perms: user.perms || user.permissions || {}
+  permissions: user.perms || user.permissions || {},
+  mustChangePassword: user.mustChangePassword === true
 });
 
-async function findActivationRecord(driver, token) {
+async function findInitialPasswordRecord(driver, identifier) {
+  const clean = normalizeIdentifier(identifier);
+  const email = normalizeEmail(clean);
   const records = await driver.listValues("user:", true);
   return (records || [])
     .map(parseStoredUser)
     .filter(Boolean)
-    .find(({ user }) => isActivatableUser(user, token));
+    .find(({ user }) => {
+      if (user?.active === false || user?.status === "archived") return false;
+      if (PASSWORD_ROLES.has(String(user?.role || ""))) return normalizeEmail(user.email) === email;
+      if (PIN_ROLES.has(String(user?.role || ""))) return normalizeIdentifier(user.workerNo) === clean;
+      return false;
+    });
 }
 
-function createDefaultDriver(env, fetchImpl) {
-  return (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
-    || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
+async function responseJson(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
 }
 
-function createSupabasePasswordActivationClient(env, fetchImpl) {
+function createSupabaseInitialPasswordClient(env, fetchImpl) {
   const supabaseUrl = trimSlash(env.SUPABASE_URL || env.VITE_SUPABASE_URL);
   const serviceRoleKey = String(env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   const anonKey = String(env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || "").trim();
@@ -92,16 +108,6 @@ function createSupabasePasswordActivationClient(env, fetchImpl) {
     apikey: serviceRoleKey,
     authorization: `Bearer ${serviceRoleKey}`,
     "content-type": "application/json"
-  };
-
-  const readJson = async (response) => {
-    const text = await response.text();
-    if (!text) return {};
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { message: text };
-    }
   };
 
   const appUserProfile = (user, authUserId) => ({
@@ -120,7 +126,7 @@ function createSupabasePasswordActivationClient(env, fetchImpl) {
     active: user.active !== false,
     must_change_password: false,
     login_metadata: {
-      source: "activation-link",
+      source: "initial-password",
       cmms_user_id: user.id || ""
     }
   });
@@ -148,7 +154,7 @@ function createSupabasePasswordActivationClient(env, fetchImpl) {
         headers: serviceHeaders,
         body: JSON.stringify(body)
       });
-      const data = await readJson(response);
+      const data = await responseJson(response);
       if (!response.ok) throw new Error(data?.message || data?.error || "auth_user_update_failed");
       return data?.id || user.authUserId;
     }
@@ -158,7 +164,7 @@ function createSupabasePasswordActivationClient(env, fetchImpl) {
       headers: serviceHeaders,
       body: JSON.stringify(body)
     });
-    const data = await readJson(response);
+    const data = await responseJson(response);
     if (!response.ok) throw new Error(data?.message || data?.error || "auth_user_create_failed");
     return data?.id || data?.user?.id || "";
   }
@@ -166,13 +172,10 @@ function createSupabasePasswordActivationClient(env, fetchImpl) {
   async function upsertAppUser(user, authUserId) {
     const response = await fetchImpl(`${supabaseUrl}/rest/v1/app_users?on_conflict=auth_user_id`, {
       method: "POST",
-      headers: {
-        ...serviceHeaders,
-        prefer: "resolution=merge-duplicates,return=representation"
-      },
+      headers: { ...serviceHeaders, prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify(appUserProfile(user, authUserId))
     });
-    const data = await readJson(response);
+    const data = await responseJson(response);
     if (!response.ok) throw new Error(data?.message || data?.error || "app_user_upsert_failed");
     return Array.isArray(data) ? data[0] : data;
   }
@@ -180,19 +183,16 @@ function createSupabasePasswordActivationClient(env, fetchImpl) {
   async function signIn(email, password) {
     const response = await fetchImpl(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: "POST",
-      headers: {
-        apikey: anonKey,
-        "content-type": "application/json"
-      },
+      headers: { apikey: anonKey, "content-type": "application/json" },
       body: JSON.stringify({ email: normalizeEmail(email), password })
     });
-    const data = await readJson(response);
-    if (!response.ok || !data?.access_token) throw new Error(data?.message || data?.error || "activation_login_failed");
+    const data = await responseJson(response);
+    if (!response.ok || !data?.access_token) throw new Error(data?.message || data?.error || "initial_password_login_failed");
     return data;
   }
 
   return {
-    async activatePasswordUser(user, password) {
+    async completePasswordUser(user, password) {
       const authUserId = await createOrUpdateAuthUser(user, password);
       const profile = await upsertAppUser(user, authUserId);
       const auth = await signIn(user.email, password);
@@ -208,23 +208,23 @@ function createSupabasePasswordActivationClient(env, fetchImpl) {
   };
 }
 
-export function createWorkerActivationHandler({
+export function createInitialPasswordHandler({
   driver = null,
-  passwordActivationClient = null,
+  passwordClient = null,
   env = process.env,
   fetchImpl = globalThis.fetch,
   now = Date.now
 } = {}) {
   const backendDriver = driver || createDefaultDriver(env, fetchImpl);
-  const passwordClient = passwordActivationClient || createSupabasePasswordActivationClient(env, fetchImpl);
+  const supabaseClient = passwordClient || createSupabaseInitialPasswordClient(env, fetchImpl);
 
-  return async function workerActivationHandler(req, res) {
+  return async function initialPasswordHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
     if (method !== "POST") {
       res.setHeader("allow", "POST");
       return json(res, 405, { error: "method_not_allowed" });
     }
-    if (!backendDriver) return json(res, 503, { error: "activation_backend_not_configured" });
+    if (!backendDriver) return json(res, 503, { error: "initial_password_backend_not_configured" });
 
     let body;
     try {
@@ -233,54 +233,56 @@ export function createWorkerActivationHandler({
       return json(res, 400, { error: "invalid_json" });
     }
 
-    const token = String(body?.token || "").trim();
-    const action = body?.action === "activate" ? "activate" : "validate";
-    if (token.length < 8 || token.length > 256) return json(res, 400, { error: "activation_token_invalid" });
+    const identifier = normalizeIdentifier(body?.identifier);
+    if (!identifier) return json(res, 400, { error: "identifier_required" });
+    const record = await findInitialPasswordRecord(backendDriver, identifier);
+    if (!record) return json(res, 404, { error: "user_not_found" });
 
-    const record = await findActivationRecord(backendDriver, token);
-    if (!record) return json(res, 404, { error: "activation_link_invalid" });
+    const kind = secretKind(record.user.role);
+    if (!kind) return json(res, 400, { error: "role_not_login_capable" });
+    if (hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_already_configured", user: publicInitialUser(record.user), auth: kind });
 
-    if (action === "validate") {
-      return json(res, 200, { ok: true, user: publicActivationUser(record.user) });
+    if (body?.action !== "complete") {
+      return json(res, 200, { ok: true, needsSetup: true, auth: kind, identifierType: kind === "password" ? "email" : "workerNo", user: publicInitialUser(record.user) });
     }
 
-    const role = record.user?.role || "worker";
-    const pin = String(body?.pin || "").trim();
     const password = String(body?.password || "").trim();
-    if (isPinActivationRole(role) && pin.length < 4) return json(res, 400, { error: "pin_too_short" });
-    if (isPasswordActivationRole(role) && password.length < 6) return json(res, 400, { error: "password_too_short" });
-    if (isPasswordActivationRole(role) && !normalizeEmail(record.user?.email)) return json(res, 400, { error: "email_required" });
+    const pin = String(body?.pin || "").trim();
+    if (kind === "password" && password.length < 6) return json(res, 400, { error: "password_too_short" });
+    if (kind === "pin" && pin.length < 4) return json(res, 400, { error: "pin_too_short" });
 
-    let passwordActivation = null;
-    if (isPasswordActivationRole(role) && passwordClient) {
+    let passwordSetup = null;
+    if (kind === "password") {
+      if (!supabaseClient) return json(res, 503, { error: "initial_password_auth_not_configured" });
       try {
-        passwordActivation = await passwordClient.activatePasswordUser(record.user, password);
+        passwordSetup = await supabaseClient.completePasswordUser(record.user, password);
       } catch (error) {
-        return json(res, 502, { error: error?.message || "password_activation_failed" });
+        return json(res, 502, { error: error?.message || "initial_password_auth_failed" });
       }
     }
 
     const updated = {
       ...record.user,
-      pin: isPinActivationRole(role) ? pin : "",
-      password: isPasswordActivationRole(role) && !passwordActivation ? password : "",
-      authUserId: passwordActivation?.user?.authUserId || record.user.authUserId || "",
+      password: kind === "password" && !passwordSetup ? password : "",
+      pin: kind === "pin" ? pin : "",
+      authUserId: passwordSetup?.user?.authUserId || record.user.authUserId || "",
       activationToken: "",
       activationStatus: "activated",
       activatedAt: now()
     };
-    const key = record.key || `user:${updated.id}`;
-    await backendDriver.set(key, JSON.stringify(updated), true);
+    await backendDriver.set(record.key, JSON.stringify(updated), true);
+
     return json(res, 200, {
       ok: true,
       user: {
-        ...publicActivatedSession(updated),
+        ...publicSession(updated),
+        id: passwordSetup?.user?.appUserId || updated.id || "",
         authUserId: updated.authUserId || "",
-        mustChangePassword: passwordActivation?.user?.mustChangePassword === true
+        mustChangePassword: passwordSetup?.user?.mustChangePassword === true
       },
-      auth: passwordActivation?.auth || null
+      auth: passwordSetup?.auth || null
     });
   };
 }
 
-export default createWorkerActivationHandler();
+export default createInitialPasswordHandler();

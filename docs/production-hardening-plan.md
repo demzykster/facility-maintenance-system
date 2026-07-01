@@ -28,7 +28,7 @@ Production requirement:
 ### P0 — Real Auth And Server-Side Permissions
 
 Current state:
-- login, PINs, activation links, and module permissions are enforced in the browser.
+- login, PINs, first-login setup, and module permissions are still partly enforced in the browser.
 - demo mode can still use built-in demo identities, but production mode must not.
 
 Production requirement:

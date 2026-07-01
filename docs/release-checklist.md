@@ -78,13 +78,13 @@ Done means:
 - Admin, manager, technician, worker, and cleaner each have a verified path to their expected modules.
 - Users with view-only permissions cannot edit.
 - Users with manage permissions can reach the relevant controls without needing unrelated admin access.
-- Worker activation/reset remains gated by `workerAccess:manage`.
+- Worker login setup/reset remains gated by `workerAccess:manage`.
 - Any role-specific smoke-check notes are captured in the related PR.
 
 Closed notes:
 - Manager/user routes now respect `users`, `audit`, `suppliers`, `analytics`, `settings`, and PPE management permissions.
 - View/manage split was checked for the newly exposed routes: suppliers edit controls still require `suppliers:manage`, analytics damage fields are read-only in manager/user route, sensitive settings actions still require `settings:full`.
-- Worker activation/reset remains gated by `workerAccess:manage`.
+- Worker login setup/reset remains gated by `workerAccess:manage`.
 - Role-smoke passed for admin, manager, technician, and worker; cleaner shell renders cleanly and shows the empty-zone state when current local data has no assigned cleaner.
 
 ### R5 — Screen Audit And Visual Noise
@@ -104,7 +104,7 @@ Closed notes:
 - `אנליטיקה`: drill-down paths, lifecycle/waiting metrics, export coverage, and visible wording were stabilized.
 - `ביגוד עובדים`: empty order states, order-line labels, net-deficit suggestions, catalog/settings labels, and movement search were stabilized.
 - `הגדרות`: duplicate module settings were moved to their module homes; waiting reasons, downtime levels, notifications, demo/backup copy, and delete actions were clarified.
-- `צוות ומשתמשים`: permissions UI, read-only cards, group toggles, worker activation flow, duplicate login warning, departments, and worker shifts were stabilized.
+- `צוות ומשתמשים`: permissions UI, read-only cards, group toggles, worker first-login setup flow, duplicate login warning, departments, and worker shifts were stabilized.
 - `כלי שינוע`: fleet search, driver coverage search, driver request labels, warning dismissal, vehicle-type settings, PM/detail edit labels, and inspection controls were stabilized.
 - `בקרת ניקיון`: zone setup, delete actions, report/spec actions, cleaner/manager/admin paths, and notification/report labels were stabilized.
 - Final browser pass over all seven R5 screens found no visible unlabeled controls. Remaining broad redesign ideas should be tracked as explicit new packages, not as R5 leftovers.
@@ -114,18 +114,17 @@ Closed notes:
 Status: done.
 
 Why it matters:
-- Worker activation works, but the flow should be obvious for the person creating/resetting access.
+- Worker login setup should be obvious for the person creating/resetting access.
 
 Done means:
-- Existing workers with pending temporary access have a clear next step.
-- Generated links explain when they must be saved before copying.
-- The saved/reopen behavior is not surprising.
+- New workers/users are saved without generated passwords, PINs, or links.
+- First login by email or worker number opens the personal password/PIN creation form.
+- Resetting access does not create a link; it clears the existing secret so the user sets a new one on next login.
 
 Closed notes:
-- New worker/cleaner forms now tell the editor to save the worker before copying the generated activation link.
-- Existing worker/cleaner reset flows now tell the editor to save the new activation/reset link before copying it.
-- The save button says `שמירת עובד והצגת קישור` while a generated link is not yet copyable.
-- Saved activation links still require `workerAccess:manage`, remain hidden until saved, and show a copied confirmation after copy.
+- The old activation-link model was replaced after owner review on 2026-07-01.
+- The user-facing flow is now `identifier -> continue -> create password/PIN -> save and enter`.
+- Reset remains permissioned by `workerAccess:manage`.
 
 ### R7 — Pre-Production Guardrails
 

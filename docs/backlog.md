@@ -30,16 +30,15 @@ Goal:
 
 ## Verified Planning Facts
 
-### Worker Activation UI
+### Worker First-Login Setup UI
 
-Status: wired, with one known UX limitation.
+Status: wired.
 
-- `src/workerAccessModel.js` provides `workerLoginStateText`, `canCopyActivationLink`, and `shouldSeedWorkerActivation`.
+- `src/workerAccessModel.js` provides first-login setup helpers and `workerLoginStateText`.
 - `src/ClaudeMaintenanceApp.jsx` shows worker login state in the user list through `workerLoginStateText`.
-- `src/ClaudeMaintenanceApp.jsx` shows the worker form login status and a create/reset activation-link button under `workerAccess:manage`.
-- `src/ClaudeMaintenanceApp.jsx` shows the copy-link textarea/button only for a saved worker/cleaner with an activation token and `workerAccess:manage`.
-- Browser smoke-check on `http://127.0.0.1:5174/`: admin login, team screen, department worker list, and worker edit form rendered with no console errors; worker login state and create-link controls were visible.
-- Known limitation: an existing worker with a temporary code does not show the copy button until an activation link is generated and saved/reopened. This is intentional in the current model but can be improved later.
+- `src/ClaudeMaintenanceApp.jsx` saves new login-capable users without generated passwords/PINs/links.
+- First login by email or worker number opens the password/PIN creation form with confirmation.
+- Reset clears the existing secret so the user sets a new one on next login.
 
 ## Login / Authentication
 
@@ -65,7 +64,7 @@ Implementation:
 - PR #84 added a pure `resolveIdentifier` helper and unit tests.
 - The helper resolves email, worker number, and technician code, and returns `archived` before any password/PIN check.
 - PR #85 replaced the role-tab login UI with one identifier field and a conditional password/PIN step.
-- Worker activation link flow remains unchanged.
+- The activation-link flow was later replaced by first-login password/PIN setup.
 
 Remaining:
 - None for the current identifier-first demo login pass.
@@ -99,24 +98,22 @@ Implementation so far:
 - Personal permissions are folded under `הרשאות אישיות`.
 - Selected checkbox chips keep the same text weight to avoid width changes.
 
-### Worker activation follow-up
+### Worker first-login follow-up
 
-Status: done in PRs #57 and #129.
+Status: active in the first-login replacement pass.
 
 Goal:
-- Decide whether the saved/reopen requirement for copying an activation link needs a clearer post-save path.
+- Keep the first-login setup path obvious across clothing, transport-driver, and user-management creation flows.
 - Keep all controls gated by `workerAccess:manage`.
 
 Suggested first PR:
-- Add a clearer post-save hint or a focused test around the saved-worker copy path if the owner finds the current flow confusing.
+- Verify in browser that a worker created from transport driver assignment can set their own PIN after entering the worker number.
 
 Implementation:
-- Copying an activation link now requires the form token to match the token already saved on the worker record.
-- Newly generated reset links must be saved before they can be copied.
-- After saving a pending activation link, the worker/cleaner form stays open so the saved link can be copied immediately.
+- Replaces activation-link generation with identifier-based first-secret setup.
 
 Remaining:
-- None for the current activation-link copy pass.
+- Browser smoke across the three creation paths.
 
 ### Topic 4 — per-technician tolerance overrides
 
@@ -470,7 +467,7 @@ Implementation so far:
 ## Deferred / Out Of Scope For Now
 
 - Supabase/Auth/RLS/Railway/database.
-- Production server-side activation tokens.
+- Production hardening for first-login setup and password/PIN reset.
 - Broad modular split.
 - Full replacement of `src/ClaudeMaintenanceApp.jsx`.
 - Public Vercel password protection, unless the owner changes the current decision to keep demo open.

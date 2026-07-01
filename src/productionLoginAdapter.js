@@ -18,7 +18,7 @@ export function productionLoginConfigFromEnv(env = {}) {
     sessionApiUrl: String(env.VITE_CMMS_SESSION_API_URL || "/api/session/me").trim() || "/api/session/me",
     profileApiUrl: String(env.VITE_CMMS_PROFILE_API_URL || "/api/session/profile").trim() || "/api/session/profile",
     changePasswordApiUrl: String(env.VITE_CMMS_CHANGE_PASSWORD_API_URL || "/api/session/change-password").trim() || "/api/session/change-password",
-    workerActivationApiUrl: String(env.VITE_CMMS_WORKER_ACTIVATION_API_URL || "/api/session/worker-activation").trim() || "/api/session/worker-activation"
+    initialPasswordApiUrl: String(env.VITE_CMMS_INITIAL_PASSWORD_API_URL || "/api/session/initial-password").trim() || "/api/session/initial-password"
   };
 }
 
@@ -172,27 +172,27 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
         mustChangePassword: data.user?.mustChangePassword === true
       };
     },
-    async validateWorkerActivation({ token }) {
-      const response = await fetchImpl(config.workerActivationApiUrl || "/api/session/worker-activation", {
+    async validateInitialPassword({ identifier }) {
+      const response = await fetchImpl(config.initialPasswordApiUrl || "/api/session/initial-password", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "validate", token })
+        body: JSON.stringify({ action: "validate", identifier })
       });
       const data = await readJson(response);
       if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "worker_activation_validate_failed");
+        throw new Error(data?.error || "initial_password_validate_failed");
       }
-      return data.user;
+      return data;
     },
-    async activateWorker({ token, pin, password }) {
-      const response = await fetchImpl(config.workerActivationApiUrl || "/api/session/worker-activation", {
+    async completeInitialPassword({ identifier, pin, password }) {
+      const response = await fetchImpl(config.initialPasswordApiUrl || "/api/session/initial-password", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "activate", token, pin, password })
+        body: JSON.stringify({ action: "complete", identifier, pin, password })
       });
       const data = await readJson(response);
       if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "worker_activation_failed");
+        throw new Error(data?.error || "initial_password_failed");
       }
       return {
         session: data.user ? cmmsSessionFromProductionUser(data.user) : null,
@@ -220,16 +220,16 @@ export async function updateProductionProfile({ accessToken, email, phone, confi
   return client.updateProfile({ accessToken, email, phone });
 }
 
-export async function validateProductionWorkerActivation({ token, config, fetchImpl } = {}) {
+export async function validateProductionInitialPassword({ identifier, config, fetchImpl } = {}) {
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
-  return client.validateWorkerActivation({ token });
+  return client.validateInitialPassword({ identifier });
 }
 
-export async function activateProductionWorker({ token, pin, password, config, fetchImpl } = {}) {
+export async function completeProductionInitialPassword({ identifier, pin, password, config, fetchImpl } = {}) {
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
-  return client.activateWorker({ token, pin, password });
+  return client.completeInitialPassword({ identifier, pin, password });
 }
 
 export function createProductionAuthStore({ key = "cmms:productionAuth:v1", local = globalThis.localStorage, session = globalThis.sessionStorage } = {}) {

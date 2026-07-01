@@ -91,11 +91,11 @@ Current permissions work:
 
 - `docs/permissions-model.md` defines the guardrail.
 - The user form has started moving old manager toggles into a single `perms` editor.
-- `workerAccess` is the planned permission for worker activation/reset flows.
-- Worker/cleaner lists now show login state (`pending activation`, `temporary code`, `activated`, `no access`).
-- Activated worker personal codes are hidden from managers; reset is done by generating a new activation link.
-- New worker/cleaner forms seed an activation token automatically when the editor has `workerAccess: manage`; copying the link requires a token already saved on the worker record.
-- Worker activation rules now have a Vitest harness covering unsaved-link copy, unsaved reset-token copy, status labels, activation, and reset.
+- `workerAccess` is the planned permission for worker login setup/reset flows.
+- Worker/cleaner lists now show whether login is configured or still waiting for first-login setup.
+- Personal codes are hidden from managers; reset clears the stored secret so the user creates a new one on next login.
+- New login-capable users are saved without generated passwords, PINs, or activation links.
+- First-login setup rules have a Vitest harness covering status labels, first-secret setup, and reset preservation.
 - New user saves write module permissions through `perms`; legacy `fleetDocs/fleetTickets` flags are read only as a migration bridge.
 - Legacy permission migration into `perms` is covered by a Vitest harness.
 - `docs/settings-site-map.md` defines current and intended homes for future settings moves.

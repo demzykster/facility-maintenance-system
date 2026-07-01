@@ -1,97 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { canCopyActivationLink, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "../src/workerAccessModel.js";
-
-function createActivationLink(user, token) {
-  return {
-    ...user,
-    pin: "",
-    activationToken: token,
-    activationStatus: "pending"
-  };
-}
-
-function activateWorker(user, newCode, now = 1_000) {
-  return {
-    ...user,
-    pin: newCode,
-    activationToken: "",
-    activationStatus: "activated",
-    activatedAt: now
-  };
-}
+import { isPasswordActivationRole, isPinActivationRole, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "../src/workerAccessModel.js";
 
 function applyWorkerLoginFields(originalUser, draft, canManageWorkerAccess) {
   return {
     pin: canManageWorkerAccess ? (draft.pin || "") : (originalUser.pin || ""),
-    activationToken: canManageWorkerAccess ? (draft.activationToken || "") : (originalUser.activationToken || ""),
+    activationToken: "",
     activationStatus: canManageWorkerAccess
-      ? (draft.activationToken ? "pending" : (originalUser.activationStatus || ""))
+      ? ((draft.pin || draft.password || originalUser.authUserId) ? "activated" : "")
       : (originalUser.activationStatus || "")
   };
 }
 
-describe("worker activation rules", () => {
-  it("does not allow copying activation links before the worker is saved", () => {
-    const unsavedWorker = createActivationLink({ role: "worker", workerNo: "4010" }, "token-1");
-    const savedWorker = { ...unsavedWorker, id: "user-4010" };
+describe("first-login credential rules", () => {
+  it("new login-capable users are saved without generated secrets or links", () => {
+    const newWorker = { role: "worker", workerNo: "4010", pin: "", activationToken: "", activationStatus: "" };
+    const newManager = { role: "user", email: "manager@example.com", password: "", activationToken: "", activationStatus: "" };
 
-    expect(canCopyActivationLink(unsavedWorker, unsavedWorker.activationToken, true)).toBe(false);
-    expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, false)).toBe(false);
-    expect(canCopyActivationLink(savedWorker, savedWorker.activationToken, true)).toBe(true);
-    expect(canCopyActivationLink(savedWorker, "token-not-saved-yet", true)).toBe(false);
+    expect(userNeedsInitialLoginSetup(newWorker)).toBe(true);
+    expect(userNeedsInitialLoginSetup(newManager)).toBe(true);
+    expect(userHasLoginSecret(newWorker)).toBe(false);
+    expect(userHasLoginSecret(newManager)).toBe(false);
   });
 
-  it("explains when activation links must be saved before copying", () => {
-    const unsavedWorker = createActivationLink({ role: "worker", workerNo: "4010" }, "token-1");
-    const savedWorker = { ...unsavedWorker, id: "user-4010" };
+  it("marks users as configured only after they set their own password or PIN", () => {
+    const worker = { role: "worker", workerNo: "4010", pin: "9876", activationStatus: "activated" };
+    const manager = { role: "user", email: "manager@example.com", password: "secret1", activationStatus: "activated" };
 
-    expect(workerActivationCopyHint(unsavedWorker, unsavedWorker.activationToken, true)).toContain("שמרו את המשתמש");
-    expect(workerActivationCopyHint(savedWorker, "token-2", true)).toContain("ההפעלה/האיפוס");
-    expect(workerActivationCopyHint(savedWorker, savedWorker.activationToken, true)).toContain("זמין להעתקה");
-    expect(workerActivationCopyHint(savedWorker, savedWorker.activationToken, false)).toBe("");
-    expect(workerActivationCopyHint(savedWorker, "", true)).toBe("");
+    expect(workerLoginStateText(worker)).toBe("כניסה מוגדרת");
+    expect(workerLoginStateText(manager)).toBe("כניסה מוגדרת");
+    expect(userNeedsInitialLoginSetup(worker)).toBe(false);
+    expect(userNeedsInitialLoginSetup(manager)).toBe(false);
   });
 
-  it("keeps saved pending worker forms open so the saved activation link can be copied", () => {
-    const savedWorker = createActivationLink({ id: "user-4010", role: "worker", workerNo: "4010" }, "token-1");
-
-    expect(shouldKeepWorkerFormOpenForActivationLink(savedWorker, true)).toBe(true);
-    expect(shouldKeepWorkerFormOpenForActivationLink({ ...savedWorker, activationStatus: "activated" }, true)).toBe(false);
-    expect(shouldKeepWorkerFormOpenForActivationLink({ ...savedWorker, id: "" }, true)).toBe(false);
-    expect(shouldKeepWorkerFormOpenForActivationLink(savedWorker, false)).toBe(false);
-  });
-
-  it("tracks pending, activated, temporary-code, and no-access states", () => {
-    expect(workerLoginStateText({ role: "worker", activationToken: "t", activationStatus: "pending" })).toBe("ממתין להפעלה");
-    expect(workerLoginStateText({ role: "worker", activationStatus: "activated", pin: "9876" })).toBe("הופעל");
-    expect(workerLoginStateText({ role: "worker", pin: "1234" })).toBe("קוד זמני");
-    expect(workerLoginStateText({ role: "worker" })).toBe("אין כניסה");
-  });
-
-  it("resets an activated worker by creating a new pending activation link", () => {
-    const activated = activateWorker({ id: "user-1", role: "worker", workerNo: "4010" }, "9876");
-    const reset = createActivationLink(activated, "token-2");
-
-    expect(workerLoginStateText(activated)).toBe("הופעל");
-    expect(reset.pin).toBe("");
-    expect(reset.activationToken).toBe("token-2");
-    expect(reset.activationStatus).toBe("pending");
-    expect(workerLoginStateText(reset)).toBe("ממתין להפעלה");
-  });
-
-  it("seeds activation state for new workers when worker-access permission is available", () => {
-    expect(shouldSeedWorkerActivation({ role: "worker" }, "worker", true)).toBe(true);
-    expect(shouldSeedWorkerActivation({ role: "cleaner" }, "cleaner", true)).toBe(true);
-    expect(shouldSeedWorkerActivation({ role: "tech" }, "tech", true)).toBe(true);
-    expect(shouldSeedWorkerActivation({ role: "user" }, "user", true)).toBe(true);
-    expect(shouldSeedWorkerActivation({ role: "admin" }, "admin", true)).toBe(true);
-    expect(shouldSeedWorkerActivation({ role: "worker", pin: "1234" }, "worker", true)).toBe(false);
-    expect(shouldSeedWorkerActivation({ role: "user", password: "123456" }, "user", true)).toBe(false);
-    expect(shouldSeedWorkerActivation({ id: "user-1", role: "worker" }, "worker", true)).toBe(false);
-    expect(shouldSeedWorkerActivation({ role: "worker" }, "worker", false)).toBe(false);
-  });
-
-  it("classifies PIN and password activation roles", () => {
+  it("classifies PIN and password roles", () => {
     expect(isPinActivationRole("worker")).toBe(true);
     expect(isPinActivationRole("cleaner")).toBe(true);
     expect(isPinActivationRole("tech")).toBe(true);
@@ -99,13 +40,6 @@ describe("worker activation rules", () => {
     expect(isPasswordActivationRole("admin")).toBe(true);
     expect(isPinActivationRole("admin")).toBe(false);
     expect(isPasswordActivationRole("worker")).toBe(false);
-  });
-
-  it("tracks password activation states for managers and admins", () => {
-    expect(workerLoginStateText({ role: "user", activationToken: "t", activationStatus: "pending" })).toBe("ממתין להפעלה");
-    expect(workerLoginStateText({ role: "user", activationStatus: "activated" })).toBe("הופעל");
-    expect(workerLoginStateText({ role: "admin", password: "123456" })).toBe("סיסמה זמנית");
-    expect(workerLoginStateText({ role: "user" })).toBe("אין כניסה");
   });
 
   it("preserves worker login fields when the editor lacks worker access permission", () => {
@@ -125,8 +59,8 @@ describe("worker activation rules", () => {
     });
     expect(applyWorkerLoginFields(original, attempted, true)).toEqual({
       pin: "9999",
-      activationToken: "new-token",
-      activationStatus: "pending"
+      activationToken: "",
+      activationStatus: "activated"
     });
   });
 });
