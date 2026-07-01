@@ -27,6 +27,12 @@ export function extractPinnedMainShas(content) {
   return [...new Set(shas)];
 }
 
+export function effectiveLedgerBranch({ gitBranch, githubHeadRef } = {}) {
+  const headRef = String(githubHeadRef || "").trim();
+  if (headRef) return headRef;
+  return String(gitBranch || "").trim();
+}
+
 export function activeWorkLedgerPolicy({
   content,
   currentBranch,

@@ -184,18 +184,19 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       }
       return data.user;
     },
-    async activateWorker({ token, pin }) {
+    async activateWorker({ token, pin, password }) {
       const response = await fetchImpl(config.workerActivationApiUrl || "/api/session/worker-activation", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "activate", token, pin })
+        body: JSON.stringify({ action: "activate", token, pin, password })
       });
       const data = await readJson(response);
       if (!response.ok || !data?.ok) {
         throw new Error(data?.error || "worker_activation_failed");
       }
       return {
-        session: data.user ? cmmsSessionFromProductionUser(data.user) : null
+        session: data.user ? cmmsSessionFromProductionUser(data.user) : null,
+        auth: data.auth ? productionAuthFromSupabase(data.auth) : null
       };
     }
   };
@@ -225,10 +226,10 @@ export async function validateProductionWorkerActivation({ token, config, fetchI
   return client.validateWorkerActivation({ token });
 }
 
-export async function activateProductionWorker({ token, pin, config, fetchImpl } = {}) {
+export async function activateProductionWorker({ token, pin, password, config, fetchImpl } = {}) {
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
-  return client.activateWorker({ token, pin });
+  return client.activateWorker({ token, pin, password });
 }
 
 export function createProductionAuthStore({ key = "cmms:productionAuth:v1", local = globalThis.localStorage, session = globalThis.sessionStorage } = {}) {

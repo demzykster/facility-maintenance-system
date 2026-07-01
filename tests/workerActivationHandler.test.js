@@ -37,6 +37,20 @@ const pendingWorker = {
   perms: { ppe: "request" }
 };
 
+const pendingManager = {
+  id: "manager-1",
+  name: "Manager One",
+  role: "user",
+  email: "manager@example.com",
+  active: true,
+  password: "",
+  activationToken: "activation-token-manager",
+  activationStatus: "pending",
+  dept: "נפחי",
+  depts: ["נפחי"],
+  perms: { fleet: "manage" }
+};
+
 describe("worker activation handler", () => {
   it("validates a pending worker activation token without exposing secrets", async () => {
     const driver = {
@@ -52,7 +66,7 @@ describe("worker activation handler", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       ok: true,
-      user: { name: "Worker One", role: "worker", workerNo: "1042" }
+      user: { name: "Worker One", role: "worker", workerNo: "1042", email: "" }
     });
     expect(driver.set).not.toHaveBeenCalled();
   });
@@ -86,6 +100,8 @@ describe("worker activation handler", () => {
     expect(driver.set).toHaveBeenCalledWith("user:worker-1", JSON.stringify({
       ...pendingWorker,
       pin: "6789",
+      password: "",
+      authUserId: "",
       activationToken: "",
       activationStatus: "activated",
       activatedAt: 123456
@@ -121,6 +137,95 @@ describe("worker activation handler", () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: "pin_too_short" });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("validates a pending manager activation token without exposing secrets", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([
+        { key: "user:manager-1", value: JSON.stringify(pendingManager) }
+      ]),
+      set: vi.fn()
+    };
+    const handler = createWorkerActivationHandler({ driver });
+
+    const res = await call(handler, { body: { action: "validate", token: "activation-token-manager" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      user: { name: "Manager One", role: "user", email: "manager@example.com", workerNo: "" }
+    });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("activates password roles through Supabase Auth and clears the token", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([
+        { key: "user:manager-1", value: JSON.stringify(pendingManager) }
+      ]),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const passwordActivationClient = {
+      activatePasswordUser: vi.fn().mockResolvedValue({
+        auth: {
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          expires_in: 3600
+        },
+        user: {
+          authUserId: "auth-user-1",
+          mustChangePassword: false
+        }
+      })
+    };
+    const handler = createWorkerActivationHandler({ driver, passwordActivationClient, now: () => 123456 });
+
+    const res = await call(handler, { body: { action: "activate", token: "activation-token-manager", password: "123456" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      user: {
+        id: "manager-1",
+        name: "Manager One",
+        role: "user",
+        email: "manager@example.com",
+        authUserId: "auth-user-1",
+        mustChangePassword: false
+      },
+      auth: {
+        access_token: "access-token",
+        refresh_token: "refresh-token"
+      }
+    });
+    expect(passwordActivationClient.activatePasswordUser).toHaveBeenCalledWith(pendingManager, "123456");
+    expect(driver.set).toHaveBeenCalledWith("user:manager-1", JSON.stringify({
+      ...pendingManager,
+      pin: "",
+      password: "",
+      authUserId: "auth-user-1",
+      activationToken: "",
+      activationStatus: "activated",
+      activatedAt: 123456
+    }), true);
+  });
+
+  it("requires a 6 character password before changing password-role users", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([
+        { key: "user:manager-1", value: JSON.stringify(pendingManager) }
+      ]),
+      set: vi.fn()
+    };
+    const passwordActivationClient = { activatePasswordUser: vi.fn() };
+    const handler = createWorkerActivationHandler({ driver, passwordActivationClient });
+
+    const res = await call(handler, { body: { action: "activate", token: "activation-token-manager", password: "12345" } });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "password_too_short" });
+    expect(passwordActivationClient.activatePasswordUser).not.toHaveBeenCalled();
     expect(driver.set).not.toHaveBeenCalled();
   });
 });

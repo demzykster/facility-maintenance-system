@@ -1,15 +1,18 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { activeWorkLedgerPolicy } from "../src/activeWorkLedgerModel.js";
+import { activeWorkLedgerPolicy, effectiveLedgerBranch } from "../src/activeWorkLedgerModel.js";
 
-function git(args) {
-  return execFileSync("git", args, { encoding: "utf8" }).trim();
+function git(args, { silent = false } = {}) {
+  return execFileSync("git", args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", silent ? "ignore" : "pipe"]
+  }).trim();
 }
 
 function gitOptional(args) {
   try {
-    return git(args);
+    return git(args, { silent: true });
   } catch {
     return "";
   }
@@ -17,7 +20,8 @@ function gitOptional(args) {
 
 const cwd = process.cwd();
 const content = readFileSync(join(cwd, "docs", "active-work.md"), "utf8");
-const currentBranch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+const gitBranch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+const currentBranch = effectiveLedgerBranch({ gitBranch, githubHeadRef: process.env.GITHUB_HEAD_REF });
 const headSha = git(["rev-parse", "--short", "HEAD"]);
 const originMainSha = gitOptional(["rev-parse", "--short", "origin/main"]);
 const statusShort = gitOptional(["status", "--porcelain"]);

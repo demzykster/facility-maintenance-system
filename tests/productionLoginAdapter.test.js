@@ -4,6 +4,7 @@ import {
   cmmsSessionFromProductionUser,
   createProductionAuthStore,
   createProductionLoginClient,
+  activateProductionWorker,
   loginWithProductionPassword,
   restoreProductionSession,
   productionAuthFromSupabase,
@@ -335,6 +336,58 @@ describe("productionLoginAdapter", () => {
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/token?grant_type=refresh_token", expect.objectContaining({
       method: "POST",
       body: JSON.stringify({ refresh_token: "refresh-token" })
+    }));
+  });
+
+  it("activates a password-link user and returns production auth", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          user: {
+            id: "app-user-1",
+            authUserId: "auth-user-1",
+            email: "manager@example.com",
+            name: "Manager",
+            role: "user",
+            permissions: {},
+            mustChangePassword: false
+          },
+          auth: {
+            access_token: "access-token",
+            refresh_token: "refresh-token",
+            expires_in: 3600
+          }
+        });
+      }
+    });
+
+    const result = await activateProductionWorker({
+      token: "activation-token",
+      password: "123456",
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me",
+        workerActivationApiUrl: "/api/session/worker-activation"
+      },
+      fetchImpl
+    });
+
+    expect(result.session).toMatchObject({
+      id: "app-user-1",
+      email: "manager@example.com",
+      role: "user",
+      productionSession: true
+    });
+    expect(result.auth).toMatchObject({
+      accessToken: "access-token",
+      refreshToken: "refresh-token"
+    });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/worker-activation", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ action: "activate", token: "activation-token", password: "123456" })
     }));
   });
 });
