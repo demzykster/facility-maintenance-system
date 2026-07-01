@@ -2315,7 +2315,14 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           setCode("");
           return;
         }
-        setErr(error?.message === "user_not_found" ? "לא נמצא משתמש מתאים" : "לא ניתן לבדוק משתמש זה כרגע");
+        const _em = error?.message || "";
+        setErr(
+          _em === "user_not_found" ? "לא נמצא משתמש מתאים" :
+          _em === "valid_email_required" ? "נדרש דוא״ל תקין לפני הגדרת סיסמה. פנו למנהל המערכת לעדכון המשתמש." :
+          _em === "initial_password_auth_not_configured" ? "אימות לא מוגדר בשרת — פנו למנהל המערכת (SUPABASE_SERVICE_ROLE_KEY)" :
+          _em === "initial_password_backend_not_configured" ? "שגיאת שרת — דרייבר KV לא מוגדר" :
+          `לא ניתן לבדוק משתמש זה כרגע${_em ? ` (${_em})` : ""}`
+        );
       } finally {
         setBusy(false);
       }
