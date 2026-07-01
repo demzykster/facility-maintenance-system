@@ -5479,10 +5479,10 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     }).length;
   };
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
-  const save = async () => {
+  const save = async ({ nextVtypes = vtypes, nextRules = rules } = {}) => {
     setTypeMsg("");
-    const list = vtypes.filter((t) => (t.name || "").trim());
-    const ruleDrafts = rules.filter((rule) => (rule.name || "").trim() || ruleHasTarget(rule));
+    const list = nextVtypes.filter((t) => (t.name || "").trim());
+    const ruleDrafts = nextRules.filter((rule) => (rule.name || "").trim() || ruleHasTarget(rule));
     const cleanRules = normalizeMaintenanceRules(ruleDrafts);
     if (ruleDrafts.length !== cleanRules.length) {
       setTypeMsg("בדקו שכל רגולציית טיפול כוללת שם ותדירות בחודשים.");
@@ -5520,8 +5520,11 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
           setTypeMsg(`${inUse.length} כלים משתמשים בסוג/דגמים האלה (${inUse.slice(0, 8).join(", ")}${inUse.length > 8 ? "…" : ""}). עדכנו או מחקו את הכלים לפני מחיקת הסוג.`);
           return;
         }
-        setVtypes((s) => s.filter((_, j) => j !== i));
-        if (op) setOpenType(null);
+        const next = vtypes.filter((_, j) => j !== i);
+        setVtypes(next);
+        save({ nextVtypes: next }).then((ok) => {
+          if (ok && op) setOpenType(null);
+        });
       }}><Trash2 size={15} /></button></div>{op && <>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>זמני יעד SLA (שעות):</div>{slaRow(t, (k, v) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>מסמכים שמנוהלים לסוג זה:</div>{docFlags.map(([k, lbl]) => <label key={k} className="chk-line"><input type="checkbox" checked={!!t[k]} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: e.target.checked } : x))} /> {lbl}</label>)}
@@ -5537,7 +5540,9 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
           setTypeMsg(`${inUse.length} כלים משתמשים בדגם ${m || "ללא שם"} (${inUse.slice(0, 8).join(", ")}${inUse.length > 8 ? "…" : ""}). עדכנו או מחקו את הכלים לפני מחיקת הדגם.`);
           return;
         }
-        setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.filter((_, k) => k !== mi) } : x));
+        const next = vtypes.map((x, j) => j === i ? { ...x, models: x.models.filter((_, k) => k !== mi) } : x);
+        setVtypes(next);
+        save({ nextVtypes: next });
       }}><Trash2 size={15} /></button></div>; })}
       <button className="btn-ghost sm" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: [...(x.models || []), ""] } : x))}><Plus size={14} /> דגם</button>
     </>}</div>;
@@ -5548,7 +5553,13 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; const affectedCount = ruleAffectedCount(rule); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם תכנית, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "תכנית ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)} · {affectedCount} כלים{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
       if (!op) { setOpenRule(i); return; }
       if (await save()) setOpenRule(null);
-    }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
+    }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => {
+      const next = rules.filter((_, j) => j !== i);
+      setRules(next);
+      save({ nextRules: next }).then((ok) => {
+        if (ok && op) setOpenRule(null);
+      });
+    }}><Trash2 size={15} /></button></div>{op && <>
       <div className="row2">
         <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={rule.intervalMonths || 1} onChange={(e) => setRule(i, { intervalMonths: e.target.value })} /></label>
         <div className="note">הצ׳ק-ליסט כאן שייך לתכנית הטיפול הזו בלבד. אם נמצא ליקוי בזמן ביצוע הטיפול, הקריאה נוצרת לכלי הספציפי שבוצע עליו הטיפול.</div>
