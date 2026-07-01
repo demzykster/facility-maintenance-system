@@ -21,15 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/rename-public-report-login-button`.
-- In progress: continue release hardening from the real remaining risks, not from stale PR state:
+- Active branch: `codex/close-ledger-after-524`.
+- In progress: close the live-ledger sync tail after PR #524 and then continue release hardening from the real remaining risks:
   1. verify/fix screen-level persistence across global settings, fleet catalog settings, PPE catalog, tasks, and cleaning settings;
   2. keep fleet import/catalog integrity stable while preserving `סוג כלי` separately from `דגם`;
   3. continue the periodic-maintenance / inspection redesign without mixing `תכניות טיפול תקופתי` with `בקרת כלים`;
   4. triage owner-submitted `appIssue:` reports and close them in small PRs;
   5. keep monolith/module splitting out of scope until the owner finishes pilot checks.
-- Current branch change: rename the public QR report button on the login screen so it no longer repeats the normal sign-in wording and does not confuse UI tests or users.
-- Current branch validation: targeted localization tests passed; full `npm test -- --run`, `npm run release:check`, and `npm run build` passed.
+- Current branch change: ledger-only sync; no application code changes.
+- Latest completed work: PR #524 renamed the public QR report button on the login screen so it no longer repeats the normal sign-in wording and does not confuse UI tests or users. Main is currently at `4c24218`.
+- Current branch validation: docs-only; `git diff --check` is sufficient before PR.
 - Latest completed work: PR #523 strengthened the live staging settings smoke so it proves category SLA and vehicle-type SLA values persist through `/api/kv`, not only a generic config marker. Main is currently at `629b01e`.
 - Latest completed work: PR #522 fixed fleet Excel import save reliability by chunking fleet records and saving catalog additions through the dedicated catalog path after successful fleet chunks. Production serves commit `182ca93`; `staging:smoke:fleet-ui` confirmed Supabase, `/api/kv`, and the live UI all report 128 fleet records.
 - Latest completed work: PR #519 fixed fleet Excel import/catalog integrity where an explicitly emptied structured vehicle-type catalog could still be suppressed by legacy `forkliftTypes`, and where duplicate models under different `סוג כלי` values could be treated as one type.
