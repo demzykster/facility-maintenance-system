@@ -34,14 +34,6 @@ export async function saveFleetImportAtomically({
       return { ok: true, savedIds };
     }
 
-    if (typeof saveMany === "function" && (catalogAdditions || []).length) {
-      const ok = await saveMany(list, catalogAdditions);
-      if (ok === false) throw new Error("fleet_import_save_failed");
-      savedIds.push(...list.map((unit) => unit.id));
-      report();
-      return { ok: true, savedIds };
-    }
-
     for (const chunk of chunkFleetImportUnits(list, batchSize)) {
       if (typeof saveMany === "function") {
         const ok = await saveMany(chunk);
