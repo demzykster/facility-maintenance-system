@@ -34,6 +34,34 @@ export function vehicleTypeInUseCodes(vehicleType, fleet = []) {
   return [...new Set(codes)];
 }
 
+export function catalogAwareTypeMaps(saved = {}, defaults = {}) {
+  const hasStructuredCatalog = hasSavedVehicleTypeCatalog(saved);
+  if (hasStructuredCatalog) {
+    return {
+      forkliftTypes: saved.forkliftTypes || [],
+      typeSla: saved.typeSla || {},
+      typeMeta: saved.typeMeta || {}
+    };
+  }
+
+  return {
+    forkliftTypes: saved.forkliftTypes || defaults.forkliftTypes || [],
+    typeSla: { ...(defaults.typeSla || {}), ...(saved.typeSla || {}) },
+    typeMeta: { ...(defaults.typeMeta || {}), ...(saved.typeMeta || {}) }
+  };
+}
+
+export function vehicleTypeExistsInConfig(name, config = {}) {
+  const value = String(name || "").trim();
+  if (!value) return false;
+
+  if (hasSavedVehicleTypeCatalog(config)) {
+    return (config.vehicleTypes || []).some((vehicleType) => String(vehicleType?.name || "").trim() === value);
+  }
+
+  return (config.vehicleTypes || []).some((vehicleType) => String(vehicleType?.name || "").trim() === value) || !!config.typeMeta?.[value];
+}
+
 export function fleetUnitsMissingFromVehicleCatalog(fleet = [], vehicleTypes = []) {
   const typeNames = new Set();
   const modelCodes = new Set();
