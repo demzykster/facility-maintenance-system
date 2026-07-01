@@ -180,9 +180,30 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       });
       const data = await readJson(response);
       if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "initial_password_validate_failed");
+        const error = new Error(data?.error || "initial_password_validate_failed");
+        error.status = response.status;
+        error.data = data;
+        throw error;
       }
       return data;
+    },
+    async signInWithPin({ identifier, pin }) {
+      const response = await fetchImpl(config.initialPasswordApiUrl || "/api/session/initial-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "login", identifier, pin })
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data?.ok) {
+        const error = new Error(data?.error || "pin_login_failed");
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+      return {
+        session: data.user ? cmmsSessionFromProductionUser(data.user) : null,
+        auth: null
+      };
     },
     async completeInitialPassword({ identifier, pin, password }) {
       const response = await fetchImpl(config.initialPasswordApiUrl || "/api/session/initial-password", {
@@ -230,6 +251,12 @@ export async function completeProductionInitialPassword({ identifier, pin, passw
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
   return client.completeInitialPassword({ identifier, pin, password });
+}
+
+export async function loginWithProductionPin({ identifier, pin, config, fetchImpl } = {}) {
+  const client = createProductionLoginClient({ config, fetchImpl });
+  if (!client) throw new Error("production_login_not_configured");
+  return client.signInWithPin({ identifier, pin });
 }
 
 export function createProductionAuthStore({ key = "cmms:productionAuth:v1", local = globalThis.localStorage, session = globalThis.sessionStorage } = {}) {

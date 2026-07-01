@@ -6,6 +6,7 @@ import {
   createProductionLoginClient,
   completeProductionInitialPassword,
   loginWithProductionPassword,
+  loginWithProductionPin,
   restoreProductionSession,
   productionAuthFromSupabase,
   productionLoginConfigFromEnv,
@@ -369,6 +370,82 @@ describe("productionLoginAdapter", () => {
     expect(fetchImpl).toHaveBeenCalledWith("/api/session/initial-password", expect.objectContaining({
       method: "POST",
       body: JSON.stringify({ action: "validate", identifier: "manager@example.com" })
+    }));
+  });
+
+  it("preserves first-login server payload when the secret already exists", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      async text() {
+        return JSON.stringify({
+          error: "initial_secret_already_configured",
+          auth: "pin",
+          user: { name: "Worker One", role: "worker", workerNo: "1042" }
+        });
+      }
+    });
+
+    await expect(validateProductionInitialPassword({
+      identifier: "1042",
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me",
+        initialPasswordApiUrl: "/api/session/initial-password"
+      },
+      fetchImpl
+    })).rejects.toMatchObject({
+      message: "initial_secret_already_configured",
+      status: 409,
+      data: {
+        auth: "pin",
+        user: { workerNo: "1042" }
+      }
+    });
+  });
+
+  it("logs in a worker through the PIN login action", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          auth: null,
+          user: {
+            id: "worker-1",
+            name: "Worker One",
+            role: "worker",
+            workerNo: "1042",
+            permissions: {},
+            mustChangePassword: false
+          }
+        });
+      }
+    });
+
+    const result = await loginWithProductionPin({
+      identifier: "1042",
+      pin: "1234",
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me",
+        initialPasswordApiUrl: "/api/session/initial-password"
+      },
+      fetchImpl
+    });
+
+    expect(result.session).toMatchObject({
+      id: "worker-1",
+      workerNo: "1042",
+      role: "worker",
+      productionSession: true
+    });
+    expect(result.auth).toBe(null);
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/initial-password", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ action: "login", identifier: "1042", pin: "1234" })
     }));
   });
 

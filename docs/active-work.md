@@ -26,6 +26,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: none.
 - No active product PR is paused.
 - Latest completed product work:
+  - Repeat worker/cleaner login after first PIN setup now routes to a server-side PIN login action instead of treating `initial_secret_already_configured` as a fatal first-login error.
   - PR #542 replaced generated activation-link onboarding with first-login password/PIN setup: new login-capable users are saved without generated secrets, then create their own password/PIN after entering email or worker number.
   - PR #541 restored activation-link creation from saved user profiles, but that direction is now superseded by the owner-approved first-login setup model implemented in PR #542.
   - PR #540 fixed the owner-confirmed live bug queue: cleaning-zone QR labels are generated locally, permission labels wrap cleanly, and cleaning-zone delete blockers are clearer. Its activation-link direction is superseded by the current first-login setup pass.
@@ -41,7 +42,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: verify first-login setup on the deployed site, then return to closure of the remaining live `appIssue:` reports.
+- Next exact action: verify deployed worker/cleaner repeat PIN login, then return to closure of the remaining live `appIssue:` reports.
 
 ## Current Product Direction
 

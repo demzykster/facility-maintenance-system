@@ -242,6 +242,13 @@ export function createInitialPasswordHandler({
 
     const kind = secretKind(record.user.role);
     if (!kind) return json(res, 400, { error: "role_not_login_capable" });
+    if (body?.action === "login") {
+      if (kind !== "pin") return json(res, 400, { error: "pin_login_not_supported" });
+      if (!hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_not_configured", user: publicInitialUser(record.user), auth: kind });
+      const pin = String(body?.pin || "").trim();
+      if (!pin || String(record.user.pin || "") !== pin) return json(res, 401, { error: "pin_login_failed" });
+      return json(res, 200, { ok: true, user: publicSession(record.user), auth: null });
+    }
     if (hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_already_configured", user: publicInitialUser(record.user), auth: kind });
     if (kind === "password" && !isValidEmail(record.user.email)) return json(res, 400, { error: "valid_email_required", user: publicInitialUser(record.user), auth: kind });
 

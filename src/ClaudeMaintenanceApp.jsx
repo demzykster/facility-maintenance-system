@@ -28,7 +28,7 @@ import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
-import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
+import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -2303,7 +2303,25 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         setCode("");
       } catch (error) {
         if (error?.message === "initial_secret_already_configured") {
-          if (!looksLikeEmail) return setErr("כבר הוגדרה כניסה למשתמש זה");
+          if (!looksLikeEmail) {
+            const serverUser = error?.data?.user || {};
+            setResolved({
+              status: "active",
+              identifierType: "workerNo",
+              auth: error?.data?.auth || "pin",
+              source: "production-pin",
+              identifier: cleanIdentifier,
+              user: {
+                ...serverUser,
+                name: serverUser.name || cleanIdentifier,
+                role: serverUser.role || "worker",
+                workerNo: serverUser.workerNo || cleanIdentifier
+              }
+            });
+            setPassword("");
+            setCode("");
+            return;
+          }
           setResolved({ status: "active", identifierType: "email", auth: "password", source: "supabase", user: { email, name: email, role: "admin" } });
           setPassword("");
           setCode("");
@@ -2368,6 +2386,22 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         await onLogin(result.session, { productionAuth: result.auth, remember });
       } catch (error) {
         setErr(error?.message === "production_login_not_configured" ? "כניסת ייצור עדיין לא הוגדרה בשרת" : "הכניסה נכשלה. בדקו דוא״ל וסיסמה או פנו למנהל המערכת");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (productionLogin && resolved.source === "production-pin") {
+      if (!productionConfigured) return setErr("כניסת ייצור עדיין לא הוגדרה בשרת");
+      if (!code.trim()) return setErr("הזינו קוד אישי");
+      setBusy(true);
+      setErr("");
+      try {
+        const result = await loginWithProductionPin({ identifier: resolved.identifier || resolved.user.workerNo || identifier.trim(), pin: code.trim(), config: productionLoginConfig });
+        remember_save({ workerNo: result.session?.workerNo || resolved.user.workerNo || identifier.trim(), mode: "worker" });
+        await onLogin(result.session, { remember });
+      } catch (error) {
+        setErr(error?.message === "pin_login_failed" ? "הקוד שגוי" : `הכניסה נכשלה${error?.message ? ` (${error.message})` : ""}`);
       } finally {
         setBusy(false);
       }
