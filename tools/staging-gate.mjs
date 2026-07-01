@@ -6,6 +6,7 @@ const steps = [
   ["staging:data:summary", ["npm", ["run", "staging:data:summary"]]],
   ["staging:vercel-env", ["npm", ["run", "staging:vercel-env"]]],
   ["staging:smoke:live:strict", ["npm", ["run", "staging:smoke:live", "--", "--expect-current-commit"]]],
+  ["staging:smoke:settings", ["npm", ["run", "staging:smoke:settings"]]],
   ["staging:smoke:fleet-ui", ["npm", ["run", "staging:smoke:fleet-ui"]]],
   ["staging:smoke:ai-intake", ["npm", ["run", "staging:smoke:ai-intake"]]],
   ["staging:smoke:ui:strict", ["npm", ["run", "staging:smoke:ui", "--", "--expect-current-commit"]]]
