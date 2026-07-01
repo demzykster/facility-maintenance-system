@@ -7268,8 +7268,6 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const roleUsesPin = isPinActivationRole(role);
   const roleUsesPassword = isPasswordActivationRole(role);
   const loginActivated = roleUsesActivation && user.activationStatus === "activated" && !activationToken;
-  const loginSecret = roleUsesPassword ? password : pin;
-  const setLoginSecret = (value) => roleUsesPassword ? setPassword(value) : setPin(value);
   const activationLabel = roleUsesPassword ? "סיסמה" : "קוד אישי";
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
   const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
@@ -7286,11 +7284,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
     if (role === "tech") {
-      if (canWorkerAccess && !pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה");
+      if (canWorkerAccess && !activationToken && !loginActivated && !user.pin) return setErr("צרו קישור הפעלה לטכנאי");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
-    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (canWorkerAccess && !pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה"); }
-    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (canWorkerAccess && !activationToken && !password.trim() && !user.password) return setErr("צרו קישור הפעלה או הזינו סיסמה זמנית"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
+    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (canWorkerAccess && !activationToken && !loginActivated && !user.pin) return setErr("צרו קישור הפעלה לעובד"); }
+    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (canWorkerAccess && !activationToken && !loginActivated && !user.password) return setErr("צרו קישור הפעלה למשתמש"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
@@ -7325,16 +7323,13 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       ? (roleUsesPassword ? "ממתין להפעלה: שלחו למשתמש את הקישור והוא יגדיר סיסמה בעצמו." : "ממתין להפעלה: שלחו את הקישור והוא יגדיר קוד אישי בעצמו.")
       : loginActivated
         ? (roleUsesPassword ? "הופעל: המשתמש הגדיר סיסמה. הסיסמה אינה מוצגת למנהלים." : "הופעל: המשתמש הגדיר קוד אישי. הקוד אינו מוצג למנהלים.")
-        : loginSecret.trim()
-          ? (roleUsesPassword ? "פעיל עם סיסמה זמנית. ניתן ליצור קישור הפעלה כדי שהמשתמש יחליף אותה." : "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהמשתמש יחליף אותו.")
-          : (roleUsesPassword ? "טרם הוגדרה כניסה. צרו קישור הפעלה או הזינו סיסמה זמנית." : "טרם הוגדרה כניסה. צרו קישור הפעלה או הזינו קוד זמני.");
+        : (roleUsesPassword ? "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר סיסמה בעצמו." : "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר קוד אישי בעצמו.");
     return <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pendingText}</div>
       {canWorkerAccess ? <>
-        <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setLoginSecret(""); setCopiedActivation(false); }}>{loginActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
+        <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPassword(""); setPin(""); setCopiedActivation(false); }}>{loginActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
         {activationToken && (canCopyLink
           ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> {copiedActivation ? "הועתק" : "העתק קישור"}</button><div className="hint">{activationHint} לאחר ההפעלה הקישור נסגר.</div></div>
           : <div className="hint">{activationHint}</div>)}
-        {!loginActivated && !activationToken && <label className="field"><span>{activationLabel} זמני{roleUsesPin ? " *" : ""}</span><input value={loginSecret} onChange={(e) => { setLoginSecret(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode={roleUsesPin ? "numeric" : undefined} type={roleUsesPassword ? "text" : "text"} placeholder={roleUsesPassword ? "לפחות 6 תווים" : "לדוגמה: 1234"} /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהמשתמש יגדיר בעצמו.</div></label>}
         {loginActivated && <div className="hint">לא מציגים {activationLabel} קיים. אם המשתמש שכח, צרו קישור איפוס ושלחו אותו מחדש.</div>}
       </> : <div className="hint">ניהול כניסה או קישור הפעלה דורש הרשאת הפעלת כניסה. שמירת פרטי המשתמש לא תשנה את הגדרת הכניסה הקיימת.</div>}
     </div>;

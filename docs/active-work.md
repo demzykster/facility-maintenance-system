@@ -26,6 +26,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: none.
 - No active product PR is paused.
 - Latest completed product work:
+  - New login-capable users are onboarded through activation links, not admin-entered temporary passwords/PINs. Existing activated users and legacy secrets remain compatible.
   - PR #535 prevents misleading cleaning-zone deletion when linked rounds, complaints, or manager assignments still exist, and links the owner to the blocking records.
   - PR #530 generalized activation-link onboarding for all system roles, allowed admins to permanently delete archived users, removed per-user admin notification-category grants from shared user create/edit flows, and fixed the active-work release gate in GitHub Actions PR builds.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
