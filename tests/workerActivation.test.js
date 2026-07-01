@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "../src/workerAccessModel.js";
+import { canCopyActivationLink, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "../src/workerAccessModel.js";
 
 function createActivationLink(user, token) {
   return {
@@ -45,7 +45,7 @@ describe("worker activation rules", () => {
     const unsavedWorker = createActivationLink({ role: "worker", workerNo: "4010" }, "token-1");
     const savedWorker = { ...unsavedWorker, id: "user-4010" };
 
-    expect(workerActivationCopyHint(unsavedWorker, unsavedWorker.activationToken, true)).toContain("שמרו את העובד");
+    expect(workerActivationCopyHint(unsavedWorker, unsavedWorker.activationToken, true)).toContain("שמרו את המשתמש");
     expect(workerActivationCopyHint(savedWorker, "token-2", true)).toContain("ההפעלה/האיפוס");
     expect(workerActivationCopyHint(savedWorker, savedWorker.activationToken, true)).toContain("זמין להעתקה");
     expect(workerActivationCopyHint(savedWorker, savedWorker.activationToken, false)).toBe("");
@@ -82,9 +82,30 @@ describe("worker activation rules", () => {
   it("seeds activation state for new workers when worker-access permission is available", () => {
     expect(shouldSeedWorkerActivation({ role: "worker" }, "worker", true)).toBe(true);
     expect(shouldSeedWorkerActivation({ role: "cleaner" }, "cleaner", true)).toBe(true);
+    expect(shouldSeedWorkerActivation({ role: "tech" }, "tech", true)).toBe(true);
+    expect(shouldSeedWorkerActivation({ role: "user" }, "user", true)).toBe(true);
+    expect(shouldSeedWorkerActivation({ role: "admin" }, "admin", true)).toBe(true);
     expect(shouldSeedWorkerActivation({ role: "worker", pin: "1234" }, "worker", true)).toBe(false);
+    expect(shouldSeedWorkerActivation({ role: "user", password: "123456" }, "user", true)).toBe(false);
     expect(shouldSeedWorkerActivation({ id: "user-1", role: "worker" }, "worker", true)).toBe(false);
     expect(shouldSeedWorkerActivation({ role: "worker" }, "worker", false)).toBe(false);
+  });
+
+  it("classifies PIN and password activation roles", () => {
+    expect(isPinActivationRole("worker")).toBe(true);
+    expect(isPinActivationRole("cleaner")).toBe(true);
+    expect(isPinActivationRole("tech")).toBe(true);
+    expect(isPasswordActivationRole("user")).toBe(true);
+    expect(isPasswordActivationRole("admin")).toBe(true);
+    expect(isPinActivationRole("admin")).toBe(false);
+    expect(isPasswordActivationRole("worker")).toBe(false);
+  });
+
+  it("tracks password activation states for managers and admins", () => {
+    expect(workerLoginStateText({ role: "user", activationToken: "t", activationStatus: "pending" })).toBe("ממתין להפעלה");
+    expect(workerLoginStateText({ role: "user", activationStatus: "activated" })).toBe("הופעל");
+    expect(workerLoginStateText({ role: "admin", password: "123456" })).toBe("סיסמה זמנית");
+    expect(workerLoginStateText({ role: "user" })).toBe("אין כניסה");
   });
 
   it("preserves worker login fields when the editor lacks worker access permission", () => {

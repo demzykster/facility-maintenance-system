@@ -21,10 +21,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/user-invite-and-archive-delete`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs: #471 `codex/audit-code-packet`, docs-only external audit packet.
 - No active product PR is paused.
+- Current branch scope:
+  - Generalize activation-link onboarding for all system roles, so admin creates a user and sends an activation link instead of assigning a password manually.
+  - Allow admins to permanently delete archived users when needed.
 - Latest completed product work:
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
@@ -35,7 +38,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Verify/fix SLA persistence report, fleet document display, cleaning-zone blockers, and supplier activity confirmation if still reproducible.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: fix the next owner-reported critical bug in a small PR, starting with persistence/SLA or another confirmed `appIssue:` report.
+- Next exact action after this branch: fix the next owner-reported critical bug in a small PR, starting with persistence/SLA or another confirmed `appIssue:` report.
 
 ## Current Product Direction
 

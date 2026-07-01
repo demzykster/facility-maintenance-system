@@ -16,7 +16,7 @@ import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { NOTIFICATION_ACCESS_GROUPS, normalizeNotificationPrefs, notificationAccessRows } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
-import { canCopyActivationLink, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
+import { canCopyActivationLink, isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
@@ -2248,11 +2248,12 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
-  const activationUser = activationToken ? active.find((u) => (u.role === "worker" || u.role === "cleaner") && u.activationToken === activationToken && u.activationStatus === "pending") : null;
+  const activationUser = activationToken ? active.find((u) => isActivationLinkRole(u.role) && u.activationToken === activationToken && u.activationStatus === "pending") : null;
   const productionLogin = seedPolicy.requiresServerBootstrapAdmin;
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const productionConfigured = productionLoginReady(productionLoginConfig);
   const displayedActivationUser = activationServerUser || activationUser;
+  const activationUsesPassword = isPasswordActivationRole(displayedActivationUser?.role);
   const activationIsLoading = activationToken && productionLogin && activationLookup === "loading";
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
   useEffect(() => {
@@ -2280,28 +2281,32 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", phone: u.phone || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
   const activateWorker = async () => {
     if (!displayedActivationUser) return setErr("קישור ההפעלה אינו תקין או שכבר נוצל");
-    if (actCode.trim().length < 4) return setErr("בחרו קוד אישי בן 4 ספרות לפחות");
-    if (actCode.trim() !== actConfirm.trim()) return setErr("הקודים אינם זהים");
+    if (activationUsesPassword && actCode.trim().length < 6) return setErr("בחרו סיסמה בת 6 תווים לפחות");
+    if (!activationUsesPassword && actCode.trim().length < 4) return setErr("בחרו קוד אישי בן 4 ספרות לפחות");
+    if (actCode.trim() !== actConfirm.trim()) return setErr(activationUsesPassword ? "הסיסמאות אינן זהות" : "הקודים אינם זהים");
     if (productionLogin) {
       setBusy(true);
       setErr("");
       try {
-        const result = await activateProductionWorker({ token: activationToken, pin: actCode.trim(), config: productionLoginConfig });
+        const result = await activateProductionWorker({ token: activationToken, pin: activationUsesPassword ? undefined : actCode.trim(), password: activationUsesPassword ? actCode.trim() : undefined, config: productionLoginConfig });
         try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
-        remember_save({ workerNo: result.session?.workerNo || "", mode: "worker" });
-        finish(result.session);
+        if (activationUsesPassword) remember_save({ email: result.session?.email || displayedActivationUser.email || "", mode: "production" });
+        else remember_save({ workerNo: result.session?.workerNo || "", mode: "worker" });
+        if (result.auth) await onLogin(result.session, { productionAuth: result.auth, remember });
+        else finish(result.session);
       } catch (error) {
-        setErr(error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : "קישור ההפעלה אינו תקין או שכבר נוצל");
+        setErr(error?.message === "password_too_short" ? "בחרו סיסמה בת 6 תווים לפחות" : error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : "קישור ההפעלה אינו תקין או שכבר נוצל");
       } finally {
         setBusy(false);
       }
       return;
     }
     if (!saveUser) return setErr("לא ניתן להשלים הפעלה בסביבה זו");
-    const u = { ...activationUser, pin: actCode.trim(), activationToken: "", activationStatus: "activated", activatedAt: Date.now() };
+    const u = { ...activationUser, pin: activationUsesPassword ? "" : actCode.trim(), password: activationUsesPassword ? actCode.trim() : "", activationToken: "", activationStatus: "activated", activatedAt: Date.now() };
     await saveUser(u);
     try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
-    remember_save({ workerNo: u.workerNo || "", mode: "worker" });
+    if (activationUsesPassword) remember_save({ email: u.email || "", mode: "user" });
+    else remember_save({ workerNo: u.workerNo || "", mode: "worker" });
     finish(u);
   };
   const dfltDept = config?.departments?.[0] || "";
@@ -2387,10 +2392,10 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         </div>
         <LanguagePicker value={language} onChange={setLanguage} />
         {activationToken ? (<>
-          <div className="login-q">הפעלת כניסה לעובד</div>
-          {activationIsLoading ? <div className="hint" style={{ marginBottom: 10 }}>בודק קישור הפעלה…</div> : displayedActivationUser ? <div className="hint" style={{ marginBottom: 10 }}>שלום {displayedActivationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד {displayedActivationUser.workerNo || "—"}.</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
-          <label className="field"><span>קוד אישי חדש</span><input value={actCode} onChange={(e) => { setActCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
-          <label className="field"><span>אישור קוד</span><input value={actConfirm} onChange={(e) => { setActConfirm(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="••••" onKeyDown={(e) => e.key === "Enter" && activateWorker()} disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
+          <div className="login-q">הפעלת כניסה למערכת</div>
+          {activationIsLoading ? <div className="hint" style={{ marginBottom: 10 }}>בודק קישור הפעלה…</div> : displayedActivationUser ? <div className="hint" style={{ marginBottom: 10 }}>{activationUsesPassword ? `שלום ${displayedActivationUser.name}. הגדירו סיסמה אישית לכניסה עם הדוא״ל ${displayedActivationUser.email || "—"}.` : `שלום ${displayedActivationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד ${displayedActivationUser.workerNo || "—"}.`}</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
+          <label className="field"><span>{activationUsesPassword ? "סיסמה חדשה" : "קוד אישי חדש"}</span><input value={actCode} onChange={(e) => { setActCode(e.target.value); setErr(""); }} type="password" inputMode={activationUsesPassword ? undefined : "numeric"} placeholder={activationUsesPassword ? "לפחות 6 תווים" : "••••"} disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
+          <label className="field"><span>{activationUsesPassword ? "אישור סיסמה" : "אישור קוד"}</span><input value={actConfirm} onChange={(e) => { setActConfirm(e.target.value); setErr(""); }} type="password" inputMode={activationUsesPassword ? undefined : "numeric"} placeholder={activationUsesPassword ? "הקלידו שוב" : "••••"} onKeyDown={(e) => e.key === "Enter" && activateWorker()} disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={activateWorker} disabled={!displayedActivationUser || activationIsLoading || busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
         </>) : (<>
@@ -4722,7 +4727,7 @@ function PpeExitSettlement({ ppe, users, items, config, session, savePpe, savePp
     </div></div>);
 }
 
-function ArchiveWorkerCard({ worker, ppe, onClose, onRestore }) {
+function ArchiveWorkerCard({ worker, ppe, onClose, onRestore, onDelete }) {
   const recs = (ppe || []).filter((x) => x.workerId === worker.id).sort((a, b) => b.at - a.at);
   const issued = recs.filter((x) => x.origin !== "clawback" && x.origin !== "return");
   const owed = recs.reduce((s, x) => s + (x.workerCharge || 0), 0);
@@ -4744,6 +4749,8 @@ function ArchiveWorkerCard({ worker, ppe, onClose, onRestore }) {
       {recs.length === 0 ? <Empty text="לא הונפק ציוד" Icon={PackageCheck} /> : <div className="task-list">{recs.map((x) => <div key={x.id} className="task-row" style={{ borderInlineStartColor: x.origin === "clawback" ? "#B45309" : x.origin === "return" ? "#0D9488" : "var(--muted)", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{x.itemName}{x.size && x.size !== "אחיד" ? ` · ${x.size}` : ""}{x.qty > 1 ? ` ×${x.qty}` : ""}</div><div className="task-row-sub">{ppeCatLabel(x.category)} · {typeLabel(x)} · {fmtDate(x.at)}</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: x.workerCharge > 0 ? "#B45309" : "#0D9488" }}>{x.workerCharge > 0 ? ils(x.workerCharge) : (x.origin === "return" ? "הוחזר" : "חינם")}</span></div></div>)}</div>}
       {onRestore && <button className="btn-primary full" style={{ marginTop: 14 }} onClick={() => onRestore(worker)}>שחזור עובד — חזרה לעבודה (ללא ביגוד)</button>}
       <div className="hint" style={{ marginTop: 6 }}>שחזור מחזיר את העובד לרשימה הפעילה עם מספר העובד וההיסטוריה, ומאפס את זכאות הביגוד — הוא מתחיל «ללא ביגוד» כעובד חדש. הרישומים הקודמים נשמרים בכרטיס זה.</div>
+      {onDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 12 }} label="מחיקה סופית מהארכיון" onConfirm={() => onDelete(worker)} />}
+      {onDelete && <div className="hint" style={{ marginTop: 6 }}>מחיקה סופית מיועדת רק לרשומה שנפתחה בטעות. היסטוריית ציוד ויומן שנשמרו בנפרד לא נמחקים כאן.</div>}
       <div style={{ height: 24 }} />
     </div></div>);
 }
@@ -7009,6 +7016,13 @@ function SettingsPanel(p) {
   const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim())));
   const duplicateUserGroups = findUserDuplicateGroups(ulist);
   const restoreWorker = async (w) => { const ok = await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); if (ok !== false) setArcView(null); return ok; };
+  const deleteArchivedWorker = async (w) => {
+    if (!mayManageUsers || !w?.id || w.id === session.id) return false;
+    if (w.role === "admin" && adminCount <= 1) return false;
+    const ok = await delUser(w.id);
+    if (ok !== false) setArcView(null);
+    return ok;
+  };
   return (<div className="settings-wrap">
     {!p.only && <div className="seg-tabs s3"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button><button className={tab === "issues" ? "on" : ""} onClick={() => setTab("issues")}>דיווחי בעיות</button></div>}
 
@@ -7136,7 +7150,7 @@ function SettingsPanel(p) {
       <UserTree list={ulist} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
-      {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} /></Overlay>}
+      {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} onDelete={mayManageUsers ? deleteArchivedWorker : undefined} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { if (await saveUser(u) === false) return false; if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want && await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }) === false) return false; } } setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return true; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       </>}
     </>)}
@@ -7156,7 +7170,13 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const activationLink = activationToken ? `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(activationToken)}` : "";
   const canCopyLink = canCopyActivationLink(user, activationToken, canWorkerAccess);
   const activationHint = workerActivationCopyHint(user, activationToken, canWorkerAccess);
-  const workerCodeActivated = (role === "worker" || role === "cleaner") && user.activationStatus === "activated" && !activationToken;
+  const roleUsesActivation = isActivationLinkRole(role);
+  const roleUsesPin = isPinActivationRole(role);
+  const roleUsesPassword = isPasswordActivationRole(role);
+  const loginActivated = roleUsesActivation && user.activationStatus === "activated" && !activationToken;
+  const loginSecret = roleUsesPassword ? password : pin;
+  const setLoginSecret = (value) => roleUsesPassword ? setPassword(value) : setPin(value);
+  const activationLabel = roleUsesPassword ? "סיסמה" : "קוד אישי";
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
   const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
   const candidateUser = useMemo(() => ({ ...user, role, perms, permissions: perms, notificationPrefs }), [user, role, perms, notificationPrefs]);
@@ -7168,7 +7188,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const setNotificationKind = (kind, enabled) => setNotificationPrefs((prefs) => ({ enabled: { ...prefs.enabled, [kind]: enabled } }));
   const changeRole = (nextRole) => {
     setRole(nextRole);
-    if (!activationToken && !pin.trim() && shouldSeedWorkerActivation(user, nextRole, canWorkerAccess)) setActivationToken(uid());
+    if (!activationToken && !pin.trim() && !password.trim() && shouldSeedWorkerActivation(user, nextRole, canWorkerAccess)) setActivationToken(uid());
+    setCopiedActivation(false);
   };
   const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); setCopiedActivation(true); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); setCopiedActivation(true); } } catch (e) {} };
   const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
@@ -7178,19 +7199,23 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
     if (role === "tech") {
-      if (!pin.trim()) return setErr("נא להזין קוד כניסה לטכנאי");
+      if (canWorkerAccess && !pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
     else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (canWorkerAccess && !pin.trim() && !activationToken) return setErr("נא להזין קוד כניסה או ליצור קישור הפעלה"); }
-    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (!password.trim()) return setErr("נא להזין סיסמה"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
+    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (canWorkerAccess && !activationToken && !password.trim() && !user.password) return setErr("צרו קישור הפעלה או הזינו סיסמה זמנית"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
-    if (role !== "tech" && role !== "worker" && role !== "cleaner" && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
+    if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
     const nextPerms = role === "admin" ? {} : cleanPerms(perms);
     const nextNotificationPrefs = normalizeNotificationPrefs(notificationPrefs);
+    const nextActivationToken = roleUsesActivation ? (canWorkerAccess ? activationToken : (user.activationToken || "")) : "";
+    const nextActivationStatus = roleUsesActivation ? (canWorkerAccess ? (activationToken ? "pending" : (user.activationStatus || "")) : (user.activationStatus || "")) : "";
+    const nextPin = roleUsesPin ? (canWorkerAccess ? (activationToken ? "" : pin.trim()) : (user.pin || "")) : "";
+    const nextPassword = roleUsesPassword ? (canWorkerAccess ? (activationToken ? "" : password) : (user.password || "")) : "";
     onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), phone: phone.trim(), role,
-      email: (role === "tech" || role === "worker" || role === "cleaner") ? "" : email.trim().toLowerCase(), password: (role === "tech" || role === "worker" || role === "cleaner") ? "" : password,
-      pin: role === "tech" ? pin.trim() : ((role === "worker" || role === "cleaner") ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : ""),
+      email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
+      pin: nextPin,
       workerNo: (role === "worker" || role === "cleaner") ? workerNo.trim() : "",
       dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: "", shiftStart: role === "tech" ? shiftStart : "", shiftEnd: role === "tech" ? shiftEnd : "",
       lateTolerance: role === "tech" && techGrace !== "" ? Math.max(0, Number(techGrace) || 0) : undefined,
@@ -7202,10 +7227,30 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
       active,
-      activationToken: (role === "worker" || role === "cleaner") ? (canWorkerAccess ? activationToken : (user.activationToken || "")) : "",
-      activationStatus: (role === "worker" || role === "cleaner") ? (canWorkerAccess ? (activationToken ? "pending" : (user.activationStatus || "")) : (user.activationStatus || "")) : "",
+      activationToken: nextActivationToken,
+      activationStatus: nextActivationStatus,
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
+  };
+  const ActivationControls = () => {
+    if (!roleUsesActivation) return null;
+    const pendingText = activationToken
+      ? (roleUsesPassword ? "ממתין להפעלה: שלחו למשתמש את הקישור והוא יגדיר סיסמה בעצמו." : "ממתין להפעלה: שלחו את הקישור והוא יגדיר קוד אישי בעצמו.")
+      : loginActivated
+        ? (roleUsesPassword ? "הופעל: המשתמש הגדיר סיסמה. הסיסמה אינה מוצגת למנהלים." : "הופעל: המשתמש הגדיר קוד אישי. הקוד אינו מוצג למנהלים.")
+        : loginSecret.trim()
+          ? (roleUsesPassword ? "פעיל עם סיסמה זמנית. ניתן ליצור קישור הפעלה כדי שהמשתמש יחליף אותה." : "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהמשתמש יחליף אותו.")
+          : (roleUsesPassword ? "טרם הוגדרה כניסה. צרו קישור הפעלה או הזינו סיסמה זמנית." : "טרם הוגדרה כניסה. צרו קישור הפעלה או הזינו קוד זמני.");
+    return <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pendingText}</div>
+      {canWorkerAccess ? <>
+        <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setLoginSecret(""); setCopiedActivation(false); }}>{loginActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
+        {activationToken && (canCopyLink
+          ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> {copiedActivation ? "הועתק" : "העתק קישור"}</button><div className="hint">{activationHint} לאחר ההפעלה הקישור נסגר.</div></div>
+          : <div className="hint">{activationHint}</div>)}
+        {!loginActivated && !activationToken && <label className="field"><span>{activationLabel} זמני{roleUsesPin ? " *" : ""}</span><input value={loginSecret} onChange={(e) => { setLoginSecret(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode={roleUsesPin ? "numeric" : undefined} type={roleUsesPassword ? "text" : "text"} placeholder={roleUsesPassword ? "לפחות 6 תווים" : "לדוגמה: 1234"} /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהמשתמש יגדיר בעצמו.</div></label>}
+        {loginActivated && <div className="hint">לא מציגים {activationLabel} קיים. אם המשתמש שכח, צרו קישור איפוס ושלחו אותו מחדש.</div>}
+      </> : <div className="hint">ניהול כניסה או קישור הפעלה דורש הרשאת הפעלת כניסה. שמירת פרטי המשתמש לא תשנה את הגדרת הכניסה הקיימת.</div>}
+    </div>;
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
     <div className="body">
@@ -7242,7 +7287,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         : <label className="field"><span>מחלקה (משויך אליה)</span><select value={dept} onChange={(e) => setDept(e.target.value)}>{config.departments.map((d) => <option key={d}>{d}</option>)}</select><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></label>)}
       {(role === "worker" || role === "cleaner") && <div className="field"><span>שיוך תעסוקתי (לחישוב חיוב ציוד מגן)</span><div className="seg-tabs s2" style={{ maxWidth: 260 }}><button className={employmentType === "direct" ? "on" : ""} onClick={() => setEmploymentType("direct")}>ישיר (חברה)</button><button className={employmentType === "contractor" ? "on" : ""} onClick={() => setEmploymentType("contractor")}>דרך קבלן</button></div>{employmentType === "contractor" && <input style={{ marginTop: 8 }} value={contractorName} onChange={(e) => setContractorName(e.target.value)} placeholder="שם הקבלן (לא חובה)" />}<div className="hint">עובד דרך קבלן משלם מחיר מלא על ציוד; עובד ישיר — לפי מדיניות המחלקה.</div></div>}
       {role === "tech" ? (<>
-        <label className="field"><span>קוד כניסה לטכנאי *</span><input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 4821" /><div className="hint">הטכנאי (קבלן חיצוני) נכנס עם קוד זה בלבד — דרך כפתור «כניסת טכנאי» במסך הכניסה.</div></label>
+        <ActivationControls />
         <div className="field"><span>פרופיל טכנאי</span><div className="pr-row">
           <button className={"pr-pick" + (techScope === "transport" ? " on" : "")} onClick={() => setTechScope("transport")} style={techScope === "transport" ? { background: "#16202E", color: "#fff", borderColor: "#16202E" } : {}}><Truck size={15} /> שינוע (כל הצי)</button>
           <button className={"pr-pick" + (techScope === "facility" ? " on" : "")} onClick={() => setTechScope("facility")} style={techScope === "facility" ? { background: "#16202E", color: "#fff", borderColor: "#16202E" } : {}}><Building2 size={15} /> מבנה</button>
@@ -7253,18 +7298,10 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         <label className="field"><span>סבילות משמרת אישית (דקות)</span><input type="number" min="0" value={techGrace} onChange={(e) => setTechGrace(e.target.value)} placeholder={`ברירת מחדל: ${Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)}`} /><div className="hint">השאירו ריק כדי להשתמש בברירת המחדל. ערך אישי משנה את בדיקת האיחור והיציאה המוקדמת של הטכנאי הזה בלבד.</div></label>
       </>) : (role === "worker" || role === "cleaner") ? (<>
         <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
-        <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{activationToken ? "ממתין להפעלה: שלחו לעובד את הקישור והוא יגדיר קוד אישי בעצמו." : workerCodeActivated ? "הופעל: העובד הגדיר קוד אישי. הקוד אינו מוצג למנהלים." : pin.trim() ? "פעיל עם קוד זמני. ניתן ליצור קישור הפעלה כדי שהעובד יחליף אותו בקוד אישי." : "טרם הוגדר קוד כניסה. צרו קישור הפעלה או הזינו קוד זמני."}</div></div>
-        {canWorkerAccess ? <>
-          <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPin(""); setCopiedActivation(false); }}>{workerCodeActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
-          {activationToken && (canCopyLink
-            ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> {copiedActivation ? "הועתק" : "העתק קישור"}</button><div className="hint">{activationHint} הקישור תקף בדמו המקומי/ב-Vercel הנוכחי. לאחר שהעובד מגדיר קוד, הקישור נסגר.</div></div>
-            : <div className="hint">{activationHint}</div>)}
-          {!workerCodeActivated && !activationToken && <label className="field"><span>קוד כניסה זמני *</span><input value={pin} onChange={(e) => { setPin(e.target.value); if (e.target.value.trim()) setActivationToken(""); }} inputMode="numeric" type="text" placeholder="לדוגמה: 1234" /><div className="hint">אפשרות מעבר בלבד. עדיף ליצור קישור הפעלה כדי שהעובד יגדיר קוד בעצמו.</div></label>}
-          {workerCodeActivated && <div className="hint">לא מציגים קוד אישי קיים. אם העובד שכח את הקוד, צרו קישור איפוס ושלחו אותו מחדש.</div>}
-        </> : <div className="hint">ניהול קוד כניסה או קישור הפעלה דורש הרשאת הפעלת כניסה לעובדים. שמירת פרטי העובד לא תשנה את הגדרת הכניסה הקיימת.</div>}
+        <ActivationControls />
       </>) : (<>
         <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
-        <label className="field"><span>סיסמה *</span><input value={password} onChange={(e) => setPassword(e.target.value)} type="text" placeholder="סיסמה שתמסרו למשתמש" /><div className="hint">אתם קובעים את הסיסמה ומוסרים אותה למשתמש. ניתן לשנות בכל עת.</div></label>
+        <ActivationControls />
       </>)}
       {(role === "worker" || role === "cleaner") ? (
         <div className="hint" style={{ marginTop: 0 }}>סטטוס עובד מנוהל דרך פעולת עזיבת עובד / החזרת ציוד, כדי לא להחזיק שתי הגדרות מקבילות.</div>
@@ -7275,7 +7312,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         </>
       )}
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>{(role === "worker" || role === "cleaner") && activationToken && !canCopyLink ? "שמירת עובד והצגת קישור" : (lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש")}</button>
+      <button className="btn-primary full" onClick={save}>{roleUsesActivation && activationToken && !canCopyLink ? "שמירת משתמש והצגת קישור" : (lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש")}</button>
       {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
       {canDelete && !(onArchive && ["worker", "cleaner", "tech"].includes(role)) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
