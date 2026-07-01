@@ -167,6 +167,37 @@ describe("fleet license import model", () => {
     ]);
   });
 
+  it("does not let legacy model lists suppress a consciously empty structured catalog", () => {
+    const parsed = parseFleetLicenseSheet([
+      headers,
+      ["טויוטה", "6882002", "OSE250", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלקטת (כפולה)", "כלי שטח תפעולי", "", "", "בבעלות", ""],
+      ["טויוטה", "6882003", "OSE250", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלקטת (סינגל)", "כלי שטח תפעולי", "", "", "בבעלות", ""],
+      ["טויוטה", "178039", "8FBE15T", "כן", "2027-02-11", "", "", "", "2026-08-11", "", "", "", "מלגזת משקל נגדי", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""]
+    ]);
+
+    expect(planFleetLicenseCatalogAdditions(parsed.rows, {
+      vehicleTypes: [],
+      vehicleTypesSaved: true,
+      forkliftTypes: ["OSE250", "8FBE15T"]
+    })).toEqual([
+      {
+        name: "מלגזת משקל נגדי",
+        models: ["8FBE15T"],
+        docs: { tasrir: true, license: true, lease: true }
+      },
+      {
+        name: "מלקטת (כפולה)",
+        models: ["OSE250"],
+        docs: { tasrir: true, license: true, lease: false }
+      },
+      {
+        name: "מלקטת (סינגל)",
+        models: ["OSE250"],
+        docs: { tasrir: true, license: true, lease: false }
+      }
+    ]);
+  });
+
   it("keeps vehicle type and model as separate catalog dimensions", () => {
     const parsed = parseFleetLicenseSheet([
       headers,
