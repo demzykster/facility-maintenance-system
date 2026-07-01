@@ -26,6 +26,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: none.
 - No active product PR is paused.
 - Latest completed product work:
+  - PR #549 adds an admin-only `app_users` sync endpoint so KV user edits for Supabase-backed users update role, active state, permissions, departments, profile fields, and email in the session source of truth.
+  - PR #548 fixed the first-login regression caused by losing `authUserId` when editing users in KV.
   - Worker/cleaner PIN sessions now use a signed CMMS session token so first login, repeat login, `/api/session/me`, and `/api/kv` all work without a Supabase password session. Production requires `CMMS_SESSION_SECRET`.
   - Repeat worker/cleaner login after first PIN setup now routes to a server-side PIN login action instead of treating `initial_secret_already_configured` as a fatal first-login error.
   - PR #542 replaced generated activation-link onboarding with first-login password/PIN setup: new login-capable users are saved without generated secrets, then create their own password/PIN after entering email or worker number.
@@ -39,12 +41,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
-  - User edit must preserve `authUserId`; losing it breaks the KV-to-Supabase Auth link and makes an existing email user look like a first-login user again.
   - Verify first-login password/PIN setup on the deployed site, then continue closure of the remaining owner-confirmed live reports.
   - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: verify deployed worker/cleaner repeat PIN login, then return to closure of the remaining live `appIssue:` reports.
+- Next exact action: verify deployed user-edit sync, then return to closure of the remaining live `appIssue:` reports.
 
 ## Current Product Direction
 

@@ -1761,7 +1761,42 @@ export default function App() {
   const saveInsp = async (i) => { if (!await persistShared(`insp:${i.id}`, JSON.stringify(i))) return false; setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); return true; };
   const saveTpl = async (t) => { if (!await persistShared(`itpl:${t.id}`, JSON.stringify(t))) return false; setTemplates((s) => [...s.filter((x) => x.id !== t.id), t]); return true; };
   const delTpl = async (id) => { if (!await deleteShared(`itpl:${id}`)) return false; setTemplates((s) => s.filter((x) => x.id !== id)); return true; };
-  const saveUser = async (u) => { if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false; setUsers((s) => [...s.filter((x) => x.id !== u.id), u]); return true; };
+  const syncAdminProfileUser = async (u) => {
+    if (!u?.authUserId) return;
+    const accessToken = PRODUCTION_AUTH_STORE.get()?.accessToken;
+    if (!accessToken) return;
+    const patch = {
+      name: u.name || "",
+      role: u.role || "user",
+      active: u.active !== false,
+      email: u.email || "",
+      phone: u.phone || "",
+      department: u.dept || "",
+      departments: Array.isArray(u.depts) ? u.depts : (u.dept ? [u.dept] : []),
+      permissions: u.perms || u.permissions || {},
+      manager_zones: Array.isArray(u.mgrZones) ? u.mgrZones : [],
+      tech_scope: u.techScope || "",
+      supplier: u.supplier || ""
+    };
+    const response = await fetch("/api/session/admin-profile", {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ authUserId: u.authUserId, patch })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error || `admin_profile_sync_${response.status}`);
+    }
+  };
+  const saveUser = async (u) => {
+    if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false;
+    syncAdminProfileUser(u).catch((error) => console.warn("admin profile sync failed", error));
+    setUsers((s) => [...s.filter((x) => x.id !== u.id), u]);
+    return true;
+  };
   const delUser = async (id) => { if (!await deleteShared(`user:${id}`)) return false; setUsers((s) => s.filter((x) => x.id !== id)); return true; };
   const saveConfig = async (n, options = {}) => { if (!await persistShared("config:v1", JSON.stringify(n), options)) return false; setConfig(n); return true; };
   const saveTask = async (t) => { if (!await persistShared(`mtask:${t.id}`, JSON.stringify(t))) return false; setTasks((s) => [t, ...s.filter((x) => x.id !== t.id)].sort((a, b) => b.createdAt - a.createdAt)); return true; };
