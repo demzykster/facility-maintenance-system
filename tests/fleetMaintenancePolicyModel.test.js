@@ -115,6 +115,38 @@ describe("fleetMaintenancePolicyModel", () => {
     });
   });
 
+  it("keeps imported vehicle kind separate from model when normalizing fleet references", () => {
+    const unit = normalizeFleetUnitRef({
+      id: "u-2",
+      code: "6882961",
+      vehicleKind: "מלקטת כפולה",
+      model: "OSE250",
+      type: "מלקטת כפולה"
+    });
+
+    expect(unit).toEqual({
+      id: "u-2",
+      code: "6882961",
+      modelCode: "OSE250",
+      vehicleTypeName: "מלקטת כפולה"
+    });
+  });
+
+  it("matches maintenance rules by imported vehicle kind without catalog fallback", () => {
+    const importedUnit = normalizeFleetUnitRef({
+      id: "u-2",
+      code: "6882961",
+      vehicleKind: "מלקטת כפולה",
+      model: "OSE250",
+      type: "מלקטת כפולה"
+    });
+    const rules = normalizeMaintenanceRules([
+      { id: "picker-500", name: "TO 500", intervalMonths: 6, vehicleTypeNames: ["מלקטת כפולה"] }
+    ]);
+
+    expect(maintenanceRulesForUnit(rules, importedUnit).map((rule) => rule.id)).toEqual(["picker-500"]);
+  });
+
   it("rejects invalid interval definitions instead of silently creating bad schedules", () => {
     expect(normalizeMaintenanceRules([
       { name: "No interval" },

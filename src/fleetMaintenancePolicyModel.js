@@ -29,6 +29,7 @@ export function normalizeFleetUnitRef(unit = {}, catalog = {}) {
   const vehicleTypeName = trim(
     unit.vehicleTypeName ||
     unit.typeName ||
+    unit.vehicleKind ||
     catalog.modelType?.[modelCode] ||
     unit.category
   );
