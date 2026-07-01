@@ -27,4 +27,8 @@ describe("cleaningZoneDeleteBlockers", () => {
     expect(canDeleteCleaningZone("z1", { rounds: [], complaints: [], users: [] })).toBe(true);
     expect(canDeleteCleaningZone("z1", { rounds: [{ id: "r1", zoneId: "z1" }], complaints: [], users: [] })).toBe(false);
   });
+
+  it("treats missing blocker details as empty", () => {
+    expect(cleaningZoneBlockerCount(null)).toBe(0);
+  });
 });

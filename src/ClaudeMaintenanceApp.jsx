@@ -9,6 +9,7 @@ import {
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
+import QRCode from "qrcode";
 import packageInfo from "../package.json";
 import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -16,7 +17,7 @@ import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
-import { canCopyActivationLink, isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
+import { activationTokenForSave, canCopyActivationLink, isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
@@ -3126,7 +3127,7 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
         <div className="u-filters" style={{ marginTop: 8 }}>
           {(deleteBlockers?.rounds || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("rounds")}>סבבים: {deleteBlockers.rounds.length}</button>}
           {(deleteBlockers?.complaints || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("complaints")}>דיווחים: {deleteBlockers.complaints.length}</button>}
-          {(deleteBlockers?.managers || []).length > 0 && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>מנהלים משויכים: {deleteBlockers.managers.length}</span>}
+          {(deleteBlockers?.managers || []).length > 0 && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>מנהלים משויכים: {deleteBlockers.managers.map((m) => m.name || "—").join(", ")}</span>}
         </div>
       </div>}
       {err && <div className="err">{err}</div>}
@@ -3138,17 +3139,25 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
 
 function ZoneTag({ zone, onClose }) {
   const qrUrl = cleaningQrUrlFromWindow(zone.id);
-  const data = encodeURIComponent(qrUrl || ("czone:" + zone.id));
-  const [imgOk, setImgOk] = useState(true);
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  useEffect(() => {
+    let alive = true;
+    setQrDataUrl("");
+    QRCode.toDataURL(qrUrl || ("czone:" + zone.id), { errorCorrectionLevel: "M", margin: 0, width: 220 })
+      .then((url) => { if (alive) setQrDataUrl(url); })
+      .catch(() => { if (alive) setQrDataUrl(""); });
+    return () => { alive = false; };
+  }, [qrUrl, zone.id]);
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">תווית להדפסה</div></div>
     <div className="body">
       <div className="zone-tag">
         <div className="zt-name">{zone.name}</div>
         {zoneLoc(zone) && <div className="zt-loc">{zoneLoc(zone)}</div>}
-        {imgOk ? <img className="zt-qr" alt="QR" src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=${data}`} onError={() => setImgOk(false)} /> : <div className="zt-qr-fallback"><ClipboardCheck size={40} /></div>}
+        {qrDataUrl ? <img className="zt-qr" alt="QR" src={qrDataUrl} /> : <div className="zt-qr-fallback"><ClipboardCheck size={40} /></div>}
         <div className="zt-code">{zone.code}</div>
         <div className="zt-hint">סריקה לדיווח או לסבב ניקיון</div>
       </div>
+      <div className="field" style={{ marginTop: 12 }}><span>קישור QR</span><input readOnly value={qrUrl} onFocus={(e) => e.target.select()} /></div>
       <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו בכניסה לאזור. הסריקה פותחת את CMMS ישירות על האזור הזה, לדיווח בעיה או לביצוע סבב ניקיון.</div>
       <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={() => { try { window.print(); } catch (e) {} }}><Printer size={15} /> הדפסה</button>
       <div style={{ height: 16 }} />
@@ -7288,21 +7297,23 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   };
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
+    const ensuredActivationToken = activationTokenForSave({ user, role, activationToken, canManageWorkerAccess: canWorkerAccess, createToken: uid });
     if (role === "tech") {
-      if (canWorkerAccess && !activationToken && !loginActivated && !user.pin) return setErr("צרו קישור הפעלה לטכנאי");
+      if (canWorkerAccess && !ensuredActivationToken && !loginActivated && !user.pin) return setErr("לא ניתן להכין קישור הפעלה לטכנאי");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
-    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (canWorkerAccess && !activationToken && !loginActivated && !user.pin) return setErr("צרו קישור הפעלה לעובד"); }
-    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (canWorkerAccess && !activationToken && !loginActivated && !user.password) return setErr("צרו קישור הפעלה למשתמש"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
+    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (canWorkerAccess && !ensuredActivationToken && !loginActivated && !user.pin) return setErr("לא ניתן להכין קישור הפעלה לעובד"); }
+    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (canWorkerAccess && !ensuredActivationToken && !loginActivated && !user.password) return setErr("לא ניתן להכין קישור הפעלה למשתמש"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
     const nextPerms = role === "admin" ? {} : cleanPerms(perms);
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
-    const nextActivationToken = roleUsesActivation ? (canWorkerAccess ? activationToken : (user.activationToken || "")) : "";
-    const nextActivationStatus = roleUsesActivation ? (canWorkerAccess ? (activationToken ? "pending" : (user.activationStatus || "")) : (user.activationStatus || "")) : "";
-    const nextPin = roleUsesPin ? (canWorkerAccess ? (activationToken ? "" : pin.trim()) : (user.pin || "")) : "";
-    const nextPassword = roleUsesPassword ? (canWorkerAccess ? (activationToken ? "" : password) : (user.password || "")) : "";
+    const nextActivationToken = roleUsesActivation ? (canWorkerAccess ? ensuredActivationToken : (user.activationToken || "")) : "";
+    const nextActivationStatus = roleUsesActivation ? (canWorkerAccess ? (ensuredActivationToken ? "pending" : (user.activationStatus || "")) : (user.activationStatus || "")) : "";
+    const nextPin = roleUsesPin ? (canWorkerAccess ? (ensuredActivationToken ? "" : pin.trim()) : (user.pin || "")) : "";
+    const nextPassword = roleUsesPassword ? (canWorkerAccess ? (ensuredActivationToken ? "" : password) : (user.password || "")) : "";
+    if (ensuredActivationToken && ensuredActivationToken !== activationToken) setActivationToken(ensuredActivationToken);
     onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
@@ -7331,7 +7342,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         : (roleUsesPassword ? "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר סיסמה בעצמו." : "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר קוד אישי בעצמו.");
     return <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pendingText}</div>
       {canWorkerAccess ? <>
-        <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPassword(""); setPin(""); setCopiedActivation(false); }}>{loginActivated ? "צור קישור איפוס כניסה" : "צור קישור הפעלה"}</button>
+        {loginActivated && <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPassword(""); setPin(""); setCopiedActivation(false); }}>צור קישור איפוס כניסה</button>}
         {activationToken && (canCopyLink
           ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> {copiedActivation ? "הועתק" : "העתק קישור"}</button><div className="hint">{activationHint} לאחר ההפעלה הקישור נסגר.</div></div>
           : <div className="hint">{activationHint}</div>)}
@@ -9017,15 +9028,16 @@ button.notif-perm:hover{background:#D1FAE5;}
 .presence-sup{font-weight:400;color:var(--muted);font-size:12px;}
 .presence-stat{font-size:12px;color:var(--muted);}
 .chk-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
-.chk-pill{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;background:var(--surface);white-space:nowrap;}
+.chk-pill{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;background:var(--surface);white-space:normal;min-width:0;max-width:100%;}
 .chk-pill input{width:16px;height:16px;flex-shrink:0;margin:0;}
 .chk-pill.on{border-color:var(--primary);background:var(--primary-soft,#FFF4ED);color:var(--primary);}
 .perm-fold{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0;}
 .perm-fold summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;}
+.perm-fold summary > span:first-child{min-width:0;}
 .perm-fold summary::-webkit-details-marker{display:none;}
 .perm-fold summary::after{content:"▾";color:var(--muted);font-size:12px;transition:transform .15s ease;}
 .perm-fold[open] summary::after{transform:rotate(180deg);}
-.perm-summary{margin-inline-start:auto;color:var(--muted);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.perm-summary{margin-inline-start:auto;color:var(--muted);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:52%;}
 .perm-fold > .field,.perm-fold > .hint{margin:0 14px 10px;}
 .perm-fold > .hint:first-of-type{margin-top:-2px;}
 .shift-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:14px;}
