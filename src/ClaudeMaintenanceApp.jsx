@@ -7381,7 +7381,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
     const nextPin = roleUsesPin ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : "";
     const nextPassword = roleUsesPassword ? (canWorkerAccess ? password : (user.password || "")) : "";
-    onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), phone: phone.trim(), role,
+    onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
       workerNo: (role === "worker" || role === "cleaner") ? workerNo.trim() : "",

@@ -39,6 +39,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
+  - User edit must preserve `authUserId`; losing it breaks the KV-to-Supabase Auth link and makes an existing email user look like a first-login user again.
   - Verify first-login password/PIN setup on the deployed site, then continue closure of the remaining owner-confirmed live reports.
   - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
