@@ -14,7 +14,7 @@ import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
-import { NOTIFICATION_ACCESS_GROUPS, normalizeNotificationPrefs, notificationAccessRows } from "./notificationAccessModel.js";
+import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { canCopyActivationLink, isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
@@ -7160,7 +7160,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const initialPerms = normalizePerms(user);
   const initialRole = user.role || lockRole || "user";
   if (initialRole === "user" && !initialPerms.ppe) initialPerms.ppe = "request";
-  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [notificationPrefs, setNotificationPrefs] = useState(() => normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs)), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
+  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const [activationToken, setActivationToken] = useState(() => user.activationToken || (shouldSeedWorkerActivation(user, initialRole, canWorkerAccess) ? uid() : ""));
@@ -7179,13 +7179,6 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const activationLabel = roleUsesPassword ? "סיסמה" : "קוד אישי";
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
   const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
-  const candidateUser = useMemo(() => ({ ...user, role, perms, permissions: perms, notificationPrefs }), [user, role, perms, notificationPrefs]);
-  const notificationRows = notificationAccessRows(candidateUser, NOTIFICATION_ACCESS_GROUPS);
-  const availableNotificationGroups = notificationRows.filter((group) => group.allowed);
-  const blockedNotificationCount = notificationRows.length - availableNotificationGroups.length;
-  const disabledNotificationLabels = notificationRows.filter((group) => group.explicitlyDisabled).map((group) => group.label);
-  const notificationSummary = disabledNotificationLabels.length ? `${disabledNotificationLabels.length} כבויות` : (blockedNotificationCount ? `${availableNotificationGroups.length} זמינות · ${blockedNotificationCount} חסומות` : "כל הזמינות פעילות");
-  const setNotificationKind = (kind, enabled) => setNotificationPrefs((prefs) => ({ enabled: { ...prefs.enabled, [kind]: enabled } }));
   const changeRole = (nextRole) => {
     setRole(nextRole);
     if (!activationToken && !pin.trim() && !password.trim() && shouldSeedWorkerActivation(user, nextRole, canWorkerAccess)) setActivationToken(uid());
@@ -7208,7 +7201,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
     const nextPerms = role === "admin" ? {} : cleanPerms(perms);
-    const nextNotificationPrefs = normalizeNotificationPrefs(notificationPrefs);
+    const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
     const nextActivationToken = roleUsesActivation ? (canWorkerAccess ? activationToken : (user.activationToken || "")) : "";
     const nextActivationStatus = roleUsesActivation ? (canWorkerAccess ? (activationToken ? "pending" : (user.activationStatus || "")) : (user.activationStatus || "")) : "";
     const nextPin = roleUsesPin ? (canWorkerAccess ? (activationToken ? "" : pin.trim()) : (user.pin || "")) : "";
@@ -7274,14 +7267,6 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       {role === "cleaner" && zones && (zones.length === 0
         ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון. הגדירו אזורים תחת «ניקיון».</div>
         : <div className="field"><span>אזורי הניקיון באחריותו</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (cleanZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={cleanZones.includes(z.id)} onChange={() => setCleanZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div><div className="hint">אותה הגדרה כמו «עובד אחראי» בעריכת האזור — נשמרת לשני הכיוונים. אזור משויך לעובד אחד.</div></div>)}
-      <details className="perm-fold notify-pref-fold"><summary><span>התראות למשתמש</span><span className="perm-summary">{notificationSummary}</span></summary>
-        <div className="hint">הסוגים כאן מחוברים לתפקיד ולהרשאות המודולים. סוג חסום לא יישלח גם אם יש למכשיר הרשאת Push.</div>
-        <div className="notify-pref-grid">{notificationRows.map((group) => <label key={group.kind} className={"notify-pref-row" + (!group.allowed ? " off" : "")}>
-          <input type="checkbox" disabled={!group.allowed} checked={group.allowed && notificationPrefs.enabled[group.kind] !== false} onChange={(e) => setNotificationKind(group.kind, e.target.checked)} />
-          <span className={"ni-dot " + group.kind} />
-          <span>{group.label}{!group.allowed && <em> · חסום</em>}</span>
-        </label>)}</div>
-      </details>
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
         : <label className="field"><span>מחלקה (משויך אליה)</span><select value={dept} onChange={(e) => setDept(e.target.value)}>{config.departments.map((d) => <option key={d}>{d}</option>)}</select><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></label>)}
@@ -8949,12 +8934,6 @@ button.notif-perm:hover{background:#D1FAE5;}
 .perm-summary{margin-inline-start:auto;color:var(--muted);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .perm-fold > .field,.perm-fold > .hint{margin:0 14px 10px;}
 .perm-fold > .hint:first-of-type{margin-top:-2px;}
-.notify-pref-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px 10px;margin:0 14px 12px;}
-.notify-pref-row{display:flex;align-items:center;gap:7px;min-height:34px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:7px 9px;font-size:12.5px;font-weight:700;cursor:pointer;}
-.notify-pref-row input{margin:0;flex-shrink:0;}
-.notify-pref-row .ni-dot{position:static;flex-shrink:0;}
-.notify-pref-row.off{opacity:.58;cursor:not-allowed;}
-.notify-pref-row.off em{font-style:normal;color:var(--muted);font-weight:600;}
 .shift-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:14px;}
 .shift-info{display:flex;align-items:center;gap:9px;}
 .shift-stat{font-weight:700;font-size:14px;}

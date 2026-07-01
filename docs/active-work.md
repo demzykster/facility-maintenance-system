@@ -28,6 +28,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Current branch scope:
   - Generalize activation-link onboarding for all system roles, so admin creates a user and sends an activation link instead of assigning a password manually.
   - Allow admins to permanently delete archived users when needed.
+  - Remove per-user admin notification-category grants from the edit-user form; notifications follow role/module access by default, while existing personal opt-outs are preserved for the user's own settings.
+  - Fix the active-work release gate in GitHub Actions PR builds, where checkout is detached as `HEAD` but `GITHUB_HEAD_REF` still names the real feature branch.
 - Latest completed product work:
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.

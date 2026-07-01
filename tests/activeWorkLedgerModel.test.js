@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   activeWorkLedgerPolicy,
+  effectiveLedgerBranch,
   extractActiveLedgerBranch,
   extractPinnedMainShas
 } from "../src/activeWorkLedgerModel.js";
@@ -19,6 +20,14 @@ describe("activeWorkLedgerModel", () => {
       "63bc69b",
       "fc4fbad"
     ]);
+  });
+
+  it("uses the GitHub PR head ref when Actions checks out a detached merge commit", () => {
+    expect(effectiveLedgerBranch({ gitBranch: "HEAD", githubHeadRef: "codex/example" })).toBe("codex/example");
+  });
+
+  it("uses the real git branch outside PR CI", () => {
+    expect(effectiveLedgerBranch({ gitBranch: "codex/example", githubHeadRef: "" })).toBe("codex/example");
   });
 
   it("fails when clean main still points at an active feature branch", () => {
