@@ -1429,7 +1429,18 @@ export default function App() {
     try {
       const sv = JSON.parse(savedConfig);
       const D = DEFAULT_CONFIG;
-      setConfig({ ...D, ...sv, widgets: { ...D.widgets, ...(sv.widgets || {}) }, techWidgets: { ...D.techWidgets, ...(sv.techWidgets || {}) }, mgrWidgets: { ...D.mgrWidgets, ...(sv.mgrWidgets || {}) }, notify: { ...D.notify, ...(sv.notify || {}) }, docWarn: { ...D.docWarn, ...(sv.docWarn || {}) }, typeMeta: { ...D.typeMeta, ...(sv.typeMeta || {}) } });
+      setConfig({
+        ...D,
+        ...sv,
+        widgets: { ...D.widgets, ...(sv.widgets || {}) },
+        techWidgets: { ...D.techWidgets, ...(sv.techWidgets || {}) },
+        mgrWidgets: { ...D.mgrWidgets, ...(sv.mgrWidgets || {}) },
+        notify: { ...D.notify, ...(sv.notify || {}) },
+        docWarn: { ...D.docWarn, ...(sv.docWarn || {}) },
+        catSla: { ...D.catSla, ...(sv.catSla || {}) },
+        typeSla: { ...D.typeSla, ...(sv.typeSla || {}) },
+        typeMeta: { ...D.typeMeta, ...(sv.typeMeta || {}) }
+      });
     } catch {}
   };
 
@@ -5433,6 +5444,26 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     buildVehicleTypes
   }));
   const [rules, setRules] = useState(() => normalizeMaintenanceRules(config.maintenanceRules || []));
+  const catalogSyncKey = JSON.stringify({
+    vehicleTypes: config.vehicleTypes || [],
+    forkliftTypes: config.forkliftTypes || [],
+    modelSupplier: config.modelSupplier || {},
+    modelType: config.modelType || {},
+    typeSla: config.typeSla || {},
+    typeMeta: config.typeMeta || {},
+    maintenanceRules: config.maintenanceRules || [],
+    fleetRefs: (fleet || []).map((unit) => [unit.id, unit.type, unit.model, unit.modelCode, unit.typeName, unit.vehicleTypeName])
+  });
+  useEffect(() => {
+    if (openType !== null || openRule !== null) return;
+    setVtypes(vehicleCatalogBase({
+      config,
+      fleet,
+      productionStartsEmpty: SEED_POLICY.productionStartsEmpty,
+      buildVehicleTypes
+    }));
+    setRules(normalizeMaintenanceRules(config.maintenanceRules || []));
+  }, [catalogSyncKey, openType, openRule]);
   const vehicleTypeNames = [...new Set(vtypes.map((t) => (t.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
   const modelCodes = [...new Set(vtypes.flatMap((t) => (t.models || []).map((m) => (m || "").trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "he"));
   const ruleHasTarget = (rule) => !!rule?.target?.allFleet || !!rule?.target?.vehicleTypeNames?.length || !!rule?.target?.modelCodes?.length || !!rule?.target?.fleetIds?.length;
@@ -6953,6 +6984,32 @@ function SettingsPanel(p) {
   const mkRows = (arr) => (arr || []).map((s, i) => ({ id: "r" + i + "_" + s, name: s, _orig: s }));
   const [depts, setDepts] = useState(mkRows(config.departments)), [zones, setZones] = useState(mkRows(config.zones));
   const [cats, setCats] = useState((config.categories || CATEGORIES).map((c) => ({ id: c.id, label: c.label, ...SLA3(config.catSla?.[c.id]) })));
+  const maintConfigSyncKey = JSON.stringify({
+    categories: config.categories || [],
+    catSla: config.catSla || {},
+    zones: config.zones || []
+  });
+  const userConfigSyncKey = JSON.stringify({
+    departments: config.departments || [],
+    techWidgets: config.techWidgets || {},
+    mgrWidgets: config.mgrWidgets || {},
+    workShifts: config.workShifts || [],
+    lateGraceMin: config.lateGraceMin,
+    earlyGraceMin: config.earlyGraceMin
+  });
+  useEffect(() => {
+    if (openCat !== null) return;
+    setCats((config.categories || CATEGORIES).map((c) => ({ id: c.id, label: c.label, ...SLA3(config.catSla?.[c.id]) })));
+    setZones(mkRows(config.zones));
+  }, [maintConfigSyncKey, openCat]);
+  useEffect(() => {
+    if (uEdit || uArchive || arcView) return;
+    setDepts(mkRows(config.departments));
+    setTw({ ...(config.techWidgets || {}) });
+    setMw({ ...(config.mgrWidgets || {}) });
+    setWshifts(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
+    setShiftGrace(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
+  }, [userConfigSyncKey, uEdit, uArchive, arcView]);
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
   const doExport = async () => { try { const data = await getBackup(); downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `backup_${new Date().toISOString().slice(0, 10)}.json`); } catch (e) {} };
   const onPickBackup = async (e) => {
