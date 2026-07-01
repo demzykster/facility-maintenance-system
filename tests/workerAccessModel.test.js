@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   activationTokenForSave,
   canCopyActivationLink,
+  canCreateActivationLinkForSavedUser,
   shouldKeepWorkerFormOpenForActivationLink,
   shouldSeedWorkerActivation,
   workerLoginStateText
@@ -56,5 +57,27 @@ describe("worker access model", () => {
       canManageWorkerAccess: true,
       createToken: () => "new-token"
     })).toBe("");
+  });
+
+  it("allows creating activation links for saved users that were created without login setup", () => {
+    expect(canCreateActivationLinkForSavedUser({
+      id: "worker-1",
+      role: "worker",
+      workerNo: "4010"
+    }, "worker", "", true)).toBe(true);
+    expect(canCreateActivationLinkForSavedUser({
+      id: "manager-1",
+      role: "user",
+      email: "manager@example.com"
+    }, "user", "", true)).toBe(true);
+  });
+
+  it("does not show saved-user activation creation for unsaved, pending, activated, or legacy-secret users", () => {
+    expect(canCreateActivationLinkForSavedUser({ role: "worker" }, "worker", "", true)).toBe(false);
+    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker" }, "worker", "token-1", true)).toBe(false);
+    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker", activationStatus: "activated" }, "worker", "", true)).toBe(false);
+    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker", pin: "1234" }, "worker", "", true)).toBe(false);
+    expect(canCreateActivationLinkForSavedUser({ id: "manager-1", role: "user", password: "123456" }, "user", "", true)).toBe(false);
+    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker" }, "worker", "", false)).toBe(false);
   });
 });

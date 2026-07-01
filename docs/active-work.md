@@ -21,7 +21,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/fix-saved-user-activation-link`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs: none.
 - No active product PR is paused.
@@ -35,10 +35,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
+  - Follow-up to PR #540 is active: old driver-created worker onboarding lost its saved-profile activation-link button, and activation URLs were hidden when an admin already had an active session in the same browser. Fix on `codex/fix-saved-user-activation-link`; verify by completing the driver-created worker PIN activation flow in-browser before PR/merge.
   - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: after PR #540 deploys, verify the three fixed flows on the deployed site, then close the corresponding live `appIssue:` reports if confirmed.
+- Next exact action: finish validation for `codex/fix-saved-user-activation-link`, open/merge the PR, verify the activation flow on the deployed site, then return to deployed verification of the three PR #540 fixed flows and close the corresponding live `appIssue:` reports if confirmed.
 
 ## Current Product Direction
 
