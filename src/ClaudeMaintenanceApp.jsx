@@ -2408,7 +2408,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       rememberLogin(u, initialSetup.identifierType);
       finish(withDefaultDept(u));
     } catch (error) {
-      setErr(error?.message === "password_too_short" ? "בחרו סיסמה בת 6 תווים לפחות" : error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : error?.message === "initial_secret_already_configured" ? "כבר הוגדרה כניסה למשתמש זה" : "לא ניתן לשמור כניסה כרגע");
+      setErr(error?.message === "password_too_short" ? "בחרו סיסמה בת 6 תווים לפחות" : error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : error?.message === "valid_email_required" ? "נדרש דוא״ל תקין לפני הגדרת סיסמה. פנו למנהל המערכת לעדכון המשתמש." : error?.message === "initial_secret_already_configured" ? "כבר הוגדרה כניסה למשתמש זה" : "לא ניתן לשמור כניסה כרגע");
     } finally {
       setBusy(false);
     }
@@ -7301,6 +7301,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const roleUsesLogin = isActivationLinkRole(role);
   const roleUsesPin = isPinActivationRole(role);
   const roleUsesPassword = isPasswordActivationRole(role);
+  const validLoginEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim().toLowerCase());
   const loginConfigured = roleUsesLogin && userHasLoginSecret({ ...user, role, pin, password });
   const canResetStoredLogin = loginConfigured && !user.authUserId;
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
@@ -7318,7 +7319,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
     else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); }
-    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
+    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (roleUsesPassword && !validLoginEmail(email)) return setErr("נא להזין דוא״ל תקין, לדוגמה name@chemipal.co.il"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
