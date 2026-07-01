@@ -14,7 +14,8 @@ export function cleaningZoneDeleteBlockers(zoneId, { rounds = [], complaints = [
 }
 
 export function cleaningZoneBlockerCount(blockers = {}) {
-  return (blockers.rounds || []).length + (blockers.complaints || []).length + (blockers.managers || []).length;
+  const safeBlockers = blockers || {};
+  return (safeBlockers.rounds || []).length + (safeBlockers.complaints || []).length + (safeBlockers.managers || []).length;
 }
 
 export function canDeleteCleaningZone(zoneId, data) {

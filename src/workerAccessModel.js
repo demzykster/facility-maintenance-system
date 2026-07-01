@@ -40,3 +40,12 @@ export function shouldSeedWorkerActivation(user, role, canManageWorkerAccess) {
     && !user?.activationToken
     && !user?.activationStatus;
 }
+
+export function activationTokenForSave({ user = {}, role, activationToken = "", canManageWorkerAccess, createToken } = {}) {
+  if (!canManageWorkerAccess || !isActivationLinkRole(role)) return user.activationToken || "";
+  if (activationToken) return activationToken;
+  if (user.activationStatus === "activated") return "";
+  if (isPinActivationRole(role) && user.pin) return "";
+  if (isPasswordActivationRole(role) && user.password) return "";
+  return typeof createToken === "function" ? createToken() : "";
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  activationTokenForSave,
   canCopyActivationLink,
   shouldKeepWorkerFormOpenForActivationLink,
   shouldSeedWorkerActivation,
@@ -31,5 +32,29 @@ describe("worker access model", () => {
   it("describes pending and activated login states without exposing secrets", () => {
     expect(workerLoginStateText({ role: "user", activationToken: "tok", activationStatus: "pending" })).toBe("ממתין להפעלה");
     expect(workerLoginStateText({ role: "worker", activationStatus: "activated" })).toBe("הופעל");
+  });
+
+  it("creates an activation token during save when a login-capable user has no secret yet", () => {
+    expect(activationTokenForSave({
+      user: {},
+      role: "user",
+      canManageWorkerAccess: true,
+      createToken: () => "new-token"
+    })).toBe("new-token");
+  });
+
+  it("does not create a new token over activated or legacy-secret users", () => {
+    expect(activationTokenForSave({
+      user: { activationStatus: "activated" },
+      role: "user",
+      canManageWorkerAccess: true,
+      createToken: () => "new-token"
+    })).toBe("");
+    expect(activationTokenForSave({
+      user: { pin: "1234" },
+      role: "worker",
+      canManageWorkerAccess: true,
+      createToken: () => "new-token"
+    })).toBe("");
   });
 });
