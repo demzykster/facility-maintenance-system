@@ -51,6 +51,7 @@ import { DEFAULT_LANGUAGE, languageDirection, languageOptions, normalizeLanguage
 import { uiText } from "./uiI18nModel.js";
 import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js";
 import { supplierActivityCounts } from "./supplierActivityModel.js";
+import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers } from "./cleaningZoneBlockersModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -3063,7 +3064,7 @@ function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve,
     </div></div>);
 }
 
-function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDelete }) {
+function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDelete, deleteBlockers = null, onOpenBlocker = () => {} }) {
   const [zoneId] = useState(zone.id || uid());
   const [zoneCode] = useState(zone.code || ("Z" + Math.random().toString(36).slice(2, 6).toUpperCase()));
   const [name, setName] = useState(zone.name || ""), [building, setBuilding] = useState(zone.building || ""), [floor, setFloor] = useState(zone.floor || ""), [code, setCode] = useState(zone.code || "");
@@ -3074,6 +3075,7 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
   const [activeDays, setActiveDays] = useState(Array.isArray(zone.activeDays) ? zone.activeDays : (zone.id ? [0, 1, 2, 3, 4, 5, 6] : WORK_WEEK));
   const [mgrIds, setMgrIds] = useState((managers || []).filter((m) => (m.mgrZones || []).includes(zone.id)).map((m) => m.id));
   const [openWin, setOpenWin] = useState(null);
+  const blockerCount = cleaningZoneBlockerCount(deleteBlockers);
   const toggleDay = (d) => setActiveDays((s) => (s.includes(d) ? s.filter((x) => x !== d) : [...s, d]).sort((a, b) => a - b));
   const toggleWinItem = (i, id) => setWindows((s) => s.map((w, j) => { if (j !== i) return w; const valid = checklist.filter((c) => (c.label || "").trim()).map((c) => c.id); const cur = Array.isArray(w.items) ? w.items.filter((x) => valid.includes(x)) : valid.slice(); const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]; return { ...w, items: next.length >= valid.length ? null : next }; }));
   const setCl = (i, v) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, label: v } : x)));
@@ -3120,9 +3122,16 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
       <label className="field"><span>עובד ניקיון אחראי</span><select value={cleanerId} onChange={(e) => setCleanerId(e.target.value)}><option value="">— ללא שיוך —</option>{cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="hint">כל עובד ניקיון יכול לבצע סבב בכל אזור (כיסוי), אך זה האזור של האחראי.</div></label>
       {managers && <div className="field"><span>מנהלי מחלקה שרואים את האזור</span>{managers.length === 0 ? <div className="hint">אין מנהלי מחלקה. הוסיפו תחת «צוות ומשתמשים».</div> : <div className="chk-grid">{managers.map((m) => <label key={m.id} className={"chk-pill" + (mgrIds.includes(m.id) ? " on" : "")}><input type="checkbox" checked={mgrIds.includes(m.id)} onChange={() => setMgrIds((s) => s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id])} /> {m.name}</label>)}</div>}<div className="hint">אותה הגדרה כמו ב«צוות ומשתמשים» של המנהל — נשמרת לשני הכיוונים.</div></div>}
       <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> אזור פעיל</label>
+      {canDelete && blockerCount > 0 && <div className="note" style={{ marginTop: 8, borderColor: "#FDE68A" }}><AlertTriangle size={14} /> אי אפשר למחוק אזור שיש לו פעילות מקושרת. פתחו את הרשומות ונקו אותן קודם.
+        <div className="u-filters" style={{ marginTop: 8 }}>
+          {(deleteBlockers?.rounds || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("rounds")}>סבבים: {deleteBlockers.rounds.length}</button>}
+          {(deleteBlockers?.complaints || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("complaints")}>דיווחים: {deleteBlockers.complaints.length}</button>}
+          {(deleteBlockers?.managers || []).length > 0 && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>מנהלים משויכים: {deleteBlockers.managers.length}</span>}
+        </div>
+      </div>}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save} disabled={busy}>{busy ? "שומר…" : "שמירה"}</button>
-      {canDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת אזור" onConfirm={onDelete} />}
+      {canDelete && blockerCount === 0 && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת אזור" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
 }
@@ -3152,15 +3161,34 @@ function CleaningAdmin(p) {
   const managers = useMemo(() => (users || []).filter((u) => u.role === "user" && u.active !== false), [users]);
   const [tab, setTab] = useState("today"), [edit, setEdit] = useState(null), [tag, setTag] = useState(null), [rep, setRep] = useState(null), [showClosed, setShowClosed] = useState(false);
   const [rZone, setRZone] = useState("all"), [rProblems, setRProblems] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null);
+  const [cZone, setCZone] = useState("all");
   const list = useMemo(() => (zones || []).slice().sort(zoneSort), [zones]);
   const roundsByDay = useMemo(() => { const g = {}; (rounds || []).slice().filter((r) => (rZone === "all" || r.zoneId === rZone) && (!rProblems || (r.issues || []).length > 0)).sort((a, b) => b.at - a.at).slice(0, 200).forEach((r) => { const k = dayStart(r.at); (g[k] = g[k] || []).push(r); }); return Object.entries(g).sort((a, b) => b[0] - a[0]); }, [rounds, rZone, rProblems]);
-  const pending = useMemo(() => (complaints || []).filter((c) => c.status === "pending").sort((a, b) => b.at - a.at), [complaints]);
-  const openC = useMemo(() => (complaints || []).filter((c) => c.status === "open").sort((a, b) => b.at - a.at), [complaints]);
+  const complaintScope = useMemo(() => (complaints || []).filter((c) => cZone === "all" || c.zoneId === cZone), [complaints, cZone]);
+  const pending = useMemo(() => complaintScope.filter((c) => c.status === "pending").sort((a, b) => b.at - a.at), [complaintScope]);
+  const openC = useMemo(() => complaintScope.filter((c) => c.status === "open").sort((a, b) => b.at - a.at), [complaintScope]);
   const escC = useMemo(() => openC.filter((c) => c.escalatedTo === "admin"), [openC]);
   const adminOwnedC = useMemo(() => openC.filter((c) => c.escalatedTo !== "admin" && c.ownerRole === "admin"), [openC]);
   const plainOpenC = useMemo(() => openC.filter((c) => c.escalatedTo !== "admin" && c.ownerRole !== "admin"), [openC]);
-  const closedC = useMemo(() => (complaints || []).filter((c) => c.status === "resolved" || c.status === "rejected").sort((a, b) => (b.resolvedAt || b.at) - (a.resolvedAt || a.at)), [complaints]);
+  const closedC = useMemo(() => complaintScope.filter((c) => c.status === "resolved" || c.status === "rejected").sort((a, b) => (b.resolvedAt || b.at) - (a.resolvedAt || a.at)), [complaintScope]);
   const needAttn = pending.length + openC.length;
+  const editDeleteBlockers = useMemo(() => edit?.id ? cleaningZoneDeleteBlockers(edit.id, { rounds, complaints, users }) : null, [edit?.id, rounds, complaints, users]);
+  const openZoneBlocker = (kind) => {
+    const zoneId = edit?.id || "all";
+    setEdit(null);
+    if (kind === "rounds") {
+      setTab("rounds");
+      setRZone(zoneId);
+      setRProblems(false);
+      return;
+    }
+    if (kind === "complaints") {
+      setTab("complaints");
+      setCZone(zoneId);
+      return;
+    }
+    setTab("zones");
+  };
   const today = useMemo(() => {
     const now = Date.now();
     const rows = list.filter((z) => z.active !== false).map((z) => ({ z, sts: zoneTodayStatuses(z, rounds, now) }));
@@ -3184,19 +3212,22 @@ function CleaningAdmin(p) {
         <div className="u-filters" style={{ marginBottom: 12 }}><select value={rZone} onChange={(e) => setRZone(e.target.value)}><option value="all">כל האזורים</option>{list.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}</select><button className={"wtoggle" + (rProblems ? " on" : "")} onClick={() => setRProblems((v) => !v)}><AlertTriangle size={14} /> רק עם הערות</button></div>
         {roundsByDay.length === 0 ? <Empty text="אין סבבים להצגה" Icon={Sparkles} sub="שנו את הסינון או המתינו לסבבים" /> : roundsByDay.map(([day, rs]) => <div key={day} style={{ marginBottom: 16 }}><div className="day-h">{dayLabel(+day)}</div><div className="cards">{rs.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.zoneLoc ? " · " + r.zoneLoc : ""}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{r.byName} · {r.doneCount}/{countLabel(r.total, "פריט", "פריטים")}{r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}{prob ? ` · ${countLabel(r.issues.length, "הערה", "הערות")}` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div></div>)}
       </>)
-      : tab === "complaints" ? ((pending.length + openC.length + closedC.length) === 0 ? <Empty text="אין דיווחים" Icon={Sparkles} sub="דיווחי לכלוך ותקלות יופיעו כאן" /> : <>
+      : tab === "complaints" ? (<>
+        <div className="u-filters" style={{ marginBottom: 12 }}><select value={cZone} onChange={(e) => setCZone(e.target.value)}><option value="all">כל האזורים</option>{list.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}</select>{cZone !== "all" && <button className="btn-ghost sm" onClick={() => setCZone("all")}>ניקוי סינון</button>}</div>
+        {(pending.length + openC.length + closedC.length) === 0 ? <Empty text="אין דיווחים" Icon={Sparkles} sub="דיווחי לכלוך ותקלות יופיעו כאן" /> : <>
         {pending.length > 0 && <><SectionTitle><Clock size={15} /> ממתין לאישורך ({pending.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדים, מעובד ניקיון ומדיווח אנונימי. הקישו לפתיחה — אישור או דחייה עם סיבה.</div><div className="cards">{pending.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {escC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הועבר אליך לטיפול ({escC.length})</SectionTitle><div className="cards">{escC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {adminOwnedC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> בטיפולך ({adminOwnedC.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדי הניקיון שקיבלת לטיפול. סגרו כטופל לאחר הטיפול — העובד יראה את התגובה.</div><div className="cards">{adminOwnedC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {plainOpenC.length > 0 && <><SectionTitle><Clock size={15} /> אצל עובד הניקיון ({plainOpenC.length})</SectionTitle><div className="cards">{plainOpenC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {closedC.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closedC.length})</button>{showClosed && <div className="cards">{closedC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
+      </>}
       </>)
       : (<>
         <div className="row-between"><SectionTitle><Sparkles size={15} /> אזורי ניקיון ({list.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> אזור חדש</button></div>
         {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדי ניקיון. הוסיפו אותם תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור. בינתיים קיים עובד ניקיון לדוגמה לכניסה (מס׳ 1050 · קוד 1234).</div>}
         {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : <div className="cards">{list.map((z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}</div>}
       </>)}
-    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} managers={managers} canDelete={!!edit.id} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
+    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} managers={managers} canDelete={!!edit.id} deleteBlockers={editDeleteBlockers} onOpenBlocker={openZoneBlocker} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
       if (!await saveZone(z)) return false;
       const managerResults = await Promise.all((managers || []).map((m) => {
         const has = (m.mgrZones || []).includes(z.id);
