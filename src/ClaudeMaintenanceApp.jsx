@@ -35,7 +35,7 @@ import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
-import { vehicleCatalogBase, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
+import { fleetUnitsMissingFromVehicleCatalog, vehicleCatalogBase, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
@@ -5493,10 +5493,12 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
       setTypeMsg("לכל רגולציית טיפול צריך לבחור יעד: כל הפארק, סוג כלי או דגם.");
       return false;
     }
-    const newModels = new Set();
-    list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); }));
-    const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type));
-    if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${countLabel(orphan.length, "כלי משויך", "כלים משויכים")} לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return false; }
+    const orphan = fleetUnitsMissingFromVehicleCatalog(fleet, list);
+    if (orphan.length) {
+      const codes = [...new Set(orphan.map((o) => unitLabel(o, config) || o.code || o.model || o.type).filter(Boolean))];
+      setTypeMsg(`${countLabel(orphan.length, "כלי משויך", "כלים משויכים")} לסוג/דגם שאינם בקטלוג (${codes.slice(0, 8).join(", ")}${codes.length > 8 ? "…" : ""}). השאירו סוגים ודגמים אלה בקטלוג או עדכנו את הכלים — ואז שמרו.`);
+      return false;
+    }
     if (await saveConfig({ ...config, ...flattenVehicleTypes(list), maintenanceRules: cleanRules }) === false) {
       setTypeMsg(SAVE_FAILED_MESSAGE);
       return false;

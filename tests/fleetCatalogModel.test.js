@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cloneVehicleTypeCatalog,
+  fleetUnitsMissingFromVehicleCatalog,
   hasSavedVehicleTypeCatalog,
   shouldUseBuiltInVehicleCatalog,
   vehicleCatalogBase,
@@ -95,5 +96,35 @@ describe("fleetCatalogModel", () => {
       { code: "111", type: "פסולתון" },
       { code: "222", type: "OSE250" }
     ])).toEqual(["111"]);
+  });
+
+  it("validates imported fleet records by vehicle type and model without mixing the fields", () => {
+    const catalog = [
+      { name: "מלקטת (כפולה)", models: ["OSE250"] },
+      { name: "מלגזת משקל נגדי", models: ["8FBE15T"] }
+    ];
+
+    expect(fleetUnitsMissingFromVehicleCatalog([
+      { code: "6882002", type: "מלקטת (כפולה)", vehicleKind: "מלקטת (כפולה)", model: "OSE250" },
+      { code: "178039", type: "מלגזת משקל נגדי", vehicleKind: "מלגזת משקל נגדי", model: "8FBE15T" }
+    ], catalog)).toEqual([]);
+  });
+
+  it("still validates legacy fleet records whose type field stores the model code", () => {
+    expect(fleetUnitsMissingFromVehicleCatalog([
+      { code: "legacy-ok", type: "OSE250" },
+      { code: "legacy-missing", type: "RRE200H" }
+    ], [
+      { name: "מלקטת", models: ["OSE250"] }
+    ]).map((unit) => unit.code)).toEqual(["legacy-missing"]);
+  });
+
+  it("reports imported fleet records whose explicit vehicle type was removed from the catalog", () => {
+    expect(fleetUnitsMissingFromVehicleCatalog([
+      { code: "6882002", type: "מלקטת (כפולה)", vehicleKind: "מלקטת (כפולה)", model: "OSE250" },
+      { code: "6882003", type: "מלקטת (סינגל)", vehicleKind: "מלקטת (סינגל)", model: "OSE250" }
+    ], [
+      { name: "מלקטת (כפולה)", models: ["OSE250"] }
+    ]).map((unit) => unit.code)).toEqual(["6882003"]);
   });
 });

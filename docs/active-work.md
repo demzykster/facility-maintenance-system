@@ -21,11 +21,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fix-supplier-activity-summary`.
-- In progress: triage owner-submitted `appIssue:` reports in small PRs. This branch fixes the supplier-list summary so a supplier with linked fleet units no longer looks empty just because it has zero purchase orders.
-- Current branch change: add a small supplier activity count model, test it, and use it in `ספקים / קבלנים`.
-- Latest completed work: PR #525 closed the live-ledger sync tail after PR #524. Main is currently at `d63261f`.
-- Current branch validation target: supplier model test, full unit tests, `release:check`, `build`, and `git diff --check`.
+- Active branch: `codex/fleet-catalog-import-verification`.
+- In progress: continue fleet catalog/import integrity after PR #526. This branch fixes the settings-save guard so imported fleet units keep `סוג כלי` and `דגם` as separate catalog dimensions instead of treating the type name as a model code.
+- Current branch change: add a small fleet catalog validation helper, test imported and legacy fleet records, and use it before saving `סוגי כלי שינוע`.
+- Latest completed work: PR #526 clarified supplier-list summary counts so linked fleet units no longer look like empty supplier activity. Main is currently at `0da623b`.
+- Current branch validation target: fleet catalog/import tests, full unit tests, `release:check`, `build`, and `git diff --check`.
 - Latest completed work: PR #523 strengthened the live staging settings smoke so it proves category SLA and vehicle-type SLA values persist through `/api/kv`, not only a generic config marker. Main is currently at `629b01e`.
 - Latest completed work: PR #522 fixed fleet Excel import save reliability by chunking fleet records and saving catalog additions through the dedicated catalog path after successful fleet chunks. Production serves commit `182ca93`; `staging:smoke:fleet-ui` confirmed Supabase, `/api/kv`, and the live UI all report 128 fleet records.
 - Latest completed work: PR #519 fixed fleet Excel import/catalog integrity where an explicitly emptied structured vehicle-type catalog could still be suppressed by legacy `forkliftTypes`, and where duplicate models under different `סוג כלי` values could be treated as one type.
