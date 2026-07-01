@@ -21,14 +21,15 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fix-worker-activation-link`.
-- In progress: fix worker/cleaner activation links opened in a clean browser by adding a narrow server-side activation endpoint. This does not start monolith/module splitting.
-- Current validation: targeted worker activation/login tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally.
-- Next exact action: commit, push, open PR, wait for GitHub/Vercel checks, then merge if green.
-- Latest completed work: PR #515 closed the remaining `/api/kv` fallback where unknown shared KV prefixes were implicitly writable by any authenticated production user. Known workflow prefixes stay covered by explicit role/module rules; unknown shared prefixes now require settings management.
-- Validation for PR #515: targeted KV permission/API tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, `git diff --check`, GitHub Actions, and Vercel passed before merge.
-- Product design note recorded but not active in this branch: continue the flexible fleet maintenance / inspection policy redesign later without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data.
-- Current next candidate: continue the periodic-maintenance settings redesign only after verifying the owner workflow. Keep maintenance programs, inspection questionnaires, fleet catalog, calendar entries, exports, and follow-up tickets as separate but connected concepts.
+- Active branch: `codex/fix-sla-settings-persistence`.
+- In progress: close the owner-reported settings persistence confusion before continuing larger fleet maintenance/inspection work. Row-level check buttons in maintenance categories, fleet vehicle types, and periodic-maintenance programs should save-and-close instead of only collapsing the editor.
+- Current validation: `git diff --check`, `npm test -- --run`, `npm run release:check`, and `npm run build` passed locally. A Playwright login-page smoke rendered without console/page errors; full settings UI smoke is limited locally because demo login did not complete normally in the headless browser.
+- Next exact action: commit, push, open PR, wait for GitHub/Vercel checks, and merge if green.
+- Latest completed work: PR #516 fixed worker/cleaner activation links opened in a clean browser by adding a narrow server-side activation endpoint. The link now activates the worker by token before normal login, without exposing broad write access or starting monolith/module splitting.
+- Validation for PR #516: targeted worker activation/login tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally; GitHub Actions and Vercel passed before merge.
+- Product design note recorded but not active in this branch: continue the flexible fleet maintenance / inspection policy redesign later without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data. Periodic-maintenance TO programs must stay separate from `בקרת כלים` inspection checklists.
+- Current next candidate: after this persistence fix, verify the app issue reports and then continue the periodic-maintenance/fleet-catalog work in separate small PRs. Keep maintenance programs, inspection questionnaires, fleet catalog, calendar entries, exports, and follow-up tickets as separate but connected concepts.
+- Backlog note: improve the internal app-issue reporter with an optional "capture current screen" action in addition to manual screenshot upload, while keeping manual upload as fallback.
 - Owner clarification recorded: periodic-maintenance TO programs are not `בקרת כלים` inspection checklists. They must stay owner-defined by flexible name, frequency in months, type/model targets, and their own PM checklist; if a PM/check result finds a fault, follow-up tickets must attach to the specific affected vehicle only.
 - Latest completed work: protected `סוגי כלי שינוע` catalog editing from false-success deletes. A vehicle type or model that is still used by fleet units now stays in place and explains which units must be updated/deleted first, instead of disappearing locally and reappearing after navigation.
 - Validation for the fleet catalog delete guard: targeted fleet catalog tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, and `git diff --check` passed.
