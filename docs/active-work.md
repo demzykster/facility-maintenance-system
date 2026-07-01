@@ -21,11 +21,17 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fix-fleet-type-kind-usage`.
-- In progress: close the fleet Excel import/catalog integrity issue where an explicitly emptied structured vehicle-type catalog could still be suppressed by legacy `forkliftTypes`, and where duplicate models under different `סוג כלי` values could be treated as one type.
-- Current validation: targeted fleet catalog/import tests passed; full `npm test -- --run`, `npm run release:check`, and `npm run build` passed. The supplied `רישיונות` workbook still reads 128 rows, 126 importable rows, 2 duplicate invalid rows, and now plans 12 structured `סוג כלי` catalog groups even when legacy `forkliftTypes` contains old models.
-- Next exact action: open PR and merge if checks/Vercel are green.
-- Latest completed work: PR #518 made fleet settings deletes persist immediately.
+- Active branch: none. `main` is the current source of truth after PR #519.
+- In progress: continue release hardening from the real remaining risks, not from stale PR state:
+  1. verify/fix settings persistence across global settings, fleet catalog settings, PPE catalog, tasks, and cleaning settings;
+  2. keep fleet import/catalog integrity stable while preserving `סוג כלי` separately from `דגם`;
+  3. continue the periodic-maintenance / inspection redesign without mixing `תכניות טיפול תקופתי` with `בקרת כלים`;
+  4. triage owner-submitted `appIssue:` reports and close them in small PRs;
+  5. keep monolith/module splitting out of scope until the owner finishes pilot checks.
+- Latest completed work: PR #519 fixed fleet Excel import/catalog integrity where an explicitly emptied structured vehicle-type catalog could still be suppressed by legacy `forkliftTypes`, and where duplicate models under different `סוג כלי` values could be treated as one type.
+- Current validation for PR #519: targeted fleet catalog/import tests passed; full `npm test -- --run`, `npm run release:check`, and `npm run build` passed. The supplied `רישיונות` workbook still reads 128 rows, 126 importable rows, 2 duplicate invalid rows, and now plans 12 structured `סוג כלי` catalog groups even when legacy `forkliftTypes` contains old models.
+- Next exact action: verify the current settings/data persistence surface, then continue the TO/inspection work in separate small PRs.
+- Previous completed work: PR #518 made fleet settings deletes persist immediately.
 - Validation for PR #518: targeted settings persistence tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, GitHub Actions passed, and Vercel deployment passed before merge.
 - Product design note recorded but not active in this branch: continue the flexible fleet maintenance / inspection policy redesign later without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data. Periodic-maintenance TO programs must stay separate from `בקרת כלים` inspection checklists.
 - Current next candidate: after this persistence fix, verify the app issue reports and then continue the periodic-maintenance/fleet-catalog work in separate small PRs. Keep maintenance programs, inspection questionnaires, fleet catalog, calendar entries, exports, and follow-up tickets as separate but connected concepts.
