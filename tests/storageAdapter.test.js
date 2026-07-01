@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SHARED_STORAGE_TIMEOUT_MS, createAppStore } from "../src/storageAdapter.js";
+import { DEFAULT_SHARED_STORAGE_TIMEOUT_MS, createAppStore, shouldClearExpiredNonRefreshAuth } from "../src/storageAdapter.js";
 
 function createRemoteStorage() {
   const data = {};
@@ -26,6 +26,30 @@ function createLocalStorage() {
 }
 
 describe("app storage adapter", () => {
+  it("clears expired CMMS PIN auth tokens that cannot be refreshed", () => {
+    expect(shouldClearExpiredNonRefreshAuth({
+      accessToken: "cmms-pin-token",
+      refreshToken: null,
+      expiresAt: 1_000
+    }, 2_000)).toBe(true);
+  });
+
+  it("keeps refreshable production auth for the normal refresh path", () => {
+    expect(shouldClearExpiredNonRefreshAuth({
+      accessToken: "supabase-token",
+      refreshToken: "refresh-token",
+      expiresAt: 1_000
+    }, 2_000)).toBe(false);
+  });
+
+  it("keeps non-expiring local auth values available", () => {
+    expect(shouldClearExpiredNonRefreshAuth({
+      accessToken: "legacy-token",
+      refreshToken: null,
+      expiresAt: 0
+    }, 2_000)).toBe(false);
+  });
+
   it("keeps the default shared write timeout long enough for server-backed staging", () => {
     expect(DEFAULT_SHARED_STORAGE_TIMEOUT_MS).toBeGreaterThanOrEqual(8000);
   });

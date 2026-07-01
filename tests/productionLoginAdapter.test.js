@@ -412,6 +412,8 @@ describe("productionLoginAdapter", () => {
         return JSON.stringify({
           ok: true,
           auth: null,
+          pinSessionToken: "cmms-pin-token",
+          pinSessionExpiresAt: 999999,
           user: {
             id: "worker-1",
             name: "Worker One",
@@ -442,7 +444,12 @@ describe("productionLoginAdapter", () => {
       role: "worker",
       productionSession: true
     });
-    expect(result.auth).toBe(null);
+    expect(result.auth).toEqual({
+      accessToken: "cmms-pin-token",
+      refreshToken: null,
+      expiresAt: 999999,
+      tokenType: "cmms-pin"
+    });
     expect(fetchImpl).toHaveBeenCalledWith("/api/session/initial-password", expect.objectContaining({
       method: "POST",
       body: JSON.stringify({ action: "login", identifier: "1042", pin: "1234" })

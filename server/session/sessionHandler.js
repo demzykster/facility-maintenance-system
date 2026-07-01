@@ -1,4 +1,7 @@
 import { normalizeSupabaseAppUserProfile } from "../../src/supabaseProfileModel.js";
+import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
+import { createUpstashKvDriverFromEnv } from "../kv/upstashDriver.js";
+import { verifyCmmsSessionToken } from "./cmmsSessionToken.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -27,6 +30,21 @@ async function responseJson(response) {
     return { message: text };
   }
 }
+
+function createDefaultDriver(env, fetchImpl) {
+  return (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
+    || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
+}
+
+const parseStoredUser = (record) => {
+  if (!record?.value) return null;
+  try {
+    const user = JSON.parse(record.value);
+    return user && typeof user === "object" ? user : null;
+  } catch {
+    return null;
+  }
+};
 
 export function createSupabaseSessionClient({ url, anonKey, fetchImpl = globalThis.fetch } = {}) {
   if (!url || !anonKey || !fetchImpl) return null;
@@ -93,9 +111,39 @@ export function buildSessionPayload(authUser, profile) {
   };
 }
 
+export function buildCmmsPinSessionPayload(tokenSession, storedUser) {
+  if (!tokenSession?.id) return { ok: false, error: "cmms_session_missing" };
+  if (!storedUser) return { ok: false, error: "cmms_user_missing" };
+  if (storedUser.active === false || storedUser.status === "archived") return { ok: false, error: "app_user_disabled" };
+  if (String(storedUser.id || storedUser.workerNo || "") !== tokenSession.id) return { ok: false, error: "cmms_session_mismatch" };
+  if (tokenSession.workerNo && String(storedUser.workerNo || "") !== tokenSession.workerNo) return { ok: false, error: "cmms_session_mismatch" };
+  if (tokenSession.role && String(storedUser.role || "") !== tokenSession.role) return { ok: false, error: "cmms_session_mismatch" };
+
+  return {
+    ok: true,
+    user: {
+      id: storedUser.id || storedUser.workerNo || "",
+      authUserId: "",
+      email: storedUser.email || "",
+      phone: storedUser.phone || "",
+      role: storedUser.role || "worker",
+      name: storedUser.name || storedUser.workerNo || "",
+      workerNo: storedUser.workerNo || "",
+      department: storedUser.dept || storedUser.department || "",
+      departments: Array.isArray(storedUser.depts) ? storedUser.depts : (Array.isArray(storedUser.departments) ? storedUser.departments : (storedUser.dept ? [storedUser.dept] : [])),
+      mgrZones: Array.isArray(storedUser.mgrZones) ? storedUser.mgrZones : [],
+      techScope: storedUser.techScope || "transport",
+      supplier: storedUser.supplier || "",
+      permissions: storedUser.perms || storedUser.permissions || {},
+      mustChangePassword: storedUser.mustChangePassword === true
+    }
+  };
+}
+
 export function createSessionMeHandler({
   env = process.env,
   sessionClient = null,
+  driver = null,
   fetchImpl = globalThis.fetch
 } = {}) {
   return async function sessionMeHandler(req, res) {
@@ -107,6 +155,28 @@ export function createSessionMeHandler({
 
     const token = bearerToken(req);
     if (!token) return json(res, 401, { error: "access_token_required" });
+
+    const cmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
+    const cmmsTokenSession = cmmsSecret ? verifyCmmsSessionToken(token, cmmsSecret) : null;
+    if (cmmsTokenSession) {
+      const backendDriver = driver || createDefaultDriver(env, fetchImpl);
+      if (!backendDriver) return json(res, 503, { error: "cmms_session_backend_not_configured" });
+      try {
+        const records = await backendDriver.listValues("user:", true);
+        const storedUser = (records || [])
+          .map(parseStoredUser)
+          .filter(Boolean)
+          .find((user) => (
+            String(user.id || user.workerNo || "") === cmmsTokenSession.id
+            || (cmmsTokenSession.workerNo && String(user.workerNo || "") === cmmsTokenSession.workerNo)
+          ));
+        const session = buildCmmsPinSessionPayload(cmmsTokenSession, storedUser);
+        if (!session.ok) return json(res, session.error === "app_user_disabled" ? 403 : 401, { error: session.error });
+        return json(res, 200, session);
+      } catch {
+        return json(res, 401, { error: "cmms_session_lookup_failed" });
+      }
+    }
 
     const client = sessionClient || createSupabaseSessionClient({
       url: env.SUPABASE_URL,

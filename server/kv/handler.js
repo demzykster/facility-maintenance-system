@@ -3,6 +3,7 @@ import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
 import { kvReadValueForSession, kvWritePermissionError, kvWritePermissionForKey, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
+import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { sendServerError } from "../httpErrors.js";
 import { ticketStatusAuditEvent } from "../../src/auditEventModel.js";
 
@@ -49,6 +50,15 @@ async function authorize(req, env, fetchImpl, sessionClient) {
   if (env.CMMS_KV_AUTH === "supabase") {
     const token = bearerToken(req);
     if (!token) return { ok: false, status: 401, error: "supabase_access_token_required" };
+
+    // Try CMMS session JWT first (issued for PIN users — worker / cleaner)
+    const cmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
+    if (cmmsSecret) {
+      const cmmsUser = verifyCmmsSessionToken(token, cmmsSecret);
+      if (cmmsUser) return { ok: true, user: cmmsUser };
+    }
+
+    // Fall through to Supabase JWT validation (admin / user roles)
     const client = sessionClient || createSupabaseSessionClient({
       url: env.SUPABASE_URL,
       anonKey: env.SUPABASE_ANON_KEY,

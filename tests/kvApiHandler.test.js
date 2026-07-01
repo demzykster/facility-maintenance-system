@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createKvApiHandler } from "../server/kv/handler.js";
+import { signCmmsSessionToken } from "../server/session/cmmsSessionToken.js";
 
 function createRes() {
   return {
@@ -441,6 +442,32 @@ describe("kv API handler", () => {
     expect(res.json()).toEqual({ value: "ticket-json" });
     expect(sessionClient.getAuthUser).toHaveBeenCalledWith("user-token");
     expect(sessionClient.getAppUserProfile).toHaveBeenCalledWith("user-token", "auth-user-1");
+  });
+
+  it("accepts a CMMS PIN token before serving storage in Supabase auth mode", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue("ticket-json")
+    };
+    const sessionClient = {
+      getAuthUser: vi.fn(),
+      getAppUserProfile: vi.fn()
+    };
+    const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase", CMMS_SESSION_SECRET: "session-secret" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      query: { key: "ticket:1", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ value: "ticket-json" });
+    expect(driver.get).toHaveBeenCalledWith("ticket:1", true);
+    expect(sessionClient.getAuthUser).not.toHaveBeenCalled();
   });
 
   it("blocks storage while a production password change is still required", async () => {

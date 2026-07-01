@@ -1,5 +1,6 @@
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
 import { createUpstashKvDriverFromEnv } from "../kv/upstashDriver.js";
+import { signCmmsSessionToken } from "./cmmsSessionToken.js";
 
 const PIN_ROLES = new Set(["worker", "cleaner"]);
 const PASSWORD_ROLES = new Set(["admin", "user"]);
@@ -247,7 +248,9 @@ export function createInitialPasswordHandler({
       if (!hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_not_configured", user: publicInitialUser(record.user), auth: kind });
       const pin = String(body?.pin || "").trim();
       if (!pin || String(record.user.pin || "") !== pin) return json(res, 401, { error: "pin_login_failed" });
-      return json(res, 200, { ok: true, user: publicSession(record.user), auth: null });
+      const cmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
+      const tokenResult = cmmsSecret ? signCmmsSessionToken(record.user.id || record.user.workerNo || "", record.user.role, record.user.workerNo || "", cmmsSecret, now()) : null;
+      return json(res, 200, { ok: true, user: publicSession(record.user), auth: null, pinSessionToken: tokenResult?.token || null, pinSessionExpiresAt: tokenResult?.expiresAt || null });
     }
     if (hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_already_configured", user: publicInitialUser(record.user), auth: kind });
     if (kind === "password" && !isValidEmail(record.user.email)) return json(res, 400, { error: "valid_email_required", user: publicInitialUser(record.user), auth: kind });
@@ -282,6 +285,11 @@ export function createInitialPasswordHandler({
     };
     await backendDriver.set(record.key, JSON.stringify(updated), true);
 
+    const completeCmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
+    const completeTokenResult = (kind === "pin" && completeCmmsSecret)
+      ? signCmmsSessionToken(updated.id || updated.workerNo || "", updated.role, updated.workerNo || "", completeCmmsSecret, now())
+      : null;
+
     return json(res, 200, {
       ok: true,
       user: {
@@ -290,7 +298,9 @@ export function createInitialPasswordHandler({
         authUserId: updated.authUserId || "",
         mustChangePassword: passwordSetup?.user?.mustChangePassword === true
       },
-      auth: passwordSetup?.auth || null
+      auth: passwordSetup?.auth || null,
+      pinSessionToken: completeTokenResult?.token || null,
+      pinSessionExpiresAt: completeTokenResult?.expiresAt || null
     });
   };
 }

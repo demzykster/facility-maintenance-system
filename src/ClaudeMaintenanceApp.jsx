@@ -2399,7 +2399,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       try {
         const result = await loginWithProductionPin({ identifier: resolved.identifier || resolved.user.workerNo || identifier.trim(), pin: code.trim(), config: productionLoginConfig });
         remember_save({ workerNo: result.session?.workerNo || resolved.user.workerNo || identifier.trim(), mode: "worker" });
-        await onLogin(result.session, { remember });
+        await onLogin(result.session, { productionAuth: result.auth, remember });
       } catch (error) {
         setErr(error?.message === "pin_login_failed" ? "הקוד שגוי" : `הכניסה נכשלה${error?.message ? ` (${error.message})` : ""}`);
       } finally {
