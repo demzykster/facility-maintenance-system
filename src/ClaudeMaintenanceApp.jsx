@@ -2408,7 +2408,20 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       rememberLogin(u, initialSetup.identifierType);
       finish(withDefaultDept(u));
     } catch (error) {
-      setErr(error?.message === "password_too_short" ? "בחרו סיסמה בת 6 תווים לפחות" : error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : error?.message === "valid_email_required" ? "נדרש דוא״ל תקין לפני הגדרת סיסמה. פנו למנהל המערכת לעדכון המשתמש." : error?.message === "initial_secret_already_configured" ? "כבר הוגדרה כניסה למשתמש זה" : "לא ניתן לשמור כניסה כרגע");
+      const _em = error?.message || "";
+      setErr(
+        _em === "password_too_short" ? "בחרו סיסמה בת 6 תווים לפחות" :
+        _em === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" :
+        _em === "valid_email_required" ? "נדרש דוא״ל תקין לפני הגדרת סיסמה. פנו למנהל המערכת לעדכון המשתמש." :
+        _em === "initial_secret_already_configured" ? "כבר הוגדרה כניסה למשתמש זה" :
+        _em === "initial_password_auth_not_configured" ? "אימות לא מוגדר בשרת — פנו למנהל המערכת (SUPABASE_SERVICE_ROLE_KEY)" :
+        _em === "initial_password_backend_not_configured" ? "שגיאת שרת — דרייבר KV לא מוגדר" :
+        _em === "user_not_found" ? "המשתמש לא נמצא. פנו למנהל המערכת" :
+        _em === "auth_user_create_failed" ? "יצירת משתמש נכשלה. פנו למנהל המערכת" :
+        _em === "app_user_upsert_failed" ? "שמירת פרופיל נכשלה. פנו למנהל המערכת" :
+        _em === "initial_password_login_failed" ? "ההגדרה הצליחה אך הכניסה נכשלה — נסו להתחבר שוב" :
+        `לא ניתן לשמור כניסה כרגע${_em ? ` (${_em})` : ""}`
+      );
     } finally {
       setBusy(false);
     }
