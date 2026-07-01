@@ -31,8 +31,8 @@ Then synchronize before answering or editing:
 ```bash
 git fetch origin --prune
 git status --short --branch
-git log --oneline --decorate -10 origin/main
-git branch -r
+git log --oneline --decorate -5 origin/main
+gh pr list --state open --limit 20
 ```
 
 ## Read Order
@@ -44,8 +44,8 @@ Always read first:
 Then read only what the current task needs:
 
 - `docs/backlog.md` - working task list.
-- `docs/current-status.md` - project phase/status questions.
-- `docs/next-steps.md` - roadmap/phase questions.
+- `docs/release-checklist.md` - current release closure packages.
+- `docs/module-growth-architecture.md` - future module, fleet maintenance, inspection, and monolith-split boundaries.
 - `docs/collaboration-model.md` - collaboration or handoff questions.
 - `docs/permissions-model.md` - user permissions, roles, worker onboarding, module access.
 - `docs/full-ui-audit-2026-06-24.md` - UI audit follow-up.
@@ -59,8 +59,8 @@ Then read only what the current task needs:
 - Autonomy never overrides the agreed strategy.
 - If something conflicts with the strategy or blocks safe work, start with `PROBLEM:` and explain the blocker, risk, and safe options.
 - Do not replace `src/ClaudeMaintenanceApp.jsx` as a whole file.
-- Do not start Supabase/Auth/RLS/Railway/database work.
-- Do not do a broad modular split yet.
+- Do not clear, reseed, or overwrite Supabase data unless the owner explicitly asks for destructive cleanup.
+- Do not do a broad modular split yet. The owner wants this only after data-layer stability and owner checks.
 - Keep changes small and reversible.
 - Keep `docs/active-work.md` short. Update it when the active state changes, work pauses mid-branch, strategy changes, or the current ledger would mislead the next session.
 - Do not update `docs/active-work.md` after every tiny merged PR if `main` is clean and the next step is obvious.
@@ -73,42 +73,30 @@ Then read only what the current task needs:
 
 ## Active Product Direction
 
-Current product thread: worker onboarding and unified permissions.
+Current product thread: release stabilization on Vercel + Supabase staging.
 
-Intent:
+Current facts:
 
-- Roles provide defaults.
-- Individual permissions are explicit overrides in `perms`.
-- HR is not a separate role for now; model HR-like access through permissions.
-- Do not add more one-off user-card checkboxes.
-- Worker login/onboarding should move toward activation links and password/code creation by the worker.
-- Managers/admin/HR-like users may generate or reset activation links only when they have the right permission.
-- Activated worker codes/passwords should not be visible to managers.
-- Production activation tokens must eventually be server-side; current behavior is demo/staging only.
+- GitHub `main` is the source of truth.
+- The app is already backed by Supabase/Vercel staging, not only browser-local demo storage.
+- Owner-entered staging/pilot data is working data. Protect it.
+- Production starts with real owner-entered data, not migrated demo/local history.
+- The Supabase KV bridge is an intentional v1 compatibility layer, not the final normalized workflow model.
+- Future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not create a separate AI-only write path.
 
-Read `docs/permissions-model.md` before changing user permissions or onboarding.
+Current next work is tracked in `docs/active-work.md`. As of the 2026-07-01 handoff, the next likely product fix is the open SLA-persistence `appIssue:` report unless the owner reports a newer critical bug.
 
-## Planning Step Before Product Code
+When working on fleet maintenance/inspection:
 
-`docs/backlog.md` already exists. Use it as the grouped task list, not as a per-PR journal.
+- Keep `סוג כלי` and `דגם` separate.
+- Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
+- Read `docs/module-growth-architecture.md` first.
 
-If a new large area is opened, do a short planning step before product code:
+When working on user permissions/onboarding:
 
-1. Verify worker activation UI wiring in code and browser:
-   - copy activation link button after saving a worker;
-   - reset/new activation link button;
-   - worker login status in the user list.
-2. Collect open tasks from:
-   - `docs/engineering-dialogue.md`;
-   - `docs/full-ui-audit-2026-06-24.md`;
-   - `docs/active-work.md`;
-   - `docs/permissions-model.md`.
-3. Group tasks by code area in `docs/backlog.md`.
-4. Merge backlog through its own docs-only PR.
-
-Work from the backlog with one clear theme per PR. Several closely related low-risk fixes can share one PR. If a product-code diff is more than about 100 lines or touches unrelated areas, split it.
-
-Check `docs/backlog.md` for the current smallest open item.
+- Read `docs/permissions-model.md` first.
+- Roles provide defaults; individual permissions are explicit overrides.
+- New login-capable users are invited through activation links, not admin-entered temporary passwords/PINs.
 
 ## Baseline Checks
 

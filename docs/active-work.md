@@ -26,6 +26,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: none.
 - No active product PR is paused.
 - Latest completed product work:
+  - PR #538 stabilized fleet type catalog settings: saved `סוגי כלי שינוע` rows now show compact model/unit/document summaries, delete actions wait for successful save instead of pretending to delete, and periodic-maintenance policy stays separate from inspection checklists.
   - New login-capable users are onboarded through activation links, not admin-entered temporary passwords/PINs. Existing activated users and legacy secrets remain compatible.
   - PR #535 prevents misleading cleaning-zone deletion when linked rounds, complaints, or manager assignments still exist, and links the owner to the blocking records.
   - PR #530 generalized activation-link onboarding for all system roles, allowed admins to permanently delete archived users, removed per-user admin notification-category grants from shared user create/edit flows, and fixed the active-work release gate in GitHub Actions PR builds.
@@ -33,11 +34,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
-  - Review internal `appIssue:` reports and close the test report.
-  - Verify/fix SLA persistence report, fleet document display, and supplier activity confirmation if still reproducible.
+  - Review internal `appIssue:` reports. Last checked on 2026-07-01: six reports exist; three are resolved, and three remain open.
+  - Open `appIssue:` reports: SLA persistence after reload; compact/visible `סוגי כלי שינוע` list; cleaning-zone delete blockers should open the relevant filtered linked records.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: fix the next owner-reported critical bug in a small PR, starting with persistence/SLA or another confirmed `appIssue:` report.
+- Next exact action: fix the next owner-reported critical bug in a small PR, starting with SLA persistence unless a newer owner report is more urgent.
 
 ## Current Product Direction
 
@@ -54,10 +55,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - `npm run release:check` must include the active-work ledger gate so stale branch/commit handoffs fail before merge.
 - `npm run staging:gate` includes live staging checks and a data summary, but do not treat staging smoke output as permission to delete owner data.
 - `npm run staging:data:summary` is the safe way to inspect table/key counts without printing secrets or record contents.
+- Last checked staging data summary on 2026-07-01: `app_users=1`, `cmms_kv_records=15`, `file_metadata=0`, `audit_events=1341`; KV prefixes included `appIssue=6`, `config=1`, `czone=1`, `itpl=2`, `mtask=1`, `ppeitem=1`, `presence=1`, `pushSubscriptions=1`, `user=1`.
 - Public and server Supabase env must point at the same project/key pair.
 - Phone push notifications are PWA/web-push. Users still need a supported browser/PWA install and notification permission.
 - Role defaults, individual module permissions, and notification preferences should stay one coherent access-control surface.
 - Production AI remains disabled for v1; AI readiness is architectural preparation.
+- Supabase KV pagination is implemented in `server/kv/supabaseDriver.js`; `list`, `listValues`, and `listValuesMany` should not regress to one-page reads.
 
 ## Accepted V1 Pilot Risks
 
