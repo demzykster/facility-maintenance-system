@@ -92,6 +92,15 @@ function parseConfig(raw) {
   }
 }
 
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value || {}));
+}
+
+function firstKey(obj, fallback) {
+  const keys = Object.keys(obj || {}).filter(Boolean);
+  return keys[0] || fallback;
+}
+
 loadEnvFile(ENV_FILE);
 loadEnvFile(CREDENTIALS_FILE);
 
@@ -114,8 +123,28 @@ const originalRaw = await kvGet({ publicUrl, token, key: CONFIG_KEY });
 const originalConfig = parseConfig(originalRaw);
 const originalSerialized = typeof originalRaw === "string" ? originalRaw : JSON.stringify(originalConfig);
 const marker = `settings-smoke-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const categorySlaKey = firstKey(originalConfig.catSla, "other");
+const vehicleTypeSlaKey = firstKey(originalConfig.typeSla, "staging-smoke-model");
 const probeConfig = {
   ...originalConfig,
+  catSla: {
+    ...cloneJson(originalConfig.catSla),
+    [categorySlaKey]: {
+      ...cloneJson(originalConfig.catSla?.[categorySlaKey]),
+      high: 11,
+      medium: 22,
+      low: 33
+    }
+  },
+  typeSla: {
+    ...cloneJson(originalConfig.typeSla),
+    [vehicleTypeSlaKey]: {
+      ...cloneJson(originalConfig.typeSla?.[vehicleTypeSlaKey]),
+      high: 12,
+      medium: 24,
+      low: 48
+    }
+  },
   __settingsPersistenceSmoke: {
     marker,
     at: new Date().toISOString()
@@ -131,6 +160,12 @@ try {
   const savedConfig = parseConfig(savedRaw);
   if (savedConfig?.__settingsPersistenceSmoke?.marker !== marker) {
     throw new Error("settings_marker_not_persisted");
+  }
+  if (Number(savedConfig?.catSla?.[categorySlaKey]?.high) !== 11 || Number(savedConfig?.catSla?.[categorySlaKey]?.low) !== 33) {
+    throw new Error("category_sla_not_persisted");
+  }
+  if (Number(savedConfig?.typeSla?.[vehicleTypeSlaKey]?.high) !== 12 || Number(savedConfig?.typeSla?.[vehicleTypeSlaKey]?.low) !== 48) {
+    throw new Error("vehicle_type_sla_not_persisted");
   }
 } finally {
   if (restoreNeeded) {
@@ -175,6 +210,11 @@ console.log(JSON.stringify({
   appUrl: publicUrl,
   key: CONFIG_KEY,
   marker,
+  sla: {
+    category: categorySlaKey,
+    vehicleType: vehicleTypeSlaKey,
+    persisted: true
+  },
   restored: true,
   records: recordResults
 }, null, 2));
