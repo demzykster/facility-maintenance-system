@@ -11,9 +11,9 @@ This note names what is currently safe to assume before treating the demo as clo
 
 ## Demo-Only Boundaries
 
-- Login, PINs, worker activation links, and module permissions are demo controls, not production authentication.
+- Login, PINs, first-login setup, and module permissions are demo controls, not final production authentication.
 - Demo credentials and browser-side permissions are useful for workflow review, but they do not replace server-side auth.
-- Activation links are frontend demo links. Production activation tokens must be server-side.
+- First-login password/PIN setup must stay server-backed in production.
 - Backup files are plain JSON and can contain business data. Treat them as sensitive files.
 
 ## Backup / Restore

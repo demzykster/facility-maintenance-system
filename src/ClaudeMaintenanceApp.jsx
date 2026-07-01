@@ -17,7 +17,7 @@ import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
-import { activationTokenForSave, canCopyActivationLink, canCreateActivationLinkForSavedUser, isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
+import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
@@ -28,7 +28,7 @@ import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
-import { activateProductionWorker, changeProductionPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionWorkerActivation } from "./productionLoginAdapter.js";
+import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -1990,13 +1990,11 @@ export default function App() {
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
   const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
-  const activationRouteOpen = (() => { try { return !!new URLSearchParams(window.location.search).get("activate"); } catch (e) { return false; } })();
-
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : (!session || activationRouteOpen) ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
+        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -2263,72 +2261,15 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE }) {
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const t = (key, vars) => uiText(language, key, vars);
   const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
-  const [actCode, setActCode] = useState(""), [actConfirm, setActConfirm] = useState("");
-  const [activationServerUser, setActivationServerUser] = useState(null), [activationLookup, setActivationLookup] = useState("idle");
+  const [initialSetup, setInitialSetup] = useState(null);
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
-  const activationToken = (() => { try { return new URLSearchParams(window.location.search).get("activate") || ""; } catch (e) { return ""; } })();
   const active = users.filter((u) => u.active !== false);
-  const activationUser = activationToken ? active.find((u) => isActivationLinkRole(u.role) && u.activationToken === activationToken && u.activationStatus === "pending") : null;
   const productionLogin = seedPolicy.requiresServerBootstrapAdmin;
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const productionConfigured = productionLoginReady(productionLoginConfig);
-  const displayedActivationUser = activationServerUser || activationUser;
-  const activationUsesPassword = isPasswordActivationRole(displayedActivationUser?.role);
-  const activationIsLoading = activationToken && productionLogin && activationLookup === "loading";
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
-  useEffect(() => {
-    let cancelled = false;
-    setActivationServerUser(null);
-    if (!activationToken || !productionLogin || !productionConfigured) {
-      setActivationLookup("idle");
-      return () => { cancelled = true; };
-    }
-    setActivationLookup("loading");
-    validateProductionWorkerActivation({ token: activationToken, config: productionLoginConfig })
-      .then((user) => {
-        if (cancelled) return;
-        setActivationServerUser(user);
-        setActivationLookup("ready");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setActivationServerUser(null);
-        setActivationLookup("invalid");
-      });
-    return () => { cancelled = true; };
-  }, [activationToken, productionLogin, productionConfigured]);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
   const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", phone: u.phone || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u) });
-  const activateWorker = async () => {
-    if (!displayedActivationUser) return setErr("קישור ההפעלה אינו תקין או שכבר נוצל");
-    if (activationUsesPassword && actCode.trim().length < 6) return setErr("בחרו סיסמה בת 6 תווים לפחות");
-    if (!activationUsesPassword && actCode.trim().length < 4) return setErr("בחרו קוד אישי בן 4 ספרות לפחות");
-    if (actCode.trim() !== actConfirm.trim()) return setErr(activationUsesPassword ? "הסיסמאות אינן זהות" : "הקודים אינם זהים");
-    if (productionLogin) {
-      setBusy(true);
-      setErr("");
-      try {
-        const result = await activateProductionWorker({ token: activationToken, pin: activationUsesPassword ? undefined : actCode.trim(), password: activationUsesPassword ? actCode.trim() : undefined, config: productionLoginConfig });
-        try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
-        if (activationUsesPassword) remember_save({ email: result.session?.email || displayedActivationUser.email || "", mode: "production" });
-        else remember_save({ workerNo: result.session?.workerNo || "", mode: "worker" });
-        if (result.auth) await onLogin(result.session, { productionAuth: result.auth, remember });
-        else finish(result.session);
-      } catch (error) {
-        setErr(error?.message === "password_too_short" ? "בחרו סיסמה בת 6 תווים לפחות" : error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : "קישור ההפעלה אינו תקין או שכבר נוצל");
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
-    if (!saveUser) return setErr("לא ניתן להשלים הפעלה בסביבה זו");
-    const u = { ...activationUser, pin: activationUsesPassword ? "" : actCode.trim(), password: activationUsesPassword ? actCode.trim() : "", activationToken: "", activationStatus: "activated", activatedAt: Date.now() };
-    await saveUser(u);
-    try { window.history.replaceState({}, "", window.location.pathname); } catch (e) {}
-    if (activationUsesPassword) remember_save({ email: u.email || "", mode: "user" });
-    else remember_save({ workerNo: u.workerNo || "", mode: "worker" });
-    finish(u);
-  };
   const dfltDept = config?.departments?.[0] || "";
   const withDefaultDept = (u) => ({ ...u, dept: u.dept || ((u.role === "user" || u.role === "worker") ? dfltDept : "") });
   const rememberLogin = (u, idType) => {
@@ -2336,15 +2277,48 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
     if (idType === "workerNo") return remember_save({ workerNo: u.workerNo || identifier.trim(), mode: "worker" });
     return remember_save({ mode: "tech" });
   };
-  const submitIdentifier = () => {
+  const submitIdentifier = async () => {
     if (productionLogin) {
-      const email = identifier.trim().toLowerCase();
-      if (!email) return setErr("הזינו דוא״ל");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setErr("הזינו דוא״ל תקין");
-      setResolved({ status: "active", identifierType: "email", auth: "password", source: "supabase", user: { email, name: email, role: "admin" } });
-      setPassword("");
-      setCode("");
+      const cleanIdentifier = identifier.trim();
+      const email = cleanIdentifier.toLowerCase();
+      const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!cleanIdentifier) return setErr("הזינו דוא״ל או מספר עובד");
+      if (!productionConfigured) return setErr("כניסת ייצור עדיין לא הוגדרה בשרת");
+      setBusy(true);
       setErr("");
+      try {
+        const initial = await validateProductionInitialPassword({ identifier: cleanIdentifier, config: productionLoginConfig });
+        if (initial?.needsSetup) {
+          setInitialSetup({ source: "production", identifier: cleanIdentifier, identifierType: initial.identifierType || (looksLikeEmail ? "email" : "workerNo"), auth: initial.auth || "password", user: initial.user || { email: looksLikeEmail ? email : "", workerNo: looksLikeEmail ? "" : cleanIdentifier, name: cleanIdentifier, role: looksLikeEmail ? "user" : "worker" } });
+          setResolved(null);
+          setPassword("");
+          setCode("");
+          setNewPassword("");
+          setNewPasswordConfirm("");
+          return;
+        }
+        if (!looksLikeEmail) return setErr("לא נמצא משתמש מתאים");
+        setResolved({ status: "active", identifierType: "email", auth: "password", source: "supabase", user: initial?.user || { email, name: email, role: "admin" } });
+        setPassword("");
+        setCode("");
+      } catch (error) {
+        if (error?.message === "initial_secret_already_configured") {
+          if (!looksLikeEmail) return setErr("כבר הוגדרה כניסה למשתמש זה");
+          setResolved({ status: "active", identifierType: "email", auth: "password", source: "supabase", user: { email, name: email, role: "admin" } });
+          setPassword("");
+          setCode("");
+          return;
+        }
+        if (error?.message === "user_not_found" && looksLikeEmail) {
+          setResolved({ status: "active", identifierType: "email", auth: "password", source: "supabase", user: { email, name: email, role: "admin" } });
+          setPassword("");
+          setCode("");
+          return;
+        }
+        setErr(error?.message === "user_not_found" ? "לא נמצא משתמש מתאים" : "לא ניתן לבדוק משתמש זה כרגע");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     const res = resolveIdentifier(identifier, users, builtinLogins);
@@ -2352,6 +2326,16 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
     if (res.status === "archived") return setErr("המשתמש אינו פעיל. פנו למנהל המערכת");
     if (res.status === "not_found") return setErr("לא נמצא משתמש מתאים");
     if (res.auth === "none") { rememberLogin(res.user, res.identifierType); return finish(withDefaultDept(res.user)); }
+    if (res.source !== "builtin" && userNeedsInitialLoginSetup(res.user)) {
+      setInitialSetup(res);
+      setResolved(null);
+      setPassword("");
+      setCode("");
+      setNewPassword("");
+      setNewPasswordConfirm("");
+      setErr("");
+      return;
+    }
     setResolved(res);
     setPassword("");
     setCode("");
@@ -2388,6 +2372,47 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
     rememberLogin(u, resolved.identifierType);
     finish(withDefaultDept(u));
   };
+  const submitInitialSecret = async () => {
+    if (!initialSetup?.user) return setErr("נדרש לבחור משתמש מחדש");
+    const usesPassword = initialSetup.auth === "password" || isPasswordActivationRole(initialSetup.user.role);
+    const nextSecret = newPassword.trim();
+    const confirmSecret = newPasswordConfirm.trim();
+    if (usesPassword && nextSecret.length < 6) return setErr("בחרו סיסמה בת 6 תווים לפחות");
+    if (!usesPassword && nextSecret.length < 4) return setErr("בחרו קוד אישי בן 4 ספרות לפחות");
+    if (nextSecret !== confirmSecret) return setErr(usesPassword ? "הסיסמאות אינן זהות" : "הקודים אינם זהים");
+    setBusy(true);
+    setErr("");
+    try {
+      if (initialSetup.source === "production") {
+        const result = await completeProductionInitialPassword({
+          identifier: initialSetup.identifier || identifier,
+          password: usesPassword ? nextSecret : undefined,
+          pin: usesPassword ? undefined : nextSecret,
+          config: productionLoginConfig
+        });
+        if (usesPassword) remember_save({ email: result.session?.email || initialSetup.user.email || identifier.trim().toLowerCase(), mode: "production" });
+        else remember_save({ workerNo: result.session?.workerNo || initialSetup.user.workerNo || identifier.trim(), mode: "worker" });
+        await onLogin(result.session, { productionAuth: result.auth, remember });
+        return;
+      }
+      if (!saveUser) return setErr("לא ניתן לשמור כניסה בסביבה זו");
+      const u = {
+        ...initialSetup.user,
+        password: usesPassword ? nextSecret : "",
+        pin: usesPassword ? "" : nextSecret,
+        activationToken: "",
+        activationStatus: "activated",
+        activatedAt: Date.now()
+      };
+      if (await saveUser(u) === false) return setErr("שמירת הכניסה נכשלה");
+      rememberLogin(u, initialSetup.identifierType);
+      finish(withDefaultDept(u));
+    } catch (error) {
+      setErr(error?.message === "password_too_short" ? "בחרו סיסמה בת 6 תווים לפחות" : error?.message === "pin_too_short" ? "בחרו קוד אישי בן 4 ספרות לפחות" : error?.message === "initial_secret_already_configured" ? "כבר הוגדרה כניסה למשתמש זה" : "לא ניתן לשמור כניסה כרגע");
+    } finally {
+      setBusy(false);
+    }
+  };
   const submitNewPassword = async () => {
     if (!passwordChange?.accessToken) return setErr("נדרש להתחבר מחדש");
     if (newPassword.length < 6) return setErr("הסיסמה החדשה חייבת לכלול לפחות 6 תווים");
@@ -2411,14 +2436,6 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
         <LanguagePicker value={language} onChange={setLanguage} />
-        {activationToken ? (<>
-          <div className="login-q">הפעלת כניסה למערכת</div>
-          {activationIsLoading ? <div className="hint" style={{ marginBottom: 10 }}>בודק קישור הפעלה…</div> : displayedActivationUser ? <div className="hint" style={{ marginBottom: 10 }}>{activationUsesPassword ? `שלום ${displayedActivationUser.name}. הגדירו סיסמה אישית לכניסה עם הדוא״ל ${displayedActivationUser.email || "—"}.` : `שלום ${displayedActivationUser.name}. הגדירו קוד אישי לכניסה עם מספר עובד ${displayedActivationUser.workerNo || "—"}.`}</div> : <div className="err">קישור ההפעלה אינו תקין או שכבר נוצל</div>}
-          <label className="field"><span>{activationUsesPassword ? "סיסמה חדשה" : "קוד אישי חדש"}</span><input value={actCode} onChange={(e) => { setActCode(e.target.value); setErr(""); }} type="password" inputMode={activationUsesPassword ? undefined : "numeric"} placeholder={activationUsesPassword ? "לפחות 6 תווים" : "••••"} disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
-          <label className="field"><span>{activationUsesPassword ? "אישור סיסמה" : "אישור קוד"}</span><input value={actConfirm} onChange={(e) => { setActConfirm(e.target.value); setErr(""); }} type="password" inputMode={activationUsesPassword ? undefined : "numeric"} placeholder={activationUsesPassword ? "הקלידו שוב" : "••••"} onKeyDown={(e) => e.key === "Enter" && activateWorker()} disabled={!displayedActivationUser || activationIsLoading || busy} /></label>
-          {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={activateWorker} disabled={!displayedActivationUser || activationIsLoading || busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
-        </>) : (<>
         {passwordChange ? (<>
           <div className="login-q">{t("login.firstPassword")}</div>
           <div className="hint" style={{ marginBottom: 10 }}>נדרש להגדיר סיסמה חדשה לפני כניסה למערכת.</div>
@@ -2427,12 +2444,20 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={submitNewPassword} disabled={busy}>{busy ? "שומר…" : t("login.saveAndEnter")}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setPasswordChange(null); setResolved(null); setPassword(""); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
+        </>) : initialSetup ? (<>
+          <div className="login-q">{isPasswordActivationRole(initialSetup.user?.role) ? "הגדרת סיסמה ראשונה" : "הגדרת קוד אישי ראשון"}</div>
+          <div className="hint" style={{ marginBottom: 10 }}>{isPasswordActivationRole(initialSetup.user?.role) ? `שלום ${initialSetup.user?.name || ""}. הגדירו סיסמה אישית לכניסה עם הדוא״ל ${initialSetup.user?.email || identifier.trim()}.` : `שלום ${initialSetup.user?.name || ""}. הגדירו קוד אישי לכניסה עם מספר עובד ${initialSetup.user?.workerNo || identifier.trim()}.`}</div>
+          <label className="field"><span>{isPasswordActivationRole(initialSetup.user?.role) ? "סיסמה חדשה" : "קוד אישי חדש"}</span><input value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" inputMode={isPasswordActivationRole(initialSetup.user?.role) ? undefined : "numeric"} placeholder={isPasswordActivationRole(initialSetup.user?.role) ? "לפחות 6 תווים" : "••••"} onKeyDown={(e) => e.key === "Enter" && submitInitialSecret()} autoFocus /></label>
+          <label className="field"><span>{isPasswordActivationRole(initialSetup.user?.role) ? "אישור סיסמה" : "אישור קוד"}</span><input value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" inputMode={isPasswordActivationRole(initialSetup.user?.role) ? undefined : "numeric"} placeholder={isPasswordActivationRole(initialSetup.user?.role) ? "הקלידו שוב" : "••••"} onKeyDown={(e) => e.key === "Enter" && submitInitialSecret()} /></label>
+          {err && <div className="err">{err}</div>}
+          <button className="btn-primary full" onClick={submitInitialSecret} disabled={busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
+          <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setInitialSetup(null); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : !resolved ? (<>
           <div className="login-q">{t("login.title")}</div>
-          <label className="field"><span>{productionLogin ? t("login.email") : t("login.identity")}</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com" : "vadim@chemipal.co.il / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
+          <label className="field"><span>{t("login.identity")}</span><input value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com / 1042" : "vadim@chemipal.co.il / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err">{err}</div>}
-          <button className="btn-primary full" onClick={submitIdentifier}>{t("login.continue")}</button>
+          <button className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
         </>) : (<>
           <div className="login-q">{t("login.hello", { name: resolved.user.name })}</div>
           <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? t("login.enterPassword") : t("login.enterPin")}</div>
@@ -2447,7 +2472,6 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>{t("login.developedBy")} </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
         <InstallAppPrompt language={language} />
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> {t("login.reportWithoutLogin")}</button>
-        </>)}
       </div>
       {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} language={language} setLanguage={setLanguage} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
     </div>
@@ -7272,49 +7296,36 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
-  const [activationToken, setActivationToken] = useState(() => user.activationToken || (shouldSeedWorkerActivation(user, initialRole, canWorkerAccess) ? uid() : ""));
-  const [copiedActivation, setCopiedActivation] = useState(false);
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
   const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
-  const activationLink = activationToken ? `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(activationToken)}` : "";
-  const canCopyLink = canCopyActivationLink(user, activationToken, canWorkerAccess);
-  const activationHint = workerActivationCopyHint(user, activationToken, canWorkerAccess);
-  const roleUsesActivation = isActivationLinkRole(role);
+  const roleUsesLogin = isActivationLinkRole(role);
   const roleUsesPin = isPinActivationRole(role);
   const roleUsesPassword = isPasswordActivationRole(role);
-  const loginActivated = roleUsesActivation && user.activationStatus === "activated" && !activationToken;
-  const activationLabel = roleUsesPassword ? "סיסמה" : "קוד אישי";
+  const loginConfigured = roleUsesLogin && userHasLoginSecret({ ...user, role, pin, password });
+  const canResetStoredLogin = loginConfigured && !user.authUserId;
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
   const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
   const changeRole = (nextRole) => {
     setRole(nextRole);
-    if (!activationToken && !pin.trim() && !password.trim() && shouldSeedWorkerActivation(user, nextRole, canWorkerAccess)) setActivationToken(uid());
-    setCopiedActivation(false);
   };
-  const copyActivationLink = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(activationLink); setCopiedActivation(true); return; } } catch (e) {} try { const ta = document.getElementById("worker-activation-link"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); setCopiedActivation(true); } } catch (e) {} };
   const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
     const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
     return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select aria-label={`הרשאה: ${label}`} value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
   };
   const save = () => {
     if (!name.trim()) return setErr("נא להזין שם");
-    const ensuredActivationToken = activationTokenForSave({ user, role, activationToken, canManageWorkerAccess: canWorkerAccess, createToken: uid });
     if (role === "tech") {
-      if (canWorkerAccess && !ensuredActivationToken && !loginActivated && !user.pin) return setErr("לא ניתן להכין קישור הפעלה לטכנאי");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
-    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); if (canWorkerAccess && !ensuredActivationToken && !loginActivated && !user.pin) return setErr("לא ניתן להכין קישור הפעלה לעובד"); }
-    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (canWorkerAccess && !ensuredActivationToken && !loginActivated && !user.password) return setErr("לא ניתן להכין קישור הפעלה למשתמש"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
+    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); }
+    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
     const nextPerms = role === "admin" ? {} : cleanPerms(perms);
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
-    const nextActivationToken = roleUsesActivation ? (canWorkerAccess ? ensuredActivationToken : (user.activationToken || "")) : "";
-    const nextActivationStatus = roleUsesActivation ? (canWorkerAccess ? (ensuredActivationToken ? "pending" : (user.activationStatus || "")) : (user.activationStatus || "")) : "";
-    const nextPin = roleUsesPin ? (canWorkerAccess ? (ensuredActivationToken ? "" : pin.trim()) : (user.pin || "")) : "";
-    const nextPassword = roleUsesPassword ? (canWorkerAccess ? (ensuredActivationToken ? "" : password) : (user.password || "")) : "";
-    if (ensuredActivationToken && ensuredActivationToken !== activationToken) setActivationToken(ensuredActivationToken);
+    const nextPin = roleUsesPin ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : "";
+    const nextPassword = roleUsesPassword ? (canWorkerAccess ? password : (user.password || "")) : "";
     onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), name: name.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
@@ -7329,29 +7340,21 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       shift: role !== "admin" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
       active,
-      activationToken: nextActivationToken,
-      activationStatus: nextActivationStatus,
+      activationToken: "",
+      activationStatus: roleUsesLogin && (nextPin || nextPassword || user.authUserId) ? "activated" : "",
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
   };
   const ActivationControls = () => {
-    if (!roleUsesActivation) return null;
-    const pendingText = activationToken
-      ? (roleUsesPassword ? "ממתין להפעלה: שלחו למשתמש את הקישור והוא יגדיר סיסמה בעצמו." : "ממתין להפעלה: שלחו את הקישור והוא יגדיר קוד אישי בעצמו.")
-      : loginActivated
-        ? (roleUsesPassword ? "הופעל: המשתמש הגדיר סיסמה. הסיסמה אינה מוצגת למנהלים." : "הופעל: המשתמש הגדיר קוד אישי. הקוד אינו מוצג למנהלים.")
-        : (user.id ? (roleUsesPassword ? "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר סיסמה בעצמו." : "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר קוד אישי בעצמו.")
-          : (roleUsesPassword ? "טרם הוגדרה כניסה. שמרו את המשתמש והקישור יופיע כאן." : "טרם הוגדרה כניסה. שמרו את המשתמש והקישור יופיע כאן."));
-    const canCreateSavedActivationLink = canCreateActivationLinkForSavedUser(user, role, activationToken, canWorkerAccess);
+    if (!roleUsesLogin) return null;
+    const pendingText = loginConfigured
+      ? (roleUsesPassword ? "כניסה מוגדרת: המשתמש הגדיר סיסמה. הסיסמה אינה מוצגת למנהלים." : "כניסה מוגדרת: המשתמש הגדיר קוד אישי. הקוד אינו מוצג למנהלים.")
+      : loginSetupPrompt({ ...user, role });
     return <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pendingText}</div>
       {canWorkerAccess ? <>
-        {canCreateSavedActivationLink && <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPassword(""); setPin(""); setCopiedActivation(false); }}>צור קישור הפעלה</button>}
-        {loginActivated && <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPassword(""); setPin(""); setCopiedActivation(false); }}>צור קישור איפוס כניסה</button>}
-        {activationToken && (canCopyLink
-          ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> {copiedActivation ? "הועתק" : "העתק קישור"}</button><div className="hint">{activationHint} לאחר ההפעלה הקישור נסגר.</div></div>
-          : <div className="hint">{activationHint}</div>)}
-        {loginActivated && <div className="hint">לא מציגים {activationLabel} קיים. אם המשתמש שכח, צרו קישור איפוס ושלחו אותו מחדש.</div>}
-      </> : <div className="hint">ניהול כניסה או קישור הפעלה דורש הרשאת הפעלת כניסה. שמירת פרטי המשתמש לא תשנה את הגדרת הכניסה הקיימת.</div>}
+        {canResetStoredLogin && <button className="btn-ghost full" type="button" onClick={() => { setPassword(""); setPin(""); }}>איפוס כניסה בכניסה הבאה</button>}
+        {canResetStoredLogin && <div className="hint">האיפוס לא יוצר קישור. אחרי שמירה, המשתמש יזין דוא״ל או מספר עובד ויגדיר סיסמה/קוד חדש בעצמו.</div>}
+      </> : <div className="hint">ניהול כניסה דורש הרשאת הפעלת כניסה. שמירת פרטי המשתמש לא תשנה את הגדרת הכניסה הקיימת.</div>}
     </div>;
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
@@ -7406,7 +7409,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         </>
       )}
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>{roleUsesActivation && activationToken && !canCopyLink ? "שמירת משתמש והצגת קישור" : (lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש")}</button>
+      <button className="btn-primary full" onClick={save}>{lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש"}</button>
       {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
       {canDelete && !(onArchive && ["worker", "cleaner", "tech"].includes(role)) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />

@@ -21,25 +21,27 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `none`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs: none.
 - No active product PR is paused.
 - Latest completed product work:
-  - PR #541 restored activation-link creation from saved user profiles for driver-created workers/users without login setup, and made activation URLs take priority over an already logged-in browser session.
-  - PR #540 fixed the owner-confirmed live bug queue: cleaning-zone QR labels are generated locally, initial user activation links are created on save without a separate create-link button, permission labels wrap cleanly, and cleaning-zone delete blockers are clearer.
+  - PR #542 replaced generated activation-link onboarding with first-login password/PIN setup: new login-capable users are saved without generated secrets, then create their own password/PIN after entering email or worker number.
+  - PR #541 restored activation-link creation from saved user profiles, but that direction is now superseded by the owner-approved first-login setup model implemented in PR #542.
+  - PR #540 fixed the owner-confirmed live bug queue: cleaning-zone QR labels are generated locally, permission labels wrap cleanly, and cleaning-zone delete blockers are clearer. Its activation-link direction is superseded by the current first-login setup pass.
   - PR #538 stabilized fleet type catalog settings: saved `סוגי כלי שינוע` rows now show compact model/unit/document summaries, delete actions wait for successful save instead of pretending to delete, and periodic-maintenance policy stays separate from inspection checklists.
-  - New login-capable users are onboarded through activation links, not admin-entered temporary passwords/PINs. Existing activated users and legacy secrets remain compatible.
+  - Owner reversed the activation-link onboarding strategy on 2026-07-01: new login-capable users must be saved without generated passwords, PINs, or activation links. On first login, the user enters email or worker number, presses continue, and creates their own password/PIN with confirmation.
   - PR #535 prevents misleading cleaning-zone deletion when linked rounds, complaints, or manager assignments still exist, and links the owner to the blocking records.
   - PR #530 generalized activation-link onboarding for all system roles, allowed admins to permanently delete archived users, removed per-user admin notification-category grants from shared user create/edit flows, and fixed the active-work release gate in GitHub Actions PR builds.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
+  - Verify first-login password/PIN setup on the deployed site, then continue closure of the remaining owner-confirmed live reports.
   - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: after PR #541 deploys, verify the saved-profile activation flow and the three PR #540 fixed flows on the deployed site, then close the corresponding live `appIssue:` reports if confirmed.
+- Next exact action: verify first-login setup on the deployed site, then return to closure of the remaining live `appIssue:` reports.
 
 ## Current Product Direction
 

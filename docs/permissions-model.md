@@ -87,24 +87,24 @@ users: view or manage
 workerAccess: manage
 ```
 
-This avoids mixing "clothing module access" with broader employee access. PPE, worker records, and worker login activation are related but separate permissions.
+This avoids mixing "clothing module access" with broader employee access. PPE, worker records, and worker login setup/reset are related but separate permissions.
 
 ## Worker Login / Onboarding
 
 Worker login should not require admins to invent and remember worker passwords/codes.
 
-Preferred future flow:
+Preferred flow:
 
 - worker is created with worker number and profile data;
-- system creates an activation state;
-- manager/admin/authorized HR can copy an activation link;
-- worker opens the link and creates a personal code with confirmation;
+- the system does not generate a password, PIN, or activation link;
+- worker enters their worker number on the login screen and presses continue;
+- worker creates a personal code with confirmation;
 - old personal codes are never shown to managers;
-- authorized users can reset access, generating a new activation link.
+- authorized users can reset access by clearing the stored secret; the user then creates a new code/password on next login.
 
-Editing a worker profile without `workerAccess: manage` must preserve existing login fields (`pin`, `activationToken`, and `activationStatus`) instead of changing or clearing them. Worker profile management and worker login management are related but separate permissions.
+Editing a worker profile without `workerAccess: manage` must preserve existing login fields (`pin`, password/auth identity fields, and login status) instead of changing or clearing them. Worker profile management and worker login management are related but separate permissions.
 
-Current demo implementation seeds an activation token automatically for new worker/cleaner forms when the editor has `workerAccess: manage`. The link can be copied only when the token in the form is already saved on the worker record, because unsaved records or unsaved reset tokens do not exist in storage yet.
+Current implementation saves new login-capable users without generated secrets. First login by email or worker number opens the password/PIN creation form.
 
 The worker active/inactive state should be handled by lifecycle actions such as "worker left" and restore-from-archive, not by a generic "active user" checkbox in the worker form.
 

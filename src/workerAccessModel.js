@@ -3,57 +3,34 @@ export const isPinActivationRole = (role) => role === "worker" || role === "clea
 export const isPasswordActivationRole = (role) => role === "admin" || role === "user";
 export const isActivationLinkRole = (role) => isPinActivationRole(role) || isPasswordActivationRole(role);
 
+export function loginSecretKindForRole(role) {
+  if (isPasswordActivationRole(role)) return "password";
+  if (isPinActivationRole(role)) return "pin";
+  return "";
+}
+
+export function userHasLoginSecret(user) {
+  if (!user || !isActivationLinkRole(user.role)) return false;
+  if (isPasswordActivationRole(user.role)) return !!String(user.password || user.authUserId || "").trim();
+  return !!String(user.pin || "").trim();
+}
+
+export function userNeedsInitialLoginSetup(user) {
+  return !!user && isActivationLinkRole(user.role) && user.active !== false && !userHasLoginSecret(user);
+}
+
 export function workerLoginStateText(user) {
   if (!user || !isActivationLinkRole(user.role)) return "";
-  if (user.activationToken && user.activationStatus === "pending") return "ממתין להפעלה";
-  if (user.activationStatus === "activated") return "הופעל";
-  if (isPinActivationRole(user.role) && user.pin) return "קוד זמני";
-  if (isPasswordActivationRole(user.role) && user.password) return "סיסמה זמנית";
-  return "אין כניסה";
+  if (userHasLoginSecret(user)) return "כניסה מוגדרת";
+  return "טרם הוגדרה כניסה";
 }
 
-export function canCopyActivationLink(user, activationToken, canManageWorkerAccess) {
-  return !!user?.id && !!activationToken && activationToken === user.activationToken && !!canManageWorkerAccess;
+export function loginSetupPrompt(user) {
+  return isPasswordActivationRole(user?.role)
+    ? "המשתמש יגדיר סיסמה אישית בכניסה הראשונה עם הדוא״ל."
+    : "המשתמש יגדיר קוד אישי בכניסה הראשונה עם מספר העובד.";
 }
 
-export function workerActivationCopyHint(user, activationToken, canManageWorkerAccess) {
-  if (!canManageWorkerAccess || !activationToken) return "";
-  if (canCopyActivationLink(user, activationToken, canManageWorkerAccess)) return "הקישור שמור וזמין להעתקה.";
-  if (!user?.id) return "שמרו את המשתמש. מיד אחרי השמירה הקישור יופיע כאן להעתקה.";
-  return "שמרו את קישור ההפעלה/האיפוס החדש. אחרי השמירה הוא יופיע כאן להעתקה.";
-}
-
-export function shouldKeepWorkerFormOpenForActivationLink(user, canManageWorkerAccess) {
-  return !!canManageWorkerAccess
-    && !!user?.id
-    && isActivationLinkRole(user.role)
-    && !!user.activationToken
-    && user.activationStatus === "pending";
-}
-
-export function shouldSeedWorkerActivation(user, role, canManageWorkerAccess) {
-  return !!canManageWorkerAccess
-    && !user?.id
-    && isActivationLinkRole(role)
-    && !user?.pin
-    && !user?.password
-    && !user?.activationToken
-    && !user?.activationStatus;
-}
-
-export function canCreateActivationLinkForSavedUser(user, role, activationToken = "", canManageWorkerAccess) {
-  if (!canManageWorkerAccess || !user?.id || !isActivationLinkRole(role) || activationToken) return false;
-  if (user.activationStatus === "activated") return false;
-  if (isPinActivationRole(role) && user.pin) return false;
-  if (isPasswordActivationRole(role) && user.password) return false;
-  return true;
-}
-
-export function activationTokenForSave({ user = {}, role, activationToken = "", canManageWorkerAccess, createToken } = {}) {
-  if (!canManageWorkerAccess || !isActivationLinkRole(role)) return user.activationToken || "";
-  if (activationToken) return activationToken;
-  if (user.activationStatus === "activated") return "";
-  if (isPinActivationRole(role) && user.pin) return "";
-  if (isPasswordActivationRole(role) && user.password) return "";
-  return typeof createToken === "function" ? createToken() : "";
+export function shouldKeepWorkerFormOpenForActivationLink() {
+  return false;
 }

@@ -1,83 +1,63 @@
 import { describe, expect, it } from "vitest";
 import {
-  activationTokenForSave,
-  canCopyActivationLink,
-  canCreateActivationLinkForSavedUser,
+  isPasswordActivationRole,
+  isPinActivationRole,
+  loginSecretKindForRole,
+  loginSetupPrompt,
   shouldKeepWorkerFormOpenForActivationLink,
-  shouldSeedWorkerActivation,
+  userHasLoginSecret,
+  userNeedsInitialLoginSetup,
   workerLoginStateText
 } from "../src/workerAccessModel.js";
 
 describe("worker access model", () => {
-  it("seeds activation links for every new login-capable role when access can be managed", () => {
-    for (const role of ["admin", "user", "tech", "worker", "cleaner"]) {
-      expect(shouldSeedWorkerActivation({}, role, true)).toBe(true);
-    }
+  it("classifies login secret kinds by role", () => {
+    expect(loginSecretKindForRole("admin")).toBe("password");
+    expect(loginSecretKindForRole("user")).toBe("password");
+    expect(loginSecretKindForRole("worker")).toBe("pin");
+    expect(loginSecretKindForRole("cleaner")).toBe("pin");
+    expect(loginSecretKindForRole("tech")).toBe("pin");
+    expect(loginSecretKindForRole("supplier")).toBe("");
   });
 
-  it("does not seed an activation link over an existing secret or activation state", () => {
-    expect(shouldSeedWorkerActivation({ pin: "1234" }, "worker", true)).toBe(false);
-    expect(shouldSeedWorkerActivation({ password: "123456" }, "user", true)).toBe(false);
-    expect(shouldSeedWorkerActivation({ activationToken: "tok" }, "cleaner", true)).toBe(false);
-    expect(shouldSeedWorkerActivation({ activationStatus: "activated" }, "tech", true)).toBe(false);
+  it("detects whether a login-capable user already has a secret", () => {
+    expect(userHasLoginSecret({ role: "user", password: "123456" })).toBe(true);
+    expect(userHasLoginSecret({ role: "user", authUserId: "auth-1" })).toBe(true);
+    expect(userHasLoginSecret({ role: "worker", pin: "1234" })).toBe(true);
+    expect(userHasLoginSecret({ role: "worker" })).toBe(false);
+    expect(userHasLoginSecret({ role: "supplier" })).toBe(false);
   });
 
-  it("keeps the form open only after a saved pending activation link can be copied", () => {
-    const pendingUser = { id: "u1", role: "user", activationToken: "tok", activationStatus: "pending" };
-
-    expect(shouldKeepWorkerFormOpenForActivationLink(pendingUser, true)).toBe(true);
-    expect(canCopyActivationLink(pendingUser, "tok", true)).toBe(true);
-    expect(canCopyActivationLink(pendingUser, "other", true)).toBe(false);
+  it("requires first-login setup for active users without secrets", () => {
+    expect(userNeedsInitialLoginSetup({ role: "user", email: "manager@example.com" })).toBe(true);
+    expect(userNeedsInitialLoginSetup({ role: "worker", workerNo: "4010" })).toBe(true);
+    expect(userNeedsInitialLoginSetup({ role: "worker", workerNo: "4010", pin: "1234" })).toBe(false);
+    expect(userNeedsInitialLoginSetup({ role: "user", email: "manager@example.com", active: false })).toBe(false);
   });
 
-  it("describes pending and activated login states without exposing secrets", () => {
-    expect(workerLoginStateText({ role: "user", activationToken: "tok", activationStatus: "pending" })).toBe("ממתין להפעלה");
-    expect(workerLoginStateText({ role: "worker", activationStatus: "activated" })).toBe("הופעל");
+  it("describes configured and not-yet-configured login states without exposing secrets", () => {
+    expect(workerLoginStateText({ role: "user", password: "123456" })).toBe("כניסה מוגדרת");
+    expect(workerLoginStateText({ role: "worker", pin: "1234" })).toBe("כניסה מוגדרת");
+    expect(workerLoginStateText({ role: "user" })).toBe("טרם הוגדרה כניסה");
+    expect(workerLoginStateText({ role: "worker" })).toBe("טרם הוגדרה כניסה");
   });
 
-  it("creates an activation token during save when a login-capable user has no secret yet", () => {
-    expect(activationTokenForSave({
-      user: {},
-      role: "user",
-      canManageWorkerAccess: true,
-      createToken: () => "new-token"
-    })).toBe("new-token");
+  it("keeps role helpers compatible with existing permission wording", () => {
+    expect(isPinActivationRole("worker")).toBe(true);
+    expect(isPinActivationRole("cleaner")).toBe(true);
+    expect(isPinActivationRole("tech")).toBe(true);
+    expect(isPasswordActivationRole("user")).toBe(true);
+    expect(isPasswordActivationRole("admin")).toBe(true);
+    expect(isPinActivationRole("admin")).toBe(false);
+    expect(isPasswordActivationRole("worker")).toBe(false);
   });
 
-  it("does not create a new token over activated or legacy-secret users", () => {
-    expect(activationTokenForSave({
-      user: { activationStatus: "activated" },
-      role: "user",
-      canManageWorkerAccess: true,
-      createToken: () => "new-token"
-    })).toBe("");
-    expect(activationTokenForSave({
-      user: { pin: "1234" },
-      role: "worker",
-      canManageWorkerAccess: true,
-      createToken: () => "new-token"
-    })).toBe("");
+  it("does not keep forms open for activation-link copying anymore", () => {
+    expect(shouldKeepWorkerFormOpenForActivationLink({ id: "u1", role: "worker" }, true)).toBe(false);
   });
 
-  it("allows creating activation links for saved users that were created without login setup", () => {
-    expect(canCreateActivationLinkForSavedUser({
-      id: "worker-1",
-      role: "worker",
-      workerNo: "4010"
-    }, "worker", "", true)).toBe(true);
-    expect(canCreateActivationLinkForSavedUser({
-      id: "manager-1",
-      role: "user",
-      email: "manager@example.com"
-    }, "user", "", true)).toBe(true);
-  });
-
-  it("does not show saved-user activation creation for unsaved, pending, activated, or legacy-secret users", () => {
-    expect(canCreateActivationLinkForSavedUser({ role: "worker" }, "worker", "", true)).toBe(false);
-    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker" }, "worker", "token-1", true)).toBe(false);
-    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker", activationStatus: "activated" }, "worker", "", true)).toBe(false);
-    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker", pin: "1234" }, "worker", "", true)).toBe(false);
-    expect(canCreateActivationLinkForSavedUser({ id: "manager-1", role: "user", password: "123456" }, "user", "", true)).toBe(false);
-    expect(canCreateActivationLinkForSavedUser({ id: "worker-1", role: "worker" }, "worker", "", false)).toBe(false);
+  it("prompts users to set their own first secret by identifier", () => {
+    expect(loginSetupPrompt({ role: "user" })).toContain("דוא״ל");
+    expect(loginSetupPrompt({ role: "worker" })).toContain("מספר העובד");
   });
 });

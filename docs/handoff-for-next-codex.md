@@ -96,7 +96,7 @@ When working on user permissions/onboarding:
 
 - Read `docs/permissions-model.md` first.
 - Roles provide defaults; individual permissions are explicit overrides.
-- New login-capable users are invited through activation links, not admin-entered temporary passwords/PINs.
+- New login-capable users are saved without generated passwords/PINs/links; first login by email or worker number opens the password/PIN creation form.
 
 ## Baseline Checks
 
