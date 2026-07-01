@@ -35,7 +35,7 @@ import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
 import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
-import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatalogBase, vehicleTypeExistsInConfig, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
+import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatalogBase, vehicleTypeCompactSummary, vehicleTypeExistsInConfig, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
@@ -5589,7 +5589,9 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
       const op = openType === i;
       const docFlags = [["insurance", "מנוהל ביטוח"], ["tasrir", "מנוהל תסקיר"], ["license", "מנוהל רישיון רכב"], ["lease", "מנוהל ליזינג"]];
       const inUseCodes = vehicleTypeInUseCodes(t, fleet);
-      return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}{(t.models || []).length ? <span className="reg-count">{t.models.length} {t.models.length === 1 ? "דגם" : "דגמים"}</span> : null}</span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
+      const summary = vehicleTypeCompactSummary(t, fleet);
+      const docsText = summary.managedDocs.length ? summary.managedDocs.join(" · ") : "ללא מסמכים";
+      return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}<span className="reg-count">{summary.modelCount} {summary.modelCount === 1 ? "דגם" : "דגמים"} · {summary.affectedCount} כלים · {docsText}</span></span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
         if (!op) { setOpenType(i); return; }
         if (await save()) setOpenType(null);
       }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" aria-disabled={inUseCodes.length > 0} style={inUseCodes.length ? { opacity: 0.45 } : undefined} title={inUseCodes.length ? "בשימוש — עדכנו או מחקו את הכלים לפני מחיקת הסוג" : "מחק"} onClick={() => {
@@ -5599,9 +5601,10 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
           return;
         }
         const next = vtypes.filter((_, j) => j !== i);
-        setVtypes(next);
         save({ nextVtypes: next }).then((ok) => {
-          if (ok && op) setOpenType(null);
+          if (!ok) return;
+          setVtypes(next);
+          if (op) setOpenType(null);
         });
       }}><Trash2 size={15} /></button></div>{op && <>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>זמני יעד SLA (שעות):</div>{slaRow(t, (k, v) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}
@@ -5619,8 +5622,9 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
           return;
         }
         const next = vtypes.map((x, j) => j === i ? { ...x, models: x.models.filter((_, k) => k !== mi) } : x);
-        setVtypes(next);
-        save({ nextVtypes: next });
+        save({ nextVtypes: next }).then((ok) => {
+          if (ok) setVtypes(next);
+        });
       }}><Trash2 size={15} /></button></div>; })}
       <button className="btn-ghost sm" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: [...(x.models || []), ""] } : x))}><Plus size={14} /> דגם</button>
     </>}</div>;
@@ -5633,9 +5637,10 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
       if (await save()) setOpenRule(null);
     }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => {
       const next = rules.filter((_, j) => j !== i);
-      setRules(next);
       save({ nextRules: next }).then((ok) => {
-        if (ok && op) setOpenRule(null);
+        if (!ok) return;
+        setRules(next);
+        if (op) setOpenRule(null);
       });
     }}><Trash2 size={15} /></button></div>{op && <>
       <div className="row2">

@@ -6,6 +6,7 @@ import {
   hasSavedVehicleTypeCatalog,
   shouldUseBuiltInVehicleCatalog,
   vehicleCatalogBase,
+  vehicleTypeCompactSummary,
   vehicleTypeExistsInConfig,
   vehicleTypeInUseCodes,
   vehicleTypeModelCodes
@@ -125,6 +126,27 @@ describe("fleetCatalogModel", () => {
       { code: "6882003", model: "OSE250" },
       { code: "194335", type: "RRE200H" }
     ])).toEqual(["6882002", "6882003"]);
+  });
+
+  it("summarizes a vehicle type without mixing its models, docs, and affected units", () => {
+    const summary = vehicleTypeCompactSummary({
+      name: "מלקטת",
+      models: ["OSE250", "LPE200"],
+      insurance: true,
+      tasrir: true,
+      license: false,
+      lease: false
+    }, [
+      { code: "6882002", model: "OSE250", vehicleKind: "מלקטת" },
+      { code: "194335", model: "RRE200H", vehicleKind: "מלגזה" }
+    ]);
+
+    expect(summary).toEqual({
+      modelCount: 2,
+      affectedCount: 1,
+      affectedCodes: ["6882002"],
+      managedDocs: ["ביטוח", "תסקיר"]
+    });
   });
 
   it("uses explicit vehicle type when the same model appears under several types", () => {
