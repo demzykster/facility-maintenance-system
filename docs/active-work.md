@@ -21,12 +21,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: codex/user-activation-access-cleanup.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs: none.
-- Current branch work: finish the #530 follow-up by enforcing activation-link onboarding for newly created login-capable users. Admins should create users and send activation links; they should not assign temporary passwords/PINs in the shared user form.
 - No active product PR is paused.
 - Latest completed product work:
+  - New login-capable users are onboarded through activation links, not admin-entered temporary passwords/PINs. Existing activated users and legacy secrets remain compatible.
   - PR #535 prevents misleading cleaning-zone deletion when linked rounds, complaints, or manager assignments still exist, and links the owner to the blocking records.
   - PR #530 generalized activation-link onboarding for all system roles, allowed admins to permanently delete archived users, removed per-user admin notification-category grants from shared user create/edit flows, and fixed the active-work release gate in GitHub Actions PR builds.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
@@ -37,7 +37,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Verify/fix SLA persistence report, fleet document display, and supplier activity confirmation if still reproducible.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: finish, validate, and merge the activation-link cleanup PR, then continue with the next owner-reported critical bug in a small PR, starting with persistence/SLA or another confirmed `appIssue:` report.
+- Next exact action: fix the next owner-reported critical bug in a small PR, starting with persistence/SLA or another confirmed `appIssue:` report.
 
 ## Current Product Direction
 
