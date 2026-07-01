@@ -26,6 +26,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: none.
 - No active product PR is paused.
 - Latest completed product work:
+  - PR #541 restored activation-link creation from saved user profiles for driver-created workers/users without login setup, and made activation URLs take priority over an already logged-in browser session.
   - PR #540 fixed the owner-confirmed live bug queue: cleaning-zone QR labels are generated locally, initial user activation links are created on save without a separate create-link button, permission labels wrap cleanly, and cleaning-zone delete blockers are clearer.
   - PR #538 stabilized fleet type catalog settings: saved `סוגי כלי שינוע` rows now show compact model/unit/document summaries, delete actions wait for successful save instead of pretending to delete, and periodic-maintenance policy stays separate from inspection checklists.
   - New login-capable users are onboarded through activation links, not admin-entered temporary passwords/PINs. Existing activated users and legacy secrets remain compatible.
@@ -38,7 +39,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: after PR #540 deploys, verify the three fixed flows on the deployed site, then close the corresponding live `appIssue:` reports if confirmed.
+- Next exact action: after PR #541 deploys, verify the saved-profile activation flow and the three PR #540 fixed flows on the deployed site, then close the corresponding live `appIssue:` reports if confirmed.
 
 ## Current Product Direction
 

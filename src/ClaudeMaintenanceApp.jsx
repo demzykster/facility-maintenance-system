@@ -17,7 +17,7 @@ import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
-import { activationTokenForSave, canCopyActivationLink, isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
+import { activationTokenForSave, canCopyActivationLink, canCreateActivationLinkForSavedUser, isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, shouldKeepWorkerFormOpenForActivationLink, shouldSeedWorkerActivation, workerActivationCopyHint, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
@@ -1990,12 +1990,13 @@ export default function App() {
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
   const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const activationRouteOpen = (() => { try { return !!new URLSearchParams(window.location.search).get("activate"); } catch (e) { return false; } })();
 
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
       {!ready ? <div className="boot"><div className="spinner" /></div>
-        : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
+        : (!session || activationRouteOpen) ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
             {effSession.role === "admin" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
@@ -7339,9 +7340,12 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       ? (roleUsesPassword ? "ממתין להפעלה: שלחו למשתמש את הקישור והוא יגדיר סיסמה בעצמו." : "ממתין להפעלה: שלחו את הקישור והוא יגדיר קוד אישי בעצמו.")
       : loginActivated
         ? (roleUsesPassword ? "הופעל: המשתמש הגדיר סיסמה. הסיסמה אינה מוצגת למנהלים." : "הופעל: המשתמש הגדיר קוד אישי. הקוד אינו מוצג למנהלים.")
-        : (roleUsesPassword ? "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר סיסמה בעצמו." : "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר קוד אישי בעצמו.");
+        : (user.id ? (roleUsesPassword ? "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר סיסמה בעצמו." : "טרם הוגדרה כניסה. צרו קישור הפעלה כדי שהמשתמש יגדיר קוד אישי בעצמו.")
+          : (roleUsesPassword ? "טרם הוגדרה כניסה. שמרו את המשתמש והקישור יופיע כאן." : "טרם הוגדרה כניסה. שמרו את המשתמש והקישור יופיע כאן."));
+    const canCreateSavedActivationLink = canCreateActivationLinkForSavedUser(user, role, activationToken, canWorkerAccess);
     return <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pendingText}</div>
       {canWorkerAccess ? <>
+        {canCreateSavedActivationLink && <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPassword(""); setPin(""); setCopiedActivation(false); }}>צור קישור הפעלה</button>}
         {loginActivated && <button className="btn-ghost full" type="button" onClick={() => { setActivationToken(uid()); setPassword(""); setPin(""); setCopiedActivation(false); }}>צור קישור איפוס כניסה</button>}
         {activationToken && (canCopyLink
           ? <div className="field"><span>קישור הפעלה</span><textarea id="worker-activation-link" readOnly value={activationLink} style={{ width: "100%", minHeight: 58, fontSize: 12, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 6 }} type="button" onClick={copyActivationLink}><Copy size={14} /> {copiedActivation ? "הועתק" : "העתק קישור"}</button><div className="hint">{activationHint} לאחר ההפעלה הקישור נסגר.</div></div>
