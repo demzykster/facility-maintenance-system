@@ -21,12 +21,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fix-sla-settings-persistence`.
-- In progress: close the owner-reported settings persistence confusion before continuing larger fleet maintenance/inspection work. Row-level check buttons in maintenance categories, fleet vehicle types, and periodic-maintenance programs should save-and-close instead of only collapsing the editor.
-- Current validation: `git diff --check`, `npm test -- --run`, `npm run release:check`, and `npm run build` passed locally. A Playwright login-page smoke rendered without console/page errors; full settings UI smoke is limited locally because demo login did not complete normally in the headless browser.
-- Next exact action: commit, push, open PR, wait for GitHub/Vercel checks, and merge if green.
-- Latest completed work: PR #516 fixed worker/cleaner activation links opened in a clean browser by adding a narrow server-side activation endpoint. The link now activates the worker by token before normal login, without exposing broad write access or starting monolith/module splitting.
-- Validation for PR #516: targeted worker activation/login tests passed; full `npm test -- --run`, `npm run release:check`, `npm run build`, and `git diff --check` passed locally; GitHub Actions and Vercel passed before merge.
+- Active branch: `codex/fleet-settings-save-deletes`.
+- In progress: close the remaining fleet settings persistence trap where deleting a vehicle type/model or periodic-maintenance program looked local-only unless the owner remembered the bottom save button.
+- Current validation: pending.
+- Next exact action: run checks, open PR, and merge if green.
+- Latest completed work: PR #517 made row-level check buttons in maintenance categories, fleet vehicle types, and periodic-maintenance programs save-and-close instead of only collapsing the editor.
+- Validation for PR #517: `git diff --check`, `npm test -- --run`, `npm run release:check`, `npm run build`, GitHub Actions, and Vercel passed before merge.
 - Product design note recorded but not active in this branch: continue the flexible fleet maintenance / inspection policy redesign later without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data. Periodic-maintenance TO programs must stay separate from `בקרת כלים` inspection checklists.
 - Current next candidate: after this persistence fix, verify the app issue reports and then continue the periodic-maintenance/fleet-catalog work in separate small PRs. Keep maintenance programs, inspection questionnaires, fleet catalog, calendar entries, exports, and follow-up tickets as separate but connected concepts.
 - Backlog note: improve the internal app-issue reporter with an optional "capture current screen" action in addition to manual screenshot upload, while keeping manual upload as fallback.
