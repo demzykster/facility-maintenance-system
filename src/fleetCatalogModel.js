@@ -17,10 +17,18 @@ export function vehicleTypeModelCodes(vehicleType) {
 
 export function vehicleTypeInUseCodes(vehicleType, fleet = []) {
   const models = new Set(vehicleTypeModelCodes(vehicleType));
+  const targetName = String(vehicleType?.name || "").trim();
+  const isModelOnlyRow = targetName && models.size === 1 && models.has(targetName);
   if (!models.size) return [];
   const codes = [];
   (fleet || []).forEach((unit) => {
+    const explicitKind = String(unit?.vehicleKind || "").trim();
     const model = String(unit?.model || unit?.type || "").trim();
+    if (explicitKind && targetName && explicitKind === targetName) {
+      codes.push(String(unit?.code || model || explicitKind));
+      return;
+    }
+    if (explicitKind && targetName && explicitKind !== targetName && !isModelOnlyRow) return;
     if (models.has(model)) codes.push(String(unit?.code || model));
   });
   return [...new Set(codes)];

@@ -21,12 +21,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fleet-settings-save-deletes`.
-- In progress: close the remaining fleet settings persistence trap where deleting a vehicle type/model or periodic-maintenance program looked local-only unless the owner remembered the bottom save button.
-- Current validation: pending.
-- Next exact action: run checks, open PR, and merge if green.
-- Latest completed work: PR #517 made row-level check buttons in maintenance categories, fleet vehicle types, and periodic-maintenance programs save-and-close instead of only collapsing the editor.
-- Validation for PR #517: `git diff --check`, `npm test -- --run`, `npm run release:check`, `npm run build`, GitHub Actions, and Vercel passed before merge.
+- Active branch: `codex/fix-fleet-type-kind-usage`.
+- In progress: close the fleet Excel import/catalog integrity issue where an explicitly emptied structured vehicle-type catalog could still be suppressed by legacy `forkliftTypes`, and where duplicate models under different `סוג כלי` values could be treated as one type.
+- Current validation: targeted fleet catalog/import tests passed; full `npm test -- --run`, `npm run release:check`, and `npm run build` passed. The supplied `רישיונות` workbook still reads 128 rows, 126 importable rows, 2 duplicate invalid rows, and now plans 12 structured `סוג כלי` catalog groups even when legacy `forkliftTypes` contains old models.
+- Next exact action: open PR and merge if checks/Vercel are green.
+- Latest completed work: PR #518 made fleet settings deletes persist immediately.
+- Validation for PR #518: targeted settings persistence tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `npm run build` passed, GitHub Actions passed, and Vercel deployment passed before merge.
 - Product design note recorded but not active in this branch: continue the flexible fleet maintenance / inspection policy redesign later without breaking the existing periodic calendar, exports, ticket creation flows, or owner-entered pilot data. Periodic-maintenance TO programs must stay separate from `בקרת כלים` inspection checklists.
 - Current next candidate: after this persistence fix, verify the app issue reports and then continue the periodic-maintenance/fleet-catalog work in separate small PRs. Keep maintenance programs, inspection questionnaires, fleet catalog, calendar entries, exports, and follow-up tickets as separate but connected concepts.
 - Backlog note: improve the internal app-issue reporter with an optional "capture current screen" action in addition to manual screenshot upload, while keeping manual upload as fallback.

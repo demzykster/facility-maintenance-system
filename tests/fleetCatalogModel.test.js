@@ -78,6 +78,18 @@ describe("fleetCatalogModel", () => {
     ])).toEqual(["6882002", "6882003"]);
   });
 
+  it("uses explicit vehicle type when the same model appears under several types", () => {
+    const fleet = [
+      { code: "6882002", model: "OSE250", vehicleKind: "מלקטת (כפולה)" },
+      { code: "6882003", model: "OSE250", vehicleKind: "מלקטת (סינגל)" },
+      { code: "legacy", type: "OSE250" }
+    ];
+
+    expect(vehicleTypeInUseCodes({ name: "מלקטת (כפולה)", models: ["OSE250"] }, fleet)).toEqual(["6882002", "legacy"]);
+    expect(vehicleTypeInUseCodes({ name: "מלקטת (סינגל)", models: ["OSE250"] }, fleet)).toEqual(["6882003", "legacy"]);
+    expect(vehicleTypeInUseCodes({ name: "OSE250", models: ["OSE250"] }, fleet)).toEqual(["6882002", "6882003", "legacy"]);
+  });
+
   it("falls back to the type name when a legacy catalog row has no explicit models", () => {
     expect(vehicleTypeInUseCodes({ name: "פסולתון", models: [] }, [
       { code: "111", type: "פסולתון" },

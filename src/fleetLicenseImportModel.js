@@ -80,7 +80,8 @@ const existingConflict = (unit, existingFleet = []) => {
 export function planFleetLicenseCatalogAdditions(rows = [], config = {}, options = {}) {
   const includeActions = new Set(options.includeActions || ["new"]);
   const structuredTypes = (config.vehicleTypes || []).filter((type) => cleanText(type?.name));
-  const hasStructuredTypes = structuredTypes.length > 0;
+  const hasExplicitStructuredCatalog = Array.isArray(config.vehicleTypes)
+    && (config.vehicleTypesSaved === true || structuredTypes.length > 0);
   const existingLegacyModels = new Set();
   (config.forkliftTypes || []).forEach((model) => { const m = cleanText(model); if (m) existingLegacyModels.add(m); });
   const existingTypeModels = new Map();
@@ -99,7 +100,7 @@ export function planFleetLicenseCatalogAdditions(rows = [], config = {}, options
     const model = cleanText(unit.model || (unit.vehicleKind ? "" : unit.type));
     const name = cleanText(unit.vehicleKind || unit.type || unit.notes || model) || model;
     if (!model || !name) return;
-    if (hasStructuredTypes) {
+    if (hasExplicitStructuredCatalog) {
       if (existingTypeModels.get(name)?.has(model)) return;
     } else if (existingLegacyModels.has(model)) {
       return;
