@@ -17,6 +17,7 @@
     "staging:smoke:fleet-ui": "node tools/staging-fleet-ui-smoke.mjs",
     "staging:smoke:ai-intake": "node tools/staging-ai-intake-smoke.mjs",
     "staging:smoke:system-errors": "node tools/staging-system-error-smoke.mjs",
+    "staging:smoke:settings": "node tools/staging-settings-persistence-smoke.mjs",
     "staging:backup:evidence": "node tools/staging-backup-evidence.mjs",
     "staging:data:summary": "node tools/staging-data-summary.mjs",
     "staging:gate": "node tools/staging-gate.mjs",
