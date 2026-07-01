@@ -1018,8 +1018,14 @@ const downtimeMs = (t) => { const start = t.downtimeStart || t.createdAt; const 
 
 function docStatus(fleet, cfg) {
   const w = cfg?.docWarn || DEFAULT_CONFIG.docWarn;
-  let min = Infinity, which = "";
-  machineDocs(fleet, cfg).forEach((d) => { const ts = dateToTs(fleet.docs?.[d.id]?.date); if (ts != null && daysLeft(ts) < min) { min = daysLeft(ts); which = d.label; } });
+  let min = Infinity, which = "", missing = "";
+  const docs = machineDocs(fleet, cfg);
+  docs.forEach((d) => {
+    const ts = dateToTs(fleet.docs?.[d.id]?.date);
+    if (ts == null) { if (!missing) missing = d.label; return; }
+    if (daysLeft(ts) < min) { min = daysLeft(ts); which = d.label; }
+  });
+  if (missing) return { d: -1, color: "#DC2626", label: "חסר תוקף", which: missing, missing: true };
   if (min === Infinity) return { d: null, color: "var(--muted)", label: "—", which: "" };
   let color = "#16A34A", label = `תקין · ${min} י׳`;
   if (min < 0) { color = "#DC2626"; label = `פג תוקף`; }
@@ -5797,13 +5803,13 @@ function FleetModule(p) {
       </select>
     </label>
   );
-  const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const col = docWarnColor(dl, config); return <span key={d.id} className="doc-chip"><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{d.label}</span><span className="doc-chip-days" style={{ color: col }}>{docDaysLabel(dl)}</span></span>; };
+  const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const missing = ts == null; const col = missing ? "#DC2626" : docWarnColor(dl, config); return <span key={d.id} className="doc-chip"><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{d.label}</span><span className="doc-chip-days" style={{ color: col }}>{missing ? "חסר" : docDaysLabel(dl)}</span></span>; };
   const renderRow = (f) => { const blk = unitBlock(f, tickets, config); const selected = selectedFleetIds.includes(f.id); return <div key={f.id} role="button" tabIndex={0} className={"ftable-row" + (blk ? " blocked" : "") + (selected ? " selected" : "")} onClick={() => setOpenId(f.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(f.id); } }} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
     <label className="ft-select" aria-label={`בחר ${f.code}`} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleFleetSelection(f.id)} /></label>
     <span className="ft-code">{f.code}</span>
     <span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span>
     <span className="ft-sup">{f.supplier || "—"}</span>
-    <span className="ft-doc"><span className="doc-chip-stack">{DOC_DEFS.map((d) => docChip(f, d))}</span></span>
+    <span className="ft-doc"><span className="doc-chip-stack">{machineDocs(f, config).map((d) => docChip(f, d))}</span></span>
   </div>; };
   const STATUS_ORDER = ["מושבת", "מסמך פג תוקף", "מסמך קרוב לפקיעה", "תקין"];
   const groupKeyOf = (f) => { if (groupBy === "type") return unitTypeName(f, config) || "אחר"; if (groupBy === "supplier") return f.supplier || "ללא ספק"; if (unitBlock(f, tickets, config)) return "מושבת"; const s = docStatus(f, config); return s.d == null ? "תקין" : s.d < 0 ? "מסמך פג תוקף" : s.d <= 30 ? "מסמך קרוב לפקיעה" : "תקין"; };
@@ -5935,7 +5941,7 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, on
         <div className="health-rec"><Sparkles size={13} /> {h.rec}</div>
       </div>); })()}
       {canDocs && <><SectionTitle><FileText size={15} /> מסמכים</SectionTitle>
-      <div className="panel">{DOC_DEFS.map((d) => { const doc = f.docs?.[d.id]; const ts = dateToTs(doc?.date); const dl = ts ? daysLeft(ts) : null; const col = docWarnColor(dl, config); return <div key={d.id} className="doc-view"><span className="dot-lg" style={{ background: col }} /><span className="doc-name">{d.label}</span><span className="doc-date" style={{ color: col }}>{doc?.date ? fmtDate(ts) : "—"}{dl != null && (dl < 0 ? " · פג" : ` · ${dl} י׳`)}</span>{doc?.link && <a href={doc.link} target="_blank" rel="noreferrer" className="doc-link" onClick={(e) => e.stopPropagation()}><ExternalLink size={15} /></a>}</div>; })}</div></>}
+      <div className="panel">{machineDocs(f, config).map((d) => { const doc = f.docs?.[d.id]; const ts = dateToTs(doc?.date); const dl = ts ? daysLeft(ts) : null; const missing = ts == null; const col = missing ? "#DC2626" : docWarnColor(dl, config); return <div key={d.id} className="doc-view"><span className="dot-lg" style={{ background: col }} /><span className="doc-name">{d.label}</span><span className="doc-date" style={{ color: col }}>{doc?.date ? fmtDate(ts) : "חסר"}{dl != null && (dl < 0 ? " · פג" : ` · ${dl} י׳`)}</span>{doc?.link && <a href={doc.link} target="_blank" rel="noreferrer" className="doc-link" onClick={(e) => e.stopPropagation()}><ExternalLink size={15} /></a>}</div>; })}</div></>}
       {unitNote(f, config) && <><SectionTitle>הערות</SectionTitle><div className="desc-box">{unitNote(f, config)}</div></>}
       {canTickets && <><SectionTitle><ClipboardCheck size={15} /> היסטוריית סיקורים ({inspections.length})</SectionTitle>
       {inspections.length === 0 ? <div className="note">טרם בוצעו סיקורים.</div> : <div className="timeline">{inspections.slice(0, 6).map((i) => <div className="tl-item" key={i.id}><div className="tl-dot" style={{ background: i.passed ? "#16A34A" : "#DC2626" }} /><div className="tl-body"><div className="tl-text">{i.passed ? "תקין" : `נמצאו ${i.problems.length} ממצאים`}</div><div className="tl-meta">{i.by} · {fmtDate(i.at)}</div></div></div>)}</div>}
