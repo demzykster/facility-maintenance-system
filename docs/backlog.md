@@ -17,6 +17,17 @@ Use `docs/release-checklist.md` as the active route for finishing the current st
 
 The backlog below remains useful for historical detail and code-area context, but broad topics should not stay open forever under vague labels. When working toward release readiness, close packages through the checklist acceptance criteria.
 
+## Current Product-Quality Follow-Ups
+
+### Internal app issue reporter — capture current screen
+
+Status: open.
+
+Goal:
+- Keep manual screenshot upload, but add an optional quick action that captures the current visible screen and attaches it to the internal bug report.
+- The feature should be useful on desktop and mobile where supported, and gracefully fall back to manual upload where browser screen capture is unavailable.
+- Do not turn internal technical logs into user-facing noise; keep the owner-facing issue list focused on useful bug reports and grouped auto-error summaries.
+
 ## Verified Planning Facts
 
 ### Worker Activation UI

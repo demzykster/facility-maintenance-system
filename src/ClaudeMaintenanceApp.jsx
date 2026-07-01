@@ -5486,21 +5486,22 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     const cleanRules = normalizeMaintenanceRules(ruleDrafts);
     if (ruleDrafts.length !== cleanRules.length) {
       setTypeMsg("בדקו שכל רגולציית טיפול כוללת שם ותדירות בחודשים.");
-      return;
+      return false;
     }
     if (cleanRules.some((rule) => !ruleHasTarget(rule))) {
       setTypeMsg("לכל רגולציית טיפול צריך לבחור יעד: כל הפארק, סוג כלי או דגם.");
-      return;
+      return false;
     }
     const newModels = new Set();
     list.forEach((v) => (v.models || []).forEach((m) => { const mm = (m || "").trim(); if (mm) newModels.add(mm); }));
     const orphan = (fleet || []).filter((u) => u.type && !newModels.has(u.type));
-    if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${countLabel(orphan.length, "כלי משויך", "כלים משויכים")} לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return; }
+    if (orphan.length) { const codes = [...new Set(orphan.map((o) => o.type))]; setTypeMsg(`${countLabel(orphan.length, "כלי משויך", "כלים משויכים")} לדגמים שאינם ברשימה (${codes.join(", ")}). השאירו דגמים אלה תחת סוג כלשהו או עדכנו את הכלים — ואז שמרו.`); return false; }
     if (await saveConfig({ ...config, ...flattenVehicleTypes(list), maintenanceRules: cleanRules }) === false) {
       setTypeMsg(SAVE_FAILED_MESSAGE);
-      return;
+      return false;
     }
     setSaved(true); setTimeout(() => setSaved(false), 1800);
+    return true;
   };
   return (<div className="settings-wrap">
     <SectionTitle>סוגי כלי שינוע</SectionTitle>
@@ -5510,7 +5511,10 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
       const op = openType === i;
       const docFlags = [["insurance", "מנוהל ביטוח"], ["tasrir", "מנוהל תסקיר"], ["license", "מנוהל רישיון רכב"], ["lease", "מנוהל ליזינג"]];
       const inUseCodes = vehicleTypeInUseCodes(t, fleet);
-      return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}{(t.models || []).length ? <span className="reg-count">{t.models.length} {t.models.length === 1 ? "דגם" : "דגמים"}</span> : null}</span>}<button className="reg-edit" onClick={() => setOpenType(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" aria-disabled={inUseCodes.length > 0} style={inUseCodes.length ? { opacity: 0.45 } : undefined} title={inUseCodes.length ? "בשימוש — עדכנו או מחקו את הכלים לפני מחיקת הסוג" : "מחק"} onClick={() => {
+      return <div key={t.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={t.name} placeholder="שם הסוג" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} /> : <span className="reg-label">{t.name || "ללא שם"}{(t.models || []).length ? <span className="reg-count">{t.models.length} {t.models.length === 1 ? "דגם" : "דגמים"}</span> : null}</span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
+        if (!op) { setOpenType(i); return; }
+        if (await save()) setOpenType(null);
+      }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" aria-disabled={inUseCodes.length > 0} style={inUseCodes.length ? { opacity: 0.45 } : undefined} title={inUseCodes.length ? "בשימוש — עדכנו או מחקו את הכלים לפני מחיקת הסוג" : "מחק"} onClick={() => {
         const inUse = vehicleTypeInUseCodes(t, fleet);
         if (inUse.length) {
           setTypeMsg(`${inUse.length} כלים משתמשים בסוג/דגמים האלה (${inUse.slice(0, 8).join(", ")}${inUse.length > 8 ? "…" : ""}). עדכנו או מחקו את הכלים לפני מחיקת הסוג.`);
@@ -5541,7 +5545,10 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
     <SectionTitle>תכניות טיפול תקופתי</SectionTitle>
     <div className="note" style={{ marginBottom: 10 }}>כאן מגדירים תכניות כמו TO 500 או TO 1000: שם חופשי, תדירות בחודשים, סוגי כלי/דגמים שעליהם זה חל, וצ׳ק-ליסט טיפול ייעודי. זה נפרד לגמרי מ-בקרת כלים.</div>
-    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; const affectedCount = ruleAffectedCount(rule); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם תכנית, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "תכנית ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)} · {affectedCount} כלים{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" onClick={() => setOpenRule(op ? null : i)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
+    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; const affectedCount = ruleAffectedCount(rule); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם תכנית, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "תכנית ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)} · {affectedCount} כלים{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
+      if (!op) { setOpenRule(i); return; }
+      if (await save()) setOpenRule(null);
+    }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setRules((s) => s.filter((_, j) => j !== i)); if (op) setOpenRule(null); }}><Trash2 size={15} /></button></div>{op && <>
       <div className="row2">
         <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={rule.intervalMonths || 1} onChange={(e) => setRule(i, { intervalMonths: e.target.value })} /></label>
         <div className="note">הצ׳ק-ליסט כאן שייך לתכנית הטיפול הזו בלבד. אם נמצא ליקוי בזמן ביצוע הטיפול, הקריאה נוצרת לכלי הספציפי שבוצע עליו הטיפול.</div>
@@ -6965,7 +6972,7 @@ function SettingsPanel(p) {
       flash();
     } catch (e) { setUserCfgMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
   };
-  const saveMaint = async () => { setMaintMsg(""); if (registryEmptied(zones, zoneUse)) { setMaintMsg("לא ניתן לרוקן שם של אזור שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return; } try { const list = cats.filter((c) => c.label.trim()); for (const r of registryRenames(zones)) { const o = r._orig, n = r.name.trim(); for (const f of (fleet || [])) if (f.zone === o && await saveFleet({ ...f, zone: n }) === false) throw new Error("save_failed"); for (const t of (tickets || [])) if (t.zone === o && await saveTicket({ ...t, zone: n }) === false) throw new Error("save_failed"); } if (await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }) === false) throw new Error("save_failed"); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); flash(); } catch (e) { setMaintMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); } };
+  const saveMaint = async () => { setMaintMsg(""); if (registryEmptied(zones, zoneUse)) { setMaintMsg("לא ניתן לרוקן שם של אזור שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return false; } try { const list = cats.filter((c) => c.label.trim()); for (const r of registryRenames(zones)) { const o = r._orig, n = r.name.trim(); for (const f of (fleet || [])) if (f.zone === o && await saveFleet({ ...f, zone: n }) === false) throw new Error("save_failed"); for (const t of (tickets || [])) if (t.zone === o && await saveTicket({ ...t, zone: n }) === false) throw new Error("save_failed"); } if (await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }) === false) throw new Error("save_failed"); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); flash(); return true; } catch (e) { setMaintMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); return false; } };
   const adminCount = users.filter((u) => u.role === "admin" && u.active).length;
   const mayViewUsers = p.only === "users" ? canViewUsers(session) : true;
   const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
@@ -7076,7 +7083,10 @@ function SettingsPanel(p) {
     {tab === "maint" && (<>
       <SectionTitle>קטגוריות אחזקה ו-SLA (שעות)</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>לכל קטגוריה זמני יעד נפרדים לפי דחיפות.</div>
-      {cats.map((c, i) => { const op = openCat === c.id; return <div key={c.id} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={c.label} placeholder="שם קטגוריה" onChange={(e) => setCats((s) => s.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /> : <span className="reg-label">{c.label || "ללא שם"}</span>}<button className="reg-edit" onClick={() => setOpenCat(op ? null : c.id)}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setCats((s) => s.filter((_, j) => j !== i)); if (op) setOpenCat(null); }}><Trash2 size={15} /></button></div>{op && slaRow(c, (k, v) => setCats((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}</div>; })}
+      {cats.map((c, i) => { const op = openCat === c.id; return <div key={c.id} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={c.label} placeholder="שם קטגוריה" onChange={(e) => setCats((s) => s.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /> : <span className="reg-label">{c.label || "ללא שם"}</span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
+        if (!op) { setOpenCat(c.id); return; }
+        if (await saveMaint()) setOpenCat(null);
+      }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => { setCats((s) => s.filter((_, j) => j !== i)); if (op) setOpenCat(null); }}><Trash2 size={15} /></button></div>{op && slaRow(c, (k, v) => setCats((s) => s.map((x, j) => j === i ? { ...x, [k]: v } : x)))}</div>; })}
       <button className="btn-ghost full" onClick={() => { const id = "c" + Date.now().toString(36); setCats((s) => [...s, { id, label: "", high: 4, medium: 24, low: 72 }]); setOpenCat(id); }}><Plus size={15} /> קטגוריה</button>
       <SectionTitle>אזורים</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>אזורי אחזקה משמשים לשיוך קריאות ודוחות. שינוי שם של אזור בשימוש יתעדכן בכל הרשומות המקושרות בעת השמירה.</div>
