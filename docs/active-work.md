@@ -21,15 +21,16 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fix-ui-save-flows`. It starts from `origin/main` at PR #521.
+- Active branch: `codex/harden-settings-smoke`.
 - In progress: continue release hardening from the real remaining risks, not from stale PR state:
   1. verify/fix screen-level persistence across global settings, fleet catalog settings, PPE catalog, tasks, and cleaning settings;
   2. keep fleet import/catalog integrity stable while preserving `סוג כלי` separately from `דגם`;
   3. continue the periodic-maintenance / inspection redesign without mixing `תכניות טיפול תקופתי` with `בקרת כלים`;
   4. triage owner-submitted `appIssue:` reports and close them in small PRs;
   5. keep monolith/module splitting out of scope until the owner finishes pilot checks.
-- Current branch change: fleet Excel import no longer sends all imported units plus catalog additions in one giant atomic KV write. It now uses the existing safe fleet batches and saves catalog additions through the dedicated catalog path after fleet chunks succeed.
-- Current branch validation: targeted import/KV tests passed, full `npm test -- --run` passed, `npm run release:check` passed, `git diff --check` passed, and `npm run build` passed.
+- Current branch change: strengthen the live staging settings smoke so it proves category SLA and vehicle-type SLA values persist through `/api/kv`, not only a generic config marker.
+- Current branch validation: live `npm run staging:smoke:settings` passed and confirmed category SLA plus vehicle-type SLA persistence/restoration; targeted activation/storage tests passed; full `npm test -- --run`, `npm run release:check`, `git diff --check`, and `npm run build` passed.
+- Latest completed work: PR #522 fixed fleet Excel import save reliability by chunking fleet records and saving catalog additions through the dedicated catalog path after successful fleet chunks. Production serves commit `182ca93`; `staging:smoke:fleet-ui` confirmed Supabase, `/api/kv`, and the live UI all report 128 fleet records.
 - Latest completed work: PR #519 fixed fleet Excel import/catalog integrity where an explicitly emptied structured vehicle-type catalog could still be suppressed by legacy `forkliftTypes`, and where duplicate models under different `סוג כלי` values could be treated as one type.
 - Current validation for PR #519: targeted fleet catalog/import tests passed; full `npm test -- --run`, `npm run release:check`, and `npm run build` passed. The supplied `רישיונות` workbook still reads 128 rows, 126 importable rows, 2 duplicate invalid rows, and now plans 12 structured `סוג כלי` catalog groups even when legacy `forkliftTypes` contains old models.
 - Latest completed work: added `staging:smoke:settings`, a live staging persistence smoke that writes, reads, and restores `config:v1`, and creates/reads/deletes temporary `mtask:`, `ppeitem:`, and `czone:` records through the production `/api/kv` path. This proves the shared API/Supabase persistence path is available for settings, tasks, PPE items, and cleaning zones; remaining "saved then disappeared" reports should be investigated at the specific screen/form state layer.
