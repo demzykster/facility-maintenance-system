@@ -21,6 +21,7 @@ const readBody = async (req) => {
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeIdentifier = (value) => String(value || "").trim();
 const trimSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 
 function createDefaultDriver(env, fetchImpl) {
   return (env.CMMS_KV_DRIVER === "upstash" ? createUpstashKvDriverFromEnv(env, fetchImpl) : null)
@@ -241,6 +242,7 @@ export function createInitialPasswordHandler({
     const kind = secretKind(record.user.role);
     if (!kind) return json(res, 400, { error: "role_not_login_capable" });
     if (hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_already_configured", user: publicInitialUser(record.user), auth: kind });
+    if (kind === "password" && !isValidEmail(record.user.email)) return json(res, 400, { error: "valid_email_required", user: publicInitialUser(record.user), auth: kind });
 
     if (body?.action !== "complete") {
       return json(res, 200, { ok: true, needsSetup: true, auth: kind, identifierType: kind === "password" ? "email" : "workerNo", user: publicInitialUser(record.user) });

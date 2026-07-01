@@ -125,6 +125,25 @@ describe("initial password handler", () => {
     }), true);
   });
 
+  it("rejects first password setup when the stored email is not valid for Supabase Auth", async () => {
+    const invalidEmailManager = { ...newManager, email: "123@123" };
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([{ key: "user:manager-1", value: JSON.stringify(invalidEmailManager) }]),
+      set: vi.fn()
+    };
+    const passwordClient = {
+      completePasswordUser: vi.fn()
+    };
+    const handler = createInitialPasswordHandler({ driver, passwordClient });
+
+    const res = await call(handler, { body: { action: "complete", identifier: "123@123", password: "secret1" } });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: "valid_email_required" });
+    expect(passwordClient.completePasswordUser).not.toHaveBeenCalled();
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
   it("does not allow first setup when a secret already exists", async () => {
     const driver = {
       listValues: vi.fn().mockResolvedValue([{ key: "user:worker-1", value: JSON.stringify({ ...newWorker, pin: "1234" }) }]),
