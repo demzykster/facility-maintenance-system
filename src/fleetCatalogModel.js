@@ -15,6 +15,26 @@ export function vehicleTypeModelCodes(vehicleType) {
   return models.length ? models : (fallback ? [fallback] : []);
 }
 
+export function vehicleTypeManagedDocs(vehicleType) {
+  const docs = [];
+  if (vehicleType?.insurance) docs.push("ביטוח");
+  if (vehicleType?.tasrir) docs.push("תסקיר");
+  if (vehicleType?.license) docs.push("רישיון רכב");
+  if (vehicleType?.lease) docs.push("ליסינג");
+  return docs;
+}
+
+export function vehicleTypeCompactSummary(vehicleType, fleet = []) {
+  const explicitModels = (vehicleType?.models || []).map((model) => String(model || "").trim()).filter(Boolean);
+  const affectedCodes = vehicleTypeInUseCodes(vehicleType, fleet);
+  return {
+    modelCount: explicitModels.length,
+    affectedCount: affectedCodes.length,
+    affectedCodes,
+    managedDocs: vehicleTypeManagedDocs(vehicleType)
+  };
+}
+
 export function vehicleTypeInUseCodes(vehicleType, fleet = []) {
   const models = new Set(vehicleTypeModelCodes(vehicleType));
   const targetName = String(vehicleType?.name || "").trim();
