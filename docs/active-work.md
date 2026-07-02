@@ -25,6 +25,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Active branch: `codex/cleaning-qr-public-zones`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs:
+  - PR #555 `codex/cleaning-qr-public-zones` is open against `main`.
 - Active work in progress: cleaner QR scans should show a physical-arrival confirmation when there is no due round, and public QR/report screens should preload active cleaning zones through a safe public endpoint before login.
 - Latest completed product work:
   - PR #556 routes production login/session calls through CMMS backend HttpOnly cookies instead of direct browser-to-Supabase Auth, while keeping direct-auth rollback via `VITE_CMMS_AUTH_MODE=direct`.
