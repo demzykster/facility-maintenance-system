@@ -4,11 +4,13 @@ import {
   buildMaintenanceAssignments,
   buildMaintenanceScheduleFromRules,
   checklistTemplateMatchesUnit,
+  distributeNewTasks,
   fleetRuleTargetMatchesUnit,
   maintenanceIntervalMonthsForTask,
   maintenanceRuleForTask,
   maintenanceRulesForUnit,
   maintenanceTitleForTask,
+  nextWorkingDay,
   nextMaintenanceDueFrom,
   normalizeFleetUnitRef,
   normalizeMaintenanceChecklistItems,
@@ -29,6 +31,7 @@ const localYmd = (timestamp) => {
     String(date.getDate()).padStart(2, "0")
   ].join("-");
 };
+const localDate = (year, monthIndex, day) => new Date(year, monthIndex, day).getTime();
 
 describe("fleetMaintenancePolicyModel", () => {
   it("allows multiple owner-defined maintenance rules for the same vehicle type", () => {
@@ -219,5 +222,71 @@ describe("fleetMaintenancePolicyModel", () => {
     expect(result.tasks.map((task) => task.maintenanceChecklistItems)).toEqual([
       [{ id: "oil", label: "בדיקת שמן" }]
     ]);
+  });
+
+  it("distributes six weight-1 maintenance tasks across two capacity-3 days", () => {
+    const assignments = Array.from({ length: 6 }, (_, index) => ({ task: { id: `task-${index + 1}` }, weight: 1 }));
+
+    distributeNewTasks(assignments, { startAt: localDate(2026, 0, 4), dailyCapacity: 3 });
+
+    expect(new Set(assignments.map((assignment) => localYmd(assignment.task.nextDue))).size).toBe(2);
+  });
+
+  it("keeps weight-2 maintenance tasks on separate days even when capacity is four", () => {
+    const assignments = Array.from({ length: 3 }, (_, index) => ({ task: { id: `heavy-${index + 1}` }, weight: 2 }));
+
+    distributeNewTasks(assignments, { startAt: localDate(2026, 0, 4), dailyCapacity: 4 });
+
+    expect(new Set(assignments.map((assignment) => localYmd(assignment.task.nextDue))).size).toBe(3);
+  });
+
+  it("schedules weight-2 tasks first and fills remaining capacity with weight-1 tasks", () => {
+    const assignments = [
+      { task: { id: "light-1" }, weight: 1 },
+      { task: { id: "heavy-1" }, weight: 2 },
+      { task: { id: "light-2" }, weight: 1 },
+      { task: { id: "heavy-2" }, weight: 2 }
+    ];
+
+    distributeNewTasks(assignments, { startAt: localDate(2026, 0, 4), dailyCapacity: 3 });
+
+    const byId = Object.fromEntries(assignments.map((assignment) => [assignment.task.id, localYmd(assignment.task.nextDue)]));
+    expect(new Set(Object.values(byId))).toEqual(new Set(["2026-01-04", "2026-01-05"]));
+    expect(byId["heavy-1"]).toBe("2026-01-04");
+    expect(byId["light-1"]).toBe("2026-01-04");
+    expect(byId["heavy-2"]).toBe("2026-01-05");
+    expect(byId["light-2"]).toBe("2026-01-05");
+  });
+
+  it("preserves an existing future nextDue when building schedules from rules", () => {
+    const futureDue = localDate(2026, 0, 20);
+    const result = buildMaintenanceScheduleFromRules({
+      rules: [{ id: "to-500", name: "TO 500", intervalMonths: 3, vehicleTypeNames: ["מלגזת היגש"] }],
+      fleetRefs: [fleet[0]],
+      existingTasks: [{ id: "existing", forkliftId: "f-1", maintenanceRuleId: "to-500", nextDue: futureDue }],
+      startAt: localDate(2026, 0, 4),
+      now: localDate(2026, 0, 10)
+    });
+
+    expect(result.tasks).toHaveLength(1);
+    expect(result.tasks[0].nextDue).toBe(futureDue);
+  });
+
+  it("redistributes an existing past nextDue when building schedules from rules", () => {
+    const result = buildMaintenanceScheduleFromRules({
+      rules: [{ id: "to-500", name: "TO 500", intervalMonths: 3, vehicleTypeNames: ["מלגזת היגש"] }],
+      fleetRefs: [fleet[0]],
+      existingTasks: [{ id: "existing", forkliftId: "f-1", maintenanceRuleId: "to-500", nextDue: localDate(2026, 0, 1) }],
+      startAt: localDate(2026, 0, 4),
+      now: localDate(2026, 0, 10)
+    });
+
+    expect(result.tasks).toHaveLength(1);
+    expect(localYmd(result.tasks[0].nextDue)).toBe("2026-01-04");
+  });
+
+  it("moves Friday and Saturday starts to Sunday as the next working day", () => {
+    expect(localYmd(nextWorkingDay(localDate(2026, 0, 2)))).toBe("2026-01-04");
+    expect(localYmd(nextWorkingDay(localDate(2026, 0, 3)))).toBe("2026-01-04");
   });
 });
