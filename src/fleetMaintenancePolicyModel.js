@@ -14,6 +14,8 @@ const unique = (values = []) => {
 };
 
 const keySet = (values = []) => new Set(unique(values).map((value) => value.toLowerCase()));
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MIN_REAL_DATE_MS = Date.UTC(2000, 0, 1);
 
 export function normalizeFleetRuleTarget(target = {}) {
   return {
@@ -95,6 +97,7 @@ export function normalizeMaintenanceRule(rule = {}) {
     id,
     name,
     intervalMonths,
+    weight: rule.weight === 2 ? 2 : 1,
     active: rule.active !== false,
     target: normalizeFleetRuleTarget(rule.target || rule),
     maintenanceChecklistItems: normalizeMaintenanceChecklistItems(rule.maintenanceChecklistItems)
@@ -156,8 +159,39 @@ function taskRuleKey(task = {}) {
   return unitId && ruleId ? `${unitId}::${ruleId}` : "";
 }
 
-export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], existingTasks = [], startAt, now, idFactory } = {}) {
+export function nextWorkingDay(tsMs) {
+  let day = new Date(Number(tsMs) || Date.now());
+  day.setHours(0, 0, 0, 0);
+  while (day.getDay() === 5 || day.getDay() === 6) {
+    day = new Date(day.getTime() + DAY_MS);
+  }
+  return day.getTime();
+}
+
+export function distributeNewTasks(assignments = [], { startAt, dailyCapacity = 4 } = {}) {
+  const original = Array.isArray(assignments) ? assignments : [];
+  const capacity = Math.max(1, Math.floor(Number(dailyCapacity) || 4));
+  const rawStart = Number(startAt) || Date.now();
+  let day = rawStart >= MIN_REAL_DATE_MS ? nextWorkingDay(rawStart) : rawStart;
+  let remaining = capacity;
+  const sorted = [...original].sort((a, b) => (b?.weight === 2 ? 2 : 1) - (a?.weight === 2 ? 2 : 1));
+
+  sorted.forEach((assignment) => {
+    const weight = assignment?.weight === 2 ? 2 : 1;
+    if (weight > remaining && remaining < capacity) {
+      day = nextWorkingDay(day + DAY_MS);
+      remaining = capacity;
+    }
+    if (assignment?.task) assignment.task.nextDue = day;
+    remaining -= weight;
+  });
+
+  return original;
+}
+
+export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], existingTasks = [], startAt, now, dailyCapacity = 4, idFactory } = {}) {
   const cleanRules = normalizeMaintenanceRules(rules);
+  const ruleWeights = new Map(cleanRules.map((rule) => [rule.id, rule.weight === 2 ? 2 : 1]));
   const units = (Array.isArray(fleetRefs) ? fleetRefs : [])
     .map((unit) => normalizeFleetUnitRef(unit))
     .filter((unit) => unit.id);
@@ -167,9 +201,12 @@ export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], 
     if (key && !byRuleKey.has(key)) byRuleKey.set(key, task);
   });
 
-  const firstDue = Number(startAt) || Date.now();
-  const createdAt = Number(now) || Date.now();
-  const tasks = [];
+  const rawFirstDue = Number(startAt) || Date.now();
+  const firstDue = rawFirstDue >= MIN_REAL_DATE_MS ? nextWorkingDay(rawFirstDue) : rawFirstDue;
+  const nowMs = Number(now) || Date.now();
+  const createdAt = nowMs;
+  const preserved = [];
+  const toDistribute = [];
   let created = 0;
   let updated = 0;
 
@@ -188,18 +225,26 @@ export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], 
         maintenanceRuleId: rule.id,
         maintenanceRuleName: rule.name,
         intervalMonths: rule.intervalMonths,
+        maintenanceRuleWeight: rule.weight === 2 ? 2 : 1,
         maintenanceChecklistItems: rule.maintenanceChecklistItems || [],
-        nextDue: base.nextDue || firstDue,
+        nextDue: Number(base.nextDue) || firstDue,
         active: base.active !== false,
         createdAt: base.createdAt || createdAt,
         lastDone: base.lastDone || null,
         history: Array.isArray(base.history) ? base.history : []
       };
-      tasks.push(task);
+      if (existing && (Number(base.nextDue) < MIN_REAL_DATE_MS || Number(base.nextDue) > nowMs)) preserved.push(task);
+      else toDistribute.push(task);
       if (existing) updated += 1;
       else created += 1;
     });
   });
+
+  distributeNewTasks(
+    toDistribute.map((task) => ({ task, weight: ruleWeights.get(task.maintenanceRuleId) || 1 })),
+    { startAt: firstDue, dailyCapacity }
+  );
+  const tasks = [...preserved, ...toDistribute];
 
   return { tasks, created, updated, total: tasks.length };
 }

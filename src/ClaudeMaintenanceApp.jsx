@@ -367,7 +367,7 @@ const DEFAULT_CONFIG = {
   mgrWidgets: { tickets: true, pm: true, sla: true },
   notify: { ...DEFAULT_NOTIFY_CONFIG },
   defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
-  vehicleTypes: [], modelSupplier: {}, modelType: {}, maintenanceRules: [], shifts: [], workShifts: [],
+  vehicleTypes: [], modelSupplier: {}, modelType: {}, maintenanceRules: [], pmDailyCapacity: 4, shifts: [], workShifts: [],
 };
 
 /* ---------- helpers ---------- */
@@ -377,6 +377,7 @@ const esc = (v) => String(v ?? "").split("&").join("&amp;").split("<").join("&lt
 // Excel formula injection: ячейку, начинающуюся с = + - @ или управляющего символа, префиксуем апострофом, чтобы Excel не исполнил её как формулу.
 const cellSafe = (v) => (typeof v === "string" && /^[=+\-@\t\r\n]/.test(v)) ? "'" + v : v;
 const rowsSafe = (rows) => (Array.isArray(rows) ? rows : []).map((r) => (r && typeof r === "object" && !Array.isArray(r)) ? Object.fromEntries(Object.entries(r).map(([k, val]) => [k, cellSafe(val)])) : r);
+const clampPmDailyCapacity = (value) => Math.max(1, Math.min(20, Number(value) || 4));
 // Надёжная выгрузка: пробуем несколько методов, т.к. песочница артефакта часто блокирует download/popup
 const downloadBlob = (blob, filename) => {
   try {
@@ -5718,7 +5719,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
   }));
   const addRule = () => {
     const nextIndex = rules.length;
-    setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, active: true, target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] }, maintenanceChecklistItems: [] }]);
+    setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, weight: 1, active: true, target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] }, maintenanceChecklistItems: [] }]);
     setOpenRule(nextIndex);
   };
   const ruleTargetText = (rule) => {
@@ -5822,7 +5823,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
     <SectionTitle>תכניות טיפול תקופתי</SectionTitle>
     <div className="note" style={{ marginBottom: 10 }}>כאן מגדירים תכניות כמו TO 500 או TO 1000: שם חופשי, תדירות בחודשים, סוגי כלי/דגמים שעליהם זה חל, וצ׳ק-ליסט טיפול ייעודי. זה נפרד לגמרי מ-בקרת כלים.</div>
-    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; const affectedCount = ruleAffectedCount(rule); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם תכנית, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "תכנית ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים · {ruleTargetText(rule)} · {affectedCount} כלים{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
+    {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; const affectedCount = ruleAffectedCount(rule); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם תכנית, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "תכנית ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים{rule.weight === 2 ? " · כבד" : ""} · {ruleTargetText(rule)} · {affectedCount} כלים{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
       if (!op) { setOpenRule(i); return; }
       if (await save()) setOpenRule(null);
     }}>{op ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" onClick={() => {
@@ -5835,6 +5836,7 @@ function FleetTypeSettings({ config, fleet, templates, saveConfig }) {
     }}><Trash2 size={15} /></button></div>{op && <>
       <div className="row2">
         <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={rule.intervalMonths || 1} onChange={(e) => setRule(i, { intervalMonths: e.target.value })} /></label>
+        <label className="field"><span>עומס</span><div className="seg-tabs s2"><button type="button" className={(rule.weight === 2 ? "" : "on")} onClick={() => setRule(i, { weight: 1 })}>רגיל</button><button type="button" className={(rule.weight === 2 ? "on" : "")} onClick={() => setRule(i, { weight: 2 })}>כבד</button></div></label>
         <div className="note">הצ׳ק-ליסט כאן שייך לתכנית הטיפול הזו בלבד. אם נמצא ליקוי בזמן ביצוע הטיפול, הקריאה נוצרת לכלי הספציפי שבוצע עליו הטיפול.</div>
       </div>
       <div className="field" style={{ marginTop: 10 }}><span>צ׳ק-ליסט טיפול תקופתי</span>
@@ -6581,15 +6583,18 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
   const rules = pmRules(config);
   const rawStartAt = dateToTs(date);
   const startAt = rawStartAt ? toWorkday(rawStartAt) : null;
+  const dailyCapacity = clampPmDailyCapacity(config?.pmDailyCapacity ?? 4);
   const fleetRefs = useMemo(() => (fleet || []).map((unit) => normalizeFleetUnitRef(unit, { modelType: config?.modelType || {} })), [fleet, config]);
   const plan = useMemo(() => buildMaintenanceScheduleFromRules({
     rules,
     fleetRefs,
     existingTasks: pm,
     startAt,
-    now: Date.now()
-  }), [rules, fleetRefs, pm, startAt]);
+    now: Date.now(),
+    dailyCapacity
+  }), [rules, fleetRefs, pm, startAt, dailyCapacity]);
   const affectedUnits = new Set(plan.tasks.map((task) => task.forkliftId)).size;
+  const spreadDays = new Set(plan.tasks.map((task) => tsToDate(task.nextDue)).filter(Boolean)).size;
   const save = async () => {
     setErr("");
     if (!startAt) return setErr("נא לבחור תאריך ראשון תקין");
@@ -6607,6 +6612,7 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
         <div className="metric"><b>{plan.updated}</b><span>שיבוצים קיימים לעדכון</span></div>
       </div>
       <div className="note" style={{ marginTop: 12 }}><CalendarClock size={13} /> {rules.length} רגולציות פעילות · {affectedUnits} כלים מתאימים · {plan.total} שיבוצים בסך הכל.</div>
+      <div className="hint" style={{ marginTop: 6 }}>פריסה על פני ~{spreadDays} ימי עבודה</div>
       <div className="hint" style={{ marginTop: 10 }}>צ׳ק-ליסטים של טיפול תקופתי נשמרים בתוך רגולציות הטיפול בלבד, ולא נלקחים משאלוני בקרת כלים.</div>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>שמירת לוח טיפולים</button><div style={{ height: 24 }} />
@@ -7201,7 +7207,7 @@ function SettingsPanel(p) {
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
-  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
+  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
@@ -7221,7 +7227,8 @@ function SettingsPanel(p) {
     mgrWidgets: config.mgrWidgets || {},
     workShifts: config.workShifts || [],
     lateGraceMin: config.lateGraceMin,
-    earlyGraceMin: config.earlyGraceMin
+    earlyGraceMin: config.earlyGraceMin,
+    pmDailyCapacity: config.pmDailyCapacity
   });
   useEffect(() => {
     if (openCat !== null) return;
@@ -7235,6 +7242,7 @@ function SettingsPanel(p) {
     setMw({ ...(config.mgrWidgets || {}) });
     setWshifts(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
     setShiftGrace(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
+    setPmDailyCapacity(clampPmDailyCapacity(config.pmDailyCapacity ?? 4));
   }, [userConfigSyncKey, uEdit, uArchive, arcView]);
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
   const doExport = async () => { try { const data = await getBackup(); downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `backup_${new Date().toISOString().slice(0, 10)}.json`); } catch (e) {} };
@@ -7255,7 +7263,7 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
   const pickLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -7370,6 +7378,12 @@ function SettingsPanel(p) {
       </div>
       <SectionTitle>השבתה קריטית — סף התראה (שעות)</SectionTitle>
       <label className="sla-cell" style={{ maxWidth: 160 }}><span style={{ color: "#DC2626" }}>שעות עד הסלמה</span><input type="number" value={escH} onChange={(e) => setEscH(e.target.value)} /></label>
+      <SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים</SectionTitle>
+      <label className="field" style={{ maxWidth: 360 }}>
+        <span>קיבולת טיפולים יומית (לפי טכנאי)</span>
+        <input type="number" min="1" max="20" value={pmDailyCapacity} onChange={(e) => setPmDailyCapacity(clampPmDailyCapacity(e.target.value))} />
+        <div className="hint">טיפול רגיל = 1 יחידה. טיפול כבד = 2 יחידות. ברירת מחדל: 4 (≈ 2 כבדים או 4 רגילים ביום).</div>
+      </label>
       <SectionTitle><Bell size={15} /> סוגי התראות</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>כיבוי סוג התראה מסתיר אותו לכל המשתמשים. סינון אישי של התצוגה נשאר בפאנל ההתראות.</div>
       <div className="notify-grid">
