@@ -24,9 +24,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Active branch: `codex/cleaning-qr-public-zones`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs:
-  - PR #554 `codex/pm-rule-distribution-capacity` is open against `main`.
+  - PR #555 `codex/cleaning-qr-public-zones` is open against `main`.
 - Active work in progress: cleaner QR scans should show a physical-arrival confirmation when there is no due round, and public QR/report screens should preload active cleaning zones through a safe public endpoint before login.
 - Latest completed product work:
+  - PR #554 spread preventive-maintenance scheduling across available days by daily capacity.
   - PR #551 fixed the cleaning QR flow: physical cleaning QR links can open the due/overdue/missed cleaner round after login, QR-required screens support camera/manual validation, and public report links work before zones finish loading.
   - PR #549 adds an admin-only `app_users` sync endpoint so KV user edits for Supabase-backed users update role, active state, permissions, departments, profile fields, and email in the session source of truth.
   - PR #548 fixed the first-login regression caused by losing `authUserId` when editing users in KV.
