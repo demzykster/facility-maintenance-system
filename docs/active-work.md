@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/inspection-programs`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: #561 first-login verification handoff, #562 remove external font import, #563 remove unused app shell.
-- Active work in progress: inspection programs per vehicle type. This branch moves fleet inspections from one legacy checklist per vehicle type to multiple inspection programs with per-program intervals, responsible users, notification targets, checklist items, and auto-ticket control.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #568 added inspection programs per vehicle type: multiple per-type inspection programs with individual intervals, checklists, responsible users, notify targets, auto-ticket control, legacy template migration, and 30-day fallback for unconfigured units.
   - PR #566 made periodic-maintenance rules accessible from the PM screen, kept `config.maintenanceRules` shared with FleetTypeSettings, and added no-rules guidance before automatic schedule generation.
   - PR #564 added periodic-maintenance distribution tests for rule weights, daily capacity, nextDue preservation/redistribution, and weekend adjustment; it also confirms that heavy weight-2 tasks do not share a day with another heavy task while light tasks may fill remaining capacity.
   - PR #555 preloads active cleaning zones for safe public QR/report screens before login and keeps cleaner QR physical-arrival fallback clear when no due round exists.
@@ -47,9 +48,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue: review and merge the inspection-programs PR, then continue only from fresh owner-reported issues.
+- Current owner-reported work queue: continue only from fresh owner-reported issues.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: review/merge `codex/inspection-programs`, then reset this ledger after merge. Do not start the broad monolith split yet.
+- Next exact action: wait for the next owner prompt. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
