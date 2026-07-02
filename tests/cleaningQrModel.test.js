@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  CLEANING_QR_PARAM,
   cleaningQrAccess,
   cleaningQrUrl,
   extractCzoneFromRaw,
@@ -16,18 +15,21 @@ describe("cleaningQrModel", () => {
       zoneId: "zone-1"
     });
 
-    expect(url).toBe(`https://cmms.example/app?${CLEANING_QR_PARAM}=zone-1`);
+    expect(url).toBe("https://cmms.example/app?z=czone%3Azone-1");
   });
 
   it("reads the scanned zone id from a QR URL", () => {
+    expect(scannedCleaningZoneIdFromSearch("?z=czone:zone-2&x=1")).toBe("zone-2");
     expect(scannedCleaningZoneIdFromSearch("?czone=zone-2&x=1")).toBe("zone-2");
     expect(scannedCleaningZoneIdFromSearch("?x=1")).toBe("");
   });
 
   it("extracts a cleaning zone id from scanned QR text", () => {
+    expect(extractCzoneFromRaw("https://cmms.example/?z=czone:zone-6")).toBe("zone-6");
     expect(extractCzoneFromRaw("https://cmms.example/?czone=zone-7&x=1")).toBe("zone-7");
     expect(extractCzoneFromRaw("?czone=zone-8")).toBe("zone-8");
     expect(extractCzoneFromRaw("czone=zone-9")).toBe("zone-9");
+    expect(extractCzoneFromRaw("czone:zone-9b")).toBe("zone-9b");
     expect(extractCzoneFromRaw("QR code czone=zone-10")).toBe("zone-10");
     expect(extractCzoneFromRaw("plain text")).toBe("");
   });
