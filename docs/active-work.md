@@ -21,7 +21,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `none`.
+- Active branch: `codex/fix-cleaning-qr-flow`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs: none.
 - No active product PR is paused.
@@ -41,11 +41,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
+  - Active QR cleaning-flow fix: physical cleaning QR links should open the due/overdue/missed cleaner round after login, QR-required screens should support in-app camera/manual scan, and public report links should work even before zones finish loading.
   - Verify first-login password/PIN setup on the deployed site, then continue closure of the remaining owner-confirmed live reports.
   - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
   - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: verify deployed user-edit sync, then return to closure of the remaining live `appIssue:` reports.
+- Next exact action: finish/merge the active QR cleaning-flow PR, then verify deployed user-edit sync and return to closure of the remaining live `appIssue:` reports.
 
 ## Current Product Direction
 

@@ -44,7 +44,7 @@ import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
-import { cleaningQrAccess, cleaningQrUrlFromWindow, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
+import { cleaningQrAccess, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, normalizeVersionManifest, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
@@ -2200,9 +2200,10 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
   const t = (key, vars) => uiText(language, key, vars);
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
-  const [zone, setZone] = useState(null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false);
+  const effectiveScannedZone = scannedZone || (scannedZoneId ? { id: scannedZoneId, name: t("public.scannedZoneFallback"), active: true } : null);
+  const [zone, setZone] = useState(effectiveScannedZone || null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false);
   const fileRef = useRef(null);
-  useEffect(() => { if (scannedZone && (!zone || zone.id !== scannedZone.id)) setZone(scannedZone); }, [scannedZone?.id]);
+  useEffect(() => { if (effectiveScannedZone && (!zone || zone.id !== effectiveScannedZone.id)) setZone(effectiveScannedZone); }, [effectiveScannedZone?.id]);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); setErr(""); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const submit = async () => {
     if (busy) return;
@@ -3534,15 +3535,65 @@ function ReportFlow({ zones, session, onSubmit, onClose, scannedZoneId = "", all
   </div></div>);
 }
 
-function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_LANGUAGE }) {
+function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_LANGUAGE, onScanSuccess = null }) {
   const wrong = !!scannedZoneId;
   const t = (key, vars) => uiText(language, key, vars);
+  const fileRef = useRef(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanErr, setScanErr] = useState("");
+  const [manualCode, setManualCode] = useState("");
+  const [showManual, setShowManual] = useState(false);
+  const finishScan = (raw) => {
+    const scanned = extractCzoneFromRaw(raw);
+    if (scanned && scanned === zone?.id) {
+      setScanErr("");
+      onScanSuccess?.();
+      return true;
+    }
+    setScanErr(scanned ? t("cleaningQr.scanWrong") : t("cleaningQr.scanMissing"));
+    return false;
+  };
+  const scanFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setScanning(true);
+    setScanErr("");
+    try {
+      if (typeof BarcodeDetector === "undefined" || typeof createImageBitmap !== "function") {
+        setShowManual(true);
+        setScanErr(t("cleaningQr.scanUnsupported"));
+        return;
+      }
+      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+      const bitmap = await createImageBitmap(file);
+      try {
+        const results = await detector.detect(bitmap);
+        finishScan(results?.[0]?.rawValue || "");
+      } finally {
+        bitmap.close?.();
+      }
+    } catch (e) {
+      setShowManual(true);
+      setScanErr(t("cleaningQr.scanFailed"));
+    } finally {
+      setScanning(false);
+      if (event.target) event.target.value = "";
+    }
+  };
+  const submitManual = () => finishScan(manualCode);
   return (<div className="pub-wrap"><div className="pub-card">
     <button className="icon-btn pub-x" aria-label={t("common.close")} onClick={onClose}><X size={20} /></button>
     <div className="pub-logo"><Camera size={24} /></div>
     <div className="pub-title">{t("cleaningQr.title")}</div>
     <div className="pub-sub">{zone?.name ? t("cleaningQr.forZone", { zone: zone.name }) : t("cleaningQr.generic")}</div>
     <div className="note">{wrong ? t("cleaningQr.wrong") : t("cleaningQr.remoteBlocked")}</div>
+    {onScanSuccess && <>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={scanFile} />
+      <button className="btn-primary full" style={{ marginTop: 10 }} disabled={scanning} onClick={() => fileRef.current?.click()}><Camera size={16} /> {scanning ? t("cleaningQr.scanning") : t("cleaningQr.scanButton")}</button>
+      <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => setShowManual((v) => !v)}>{t("cleaningQr.manualToggle")}</button>
+      {showManual && <div className="field" style={{ marginTop: 8 }}><span>{t("cleaningQr.manualLabel")}</span><input value={manualCode} onChange={(e) => setManualCode(e.target.value)} placeholder={t("cleaningQr.manualPlaceholder")} /><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={submitManual}>{t("cleaningQr.manualSubmit")}</button></div>}
+      {scanErr && <div className="err" style={{ marginTop: 10 }}>{scanErr}</div>}
+    </>}
     <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={onClose}>{t("common.close")}</button>
   </div></div>);
 }
@@ -3558,6 +3609,17 @@ function CleanerApp(p) {
   const others = active.filter((z) => z.cleanerId !== session.id);
   const todo = useMemo(() => { const out = []; mine.forEach((z) => zoneTodayStatuses(z, rounds, now).forEach(({ win, status }) => { if (status === "due" || status === "overdue") out.push({ z, win, status }); })); return out.sort((a, b) => parseHM(a.win.time) - parseHM(b.win.time)); }, [mine, rounds]);
   const doneToday = useMemo(() => (rounds || []).filter((r) => r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
+  const autoQrOpened = useRef(false);
+  const actionableRoundForZone = (z) => zoneTodayStatuses(z, rounds, Date.now()).find(({ status }) => status === "due" || status === "overdue" || status === "missed");
+  useEffect(() => {
+    if (autoQrOpened.current || !scannedZoneId) return;
+    const z = mine.find((zone) => zone.id === scannedZoneId);
+    if (!z || !cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }).allowed) return;
+    const target = actionableRoundForZone(z);
+    if (!target) return;
+    autoQrOpened.current = true;
+    setRun({ zone: z, win: target.win });
+  }, [mine, scannedZoneId, rounds]);
   const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
   const myReports = useMemo(() => (complaints || []).filter((c) => c.reportedById === session.id).sort((a, b) => b.at - a.at).slice(0, 30), [complaints, session.id]);
   const doSave = async (r) => {
@@ -3628,7 +3690,7 @@ function CleanerApp(p) {
       </div>; })()}
     </main>
     {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
-    {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setQrBlockedZone(null)} /></Overlay>}
+    {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setQrBlockedZone(null)} onScanSuccess={() => { const target = actionableRoundForZone(qrBlockedZone); setQrBlockedZone(null); if (target) setRun({ zone: qrBlockedZone, win: target.win }); }} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId), escalate: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId) }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onEscalate={(c) => { escalateComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
     {showNotif && <NotifPanel notif={notif} language={language} onClose={() => setShowNotif(false)} onOpen={() => setShowNotif(false)} onGo={() => setShowNotif(false)} />}
