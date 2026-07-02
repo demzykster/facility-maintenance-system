@@ -39,7 +39,7 @@ import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./f
 import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatalogBase, vehicleTypeCompactSummary, vehicleTypeExistsInConfig, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
-import { buildMaintenanceScheduleFromRules, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
+import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -6405,24 +6405,144 @@ const pmVisible = (session, pm, fleet) => {
 };
 const techCanSeeFleet = (session, f) => { if (!f) return false; if (!session.supplier) return true; return f.supplier === session.supplier; };
 function PMModule(p) {
-  const { pm, fleet, config, savePm, savePmMany, delPm, saveTicket, session } = p;
+  const { pm, fleet, config, savePm, savePmMany, delPm, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [run, setRun] = useState(null), [bulkRules, setBulkRules] = useState(false);
+  const [pmTab, setPmTab] = useState("schedule");
   const items = pm.filter((x) => x.active !== false);
   return (<>
-    <div className="row-between"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={() => setBulkRules(true)}><ClipboardList size={15} /> הפקה מרגולציות</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div></div>
-    <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} />
-    {bulkRules && <Overlay persistent onClose={() => setBulkRules(false)}><PMRuleBulkScheduleForm pm={pm} fleet={fleet} config={config} onCancel={() => setBulkRules(false)} onSave={async (tasks) => { const ok = await savePmMany(tasks); if (ok !== false) setBulkRules(false); return ok; }} /></Overlay>}
-    {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await savePm(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
-    {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
+    <div className="seg-tabs s2" style={{ maxWidth: 320, marginBottom: 12 }}>
+      <button className={pmTab === "schedule" ? "on" : ""} onClick={() => setPmTab("schedule")}>לוח טיפולים</button>
+      <button className={pmTab === "rules" ? "on" : ""} onClick={() => setPmTab("rules")}>כללי טיפול{pmRules(config).length === 0 && <span className="tab-badge" style={{ background: "#F59E0B" }}>!</span>}</button>
+    </div>
+    {pmTab === "rules" ? <PMRulesPanel config={config} saveConfig={saveConfig} fleet={fleet} /> : <>
+      <div className="row-between"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={() => setBulkRules(true)}><ClipboardList size={15} /> הפקה מרגולציות</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div></div>
+      <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} onGoRules={() => setPmTab("rules")} />
+      {bulkRules && <Overlay persistent onClose={() => setBulkRules(false)}><PMRuleBulkScheduleForm pm={pm} fleet={fleet} config={config} onCancel={() => setBulkRules(false)} onSave={async (tasks) => { const ok = await savePmMany(tasks); if (ok !== false) setBulkRules(false); return ok; }} /></Overlay>}
+      {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await savePm(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
+      {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
+    </>}
   </>);
 }
-function PMSchedule({ items, fleet, onOpen, allPm, config }) {
+function PMRulesPanel({ config, saveConfig, fleet }) {
+  const [rules, setRules] = useState(() => normalizeMaintenanceRules(config.maintenanceRules || []));
+  const [openIdx, setOpenIdx] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [err, setErr] = useState("");
+  const [flash, setFlash] = useState(false);
+  const rulesSyncKey = JSON.stringify(config.maintenanceRules || []);
+  useEffect(() => {
+    if (openIdx !== null) return;
+    setRules(normalizeMaintenanceRules(config.maintenanceRules || []));
+  }, [rulesSyncKey, openIdx]);
+  const vehicleTypeNames = [...new Set((config.vehicleTypes || []).map((t) => (t.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+  const modelCodes = [...new Set((config.vehicleTypes || []).flatMap((t) => (t.models || []).map((m) => (m || "").trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "he"));
+  const targetWithDefaults = (target = {}) => ({ allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...target });
+  const targetHasValue = (target = {}) => {
+    const t = targetWithDefaults(target);
+    return !!t.allFleet || !!t.vehicleTypeNames?.length || !!t.modelCodes?.length || !!t.fleetIds?.length;
+  };
+  const ruleAffectedCount = (rule) => (fleet || []).filter((unit) => fleetRuleTargetMatchesUnit(rule.target, normalizeFleetUnitRef(unit, { modelType: config.modelType || {} }))).length;
+  const ruleTargetText = (rule) => {
+    const target = targetWithDefaults(rule.target);
+    if (target.allFleet) return "כל הפארק";
+    const parts = [];
+    if (target.vehicleTypeNames?.length) parts.push(`${target.vehicleTypeNames.length} סוגים`);
+    if (target.modelCodes?.length) parts.push(`${target.modelCodes.length} דגמים`);
+    if (target.fleetIds?.length) parts.push(`${target.fleetIds.length} כלים`);
+    return parts.join(" · ") || "ללא יעד";
+  };
+  const openRule = (idx) => {
+    setErr("");
+    setOpenIdx(idx);
+    setDraft({ ...rules[idx], target: targetWithDefaults(rules[idx]?.target) });
+  };
+  const setDraftTarget = (patch) => setDraft((r) => ({ ...r, target: { ...targetWithDefaults(r?.target), ...patch } }));
+  const saveRule = async () => {
+    const current = { ...(draft || {}), name: (draft?.name || "").trim(), intervalMonths: Number(draft?.intervalMonths) || 0, weight: draft?.weight === 2 ? 2 : 1, target: targetWithDefaults(draft?.target) };
+    if (!current.name) { setErr("שם הכלל הוא שדה חובה"); return false; }
+    if (!current.intervalMonths || current.intervalMonths < 1 || current.intervalMonths > 120) { setErr("יש להגדיר תדירות תקינה בין 1 ל-120 חודשים"); return false; }
+    if (!targetHasValue(current.target)) { setErr("יש להגדיר יעד לכלל"); return false; }
+    const updated = rules.map((rule, idx) => idx === openIdx ? current : rule);
+    const clean = updated.map((rule) => {
+      const normalized = normalizeMaintenanceRules([rule])[0];
+      return normalized ? { ...rule, ...normalized } : null;
+    }).filter(Boolean);
+    if (clean.length !== updated.length) { setErr("בדקו שכל כלל כולל שם, תדירות ויעד תקינים"); return false; }
+    if (await saveConfig({ ...config, maintenanceRules: clean }) === false) { setErr(SAVE_FAILED_MESSAGE); return false; }
+    setErr("");
+    setRules(clean);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1500);
+    setOpenIdx(null);
+    setDraft(null);
+    return true;
+  };
+  const deleteRule = async (idx) => {
+    const updated = rules.filter((_, i) => i !== idx);
+    if (await saveConfig({ ...config, maintenanceRules: updated }) === false) { setErr(SAVE_FAILED_MESSAGE); return false; }
+    setErr("");
+    setRules(updated);
+    setOpenIdx(null);
+    setDraft(null);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1500);
+    return true;
+  };
+  const addRule = () => {
+    const blank = { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 3, weight: 1, active: true, target: { allFleet: true, vehicleTypeNames: [], modelCodes: [], fleetIds: [] }, maintenanceChecklistItems: [] };
+    const next = [...rules, blank];
+    setRules(next);
+    setOpenIdx(next.length - 1);
+    setDraft(blank);
+    setErr("");
+  };
+  const toggleTargetValue = (group, value) => setDraft((r) => {
+    const target = targetWithDefaults(r?.target);
+    const current = new Set(target[group] || []);
+    current.has(value) ? current.delete(value) : current.add(value);
+    return { ...r, target: { ...target, allFleet: false, [group]: [...current] } };
+  });
+  return (<div>
+    <SectionTitle>כללי טיפול תקופתי</SectionTitle>
+    {flash && <div className="save-flash">נשמר ✓</div>}
+    {err && <div className="err">{err}</div>}
+    <div className="note" style={{ marginBottom: 14 }}>כלל מגדיר לאילו כלים ובאיזו תדירות יש לקיים טיפול. לאחר הגדרת הכללים עברו ל״לוח טיפולים״ ולחצו ״הפקת מרגולציות״.</div>
+    {rules.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין כללי טיפול תקופתי. הוסיפו כלל ראשון כדי לאפשר הפקת לוח טיפולים אוטומטי.</div>}
+    {rules.map((rule, i) => {
+      const isOpen = openIdx === i;
+      const current = isOpen ? (draft || rule) : rule;
+      const target = targetWithDefaults(current.target);
+      return <div key={rule.id || i} className="rule-row">{!isOpen ? <button type="button" className="rule-collapsed" onClick={() => openRule(i)}>
+        <span className="rule-name">{rule.name || "(ללא שם)"}</span>
+        <span className="rule-meta">{rule.intervalMonths || 1} חודשים · {rule.weight === 2 ? "כבד" : "רגיל"} · {ruleTargetText(rule)} · {ruleAffectedCount(rule)} כלים</span>
+        <span className="btn-ghost sm" role="presentation">ערוך</span>
+      </button> : <div className="rule-expanded">
+        <label className="field"><span>שם הכלל *</span><input value={current.name || ""} onChange={(e) => setDraft((r) => ({ ...r, name: e.target.value }))} placeholder="למשל TO 500" /></label>
+        <label className="field"><span>תדירות (חודשים)</span><input type="number" min="1" max="120" value={current.intervalMonths || 1} onChange={(e) => setDraft((r) => ({ ...r, intervalMonths: e.target.value }))} /></label>
+        <label className="field"><span>עומס</span><div className="seg-tabs s2"><button type="button" className={current.weight === 2 ? "" : "on"} onClick={() => setDraft((r) => ({ ...r, weight: 1 }))}>רגיל</button><button type="button" className={current.weight === 2 ? "on" : ""} onClick={() => setDraft((r) => ({ ...r, weight: 2 }))}>כבד</button></div><span className="hint">טיפול כבד מופקד ליום עבודה נפרד</span></label>
+        <div className="field"><span>יעד הכלל</span>
+          <label className="chk-line"><input type="radio" name={`pm-rule-target-${i}`} checked={!!target.allFleet} onChange={() => setDraftTarget({ allFleet: true, vehicleTypeNames: [], modelCodes: [], fleetIds: [] })} /> כל הפארק</label>
+          <label className="chk-line"><input type="radio" name={`pm-rule-target-${i}`} checked={!target.allFleet && !!target.vehicleTypeNames?.length} onChange={() => setDraftTarget({ allFleet: false, vehicleTypeNames: target.vehicleTypeNames?.length ? target.vehicleTypeNames : vehicleTypeNames.slice(0, 1), modelCodes: [], fleetIds: [] })} /> סוגי כלי</label>
+          {!target.allFleet && !!target.vehicleTypeNames?.length && <div className="pm-target-box">{vehicleTypeNames.length ? vehicleTypeNames.map((name) => <label key={name} className="chk-line"><input type="checkbox" checked={(target.vehicleTypeNames || []).includes(name)} onChange={() => toggleTargetValue("vehicleTypeNames", name)} /> {name}</label>) : <div className="hint">אין סוגי כלי בקטלוג.</div>}</div>}
+          <label className="chk-line"><input type="radio" name={`pm-rule-target-${i}`} checked={!target.allFleet && !target.vehicleTypeNames?.length && (!!target.modelCodes?.length || !targetHasValue(target))} onChange={() => setDraftTarget({ allFleet: false, vehicleTypeNames: [], modelCodes: target.modelCodes || [], fleetIds: [] })} /> דגמים</label>
+          {!target.allFleet && !target.vehicleTypeNames?.length && <label className="field" style={{ marginTop: 6 }}><span>דגמים לפי קוד, מופרדים בפסיקים</span><input value={(target.modelCodes || []).join(", ")} list="pm-rule-model-codes" onChange={(e) => setDraftTarget({ allFleet: false, vehicleTypeNames: [], modelCodes: e.target.value.split(",").map((x) => x.trim()).filter(Boolean), fleetIds: [] })} placeholder={modelCodes.slice(0, 3).join(", ") || "דגם"} /></label>}
+          <datalist id="pm-rule-model-codes">{modelCodes.map((code) => <option key={code} value={code} />)}</datalist>
+        </div>
+        <div className="rule-actions"><button className="btn-primary" onClick={saveRule}>שמור שינויים</button><button className="btn-ghost" onClick={() => { setOpenIdx(null); setDraft(null); setErr(""); setRules(normalizeMaintenanceRules(config.maintenanceRules || [])); }}>ביטול</button><button className="btn-ghost danger" onClick={() => deleteRule(i)}>מחק כלל</button></div>
+      </div>}</div>;
+    })}
+    <button className="btn-ghost full" style={{ marginTop: 12 }} onClick={addRule}><Plus size={14} /> הוסף כלל טיפול</button>
+  </div>);
+}
+function PMSchedule({ items, fleet, onOpen, allPm, config, onGoRules }) {
   const [mode, setMode] = useState("calendar");
   const overdue = items.filter((x) => startOfDay(x.nextDue) < startOfDay(Date.now())).sort((a, b) => a.nextDue - b.nextDue);
+  const hasRules = pmRules(config).length > 0;
+  const emptyState = hasRules ? <Empty text="אין טיפולים מתוזמנים" Icon={CalendarClock} sub='לחצו "הפקת מרגולציות" לתזמון אוטומטי לפי הכללים שהוגדרו' /> : <div className="empty-setup"><CalendarClock size={32} style={{ color: "var(--muted)", marginBottom: 10 }} /><div className="empty-title">לא הוגדרו כללי טיפול תקופתי</div><div className="empty-sub">כדי להפיק לוח טיפולים אוטומטי, הגדר כללי טיפול לפי סוג הכלי.</div>{onGoRules && <button className="btn-primary" style={{ marginTop: 14 }} onClick={onGoRules}>הגדר כללי טיפול ←</button>}</div>;
   return (<>
     <div className="seg-tabs s4" style={{ maxWidth: 460 }}><button className={mode === "calendar" ? "on" : ""} onClick={() => setMode("calendar")}>לוח שנה</button><button className={mode === "year" ? "on" : ""} onClick={() => setMode("year")}>תצוגה שנתית</button><button className={mode === "list" ? "on" : ""} onClick={() => setMode("list")}>רשימה</button><button className={mode === "history" ? "on" : ""} onClick={() => setMode("history")}>היסטוריה</button></div>
     {mode === "history" ? <PMHistory pm={allPm || items} fleet={fleet} onOpen={onOpen} config={config} />
-      : items.length === 0 ? <Empty text="אין טיפולים מתוזמנים" Icon={CalendarClock} sub="שבצו טיפול תקופתי לכלי" />
+      : items.length === 0 ? emptyState
       : mode === "year" ? <PMYearMatrix items={items} fleet={fleet} onOpen={onOpen} config={config} />
       : mode === "calendar" ? <PMCalendar items={items} fleet={fleet} onOpen={onOpen} overdue={overdue} config={config} /> : <PMList items={items} fleet={fleet} onOpen={onOpen} config={config} />}
   </>);
@@ -6616,16 +6736,21 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">הפקת לוח טיפולים מרגולציות</div></div>
     <div className="body">
       <div className="note">המערכת תיצור שיבוצי טיפול לפי רגולציות הטיפול שהוגדרו בסוגי כלי השינוע. שיבוצים קיימים לא יוכפלו; הם רק יעודכנו בשם/תדירות הרגולציה.</div>
-      <label className="field" style={{ marginTop: 12 }}><span>תאריך ראשון לשיבוצים חדשים</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><div className="hint">שיבוצים קיימים ישמרו את מועד הטיפול הבא שכבר נקבע להם.</div></label>
-      <div className="grid2" style={{ marginTop: 12 }}>
-        <div className="metric"><b>{plan.created}</b><span>שיבוצים חדשים</span></div>
-        <div className="metric"><b>{plan.updated}</b><span>שיבוצים קיימים לעדכון</span></div>
-      </div>
-      <div className="note" style={{ marginTop: 12 }}><CalendarClock size={13} /> {rules.length} רגולציות פעילות · {affectedUnits} כלים מתאימים · {plan.total} שיבוצים בסך הכל.</div>
-      <div className="hint" style={{ marginTop: 6 }}>פריסה על פני ~{spreadDays} ימי עבודה</div>
-      <div className="hint" style={{ marginTop: 10 }}>צ׳ק-ליסטים של טיפול תקופתי נשמרים בתוך רגולציות הטיפול בלבד, ולא נלקחים משאלוני בקרת כלים.</div>
-      {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>שמירת לוח טיפולים</button><div style={{ height: 24 }} />
+      {!rules.length ? <>
+        <div className="note" style={{ color: "#B45309", background: "#FEF3C7", borderRadius: 10, padding: "12px 14px", marginTop: 12 }}>לא הוגדרו כללי טיפול — לא ניתן להפיק לוח. עברו לכרטיסיית ״כללי טיפול״ כדי להוסיף כללים.</div>
+        <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={onCancel}>סגור</button><div style={{ height: 24 }} />
+      </> : <>
+        <label className="field" style={{ marginTop: 12 }}><span>תאריך ראשון לשיבוצים חדשים</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><div className="hint">שיבוצים קיימים ישמרו את מועד הטיפול הבא שכבר נקבע להם.</div></label>
+        <div className="grid2" style={{ marginTop: 12 }}>
+          <div className="metric"><b>{plan.created}</b><span>שיבוצים חדשים</span></div>
+          <div className="metric"><b>{plan.updated}</b><span>שיבוצים קיימים לעדכון</span></div>
+        </div>
+        <div className="note" style={{ marginTop: 12 }}><CalendarClock size={13} /> {rules.length} רגולציות פעילות · {affectedUnits} כלים מתאימים · {plan.total} שיבוצים בסך הכל.</div>
+        <div className="hint" style={{ marginTop: 6 }}>פריסה על פני ~{spreadDays} ימי עבודה</div>
+        <div className="hint" style={{ marginTop: 10 }}>צ׳ק-ליסטים של טיפול תקופתי נשמרים בתוך רגולציות הטיפול בלבד, ולא נלקחים משאלוני בקרת כלים.</div>
+        {err && <div className="err">{err}</div>}
+        <button className="btn-primary full" onClick={save}>שמירת לוח טיפולים</button><div style={{ height: 24 }} />
+      </>}
     </div></div>);
 }
 function PMForm({ task, fleet, config, onCancel, onSave }) {
@@ -8965,6 +9090,9 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .empty{text-align:center;padding:46px 20px;color:var(--muted);}.empty.sm{padding:32px;}
 .empty svg{color:var(--line);}
 .empty-t{font-weight:600;font-size:15px;margin-top:12px;color:var(--muted);}.empty-s{font-size:13px;margin-top:5px;}
+.empty-setup{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 24px;}
+.empty-setup .empty-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px;}
+.empty-setup .empty-sub{font-size:13px;color:var(--muted);max-width:320px;}
 
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:var(--surface);border-top:1px solid var(--line);display:flex;padding:7px 0 max(7px,env(safe-area-inset-bottom));z-index:18;}
 .bottom-nav.nav-scroll{justify-content:flex-start;gap:6px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-inline:10px;scroll-padding-inline:10px;box-shadow:0 -1px 0 var(--line), inset 18px 0 16px -18px rgba(15,23,42,.25), inset -18px 0 16px -18px rgba(15,23,42,.25);}
@@ -9241,6 +9369,15 @@ button.notif-perm:hover{background:#D1FAE5;}
 .reg-edit{flex-shrink:0;width:34px;height:34px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);color:var(--primary);display:flex;align-items:center;justify-content:center;}
 .reg-del{flex-shrink:0;width:34px;height:34px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);color:#DC2626;display:flex;align-items:center;justify-content:center;}
 .reg-name:disabled{opacity:.55;cursor:not-allowed;}
+.rule-row{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--surface);}
+.rule-collapsed{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;cursor:pointer;text-align:right;color:var(--ink);}
+.rule-collapsed:hover{background:var(--surface-2);}
+.rule-name{font-weight:600;flex:1;min-width:0;}
+.rule-meta{font-size:12px;color:var(--muted);text-align:left;}
+.rule-expanded{padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface);}
+.rule-actions{display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;}
+.save-flash{color:#059669;font-size:13px;font-weight:700;margin-bottom:6px;}
+.pm-target-box{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2);margin:2px 0 10px;}
 .reg-del:disabled{opacity:.35;cursor:not-allowed;}
 .reg-use{flex-shrink:0;font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:3px 8px;white-space:nowrap;}
 .legacy-fold{margin-top:8px;border:1px dashed var(--line);border-radius:10px;background:var(--surface-2);padding:8px 10px;}
