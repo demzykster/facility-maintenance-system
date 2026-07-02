@@ -41,6 +41,21 @@ export function scannedCleaningZoneIdFromSearch(search = "") {
   }
 }
 
+export function extractCzoneFromRaw(raw = "") {
+  const text = String(raw || "").trim();
+  if (!text) return "";
+  try {
+    const url = new URL(text);
+    return normalizeScannedCleaningZoneId(url.searchParams.get(CLEANING_QR_PARAM));
+  } catch (e) {
+    const query = text.includes("?") ? text.slice(text.indexOf("?")) : text;
+    const fromParams = normalizeScannedCleaningZoneId(new URLSearchParams(query).get(CLEANING_QR_PARAM));
+    if (fromParams) return fromParams;
+    const match = text.match(/(?:^|[?&#\s])czone[=:]([^&#\s]+)/i);
+    return normalizeScannedCleaningZoneId(match?.[1]);
+  }
+}
+
 export function scannedCleaningZoneIdFromWindow(win = globalThis.window) {
   return scannedCleaningZoneIdFromSearch(win?.location?.search || "");
 }

@@ -3,6 +3,7 @@ import {
   CLEANING_QR_PARAM,
   cleaningQrAccess,
   cleaningQrUrl,
+  extractCzoneFromRaw,
   findScannedCleaningZone,
   scannedCleaningZoneIdFromSearch
 } from "../src/cleaningQrModel.js";
@@ -21,6 +22,14 @@ describe("cleaningQrModel", () => {
   it("reads the scanned zone id from a QR URL", () => {
     expect(scannedCleaningZoneIdFromSearch("?czone=zone-2&x=1")).toBe("zone-2");
     expect(scannedCleaningZoneIdFromSearch("?x=1")).toBe("");
+  });
+
+  it("extracts a cleaning zone id from scanned QR text", () => {
+    expect(extractCzoneFromRaw("https://cmms.example/?czone=zone-7&x=1")).toBe("zone-7");
+    expect(extractCzoneFromRaw("?czone=zone-8")).toBe("zone-8");
+    expect(extractCzoneFromRaw("czone=zone-9")).toBe("zone-9");
+    expect(extractCzoneFromRaw("QR code czone=zone-10")).toBe("zone-10");
+    expect(extractCzoneFromRaw("plain text")).toBe("");
   });
 
   it("allows manual zone choice outside production", () => {
