@@ -4,6 +4,7 @@ import { kvReadValueForSession, kvWritePermissionError, kvWritePermissionForKey,
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
+import { bearerToken, getHeader } from "../session/authCookie.js";
 import { sendServerError } from "../httpErrors.js";
 import { ticketStatusAuditEvent } from "../../src/auditEventModel.js";
 
@@ -54,18 +55,6 @@ const parseBool = (value) => value === true || value === "1" || value === "true"
 const parsePrefixes = (value) => {
   const raw = Array.isArray(value) ? value.join(",") : String(value || "");
   return [...new Set(raw.split(",").map((prefix) => prefix.trim()).filter(Boolean))];
-};
-
-const getHeader = (headers = {}, name) => {
-  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
-  if (direct) return direct;
-  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
-  return match ? match[1] : "";
-};
-
-const bearerToken = (req) => {
-  const value = String(getHeader(req.headers, "authorization") || "");
-  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
 };
 
 const parsePositiveInt = (value, fallback) => {

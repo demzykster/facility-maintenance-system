@@ -29,6 +29,9 @@ describe("productionLoginAdapter", () => {
     expect(productionLoginConfigFromEnv({ VITE_SUPABASE_URL: " https://supabase.example/// ", VITE_SUPABASE_ANON_KEY: "anon" })).toEqual({
       supabaseUrl: "https://supabase.example",
       supabaseAnonKey: "anon",
+      authMode: "cookie",
+      loginApiUrl: "/api/session/login",
+      logoutApiUrl: "/api/session/logout",
       sessionApiUrl: "/api/session/me",
       profileApiUrl: "/api/session/profile",
       changePasswordApiUrl: "/api/session/change-password",
@@ -65,35 +68,31 @@ describe("productionLoginAdapter", () => {
     });
   });
 
-  it("signs in through Supabase Auth and then asks the CMMS session endpoint", async () => {
-    const fetchImpl = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        async text() {
-          return JSON.stringify({ access_token: "access-token" });
-        }
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        async text() {
-          return JSON.stringify({
-            ok: true,
-            user: {
-              id: "app-user-1",
-              authUserId: "auth-user-1",
-              email: "owner@example.com",
-              name: "Owner",
-              role: "admin",
-              permissions: {},
-              mustChangePassword: false
-            }
-          });
-        }
-      });
+  it("signs in through the CMMS cookie login endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          user: {
+            id: "app-user-1",
+            authUserId: "auth-user-1",
+            email: "owner@example.com",
+            name: "Owner",
+            role: "admin",
+            permissions: {},
+            mustChangePassword: false
+          },
+          auth: { cookieSession: true, expiresAt: 1800000000000 }
+        });
+      }
+    });
     const client = createProductionLoginClient({
       config: {
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon-key",
+        authMode: "cookie",
+        loginApiUrl: "/api/session/login",
         sessionApiUrl: "/api/session/me"
       },
       fetchImpl
@@ -108,20 +107,18 @@ describe("productionLoginAdapter", () => {
       role: "admin",
       productionSession: true
     });
-    expect(result.accessToken).toBe("access-token");
-    expect(result.auth).toMatchObject({ accessToken: "access-token" });
-    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/token?grant_type=password", expect.objectContaining({
+    expect(result.accessToken).toBe("");
+    expect(result.auth).toMatchObject({ accessToken: "", cookieSession: true });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/login", expect.objectContaining({
       method: "POST",
-      headers: expect.objectContaining({ apikey: "anon-key" })
+      credentials: "include",
+      headers: expect.objectContaining({ "content-type": "application/json" })
     }));
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
       email: "owner@example.com",
-      password: "secret"
+      password: "secret",
+      remember: false
     });
-    expect(fetchImpl).toHaveBeenCalledWith("/api/session/me", expect.objectContaining({
-      method: "GET",
-      headers: expect.objectContaining({ authorization: "Bearer access-token" })
-    }));
   });
 
   it("fails closed when production login is not configured", async () => {
@@ -453,7 +450,8 @@ describe("productionLoginAdapter", () => {
     });
     expect(fetchImpl).toHaveBeenCalledWith("/api/session/initial-password", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ action: "login", identifier: "1042", pin: "1234" })
+      credentials: "include",
+      body: JSON.stringify({ action: "login", identifier: "1042", pin: "1234", remember: false })
     }));
   });
 
@@ -502,7 +500,8 @@ describe("productionLoginAdapter", () => {
     expect(result.auth).toMatchObject({ accessToken: "access-token" });
     expect(fetchImpl).toHaveBeenCalledWith("/api/session/initial-password", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ action: "complete", identifier: "manager@example.com", password: "123456" })
+      credentials: "include",
+      body: JSON.stringify({ action: "complete", identifier: "manager@example.com", pin: undefined, password: "123456", remember: false })
     }));
   });
 });

@@ -28,7 +28,7 @@ import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
-import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
+import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -1764,8 +1764,7 @@ export default function App() {
   const delTpl = async (id) => { if (!await deleteShared(`itpl:${id}`)) return false; setTemplates((s) => s.filter((x) => x.id !== id)); return true; };
   const syncAdminProfileUser = async (u) => {
     if (!u?.authUserId) return;
-    const accessToken = PRODUCTION_AUTH_STORE.get()?.accessToken;
-    if (!accessToken) throw new Error("admin_profile_sync_missing_token");
+    const accessToken = PRODUCTION_AUTH_STORE.get()?.accessToken || "";
     const patch = {
       name: u.name || "",
       role: u.role || "user",
@@ -1781,8 +1780,9 @@ export default function App() {
     };
     const response = await fetch("/api/session/admin-profile", {
       method: "PATCH",
+      credentials: "include",
       headers: {
-        authorization: `Bearer ${accessToken}`,
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
         "content-type": "application/json"
       },
       body: JSON.stringify({ authUserId: u.authUserId, patch })
@@ -1841,7 +1841,7 @@ export default function App() {
     }
     await store.set("session:v1", JSON.stringify(s), false);
   };
-  const logout = async () => { setRolePreviewRole(null); setSession(null); PRODUCTION_AUTH_STORE.clear(); await store.del("session:v1", false); };
+  const logout = async () => { setRolePreviewRole(null); setSession(null); await logoutProductionSession({ config: PRODUCTION_LOGIN_CONFIG }); PRODUCTION_AUTH_STORE.clear(); await store.del("session:v1", false); };
   const saveMyProfile = async ({ email, phone, newPassword } = {}) => {
     const realSession = session;
     if (!realSession) return { ok: false, error: "session_missing" };
@@ -1850,7 +1850,7 @@ export default function App() {
       if (realSession.productionSession) {
         const auth = PRODUCTION_AUTH_STORE.get();
         const accessToken = auth?.accessToken || "";
-        if (!accessToken) return { ok: false, error: "access_token_required" };
+        if (!accessToken && !auth?.cookieSession) return { ok: false, error: "access_token_required" };
         let nextSession = realSession;
         const normalizedEmail = String(email || "").trim().toLowerCase();
         const normalizedPhone = String(phone || "").trim();
@@ -2416,7 +2416,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       setBusy(true);
       setErr("");
       try {
-        const result = await loginWithProductionPassword({ email: resolved.user.email, password, config: productionLoginConfig });
+        const result = await loginWithProductionPassword({ email: resolved.user.email, password, remember, config: productionLoginConfig });
         remember_save({ email: resolved.user.email, mode: "production" });
         if (result.mustChangePassword) {
           setPasswordChange({ accessToken: result.accessToken, auth: result.auth, session: result.session });
@@ -2439,7 +2439,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       setBusy(true);
       setErr("");
       try {
-        const result = await loginWithProductionPin({ identifier: resolved.identifier || resolved.user.workerNo || identifier.trim(), pin: code.trim(), config: productionLoginConfig });
+        const result = await loginWithProductionPin({ identifier: resolved.identifier || resolved.user.workerNo || identifier.trim(), pin: code.trim(), remember, config: productionLoginConfig });
         remember_save({ workerNo: result.session?.workerNo || resolved.user.workerNo || identifier.trim(), mode: "worker" });
         await onLogin(result.session, { productionAuth: result.auth, remember });
       } catch (error) {
@@ -2471,6 +2471,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           identifier: initialSetup.identifier || identifier,
           password: usesPassword ? nextSecret : undefined,
           pin: usesPassword ? undefined : nextSecret,
+          remember,
           config: productionLoginConfig
         });
         if (usesPassword) remember_save({ email: result.session?.email || initialSetup.user.email || identifier.trim().toLowerCase(), mode: "production" });
@@ -2510,7 +2511,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
     }
   };
   const submitNewPassword = async () => {
-    if (!passwordChange?.accessToken) return setErr("נדרש להתחבר מחדש");
+    if (!passwordChange?.accessToken && !passwordChange?.auth?.cookieSession) return setErr("נדרש להתחבר מחדש");
     if (newPassword.length < 6) return setErr("הסיסמה החדשה חייבת לכלול לפחות 6 תווים");
     if (newPassword !== newPasswordConfirm) return setErr("הסיסמאות אינן זהות");
     setBusy(true);

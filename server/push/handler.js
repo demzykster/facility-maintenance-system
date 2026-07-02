@@ -1,5 +1,6 @@
 import webPush from "web-push";
 import { createSupabaseSessionClient, buildSessionPayload } from "../session/sessionHandler.js";
+import { bearerToken } from "../session/authCookie.js";
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import {
@@ -12,18 +13,6 @@ import {
   selectPushNotificationTargets,
   upsertPushSubscription
 } from "../../src/pushNotificationModel.js";
-
-const getHeader = (headers = {}, name) => {
-  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
-  if (direct) return Array.isArray(direct) ? direct[0] : direct;
-  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
-  return match ? (Array.isArray(match[1]) ? match[1][0] : match[1]) : "";
-};
-
-const bearerToken = (req) => {
-  const value = String(getHeader(req.headers, "authorization") || "");
-  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
-};
 
 const readBody = async (req) => {
   if (req.body && typeof req.body === "object") return req.body;

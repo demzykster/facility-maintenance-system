@@ -13,9 +13,13 @@ async function readJson(response) {
 }
 
 export function productionLoginConfigFromEnv(env = {}) {
+  const hasSupabaseEnv = !!(env.VITE_SUPABASE_URL || env.SUPABASE_URL || env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY);
   return {
     supabaseUrl: trimSlash(env.VITE_SUPABASE_URL || env.SUPABASE_URL),
     supabaseAnonKey: String(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || "").trim(),
+    authMode: String(env.VITE_CMMS_AUTH_MODE || (hasSupabaseEnv ? "cookie" : "")).trim().toLowerCase(),
+    loginApiUrl: String(env.VITE_CMMS_LOGIN_API_URL || "/api/session/login").trim() || "/api/session/login",
+    logoutApiUrl: String(env.VITE_CMMS_LOGOUT_API_URL || "/api/session/logout").trim() || "/api/session/logout",
     sessionApiUrl: String(env.VITE_CMMS_SESSION_API_URL || "/api/session/me").trim() || "/api/session/me",
     profileApiUrl: String(env.VITE_CMMS_PROFILE_API_URL || "/api/session/profile").trim() || "/api/session/profile",
     changePasswordApiUrl: String(env.VITE_CMMS_CHANGE_PASSWORD_API_URL || "/api/session/change-password").trim() || "/api/session/change-password",
@@ -24,7 +28,10 @@ export function productionLoginConfigFromEnv(env = {}) {
 }
 
 export function productionLoginReady(config = {}) {
-  return !!(config.supabaseUrl && config.supabaseAnonKey && config.sessionApiUrl);
+  const mode = config.authMode || (config.supabaseUrl || config.supabaseAnonKey ? "cookie" : "");
+  if (mode === "direct") return !!(config.supabaseUrl && config.supabaseAnonKey && config.sessionApiUrl);
+  if (mode === "cookie") return !!((config.loginApiUrl || "/api/session/login") && (config.sessionApiUrl || "/api/session/me"));
+  return false;
 }
 
 export function normalizeAuthExpiresAt(value) {
@@ -41,6 +48,17 @@ export function productionAuthFromSupabase(data = {}, now = Date.now()) {
     refreshToken: data.refresh_token || "",
     expiresAt: expiresAt || (expiresIn ? now + expiresIn * 1000 : 0),
     tokenType: data.token_type || "bearer"
+  };
+}
+
+export function productionAuthFromCookie(data = {}, now = Date.now()) {
+  const expiresAt = normalizeAuthExpiresAt(data.expiresAt || data.expires_at);
+  return {
+    accessToken: "",
+    refreshToken: "",
+    expiresAt: expiresAt || (data.expires_in ? now + Number(data.expires_in) * 1000 : 0),
+    tokenType: "cookie",
+    cookieSession: true
   };
 }
 
@@ -91,8 +109,9 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
   async function sessionFromAccessToken(accessToken) {
     const sessionResponse = await fetchImpl(sessionApiUrl, {
       method: "GET",
+      credentials: "include",
       headers: {
-        authorization: `Bearer ${accessToken}`,
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
         "content-type": "application/json"
       }
     });
@@ -107,9 +126,29 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
   }
 
   return {
-    async signInWithPassword({ email, password }) {
+    async signInWithPassword({ email, password, remember = false }) {
       const normalizedEmail = normalizeEmail(email);
       if (!normalizedEmail || !password) throw new Error("email_and_password_required");
+
+      if (config.authMode !== "direct") {
+        const loginResponse = await fetchImpl(config.loginApiUrl || "/api/session/login", {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail, password, remember: remember === true })
+        });
+        const loginData = await readJson(loginResponse);
+        if (!loginResponse.ok || !loginData?.ok) {
+          throw new Error(loginData?.error || "cmms_login_failed");
+        }
+        const auth = productionAuthFromCookie(loginData.auth || {});
+        return {
+          session: cmmsSessionFromProductionUser(loginData.user),
+          mustChangePassword: loginData.user?.mustChangePassword === true,
+          auth,
+          accessToken: auth.accessToken
+        };
+      }
 
       const authResponse = await fetchImpl(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
         method: "POST",
@@ -151,11 +190,12 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       return productionAuthFromSupabase(data);
     },
     async changePassword({ accessToken, newPassword }) {
-      if (!accessToken || !newPassword) throw new Error("access_token_and_password_required");
+      if (!newPassword) throw new Error("access_token_and_password_required");
       const response = await fetchImpl(config.changePasswordApiUrl || "/api/session/change-password", {
         method: "POST",
+        credentials: "include",
         headers: {
-          authorization: `Bearer ${accessToken}`,
+          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
           "content-type": "application/json"
         },
         body: JSON.stringify({ newPassword })
@@ -170,11 +210,11 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       };
     },
     async updateProfile({ accessToken, email, phone }) {
-      if (!accessToken) throw new Error("access_token_required");
       const response = await fetchImpl(config.profileApiUrl || "/api/session/profile", {
         method: "PATCH",
+        credentials: "include",
         headers: {
-          authorization: `Bearer ${accessToken}`,
+          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
           "content-type": "application/json"
         },
         body: JSON.stringify({ email, phone })
@@ -191,6 +231,7 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
     async validateInitialPassword({ identifier }) {
       const response = await fetchImpl(config.initialPasswordApiUrl || "/api/session/initial-password", {
         method: "POST",
+        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "validate", identifier })
       });
@@ -203,11 +244,12 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       }
       return data;
     },
-    async signInWithPin({ identifier, pin }) {
+    async signInWithPin({ identifier, pin, remember = false }) {
       const response = await fetchImpl(config.initialPasswordApiUrl || "/api/session/initial-password", {
         method: "POST",
+        credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "login", identifier, pin })
+        body: JSON.stringify({ action: "login", identifier, pin, remember: remember === true })
       });
       const data = await readJson(response);
       if (!response.ok || !data?.ok) {
@@ -218,16 +260,19 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       }
       return {
         session: data.user ? cmmsSessionFromProductionUser(data.user) : null,
-        auth: data.pinSessionToken
+        auth: data.auth?.cookieSession
+          ? productionAuthFromCookie(data.auth)
+          : data.pinSessionToken
           ? { accessToken: data.pinSessionToken, refreshToken: null, expiresAt: data.pinSessionExpiresAt || 0, tokenType: "cmms-pin" }
           : null
       };
     },
-    async completeInitialPassword({ identifier, pin, password }) {
+    async completeInitialPassword({ identifier, pin, password, remember = false }) {
       const response = await fetchImpl(config.initialPasswordApiUrl || "/api/session/initial-password", {
         method: "POST",
+        credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "complete", identifier, pin, password })
+        body: JSON.stringify({ action: "complete", identifier, pin, password, remember: remember === true })
       });
       const data = await readJson(response);
       if (!response.ok || !data?.ok) {
@@ -236,7 +281,7 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
       return {
         session: data.user ? cmmsSessionFromProductionUser(data.user) : null,
         auth: data.auth
-          ? productionAuthFromSupabase(data.auth)
+          ? (data.auth.cookieSession ? productionAuthFromCookie(data.auth) : productionAuthFromSupabase(data.auth))
           : (data.pinSessionToken
             ? { accessToken: data.pinSessionToken, refreshToken: null, expiresAt: data.pinSessionExpiresAt || 0, tokenType: "cmms-pin" }
             : null)
@@ -245,10 +290,10 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
   };
 }
 
-export async function loginWithProductionPassword({ email, password, config, fetchImpl } = {}) {
+export async function loginWithProductionPassword({ email, password, remember = false, config, fetchImpl } = {}) {
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
-  return client.signInWithPassword({ email, password });
+  return client.signInWithPassword({ email, password, remember });
 }
 
 export async function changeProductionPassword({ accessToken, newPassword, config, fetchImpl } = {}) {
@@ -269,16 +314,26 @@ export async function validateProductionInitialPassword({ identifier, config, fe
   return client.validateInitialPassword({ identifier });
 }
 
-export async function completeProductionInitialPassword({ identifier, pin, password, config, fetchImpl } = {}) {
+export async function completeProductionInitialPassword({ identifier, pin, password, remember = false, config, fetchImpl } = {}) {
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
-  return client.completeInitialPassword({ identifier, pin, password });
+  return client.completeInitialPassword({ identifier, pin, password, remember });
 }
 
-export async function loginWithProductionPin({ identifier, pin, config, fetchImpl } = {}) {
+export async function loginWithProductionPin({ identifier, pin, remember = false, config, fetchImpl } = {}) {
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
-  return client.signInWithPin({ identifier, pin });
+  return client.signInWithPin({ identifier, pin, remember });
+}
+
+export async function logoutProductionSession({ config, fetchImpl = globalThis.fetch } = {}) {
+  try {
+    await fetchImpl(config?.logoutApiUrl || "/api/session/logout", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" }
+    });
+  } catch {}
 }
 
 export function createProductionAuthStore({ key = "cmms:productionAuth:v1", local = globalThis.localStorage, session = globalThis.sessionStorage } = {}) {
@@ -313,16 +368,20 @@ export function createProductionAuthStore({ key = "cmms:productionAuth:v1", loca
 export async function restoreProductionSession({ config, authStore = createProductionAuthStore(), fetchImpl } = {}) {
   const client = createProductionLoginClient({ config, fetchImpl });
   const auth = authStore?.get?.();
-  if (!client || !auth?.accessToken) return null;
+  if (!client || (!auth?.accessToken && !auth?.cookieSession)) return null;
 
   try {
-    const result = await client.sessionFromAccessToken(auth.accessToken);
+    const result = await client.sessionFromAccessToken(auth.accessToken || "");
     if (result.mustChangePassword) {
       authStore.clear?.();
       return null;
     }
     return { ...result, auth };
   } catch (error) {
+    if (auth.cookieSession) {
+      authStore.clear?.();
+      return null;
+    }
     if (!auth.refreshToken) {
       authStore.clear?.();
       return null;

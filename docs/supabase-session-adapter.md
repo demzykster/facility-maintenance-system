@@ -13,7 +13,8 @@ Required server env:
 
 Request:
 
-- `Authorization: Bearer <supabase-access-token>`
+- Preferred: HttpOnly `cmms_access_token` cookie set by `POST /api/session/login` or `POST /api/session/initial-password`.
+- Legacy/direct mode: `Authorization: Bearer <supabase-access-token>`.
 
 The endpoint reads:
 
@@ -39,7 +40,9 @@ This endpoint is that boundary. It does not use the service role key. It uses th
 
 ## Frontend Production Login
 
-`src/productionLoginAdapter.js` signs in through Supabase Auth password login, then calls `/api/session/me` to receive a normalized CMMS session.
+`src/productionLoginAdapter.js` signs in through `POST /api/session/login` by default. The server performs the Supabase Auth password login, validates the linked CMMS profile, sets HttpOnly session cookies, and returns only a cookie-session marker plus the normalized CMMS session.
+
+`VITE_CMMS_AUTH_MODE=direct` keeps the older browser-to-Supabase Bearer flow for legacy/debug use.
 
 Demo and test modes keep the existing local/demo login flow.
 
@@ -60,11 +63,11 @@ The frontend blocks normal production app entry while `mustChangePassword` is tr
 
 ## Production Session Persistence
 
-Production mode persists Supabase token data, not a trusted local CMMS user object.
+Production mode persists a session marker, not Supabase token data, in browser storage.
 
-- Access and refresh tokens are stored in browser storage according to the Remember checkbox.
-- App startup restores the CMMS session by calling `/api/session/me` with the access token.
-- If the access token is expired, the frontend refreshes it through Supabase Auth and retries `/api/session/me`.
+- Access and refresh tokens live in HttpOnly cookies and are not readable by frontend JavaScript.
+- App startup restores the CMMS session by calling `/api/session/me` with browser credentials.
+- The Remember checkbox controls whether the refresh cookie is persistent.
 - Demo and test modes keep the existing local `session:v1` restore behavior.
 
 ## Next Steps

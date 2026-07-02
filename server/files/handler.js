@@ -3,6 +3,7 @@ import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.j
 import { createSupabaseFileDriverFromEnv } from "./supabaseFileDriver.js";
 import { createSupabaseFileMetadataDriverFromEnv } from "./supabaseFileMetadataDriver.js";
 import { sendServerError } from "../httpErrors.js";
+import { bearerToken } from "../session/authCookie.js";
 import { AUDIT_ACTIONS, fileAuditEvent } from "../../src/auditEventModel.js";
 import { fileMetadataPathMatchesOwner, normalizeFileMetadata } from "../../src/fileMetadataModel.js";
 
@@ -10,18 +11,6 @@ const json = (res, status, body) => {
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
-};
-
-const getHeader = (headers = {}, name) => {
-  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
-  if (direct) return direct;
-  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
-  return match ? match[1] : "";
-};
-
-const bearerToken = (req) => {
-  const value = String(getHeader(req.headers, "authorization") || "");
-  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
 };
 
 const readBody = async (req) => {
