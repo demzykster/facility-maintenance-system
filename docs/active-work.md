@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/pm-distribution-tests`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
-- Open PRs at branch start: #561 first-login verification handoff, #562 remove external font import, #563 remove unused app shell.
-- Active work in progress: add periodic-maintenance distribution verification tests for rule weights, daily capacity, nextDue preservation/redistribution, and weekend adjustment.
+- Open PRs at last check: #561 first-login verification handoff, #562 remove external font import, #563 remove unused app shell.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #564 added periodic-maintenance distribution tests for rule weights, daily capacity, nextDue preservation/redistribution, and weekend adjustment; it also confirms that heavy weight-2 tasks do not share a day with another heavy task while light tasks may fill remaining capacity.
   - PR #555 preloads active cleaning zones for safe public QR/report screens before login and keeps cleaner QR physical-arrival fallback clear when no due round exists.
   - PR #556 routes production login/session calls through CMMS backend HttpOnly cookies instead of direct browser-to-Supabase Auth, while keeping direct-auth rollback via `VITE_CMMS_AUTH_MODE=direct`.
   - PR #554 spread periodic-maintenance due work by daily capacity while keeping inspection/checklists separate from treatment regulations.
@@ -45,10 +46,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue:
-  - Review the periodic-maintenance distribution verification tests PR.
+- Current owner-reported work queue: wait for fresh owner formulations.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: review/merge `codex/pm-distribution-tests`, then continue only from fresh owner-reported issues. Do not start the broad monolith split yet.
+- Next exact action: continue only from fresh owner-reported issues. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
