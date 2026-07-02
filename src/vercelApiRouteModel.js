@@ -8,6 +8,7 @@ export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/kv/[key].js",
   "api/kv/index.js",
   "api/public/complaints.js",
+  "api/public/zones.js",
   "api/push.js",
   "api/session/change-password.js",
   "api/session/admin-profile.js",

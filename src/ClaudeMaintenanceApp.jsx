@@ -34,7 +34,7 @@ import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
 import { createTicketPhotoStorageFromEnv } from "./ticketPhotoStorage.js";
 import { createCleaningPhotoStorageFromEnv } from "./cleaningPhotoStorage.js";
-import { createPublicComplaintClient, publicComplaintApiUrlFromEnv } from "./publicComplaintAdapter.js";
+import { createPublicComplaintClient, fetchPublicZones, publicComplaintApiUrlFromEnv, publicZonesApiUrlFromEnv } from "./publicComplaintAdapter.js";
 import { parseFleetLicenseWorkbook, planFleetLicenseCatalogAdditions } from "./fleetLicenseImportModel.js";
 import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatalogBase, vehicleTypeCompactSummary, vehicleTypeExistsInConfig, vehicleTypeInUseCodes } from "./fleetCatalogModel.js";
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
@@ -79,6 +79,7 @@ const PRODUCTION_AUTH_STORE = createProductionAuthStore();
 const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PRODUCTION_AUTH_STORE);
 const CLEANING_PHOTOS = createCleaningPhotoStorageFromEnv(import.meta.env, PRODUCTION_AUTH_STORE);
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
+const PUBLIC_ZONES_URL = publicZonesApiUrlFromEnv(import.meta.env);
 
 function LanguagePicker({ value, onChange, compact = false }) {
   const current = normalizeLanguageCode(value);
@@ -1451,6 +1452,9 @@ export default function App() {
     const th = await store.get("theme:v1", false); if (th) setTheme(th);
     const savedLanguage = await store.get("language:v1", false); if (savedLanguage) setLanguageState(normalizeLanguageCode(savedLanguage));
     if (SEED_POLICY.requiresServerBootstrapAdmin) {
+      fetchPublicZones({ url: PUBLIC_ZONES_URL })
+        .then((publicZones) => { if (publicZones.length > 0) setZones(publicZones); })
+        .catch(() => {});
       const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
       if (restored?.session) {
         setSession(restored.session);
@@ -3601,12 +3605,13 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_L
 function CleanerApp(p) {
   const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key), absences, saveAbsence, delAbsence } = p;
   const [run, setRun] = useState(null), [qrBlockedZone, setQrBlockedZone] = useState(null), [sent, setSent] = useState(false), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
+  const [qrArrivalZone, setQrArrivalZone] = useState(null);
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, [], absences);
   const now = Date.now();
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
-  const mine = active.filter((z) => z.cleanerId === session.id);
-  const others = active.filter((z) => z.cleanerId !== session.id);
+  const mine = useMemo(() => active.filter((z) => z.cleanerId === session.id), [active, session.id]);
+  const others = useMemo(() => active.filter((z) => z.cleanerId !== session.id), [active, session.id]);
   const todo = useMemo(() => { const out = []; mine.forEach((z) => zoneTodayStatuses(z, rounds, now).forEach(({ win, status }) => { if (status === "due" || status === "overdue") out.push({ z, win, status }); })); return out.sort((a, b) => parseHM(a.win.time) - parseHM(b.win.time)); }, [mine, rounds]);
   const doneToday = useMemo(() => (rounds || []).filter((r) => r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
   const autoQrOpened = useRef(false);
@@ -3616,8 +3621,11 @@ function CleanerApp(p) {
     const z = mine.find((zone) => zone.id === scannedZoneId);
     if (!z || !cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }).allowed) return;
     const target = actionableRoundForZone(z);
-    if (!target) return;
     autoQrOpened.current = true;
+    if (!target) {
+      setQrArrivalZone(z);
+      return;
+    }
     setRun({ zone: z, win: target.win });
   }, [mine, scannedZoneId, rounds]);
   const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
@@ -3669,6 +3677,7 @@ function CleanerApp(p) {
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} language={language} /></div>}
     <main className="content">
+      {qrArrivalZone && <div className="toast-ok"><MapPin size={16} /> {t("cleaner.qrArrived", { zone: qrArrivalZone.name })}</div>}
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
       {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>)}</div>}
       {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> {t("cleaner.openReports", { count: myComplaints.length })}</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
