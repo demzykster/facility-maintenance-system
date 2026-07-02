@@ -8,8 +8,9 @@ Before answering project-status questions or starting work:
 
 1. Run `git fetch origin --prune`.
 2. Check current branch, working tree, latest `origin/main`, and open PRs.
-3. Read this file first.
-4. Read only the extra docs needed for the current task. Check remote branches only when the task involves PR/branch sync or this file says an unmerged branch exists.
+3. Include draft PRs in the open-PR check. A draft PR is still active work.
+4. Read this file first.
+5. Read only the extra docs needed for the current task. Check remote branches only when the task involves PR/branch sync or this file says an unmerged branch exists.
 
 If `main`, open PRs, or this live ledger disagree, start with:
 
@@ -24,6 +25,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Active branch: `codex/server-cookie-auth`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs:
+  - PR #556 `codex/server-cookie-auth` is draft, green, and active. It routes production auth through CMMS backend HttpOnly cookies while keeping direct-auth rollback via `VITE_CMMS_AUTH_MODE=direct`.
   - PR #555 `codex/cleaning-qr-public-zones` is open and green; keep it separate from this cookie-auth work.
 - Active work: package the server-cookie-auth layer that routes production login/session calls through CMMS backend cookies instead of direct browser-to-Supabase Auth.
 - Latest completed product work:
