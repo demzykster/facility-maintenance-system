@@ -46,11 +46,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
-  - Verify first-login password/PIN setup on the deployed site, then continue closure of the remaining owner-confirmed live reports.
-  - Internal `appIssue:` reports were cleared from staging/pilot data on 2026-07-02 at owner request. Current `appIssue` KV count: 0.
-  - TO/periodic-maintenance redesign is paused and removed from the active queue at owner request. Wait for a fresh formulation before implementing it.
-  - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: continue first-login deployed-site verification and remaining fleet/catalog stability work. Do not restart the TO/periodic-maintenance redesign until the owner reformulates it. Do not start the broad monolith split yet.
+  - Verify first-login password/PIN setup on the deployed site after the latest auth/session changes.
+- Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
+- Next exact action: verify first-login deployed-site behavior, then continue release stabilization from fresh owner-reported issues only. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
@@ -74,6 +72,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Role defaults, individual module permissions, and notification preferences should stay one coherent access-control surface.
 - Production AI remains disabled for v1; AI readiness is architectural preparation.
 - Supabase KV pagination is implemented in `server/kv/supabaseDriver.js`; `list`, `listValues`, and `listValuesMany` should not regress to one-page reads.
+- Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
 
 ## Accepted V1 Pilot Risks
 
