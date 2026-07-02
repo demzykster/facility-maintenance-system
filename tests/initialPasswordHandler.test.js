@@ -80,10 +80,11 @@ describe("initial password handler", () => {
     expect(res.json()).toMatchObject({
       ok: true,
       user: { id: "worker-1", name: "Worker One", role: "worker", workerNo: "1042" },
-      auth: null,
+      auth: { accessToken: "", cookieSession: true, expiresAt: 86523000 },
       pinSessionExpiresAt: 86523000
     });
     expect(res.json().pinSessionToken).toEqual(expect.stringContaining("."));
+    expect(res.headers["set-cookie"].join("\n")).toContain("cmms_access_token=");
     expect(driver.set).toHaveBeenCalledWith("user:worker-1", JSON.stringify({
       ...newWorker,
       pin: "6789",
@@ -114,8 +115,9 @@ describe("initial password handler", () => {
     expect(res.json()).toMatchObject({
       ok: true,
       user: { id: "app-1", authUserId: "auth-1", email: "manager@example.com", role: "user" },
-      auth: { access_token: "access" }
+      auth: { accessToken: "", cookieSession: true }
     });
+    expect(res.headers["set-cookie"].join("\n")).toContain("cmms_access_token=access");
     expect(driver.set).toHaveBeenCalledWith("user:manager-1", JSON.stringify({
       ...newManager,
       password: "",
@@ -176,11 +178,12 @@ describe("initial password handler", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       ok: true,
-      auth: null,
+      auth: { accessToken: "", cookieSession: true, expiresAt: 86523000 },
       pinSessionExpiresAt: 86523000,
       user: { id: "worker-1", name: "Worker One", role: "worker", workerNo: "1042" }
     });
     expect(res.json().pinSessionToken).toEqual(expect.stringContaining("."));
+    expect(res.headers["set-cookie"].join("\n")).toContain("cmms_access_token=");
     expect(driver.set).not.toHaveBeenCalled();
   });
 

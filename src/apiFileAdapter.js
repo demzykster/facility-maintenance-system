@@ -18,6 +18,7 @@ export function createApiFileProvider({ baseUrl, fetchImpl = globalThis.fetch, g
     const accessToken = typeof getAccessToken === "function" ? getAccessToken() : "";
     const response = await fetchImpl(`${root}${path}`, {
       ...options,
+      credentials: "include",
       headers: {
         "content-type": "application/json",
         ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),

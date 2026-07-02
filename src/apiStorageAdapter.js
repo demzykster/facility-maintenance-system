@@ -18,6 +18,7 @@ export function createApiStorageProvider({ baseUrl, fetchImpl = globalThis.fetch
     const accessToken = typeof getAccessToken === "function" ? await getAccessToken() : "";
     const response = await fetchImpl(`${root}${path}`, {
       ...options,
+      credentials: "include",
       headers: {
         "content-type": "application/json",
         ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),

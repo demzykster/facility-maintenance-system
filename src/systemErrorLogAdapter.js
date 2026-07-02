@@ -20,12 +20,14 @@ export async function fetchSystemErrorLogs({
 } = {}) {
   if (typeof fetchImpl !== "function") return { ok: false, error: "fetch_unavailable", errors: [] };
   const accessToken = typeof getAccessToken === "function" ? getAccessToken() : "";
-  if (!accessToken) return { ok: false, error: "access_token_required", errors: [] };
+  const hasCookieSession = authStore.get()?.cookieSession === true;
+  if (!accessToken && !hasCookieSession) return { ok: false, error: "access_token_required", errors: [] };
 
   const url = `${endpoint}?limit=${encodeURIComponent(String(limit))}`;
   const response = await fetchImpl(url, {
     method: "GET",
-    headers: { authorization: `Bearer ${accessToken}` }
+    credentials: "include",
+    headers: { ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) }
   });
   const data = await readJson(response);
   if (!response.ok || data?.ok !== true) {

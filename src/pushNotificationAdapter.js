@@ -47,7 +47,8 @@ export async function subscribeToPhonePush({
 } = {}) {
   if (!pushSupported()) return { ok: false, error: "push_not_supported" };
   const accessToken = getAccessToken();
-  if (!accessToken) return { ok: false, error: "access_token_required" };
+  const hasCookieSession = authStore.get()?.cookieSession === true;
+  if (!accessToken && !hasCookieSession) return { ok: false, error: "access_token_required" };
   const config = await fetchPushConfig({ endpoint, fetchImpl });
   if (!config.ok) return config;
   if (!config.enabled || !config.publicKey) return { ok: false, error: "push_server_disabled" };
@@ -63,7 +64,8 @@ export async function subscribeToPhonePush({
 
   const response = await fetchImpl(endpoint, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    credentials: "include",
+    headers: { "content-type": "application/json", ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) },
     body: JSON.stringify({ action: "subscribe", subscription: subscription.toJSON() })
   });
   const data = await readJson(response);
@@ -77,10 +79,12 @@ export async function sendTestPhonePush({
   getAccessToken = () => authStore.get()?.accessToken || ""
 } = {}) {
   const accessToken = getAccessToken();
-  if (!accessToken) return { ok: false, error: "access_token_required" };
+  const hasCookieSession = authStore.get()?.cookieSession === true;
+  if (!accessToken && !hasCookieSession) return { ok: false, error: "access_token_required" };
   const response = await fetchImpl(endpoint, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    credentials: "include",
+    headers: { "content-type": "application/json", ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) },
     body: JSON.stringify({ action: "test" })
   });
   const data = await readJson(response);
@@ -95,10 +99,12 @@ export async function sendPhoneNotification({
   getAccessToken = () => authStore.get()?.accessToken || ""
 } = {}) {
   const accessToken = getAccessToken();
-  if (!accessToken) return { ok: false, error: "access_token_required" };
+  const hasCookieSession = authStore.get()?.cookieSession === true;
+  if (!accessToken && !hasCookieSession) return { ok: false, error: "access_token_required" };
   const response = await fetchImpl(endpoint, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    credentials: "include",
+    headers: { "content-type": "application/json", ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) },
     body: JSON.stringify({ action: "notify", event })
   });
   const data = await readJson(response);

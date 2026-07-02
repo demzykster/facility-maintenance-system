@@ -23,7 +23,7 @@ VITE_CMMS_STORAGE_API_URL=https://example.com/api
 
 - The frontend uses `src/apiStorageAdapter.js` to talk to the backend.
 - `/api/kv` route skeleton exists, but it is closed by default until server Auth/backend storage are configured.
-- When a production Supabase session exists, the frontend sends its access token as `Authorization: Bearer ...` on storage API requests.
+- When a production session exists, the frontend sends same-site credentials and the backend reads the HttpOnly session cookie. Legacy/direct mode can still send `Authorization: Bearer ...`.
 - API storage does not use the browser memory fallback. If the backend is unavailable, writes fail instead of pretending that production data was saved locally.
 
 ### `upstash` server driver

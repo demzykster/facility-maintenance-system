@@ -30,14 +30,16 @@ export async function reportClientError(event = {}, {
 } = {}) {
   if (typeof fetchImpl !== "function") return false;
   const accessToken = typeof getAccessToken === "function" ? getAccessToken() : "";
-  if (!accessToken) return false;
+  const hasCookieSession = authStore.get()?.cookieSession === true;
+  if (!accessToken && !hasCookieSession) return false;
 
   try {
     const response = await fetchImpl(endpoint, {
       method: "POST",
+      credentials: "include",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${accessToken}`
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {})
       },
       body: JSON.stringify({
         kind: event.kind || "client_error",

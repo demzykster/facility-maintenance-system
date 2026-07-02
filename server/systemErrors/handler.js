@@ -1,18 +1,7 @@
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
-
-const getHeader = (headers = {}, name) => {
-  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
-  if (direct) return Array.isArray(direct) ? direct[0] : direct;
-  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
-  return match ? (Array.isArray(match[1]) ? match[1][0] : match[1]) : "";
-};
-
-const bearerToken = (req) => {
-  const value = String(getHeader(req.headers, "authorization") || "");
-  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
-};
+import { bearerToken } from "../session/authCookie.js";
 
 const text = (value, max = 160) => String(value || "").replace(/[\r\n\t]+/g, " ").trim().slice(0, max);
 
