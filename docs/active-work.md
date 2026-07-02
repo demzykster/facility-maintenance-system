@@ -47,10 +47,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue:
   - Verify first-login password/PIN setup on the deployed site, then continue closure of the remaining owner-confirmed live reports.
-  - Internal `appIssue:` reports were owner-triaged on 2026-07-01. The owner confirmed reports 1, 2, and 5 as current, and explicitly allowed closing/removing the other printed site reports. PR #540 implements fixes for the confirmed set; verify on deployed site before closing those remaining reports in live data.
-  - Continue TO/periodic-maintenance and inspection/checklist redesign as separate concepts. Do not reuse `בקרת כלים` inspection checklists as periodic-maintenance treatment checklists.
+  - Internal `appIssue:` reports were cleared from staging/pilot data on 2026-07-02 at owner request. Current `appIssue` KV count: 0.
+  - TO/periodic-maintenance redesign is paused and removed from the active queue at owner request. Wait for a fresh formulation before implementing it.
   - Keep fleet `סוג כלי` and `דגם` separate. Never merge them into one catalog field.
-- Next exact action: continue the owner-confirmed live-report closure queue and the TO/periodic-maintenance plus inspection/checklist redesign. Do not start the broad monolith split yet.
+- Next exact action: continue first-login deployed-site verification and remaining fleet/catalog stability work. Do not restart the TO/periodic-maintenance redesign until the owner reformulates it. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
@@ -67,7 +67,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - `npm run release:check` must include the active-work ledger gate so stale branch/commit handoffs fail before merge.
 - `npm run staging:gate` includes live staging checks and a data summary, but do not treat staging smoke output as permission to delete owner data.
 - `npm run staging:data:summary` is the safe way to inspect table/key counts without printing secrets or record contents.
-- Last checked staging data summary on 2026-07-01: `app_users=1`, `cmms_kv_records=15`, `file_metadata=0`, `audit_events=1346`; KV prefixes included `appIssue=3`, `config=1`, `czone=1`, `fleet=1`, `itpl=2`, `mtask=1`, `ppeitem=1`, `presence=1`, `pushSubscriptions=1`, `user=3`.
+- Last checked staging data summary on 2026-07-02 after owner-requested issue cleanup: `app_users=6`, `cmms_kv_records=228`, `file_metadata=0`, `audit_events=1584`; KV prefixes included `appIssue=0`, `fleet=126`, `mtask=88`, `user=2`, and no file objects.
 - Public and server Supabase env must point at the same project/key pair.
 - `CMMS_SESSION_SECRET` must be present in Vercel Production for worker/cleaner PIN sessions, because those roles do not receive Supabase refresh tokens.
 - Phone push notifications are PWA/web-push. Users still need a supported browser/PWA install and notification permission.
