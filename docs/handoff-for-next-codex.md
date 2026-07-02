@@ -78,13 +78,23 @@ Current product thread: release stabilization on Vercel + Supabase staging.
 Current facts:
 
 - GitHub `main` is the source of truth.
-- The app is already backed by Supabase/Vercel staging, not only browser-local demo storage.
+- The app is backed by Supabase/Vercel staging, not only browser-local demo storage.
 - Owner-entered staging/pilot data is working data. Protect it.
 - Production starts with real owner-entered data, not migrated demo/local history.
 - The Supabase KV bridge is an intentional v1 compatibility layer, not the final normalized workflow model.
 - Future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not create a separate AI-only write path.
+- Production auth/session work recently moved toward server-side sessions and HttpOnly cookies. Verify current `main` and `docs/active-work.md` before assuming direct browser-to-Supabase Auth behavior.
+- Broad monolith/module split is still not open. Do not start it until data-layer stability and owner checks are complete.
 
-Current next work is tracked in `docs/active-work.md`. As of the 2026-07-01 handoff, the next likely product fix is the open SLA-persistence `appIssue:` report unless the owner reports a newer critical bug.
+Current next work is tracked in `docs/active-work.md`. As of the 2026-07-02 handoff after PR #559:
+
+- `main` should be clean.
+- Open PRs should be none.
+- Active branch should be none.
+- The active queue was intentionally narrowed to deployed first-login/password/PIN verification after the latest auth/session changes.
+- Internal `appIssue:` reports were cleared at owner request and should not be revived from old chat history.
+- TO/periodic-maintenance redesign and old fleet/catalog wording were removed from the active queue. Wait for a fresh owner formulation before restarting them.
+- The `סוג כלי` versus `דגם` separation remains an invariant, not an active standalone task.
 
 When working on fleet maintenance/inspection:
 
@@ -108,3 +118,41 @@ npm run build
 ```
 
 For docs-only PRs, `git diff --check` is enough unless the change alters package/config/code behavior.
+
+## Suggested Prompt For A Fresh Codex Session
+
+Use this prompt when starting a new Codex session without importing the old chat:
+
+```text
+Continue CMMS CDSL.
+
+Source of truth:
+https://github.com/demzykster/facility-maintenance-system
+
+Start with a lightweight sync:
+git fetch origin --prune
+git status --short --branch
+git log --oneline --decorate -5 origin/main
+gh pr list --state open --json number,title,isDraft,headRefName
+
+Then read:
+- docs/active-work.md
+- docs/handoff-for-next-codex.md
+
+Read extra docs only if the task needs them:
+- docs/permissions-model.md for users/roles/access/auth
+- docs/module-growth-architecture.md for fleet maintenance, inspections, new modules, or monolith boundaries
+- docs/release-checklist.md for release-package context
+- docs/settings-site-map.md for settings screen moves
+
+Current rule:
+- GitHub/main wins over chat memory.
+- Do not trust old chat history over active-work.md and GitHub.
+- Do not clear/reseed/overwrite Supabase data unless the owner explicitly asks.
+- Do not revive cleared appIssue reports or old TO/fleet task wording.
+- Do not start broad monolith split yet.
+- Work in small branches and PRs.
+
+Current expected next step:
+Verify deployed first-login/password/PIN behavior after the latest auth/session changes, then continue only from fresh owner-reported issues.
+```
