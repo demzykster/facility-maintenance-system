@@ -7,6 +7,35 @@ import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { sendServerError } from "../httpErrors.js";
 import { ticketStatusAuditEvent } from "../../src/auditEventModel.js";
 
+const KV_KEY_PATTERN = /^[A-Za-z0-9:_@./=+-]+$/;
+const KV_RATE_BUCKETS = new Map();
+const DEFAULT_KV_RATE_LIMIT_MAX = 600;
+const DEFAULT_KV_RATE_LIMIT_WINDOW_MS = 60_000;
+const ALLOWED_KV_PREFIXES = Object.freeze([
+  "user:",
+  "config:v1",
+  "fleet:",
+  "pm:",
+  "insp:",
+  "itpl:",
+  "photo:",
+  "ppe:",
+  "ppeitem:",
+  "ppenorm:",
+  "ppeorder:",
+  "czone:",
+  "cround:",
+  "ccomplaint:",
+  "cabsence:",
+  "ticket:",
+  "ppereq:",
+  "presence:",
+  "mtask:",
+  "mmeet:",
+  "appIssue:",
+  "pushSubscriptions:v1"
+]);
+
 const json = (res, status, body) => {
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
@@ -37,6 +66,58 @@ const getHeader = (headers = {}, name) => {
 const bearerToken = (req) => {
   const value = String(getHeader(req.headers, "authorization") || "");
   return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
+};
+
+const parsePositiveInt = (value, fallback) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : fallback;
+};
+
+const isKnownKvPrefix = (key = "") => ALLOWED_KV_PREFIXES.some((prefix) => String(key || "").startsWith(prefix));
+
+const kvKeyValidationError = (key = "") => {
+  const recordKey = String(key || "");
+  if (!recordKey || recordKey.length > 512) return "key_required";
+  if (!KV_KEY_PATTERN.test(recordKey)) return "key_invalid";
+  if (!isKnownKvPrefix(recordKey)) return "key_prefix_not_allowed";
+  return null;
+};
+
+const kvPrefixValidationError = (prefix = "") => {
+  const recordPrefix = String(prefix || "");
+  if (!recordPrefix) return null;
+  if (recordPrefix.length > 128) return "prefix_invalid";
+  if (!KV_KEY_PATTERN.test(recordPrefix)) return "prefix_invalid";
+  if (!ALLOWED_KV_PREFIXES.some((allowed) => allowed.startsWith(recordPrefix) || recordPrefix.startsWith(allowed))) return "prefix_not_allowed";
+  return null;
+};
+
+const requestIp = (req) => {
+  const forwarded = String(getHeader(req.headers, "x-forwarded-for") || "");
+  return forwarded.split(",")[0].trim() || String(getHeader(req.headers, "x-real-ip") || "") || "unknown";
+};
+
+const rateLimitIdentity = (req, auth) => {
+  if (auth?.user?.id) return `user:${auth.user.id}`;
+  if (auth?.user?.workerNo) return `worker:${auth.user.workerNo}`;
+  const token = bearerToken(req);
+  if (token) return `bearer:${token.slice(0, 16)}`;
+  return `ip:${requestIp(req)}`;
+};
+
+const checkKvRateLimit = (req, auth, env, now = Date.now()) => {
+  if (parseBool(env.CMMS_KV_RATE_LIMIT_DISABLED)) return null;
+  const max = parsePositiveInt(env.CMMS_KV_RATE_LIMIT_MAX, DEFAULT_KV_RATE_LIMIT_MAX);
+  const windowMs = parsePositiveInt(env.CMMS_KV_RATE_LIMIT_WINDOW_MS, DEFAULT_KV_RATE_LIMIT_WINDOW_MS);
+  const identity = rateLimitIdentity(req, auth);
+  const bucket = KV_RATE_BUCKETS.get(identity);
+  if (!bucket || now >= bucket.resetAt) {
+    KV_RATE_BUCKETS.set(identity, { count: 1, resetAt: now + windowMs });
+    return null;
+  }
+  bucket.count += 1;
+  if (bucket.count <= max) return null;
+  return { retryAfterMs: Math.max(bucket.resetAt - now, 1000) };
 };
 
 function isTokenAuthorized(req, env) {
@@ -137,6 +218,11 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
     if (!backendDriver) {
       return json(res, 503, { error: "storage_backend_not_configured" });
     }
+    const rateLimit = checkKvRateLimit(req, auth, env);
+    if (rateLimit) {
+      res.setHeader("retry-after", String(Math.ceil(rateLimit.retryAfterMs / 1000)));
+      return json(res, 429, { error: "rate_limit_exceeded" });
+    }
 
     try {
       const method = String(req.method || "GET").toUpperCase();
@@ -154,8 +240,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
           key: String(record?.key || ""),
           value: record?.value ?? ""
         }));
-        const badRecord = normalizedRecords.find((record) => !record.key || record.key.length > 512);
-        if (badRecord) return json(res, 400, { error: "record_key_invalid" });
+        const badRecord = normalizedRecords.find((record) => kvKeyValidationError(record.key));
+        if (badRecord) return json(res, 400, { error: "record_key_invalid", reason: kvKeyValidationError(badRecord.key) });
         if (auth.user) {
           const permissionError = normalizedRecords.map((record) => kvWritePermissionError(auth.user, record.key)).find(Boolean);
           if (permissionError) return json(res, 403, { error: permissionError });
@@ -227,9 +313,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         if (parseBool(query.includeValues)) {
           const prefixes = parsePrefixes(query.prefixes);
           if (prefixes.length) {
-            if (prefixes.length > 50 || prefixes.some((item) => item.length > 128)) {
-              return json(res, 400, { error: "prefixes_invalid" });
-            }
+            const invalidPrefix = prefixes.find((item) => kvPrefixValidationError(item));
+            if (prefixes.length > 50 || invalidPrefix) return json(res, 400, { error: "prefixes_invalid", reason: invalidPrefix ? kvPrefixValidationError(invalidPrefix) : "too_many_prefixes" });
             const grouped = typeof backendDriver.listValuesMany === "function"
               ? await backendDriver.listValuesMany(prefixes, shared)
               : Object.fromEntries(await Promise.all(prefixes.map(async (item) => [
@@ -256,6 +341,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
             }
             return json(res, 200, { collections });
           }
+          const prefixError = kvPrefixValidationError(prefix);
+          if (prefixError) return json(res, 400, { error: "prefix_invalid", reason: prefixError });
           const records = typeof backendDriver.listValues === "function"
             ? await backendDriver.listValues(prefix, shared)
             : await Promise.all((await backendDriver.list(prefix, shared)).map(async (recordKey) => ({
@@ -274,10 +361,14 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
             .filter((record) => record.key && record.value !== null && record.value !== undefined);
           return json(res, 200, { records: readable });
         }
+        const prefixError = kvPrefixValidationError(prefix);
+        if (prefixError) return json(res, 400, { error: "prefix_invalid", reason: prefixError });
         const keys = await backendDriver.list(prefix, shared);
         return json(res, 200, { keys });
       }
       if (!key) return json(res, 400, { error: "key_required" });
+      const keyError = kvKeyValidationError(key);
+      if (keyError) return json(res, 400, { error: keyError });
 
       if ((method === "PUT" || method === "DELETE") && auth.user) {
         const permissionError = kvWritePermissionError(auth.user, key);
