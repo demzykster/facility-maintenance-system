@@ -27,6 +27,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs: none.
 - Active work in progress: none.
 - Latest completed product work:
+  - Deployed first-login verification passed on 2026-07-02 against `https://facility-maintenance-system.vercel.app` serving `f4f3ea8`: worker PIN setup, repeat worker PIN login, manager password setup, and `/api/session/me` cookie-session restore all worked. The smoke used temporary `user:codex-*` / `cmms-codex-*` records and verified cleanup afterward.
   - PR #555 preloads active cleaning zones for safe public QR/report screens before login and keeps cleaner QR physical-arrival fallback clear when no due round exists.
   - PR #556 routes production login/session calls through CMMS backend HttpOnly cookies instead of direct browser-to-Supabase Auth, while keeping direct-auth rollback via `VITE_CMMS_AUTH_MODE=direct`.
   - PR #554 spread periodic-maintenance due work by daily capacity while keeping inspection/checklists separate from treatment regulations.
@@ -45,10 +46,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue:
-  - Verify first-login password/PIN setup on the deployed site after the latest auth/session changes.
+- Current owner-reported work queue: none. Wait for fresh owner-reported issues before opening new product work.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: verify first-login deployed-site behavior, then continue release stabilization from fresh owner-reported issues only. Do not start the broad monolith split yet.
+- Next exact action: wait for fresh owner-reported release-stabilization issues. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
@@ -65,7 +65,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - `npm run release:check` must include the active-work ledger gate so stale branch/commit handoffs fail before merge.
 - `npm run staging:gate` includes live staging checks and a data summary, but do not treat staging smoke output as permission to delete owner data.
 - `npm run staging:data:summary` is the safe way to inspect table/key counts without printing secrets or record contents.
-- Last checked staging data summary on 2026-07-02 after owner-requested issue cleanup: `app_users=6`, `cmms_kv_records=228`, `file_metadata=0`, `audit_events=1584`; KV prefixes included `appIssue=0`, `fleet=126`, `mtask=88`, `user=2`, and no file objects.
+- Last checked staging data summary on 2026-07-02 after first-login verification cleanup: `app_users=7`, `cmms_kv_records=229`, `file_metadata=0`, `audit_events=1585`; KV prefixes included `fleet=126`, `mtask=88`, `user=3`, `appIssue=0`, and no file objects.
 - Public and server Supabase env must point at the same project/key pair.
 - `CMMS_SESSION_SECRET` must be present in Vercel Production for worker/cleaner PIN sessions, because those roles do not receive Supabase refresh tokens.
 - Phone push notifications are PWA/web-push. Users still need a supported browser/PWA install and notification permission.
