@@ -90,6 +90,65 @@ describe("kv API handler", () => {
     expect(driver.set).toHaveBeenCalledWith("fleet:2", "{\"id\":\"fleet-2\"}", true);
   });
 
+  it("rejects malformed or unknown KV keys before touching the backend", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue("value"),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createKvApiHandler({ driver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const badChars = await call(handler, { query: { key: "ticket:1?debug=true" } });
+    const badPrefix = await call(handler, { method: "PUT", query: { key: "unknown:1" }, body: { value: "x" } });
+
+    expect(badChars.statusCode).toBe(400);
+    expect(badChars.json()).toEqual({ error: "key_invalid" });
+    expect(badPrefix.statusCode).toBe(400);
+    expect(badPrefix.json()).toEqual({ error: "key_prefix_not_allowed" });
+    expect(driver.get).not.toHaveBeenCalled();
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed or unknown KV batch keys before touching the backend", async () => {
+    const driver = {
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createKvApiHandler({ driver, env: { CMMS_KV_ALLOW_UNAUTHENTICATED: "true" } });
+
+    const res = await call(handler, {
+      method: "POST",
+      body: {
+        shared: true,
+        records: [{ key: "unplanned:1", value: "{}" }]
+      }
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "record_key_invalid", reason: "key_prefix_not_allowed" });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("rate limits repeated requests from the same unauthenticated client", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue("value")
+    };
+    const handler = createKvApiHandler({
+      driver,
+      env: {
+        CMMS_KV_ALLOW_UNAUTHENTICATED: "true",
+        CMMS_KV_RATE_LIMIT_MAX: "1",
+        CMMS_KV_RATE_LIMIT_WINDOW_MS: "60000"
+      }
+    });
+
+    const first = await call(handler, { headers: { "x-forwarded-for": "198.51.100.10" }, query: { key: "ticket:1" } });
+    const second = await call(handler, { headers: { "x-forwarded-for": "198.51.100.10" }, query: { key: "ticket:1" } });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(429);
+    expect(second.headers["retry-after"]).toBe("60");
+    expect(second.json()).toEqual({ error: "rate_limit_exceeded" });
+  });
+
   it("uses bulk KV and audit drivers for atomic batches when available", async () => {
     const driver = {
       get: vi.fn().mockResolvedValue(null),
@@ -978,8 +1037,8 @@ describe("kv API handler", () => {
       body: { value: "{\"id\":\"record-1\"}" }
     });
 
-    expect(res.statusCode).toBe(403);
-    expect(res.json()).toEqual({ error: "permission_required:settings:manage" });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "key_prefix_not_allowed" });
     expect(driver.set).not.toHaveBeenCalled();
   });
 });

@@ -337,6 +337,7 @@ describe("productionLoginAdapter", () => {
     }), { remember: true });
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/auth/v1/token?grant_type=refresh_token", expect.objectContaining({
       method: "POST",
+      signal: expect.any(Object),
       body: JSON.stringify({ refresh_token: "refresh-token" })
     }));
   });

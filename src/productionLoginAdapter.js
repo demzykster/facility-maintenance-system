@@ -1,5 +1,6 @@
 const trimSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const DEFAULT_AUTH_REQUEST_TIMEOUT_MS = 10_000;
 
 async function readJson(response) {
   const text = await response.text();
@@ -41,6 +42,21 @@ export function productionAuthFromSupabase(data = {}, now = Date.now()) {
     expiresAt: expiresAt || (expiresIn ? now + expiresIn * 1000 : 0),
     tokenType: data.token_type || "bearer"
   };
+}
+
+async function fetchWithTimeout(fetchImpl, url, options = {}, timeoutMs = DEFAULT_AUTH_REQUEST_TIMEOUT_MS) {
+  const ms = Number(timeoutMs || 0);
+  if (!ms || typeof AbortController === "undefined") return fetchImpl(url, options);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetchImpl(url, { ...options, signal: options.signal || controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("supabase_request_timeout");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function cmmsSessionFromProductionUser(user = {}) {
@@ -120,7 +136,7 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
     sessionFromAccessToken,
     async refreshAuth(refreshToken) {
       if (!refreshToken) throw new Error("refresh_token_required");
-      const response = await fetchImpl(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+      const response = await fetchWithTimeout(fetchImpl, `${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
         method: "POST",
         headers: {
           apikey: supabaseAnonKey,
