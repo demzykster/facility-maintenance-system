@@ -172,18 +172,30 @@ export function distributeNewTasks(assignments = [], { startAt, dailyCapacity = 
   const original = Array.isArray(assignments) ? assignments : [];
   const capacity = Math.max(1, Math.floor(Number(dailyCapacity) || 4));
   const rawStart = Number(startAt) || Date.now();
-  let day = rawStart >= MIN_REAL_DATE_MS ? nextWorkingDay(rawStart) : rawStart;
-  let remaining = capacity;
-  const sorted = [...original].sort((a, b) => (b?.weight === 2 ? 2 : 1) - (a?.weight === 2 ? 2 : 1));
+  const firstDay = rawStart >= MIN_REAL_DATE_MS ? nextWorkingDay(rawStart) : rawStart;
+  const nextDay = (day) => rawStart >= MIN_REAL_DATE_MS ? nextWorkingDay(day + DAY_MS) : day + DAY_MS;
+  const sorted = original
+    .map((assignment, index) => ({ assignment, index, weight: assignment?.weight === 2 ? 2 : 1 }))
+    .sort((a, b) => b.weight - a.weight || a.index - b.index);
+  const days = [];
+  const addDay = () => {
+    const date = days.length ? nextDay(days[days.length - 1].date) : firstDay;
+    const day = { date, remaining: capacity, hasHeavy: false };
+    days.push(day);
+    return day;
+  };
 
-  sorted.forEach((assignment) => {
-    const weight = assignment?.weight === 2 ? 2 : 1;
-    if (weight > remaining && remaining < capacity) {
-      day = nextWorkingDay(day + DAY_MS);
-      remaining = capacity;
+  sorted.forEach(({ assignment, weight }) => {
+    let target = null;
+    if (weight === 2) {
+      target = days.find((day) => !day.hasHeavy && day.remaining >= weight);
+    } else {
+      target = days.find((day) => day.remaining >= weight);
     }
-    if (assignment?.task) assignment.task.nextDue = day;
-    remaining -= weight;
+    if (!target) target = addDay();
+    if (weight === 2) target.hasHeavy = true;
+    if (assignment?.task) assignment.task.nextDue = target.date;
+    target.remaining = Math.max(0, target.remaining - Math.min(weight, capacity));
   });
 
   return original;
