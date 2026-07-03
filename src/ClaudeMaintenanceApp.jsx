@@ -1346,10 +1346,11 @@ export default function App() {
   useEffect(() => {
     store._onFail = (details = {}) => {
       const errorId = `client-${Date.now().toString(36)}`;
-      if (!quietSharedFailureKeysRef.current.has(details.key)) {
+      const current = sessionRef.current || {};
+      const canToastStorageFailure = !!current.id && !quietSharedFailureKeysRef.current.has(details.key);
+      if (canToastStorageFailure) {
         setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
       }
-      const current = sessionRef.current || {};
       reportClientError({
         kind: "storage_save_failed",
         message: "Shared storage operation failed",
@@ -2251,7 +2252,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
   };
   return (<div className="pub-wrap"><div className="pub-card">
     <button className="icon-btn pub-x" aria-label={t("common.close")} onClick={onClose}><X size={20} /></button>
-    <LanguagePicker value={language} onChange={setLanguage} />
+    <LanguagePicker value={language} onChange={setLanguage} compact />
     {done ? <div className="pub-done"><CheckCircle2 size={44} color="#16A34A" /><div className="pub-done-t">{t("public.received")}</div><div className="pub-done-s">{t("public.receivedSub")}</div><button className="btn-primary full" onClick={onClose}>{t("common.close")}</button></div>
       : !zone ? <>
         <div className="pub-logo"><Sparkles size={24} /></div>
@@ -3088,7 +3089,7 @@ function ManagerFleet(p) {
       : <>
       <ProblemUnitsPanel fleet={scoped} tickets={tickets} insp={insp} config={config} onOpen={(id) => setOpenId(id)} />
       <SectionTitle><Truck size={15} /> כלי השינוע של מחלקותיי ({scoped.length})</SectionTitle>
-      {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable"><div className="ftable-head"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
+      {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
     </>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
     {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
@@ -9251,6 +9252,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .more-menu button:hover{background:var(--surface-2);}
 .ftable-head{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
 .ftable-row{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;cursor:pointer;}
+.manager-fleet-row{grid-template-columns:minmax(72px,0.8fr) minmax(120px,1.4fr) minmax(82px,1fr) minmax(84px,1.1fr);}
 .ftable-row:hover{background:var(--surface-2);}
 .ftable-row.selected{background:rgba(249,115,22,0.08);}
 .ft-select{display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -9424,6 +9426,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .pub-entry:hover{border-color:#0EA5E9;color:#0EA5E9;}
 .pub-wrap{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;}
 .pub-card{position:relative;width:100%;max-width:420px;background:var(--surface);border-radius:18px;padding:22px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.pub-card .language-picker{width:max-content;max-width:calc(100% - 48px);margin:0 0 16px;margin-inline-end:48px;}
+.pub-card .language-picker.compact select{background:var(--surface);color:var(--ink);border-color:var(--line);}
 .pub-x{position:absolute;inset-inline-end:12px;top:12px;}
 .pub-logo{width:52px;height:52px;border-radius:14px;background:#0EA5E91a;color:#0EA5E9;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
 .pub-title{font-size:20px;font-weight:800;}
@@ -9849,6 +9853,13 @@ button.notif-perm:hover{background:#D1FAE5;}
   .wk-tabs button{min-width:0;min-height:64px;flex-direction:column;gap:4px;padding:8px 4px;font-size:12px;line-height:1.12;text-align:center;white-space:normal;overflow-wrap:anywhere;}
   .wk-tabs button svg{width:15px;height:15px;flex-shrink:0;}
   .worker-body{padding:16px 12px 40px;}
+  .manager-fleet-table .ftable-head{display:none;}
+  .manager-fleet-table .ftable-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"code drivers" "model supplier";gap:5px 12px;align-items:start;padding:12px 14px;text-align:start;}
+  .manager-fleet-table .ft-code{grid-area:code;min-width:0;direction:ltr;unicode-bidi:isolate;text-align:start;font-size:13px;line-height:1.25;overflow-wrap:anywhere;}
+  .manager-fleet-table .ft-model{grid-area:model;min-width:0;display:block;line-height:1.3;}
+  .manager-fleet-table .ft-model b{display:block;font-size:13px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;}
+  .manager-fleet-table .ft-sup{grid-area:supplier;max-width:96px;text-align:end;white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.3;}
+  .manager-fleet-table .ft-doc{grid-area:drivers;justify-content:flex-end;white-space:nowrap;font-size:12px;line-height:1.3;}
 }
 @media(max-width:390px){
   .wk-tabs{gap:3px;padding-inline:6px;}
