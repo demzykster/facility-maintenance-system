@@ -86,12 +86,13 @@ Current facts:
 - Production auth/session work recently moved toward server-side sessions and HttpOnly cookies. Verify current `main` and `docs/active-work.md` before assuming direct browser-to-Supabase Auth behavior.
 - Broad monolith/module split is still not open. Do not start it until data-layer stability and owner checks are complete.
 
-Current next work is tracked in `docs/active-work.md`. As of the 2026-07-02 handoff after PR #559:
+Current next work is tracked in `docs/active-work.md`. As of the 2026-07-03 reset after PRs #573, #575, #563, and #562:
 
 - `main` should be clean.
 - Open PRs should be none.
 - Active branch should be none.
-- The active queue was intentionally narrowed to deployed first-login/password/PIN verification after the latest auth/session changes.
+- There is no active owner-reported work queue. Wait for fresh owner-reported release-stabilization issues before opening product work.
+- Deployed first-login/password/PIN behavior was previously verified after the auth/session changes; do not reopen that verification unless the owner reports a fresh auth issue.
 - Internal `appIssue:` reports were cleared at owner request and should not be revived from old chat history.
 - TO/periodic-maintenance redesign and old fleet/catalog wording were removed from the active queue. Wait for a fresh owner formulation before restarting them.
 - The `סוג כלי` versus `דגם` separation remains an invariant, not an active standalone task.
@@ -154,5 +155,5 @@ Current rule:
 - Work in small branches and PRs.
 
 Current expected next step:
-Verify deployed first-login/password/PIN behavior after the latest auth/session changes, then continue only from fresh owner-reported issues.
+Wait for fresh owner-reported release-stabilization issues, then work in a small branch/PR from current main.
 ```
