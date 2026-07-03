@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/pwa-auto-refresh-stale-build`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
-- Open PRs at last check: #577 PWA stale build auto-refresh.
-- Active work in progress: auto-refresh stale installed PWA builds when deployed version changes.
+- Open PRs at last check: none.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #577 added one-shot auto-refresh for stale standalone/PWA builds when `cmms-version.json` reports a newer deployed commit.
   - PR #562 removed the external Google Fonts import and kept the app on the configured system-safe font fallback stack.
   - PR #575 added automatic sanitized screenshots to internal app issue reports and introduced `npm run pr:preflight`.
   - PR #563 removed the unused `src/App.jsx` shell.
@@ -54,9 +55,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue: fix installed PWA stale-build behavior reported by owner, then continue only from fresh owner-reported issues.
+- Current owner-reported work queue: none. Continue only from fresh owner-reported issues.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: review/merge `codex/pwa-auto-refresh-stale-build`, then reset this ledger. Do not start the broad monolith split yet.
+- Next exact action: wait for fresh owner-reported release-stabilization issues. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
