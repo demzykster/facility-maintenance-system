@@ -212,13 +212,40 @@ Current AI-related pieces include:
 
 This is useful, but not a unified production AI operation layer.
 
+There is also a concrete implementation issue in the client AI path:
+
+- `callClaude()` in `src/ClaudeMaintenanceApp.jsx` calls `https://api.anthropic.com/v1/messages` directly from the browser;
+- headers include only `Content-Type`;
+- there is no `x-api-key` or provider-version header;
+- when `VITE_CMMS_AI_MODE=client` enables this path, requests are expected to fail with provider authentication errors.
+
+This should be treated as broken/experimental wiring, not as a production-ready AI feature.
+
 Recommendation:
 
 - keep AI as assistant/suggester/summarizer;
 - do not allow AI-only data writes;
+- do not enable the current browser Anthropic path as-is;
 - accepted AI suggestions should go through normal product operations, permission checks, validation, and audit.
 
-## 9. Backup And Storage Are Better Than Some Docs Suggest
+## 9. Built-In Demo Logins Remain In Source
+
+`src/ClaudeMaintenanceApp.jsx` still contains `BUILTIN_LOGINS` with demo credentials, including real-looking company email addresses and simple passwords/PINs.
+
+The code comment says production mode disables this list through seed policy, and the production seed policy is intentional. However, these credentials still live in source code and can confuse reviewers or future sessions.
+
+Risk:
+
+- source contains real-looking credentials even if production disables them;
+- future work may accidentally treat them as valid production users or support data;
+- security review noise remains.
+
+Recommendation:
+
+- before production hardening, replace real-looking emails with unmistakable demo/local identities or move demo identities into a safer demo-only fixture;
+- keep production mode disabling built-in identities.
+
+## 10. Backup And Storage Are Better Than Some Docs Suggest
 
 `src/backupModel.js` builds backups from `DATA_COLLECTIONS`.
 
@@ -234,7 +261,7 @@ Recommendation:
 
 - update stale documentation rather than re-solving already fixed backup issues.
 
-## 10. Items To Close Before Large Work
+## 11. Items To Close Before Large Work
 
 Recommended cleanup list before starting major new functionality:
 
@@ -243,7 +270,9 @@ Recommended cleanup list before starting major new functionality:
 3. Remove or freeze legacy `שאלונים` / `inspection_templates`.
 4. Decide how to converge `config.zones` and `czone:*`.
 5. Decide whether `מטלות` is formally the shared action layer; code already suggests yes.
-6. Avoid a broad monolith split; extract only small tested model logic when touched.
+6. Mark or fix the current broken client AI path before enabling AI.
+7. Replace real-looking built-in demo login emails/passwords before production hardening.
+8. Avoid a broad monolith split; extract only small tested model logic when touched.
 
 ## Summary
 
@@ -254,6 +283,8 @@ The current app is working and green by tests/build. The immediate risk is not a
 - legacy inspection templates;
 - two zone models;
 - tasks behaving as a shared action layer while still named/permissioned as maintenance;
+- broken/experimental browser AI wiring;
+- built-in demo credentials in source;
 - one very large UI monolith.
 
 These should be cleaned or documented before building large new workflows.
