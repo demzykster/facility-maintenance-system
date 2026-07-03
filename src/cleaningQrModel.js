@@ -1,7 +1,15 @@
 export const CLEANING_QR_PARAM = "czone";
+export const CLEANING_QR_SCAN_PARAM = "z";
+export const CLEANING_QR_PREFIX = "czone:";
 
 export function normalizeScannedCleaningZoneId(value) {
-  return String(value || "").trim();
+  const text = String(value || "").trim();
+  return text.startsWith(CLEANING_QR_PREFIX) ? text.slice(CLEANING_QR_PREFIX.length).trim() : text;
+}
+
+export function cleaningQrToken(zoneId) {
+  const cleanZoneId = normalizeScannedCleaningZoneId(zoneId);
+  return cleanZoneId ? `${CLEANING_QR_PREFIX}${cleanZoneId}` : "";
 }
 
 export function appModeRequiresCleaningQr(appMode) {
@@ -15,17 +23,17 @@ export function cleaningQrUrl({ origin = "", pathname = "/", zoneId }) {
     const url = new URL(pathname || "/", origin || "https://cmms.local");
     url.search = "";
     url.hash = "";
-    url.searchParams.set(CLEANING_QR_PARAM, cleanZoneId);
+    url.searchParams.set(CLEANING_QR_SCAN_PARAM, cleaningQrToken(cleanZoneId));
     return url.toString();
   } catch (e) {
-    return `?${CLEANING_QR_PARAM}=${encodeURIComponent(cleanZoneId)}`;
+    return `?${CLEANING_QR_SCAN_PARAM}=${encodeURIComponent(cleaningQrToken(cleanZoneId))}`;
   }
 }
 
 export function cleaningQrUrlFromWindow(zoneId, win = globalThis.window) {
   const cleanZoneId = normalizeScannedCleaningZoneId(zoneId);
   if (!cleanZoneId) return "";
-  if (!win?.location) return `?${CLEANING_QR_PARAM}=${encodeURIComponent(cleanZoneId)}`;
+  if (!win?.location) return `?${CLEANING_QR_SCAN_PARAM}=${encodeURIComponent(cleaningQrToken(cleanZoneId))}`;
   return cleaningQrUrl({
     origin: win.location.origin,
     pathname: win.location.pathname || "/",
@@ -35,7 +43,8 @@ export function cleaningQrUrlFromWindow(zoneId, win = globalThis.window) {
 
 export function scannedCleaningZoneIdFromSearch(search = "") {
   try {
-    return normalizeScannedCleaningZoneId(new URLSearchParams(search || "").get(CLEANING_QR_PARAM));
+    const params = new URLSearchParams(search || "");
+    return normalizeScannedCleaningZoneId(params.get(CLEANING_QR_SCAN_PARAM) || params.get(CLEANING_QR_PARAM));
   } catch (e) {
     return "";
   }
@@ -46,12 +55,15 @@ export function extractCzoneFromRaw(raw = "") {
   if (!text) return "";
   try {
     const url = new URL(text);
-    return normalizeScannedCleaningZoneId(url.searchParams.get(CLEANING_QR_PARAM));
+    const fromUrl = normalizeScannedCleaningZoneId(url.searchParams.get(CLEANING_QR_SCAN_PARAM) || url.searchParams.get(CLEANING_QR_PARAM));
+    if (fromUrl) return fromUrl;
+    if (url.protocol.toLowerCase() === CLEANING_QR_PREFIX) return normalizeScannedCleaningZoneId(url.pathname);
   } catch (e) {
     const query = text.includes("?") ? text.slice(text.indexOf("?")) : text;
-    const fromParams = normalizeScannedCleaningZoneId(new URLSearchParams(query).get(CLEANING_QR_PARAM));
+    const params = new URLSearchParams(query);
+    const fromParams = normalizeScannedCleaningZoneId(params.get(CLEANING_QR_SCAN_PARAM) || params.get(CLEANING_QR_PARAM));
     if (fromParams) return fromParams;
-    const match = text.match(/(?:^|[?&#\s])czone[=:]([^&#\s]+)/i);
+    const match = text.match(/(?:^|[?&#\s])(?:z=)?czone[=:]([^&#\s]+)/i);
     return normalizeScannedCleaningZoneId(match?.[1]);
   }
 }

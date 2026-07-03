@@ -10,6 +10,7 @@ import {
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import QRCode from "qrcode";
+import jsQR from "jsqr";
 import packageInfo from "../package.json";
 import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -25,7 +26,6 @@ import { findTaskImportMatch } from "./taskImportModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { DEFAULT_LOCAL_NOTIFICATION_PREFS, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { isRateLimited } from "./localRateLimitModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
@@ -45,7 +45,7 @@ import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
-import { cleaningQrAccess, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
+import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, normalizeVersionManifest, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
@@ -369,7 +369,7 @@ const DEFAULT_CONFIG = {
   mgrWidgets: { tickets: true, pm: true, sla: true },
   notify: { ...DEFAULT_NOTIFY_CONFIG },
   defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
-  vehicleTypes: [], modelSupplier: {}, modelType: {}, maintenanceRules: [], pmDailyCapacity: 4, defaultInspIntervalMonths: 2, shifts: [], workShifts: [],
+  vehicleTypes: [], modelSupplier: {}, modelType: {}, maintenanceRules: [], pmDailyCapacity: 4, defaultInspIntervalMonths: 2, cleaningReminderMins: 30, shifts: [], workShifts: [],
 };
 
 /* ---------- helpers ---------- */
@@ -381,6 +381,7 @@ const cellSafe = (v) => (typeof v === "string" && /^[=+\-@\t\r\n]/.test(v)) ? "'
 const rowsSafe = (rows) => (Array.isArray(rows) ? rows : []).map((r) => (r && typeof r === "object" && !Array.isArray(r)) ? Object.fromEntries(Object.entries(r).map(([k, val]) => [k, cellSafe(val)])) : r);
 const clampPmDailyCapacity = (value) => Math.max(1, Math.min(20, Number(value) || 4));
 const clampInspIntervalMonths = (value) => Math.max(1, Math.min(120, Number(value) || 2));
+const clampCleaningReminderMins = (value) => Math.max(5, Math.min(120, Number(value) || 30));
 // Надёжная выгрузка: пробуем несколько методов, т.к. песочница артефакта часто блокирует download/popup
 const downloadBlob = (blob, filename) => {
   try {
@@ -1231,8 +1232,9 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
   };
   if (session.role === "cleaner") {
     const nowTs = Date.now();
-    (zones || []).filter((z) => z.active !== false && z.cleanerId === session.id).forEach((z) => zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => {
+    (zones || []).filter((z) => z.active !== false && z.cleanerId === session.id).forEach((z) => zoneTodayStatuses(z, rounds, nowTs, cfg).forEach(({ win, status, slotStart }) => {
       if ((status === "due" || status === "overdue") && !isAbsentOn(session.id, absences)) ev.push({ key: `cls-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) - (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: status === "overdue" ? "סבב ניקיון באיחור" : "סבב ניקיון לביצוע כעת", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}` });
+      if (status === "upcoming" && !isAbsentOn(session.id, absences)) ev.push({ key: `upcoming-${z.id}-${win.id}-${todayKey()}`, at: slotStart - clampCleaningReminderMins(cfg?.cleaningReminderMins ?? 30) * 60000, kind: "cleaning", go: "cleaning", title: "סבב מתחיל בקרוב", body: `${z.name} · בעוד ${Math.max(1, Math.round((slotStart - nowTs) / 60000))} דקות` });
     }));
     (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && c.reportedById !== session.id && (zones || []).some((z) => z.id === c.zoneId && z.cleanerId === session.id)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "דווחה תקלה באזור שלך" : "דווח לכלוך באזור שלך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}${c.text ? " · " + c.text : ""}` }));
     return ev.sort((a, b) => b.at - a.at);
@@ -1264,7 +1266,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
       if (openOrders.length) ev.push({ key: "ppe-orders-admin", at: Math.max(...openOrders.map((o) => o.sentAt || o.createdAt || 0)), kind: "ppe", go: "ppe", ppeSub: "log", title: "הזמנות ביגוד ממתינות לקליטה", body: `${countLabel(openOrders.length, "הזמנת רכש פתוחה", "הזמנות רכש פתוחות")}` }); }
     ev.push(...buildPpeApprovedEvents(ppeReqs));
     shiftEvents("team");
-    { const nowTs = Date.now(); (zones || []).filter((z) => z.active !== false).forEach((z) => { const absent = isAbsentOn(z.cleanerId, absences); zoneTodayStatuses(z, rounds, nowTs).forEach(({ win, status }) => { if (status === "missed") ev.push({ key: `clmiss-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) + (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: absent ? "סבב ניקיון — נדרש כיסוי (העובד בחופשה)" : "סבב ניקיון פוספס", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}${z.cleanerName ? " · " + z.cleanerName : ""}` }); }); }); }
+    { const nowTs = Date.now(); (zones || []).filter((z) => z.active !== false).forEach((z) => { const absent = isAbsentOn(z.cleanerId, absences); zoneTodayStatuses(z, rounds, nowTs, cfg).forEach(({ win, status }) => { if (status === "missed") ev.push({ key: `clmiss-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) + (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: absent ? "סבב ניקיון — נדרש כיסוי (העובד בחופשה)" : "סבב ניקיון פוספס", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}${z.cleanerName ? " · " + z.cleanerName : ""}` }); }); }); }
     (complaints || []).filter((c) => c.status === "pending").forEach((c) => ev.push({ key: "cmpp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: "דיווח ממתין לאישורך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""} · ${c.reportedByRole === "anonymous" ? "אנונימי" : c.reportedByName}` }));
     (complaints || []).filter((c) => c.status === "open").forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.escalatedTo === "admin" ? (c.escalatedAt || c.at) : c.at, kind: "cleaning", go: "cleaning", title: c.escalatedTo === "admin" ? "דיווח הועבר אליך לטיפול" : (c.kind === "broken" ? "דיווח תקלה באזור ניקיון" : "דיווח לכלוך באזור ניקיון"), body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""} · ${c.escalatedTo === "admin" ? "מ-" + (c.escalatedBy || "עובד ניקיון") : "מ-" + c.reportedByName}` }));
   } else if (session.role === "tech") {
@@ -1283,7 +1285,8 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); if (!f || !fleetDepts(f).some((d) => userDepts(session).includes(d))) return; const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "dept", fleetId: f.id, title: "כלי מחלקתך לטיפול", body: `${unitLabel(f, cfg)} · ${d < 0 ? "באיחור — יש להוציא" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
     if (session.role === "user") fleetForSession(session, fleet).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "dept", title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
     if (session.role === "user") (cfg.driverEvents || []).filter((e) => (e.type === "approved" || e.type === "rejected") && e.reqByUid === session.id).slice(0, 20).forEach((e) => ev.push({ key: "drvout-" + e.id, at: e.at, kind: "driver", go: "dept", fleetId: e.unitId || null, title: e.type === "approved" ? "בקשת הנהג שלך אושרה" : "בקשת הנהג שלך נדחתה", body: `${e.sub === "move" ? "העברת" : "הוספת"} ${e.driverName} · ${e.unitCode}${e.toUnitCode ? ` → ${e.toUnitCode}` : ""}` }));
-    if (session.role === "user") { const mz = session.mgrZones || []; (complaints || []).filter((c) => c.status === "open" && mz.includes(c.zoneId)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "תקלה באזור של מחלקתך" : "לכלוך באזור של מחלקתך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}` })); }
+    if (session.role === "user") { const mz = session.mgrZones || []; (complaints || []).filter((c) => c.status === "open" && mz.includes(c.zoneId)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "תקלה באזור של מחלקתך" : "לכלוך באזור של מחלקתך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}` }));
+      (rounds || []).filter((r) => r.zoneId && Date.now() - r.at < 2 * 60 * 60 * 1000 && r.byUid !== session.id).forEach((r) => { const zone = (zones || []).find((z) => z.id === r.zoneId); if (!zone || !mz.includes(zone.id)) return; ev.push({ key: "zone-cleaned-" + r.id, at: r.at, kind: "cleaning", go: "cleaning", title: "האזור שלך נוקה", body: `${zone.name} · ${r.byName || "עובד ניקיון"}` }); }); }
     shiftEvents("dept");
   }
   return ev.sort((a, b) => b.at - a.at);
@@ -2228,7 +2231,16 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
     if (!prob) return setErr("נא לבחור סוג בעיה");
     if (!photo) return setErr("חובה לצרף תמונה — הדיווח לא יישלח בלעדיה");
     setBusy(true);
-    try { const last = await store.get("anonrl"); if (isRateLimited(last)) { setBusy(false); return setErr("דיווח נשלח לאחרונה ממכשיר זה. נסו שוב בעוד דקה."); } await store.set("anonrl", String(Date.now())); } catch (e) {}
+    try {
+      const key = `anonrl_${zone.id}`;
+      const last = Number(await store.get(key, false) || 0);
+      const waitMs = 5 * 60 * 1000 - (Date.now() - last);
+      if (waitMs > 0) {
+        setBusy(false);
+        return setErr(`דיווח כבר נשלח עבור אזור זה. ניתן לדווח שוב בעוד ${Math.max(1, Math.ceil(waitMs / 60000))} דקות.`);
+      }
+      await store.set(key, String(Date.now()), false);
+    } catch (e) {}
     try {
       await onSubmit({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind: prob.kind, photo, text: text.trim() || prob.label, reportedById: "", reportedByName: "דיווח אנונימי", reportedByRole: "anonymous" });
     } catch (e) {
@@ -2260,6 +2272,17 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
         <div className="pub-foot">{t("public.approvalFoot")}</div>
       </>}
   </div></div>);
+}
+
+function ScanPublicLanding({ zone, invalid, onReport, onLogin, language = DEFAULT_LANGUAGE }) {
+  const t = (key, vars) => uiText(language, key, vars);
+  return <div className="scan-public">
+    <div className="pub-logo"><Camera size={24} /></div>
+    <div className="pub-title">{invalid ? "QR לא מזוהה" : (zone?.name || "סריקת QR")}</div>
+    <div className="pub-sub">{invalid ? "QR לא מזוהה — פנו למנהל" : (zoneLoc(zone) || "בחרו פעולה להמשך")}</div>
+    {!invalid && <button className="btn-primary full" onClick={onReport}><AlertTriangle size={15} /> דיווח על בעיה</button>}
+    <button className="btn-ghost full" style={{ marginTop: 8 }} onClick={onLogin}>כניסה לאפליקציה</button>
+  </div>;
 }
 
 function InstallAppPrompt({ language = DEFAULT_LANGUAGE }) {
@@ -2320,11 +2343,13 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE }) {
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const t = (key, vars) => uiText(language, key, vars);
   const [identifier, setIdentifier] = useState(""), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
+  const [skipScanLanding, setSkipScanLanding] = useState(false);
   const [initialSetup, setInitialSetup] = useState(null);
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const active = users.filter((u) => u.active !== false);
   const productionLogin = seedPolicy.requiresServerBootstrapAdmin;
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
+  const scannedLandingZone = useMemo(() => findScannedCleaningZone(zones || [], scannedZoneId), [zones, scannedZoneId]);
   const productionConfigured = productionLoginReady(productionLoginConfig);
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
@@ -2550,7 +2575,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
         <LanguagePicker value={language} onChange={setLanguage} />
-        {passwordChange ? (<>
+        {scannedZoneId && !skipScanLanding && !passwordChange && !initialSetup && !resolved ? <ScanPublicLanding zone={scannedLandingZone} invalid={!scannedLandingZone} language={language} onReport={() => setPub(true)} onLogin={() => setSkipScanLanding(true)} /> : passwordChange ? (<>
           <div className="login-q">{t("login.firstPassword")}</div>
           <div className="hint" style={{ marginBottom: 10 }}>נדרש להגדיר סיסמה חדשה לפני כניסה למערכת.</div>
           <label className="field"><span>{t("login.newPassword")}</span><input value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" placeholder="לפחות 6 תווים" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} autoFocus /><div className="hint">לפחות 6 תווים. מומלץ לשלב אות גדולה או סימן, אבל אין דרישת מורכבות קשיחה.</div></label>
@@ -2673,7 +2698,7 @@ function UserApp(p) {
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
-              : deptTab === "cleaning" ? <ManagerCleaning session={session} zones={zones} rounds={rounds} complaints={complaints} fileComplaint={fileComplaint} resolveComplaint={resolveComplaint} language={p.language} />
+              : deptTab === "cleaning" ? <ManagerCleaning session={session} zones={zones} rounds={rounds} complaints={complaints} fileComplaint={fileComplaint} resolveComplaint={resolveComplaint} config={config} language={p.language} />
               : deptTab === "team" ? <>
                 <div className="row-between"><SectionTitle><Users size={15} /> עובדי המחלקה{session.dept ? ` · ${session.dept}` : ""}</SectionTitle><button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> הוסף עובד</button></div>
                 <div className="note">העובדים מדווחים תקלות שמגיעות אליך לבדיקה. הם נכנסים עם מספר עובד + קוד שתגדירו כאן.</div>
@@ -3086,8 +3111,9 @@ const activeDaysLabel = (z) => { const d = zoneActiveDays(z); if (d.length === 7
 const windowItems = (zone, win) => { const cl = zone.checklist || []; if (!win || !Array.isArray(win.items)) return cl; const set = new Set(win.items); return cl.filter((c) => set.has(c.id)); };
 const parseHM = (hm) => { const [h, m] = String(hm || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
 const windowAbs = (win, ts) => dayStart(ts) + parseHM(win.time) * 60000;
-const zoneTodayStatuses = (zone, rounds, now) => {
+const zoneTodayStatuses = (zone, rounds, now, cfg = {}) => {
   if (!isCleaningDay(zone, now)) return []; // לא יום ניקיון של האזור — אין חלונות / אין "פוספס"
+  const reminderMs = clampCleaningReminderMins(cfg?.cleaningReminderMins ?? 30) * 60000;
   const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
   const ds = dayStart(now), eod = ds + 86400000;
   return ws.map((win, i) => {
@@ -3096,14 +3122,14 @@ const zoneTodayStatuses = (zone, rounds, now) => {
     const round = (rounds || []).find((r) => r.zoneId === zone.id && r.at >= ds && r.at < eod && (r.winId ? r.winId === win.id : (r.at >= slotStart && r.at < slotEnd)));
     let status;
     if (round) status = "done";
-    else if (now < slotStart) status = "pending";
+    else if (now < slotStart) status = slotStart - now <= reminderMs ? "upcoming" : "pending";
     else if (now <= target + tol) status = "due";
     else if (now < slotEnd) status = "overdue";
     else status = "missed";
     return { win, status, target, slotStart, slotEnd, round };
   });
 };
-const WIN_META = { done: { label: "בוצע", color: "#16A34A", bg: "#DCFCE7" }, due: { label: "כעת", color: "#B45309", bg: "#FEF3C7" }, overdue: { label: "באיחור", color: "#EA580C", bg: "#FFEDD5" }, missed: { label: "פוספס", color: "#DC2626", bg: "#FEE2E2" }, pending: { label: "מתוכנן", color: "#64748B", bg: "var(--surface-2)" } };
+const WIN_META = { done: { label: "בוצע", color: "#16A34A", bg: "#DCFCE7" }, due: { label: "כעת", color: "#B45309", bg: "#FEF3C7" }, overdue: { label: "באיחור", color: "#EA580C", bg: "#FFEDD5" }, missed: { label: "פוספס", color: "#DC2626", bg: "#FEE2E2" }, upcoming: { label: "מתקרב", color: "#7C3AED", bg: "#EDE9FE" }, pending: { label: "מתוכנן", color: "#64748B", bg: "var(--surface-2)" } };
 const dayCompliance = (zone, rounds, dayTs, now) => {
   if (!isCleaningDay(zone, dayTs)) return []; // יום ללא ניקיון מתוכנן — לא נספר בעמידה ביעדים
   const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
@@ -3339,7 +3365,7 @@ function CleaningAdmin(p) {
   };
   const today = useMemo(() => {
     const now = Date.now();
-    const rows = list.filter((z) => z.active !== false).map((z) => ({ z, sts: zoneTodayStatuses(z, rounds, now) }));
+    const rows = list.filter((z) => z.active !== false).map((z) => ({ z, sts: zoneTodayStatuses(z, rounds, now, p.config) }));
     const tot = rows.reduce((n, r) => n + r.sts.length, 0);
     const done = rows.reduce((n, r) => n + r.sts.filter((s) => s.status === "done").length, 0);
     const action = rows.filter((r) => r.sts.some((s) => s.status === "missed" || s.status === "due" || s.status === "overdue"));
@@ -3394,8 +3420,9 @@ function CleaningAdmin(p) {
   </>);
 }
 
-function RoundForm({ zone, win, session, onCancel, onSave }) {
+function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, config }) {
   const [done, setDone] = useState({}), [issues, setIssues] = useState({}), [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  const [scanOk, setScanOk] = useState(!appModeRequiresCleaningQr(APP_MODE) || !!scanToken), [showScanner, setShowScanner] = useState(false), [showManual, setShowManual] = useState(false), [manualReason, setManualReason] = useState(""), [manualEntry, setManualEntry] = useState(null);
   const fileRef = useRef(null); const photoTarget = useRef(null);
   const resize = (file, cb) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); cb(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const cl = windowItems(zone, win);
@@ -3405,6 +3432,21 @@ function RoundForm({ zone, win, session, onCancel, onSave }) {
   const setIssueReason = (id, v) => setIssues((s) => ({ ...s, [id]: { ...s[id], reason: v } }));
   const setIssueKind = (id, k) => setIssues((s) => ({ ...s, [id]: { ...s[id], kind: k } }));
   const grabIssuePhoto = (file) => { const id = photoTarget.current; if (!id) return; resize(file, (d) => setIssues((s) => ({ ...s, [id]: { ...s[id], photo: d } }))); };
+  const acceptScan = (raw) => {
+    const scanned = extractCzoneFromRaw(raw);
+    if (scanned !== zone.id) return setErr(scanned ? "ה-QR שייך לאזור אחר" : "לא נמצא קוד אזור בסריקה");
+    setErr("");
+    setShowScanner(false);
+    setScanOk(true);
+  };
+  const submitManualEntry = () => {
+    const reason = manualReason.trim();
+    if (!reason) return setErr("יש לציין סיבה");
+    setManualEntry({ reason, at: Date.now() });
+    setScanOk(true);
+    setShowManual(false);
+    setErr("");
+  };
   const submit = async () => {
     if (busy) return;
     const issArr = Object.entries(issues).map(([itemId, v]) => ({ itemId, label: (cl.find((c) => c.id === itemId) || {}).label || "", reason: (v.reason || "").trim(), photo: v.photo || null, kind: v.kind === "broken" ? "broken" : "dirty" }));
@@ -3414,7 +3456,7 @@ function RoundForm({ zone, win, session, onCancel, onSave }) {
     setErr("");
     setBusy(true);
     try {
-      const ok = await onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr });
+      const ok = await onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr, manualEntry: !!manualEntry, manualEntryReason: manualEntry?.reason || "" });
       if (ok === false) {
         setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
         setBusy(false);
@@ -3424,6 +3466,13 @@ function RoundForm({ zone, win, session, onCancel, onSave }) {
       setBusy(false);
     }
   };
+  if (!scanOk) return <div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">נדרשת סריקת QR</div></div>
+    <div className="body">
+      <div className="scan-required"><div>יש לסרוק את ה-QR של האזור לפני ביצוע הסבב</div><button className="btn-primary full" onClick={() => setShowScanner(true)}><Camera size={16} /> סרוק QR</button><button className="btn-ghost full" onClick={() => setShowManual(true)}>לא מצליח לסרוק</button></div>
+      {showManual && <div className="manual-entry"><div>תאר את הבעיה עם הסריקה (שדה חובה)</div><textarea rows={3} value={manualReason} onChange={(e) => setManualReason(e.target.value)} /><button className="btn-primary full" onClick={submitManualEntry}>המשך ללא סריקה</button></div>}
+      {err && <div className="err">{err}</div>}
+      {showScanner && <QRScannerOverlay onScan={acceptScan} onManual={() => { setShowScanner(false); setShowManual(true); }} onCancel={() => setShowScanner(false)} />}
+    </div></div>;
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">סבב ניקיון{win?.time ? " · " + win.time : ""}</div></div>
     <div className="body">
       <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{win?.time ? " · סבב " + win.time : ""}</div>{isCover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{zone.cleanerName ? " · עבור " + zone.cleanerName : " — לא האזור שלך"}</span>}</div>
@@ -3454,7 +3503,7 @@ function RoundDetail({ round, zone, onClose }) {
   const issues = round.issues || [];
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פרטי סבב</div></div>
     <div className="body">
-      <div className="round-zone"><div className="rz-name">{round.zoneName}</div><div className="rz-loc">{round.zoneLoc || "—"}{round.winTime ? " · סבב " + round.winTime : ""}</div>{issues.length > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{countLabel(issues.length, "הערה", "הערות")}</span>}</div>
+      <div className="round-zone"><div className="rz-name">{round.zoneName}</div><div className="rz-loc">{round.zoneLoc || "—"}{round.winTime ? " · סבב " + round.winTime : ""}</div>{issues.length > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{countLabel(issues.length, "הערה", "הערות")}</span>}{round.manualEntry && <span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309", border: "1px solid #FCD34D" }}>ידני · {round.manualEntryReason || "ללא סיבה"}</span>}</div>
       <div className="field"><span>סיכום</span>
         <div className="audit-row"><span className="audit-kdot" style={{ background: issues.length ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{round.byName}{round.isCover ? " · כיסוי" + (round.coverFor ? " עבור " + round.coverFor : "") : ""}</div><div className="audit-meta">{dayLabel(dayStart(round.at))} · {fmtTime(round.at)} · בוצעו {round.doneCount}/{countLabel(round.total, "פריט", "פריטים")}</div></div></div>
       </div>
@@ -3463,7 +3512,28 @@ function RoundDetail({ round, zone, onClose }) {
       </div>}
       {items.length > 0 && <div className="field"><span>פירוט צ׳קליסט</span><div className="round-cl">{items.map((c) => { const ok = round.items && round.items[c.id]; const flagged = issues.some((x) => x.itemId === c.id); return <div key={c.id} className="round-item" style={{ cursor: "default", opacity: ok ? 1 : 0.55 }}><span className="ri-box" style={ok ? {} : { borderColor: "var(--muted)" }}>{ok && <Check size={14} />}</span>{c.label}{flagged && <AlertTriangle size={13} color="#DC2626" style={{ marginInlineStart: 6 }} />}{!ok && !flagged && <span style={{ color: "var(--muted)", fontSize: 12, marginInlineStart: 6 }}>· לא סומן</span>}</div>; })}</div></div>}
       <div style={{ height: 20 }} />
-    </div></div>);
+  </div></div>);
+}
+
+function RoundDoneScreen({ round, zones, rounds, session, config, onClose }) {
+  const zone = (zones || []).find((z) => z.id === round.zoneId) || { id: round.zoneId, name: round.zoneName };
+  const now = Date.now();
+  const withCurrent = [round, ...(rounds || []).filter((r) => r.id !== round.id)];
+  const zoneRemaining = zoneTodayStatuses(zone, withCurrent, now, config).filter(({ status }) => status !== "done");
+  const activeOther = (zones || [])
+    .filter((z) => z.active !== false && z.cleanerId === session.id && z.id !== zone.id)
+    .map((z) => ({ z, next: zoneTodayStatuses(z, withCurrent, now, config).find(({ status }) => status === "due" || status === "overdue") }))
+    .filter((x) => x.next)
+    .sort((a, b) => parseHM(a.next.win.time) - parseHM(b.next.win.time));
+  return <div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">הסבב הושלם</div></div>
+    <div className="body">
+      <div className="done-hero"><CheckCircle2 size={38} /><div>הסבב הושלם · {zone.name}</div></div>
+      <SectionTitle>חלונות שנותרו היום באזור זה</SectionTitle>
+      {zoneRemaining.length ? <div className="task-list">{zoneRemaining.map(({ win, status }) => <div key={win.id} className="task-row" style={{ cursor: "default", borderInlineStartColor: WIN_META[status]?.color || "#64748B" }}><div className="task-row-main"><div className="task-row-t">{win.time}</div><div className="task-row-sub">{WIN_META[status]?.label || status}</div></div></div>)}</div> : <div className="note">✓ כל חלונות היום לאזור זה הושלמו</div>}
+      <SectionTitle>אזורים אחרים עם חלון פעיל</SectionTitle>
+      {activeOther.length ? <div className="task-list">{activeOther.map(({ z, next }) => <div key={z.id} className="task-row" style={{ cursor: "default", borderInlineStartColor: WIN_META[next.status]?.color || "#64748B" }}><div className="task-row-main"><div className="task-row-t">{z.name}</div><div className="task-row-sub">{next.win.time} · {WIN_META[next.status]?.label || next.status}</div></div></div>)}</div> : <div className="note">אין חלונות פעילים נוספים כרגע.</div>}
+      <button className="btn-primary full" style={{ marginTop: 14 }} onClick={onClose}>חזור לאזורים שלי</button>
+    </div></div>;
 }
 
 function ComplaintForm({ zone, session, onCancel, onSave }) {
@@ -3554,14 +3624,76 @@ function ReportFlow({ zones, session, onSubmit, onClose, scannedZoneId = "", all
   </div></div>);
 }
 
+function QRScannerOverlay({ onScan, onCancel, onManual }) {
+  const videoRef = useRef(null), canvasRef = useRef(null), rafRef = useRef(0), streamRef = useRef(null);
+  const [err, setErr] = useState(""), [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const stop = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+      streamRef.current?.getTracks?.().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+    const tick = () => {
+      if (!alive) return;
+      const video = videoRef.current, canvas = canvasRef.current;
+      if (video && canvas && video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+        const w = video.videoWidth, h = video.videoHeight;
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, w, h);
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const result = jsQR(imageData.data, w, h);
+        const scanned = extractCzoneFromRaw(result?.data || "");
+        if (scanned) {
+          stop();
+          onScan(`czone:${scanned}`);
+          return;
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    navigator.mediaDevices?.getUserMedia?.({ video: { facingMode: { ideal: "environment" } }, audio: false })
+      .then((stream) => {
+        if (!alive) { stream.getTracks().forEach((track) => track.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play?.().catch(() => {});
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      })
+      .catch((error) => {
+        const name = error?.name || "";
+        setErr(name === "NotAllowedError" || name === "SecurityError" ? "לא ניתנה גישה למצלמה" : "מצלמה לא זמינה");
+      });
+    const timeout = setTimeout(() => alive && setTimedOut(true), 15000);
+    return () => { alive = false; clearTimeout(timeout); stop(); };
+  }, [onScan]);
+  return <div className="qr-overlay">
+    <div className="qr-viewfinder">
+      <video ref={videoRef} playsInline muted />
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+      <div className="qr-frame"><span /></div>
+    </div>
+    <div className="qr-copy">
+      <b>סריקת QR של האזור</b>
+      <span>{err || (timedOut ? "לא מצליח לסרוק?" : "כוונו את המצלמה לקוד ה-QR")}</span>
+    </div>
+    <div className="qr-btns">
+      <button className="btn-primary" onClick={onManual}>לא מצליח לסרוק</button>
+      <button className="btn-ghost" onClick={onCancel}>ביטול</button>
+    </div>
+  </div>;
+}
+
 function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_LANGUAGE, onScanSuccess = null }) {
   const wrong = !!scannedZoneId;
   const t = (key, vars) => uiText(language, key, vars);
-  const fileRef = useRef(null);
-  const [scanning, setScanning] = useState(false);
   const [scanErr, setScanErr] = useState("");
   const [manualCode, setManualCode] = useState("");
-  const [showManual, setShowManual] = useState(false);
+  const [showManual, setShowManual] = useState(false), [showScanner, setShowScanner] = useState(false);
   const finishScan = (raw) => {
     const scanned = extractCzoneFromRaw(raw);
     if (scanned && scanned === zone?.id) {
@@ -3572,33 +3704,6 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_L
     setScanErr(scanned ? t("cleaningQr.scanWrong") : t("cleaningQr.scanMissing"));
     return false;
   };
-  const scanFile = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setScanning(true);
-    setScanErr("");
-    try {
-      if (typeof BarcodeDetector === "undefined" || typeof createImageBitmap !== "function") {
-        setShowManual(true);
-        setScanErr(t("cleaningQr.scanUnsupported"));
-        return;
-      }
-      const detector = new BarcodeDetector({ formats: ["qr_code"] });
-      const bitmap = await createImageBitmap(file);
-      try {
-        const results = await detector.detect(bitmap);
-        finishScan(results?.[0]?.rawValue || "");
-      } finally {
-        bitmap.close?.();
-      }
-    } catch (e) {
-      setShowManual(true);
-      setScanErr(t("cleaningQr.scanFailed"));
-    } finally {
-      setScanning(false);
-      if (event.target) event.target.value = "";
-    }
-  };
   const submitManual = () => finishScan(manualCode);
   return (<div className="pub-wrap"><div className="pub-card">
     <button className="icon-btn pub-x" aria-label={t("common.close")} onClick={onClose}><X size={20} /></button>
@@ -3607,11 +3712,11 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_L
     <div className="pub-sub">{zone?.name ? t("cleaningQr.forZone", { zone: zone.name }) : t("cleaningQr.generic")}</div>
     <div className="note">{wrong ? t("cleaningQr.wrong") : t("cleaningQr.remoteBlocked")}</div>
     {onScanSuccess && <>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={scanFile} />
-      <button className="btn-primary full" style={{ marginTop: 10 }} disabled={scanning} onClick={() => fileRef.current?.click()}><Camera size={16} /> {scanning ? t("cleaningQr.scanning") : t("cleaningQr.scanButton")}</button>
+      <button className="btn-primary full" style={{ marginTop: 10 }} onClick={() => setShowScanner(true)}><Camera size={16} /> {t("cleaningQr.scanButton")}</button>
       <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => setShowManual((v) => !v)}>{t("cleaningQr.manualToggle")}</button>
       {showManual && <div className="field" style={{ marginTop: 8 }}><span>{t("cleaningQr.manualLabel")}</span><input value={manualCode} onChange={(e) => setManualCode(e.target.value)} placeholder={t("cleaningQr.manualPlaceholder")} /><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={submitManual}>{t("cleaningQr.manualSubmit")}</button></div>}
       {scanErr && <div className="err" style={{ marginTop: 10 }}>{scanErr}</div>}
+      {showScanner && <QRScannerOverlay onScan={(raw) => { setShowScanner(false); finishScan(raw); }} onManual={() => { setShowScanner(false); setShowManual(true); }} onCancel={() => setShowScanner(false)} />}
     </>}
     <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={onClose}>{t("common.close")}</button>
   </div></div>);
@@ -3619,7 +3724,7 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_L
 
 function CleanerApp(p) {
   const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key), absences, saveAbsence, delAbsence } = p;
-  const [run, setRun] = useState(null), [qrBlockedZone, setQrBlockedZone] = useState(null), [sent, setSent] = useState(false), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
+  const [run, setRun] = useState(null), [qrBlockedZone, setQrBlockedZone] = useState(null), [sent, setSent] = useState(false), [doneRound, setDoneRound] = useState(null), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
   const [qrArrivalZone, setQrArrivalZone] = useState(null);
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, [], absences);
@@ -3627,10 +3732,10 @@ function CleanerApp(p) {
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const mine = useMemo(() => active.filter((z) => z.cleanerId === session.id), [active, session.id]);
   const others = useMemo(() => active.filter((z) => z.cleanerId !== session.id), [active, session.id]);
-  const todo = useMemo(() => { const out = []; mine.forEach((z) => zoneTodayStatuses(z, rounds, now).forEach(({ win, status }) => { if (status === "due" || status === "overdue") out.push({ z, win, status }); })); return out.sort((a, b) => parseHM(a.win.time) - parseHM(b.win.time)); }, [mine, rounds]);
+  const todo = useMemo(() => { const out = []; mine.forEach((z) => zoneTodayStatuses(z, rounds, now, config).forEach(({ win, status }) => { if (status === "due" || status === "overdue") out.push({ z, win, status }); })); return out.sort((a, b) => parseHM(a.win.time) - parseHM(b.win.time)); }, [mine, rounds, config]);
   const doneToday = useMemo(() => (rounds || []).filter((r) => r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
   const autoQrOpened = useRef(false);
-  const actionableRoundForZone = (z) => zoneTodayStatuses(z, rounds, Date.now()).find(({ status }) => status === "due" || status === "overdue" || status === "missed");
+  const actionableRoundForZone = (z) => zoneTodayStatuses(z, rounds, Date.now(), config).find(({ status }) => status === "due" || status === "overdue" || status === "missed");
   useEffect(() => {
     if (autoQrOpened.current || !scannedZoneId) return;
     const z = mine.find((zone) => zone.id === scannedZoneId);
@@ -3641,8 +3746,8 @@ function CleanerApp(p) {
       setQrArrivalZone(z);
       return;
     }
-    setRun({ zone: z, win: target.win });
-  }, [mine, scannedZoneId, rounds]);
+    setRun({ zone: z, win: target.win, scanToken: true });
+  }, [mine, scannedZoneId, rounds, config]);
   const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
   const myReports = useMemo(() => (complaints || []).filter((c) => c.reportedById === session.id).sort((a, b) => b.at - a.at).slice(0, 30), [complaints, session.id]);
   const doSave = async (r) => {
@@ -3656,12 +3761,13 @@ function CleanerApp(p) {
     if (dirty.length) complaintResults.push(await fileComplaint(mk("round", dirty)));
     if (complaintResults.some((ok) => ok === false)) return false;
     setRun(null);
+    setDoneRound(r);
     setSent(true);
     setTimeout(() => setSent(false), 2600);
     return true;
   };
   const card = (z, cover) => {
-    const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds);
+    const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds);
     const oc = (complaints || []).filter((c) => c.zoneId === z.id && c.status === "open" && c.ownerRole !== "admin").length;
     const notDay = sts.length === 0;
     const dueNow = sts.find((s) => s.status === "due" || s.status === "overdue");
@@ -3681,7 +3787,7 @@ function CleanerApp(p) {
       if (!target) return;
       const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id });
       if (!qr.allowed) return setQrBlockedZone(z);
-      setRun({ zone: z, win: target });
+      setRun({ zone: z, win: target, scanToken: qr.reason === "scan_matched" });
     };
     return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{z.cleanerName ? " · " + t("cleaner.coverFor", { name: z.cleanerName }) : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{t("cleaner.reportsBadge", { count: oc })}</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? t("cleaner.cleanedAgo", { time: timeAgo(lr) }) : t("cleaner.neverCleaned")}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
   };
@@ -3694,13 +3800,13 @@ function CleanerApp(p) {
     <main className="content">
       {qrArrivalZone && <div className="toast-ok"><MapPin size={16} /> {t("cleaner.qrArrived", { zone: qrArrivalZone.name })}</div>}
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
-      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>)}</div>}
+      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win, scanToken: qr.reason === "scan_matched" }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>)}</div>}
       {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> {t("cleaner.openReports", { count: myComplaints.length })}</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
       {active.length === 0 ? <Empty text={t("cleaner.noZones")} Icon={Sparkles} sub={t("cleaner.managerDefinesZones")} /> : <>
         <SectionTitle><Sparkles size={15} /> {t("cleaner.myZones", { count: mine.length })}</SectionTitle>
         {mine.length === 0 ? <Empty text={t("cleaner.noAssignedZones")} Icon={Sparkles} /> : <div className="cards">{mine.map(card)}</div>}
         {others.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowCover((v) => !v)}>{showCover ? "▾" : "▸"} {t("cleaner.peerCover", { count: others.length })}</button>{showCover ? <div className="cards">{others.map((z) => card(z, true))}</div> : <div className="hint" style={{ marginInlineStart: 4 }}>{t("cleaner.peerCoverHint")}</div>}</div>}
-        {doneToday.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowDone((v) => !v)}>{showDone ? "▾" : "▸"} {t("cleaner.doneToday", { count: doneToday.length })}</button>{showDone && <div className="cards">{doneToday.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{t("cleaner.itemsProgress", { done: r.doneCount, total: r.total })}{r.isCover ? " · " + t("cleaner.coverBadge") + (r.coverFor ? " " + t("cleaner.coverFor", { name: r.coverFor }) : "") : ""}{prob ? ` · ${t("cleaner.issuesCount", { count: r.issues.length })}` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div>}</div>}
+        {doneToday.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowDone((v) => !v)}>{showDone ? "▾" : "▸"} {t("cleaner.doneToday", { count: doneToday.length })}</button>{showDone && <div className="cards">{doneToday.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.winTime ? " · " + r.winTime : ""}{r.manualEntry ? " · ידני" : ""}</div><div className="audit-meta">{t("cleaner.itemsProgress", { done: r.doneCount, total: r.total })}{r.isCover ? " · " + t("cleaner.coverBadge") + (r.coverFor ? " " + t("cleaner.coverFor", { name: r.coverFor }) : "") : ""}{prob ? ` · ${t("cleaner.issuesCount", { count: r.issues.length })}` : ""}{r.manualEntryReason ? " · " + r.manualEntryReason : ""}</div></div><ChevronLeft size={16} /></button>; })}</div>}</div>}
       </>}
       {myReports.length > 0 && <div style={{ marginTop: 6 }}><SectionTitle><AlertTriangle size={15} /> {t("cleaner.myReports", { count: myReports.length })}</SectionTitle><div className="cards">{myReports.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></div>}
       {(() => { const myAbs = (absences || []).filter((a) => a.userId === session.id && (a.to || a.from) >= todayKey()).sort((a, b) => (a.from > b.from ? 1 : -1)); return <div style={{ marginTop: 6 }}>
@@ -3713,19 +3819,28 @@ function CleanerApp(p) {
         </div>}
       </div>; })()}
     </main>
-    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
-    {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setQrBlockedZone(null)} onScanSuccess={() => { const target = actionableRoundForZone(qrBlockedZone); setQrBlockedZone(null); if (target) setRun({ zone: qrBlockedZone, win: target.win }); }} /></Overlay>}
+    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} scanToken={run.scanToken} config={config} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
+    {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setQrBlockedZone(null)} onScanSuccess={() => { const target = actionableRoundForZone(qrBlockedZone); setQrBlockedZone(null); if (target) setRun({ zone: qrBlockedZone, win: target.win, scanToken: true }); }} /></Overlay>}
+    {doneRound && <Overlay onClose={() => setDoneRound(null)}><RoundDoneScreen round={doneRound} zones={zones} rounds={rounds} session={session} config={config} onClose={() => setDoneRound(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId), escalate: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId) }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onEscalate={(c) => { escalateComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
     {showNotif && <NotifPanel notif={notif} language={language} onClose={() => setShowNotif(false)} onOpen={() => setShowNotif(false)} onGo={() => setShowNotif(false)} />}
   </div>);
 }
 
-function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, resolveComplaint, language = DEFAULT_LANGUAGE }) {
+function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, resolveComplaint, config, language = DEFAULT_LANGUAGE }) {
   const [rep, setRep] = useState(null), [report, setReport] = useState(false), [showClosed, setShowClosed] = useState(false), [spec, setSpec] = useState(null), [cDetail, setCDetail] = useState(null);
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
+  const autoQrOpened = useRef(false);
   const mz = session.mgrZones || [];
   const myZones = useMemo(() => (zones || []).filter((z) => mz.includes(z.id)).sort(zoneSort), [zones, mz]);
+  useEffect(() => {
+    if (autoQrOpened.current || !scannedZoneId) return;
+    const z = myZones.find((zone) => zone.id === scannedZoneId);
+    if (!z) return;
+    autoQrOpened.current = true;
+    setRep(z);
+  }, [myZones, scannedZoneId]);
   const open = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && c.status === "open").sort((a, b) => b.at - a.at), [complaints, mz]);
   const closed = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && (c.status === "resolved" || c.status === "rejected")).sort((a, b) => (b.resolvedAt || b.at) - (a.resolvedAt || a.at)), [complaints, mz]);
   const now = Date.now();
@@ -3734,7 +3849,7 @@ function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, re
     <div className="note" style={{ marginBottom: 12 }}>מצב הניקיון באזורים של מחלקתך. ניתן לדווח על בעיה — הדיווח מגיע אליך, לעובד הניקיון של האזור ולמנהל המערכת.</div>
     <button className="btn-primary full" style={{ marginBottom: 14 }} onClick={() => setReport(true)}><AlertTriangle size={15} /> דיווח על בעיה (סריקת QR)</button>
     <SectionTitle><Sparkles size={15} /> אזורי מחלקתי ({myZones.length})</SectionTitle>
-    {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : <div className="cards">{myZones.map((z) => { const sts = zoneTodayStatuses(z, rounds, now); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}</div>}
+    {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : <div className="cards">{myZones.map((z) => { const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}</div>}
     {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(open.length, "דיווח", "דיווחים")})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>הקישו לצפייה בפרטים המלאים. דיווחי לכלוך נסגרים ע״י עובד הניקיון; דיווחים מעובד הניקיון בטיפול ההנהלה.</div><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
     {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
     {rep && <Overlay onClose={() => setRep(null)}>{cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: rep.id }).allowed ? <ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /> : <CleaningQrRequired zone={rep} scannedZoneId={scannedZoneId} language={language} onClose={() => setRep(null)} />}</Overlay>}
@@ -7439,7 +7554,7 @@ function SettingsPanel(p) {
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
-  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [defaultInspIntervalMonths, setDefaultInspIntervalMonths] = useState(clampInspIntervalMonths(config.defaultInspIntervalMonths ?? 2));
+  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [defaultInspIntervalMonths, setDefaultInspIntervalMonths] = useState(clampInspIntervalMonths(config.defaultInspIntervalMonths ?? 2)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
@@ -7461,7 +7576,8 @@ function SettingsPanel(p) {
     lateGraceMin: config.lateGraceMin,
     earlyGraceMin: config.earlyGraceMin,
     pmDailyCapacity: config.pmDailyCapacity,
-    defaultInspIntervalMonths: config.defaultInspIntervalMonths
+    defaultInspIntervalMonths: config.defaultInspIntervalMonths,
+    cleaningReminderMins: config.cleaningReminderMins
   });
   useEffect(() => {
     if (openCat !== null) return;
@@ -7477,6 +7593,7 @@ function SettingsPanel(p) {
     setShiftGrace(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
     setPmDailyCapacity(clampPmDailyCapacity(config.pmDailyCapacity ?? 4));
     setDefaultInspIntervalMonths(clampInspIntervalMonths(config.defaultInspIntervalMonths ?? 2));
+    setCleaningReminderMins(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   }, [userConfigSyncKey, uEdit, uArchive, arcView]);
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
   const doExport = async () => { try { const data = await getBackup(); downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `backup_${new Date().toISOString().slice(0, 10)}.json`); } catch (e) {} };
@@ -7497,7 +7614,7 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), defaultInspIntervalMonths: clampInspIntervalMonths(defaultInspIntervalMonths), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), defaultInspIntervalMonths: clampInspIntervalMonths(defaultInspIntervalMonths), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
   const pickLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -7622,6 +7739,12 @@ function SettingsPanel(p) {
         <span>ברירת מחדל לתדירות בקרה (חודשים)</span>
         <input type="number" min="1" max="120" value={defaultInspIntervalMonths} onChange={(e) => setDefaultInspIntervalMonths(clampInspIntervalMonths(e.target.value))} />
         <div className="hint">משמש כברירת מחדל לתכנית בקרה חדשה ולמיגרציה משאלוני הבקרה הישנים.</div>
+      </label>
+      <SectionTitle><Sparkles size={15} /> ניקיון</SectionTitle>
+      <label className="field" style={{ maxWidth: 360 }}>
+        <span>תזכורת לפני סבב (דקות)</span>
+        <input type="number" min="5" max="120" value={cleaningReminderMins} onChange={(e) => setCleaningReminderMins(clampCleaningReminderMins(e.target.value))} />
+        <div className="hint">כמה דקות לפני פתיחת חלון ניקיון להציג תזכורת לעובד.</div>
       </label>
       <SectionTitle><Bell size={15} /> סוגי התראות</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>כיבוי סוג התראה מסתיר אותו לכל המשתמשים. סינון אישי של התצוגה נשאר בפאנל ההתראות.</div>
@@ -9197,6 +9320,18 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .empty-setup{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 24px;}
 .empty-setup .empty-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px;}
 .empty-setup .empty-sub{font-size:13px;color:var(--muted);max-width:320px;}
+.qr-overlay{position:fixed;inset:0;z-index:120;background:rgba(2,6,23,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;color:#fff;}
+.qr-viewfinder{position:relative;width:min(82vw,360px);aspect-ratio:1;border-radius:18px;overflow:hidden;background:#111827;}
+.qr-viewfinder video{width:100%;height:100%;object-fit:cover;}
+.qr-frame{position:absolute;inset:28px;border:3px solid rgba(255,255,255,.9);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.22);}
+.qr-frame span{position:absolute;left:10px;right:10px;top:50%;height:2px;background:#22C55E;box-shadow:0 0 14px #22C55E;animation:qrscan 1.5s ease-in-out infinite;}
+@keyframes qrscan{0%,100%{transform:translateY(-70px);}50%{transform:translateY(70px);}}
+.qr-copy{text-align:center;margin:18px 0 12px;display:flex;flex-direction:column;gap:5px;}
+.qr-copy b{font-size:18px;}.qr-copy span{font-size:13px;color:#CBD5E1;}
+.qr-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:min(82vw,360px);}
+.scan-required,.manual-entry,.scan-public{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center;}
+.manual-entry{text-align:start;}
+.done-hero{display:flex;align-items:center;gap:12px;background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;border-radius:14px;padding:14px;margin-bottom:14px;font-weight:800;}
 
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:var(--surface);border-top:1px solid var(--line);display:flex;padding:7px 0 max(7px,env(safe-area-inset-bottom));z-index:18;}
 .bottom-nav.nav-scroll{justify-content:flex-start;gap:6px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-inline:10px;scroll-padding-inline:10px;box-shadow:0 -1px 0 var(--line), inset 18px 0 16px -18px rgba(15,23,42,.25), inset -18px 0 16px -18px rgba(15,23,42,.25);}
