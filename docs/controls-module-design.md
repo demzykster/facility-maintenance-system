@@ -5,6 +5,8 @@ Working document for the future `בקרות` module.
 Status: draft for owner/Claude review.
 Source of truth date: 2026-07-03.
 
+Companion product blueprint in Russian: `docs/controls-product-blueprint-ru.md`.
+
 ## Purpose
 
 `בקרות` is not just another inspection screen. It should become the shared control layer for operational checks, findings, follow-up actions, and management insight.
