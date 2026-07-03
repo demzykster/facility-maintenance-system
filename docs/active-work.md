@@ -27,6 +27,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs at last check: none.
 - Active work in progress: none.
 - Latest completed product work:
+  - PR #599 added pure shared-location model helpers and tests: legacy string zones can become base location drafts, cleaning-zone objects split into base location plus cleaning profile, and no persistence/UI/cleaning migration is performed.
   - PR #598 documented the shared `locations` migration boundary: base location records are separate from cleaning profiles, first controls work may use `locationId`, and cleaning rounds/QR/compliance must not be touched by early controls/location PRs.
   - PR #597 formalized the first small `מטלות` action-layer contract: saved tasks now preserve `source*` links for future findings/programs, expose a minimal dashboard-readable signal projection in code, and do not require a Supabase/backfill migration for existing `mtask:` records.
   - PR #595 removed legacy inspection-template authoring from `בקרת כלים`: the old `שאלונים` create/edit/delete UI is gone, old `itpl:` records remain read-only for history/migration labels, and unconfigured units use a small built-in general inspection checklist instead of requiring a legacy template.
@@ -70,7 +71,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: continue the pre-controls cleanup carefully. The next safe step is a pure `locationModel` helper/test PR for normalizing legacy string zones, cleaning-zone objects, and base location display text. No persistence, UI, cleaning rounds, QR, or broad migration in that PR. Do not start the broad monolith split yet.
+- Next exact action: pause for owner review before creating actual controls records or UI. If continuing pre-controls cleanup, prefer another pure model/test PR for `userGroups` / organizational memberships, with no permissions UI rewrite and no broad monolith split.
 
 ## Current Product Direction
 
