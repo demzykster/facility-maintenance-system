@@ -127,6 +127,19 @@ Assignments should support:
 - avoiding duplicate checks of the same target within a configured window;
 - controlled reassignment/rescheduling by authorized users.
 
+Before locking the assignment/schedule schema, run at least one real scheduling scenario through the fields manually:
+
+```text
+Department manager
+  preferred weekdays: Sunday + Thursday
+  target: one zone/location
+  anti-duplicate window: 30 days
+  coverage threshold: at least once per month
+  max delay: configured by program
+```
+
+The first implementation does not need the full scheduling engine, but the model must be proven against a concrete business scenario. Fields designed without this dry run are likely to be either unused or insufficient.
+
 ### Run
 
 The actual performed control.
@@ -534,6 +547,21 @@ It should show:
 
 Sensitive worker scoring should be limited to QA, the relevant manager, and operations leadership.
 
+To keep the future dashboard feasible, all signal-producing records should expose or map to a minimal common envelope:
+
+```js
+{
+  severity,
+  status,
+  assignedTo,
+  dueAt,
+  sourceModule,
+  sourceId
+}
+```
+
+This does not require every module to use the same storage table. It means controls findings, tasks, tickets, cleaning signals, and SLA alerts should be readable as comparable operational signals without one-off parsing for every source.
+
 ## AI Role
 
 AI should not be a separate module that writes directly to data.
@@ -565,6 +593,8 @@ This is intentionally conservative.
 6. Minimal `בקרות` UI shell.
 7. Domain increments: safety, quality, fleet controls, executive walk.
 8. Dashboard/insights layer.
+
+Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
 
 ## Open Questions
 
