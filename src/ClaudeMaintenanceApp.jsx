@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import QRCode from "qrcode";
@@ -2735,7 +2735,7 @@ function UserApp(p) {
         </div>
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
-      <nav className={"bottom-nav" + (userNav.length > 4 ? " nav-scroll" : "")} aria-label="ניווט ראשי">{userNav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
+      <MobileBottomNav nav={userNav} primaryIds={["tickets", "tasks", "dept", "ppe"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
@@ -5516,7 +5516,7 @@ function AdminApp(p) {
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
-      <nav className="bottom-nav nav-scroll" aria-label="ניווט ראשי">{nav.map((n) => <NavBtn key={n.id} active={n.active} onClick={n.onClick} Icon={n.Icon} label={n.label} />)}</nav>
+      <MobileBottomNav nav={nav} primaryIds={["dash", "tickets", "tasks", "assets"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
@@ -8843,7 +8843,46 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   </button>);
 }
 function Kpi({ num, label, color, small }) { return <div className="kpi"><div className={"kpi-num" + (small ? " sm" : "")} style={{ color }}>{num}</div><div className="kpi-lbl">{label}</div></div>; }
-function NavBtn({ active, onClick, Icon, label }) { return <button className={"navbtn" + (active ? " on" : "")} onClick={onClick}><Icon size={21} /><span>{label}</span></button>; }
+function NavBtn({ active, onClick, Icon, label }) { return <button type="button" className={"navbtn" + (active ? " on" : "")} onClick={onClick}><Icon size={21} /><span>{label}</span></button>; }
+function MobileBottomNav({ nav = [], primaryIds = [], label = "ניווט ראשי" }) {
+  const [open, setOpen] = useState(false);
+  const items = (nav || []).filter(Boolean);
+  const preferred = primaryIds.length
+    ? primaryIds.map((id) => items.find((n) => n.id === id)).filter(Boolean)
+    : items;
+  const primary = preferred.slice(0, 4);
+  const primaryIdsSet = new Set(primary.map((n) => n.id));
+  const overflow = items.filter((n) => !primaryIdsSet.has(n.id));
+  const visible = overflow.length ? primary : items.slice(0, 5);
+  const moreActive = overflow.some((n) => n.active);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+  if (!items.length) return null;
+  return (
+    <nav className="bottom-nav" aria-label={label}>
+      {visible.map((n) => <NavBtn key={n.id} active={n.active} onClick={() => { setOpen(false); n.onClick(); }} Icon={n.Icon} label={n.label} />)}
+      {overflow.length > 0 && <>
+        <button type="button" className={"navbtn nav-more-btn" + (moreActive || open ? " on" : "")} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <MoreHorizontal size={21} />
+          <span>עוד</span>
+        </button>
+        {open && <div className="nav-more-menu" role="menu">
+          {overflow.map((n) => {
+            const Icon = n.Icon;
+            return <button key={n.id} type="button" role="menuitem" className={"nav-more-item" + (n.active ? " on" : "")} onClick={() => { setOpen(false); n.onClick(); }}>
+              <Icon size={18} />
+              <span>{n.label}</span>
+            </button>;
+          })}
+        </div>}
+      </>}
+    </nav>
+  );
+}
 function SectionTitle({ children }) { return <div className="sect">{children}</div>; }
 function Meta({ Icon, iconColor, label, value }) { return <div className="meta"><Icon size={15} color={iconColor || "var(--muted)"} /><div><div className="meta-lbl">{label}</div><div className="meta-val">{value}</div></div></div>; }
 function Empty({ text, sub, Icon = CheckCircle2 }) { return <div className="empty"><Icon size={34} /><div className="empty-t">{text}</div>{sub && <div className="empty-s">{sub}</div>}</div>; }
@@ -9373,12 +9412,16 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .manual-entry{text-align:start;}
 .done-hero{display:flex;align-items:center;gap:12px;background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;border-radius:14px;padding:14px;margin-bottom:14px;font-weight:800;}
 
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:var(--surface);border-top:1px solid var(--line);display:flex;padding:7px 0 max(7px,env(safe-area-inset-bottom));z-index:18;}
-.bottom-nav.nav-scroll{justify-content:flex-start;gap:6px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-inline:10px;scroll-padding-inline:10px;box-shadow:0 -1px 0 var(--line), inset 18px 0 16px -18px rgba(15,23,42,.25), inset -18px 0 16px -18px rgba(15,23,42,.25);}
-.bottom-nav.nav-scroll::-webkit-scrollbar{display:none;}
-.navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:500;padding:5px;}
-.nav-scroll .navbtn{flex:0 0 82px;min-width:82px;scroll-snap-align:center;border-radius:12px;}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:7px 6px max(7px,env(safe-area-inset-bottom));z-index:30;box-shadow:0 -1px 0 var(--line),0 -8px 24px rgba(15,23,42,.08);}
+.navbtn{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:500;padding:5px;border:0;background:transparent;cursor:pointer;border-radius:12px;}
+.navbtn span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .navbtn.on{color:var(--primary);}
+.nav-more-btn{position:relative;}
+.nav-more-menu{position:fixed;left:50%;bottom:calc(58px + max(7px,env(safe-area-inset-bottom)));transform:translateX(-50%);width:min(420px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;box-shadow:0 18px 42px rgba(15,23,42,.22);z-index:25;}
+.nav-more-item{min-height:44px;display:flex;align-items:center;gap:8px;justify-content:flex-start;text-align:start;border:1px solid transparent;background:var(--surface-2);color:var(--ink);border-radius:10px;padding:8px 10px;font:inherit;font-size:12.5px;font-weight:650;cursor:pointer;}
+.nav-more-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nav-more-item.on{border-color:#FDBA74;background:#FFF7ED;color:var(--primary);}
+.app-dark .nav-more-item.on{background:rgba(234,88,12,.14);border-color:rgba(234,88,12,.45);}
 
 .notif-back{align-items:center;justify-content:center;padding:16px;z-index:70;}
 .notif-panel{background:var(--surface);width:100%;max-width:440px;max-height:80vh;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35);}

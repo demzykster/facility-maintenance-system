@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: codex/role-based-bottom-nav.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: replace horizontally scrolling mobile bottom navigation with role-prioritized fixed items plus an explicit More menu.
 - Latest completed product work:
   - PR #579 suppressed the inspection-program migration toast on the login/PWA screen while keeping the admin migration notification available for authenticated admins.
   - PR #577 added one-shot auto-refresh for stale standalone/PWA builds when `cmms-version.json` reports a newer deployed commit.
