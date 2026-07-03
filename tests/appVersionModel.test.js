@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  markStandaloneVersionRefreshed,
   normalizeVersionManifest,
+  pwaRefreshStorageKey,
+  shouldAutoRefreshStandaloneVersion,
   shouldShowVersionUpdate
 } from "../src/appVersionModel.js";
 
@@ -33,5 +36,38 @@ describe("app version model", () => {
       buildTime: "2026-06-29T18:00:00.000Z",
       version: "0.1.0"
     });
+  });
+
+  it("auto-refreshes stale standalone builds only once per deployed commit", () => {
+    const storage = new Map();
+    const store = {
+      getItem: (key) => storage.get(key),
+      setItem: (key, value) => storage.set(key, value)
+    };
+
+    expect(shouldAutoRefreshStandaloneVersion({
+      currentCommit: "abc1234",
+      latestCommit: "def5678",
+      isStandalone: true,
+      storage: store
+    })).toBe(true);
+
+    expect(markStandaloneVersionRefreshed({ latestCommit: "def5678", storage: store })).toBe(true);
+    expect(storage.get(pwaRefreshStorageKey("def5678"))).toBe("1");
+    expect(shouldAutoRefreshStandaloneVersion({
+      currentCommit: "abc1234",
+      latestCommit: "def5678",
+      isStandalone: true,
+      storage: store
+    })).toBe(false);
+  });
+
+  it("does not auto-refresh normal browser tabs", () => {
+    expect(shouldAutoRefreshStandaloneVersion({
+      currentCommit: "abc1234",
+      latestCommit: "def5678",
+      isStandalone: false,
+      storage: new Map()
+    })).toBe(false);
   });
 });
