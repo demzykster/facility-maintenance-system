@@ -9329,7 +9329,12 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .more-menu button:hover{background:var(--surface-2);}
 .ftable-head{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
 .ftable-row{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;cursor:pointer;}
-.manager-fleet-row{grid-template-columns:minmax(72px,0.8fr) minmax(120px,1.4fr) minmax(82px,1fr) minmax(84px,1.1fr);}
+.manager-fleet-row{grid-template-columns:minmax(118px,0.95fr) minmax(240px,1.75fr) minmax(96px,0.85fr) minmax(96px,0.8fr);}
+.manager-fleet-table .ft-code{min-width:0;direction:ltr;unicode-bidi:isolate;text-align:start;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.manager-fleet-table .ft-model{min-width:0;line-height:1.3;}
+.manager-fleet-table .ft-model b{display:block;white-space:normal;overflow-wrap:anywhere;}
+.manager-fleet-table .ft-sup{min-width:0;overflow-wrap:anywhere;}
+.manager-fleet-table .ft-doc{white-space:nowrap;}
 .ftable-row:hover{background:var(--surface-2);}
 .ftable-row.selected{background:rgba(249,115,22,0.08);}
 .ft-select{display:flex;align-items:center;justify-content:center;cursor:pointer;}
