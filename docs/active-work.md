@@ -27,6 +27,11 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs at last check: none.
 - Active work in progress: none.
 - Latest completed product work:
+  - PR #595 removed legacy inspection-template authoring from `בקרת כלים`: the old `שאלונים` create/edit/delete UI is gone, old `itpl:` records remain read-only for history/migration labels, and unconfigured units use a small built-in general inspection checklist instead of requiring a legacy template.
+  - PR #594 fixed the manager fleet table overlap on desktop by giving fleet number/type/model/supplier/driver columns explicit responsive tracks and isolating numeric fleet codes in RTL rows.
+  - PR #593 disabled the unsafe browser-side Anthropic client AI path and replaced real-looking built-in demo logins with clearly local/example identities.
+  - PR #592 refreshed staging/Supabase status docs so they no longer describe the old localStorage-only/no-Supabase state.
+  - PR #591 added the controls-module product blueprint, current-state audit, and agreed design notes for `בקרות`, shared actions, locations, scheduling, visibility, quality scope, and future executive dashboard direction.
   - PR #589 split CI release gates so PRs still run the active-work ledger gate, while push-to-main runs no longer fail only because the just-merged feature branch is still listed in active-work.
   - PR #587 made login identifier, password, PIN, first-password, and profile password-change inputs LTR inside RTL screens.
   - PR #585 moved the mobile role-preview control into the topbar action row as a compact button while keeping the role switcher available as a popover.
@@ -61,9 +66,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue: none. Continue only from fresh owner-reported issues.
+- Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: wait for fresh owner-reported release-stabilization issues. Do not start the broad monolith split yet.
+- Next exact action: continue the pre-controls cleanup carefully. Prefer small, reversible PRs that reduce confusion before the new `בקרות` module: first formalize `מטלות` as the shared follow-up/action layer, then plan the unified `locations` model without touching working cleaning rounds. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
