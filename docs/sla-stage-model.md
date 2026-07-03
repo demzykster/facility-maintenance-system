@@ -86,8 +86,8 @@ Dashboard and analytics should be clickable:
 
 ## Explicit Non-Goals For This Phase
 
-- No database migration.
-- No Supabase/Auth/RLS work.
+- No new database migration for SLA in this phase.
+- No new Supabase/Auth/RLS expansion for SLA in this phase.
 - No broad modular split.
 - No rewrite of `ClaudeMaintenanceApp.jsx`.
 - No separate backend SLA engine yet.
