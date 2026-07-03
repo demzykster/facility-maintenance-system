@@ -17,6 +17,9 @@ const buildTime = new Date().toISOString();
 
 export default defineConfig({
   cacheDir: "vite-cache",
+  optimizeDeps: {
+    include: ["jsqr"]
+  },
   plugins: [{
     name: "cmms-version-manifest",
     generateBundle() {
