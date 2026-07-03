@@ -76,3 +76,24 @@ export function activeWorkLedgerPolicy({
     pinnedMainShas
   };
 }
+
+export function activeWorkLedgerErrorHint(error = "") {
+  const text = String(error || "");
+  if (text.startsWith("active_work_branch_mismatch:")) {
+    const [, pair = ""] = text.split(":");
+    const [, current = ""] = pair.split("!=");
+    return current
+      ? `Set docs/active-work.md to: - Active branch: \`${current}\`.`
+      : "Set docs/active-work.md Active branch to the current PR branch.";
+  }
+  if (text.startsWith("active_work_points_to_branch_on_main:") || text === "active_work_claims_unmerged_branch_but_main_is_clean") {
+    return "After merging work to main, reset docs/active-work.md to: - Active branch: none.";
+  }
+  if (text.startsWith("active_work_pins_stale_main:")) {
+    return "Remove stale pinned main SHAs from docs/active-work.md or refresh them to the current origin/main.";
+  }
+  if (text === "active_work_has_current_branch_work_without_active_branch") {
+    return "Either remove stale current-branch wording from docs/active-work.md or set Active branch to the current PR branch.";
+  }
+  return "";
+}

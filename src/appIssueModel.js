@@ -15,6 +15,7 @@ export function createAppIssue({
   at = Date.now(),
   description = "",
   screenshot = "",
+  screenshotContext = {},
   session = {},
   location = "",
   userAgent = "",
@@ -29,6 +30,12 @@ export function createAppIssue({
     status: APP_ISSUE_STATUS.open,
     description: text,
     screenshot: typeof screenshot === "string" ? screenshot : "",
+    screenshotContext: screenshotContext && typeof screenshotContext === "object" && !Array.isArray(screenshotContext) ? {
+      location: String(screenshotContext.location || ""),
+      viewport: String(screenshotContext.viewport || ""),
+      devicePixelRatio: Number(screenshotContext.devicePixelRatio || 0),
+      screenshotSize: String(screenshotContext.screenshotSize || ""),
+    } : {},
     location: String(location || ""),
     userAgent: String(userAgent || ""),
     reporter: {
