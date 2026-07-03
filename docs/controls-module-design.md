@@ -31,13 +31,27 @@ The goal is one control engine, not parallel systems for every domain.
 - Treat GitHub `main` as source of truth.
 - Preserve the future AI-agent principle: AI may classify, suggest, summarize, and route, but accepted changes must go through normal product operations, permissions, validation, and audit.
 
+## Decision Log
+
+These decisions are considered agreed unless the owner changes direction:
+
+- Documentation comes before large implementation.
+- Current legacy inspection/questionnaire data is not valuable and does not need migration.
+- Legacy `שאלונים` / `inspection_templates` should be removed rather than kept as dead product surface.
+- `בקרת כלים` should become one category/domain inside the future `בקרות` model, not remain a separate parallel inspection universe.
+- `מטלות` should become the shared action/follow-up layer after source links, permissions, and visibility are clarified.
+- Locations/zones should converge into one object-based model; do not add a third location list.
+- Quality (`איכות`) is a large domain inside the shared control engine, not a small checklist add-on.
+- Executive users primarily need a dashboard/attention layer, not raw access to every small record.
+- Worker-based quality scoring is sensitive and must be visible only to configured authorized audiences.
+
 ## Current Cleanup Direction
 
 Before building the new module, reduce confusion in the current system:
 
 1. Remove or close stale remote branches that no longer have open PRs.
 2. Update stale documentation that still describes Supabase/Auth/RLS as not started or Vercel as only localStorage demo.
-3. Remove legacy `שאלונים` / `inspection_templates` if current data is not valuable.
+3. Remove legacy `שאלונים` / `inspection_templates`; current data is not valuable and does not need migration.
 4. Resolve the two-zone-model problem before adding another location list.
 5. Decide and document that `מטלות` is the shared action/task layer, not only maintenance tasks.
 
@@ -132,6 +146,14 @@ Expected fields:
 
 Signature is for the overall run, not every checklist item.
 
+Photo requirements should be checklist-aware:
+
+- no photo required by default;
+- photo may be required only when a specific checklist item has a problem;
+- photo may be optional for low-risk observations;
+- photo may be mandatory for severe safety/quality findings;
+- photo rules should be configurable per program and per checklist item.
+
 ### Finding
 
 A first-class record for a problem, deviation, risk, or observation.
@@ -159,6 +181,28 @@ Expected fields:
 
 Findings are not the same as "inspection failed". A run can have zero, one, or many findings.
 
+People/contractor subject flow should support incomplete knowledge. The inspector should be able to record a finding through a structured chain:
+
+```text
+subjectType:
+  - company_worker
+  - contractor_worker
+  - unknown_person
+  - team
+  - supplier
+  - no_person
+
+if contractor_worker:
+  contractorId / contractorName if known
+
+if company_worker:
+  departmentId / managerId if known
+  workerId if known
+  workerName text fallback if not known
+```
+
+This keeps the record useful even when the inspector knows the relevant area, team, contractor, or manager, but not the exact employee name.
+
 ### Action
 
 The decision about what to do with a finding.
@@ -178,6 +222,24 @@ Possible action outcomes:
 - CAPA-lite.
 
 Actions should be configurable per program/domain.
+
+Visibility and closure should also be configurable. A program should be able to define:
+
+- who can see findings;
+- who can see sensitive people-related findings;
+- who can create actions;
+- who can close actions;
+- who can reopen or reject closure;
+- which observer groups see only summaries/trends rather than raw records.
+
+Default policy examples:
+
+- responsible plus creator;
+- responsible, creator, and relevant manager;
+- QA/safety group plus relevant manager;
+- committee/group visibility;
+- executive dashboard only;
+- private/sensitive people case.
 
 ## Locations And Zones
 
@@ -401,7 +463,43 @@ Quality should support CAPA-lite:
 
 Do not build a heavy ISO system immediately, but leave room for this structure.
 
-Sensitive worker-based quality metrics must not be visible broadly.
+Quality responsibility should be modeled as a working triangle:
+
+- quality manager/quality department defines programs, sampling, scoring, reports, and closure expectations;
+- operations department managers own corrections in their processes, zones, teams, and workers;
+- workers/teams/suppliers may be the subject of checks or responsible for concrete follow-up actions.
+
+Senior observers sit above that triangle through dashboard visibility, not by editing every raw quality record.
+
+Quality scoring should be configurable across all useful dimensions:
+
+- process;
+- worker;
+- team;
+- zone/location;
+- supplier;
+- customer;
+- product category;
+- SKU/batch where relevant.
+
+Sensitive worker-based quality metrics must not be visible broadly. They should be limited to configured audiences such as QA, the relevant manager, and operations leadership.
+
+## Executive And Management Walks
+
+`סיור מנכ"ל` / `סיור הנהלה` should be treated as a hybrid control run, not as a simple meeting note.
+
+It should support:
+
+- planned or floating schedule;
+- participants;
+- broad multi-domain checklist or open observation mode;
+- findings across safety, quality, operations, cleaning, maintenance, and improvement ideas;
+- decisions;
+- linked tasks;
+- responsible owners;
+- follow-up status.
+
+This allows a management walk to become a structured operational record without creating a separate meeting/task universe.
 
 ## Executive Dashboard
 
