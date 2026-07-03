@@ -4,6 +4,8 @@
 
 Phase 2 stabilization basics are complete on `main`.
 
+This file is historical planning context. For the current work queue, read `docs/active-work.md` and GitHub PR state first.
+
 Completed:
 
 - PR #1 fixed duplicate `createdAt`.
@@ -51,12 +53,11 @@ DoD:
 
 `npm audit` still reports `xlsx` high severity advisories with no npm automatic fix. Do not replace `xlsx` casually; this affects business import/export flows. Handle it in a focused dependency phase after the permissions/onboarding direction is clear.
 
-## Still Not Next
+## Still Not Next Without Explicit Scope
 
-- No Supabase.
 - No Railway.
-- No production database.
-- No RLS/Auth migration.
+- No new Supabase/Auth/RLS/database expansion outside a named branch/PR and explicit task.
+- Do not clear, reseed, or overwrite owner-entered Supabase staging data.
 - No broad UI changes.
 - No full monolith split.
 - No whole-file replacement of `ClaudeMaintenanceApp.jsx`.

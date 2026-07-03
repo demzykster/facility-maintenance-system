@@ -24,12 +24,11 @@ npm run build
 
 The build output is written to `dist/`.
 
-## Demo Login
+## Login / Data Mode
 
-- Admin: `vadim@chemipal.co.il`
-- Password: `1234`
+Local/demo mode can still use built-in demo identities for development review.
 
-Demo data is stored in the browser through the local `window.storage` shim backed by `localStorage`.
+The deployed staging/pilot app uses the server session path backed by Supabase Auth/app profiles and the current Supabase KV compatibility bridge. Owner-entered staging data is working data; do not clear, reseed, or overwrite it unless the owner explicitly asks.
 
 ## Project Continuity
 

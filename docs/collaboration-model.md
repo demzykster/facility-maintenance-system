@@ -59,7 +59,7 @@ If `main`, open PRs, remote branches, or docs disagree, treat that as a synchron
 - Keep changes small and reversible.
 - One PR should have one clear theme. It may include several closely related low-risk fixes.
 - Do not replace `src/ClaudeMaintenanceApp.jsx` as a whole file.
-- Do not start Supabase/Auth/RLS/Railway/database work.
+- Do not start new Supabase/Auth/RLS/database expansion unless it is explicitly scoped. Existing Supabase/Vercel staging is live; protect owner-entered data.
 - Do not do a broad modular split yet.
 - Cross-cutting changes to auth, sessions, storage, files, push, permissions, or security must be done on a named branch with a visible PR, preferably draft until verified. Do not leave that kind of work as hidden uncommitted changes on `main`.
 - Autonomy never overrides the agreed strategy. Even if the owner says "move freely", "do it yourself", or "do not wait for me", Codex must stay inside the current roadmap and documented guardrails.
@@ -100,7 +100,7 @@ Rules:
 - GitHub/main is the source of truth.
 - Use small branches and PRs.
 - Do not replace src/ClaudeMaintenanceApp.jsx as a whole file.
-- No Supabase/Auth/RLS/Railway/database unless explicitly started.
+- No new Supabase/Auth/RLS/database expansion unless explicitly scoped. Existing Supabase/Vercel staging is live; protect owner-entered data.
 - No broad modular split.
 - For code changes run npm test -- --run, npm run build, and browser smoke-check UI behavior changes.
 - Keep docs short: active-work is a live ledger, not full history.

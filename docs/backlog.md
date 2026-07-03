@@ -7,7 +7,7 @@ This file is the active grouped task list. It collects open items from the hando
 - Each PR ships one atomic change.
 - Keep product-code diffs under about 100 lines when possible.
 - Do not replace `src/ClaudeMaintenanceApp.jsx` as a whole file.
-- Do not start Supabase/Auth/RLS/Railway/database work.
+- Do not start new Supabase/Auth/RLS/database expansion unless it is explicitly scoped. Existing Supabase/Vercel staging is live; protect owner-entered data.
 - Do not do a broad modular split.
 - For code changes run `npm test -- --run`, `npm run build`, and browser smoke-check UI behavior changes.
 
@@ -68,7 +68,7 @@ Implementation:
 
 Remaining:
 - None for the current identifier-first demo login pass.
-- Production authentication remains out of scope until Supabase/Auth/RLS/database work is explicitly started.
+- Production authentication work has started through the Supabase-backed server session path. Further auth/RLS/database expansion still requires an explicit scoped PR.
 
 ## User Management / Permissions / Worker Onboarding
 
