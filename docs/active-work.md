@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: codex/mobile-compact-role-chip.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: make the mobile role-preview control a compact topbar button.
 - Latest completed product work:
   - PR #583 compacted mobile header/profile surfaces, fixed LTR numeric/contact fields, and made expiring fleet-document rows directly tappable.
   - PR #581 replaced horizontally scrolling mobile bottom navigation with role-prioritized fixed items and an explicit More menu for secondary sections.
