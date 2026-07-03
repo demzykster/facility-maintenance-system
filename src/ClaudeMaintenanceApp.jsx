@@ -54,6 +54,7 @@ import { uiText } from "./uiI18nModel.js";
 import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js";
 import { supplierActivityCounts } from "./supplierActivityModel.js";
 import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers } from "./cleaningZoneBlockersModel.js";
+import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -1424,6 +1425,7 @@ export default function App() {
   const [ppeOrders, setPpeOrders] = useState([]);
   const [appIssues, setAppIssues] = useState([]);
   const [issueReportOpen, setIssueReportOpen] = useState(false);
+  const [issueReportDraft, setIssueReportDraft] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const [language, setLanguageState] = useState(DEFAULT_LANGUAGE);
@@ -2051,7 +2053,20 @@ export default function App() {
   }, [session && session.id, session && session.role, impersonating]);
 
   const rolePreview = isRealAdmin ? { active: rolePreviewRole || "admin", realName: session.name, onChange: (role) => setRolePreviewRole(role === "admin" ? null : role) } : null;
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: () => setIssueReportOpen(true), rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const openIssueReport = () => {
+    const fallbackContext = appIssueScreenContext();
+    setIssueReportDraft({ screenshot: "", screenshotContext: fallbackContext, captureStatus: "capturing", captureError: "" });
+    captureAppIssueScreenshot().then((result) => {
+      setIssueReportDraft({
+        screenshot: result.screenshot || "",
+        screenshotContext: result.context || fallbackContext,
+        captureStatus: result.screenshot ? "ready" : "failed",
+        captureError: result.error || "",
+      });
+    });
+    setIssueReportOpen(true);
+  };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -2063,7 +2078,7 @@ export default function App() {
                 : effSession.role === "worker" ? <WorkerApp {...shared} key="imp-worker" />
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
                   : <UserApp {...shared} key="imp-user" />}
-            {issueReportOpen && <Overlay persistent panelClassName="issue-report-shell" onClose={() => setIssueReportOpen(false)}><AppIssueReportModal session={effSession} onSave={async (issue) => { const ok = await saveAppIssue(issue); if (ok) setIssueReportOpen(false); return ok; }} onClose={() => setIssueReportOpen(false)} /></Overlay>}
+            {issueReportOpen && <Overlay persistent panelClassName="issue-report-shell" onClose={() => setIssueReportOpen(false)}><AppIssueReportModal session={effSession} draft={issueReportDraft} onSave={async (issue) => { const ok = await saveAppIssue(issue); if (ok) setIssueReportOpen(false); return ok; }} onClose={() => setIssueReportOpen(false)} /></Overlay>}
             {profileOpen && <Overlay persistent panelClassName="profile-shell" onClose={() => setProfileOpen(false)}><ProfileModal session={session} onSave={saveMyProfile} onClose={() => setProfileOpen(false)} /></Overlay>}
           </>)}
       {toast && <div role="alert" aria-live="assertive" onClick={() => setToast(null)} style={{ position: "fixed", insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, margin: "0 auto 16px", maxWidth: 420, background: "#B91C1C", color: "#fff", padding: "11px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, textAlign: "center", boxShadow: "0 8px 28px rgba(0,0,0,.28)", zIndex: 9999, cursor: "pointer", insetInline: 16 }}>{toast}</div>}
@@ -8461,17 +8476,27 @@ function ProfileModal({ session, onSave, onClose }) {
   </div>;
 }
 
-function AppIssueReportModal({ session, onSave, onClose }) {
+function AppIssueReportModal({ session, draft, onSave, onClose }) {
   const [description, setDescription] = useState("");
   const [screenshot, setScreenshot] = useState("");
+  const [screenshotContext, setScreenshotContext] = useState({});
+  const [captureStatus, setCaptureStatus] = useState("idle");
+  const [captureError, setCaptureError] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!draft) return;
+    setScreenshot(draft.screenshot || "");
+    setScreenshotContext(draft.screenshotContext || {});
+    setCaptureStatus(draft.captureStatus || "idle");
+    setCaptureError(draft.captureError || "");
+  }, [draft]);
   const pickScreenshot = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
     if (!file) return;
     setErr("");
-    try { setScreenshot(await imageFileToDataUrl(file)); }
+    try { setScreenshot(await imageFileToDataUrl(file)); setCaptureStatus("manual"); setCaptureError(""); }
     catch { setErr("לא ניתן לקרוא את התמונה. נסו קובץ PNG או JPG."); }
   };
   const submit = async () => {
@@ -8480,7 +8505,7 @@ function AppIssueReportModal({ session, onSave, onClose }) {
     try {
       const location = typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "";
       const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
-      const ok = await onSave(createAppIssue({ description, screenshot, session, location, userAgent }));
+      const ok = await onSave(createAppIssue({ description, screenshot, screenshotContext, session, location, userAgent }));
       if (ok === false) throw new Error("save_failed");
     } catch (e) {
       setErr(e?.message === "description_required" ? "כתבו תיאור קצר של הבעיה" : e?.message === "description_too_long" ? "התיאור ארוך מדי" : "השמירה נכשלה. נסו שוב.");
@@ -8491,8 +8516,12 @@ function AppIssueReportModal({ session, onSave, onClose }) {
     <div className="modal2-body">
       <div className="hint" style={{ margin: "0 0 12px" }}>זה לא פותח קריאת אחזקה. זה נשמר ביומן פנימי כדי שנוכל לבדוק ולתקן את המערכת.</div>
       <label className="field"><span>מה קרה?</span><textarea rows={5} value={description} maxLength={1200} onChange={(e) => setDescription(e.target.value)} placeholder="לדוגמה: הכפתור לא מגיב / המסך קופץ / חסר שדה…" /></label>
-      <label className="btn-ghost full" style={{ cursor: "pointer", marginBottom: 10 }}><input type="file" accept="image/*" hidden onChange={pickScreenshot} /><Camera size={16} /> צירוף צילום מסך</label>
-      {screenshot && <div className="issue-shot"><img src={screenshot} alt="צילום מסך מצורף" /><button className="photo-x" onClick={() => setScreenshot("")}><X size={16} /></button></div>}
+      <div className="issue-capture-box">
+        <div className="issue-capture-head"><Camera size={16} /><b>צילום מסך</b><span>{captureStatus === "capturing" ? "מצלם את המסך הנוכחי…" : screenshot ? "מצורף לדיווח" : "לא צורף"}</span></div>
+        {captureError && !screenshot && <div className="hint">לא הצלחנו לצלם אוטומטית. אפשר לצרף תמונה ידנית.</div>}
+        <label className="btn-ghost full" style={{ cursor: "pointer" }}><input type="file" accept="image/*" hidden onChange={pickScreenshot} /><Camera size={16} /> {screenshot ? "החלפת צילום" : "צירוף צילום ידני"}</label>
+      </div>
+      {screenshot && <div className="issue-shot"><img src={screenshot} alt="צילום מסך מצורף" /><button className="photo-x" onClick={() => { setScreenshot(""); setCaptureStatus("removed"); }}><X size={16} /></button></div>}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={submit} disabled={busy}>{busy ? "שומר…" : "שליחת דיווח"}</button>
     </div>
@@ -8582,7 +8611,7 @@ function AppIssuesSettings({ issues, session, onSave }) {
         <div className="issue-main">
           <div className="issue-top"><span className={"issue-status " + (issue.status || "open")}>{appIssueStatusLabel(issue.status)}</span><span className="issue-date">{fmtDate(issue.at)} {fmtTime(issue.at)}</span></div>
           <div className="issue-desc">{issue.description}</div>
-          <div className="issue-meta">{issue.reporter?.name || "—"} · {ROLE_LABEL[issue.reporter?.role] || issue.reporter?.role || "—"}{issue.location ? " · " + issue.location : ""}</div>
+          <div className="issue-meta">{issue.reporter?.name || "—"} · {ROLE_LABEL[issue.reporter?.role] || issue.reporter?.role || "—"}{issue.location ? " · " + issue.location : ""}{issue.screenshotContext?.viewport ? " · " + issue.screenshotContext.viewport : ""}</div>
           {issue.response && <div className="issue-response">תגובה: {issue.response} {issue.responseBy ? `· ${issue.responseBy}` : ""}</div>}
         </div>
         {issue.screenshot && <a className="issue-thumb" href={issue.screenshot} target="_blank" rel="noreferrer"><img src={issue.screenshot} alt="צילום מסך" /></a>}
@@ -9496,6 +9525,10 @@ button.notif-perm:hover{background:#D1FAE5;}
 .side-user-btn{width:100%;text-align:right;border-radius:12px;transition:.15s;}
 .side-user-btn:hover,.side-user-btn:focus-visible{background:#ffffff12;}
 .side-version{color:var(--side-ink);font-size:10.5px;text-align:center;padding:5px 4px 0;opacity:.82;}
+.issue-capture-box{border:1px solid var(--line);border-radius:13px;background:var(--surface-2);padding:10px;margin-bottom:10px;display:grid;gap:8px;}
+.issue-capture-head{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);}
+.issue-capture-head b{color:var(--ink);font-size:13px;}
+.issue-capture-head span{margin-inline-start:auto;font-weight:700;text-align:end;}
 .issue-shot{position:relative;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:12px;background:var(--surface-2);}
 .issue-shot img{display:block;width:100%;max-height:260px;object-fit:contain;}
 .issue-list{display:grid;gap:10px;}

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { activeWorkLedgerPolicy, effectiveLedgerBranch } from "../src/activeWorkLedgerModel.js";
+import { activeWorkLedgerErrorHint, activeWorkLedgerPolicy, effectiveLedgerBranch } from "../src/activeWorkLedgerModel.js";
 
 function git(args, { silent = false } = {}) {
   return execFileSync("git", args, {
@@ -36,8 +36,13 @@ const result = activeWorkLedgerPolicy({
 
 if (!result.ok) {
   console.error("[active-work-ledger] failed");
-  for (const error of result.errors) console.error(`- ${error}`);
+  for (const error of result.errors) {
+    console.error(`- ${error}`);
+    const hint = activeWorkLedgerErrorHint(error);
+    if (hint) console.error(`  fix: ${hint}`);
+  }
   console.error("Update docs/active-work.md so it reflects the real current branch/main state.");
+  console.error("Before opening a PR, run: npm run pr:preflight");
   process.exit(1);
 }
 

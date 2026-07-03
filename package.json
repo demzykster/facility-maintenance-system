@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1 --configLoader native",
     "build": "vite build --configLoader native",
     "release:check": "node tools/vercel-api-route-gate.mjs && node tools/active-work-ledger-gate.mjs && node tools/production-config-gate.mjs",
+    "pr:preflight": "npm ci && npm run release:check && npm test -- --run && npm run build",
     "staging:preflight": "node tools/staging-smoke-preflight.mjs",
     "staging:preflight:local": "node tools/staging-smoke-preflight-local.mjs",
     "staging:vercel-env": "node tools/vercel-env-preflight.mjs --scope demzyksters-projects",
@@ -28,6 +29,7 @@
     "serve": "node tools/static-server.cjs"
   },
   "dependencies": {
+    "html2canvas": "^1.4.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.468.0",
     "papaparse": "^5.5.4",

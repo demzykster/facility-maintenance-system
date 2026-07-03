@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/mobile-qr-visual-fixes`.
+- Active branch: `codex/appissue-screenshot-ci-preflight`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
-- Open PRs at last check: #573 mobile QR visual fixes, #572 active-work reset after #571, #561 first-login verification handoff, #562 remove external font import, #563 remove unused app shell.
-- Active work in progress: mobile QR/public-report visual fixes and anonymous storage-toast suppression.
+- Open PRs at last check: #574 app issue screenshots and PR preflight, #572 active-work reset after #571, #561 first-login verification handoff, #562 remove external font import, #563 remove unused app shell.
+- Active work in progress: app issue reports with automatic sanitized screenshots, plus PR preflight guidance for active-work ledger failures.
 - Latest completed product work:
+  - PR #573 fixed mobile QR/public-report visual issues, manager fleet mobile row wrapping, and guest QR storage-toast behavior.
   - PR #571 added the Vite optimizer workaround for `jsqr` dev-server loading.
   - PR #570 added URL-based cleaning QR tokens, an in-app jsqr camera scanner, production QR/manual fallback audit fields, post-round summary, manager clean-complete notifications, upcoming cleaning reminders, and per-zone anonymous report throttling.
   - PR #568 added inspection programs per vehicle type: multiple per-type inspection programs with individual intervals, checklists, responsible users, notify targets, auto-ticket control, legacy template migration, and 30-day fallback for unconfigured units.
@@ -50,9 +51,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue: review and merge the mobile QR visual fix PR, then continue only from fresh owner-reported issues.
+- Current owner-reported work queue: review and merge the app issue screenshot / CI preflight PR, then continue only from fresh owner-reported issues.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: review/merge `codex/mobile-qr-visual-fixes`, then reset this ledger after merge. Do not start the broad monolith split yet.
+- Next exact action: review/merge `codex/appissue-screenshot-ci-preflight`, then reset this ledger after merge. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 
@@ -100,6 +101,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 For code changes:
 
+- `npm run pr:preflight`
 - `npm test -- --run`
 - `npm run build`
 - browser smoke-check for UI behavior changes
