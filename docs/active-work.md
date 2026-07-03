@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: codex/ltr-auth-secret-fields.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: make login, password, PIN, and profile password inputs LTR inside RTL screens.
 - Latest completed product work:
   - PR #585 moved the mobile role-preview control into the topbar action row as a compact button while keeping the role switcher available as a popover.
   - PR #583 compacted mobile header/profile surfaces, fixed LTR numeric/contact fields, and made expiring fleet-document rows directly tappable.
