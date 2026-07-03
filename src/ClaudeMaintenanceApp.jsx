@@ -23,6 +23,7 @@ import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
+import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { DEFAULT_LOCAL_NOTIFICATION_PREFS, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
@@ -1828,7 +1829,12 @@ export default function App() {
   };
   const delUser = async (id) => { if (!await deleteShared(`user:${id}`)) return false; setUsers((s) => s.filter((x) => x.id !== id)); return true; };
   const saveConfig = async (n, options = {}) => { if (!await persistShared("config:v1", JSON.stringify(n), options)) return false; setConfig(n); return true; };
-  const saveTask = async (t) => { if (!await persistShared(`mtask:${t.id}`, JSON.stringify(t))) return false; setTasks((s) => [t, ...s.filter((x) => x.id !== t.id)].sort((a, b) => b.createdAt - a.createdAt)); return true; };
+  const saveTask = async (t) => {
+    const task = normalizeTaskActionRecord(t);
+    if (!await persistShared(`mtask:${task.id}`, JSON.stringify(task))) return false;
+    setTasks((s) => [task, ...s.filter((x) => x.id !== task.id)].sort((a, b) => b.createdAt - a.createdAt));
+    return true;
+  };
   const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
   const saveMeeting = async (m) => { if (!await persistShared(`mmeet:${m.id}`, JSON.stringify(m))) return false; setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); return true; };
   const delMeeting = async (id) => { if (!await deleteShared(`mmeet:${id}`)) return false; setMeetings((s) => s.filter((x) => x.id !== id)); return true; };
@@ -4101,7 +4107,7 @@ function TaskForm({ task, users, session, onCancel, onSave }) {
     const now = Date.now();
     const dueAt = (f.mode === "deadline" || f.mode === "recurring") ? f.dueAt : null;
     setBusy(true); setErr("");
-    const ok = await onSave({ id: task.id || uid(), title: f.title.trim(), desc: f.desc.trim(), responsibleIds: f.responsibleIds, participantIds: task.participantIds || [], priority: f.priority, status: f.status, mode: f.mode, dueAt, recur: f.mode === "recurring" ? f.recur : null, nextActionAt: f.nextActionAt || null, category: f.category.trim(), locationText: (f.locationText || "").trim(), waitingFor: f.status === "waiting" ? f.waitingFor : "", isPrivate: f.isPrivate, meetingId: task.meetingId || null, linkedMeetingIds: task.linkedMeetingIds || [], origin: task.origin || "manual", ownerId: task.ownerId || session.id, createdBy: task.createdBy || { name: session.name, role: session.role }, createdAt: task.createdAt || now, updatedAt: now, log: task.log || [{ at: now, by: session.name, byRole: session.role, text: "המטלה נוצרה", kind: "open" }] });
+    const ok = await onSave({ ...taskActionSourceFields(task), id: task.id || uid(), title: f.title.trim(), desc: f.desc.trim(), responsibleIds: f.responsibleIds, participantIds: task.participantIds || [], priority: f.priority, status: f.status, mode: f.mode, dueAt, recur: f.mode === "recurring" ? f.recur : null, nextActionAt: f.nextActionAt || null, category: f.category.trim(), locationText: (f.locationText || "").trim(), waitingFor: f.status === "waiting" ? f.waitingFor : "", isPrivate: f.isPrivate, meetingId: task.meetingId || null, linkedMeetingIds: task.linkedMeetingIds || [], origin: task.origin || "manual", ownerId: task.ownerId || session.id, createdBy: task.createdBy || { name: session.name, role: session.role }, createdAt: task.createdAt || now, updatedAt: now, log: task.log || [{ at: now, by: session.name, byRole: session.role, text: "המטלה נוצרה", kind: "open" }] });
     setBusy(false);
     if (ok === false) {
       setErr("השמירה נכשלה. בדקו חיבור ונסו שוב.");
