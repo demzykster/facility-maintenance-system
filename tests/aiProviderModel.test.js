@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { AI_MODES, aiModeFromEnv, productionAiPolicy } from "../src/aiProviderModel.js";
 
 describe("aiProviderModel", () => {
-  it("defaults browser AI to demo only and disables it in production", () => {
-    expect(aiModeFromEnv({}, "demo")).toBe(AI_MODES.client);
+  it("disables browser AI by default and ignores the legacy client mode", () => {
+    expect(aiModeFromEnv({}, "demo")).toBe(AI_MODES.disabled);
     expect(aiModeFromEnv({}, "production")).toBe(AI_MODES.disabled);
+    expect(aiModeFromEnv({ VITE_CMMS_AI_MODE: "client" }, "demo")).toBe(AI_MODES.disabled);
   });
 
   it("blocks direct browser provider calls in production", () => {
