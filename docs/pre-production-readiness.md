@@ -1,19 +1,21 @@
 # Pre-Production Readiness Note
 
-This note names what is currently safe to assume before treating the demo as close to production.
+This note names what is currently safe to assume before treating the staging/pilot app as close to production.
 
 ## Current Status
 
 - GitHub `main` is the source of truth.
-- Vercel is a public demo/staging deployment, not production.
-- The app is still a single-client demo shell backed by browser `localStorage`.
-- Current data is stored per browser/device. There is no shared production database yet.
+- Vercel is the public staging/pilot deployment, not final production.
+- Staging is backed by Supabase Auth/app profiles and the Supabase KV compatibility bridge.
+- Local/demo mode still exists for development review, but it is not the deployed staging data path.
+- Owner-entered staging/pilot data is working data. Do not clear, reseed, or overwrite it unless the owner explicitly asks.
 
 ## Demo-Only Boundaries
 
-- Login, PINs, first-login setup, and module permissions are demo controls, not final production authentication.
-- Demo credentials and browser-side permissions are useful for workflow review, but they do not replace server-side auth.
-- First-login password/PIN setup must stay server-backed in production.
+- Built-in demo identities are for local/demo review only and must stay disabled in production-like modes.
+- Production/staging login now uses the server session path with Supabase-backed identity/profile checks.
+- First-login password/PIN setup must remain server-backed.
+- Module permissions must continue moving toward server-side enforcement as flows leave the KV bridge.
 - Backup files are plain JSON and can contain business data. Treat them as sensitive files.
 
 ## Backup / Restore
@@ -26,15 +28,12 @@ This note names what is currently safe to assume before treating the demo as clo
 
 ## Production Backend Phase
 
-The owner opened the production backend/auth phase after R8.
+The owner opened the production backend/auth phase after R8. The first staging scope is now implemented around Supabase Auth/app profiles, server sessions, and the Supabase KV compatibility bridge.
 
-The current Vercel deployment remains demo/staging until the production backend work is actually implemented and verified.
+Still in scope for production hardening:
 
-Now in scope for the next phase:
-
-- database provider selection and schema design;
-- Auth provider integration;
-- RLS / server-side permission rules;
+- normalized database schema/RLS for more business tables;
+- continued server-side permission enforcement;
 - production file/photo storage;
 - server-side AI endpoint for provider secrets;
 - adapter/model-first extraction from `src/ClaudeMaintenanceApp.jsx`.

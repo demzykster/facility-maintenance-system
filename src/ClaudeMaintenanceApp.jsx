@@ -1491,16 +1491,16 @@ export default function App() {
     { // migrate legacy users that predate email/password login
       let migrated = false;
       for (const u of us) {
-        if (u.role !== "tech" && u.role !== "worker" && !u.email) { u.email = u.role === "admin" ? "vadim@chemipal.co.il" : `user${String(u.id).slice(-4)}@local`; u.password = u.password || u.pin || "1234"; await store.set(`user:${u.id}`, JSON.stringify(u), true); migrated = true; }
+        if (u.role !== "tech" && u.role !== "worker" && !u.email) { u.email = u.role === "admin" ? "owner@example.local" : `user${String(u.id).slice(-4)}@example.local`; u.password = u.password || u.pin || "demo1234"; await store.set(`user:${u.id}`, JSON.stringify(u), true); migrated = true; }
         if (u.role === "tech" && !u.pin) { u.pin = "0000"; await store.set(`user:${u.id}`, JSON.stringify(u), true); migrated = true; }
-        if (u.role === "worker" && !u.workerNo) { u.workerNo = (u.email === "worker@chemipal.co.il") ? "1042" : String(u.id).slice(-4); u.pin = u.pin || u.password || "1234"; u.email = ""; u.password = ""; await store.set(`user:${u.id}`, JSON.stringify(u), true); migrated = true; }
+        if (u.role === "worker" && !u.workerNo) { u.workerNo = (u.email === "worker@example.local") ? "1042" : String(u.id).slice(-4); u.pin = u.pin || u.password || "1234"; u.email = ""; u.password = ""; await store.set(`user:${u.id}`, JSON.stringify(u), true); migrated = true; }
       }
       if (migrated) us = await loadColl("user:");
     }
     if (SEED_POLICY.allowBuiltinDemoUsers) { // гарантируем наличие дефолтных учёток в demo/test בלבד
       const defaults = [
-        { name: "ודים", role: "admin", email: "vadim@chemipal.co.il", password: "1234", pin: "", dept: "הנהלה" },
-        { name: "מנהל מחלקה", role: "user", email: "menahel@chemipal.co.il", password: "1234", pin: "", dept: (DEFAULT_CONFIG.departments[0] || "שילוח") },
+        { name: "ודים", role: "admin", email: "owner@example.local", password: "demo1234", pin: "", dept: "הנהלה" },
+        { name: "מנהל מחלקה", role: "user", email: "manager@example.local", password: "demo1234", pin: "", dept: (DEFAULT_CONFIG.departments[0] || "שילוח") },
         { name: "טכנאי", role: "tech", email: "", password: "", pin: "1234", supplier: "", shiftEnd: "16:30", dept: "" },
         { name: "עובד מחסן", role: "worker", workerNo: "1042", pin: "1234", email: "", password: "", dept: (DEFAULT_CONFIG.departments[0] || "שילוח") },
         { name: "עובד ניקיון", role: "cleaner", workerNo: "1050", pin: "1234", email: "", password: "", dept: "" },
@@ -2236,8 +2236,8 @@ function WorkerReportView({ report, session, saveTicket, onClose }) {
 /* ============================================================ LOGIN */
 // Demo-only identities. Production mode disables this list through seed policy.
 const BUILTIN_LOGINS = [
-  { id: "builtin_admin", name: "ודים", role: "admin", email: "vadim@chemipal.co.il", password: "1234", dept: "הנהלה" },
-  { id: "builtin_mgr", name: "מנהל מחלקה", role: "user", email: "menahel@chemipal.co.il", password: "1234", dept: "" },
+  { id: "builtin_admin", name: "ודים", role: "admin", email: "owner@example.local", password: "demo1234", dept: "הנהלה" },
+  { id: "builtin_mgr", name: "מנהל מחלקה", role: "user", email: "manager@example.local", password: "demo1234", dept: "" },
   { id: "builtin_tech", name: "טכנאי", role: "tech", pin: "1234", supplier: "", shiftEnd: "16:30", techScope: "transport", techCats: [] },
   { id: "builtin_worker", name: "עובד מחסן", role: "worker", workerNo: "1042", pin: "1234", dept: "" },
   { id: "builtin_cleaner", name: "עובד ניקיון", role: "cleaner", workerNo: "1050", pin: "1234", dept: "" },
@@ -2619,7 +2619,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setInitialSetup(null); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : !resolved ? (<>
           <div className="login-q">{t("login.title")}</div>
-          <label className="field"><span>{t("login.identity")}</span><input className="ltr-input" dir="ltr" value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com / 1042" : "vadim@chemipal.co.il / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
+          <label className="field"><span>{t("login.identity")}</span><input className="ltr-input" dir="ltr" value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" placeholder={productionLogin ? "owner@example.com / 1042" : "owner@example.local / 1042 / 1234"} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err">{err}</div>}
           <button className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
@@ -2633,7 +2633,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? t("login.connecting") : t("login.signIn")}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>{t("login.back")}</button>
         </>)}
-        {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: vadim@chemipal.co.il + סיסמה 1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
+        {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: owner@example.local + סיסמה demo1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
         <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>{t("login.developedBy")} </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
         <InstallAppPrompt language={language} />
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> {t("login.reportWithoutLogin")}</button>

@@ -79,13 +79,11 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 - Excel/CSV task import is capped at 5 MB in branch `codex/audit-dependencies` as a small mitigation while the `xlsx` replacement/upgrade decision remains open.
 - Branch `codex/replace-task-import-xlsx` moves task file import away from `xlsx` to `read-excel-file` for `.xlsx` and `papaparse` for `.csv`.
 - After that branch, `xlsx` remains only for Excel export/report generation paths.
-- The public Vercel deployment is still demo/staging. It uses browser-local storage, not Supabase or a production database.
+- The public Vercel deployment is staging/pilot, not final production. It uses the current Supabase-backed server/session/KV compatibility path for staging data, while local/demo mode can still use browser storage for development review.
 
 ## Current Position
 
-Phase 2 basics are now complete.
-
-Next practical work should define and implement a unified permissions model before adding more one-off user-card checkboxes or worker onboarding controls.
+Phase 2 basics are complete. This file is now a historical reference; check `docs/active-work.md` and GitHub PR state before treating any "next" item below as current.
 
 Current permissions work:
 
