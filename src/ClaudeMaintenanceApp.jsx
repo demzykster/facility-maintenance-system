@@ -47,7 +47,7 @@ import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSup
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
-import { VERSION_MANIFEST_PATH, normalizeVersionManifest, shouldShowVersionUpdate } from "./appVersionModel.js";
+import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
 import { DEFAULT_LANGUAGE, languageDirection, languageOptions, normalizeLanguageCode } from "./languageModel.js";
 import { uiText } from "./uiI18nModel.js";
@@ -1378,6 +1378,16 @@ export default function App() {
         const latest = normalizeVersionManifest(await response.json());
         if (cancelled) return;
         if (shouldShowVersionUpdate({ currentCommit: APP_BUILD_COMMIT, latestCommit: latest.commit, dismissedCommit: dismissedVersionCommit })) {
+          if (shouldAutoRefreshStandaloneVersion({
+            currentCommit: APP_BUILD_COMMIT,
+            latestCommit: latest.commit,
+            isStandalone: isStandaloneDisplay({ matchMedia: window.matchMedia?.bind(window), navigator: window.navigator }),
+            storage: window.sessionStorage
+          })) {
+            markStandaloneVersionRefreshed({ latestCommit: latest.commit, storage: window.sessionStorage });
+            await refreshAppCache();
+            return;
+          }
           setVersionUpdate(latest);
         } else if (latest.commit === APP_BUILD_COMMIT) {
           setVersionUpdate(null);
