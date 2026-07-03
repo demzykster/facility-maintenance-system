@@ -22,11 +22,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/appissue-screenshot-ci-preflight-v2`.
+- Active branch: `codex/remove-google-font-import`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
-- Open PRs at last check: #574 app issue screenshots and PR preflight, #572 active-work reset after #571, #561 first-login verification handoff, #562 remove external font import, #563 remove unused app shell.
-- Active work in progress: app issue reports with automatic sanitized screenshots, plus PR preflight guidance for active-work ledger failures.
+- Open PRs at last check: #562 remove external font import, #561 first-login verification handoff.
+- Active work in progress: remove external Google Fonts import and keep CSP-friendly system font stack.
 - Latest completed product work:
+  - PR #575 added automatic sanitized screenshots to internal app issue reports and introduced `npm run pr:preflight`.
+  - PR #563 removed the unused `src/App.jsx` shell.
   - PR #573 fixed mobile QR/public-report visual issues, manager fleet mobile row wrapping, and guest QR storage-toast behavior.
   - PR #571 added the Vite optimizer workaround for `jsqr` dev-server loading.
   - PR #570 added URL-based cleaning QR tokens, an in-app jsqr camera scanner, production QR/manual fallback audit fields, post-round summary, manager clean-complete notifications, upcoming cleaning reminders, and per-zone anonymous report throttling.
@@ -51,9 +53,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue: review and merge the app issue screenshot / CI preflight PR, then continue only from fresh owner-reported issues.
+- Current owner-reported work queue: review and merge the external font cleanup PR, then reset this ledger and continue only from fresh owner-reported issues.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: review/merge `codex/appissue-screenshot-ci-preflight-v2`, then reset this ledger after merge. Do not start the broad monolith split yet.
+- Next exact action: review/merge `codex/remove-google-font-import`, then reset this ledger after merge. Do not start the broad monolith split yet.
 
 ## Current Product Direction
 

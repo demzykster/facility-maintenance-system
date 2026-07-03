@@ -8846,7 +8846,6 @@ function ConfirmBtn({ onConfirm, label, className = "btn-danger full", style, ic
 /* ============================================================ STYLES */
 function Style() {
   return (<style>{`
-@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Assistant:wght@400;500;600;700&display=swap');
 :root{--font-body:'Assistant','Rubik',system-ui,'Segoe UI',Arial,sans-serif;--font-head:'Rubik','Assistant',system-ui,sans-serif;
 --bg:#EEF1F4;--surface:#FFFFFF;--surface-2:#F4F6F9;--ink:#16202E;--muted:#64748B;--line:#E2E7ED;--input:#FFFFFF;
 --primary:#EA580C;--primary-d:#C2410C;--accent:#F59E0B;--slate:#16202E;--side:#16202E;--side-ink:#94A3B8;}
