@@ -1857,9 +1857,9 @@ export default function App() {
     const nextConfig = migrateInspectionProgramsFromTemplates(config, templates, config.defaultInspIntervalMonths ?? 2);
     if (nextConfig === config) return;
     saveConfig(nextConfig).then((ok) => {
-      if (ok !== false) setToast("תכניות בקרה הועברו אוטומטית — אנא בדוק את התדירויות בהגדרות סוגי כלים");
+      if (ok !== false && session?.role === "admin") setToast("תכניות בקרה הועברו אוטומטית — אנא בדוק את התדירויות בהגדרות סוגי כלים");
     });
-  }, [ready, config?.vtInspMigV, templates]);
+  }, [ready, config?.vtInspMigV, templates, session?.role]);
   const setShift = async (on) => { if (!session) return false; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return false; setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); return true; };
   const beat = async () => { if (!session || session.role !== "tech") return; const cur = presence.find((x) => x.id === session.id); if (!cur || !cur.onShift || cur.day !== todayKey()) return; const rec = { ...cur, lastSeen: Date.now() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); };
   useEffect(() => { if (!session || session.role !== "tech") return; const id = setInterval(beat, 60000); return () => clearInterval(id); }, [session, presence]);
