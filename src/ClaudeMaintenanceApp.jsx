@@ -1785,8 +1785,6 @@ export default function App() {
   const progressComplaint = async (c) => persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() });
   const delFleet = async (id, options = {}) => { if (!await deleteShared(`fleet:${id}`, options)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
   const saveInsp = async (i) => { if (!await persistShared(`insp:${i.id}`, JSON.stringify(i))) return false; setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); return true; };
-  const saveTpl = async (t) => { if (!await persistShared(`itpl:${t.id}`, JSON.stringify(t))) return false; setTemplates((s) => [...s.filter((x) => x.id !== t.id), t]); return true; };
-  const delTpl = async (id) => { if (!await deleteShared(`itpl:${id}`)) return false; setTemplates((s) => s.filter((x) => x.id !== id)); return true; };
   const syncAdminProfileUser = async (u) => {
     if (!u?.authUserId) return;
     const accessToken = PRODUCTION_AUTH_STORE.get()?.accessToken || "";
@@ -2076,7 +2074,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveTpl, delTpl, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -6454,25 +6452,16 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, on
 
 /* ============================================================ INSPECTIONS */
 function InspectionsModule(p) {
-  const { fleet, templates, insp, saveTpl, delTpl, saveInsp, saveTicket, session, config } = p;
-  const [sub, setSub] = useState("run"), [tplEdit, setTplEdit] = useState(null), [run, setRun] = useState(null), [detail, setDetail] = useState(null);
-  const [tplId, setTplId] = useState("all"), [mode, setMode] = useState("todo");
+  const { fleet, templates, insp, saveInsp, saveTicket, session, config } = p;
+  const [run, setRun] = useState(null), [detail, setDetail] = useState(null);
+  const [mode, setMode] = useState("todo");
   const [igrp, setIgrp] = useState("none"), [icoll, setIcoll] = useState({});
   const duePairs = useMemo(() => buildInspectionDuePairs({ fleet, insps: insp, config, now: Date.now(), unitModelCode, unitTypeName }), [fleet, insp, config]);
-  const matchFleet = (f) => { if (tplId === "all") return true; const tpl = templates.find((t) => t.id === tplId); if (!tpl) return true; return tpl.target === "all" || (tpl.target === "hydraulic") === resolveHydraulics(f, config); };
-  const pool = fleet.filter(matchFleet);
   const dueFleetIds = new Set(duePairs.map(({ f }) => f.id));
   const okCount = fleet.filter((f) => !dueFleetIds.has(f.id)).length;
   const hasUnconfiguredTypes = fleet.length > 0 && (config.vehicleTypes || []).some((vt) => !inspectionProgramsForType(vt).length);
   return (<>
-    <div className="seg-tabs"><button className={sub === "run" ? "on" : ""} onClick={() => setSub("run")}>בקרה</button><button className={sub === "tpl" ? "on" : ""} onClick={() => setSub("tpl")}>שאלונים</button></div>
-    {sub === "tpl" ? (<>
-      <div className="note" style={{ background: "#FEF3C7", color: "#B45309", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>שאלונים אלו שמורים לצורך הצגת היסטוריה בלבד. תכניות בקרה חדשות מוגדרות בהגדרות ← סוגי כלי השינוע.</div>
-      <div className="row-between"><SectionTitle><ClipboardList size={15} /> שאלוני בקרה</SectionTitle><button className="btn-primary sm" onClick={() => setTplEdit({})}><Plus size={15} /> שאלון</button></div>
-      {templates.length === 0 ? <Empty text="אין שאלונים" Icon={ClipboardCheck} sub="צרו שאלון לכלים עם/בלי תסקיר" />
-        : <div className="cards">{templates.map((t) => <button key={t.id} className="tcard" onClick={() => setTplEdit(t)} style={{ borderInlineStartColor: TRACKS.transport.color }}><div className="tcard-icon" style={{ background: "var(--surface-2)" }}><ClipboardList size={20} color={TRACKS.transport.color} /></div><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{t.name}</span></div><div className="tcard-sub">{t.target === "hydraulic" ? "כלים עם תסקיר" : t.target === "ground" ? "כלים ללא תסקיר" : "כל הכלים"} · {t.items.length} סעיפים</div></div></button>)}</div>}
-    </>) : (<>
-      {mode === "hist" && <label className="field"><span>בחרו שאלון בקרה</span><select value={tplId} onChange={(e) => setTplId(e.target.value)}><option value="all">כל הכלים</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>}
+    <div className="note" style={{ marginBottom: 10 }}>תכניות בקרה חדשות מוגדרות בהגדרות ← סוגי כלי השינוע. שאלוני הבקרה הישנים הוסרו מעריכת המוצר ונשארים לקריאת היסטוריה בלבד.</div>
       <div className="seg-tabs" style={{ maxWidth: 320 }}><button className={mode === "todo" ? "on" : ""} onClick={() => setMode("todo")}>לביצוע{duePairs.length ? ` (${duePairs.length})` : ""}</button><button className={mode === "hist" ? "on" : ""} onClick={() => setMode("hist")}>היסטוריה</button></div>
       {mode === "todo" ? (
         duePairs.length === 0 ? (hasUnconfiguredTypes ? <div className="empty-setup"><div className="empty-title">אין בקרות לביצוע</div><div className="empty-sub">להגדרת תכניות בקרה: הגדרות ← סוגי כלי השינוע ← תכניות בקרה</div></div> : <Empty text="הכל תקין" Icon={ClipboardCheck} />)
@@ -6487,12 +6476,10 @@ function InspectionsModule(p) {
               <div className="fleet-groups">{arr.map(([k, items]) => { const open = !icoll[k]; return <div key={k} className="fgroup"><button className="fgroup-head" onClick={() => setIcoll((c) => ({ ...c, [k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{k}</span><span className="fgroup-count">{items.length}</span></button>{open && <div className="cards">{items.map(dueCard)}</div>}</div>; })}{ftr}</div></>;
           })()
       ) : (
-        <InspHistory pool={pool} insp={insp} templates={templates} config={config} onRun={(f) => setRun({ fleet: f, program: null })} onView={(i) => setDetail(i)} />
+        <InspHistory pool={fleet} insp={insp} templates={templates} config={config} onRun={(f) => setRun({ fleet: f, program: null })} onView={(i) => setDetail(i)} />
       )}
-    </>)}
     {detail && <Overlay onClose={() => setDetail(null)}><InspDetail rec={detail} fleet={fleet} templates={templates} onClose={() => setDetail(null)} /></Overlay>}
-    {tplEdit && <Overlay persistent onClose={() => setTplEdit(null)}><TemplateForm tpl={tplEdit} onCancel={() => setTplEdit(null)} onSave={async (t) => { const ok = await saveTpl(t); if (ok !== false) setTplEdit(null); return ok; }} onDelete={tplEdit.id ? async () => { const ok = await delTpl(tplEdit.id); if (ok !== false) setTplEdit(null); return ok; } : null} /></Overlay>}
-    {run && <Overlay persistent onClose={() => setRun(null)}><InspectionRun fleet={run.fleet} program={run.program || null} templates={templates} session={session} config={config} onClose={() => setRun(null)} onFinish={async (record, ticket) => { if (await saveInsp(record) === false) return false; if (ticket && await saveTicket(ticket) === false) return false; setRun(null); return true; }} /></Overlay>}
+    {run && <Overlay persistent onClose={() => setRun(null)}><InspectionRun fleet={run.fleet} program={run.program || null} session={session} config={config} onClose={() => setRun(null)} onFinish={async (record, ticket) => { if (await saveInsp(record) === false) return false; if (ticket && await saveTicket(ticket) === false) return false; setRun(null); return true; }} /></Overlay>}
   </>);
 }
 function InspHistory({ pool, insp, templates, onRun, onView, config }) {
@@ -6578,25 +6565,13 @@ function InspDetail({ rec, fleet, templates, onClose }) {
       <div style={{ height: 20 }} />
     </div></div>);
 }
-function TemplateForm({ tpl, onCancel, onSave, onDelete }) {
-  const [name, setName] = useState(tpl.name || ""), [target, setTarget] = useState(tpl.target || "hydraulic"), [items, setItems] = useState((tpl.items || []).join("\n")), [err, setErr] = useState("");
-  const save = () => { const it = items.split("\n").map((s) => s.trim()).filter(Boolean); if (!name.trim()) return setErr("נא להזין שם"); if (!it.length) return setErr("נא להוסיף סעיפים"); onSave({ id: tpl.id || uid(), name: name.trim(), target, items: it }); };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{tpl.id ? "עריכת שאלון" : "שאלון בקרה חדש"}</div></div>
-    <div className="body">
-      <label className="field"><span>שם השאלון *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: סיקור חודשי — מלגזה הידראולית" /></label>
-      <label className="field"><span>מתאים לכלים</span><select value={target} onChange={(e) => setTarget(e.target.value)}><option value="hydraulic">כלים עם תסקיר</option><option value="ground">כלים ללא תסקיר</option><option value="all">כל הכלים</option></select></label>
-      <label className="field"><span>סעיפי בדיקה (סעיף בכל שורה)</span><textarea rows={8} className="ta" value={items} onChange={(e) => setItems(e.target.value)} placeholder={"בלמים\nצמיגים\nתאורה\nמערכת הידראולית\nדליפות שמן\nצופר"} /></label>
-      {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>שמירה</button>
-      {onDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
-      <div style={{ height: 24 }} />
-    </div></div>);
-}
-function InspectionRun({ fleet, program, templates, session, config, onClose, onFinish }) {
-  const match = templates.filter((t) => t.target === "all" || (t.target === "hydraulic") === resolveHydraulics(fleet, config));
-  const [tplId, setTplId] = useState(match[0]?.id || "");
-  const tpl = templates.find((t) => t.id === tplId);
-  const checklist = program ? (program.checklist || []) : (tpl?.items || []).map((label, idx) => ({ id: `tpl-${idx}`, label }));
+const GENERAL_INSPECTION_CHECKLIST = [
+  { id: "general-visual", label: "בדיקה חזותית כללית" },
+  { id: "general-safety", label: "בטיחות שימוש בסיסית" },
+  { id: "general-damage", label: "נזקים / נזילות / חריגות" },
+];
+function InspectionRun({ fleet, program, session, config, onClose, onFinish }) {
+  const checklist = program ? (program.checklist || []) : GENERAL_INSPECTION_CHECKLIST;
   const [res, setRes] = useState({});
   const [sev, setSev] = useState("minor");
   const set = (i, ok) => setRes((s) => ({ ...s, [i]: { ...s[i], ok } }));
@@ -6607,7 +6582,7 @@ function InspectionRun({ fleet, program, templates, session, config, onClose, on
   const finish = () => {
     const now = Date.now(); const passed = problems.length === 0;
     const probTexts = problems.map(({ it, i }) => `${it}${res[i]?.note ? " — " + res[i].note : ""}`);
-    const record = { id: uid(), fleetId: fleet.id, programId: program?.id || null, templateId: program ? null : tplId, by: session.name, at: now, results: checklist.map((it, i) => ({ text: it.label || it, ok: res[i]?.ok !== false, note: res[i]?.note || "" })), problems: probTexts, passed };
+    const record = { id: uid(), fleetId: fleet.id, programId: program?.id || null, templateId: null, by: session.name, at: now, results: checklist.map((it, i) => ({ text: it.label || it, ok: res[i]?.ok !== false, note: res[i]?.note || "" })), problems: probTexts, passed };
     let ticket = null;
     if (!passed && (!program || program.autoTicket === true)) {
       const tid = uid();
@@ -6619,15 +6594,13 @@ function InspectionRun({ fleet, program, templates, session, config, onClose, on
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">בקרת כלי · {fleet.code}</div></div>
     <div className="body">
-      {!program && match.length === 0 ? <div className="note" style={{ borderColor: "#FCD34D" }}>אין שאלון מתאים לכלי זה. צרו שאלון בלשונית "שאלונים".</div> : <>
-        {program ? <div className="detail-caption" style={{ color: TRACKS.transport.color }}><ClipboardList size={14} /> {program.name}</div> : <label className="field"><span>שאלון</span><select value={tplId} onChange={(e) => setTplId(e.target.value)}>{match.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>}
+        <div className="detail-caption" style={{ color: TRACKS.transport.color }}><ClipboardList size={14} /> {program ? program.name : "בקרה כללית"}</div>
         <SectionTitle>סעיפי בדיקה</SectionTitle>
         {!hasChecklist && <div className="note" style={{ borderColor: "#FCD34D" }}>אין סעיפי בדיקה בתכנית זו.</div>}
         {checklist.map((it, i) => <div key={it.id || i} className="insp-item"><div className="insp-row"><span className="insp-name">{it.label || it}</span><div className="insp-btns"><button className={"ins-ok" + (res[i]?.ok === true ? " on" : "")} onClick={() => set(i, true)}><Check size={16} /></button><button className={"ins-bad" + (res[i]?.ok === false ? " on" : "")} onClick={() => set(i, false)}><X size={16} /></button></div></div>{res[i]?.ok === false && <input className="insp-note" value={res[i]?.note || ""} onChange={(e) => note(i, e.target.value)} placeholder="תיאור הממצא…" />}</div>)}
         {problems.length > 0 && <><div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2" }}>{problems.length} ממצאים{program && program.autoTicket === false ? " — לא תיפתח קריאה אוטומטית לתכנית זו." : " — עם סיום הסיקור תיפתח אוטומטית קריאת טיפול לטכנאי."}</div>
         <div className="field"><span>מצב הכלי בעקבות הממצאים *</span><div className="dt-list">{dtLevels(config).map((d) => <button key={d.id} type="button" className={"dt-pick" + (sev === d.id ? " on" : "")} onClick={() => setSev(d.id)} style={sev === d.id ? { borderColor: d.color, background: d.color + "14" } : {}}><span className="dt-dot" style={{ background: d.color }} /><div><div className="dt-name">{d.label}{d.oos ? " · מושבת" : ""}</div><div className="dt-desc">{d.desc}</div></div></button>)}</div></div></>}
         <button className="btn-primary full" style={{ marginTop: 14 }} onClick={finish} disabled={!allChecked}>{allChecked ? "סיום סיקור" + (problems.length && (!program || program.autoTicket === true) ? " ופתיחת קריאה" : "") : "השלימו את כל הסעיפים"}</button>
-      </>}
       <div style={{ height: 24 }} />
     </div></div>);
 }
