@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: codex/suppress-login-migration-toast.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: suppress the inspection-program migration toast on the login/PWA screen while keeping the admin migration flow intact.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #579 suppressed the inspection-program migration toast on the login/PWA screen while keeping the admin migration notification available for authenticated admins.
   - PR #577 added one-shot auto-refresh for stale standalone/PWA builds when `cmms-version.json` reports a newer deployed commit.
   - PR #562 removed the external Google Fonts import and kept the app on the configured system-safe font fallback stack.
   - PR #575 added automatic sanitized screenshots to internal app issue reports and introduced `npm run pr:preflight`.
