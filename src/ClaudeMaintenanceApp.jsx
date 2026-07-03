@@ -8646,16 +8646,16 @@ function BrandMark({ logo, small = false }) {
   </div>;
 }
 
-function RolePreviewBox({ rolePreview, language = DEFAULT_LANGUAGE }) {
+function RolePreviewBox({ rolePreview, language = DEFAULT_LANGUAGE, compact = false }) {
   const [open, setOpen] = useState(false);
   if (!rolePreview) return null;
   const active = ROLE_PREVIEW_OPTIONS.find(([role]) => role === rolePreview.active);
   const ActiveIcon = active?.[2] || ShieldCheck;
   const activeLabel = roleLabelFor(rolePreview.active, language);
   return <div className="role-preview">
-    <button className={"rp-toggle" + (open ? " on" : "")} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={localizedUiLabel(language, "rolePreview.open", "פתיחת תצוגת תפקיד")}>
+    <button className={"rp-toggle" + (compact ? " compact" : "") + (open ? " on" : "")} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={localizedUiLabel(language, "rolePreview.open", "פתיחת תצוגת תפקיד")}>
       <span className="rp-toggle-ic"><ActiveIcon size={17} /></span>
-      <span className="rp-toggle-txt"><b>{localizedUiLabel(language, "rolePreview.title", "תצוגת תפקיד")}</b><small>{activeLabel} · {rolePreview.realName}</small></span>
+      <span className="rp-toggle-txt"><b>{compact ? "תפקיד" : localizedUiLabel(language, "rolePreview.title", "תצוגת תפקיד")}</b>{!compact && <small>{activeLabel} · {rolePreview.realName}</small>}</span>
       <ChevronLeft size={15} className="rp-toggle-chev" />
     </button>
     {open && <div className="rp-grid">{ROLE_PREVIEW_OPTIONS.map(([role, label, Icon]) => {
@@ -8683,8 +8683,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
 }
 function TopBar({ title, subtitle, onLogout, notif, onBell, rolePreview, theme, toggleTheme, extra, demoActive, onProfile, onReportIssue }) {
   return (<header className="topbar"><div className="tb-left"><div><div className="tb-title">{title}{demoActive && <span className="demo-badge">נתוני דמו</span>}</div>{subtitle && <div className="tb-sub">{subtitle}</div>}</div>{extra}</div>
-    <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{onReportIssue && <button className="bell" onClick={onReportIssue} aria-label="דיווח על בעיה במערכת" title="דיווח על בעיה במערכת"><Bug size={19} /></button>}{onProfile && <button className="bell" onClick={onProfile} aria-label="הפרופיל שלי"><User size={19} /></button>}<button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div>
-    {rolePreview && <div className="tb-role-preview"><RolePreviewBox rolePreview={rolePreview} /></div>}</header>);
+    <div className="tb-actions"><button className="bell" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}</button><button className="bell" onClick={onBell} aria-label="התראות"><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{onReportIssue && <button className="bell" onClick={onReportIssue} aria-label="דיווח על בעיה במערכת" title="דיווח על בעיה במערכת"><Bug size={19} /></button>}{onProfile && <button className="bell" onClick={onProfile} aria-label="הפרופיל שלי"><User size={19} /></button>}{rolePreview && <div className="tb-role-preview"><RolePreviewBox rolePreview={rolePreview} compact /></div>}<button className="tb-logout" onClick={onLogout} aria-label="יציאה מהמערכת"><LogOut size={17} /><span>יציאה</span></button></div></header>);
 }
 function Overlay({ children, onClose, persistent, panelClassName = "" }) {
   const ref = useRef(null);
@@ -9007,8 +9006,8 @@ a{color:inherit;}
 .bell .dot{position:absolute;top:4px;inset-inline-start:4px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
 .mob-tab{background:#ffffff1a;color:#fff;border:1px solid #ffffff33;border-radius:9px;padding:7px 9px;font-size:13px;max-width:140px;}
 .mob-tab option{color:#16202E;}
-.tb-role-preview{width:100%;margin-top:2px;}
-.tb-role-preview .role-preview{margin-top:0;}
+.tb-role-preview{width:auto;margin-top:0;position:relative;}
+.tb-role-preview .role-preview{margin-top:0;position:relative;}
 .tb-role-preview .rp-toggle{min-height:34px;}
 .tb-role-preview .rp-grid{padding-bottom:0;}
 
@@ -9563,6 +9562,9 @@ button.notif-perm:hover{background:#D1FAE5;}
 .role-preview{margin-top:8px;}
 .rp-toggle{display:flex;align-items:center;gap:7px;width:100%;min-height:36px;border:1px solid #ffffff1a;border-radius:999px;background:#ffffff08;color:#fff;padding:5px 7px;text-align:right;}
 .rp-toggle:hover,.rp-toggle.on{background:#ffffff12;border-color:#ffffff28;}
+.rp-toggle.compact{width:auto;padding:5px 7px;}
+.rp-toggle.compact .rp-toggle-txt{flex:0 0 auto;}
+.rp-toggle.compact .rp-toggle-txt b{white-space:nowrap;}
 .rp-toggle-ic{width:26px;height:26px;border-radius:999px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
 .rp-toggle-txt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;}
 .rp-toggle-txt b{font-size:11.5px;font-weight:800;line-height:1.15;}
@@ -9937,13 +9939,13 @@ button.notif-perm:hover{background:#D1FAE5;}
   .tb-actions{width:100%;justify-content:flex-start;gap:4px;}
   .tb-logout,.bell{width:34px;height:34px;border-radius:9px;}
   .tb-logout{width:auto;min-width:34px;padding:0 7px;}
-  .tb-role-preview{width:auto;max-width:100%;margin-top:0;margin-inline-start:auto;}
+  .tb-role-preview{width:auto;max-width:100%;margin-top:0;}
   .tb-role-preview .role-preview{width:auto;max-width:100%;}
   .tb-role-preview .rp-toggle{width:auto;min-height:30px;border-radius:11px;padding:4px 6px;}
   .tb-role-preview .rp-toggle-ic{width:24px;height:24px;}
   .tb-role-preview .rp-toggle-txt b{font-size:11px;}
   .tb-role-preview .rp-toggle-txt small{font-size:9.5px;}
-  .tb-role-preview .rp-grid{grid-template-columns:repeat(3,minmax(0,1fr));padding:6px;gap:4px;}
+  .tb-role-preview .rp-grid{position:absolute;top:calc(100% + 7px);inset-inline-end:0;width:min(270px,calc(100vw - 24px));grid-template-columns:repeat(3,minmax(0,1fr));padding:6px;gap:4px;background:var(--slate);box-shadow:0 18px 42px rgba(0,0,0,.32);z-index:42;}
   .modal2-body{padding:14px;}
   .profile-head{margin-bottom:10px;}
   .avatar.big{width:34px;height:34px;font-size:16px;}
