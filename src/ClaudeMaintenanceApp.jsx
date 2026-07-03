@@ -5687,7 +5687,7 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, insp, config, user
     </>}
     {w.docs && dashTrack !== "facility" && <><SectionTitle><FileText size={15} /> מסמכי כלי שינוע פגי-תוקף (30 ימים){expDocs.length ? ` · ${expDocs.length}` : ""}</SectionTitle>
       {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
-        : <div className="cards">{expDocs.map(({ f, s }) => <div key={f.id} className="doc-line"><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><button className="btn-ghost sm" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><PenLine size={13} /> לעדכן</button></div>)}</div>}</>}
+        : <div className="cards">{expDocs.map(({ f, s }) => <button key={f.id} type="button" className="doc-line doc-line-click" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><span className="doc-line-action" aria-hidden="true"><PenLine size={15} /></span></button>)}</div>}</>}
     {w.insp && dashTrack !== "facility" && <><SectionTitle><ClipboardCheck size={15} /> בקרת כלים לביצוע (חודשי)</SectionTitle>
       {inspDue.length === 0 ? <div className="note">כל כלי השינוע סוקרו החודש.</div> : <div className="note" style={{ borderColor: "#FCD34D", cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "insp" }) : setTab("assets")}>{countLabel(inspDue.length, "כלי ממתין", "כלים ממתינים")} לבקרה חודשית. גשו ללשונית "בקרת כלים".</div>}</>}
     {w.pm && dashTrack !== "facility" && pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים קרובים</SectionTitle><div className="pm-mini">{pmSoon.slice(0, 5).map((x) => { const d = daysLeft(x.nextDue); const f = fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId); return <div key={x.id} className="pm-mini-item" style={{ cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span className="dot-lg" style={{ background: pmColor(d) }} /><span className="pm-mini-t">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="pm-mini-d" style={{ color: pmColor(d) }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></div>; })}</div></>}
@@ -6400,8 +6400,8 @@ function FleetForm({ item, config, onCancel, onSave }) {
       </>}
       <label className="field"><span>ספק / ליסינג</span><select value={f.supplier} onChange={(e) => setF({ ...f, supplier: e.target.value })}><option value="">— בחרו ספק —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select></label>
       <div className="field"><span>מחלקות אחראיות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (f.depts.includes(d) ? " on" : "")}><input type="checkbox" checked={f.depts.includes(d)} onChange={() => toggleDept(d)} /> {d}</label>)}</div></div>
-      <label className="field"><span>מספר שלדה</span><input value={f.chassis} onChange={(e) => setF({ ...f, chassis: e.target.value })} /></label>
-      {showLicense && <label className="field"><span>מספר רישוי</span><input value={f.license} onChange={(e) => setF({ ...f, license: e.target.value })} /></label>}
+      <label className="field"><span>מספר שלדה</span><input className="ltr-input" dir="ltr" value={f.chassis} onChange={(e) => setF({ ...f, chassis: e.target.value })} /></label>
+      {showLicense && <label className="field"><span>מספר רישוי</span><input className="ltr-input" dir="ltr" value={f.license} onChange={(e) => setF({ ...f, license: e.target.value })} /></label>}
       <SectionTitle><FileText size={15} /> מסמכים ותוקף</SectionTitle>
       {machineDocs(f, config).length === 0 ? <div className="hint">לסוג זה לא הוגדרו מסמכים מנוהלים. ניתן להגדיר בהגדרות → כלי שינוע.</div> : machineDocs(f, config).map((d) => <div key={d.id} className="doc-edit"><div className="doc-edit-lbl">{d.label}</div><div className="doc-edit-row"><input type="date" value={f.docs[d.id]?.date || ""} onChange={(e) => setDoc(d.id, "date", e.target.value)} /><input value={f.docs[d.id]?.link || ""} onChange={(e) => setDoc(d.id, "link", e.target.value)} placeholder="קישור לקובץ (Drive/SharePoint)" /></div></div>)}
       <label className="field" style={{ marginTop: 14 }}><span>הערות</span><textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
@@ -7512,10 +7512,10 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
     {tab === "details" && <div>
       <label className="field"><span>שם הספק</span><div style={{ display: "flex", gap: 8 }}><input value={nm} onChange={(e) => setNm(e.target.value)} readOnly={!canManage} style={{ flex: 1 }} />{canManage && nm.trim() && nm.trim() !== name && onRename && <button className="btn-ghost sm" onClick={() => onRename(name, nm)}>שנה שם</button>}</div></label>
       <div className="field"><span>תחום / מודול</span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>{SUP_INDUSTRIES.map((x) => <button key={x.id} type="button" onClick={() => toggleInd(x.id)} disabled={!canManage} className={"chip" + (ind.includes(x.id) ? " on" : "")}>{x.label}</button>)}</div></div>
-      <label className="field"><span>ח.פ. / מספר עוסק</span><input value={hp} onChange={(e) => setHp(e.target.value)} readOnly={!canManage} placeholder="לדוגמה: 514123456" /></label>
+      <label className="field"><span>ח.פ. / מספר עוסק</span><input className="ltr-input" dir="ltr" value={hp} onChange={(e) => setHp(e.target.value)} readOnly={!canManage} placeholder="לדוגמה: 514123456" /></label>
       <label className="field"><span>כתובת</span><input value={address} onChange={(e) => setAddress(e.target.value)} readOnly={!canManage} placeholder="רחוב, עיר" /></label>
       <div className="field"><div className="row-between"><span>אנשי קשר</span>{canManage && <button className="btn-ghost sm" onClick={addContact}><Plus size={14} /> איש קשר</button>}</div>
-        {contacts.length === 0 ? <div className="hint">{canManage ? "אפשר להוסיף שם וטלפון בלבד (פרטי), או מספר אנשי קשר עם תפקיד (חברה)." : "אין אנשי קשר שמורים."}</div> : <div className="task-list">{contacts.map((c, i) => <div key={c.id || i} className="task-row" style={{ cursor: "default" }}><div className="task-row-main" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><input value={c.name} onChange={(e) => updContact(i, { name: e.target.value })} readOnly={!canManage} placeholder="שם" style={{ flex: "1 1 110px" }} /><input value={c.phone} onChange={(e) => updContact(i, { phone: e.target.value })} readOnly={!canManage} placeholder="טלפון" style={{ flex: "1 1 110px" }} /><input value={c.email || ""} onChange={(e) => updContact(i, { email: e.target.value })} readOnly={!canManage} placeholder="אימייל (לא חובה)" style={{ flex: "1 1 110px" }} /><input value={c.role} onChange={(e) => updContact(i, { role: e.target.value })} readOnly={!canManage} placeholder="תפקיד (לא חובה)" style={{ flex: "1 1 110px" }} /></div>{canManage && <div className="task-row-side"><button className="btn-ghost sm" onClick={() => delContact(i)}><X size={14} /></button></div>}</div>)}</div>}
+        {contacts.length === 0 ? <div className="hint">{canManage ? "אפשר להוסיף שם וטלפון בלבד (פרטי), או מספר אנשי קשר עם תפקיד (חברה)." : "אין אנשי קשר שמורים."}</div> : <div className="task-list">{contacts.map((c, i) => <div key={c.id || i} className="task-row" style={{ cursor: "default" }}><div className="task-row-main" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><input value={c.name} onChange={(e) => updContact(i, { name: e.target.value })} readOnly={!canManage} placeholder="שם" style={{ flex: "1 1 110px" }} /><input className="ltr-input" dir="ltr" value={c.phone} onChange={(e) => updContact(i, { phone: e.target.value })} readOnly={!canManage} placeholder="טלפון" style={{ flex: "1 1 110px" }} /><input className="ltr-input" dir="ltr" value={c.email || ""} onChange={(e) => updContact(i, { email: e.target.value })} readOnly={!canManage} placeholder="אימייל (לא חובה)" style={{ flex: "1 1 110px" }} /><input value={c.role} onChange={(e) => updContact(i, { role: e.target.value })} readOnly={!canManage} placeholder="תפקיד (לא חובה)" style={{ flex: "1 1 110px" }} /></div>{canManage && <div className="task-row-side"><button className="btn-ghost sm" onClick={() => delContact(i)}><X size={14} /></button></div>}</div>)}</div>}
       </div>
       <label className="field"><span>הערות</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} readOnly={!canManage} rows={2} /></label>
       {err && <div className="err">{err}</div>}
@@ -7920,7 +7920,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
-      <label className="field"><span>טלפון</span><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
+      <label className="field"><span>טלפון</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
       {!lockRole && <label className="field"><span>תפקיד</span><select value={role} onChange={(e) => changeRole(e.target.value)}>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>}
       {role !== "admin" && <label className="field"><span>משמרת</span><select value={shift} onChange={(e) => setShift(e.target.value)}><option value="">ללא משמרת</option>{workShiftsOf(config).map((sh) => <option key={sh.id} value={sh.id}>{sh.label}</option>)}</select></label>}
       {role === "user" && (lockDept
@@ -7954,10 +7954,10 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>
         <label className="field"><span>סבילות משמרת אישית (דקות)</span><input type="number" min="0" value={techGrace} onChange={(e) => setTechGrace(e.target.value)} placeholder={`ברירת מחדל: ${Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)}`} /><div className="hint">השאירו ריק כדי להשתמש בברירת המחדל. ערך אישי משנה את בדיקת האיחור והיציאה המוקדמת של הטכנאי הזה בלבד.</div></label>
       </>) : (role === "worker" || role === "cleaner") ? (<>
-        <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
+        <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
         <ActivationControls />
       </>) : (<>
-        <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
+        <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
         <ActivationControls />
       </>)}
       {(role === "worker" || role === "cleaner") ? (
@@ -8472,8 +8472,8 @@ function ProfileModal({ session, onSave, onClose }) {
         <div className="avatar big">{(session?.name || "?").charAt(0)}</div>
         <div><div className="profile-name">{session?.name || "—"}</div><div className="hint">{ROLE_LABEL[session?.role] || session?.role || ""}{session?.dept ? " · " + session.dept : ""}</div></div>
       </div>
-      <label className="field"><span><Phone size={14} /> טלפון</span><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /></label>
-      {canEditEmail && <label className="field"><span><Mail size={14} /> דוא״ל</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" autoComplete="email" /></label>}
+      <label className="field"><span><Phone size={14} /> טלפון</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /></label>
+      {canEditEmail && <label className="field"><span><Mail size={14} /> דוא״ל</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" autoComplete="email" /></label>}
       <div className="profile-password">
         <SectionTitle><KeyRound size={15} /> שינוי סיסמה</SectionTitle>
         <label className="field compact"><input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="סיסמה חדשה" /></label>
@@ -8961,6 +8961,7 @@ a{color:inherit;}
 .field.compact{margin-bottom:10px;}
 .field input,.field select,.field textarea,.ta{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--input);color:var(--ink);outline:none;transition:.15s;}
 .field input:focus,.field select:focus,.field textarea:focus,.ta:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(234,88,12,.12);}
+.field input.ltr-input,.ltr-input{direction:ltr;text-align:left;unicode-bidi:isolate;}
 .field textarea,.ta{resize:vertical;line-height:1.5;}
 .chk-line{display:flex;align-items:center;gap:9px;font-size:14px;margin-bottom:15px;cursor:pointer;}
 .chk-line input{width:18px;height:18px;}
@@ -8971,9 +8972,9 @@ a{color:inherit;}
 .note.ok{border-color:#86EFAC;color:#166534;background:#DCFCE7;}
 .tel-link{color:var(--primary);font-weight:700;text-decoration:none;direction:ltr;unicode-bidi:isolate;}
 .modal2-panel.profile-modal{max-width:520px;}
-.profile-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px;}
-.profile-name{font-weight:800;color:var(--ink);}
-.avatar.big{width:44px;height:44px;font-size:18px;}
+.profile-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;background:transparent;border:0;border-radius:0;padding:0;}
+.profile-name{font-weight:800;color:var(--ink);line-height:1.2;}
+.avatar.big{width:38px;height:38px;font-size:17px;}
 .profile-password{border-top:1px solid var(--line);padding-top:10px;margin-top:6px;}
 .btn-primary{background:var(--primary);color:#fff;font-weight:600;font-size:15px;border-radius:11px;padding:13px 18px;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.15s;}
 .btn-primary:hover:not(:disabled){background:var(--primary-d);}.btn-primary.full{width:100%;}.btn-primary.sm{padding:9px 14px;font-size:13.5px;}
@@ -9654,9 +9655,14 @@ button.notif-perm:hover{background:#D1FAE5;}
 .sec-toggle > span{display:flex;align-items:center;gap:8px;text-align:start;}
 .sec-toggle svg{flex-shrink:0;}
 .doc-line{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;}
+.doc-line-click{width:100%;text-align:start;color:inherit;cursor:pointer;}
+.doc-line-click:hover{border-color:var(--primary);}
 .doc-line-main{flex:1;min-width:0;}
 .doc-line-t{font-weight:600;font-size:13.5px;}
 .doc-line-s{font-size:12px;margin-top:2px;}
+.doc-line-action{width:32px;height:32px;border-radius:10px;background:var(--surface-2);color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none;}
+.doc-line-click:hover .doc-line-action{color:var(--primary);background:#FFF7ED;}
+.app-dark .doc-line-click:hover .doc-line-action{background:rgba(234,88,12,.14);}
 .kpi-btn{display:block;width:100%;text-align:inherit;background:none;border:none;padding:0;}
 .kpi-btn:hover .kpi{border-color:var(--primary);box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-2px);}
 .kpi-btn:active .kpi{transform:translateY(0);}
@@ -9926,6 +9932,21 @@ button.notif-perm:hover{background:#D1FAE5;}
 .badge.sm{font-size:11px;padding:3px 9px;}
 .spinner.sm{width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:-2px;}
 @media(max-width:720px){
+  .topbar{padding:8px 12px;gap:6px;align-items:center;}
+  .topbar .tb-left{display:none;}
+  .tb-actions{width:100%;justify-content:flex-start;gap:4px;}
+  .tb-logout,.bell{width:34px;height:34px;border-radius:9px;}
+  .tb-logout{width:auto;min-width:34px;padding:0 7px;}
+  .tb-role-preview{width:auto;max-width:100%;margin-top:0;margin-inline-start:auto;}
+  .tb-role-preview .role-preview{width:auto;max-width:100%;}
+  .tb-role-preview .rp-toggle{width:auto;min-height:30px;border-radius:11px;padding:4px 6px;}
+  .tb-role-preview .rp-toggle-ic{width:24px;height:24px;}
+  .tb-role-preview .rp-toggle-txt b{font-size:11px;}
+  .tb-role-preview .rp-toggle-txt small{font-size:9.5px;}
+  .tb-role-preview .rp-grid{grid-template-columns:repeat(3,minmax(0,1fr));padding:6px;gap:4px;}
+  .modal2-body{padding:14px;}
+  .profile-head{margin-bottom:10px;}
+  .avatar.big{width:34px;height:34px;font-size:16px;}
   .worker-top{display:grid;grid-template-columns:1fr;gap:10px;padding:14px 12px 10px;}
   .worker-top-actions{justify-content:space-between;width:100%;gap:6px;}
   .worker-top .icon-btn{width:40px;height:40px;flex:0 0 40px;}

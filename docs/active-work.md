@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: codex/mobile-density-polish.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: compact mobile header/profile surfaces, fix LTR numeric/contact fields, and make expiring fleet-document rows directly tappable.
 - Latest completed product work:
   - PR #581 replaced horizontally scrolling mobile bottom navigation with role-prioritized fixed items and an explicit More menu for secondary sections.
   - PR #579 suppressed the inspection-program migration toast on the login/PWA screen while keeping the admin migration notification available for authenticated admins.
