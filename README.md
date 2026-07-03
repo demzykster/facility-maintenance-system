@@ -1,0 +1,42 @@
+# CMMS CDSL
+
+React/Vite CMMS for CDSL maintenance, fleet, PPE, suppliers, tasks, and operational dashboards.
+
+## Requirements
+
+- Node.js 20 or newer
+- npm
+
+## Local Run
+
+```powershell
+npm install
+npm run dev
+```
+
+Open the local URL printed by Vite, usually `http://127.0.0.1:5173/`.
+
+## Production Build
+
+```powershell
+npm run build
+```
+
+The build output is written to `dist/`.
+
+## Demo Login
+
+- Admin: `vadim@chemipal.co.il`
+- Password: `1234`
+
+Demo data is stored in the browser through the local `window.storage` shim backed by `localStorage`.
+
+## Project Continuity
+
+For handoff to another PC, Codex session, or Claude session, start with:
+
+- [Active work ledger](docs/active-work.md)
+- [Current status](docs/current-status.md)
+- [Next steps](docs/next-steps.md)
+- [Collaboration model](docs/collaboration-model.md)
+- [Handoff for next Codex session](docs/handoff-for-next-codex.md)

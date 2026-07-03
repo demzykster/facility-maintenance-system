@@ -1,0 +1,47 @@
+{
+  "name": "facility-maintenance-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --configLoader native",
+    "build": "vite build --configLoader native",
+    "release:check": "node tools/vercel-api-route-gate.mjs && node tools/active-work-ledger-gate.mjs && node tools/production-config-gate.mjs",
+    "staging:preflight": "node tools/staging-smoke-preflight.mjs",
+    "staging:preflight:local": "node tools/staging-smoke-preflight-local.mjs",
+    "staging:vercel-env": "node tools/vercel-env-preflight.mjs --scope demzyksters-projects",
+    "staging:supabase-schema": "node tools/supabase-staging-schema-check.mjs",
+    "staging:smoke:live": "node tools/staging-smoke-live.mjs",
+    "staging:smoke:browser": "node tools/staging-browser-smoke.mjs",
+    "staging:smoke:ui": "node tools/staging-ui-smoke.mjs",
+    "staging:smoke:fleet-ui": "node tools/staging-fleet-ui-smoke.mjs",
+    "staging:smoke:ai-intake": "node tools/staging-ai-intake-smoke.mjs",
+    "staging:smoke:system-errors": "node tools/staging-system-error-smoke.mjs",
+    "staging:smoke:settings": "node tools/staging-settings-persistence-smoke.mjs",
+    "staging:backup:evidence": "node tools/staging-backup-evidence.mjs",
+    "staging:data:summary": "node tools/staging-data-summary.mjs",
+    "staging:gate": "node tools/staging-gate.mjs",
+    "fleet:import:preview": "node tools/fleet-license-import-preview.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview --host 127.0.0.1",
+    "serve": "node tools/static-server.cjs"
+  },
+  "dependencies": {
+    "jsqr": "^1.4.0",
+    "lucide-react": "^0.468.0",
+    "papaparse": "^5.5.4",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "read-excel-file": "^9.2.0",
+    "web-push": "^3.6.7",
+    "write-excel-file": "^4.1.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@vitejs/plugin-react": "^6.0.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
+  }
+}

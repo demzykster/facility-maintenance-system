@@ -1,0 +1,44 @@
+export const VERCEL_API_ROUTE_FUNCTION_BUDGET = 24;
+
+export const VERCEL_API_ROUTE_FILES = Object.freeze([
+  "api/ai/intake.js",
+  "api/bootstrap/admin.js",
+  "api/client-errors.js",
+  "api/files/index.js",
+  "api/kv/[key].js",
+  "api/kv/index.js",
+  "api/public/complaints.js",
+  "api/public/zones.js",
+  "api/push.js",
+  "api/session/change-password.js",
+  "api/session/admin-profile.js",
+  "api/session/initial-password.js",
+  "api/session/login.js",
+  "api/session/logout.js",
+  "api/session/profile.js",
+  "api/session/me.js",
+  "api/system-errors.js"
+]);
+
+export function vercelApiRoutePolicy(files = [], { functionLimit = VERCEL_API_ROUTE_FUNCTION_BUDGET } = {}) {
+  const apiFiles = [...new Set((files || []).map((file) => String(file || "").replace(/\\/g, "/")))]
+    .filter((file) => file.startsWith("api/") && file.endsWith(".js"))
+    .sort();
+  const allowed = new Set(VERCEL_API_ROUTE_FILES);
+  const unexpected = apiFiles.filter((file) => !allowed.has(file));
+  const missing = VERCEL_API_ROUTE_FILES.filter((file) => !apiFiles.includes(file));
+  const overLimit = apiFiles.length > functionLimit;
+  const errors = [];
+  if (unexpected.length) errors.push(`unexpected_api_route_files:${unexpected.join(",")}`);
+  if (missing.length) errors.push(`missing_api_route_files:${missing.join(",")}`);
+  if (overLimit) errors.push(`api_route_count_exceeds_limit:${apiFiles.length}/${functionLimit}`);
+  return {
+    ok: errors.length === 0,
+    apiFiles,
+    expected: VERCEL_API_ROUTE_FILES,
+    unexpected,
+    missing,
+    functionLimit,
+    errors
+  };
+}
