@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: codex/main-ci-ledger-noise.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: split PR and main CI release gates so post-merge main runs do not fail only because active-work still points to the just-merged feature branch.
 - Latest completed product work:
   - PR #587 made login identifier, password, PIN, first-password, and profile password-change inputs LTR inside RTL screens.
   - PR #585 moved the mobile role-preview control into the topbar action row as a compact button while keeping the role switcher available as a popover.
