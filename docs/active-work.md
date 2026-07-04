@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/login-empty-placeholders`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: login screen copy/placeholder cleanup: simplify the Hebrew identity label and remove demo/example placeholders from the identifier, password, PIN, and first-secret fields. No auth/session behavior changes.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #650 simplified login form copy/placeholders: the Hebrew identity field now reads `פרטי כניסה`, and identifier/password/PIN/first-secret fields no longer show demo examples or placeholder dots. Auth/session behavior was not changed.
   - PR #648 compacted the pending PPE issue-request queue so multiple requests stay readable: worker, request summary, requester/date, status, and actions are separated, approve/reject actions use compact icon buttons, and the mobile rejection state no longer squeezes the request text. PPE business logic, storage, inventory, and permissions were not changed.
   - PR #646 added the first gated `בקרות` UI shell behind `controls:view` for admin/manager navigation. It is read-only: planned domains, empty KPIs, and mobile/desktop navigation only; no controls records, scheduling engine, Supabase/KV migration, or cleaning/location migration.
   - PR #644 added `controls` to the shared permission editor/model for the future `בקרות` module. It uses the existing `none/view/request/manage/full` levels, with `request` documented as the current perform/run level; no controls UI, Supabase/KV migration, scheduling engine, or cleaning/location migration was added.
