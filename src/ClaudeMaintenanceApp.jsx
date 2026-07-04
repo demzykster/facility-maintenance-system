@@ -6266,7 +6266,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
 }
 
 /* ============================================================ FLEET */
-function FleetTypeSettings({ config, fleet, templates, users = [], saveConfig }) {
+function FleetTypeSettings({ config, fleet, users = [], saveConfig }) {
   const [saved, setSaved] = useState(false), [typeMsg, setTypeMsg] = useState(""), [openType, setOpenType] = useState(null);
   const [openRule, setOpenRule] = useState(null);
   const [openProg, setOpenProg] = useState(null), [progDraft, setProgDraft] = useState(null), [progErr, setProgErr] = useState("");
@@ -6470,7 +6470,6 @@ function FleetTypeSettings({ config, fleet, templates, users = [], saveConfig })
         <div className="hint" style={{ marginTop: 8, marginBottom: 8 }}>התכניות הגמישות למטה הן הדרך הראשית להגדיר TO 500, TO 1000 ותדירויות לפי חודשים. השדה הזה נשאר רק לשיבוצים ישנים שלא נוצרו מתכנית.</div>
         <label className="field"><span>תדירות טיפול תקופתי ישנה</span><select value={t.pmFreq || "monthly"} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, pmFreq: e.target.value } : x))}>{FREQS.map((fr) => <option key={fr.id} value={fr.id}>{fr.label}</option>)}</select></label>
       </details>
-      <label className="field" style={{ marginTop: 8 }}><span>שאלון מקושר (ישן)</span><select value={t.inspTpl || ""} disabled><option value="">— ללא —</option>{(templates || []).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}</select><div className="hint">נשמר להצגת היסטוריית בקרות ישנה. תכניות חדשות מנוהלות למטה.</div></label>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>תכניות בקרה</div>
       {((t.inspectionPrograms || []).length === 0) && <div className="hint" style={{ marginBottom: 8 }}>אין תכניות בקרה לסוג זה.</div>}
       {(t.inspectionPrograms || []).map((program, pi) => {
@@ -6757,7 +6756,7 @@ function FleetModule(p) {
   const GROUP_OPTS = [["none", "ללא"], ["type", "סוג"], ["supplier", "ספק"], ["status", "סטטוס"]];
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
-    {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} templates={p.templates} users={p.users} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
+    {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} users={p.users} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
     <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportFleet} disabled={!rows.length} title={!rows.length ? "אין נתונים לייצוא" : ""}><FileSpreadsheet size={15} /> ייצוא Excel</button>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
     <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">

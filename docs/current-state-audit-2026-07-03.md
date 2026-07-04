@@ -114,28 +114,27 @@ Recommendation:
 
 ## 5. Legacy Inspection / `שאלונים` Tails
 
-The app has newer inspection programs per vehicle type, but old inspection templates still remain.
+The app has newer inspection programs per vehicle type. Legacy questionnaire authoring has been removed, and the old linked-template selector is no longer shown in vehicle-type settings.
 
-Current legacy pieces:
+Current remaining compatibility pieces:
 
 - `src/dataCollections.js`: `templates`, prefix `itpl:`, table `inspection_templates`;
-- `src/ClaudeMaintenanceApp.jsx`: `TemplateForm`, `saveTpl`, `delTpl`;
-- `InspectionsModule` still displays old `שאלונים`;
-- `FleetTypeSettings` still displays `שאלון מקושר (ישן)`;
+- `inspectionProgramModel.js` still supports migrating old `inspTpl` values into inspection programs;
+- `InspHistory` / `InspDetail` still read legacy `templateId` on old `insp:` records for read-only history labels;
 - `InspHistory` uses hardcoded `NEXT_DAYS = 30`;
 - auto-ticket from inspection hardcodes `zone: "רחבת מלגזות"`;
 - records still carry `sourceInspectionId`.
 
 Risk:
 
-- the system is partly program-based and partly legacy-template-based;
-- users may configure the wrong thing;
+- users can no longer configure old questionnaires, but compatibility fields still exist in history/import paths;
 - future inspection/control work may build on obsolete assumptions.
 
 Recommendation:
 
-- if the current legacy inspection data is not valuable, remove legacy template creation/UI;
-- either keep old history read-only for a transition, or delete the old path fully in a separate cleanup PR.
+- keep old inspection history read-only until fleet inspections are absorbed into `בקרות`;
+- do not add new UI for legacy templates;
+- remove remaining compatibility paths only when `בקרת כלים` is intentionally folded into the controls domain.
 
 ## 6. Two Different Zone Models
 
