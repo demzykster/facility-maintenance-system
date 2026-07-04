@@ -9,13 +9,15 @@ Supabase Auth owns identity in `auth.users`.
 CMMS owns operational profile data in `public.app_users`:
 
 - linked `auth_user_id`;
-- CMMS role: `admin`, `user`, `tech`, `worker`, `cleaner`;
+- CMMS role: `admin`, `user`, `tech`, `worker`, plus legacy `cleaner` during the cleaning-access transition;
 - active/disabled state;
 - department and multi-department responsibility;
 - worker number where relevant;
 - technician scope/supplier metadata;
 - module permissions as `jsonb`;
 - bootstrap/password-change metadata.
+
+Direction note: future cleaning workers should be stored as `role: "worker"` with cleaning access/capabilities. Legacy `role: "cleaner"` remains valid only as a compatibility bridge until UI, session, KV, and RLS policies are updated.
 
 This avoids a duplicate login system while still keeping CMMS business rules outside the Auth system table.
 

@@ -6,7 +6,7 @@ This document is the guardrail for user access settings. Before adding a new che
 
 The prototype currently mixes several permission styles:
 
-- role-based access (`admin`, `user`, `tech`, `worker`, `cleaner`);
+- role-based access (`admin`, `user`, `tech`, `worker`, plus legacy `cleaner` during transition);
 - one-off flags such as `fleetDocs` and `fleetTickets`;
 - PPE-specific permission such as `perms.ppe`;
 - UI text that treats "HR" as full PPE access, not as a separate role.
@@ -107,6 +107,20 @@ Editing a worker profile without `workerAccess: manage` must preserve existing l
 Current implementation saves new login-capable users without generated secrets. First login by email or worker number opens the password/PIN creation form.
 
 The worker active/inactive state should be handled by lifecycle actions such as "worker left" and restore-from-archive, not by a generic "active user" checkbox in the worker form.
+
+## Cleaning Access Direction
+
+Long term, `cleaner` should not be a separate core role.
+
+Cleaning workers should be regular `worker` users with cleaning access/capabilities. Legacy `role === "cleaner"` remains supported during transition so existing code and data do not break before helper-based access checks are in place.
+
+Default cleaning worker access:
+
+- perform cleaning rounds;
+- receive cleaning complaints for assigned/covered zones;
+- close/respond to cleaning complaints.
+
+Cleaning-zone management and cleaning analytics are management permissions, not default worker-cleaning permissions.
 
 ## UI Direction
 

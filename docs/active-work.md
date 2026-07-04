@@ -27,6 +27,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs at last check: none.
 - Active work in progress: none.
 - Latest completed product work:
+  - PR #600 documented the owner-approved `cleaner` role cleanup direction: future cleaning workers are regular `worker` users with cleaning access/capabilities, contractor status is an employment attribute, legacy `role === "cleaner"` remains compatible during transition, and current app users/history are not valuable for migration unless the owner later says otherwise.
   - PR #599 added pure shared-location model helpers and tests: legacy string zones can become base location drafts, cleaning-zone objects split into base location plus cleaning profile, and no persistence/UI/cleaning migration is performed.
   - PR #598 documented the shared `locations` migration boundary: base location records are separate from cleaning profiles, first controls work may use `locationId`, and cleaning rounds/QR/compliance must not be touched by early controls/location PRs.
   - PR #597 formalized the first small `מטלות` action-layer contract: saved tasks now preserve `source*` links for future findings/programs, expose a minimal dashboard-readable signal projection in code, and do not require a Supabase/backfill migration for existing `mtask:` records.
@@ -71,12 +72,13 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: pause for owner review before creating actual controls records or UI. If continuing pre-controls cleanup, prefer another pure model/test PR for `userGroups` / organizational memberships, with no permissions UI rewrite and no broad monolith split.
+- Next exact action: pause for owner review before creating actual controls records or UI. If continuing pre-controls cleanup, start with a pure `cleaningAccessModel` helper/test PR that keeps legacy `role === "cleaner"` compatibility and does not yet rewrite UI, Supabase, or KV policies. After that, continue to `userGroups` / organizational memberships. Do not start the broad monolith split.
 
 ## Current Product Direction
 
 - Continue release stabilization toward a safe pilot/prod-candidate build.
 - Owner-entered staging/pilot data is protected working data. Do not clear, reseed, or overwrite Supabase data unless the owner explicitly asks for destructive cleanup.
+- As of 2026-07-04, the owner says current users/history/working app data are not valuable for migration unless he later says otherwise. This reduces migration constraints for architecture cleanup, but does not authorize silent destructive Supabase operations.
 - Production starts with real data entered by the owner, not migrated demo/local history.
 - The interim Supabase KV bridge is an explicit v1 compatibility choice, not the final normalized workflow model.
 - Target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.

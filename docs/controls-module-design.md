@@ -39,6 +39,7 @@ These decisions are considered agreed unless the owner changes direction:
 
 - Documentation comes before large implementation.
 - Current legacy inspection/questionnaire data is not valuable and does not need migration.
+- Current app users/history are not valuable for migration as of 2026-07-04 unless the owner says otherwise later. This allows architecture cleanup to avoid preserving obsolete local/staging records, but destructive Supabase cleanup still requires an explicit owner request.
 - Legacy `שאלונים` / `inspection_templates` should be removed rather than kept as dead product surface.
 - `בקרת כלים` should become one category/domain inside the future `בקרות` model, not remain a separate parallel inspection universe.
 - `מטלות` should become the shared action/follow-up layer after source links, permissions, and visibility are clarified.
@@ -46,6 +47,7 @@ These decisions are considered agreed unless the owner changes direction:
 - Quality (`איכות`) is a large domain inside the shared control engine, not a small checklist add-on.
 - Executive users primarily need a dashboard/attention layer, not raw access to every small record.
 - Worker-based quality scoring is sensitive and must be visible only to configured authorized audiences.
+- `cleaner` should not remain a long-term core role. Cleaning workers should become `worker` users with cleaning access/capability, while legacy `role === "cleaner"` remains compatible during transition.
 
 ## Current Cleanup Direction
 
@@ -326,6 +328,38 @@ User groups should support:
 - execution/review/owner groups.
 
 Do not encode these as new global roles.
+
+## Cleaning Workers And Role Cleanup
+
+Owner-approved direction:
+
+- `cleaner` should move out of the long-term core role model;
+- a cleaning worker is a regular `worker` with permanent cleaning access/group;
+- cleaning workers use the same worker-number/PIN login flow as other workers;
+- worker features should remain available to cleaning workers;
+- contractor cleaning workers use `employmentType: "contractor"` and `contractorName`, not a separate role.
+
+Default cleaning worker capabilities:
+
+- perform cleaning rounds;
+- receive complaints for assigned/covered zones;
+- close/respond to cleaning complaints.
+
+Cleaning management/reporting capabilities are separate:
+
+- manage cleaning zones, windows, checklists, and assignments;
+- view cleaning reports/analytics.
+
+Those management capabilities should come from module permissions or future group/capability settings.
+
+Implementation guardrail:
+
+- do not remove `cleaner` directly;
+- first add a `cleaningAccess` helper/model layer with legacy compatibility for `role === "cleaner"`;
+- then replace direct role checks and update server/KV/session policies;
+- only after that stop creating new `cleaner` users.
+
+See `docs/cleaning-worker-access-plan.md`.
 
 ## Permissions
 
