@@ -5334,13 +5334,38 @@ function PpeRequests({ ppe, reqs, items, norms, users, config, session, savePpe,
       setRejId(null); setReason("");
     }
   };
-  const lineTxt = (r) => r.lines.map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ");
+  const lineTxt = ppeRequestLineSummary;
+  const lineCount = (r) => (r.lines || []).length;
+  const qtyCount = (r) => (r.lines || []).reduce((sum, line) => sum + Number(line.qty || 0), 0);
+  const rejectOpen = (r) => rejId === r.id;
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> בקשות הנפקה</SectionTitle></div>
-    {pend.length === 0 ? <Empty text="אין בקשות ממתינות" Icon={ClipboardList} sub="בקשות מהמנהלים יופיעו כאן לאישור" /> : <div className="task-list ppe-request-list">{pend.map((r) => <div key={r.id} className="task-row" style={{ borderInlineStartColor: "#D97706", cursor: "default" }}>
-      <div className="task-row-main"><div className="task-row-t">{r.workerName}{r.workerNo ? ` · מס׳ ${r.workerNo}` : ""}{r.dept ? ` · ${r.dept}` : ""}</div><div className="task-row-sub">{lineTxt(r)}</div><div className="task-row-sub">מאת {(r.by && r.by.name) || "—"} · {fmtDate(r.at)}{r.note ? ` · ${r.note}` : ""}</div>
-        {rejId === r.id && <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="סיבת דחייה" autoFocus style={{ flex: 1 }} /><button className="btn-danger sm" onClick={() => doReject(r)}>דחה</button><button className="btn-ghost sm" onClick={() => { setRejId(null); setReason(""); }}>בטל</button></div>}</div>
-      {rejId !== r.id && <div className="task-row-side" style={{ flexDirection: "column", gap: 6 }}><button className="btn-primary sm" onClick={() => setApprove(r)}>אישור והנפקה</button><button className="btn-ghost sm" onClick={() => { setRejId(r.id); setReason(""); }}>דחייה</button></div>}
+    {pend.length === 0 ? <Empty text="אין בקשות ממתינות" Icon={ClipboardList} sub="בקשות מהמנהלים יופיעו כאן לאישור" /> : <div className="ppe-request-list">{pend.map((r) => <div key={r.id} className={"ppe-request-row" + (rejectOpen(r) ? " rejecting" : "")}>
+      <div className="ppe-req-worker">
+        <span className="ppe-req-ic"><Shirt size={16} /></span>
+        <div className="ppe-req-text">
+          <div className="ppe-req-title">{r.workerName || "עובד"}</div>
+          <div className="ppe-req-meta">{r.workerNo ? <><span>מס׳</span> <span className="ltr-inline">{r.workerNo}</span></> : "ללא מספר"}{r.dept ? <><span className="sep">·</span><span>{r.dept}</span></> : null}</div>
+        </div>
+      </div>
+      <div className="ppe-req-main">
+        <div className="ppe-req-title">{lineTxt(r) || "בקשת ציוד"}</div>
+        <div className="ppe-req-meta">{countLabel(lineCount(r), "שורה", "שורות")} · {countLabel(qtyCount(r), "יחידה", "יחידות")}{r.note ? <><span className="sep">·</span><span className="ppe-req-note">{r.note}</span></> : null}</div>
+      </div>
+      <div className="ppe-req-by">
+        <span className="ppe-req-kicker">מאת</span>
+        <span>{(r.by && r.by.name) || "—"}</span>
+        <span className="ppe-req-date">{fmtDate(r.at)}</span>
+      </div>
+      <div className="ppe-req-status"><span className={"badge sm" + (r.status === "worker_sign" ? " warn" : "")}>{ppeRequestStatusLabel(r.status)}</span></div>
+      {!rejectOpen(r) ? <div className="ppe-req-actions">
+        <button className="icon-btn sm approve" onClick={() => setApprove(r)} title="אישור והנפקה" aria-label={`אישור והנפקה עבור ${r.workerName || "עובד"}`}><Check size={15} /></button>
+        <button className="icon-btn sm danger" onClick={() => { setRejId(r.id); setReason(""); }} title="דחייה" aria-label={`דחיית בקשה עבור ${r.workerName || "עובד"}`}><X size={15} /></button>
+      </div> : <div className="ppe-req-reject">
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="סיבת דחייה" autoFocus />
+        <button className="icon-btn sm danger fill" onClick={() => doReject(r)} title="אישור דחייה" aria-label={`אישור דחיית בקשה עבור ${r.workerName || "עובד"}`}><X size={15} /></button>
+        <button className="icon-btn sm" onClick={() => { setRejId(null); setReason(""); }} title="ביטול דחייה" aria-label="ביטול דחייה"><RefreshCw size={14} /></button>
+      </div>}
     </div>)}</div>}
     {!compact && done.length > 0 && <div style={{ marginTop: 16 }}><button className="btn-ghost sm" onClick={() => setShowDone((v) => !v)}>{showDone ? "הסתר" : "הצג"} בקשות מטופלות ({done.length})</button>{showDone && <div className="task-list" style={{ marginTop: 8 }}>{done.slice(0, 30).map((r) => <div key={r.id} className="task-row" style={{ borderInlineStartColor: r.status === "approved" ? "#0D9488" : "#DC2626", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.workerName} · {lineTxt(r)}</div><div className="task-row-sub">{r.status === "approved" ? "אושרה והונפקה" : `נדחתה${r.rejectReason ? ` — ${r.rejectReason}` : ""}`} · {(r.decidedBy && r.decidedBy.name) || ""} · {fmtDate(r.decidedAt || r.at)}</div></div></div>)}</div>}</div>}
     {approve && <Overlay persistent onClose={() => setApprove(null)}><PpeIssueForm users={users} items={items} norms={norms} ppe={ppe} config={config} session={session} saveUser={saveUser} deptScope={null} initial={{ workerId: approve.workerId, lines: approve.lines.map((l) => ({ itemId: l.itemId, size: l.size, qty: l.qty })), note: approve.note, signature: approve.signature }} lockWorker={true} onCancel={() => setApprove(null)} onIssue={onApprove} submitLabel="אישור והנפקה" title="אישור בקשה והנפקה" /></Overlay>}
@@ -9321,6 +9346,28 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .tr-wait{color:#B45309;}
 .task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
 .task-due{font-size:11px;color:var(--muted);white-space:nowrap;}
+.ppe-request-list{display:flex;flex-direction:column;gap:8px;}
+.ppe-request-row{display:grid;grid-template-columns:minmax(150px,1.05fr) minmax(220px,1.5fr) minmax(115px,.75fr) auto auto;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 11px;color:var(--ink);box-shadow:0 1px 3px rgba(15,23,42,.04);}
+.ppe-request-row:hover{background:var(--surface-2);}
+.ppe-request-row.rejecting{align-items:start;}
+.ppe-req-worker{display:flex;align-items:center;gap:9px;min-width:0;}
+.ppe-req-ic{width:32px;height:32px;border-radius:9px;background:#FFF7ED;color:#EA580C;display:inline-flex;align-items:center;justify-content:center;flex:none;}
+.ppe-req-text,.ppe-req-main{min-width:0;}
+.ppe-req-title{font-size:13px;font-weight:800;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ppe-req-meta{display:flex;align-items:center;gap:4px;min-width:0;margin-top:3px;color:var(--muted);font-size:11.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ppe-req-meta .sep{color:var(--line);margin:0 2px;}
+.ppe-req-note{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.ppe-req-by{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--ink);min-width:0;}
+.ppe-req-kicker,.ppe-req-date{font-size:11px;color:var(--muted);}
+.ppe-req-status .badge{background:#FEF3C7;color:#92400E;white-space:nowrap;}
+.ppe-req-status .badge.warn{background:#FEF9C3;color:#854D0E;}
+.ppe-req-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;}
+.ppe-req-actions .icon-btn.approve{color:#0F766E;background:#CCFBF1;}
+.ppe-req-actions .icon-btn.approve:hover{background:#99F6E4;}
+.ppe-req-reject{grid-column:1 / -1;display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:220px;}
+.ppe-req-reject input{min-width:150px;flex:1;border:1.5px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--input);outline:none;font-size:12.5px;}
+.ppe-req-reject input:focus{border-color:#DC2626;}
+.ppe-req-reject .fill{background:#DC2626;color:#fff;}
 .tk-chips{display:flex;flex-wrap:wrap;gap:6px;}
 .detail-desc{font-size:14px;line-height:1.55;color:var(--ink);white-space:pre-wrap;margin:4px 0 8px;}
 .meta-cell{display:flex;flex-direction:column;}
@@ -10067,6 +10114,16 @@ button.notif-perm:hover{background:#D1FAE5;}
   .wk-tabs button{min-width:0;min-height:64px;flex-direction:column;gap:4px;padding:8px 4px;font-size:12px;line-height:1.12;text-align:center;white-space:normal;overflow-wrap:anywhere;}
   .wk-tabs button svg{width:15px;height:15px;flex-shrink:0;}
   .worker-body{padding:16px 12px 40px;}
+  .ppe-request-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"worker actions" "main main" "by status";align-items:start;gap:8px;padding:10px;}
+  .ppe-request-row.rejecting{grid-template-areas:"worker status" "main main" "by by" "reject reject";}
+  .ppe-req-worker{grid-area:worker;}
+  .ppe-req-main{grid-area:main;}
+  .ppe-req-by{grid-area:by;flex-direction:row;align-items:center;flex-wrap:wrap;gap:4px;}
+  .ppe-req-status{grid-area:status;justify-self:end;}
+  .ppe-req-actions{grid-area:actions;}
+  .ppe-req-reject{grid-area:reject;grid-column:auto;min-width:0;width:100%;margin-top:2px;}
+  .ppe-req-reject input{min-width:0;}
+  .ppe-req-title,.ppe-req-meta{white-space:normal;overflow:visible;text-overflow:clip;}
   .manager-fleet-table .ftable-head{display:none;}
   .manager-fleet-table .ftable-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"code drivers" "model supplier";gap:5px 12px;align-items:start;padding:12px 14px;text-align:start;}
   .manager-fleet-table .ft-code{grid-area:code;min-width:0;direction:ltr;unicode-bidi:isolate;text-align:start;font-size:13px;line-height:1.25;overflow-wrap:anywhere;}
