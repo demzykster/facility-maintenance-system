@@ -73,6 +73,7 @@ const publicSession = (user = {}) => ({
   mgrZones: Array.isArray(user.mgrZones) ? user.mgrZones : [],
   shift: user.shift || "",
   permissions: user.perms || user.permissions || {},
+  cleaningAccess: user.cleaningAccess || user.cleaning || false,
   mustChangePassword: user.mustChangePassword === true
 });
 

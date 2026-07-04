@@ -70,6 +70,11 @@ describe("cleaning access model", () => {
     expect(canPerformCleaning({ role: "worker", depts: ["מחסן", "ניקיון"] })).toBe(true);
   });
 
+  it("supports server session department fields for cleaning workers", () => {
+    expect(canPerformCleaning({ role: "worker", department: "ניקיון" })).toBe(true);
+    expect(canPerformCleaning({ role: "worker", departments: ["מחסן", "ניקיון"] })).toBe(true);
+  });
+
   it("does not grant cleaning access just because a manager owns the cleaning department", () => {
     expect(canPerformCleaning({ role: "user", dept: "ניקיון" })).toBe(false);
   });
