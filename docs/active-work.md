@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/controls-permission-foundation`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: add the future `בקרות` permission module to the shared permission editor/model before exposing controls UI.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #644 added `controls` to the shared permission editor/model for the future `בקרות` module. It uses the existing `none/view/request/manage/full` levels, with `request` documented as the current perform/run level; no controls UI, Supabase/KV migration, scheduling engine, or cleaning/location migration was added.
   - PR #642 added an explicit PPE dashboard section flow so pending issue-request cards and KPI cards keep stable spacing instead of visually sticking together.
   - PR #640 fixed branding subtitle display so an intentionally empty `אתר / סניף` stays empty in login/sidebar branding instead of falling back to the default system description.
   - PR #638 added a pure controls core model for Program, Assignment, Run, Finding, finding visibility policy, action routes, and dashboard signal envelopes. It is model/test only: no UI, Supabase/KV migration, cleaning migration, scheduling engine, or monolith split.
@@ -94,7 +95,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: finish and merge the controls permission foundation PR, then reset this ledger back to `Active branch: none.` before continuing toward the first narrow `בקרות` UI shell.
+- Next exact action: continue toward the first narrow `בקרות` UI shell using the existing controls core model and `controls` permission gate; do not start the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
