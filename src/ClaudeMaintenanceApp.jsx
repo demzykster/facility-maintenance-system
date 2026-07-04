@@ -641,6 +641,7 @@ const canManageSuppliers = (session) => canManage(session, "suppliers");
 const canManageSettings = (session) => canManage(session, "settings");
 const canFullSettings = (session) => canFull(session, "settings");
 const canViewAudit = (session) => canView(session, "audit");
+const canViewControls = (session) => canView(session, "controls");
 const fleetForSession = (session, fleet) => { if (!session || session.role === "admin") return fleet || []; const md = userDepts(session); if (!md.length) return fleet || []; return (fleet || []).filter((f) => fleetDepts(f).some((d) => md.includes(d))); };
 const pushDriverEvent = (cfg, evt) => ({ ...cfg, driverEvents: [{ id: uid(), at: Date.now(), ...evt }, ...((cfg.driverEvents || []).slice(0, 299))] });
 const pendingDriverReqs = (fleet) => { const out = []; (fleet || []).forEach((f) => DRIVER_SHIFTS.forEach((s) => { const d = driverOf(f, s.id); if (driverPending(d)) out.push({ unit: f, cat: s.id, driver: d }); })); return out.sort((a, b) => (b.driver.reqAt || 0) - (a.driver.reqAt || 0)); };
@@ -2651,6 +2652,47 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
+function ControlsHub({ session }) {
+  const canPerform = canRequest(session, "controls");
+  const canManageControls = canManage(session, "controls");
+  const areas = [
+    { label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
+    { label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
+    { label: "תפעול", text: "סיורי הנהלה, אזורים, תצפיות ושיפורי תהליך.", Icon: LayoutDashboard, color: "#2563EB" },
+    { label: "בקרת כלים", text: "בקרות ציוד שינוע כחלק מאותו מנוע בקרות.", Icon: Truck, color: "#EA580C" }
+  ];
+  return (
+    <div>
+      <div className="row-between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+        <div>
+          <SectionTitle><ClipboardCheck size={15} /> בקרות</SectionTitle>
+          <div className="hint" style={{ maxWidth: 680 }}>שכבת הבקרות החדשה תנהל תכניות, שיוכים, ביצוע סבבים, ממצאים ופעולות המשך. בשלב הזה זהו מסך כניסה בלבד, בלי יצירת רשומות.</div>
+        </div>
+        {canManageControls && <span className="badge sm" style={{ background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>ניהול בקרות</span>}
+        {!canManageControls && canPerform && <span className="badge sm" style={{ background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0" }}>ביצוע בקרות</span>}
+      </div>
+      <div className="stat-strip">
+        <div className="stat-box"><div className="stat-num">0</div><div className="stat-lbl">פתוחות</div></div>
+        <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>0</div><div className="stat-lbl">לביצוע</div></div>
+        <div className="stat-box"><div className="stat-num" style={{ color: "#DC2626" }}>0</div><div className="stat-lbl">ממצאים</div></div>
+      </div>
+      <SectionTitle><Sparkles size={15} /> תחומי בקרה מתוכננים</SectionTitle>
+      <div className="cards" style={{ marginBottom: 12 }}>
+        {areas.map(({ label, text, Icon, color }) => (
+          <div key={label} className="tcard" style={{ borderInlineStartWidth: 1, borderInlineStartColor: "var(--line)", cursor: "default" }}>
+            <span className="avatar" style={{ color, background: color + "16" }}><Icon size={18} /></span>
+            <div className="tcard-main">
+              <div className="tcard-row1"><span className="tcard-subj">{label}</span></div>
+              <div className="tcard-sub">{text}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Empty text="אין עדיין בקרות פעילות" Icon={ClipboardCheck} sub="השלב הבא יהיה UI קטן לתכנית אחת, שיוך אחד, ממצא אחד וניתוב ל-מטלות או לדוח בלבד." />
+    </div>
+  );
+}
+
 /* ============================================================ USER APP */
 function UserApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
@@ -2672,15 +2714,17 @@ function UserApp(p) {
   const mayViewSuppliers = canViewSuppliers(session);
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
+  const mayViewControls = canViewControls(session);
   const analyticsScope = useMemo(() => analyticsScopeForSession(session, {
     tickets, fleet, pm, zones, rounds, complaints, tasks: p.tasks, meetings: p.meetings,
     ppe: p.ppe, ppeItems: p.ppeItems, users
   }), [session, tickets, fleet, pm, zones, rounds, complaints, p.tasks, p.meetings, p.ppe, p.ppeItems, users]);
-  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "teamAdmin" && !mayViewUsers ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view;
-  const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
+  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "teamAdmin" && !mayViewUsers ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view === "controls" && !mayViewControls ? "tickets" : view;
+  const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "controls" ? "בקרות" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   const userNav = [
     { id: "tickets", Icon: ListChecks, label: "קריאות", active: activeView === "tickets", onClick: () => setView("tickets") },
     { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") },
+    mayViewControls ? { id: "controls", Icon: ClipboardCheck, label: "בקרות", active: activeView === "controls", onClick: () => setView("controls") } : null,
     { id: "dept", Icon: Users, label: "המחלקה", active: activeView === "dept", onClick: () => setView("dept") },
     mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null,
     mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null,
@@ -2728,7 +2772,7 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "controls" && mayViewControls ? (<ControlsHub session={session} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -2743,7 +2787,7 @@ function UserApp(p) {
         </div>
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
-      <MobileBottomNav nav={userNav} primaryIds={["tickets", "tasks", "dept", "ppe"]} />
+      <MobileBottomNav nav={userNav} primaryIds={["tickets", "tasks", "controls", "dept"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
@@ -5484,8 +5528,10 @@ function AdminApp(p) {
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
   const mayViewAudit = canViewAudit(session);
+  const mayViewControls = canViewControls(session);
   const blockedTab = {
     insights: !mayViewAnalytics,
+    controls: !mayViewControls,
     team: !mayViewUsers,
     suppliers: !mayViewSuppliers,
     activity: !mayViewAudit,
@@ -5496,6 +5542,7 @@ function AdminApp(p) {
     { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
     { id: "tasks", Icon: ClipboardList, label: "מטלות" },
+    mayViewControls ? { id: "controls", Icon: ClipboardCheck, label: "בקרות" } : null,
     { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" },
     { id: "assets", Icon: Truck, label: "כלי שינוע" },
     mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה" } : null,
@@ -5515,6 +5562,7 @@ function AdminApp(p) {
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} />}
+          {activeTab === "controls" && mayViewControls && <ControlsHub session={session} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
           {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
@@ -5524,7 +5572,7 @@ function AdminApp(p) {
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
-      <MobileBottomNav nav={nav} primaryIds={["dash", "tickets", "tasks", "assets"]} />
+      <MobileBottomNav nav={nav} primaryIds={["dash", "tickets", "tasks", "controls"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
