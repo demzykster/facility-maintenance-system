@@ -379,6 +379,25 @@ Permission direction:
 
 Initial permission naming is now decided for the shared permission editor: one `controls` module with levels `none/view/request/manage/full`. If a later UI needs clearer copy, the UI can label `request` as "ביצוע" without adding a second permission level.
 
+## Settings Ownership Guardrail
+
+Do not use the future `בקרות` work as an excuse to create another global settings dump.
+
+Settings should follow ownership:
+
+- program-specific cadence belongs on the Program, not in a global "default inspection frequency" field;
+- fleet periodic-maintenance capacity belongs near fleet PM rules/generation, not in general company settings;
+- cleaning round reminders belong with cleaning rounds/windows, not in general company settings;
+- global notification kind toggles are a system notification policy, not personal notification filters;
+- personal notification filtering stays in the notification panel.
+
+Near-term decision:
+
+- remove `ברירת מחדל לתדירות בקרה` from user-facing general settings because fleet inspection programs and future controls programs carry their own cadence;
+- do not immediately move every live setting just to clean up the screen;
+- move live settings only when the destination module has a stable settings surface and save handler;
+- use `docs/settings-site-map.md` as the source of truth before moving settings between screens.
+
 ## Work Calendar
 
 The scheduling engine should use one shared work calendar.
