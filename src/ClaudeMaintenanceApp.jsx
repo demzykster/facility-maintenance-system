@@ -224,6 +224,17 @@ const MEETING_TYPE_CFG = {
 const mtgCfg = (type) => MEETING_TYPE_CFG[type] || { importExcel: false, standingTopics: false, taskMulti: false, taskLocation: false, hint: "" };
 const ORIGIN_LABEL = { manual: "ידני", excel: "מ-Excel", ai: "ניתוח AI", meeting: "מפגישה", boss_meeting: "מפגישת הממונה", boss_excel: "Excel של הממונה" };
 const originLabel = (o) => ORIGIN_LABEL[o] || "ידני";
+const TASK_SOURCE_MODULE_LABEL = { controls: "בקרות", fleet: "כלי שינוע", cleaning: "ניקיון", tickets: "קריאה", ticket: "קריאה", meetings: "פגישה", meeting: "פגישה", ppe: "ביגוד עובדים", pm: "טיפול תקופתי" };
+const taskSourceInfo = (task = {}) => {
+  const ref = task.sourceRef && typeof task.sourceRef === "object" ? task.sourceRef : {};
+  const moduleId = task.sourceModule || ref.module || "";
+  const sourceId = task.sourceId || ref.id || task.sourceRecordId || ref.recordId || task.sourceFindingId || ref.findingId || task.sourceRunId || ref.runId || task.sourceProgramId || ref.programId || "";
+  const label = task.sourceLabel || ref.label || TASK_SOURCE_MODULE_LABEL[moduleId] || "";
+  if (!moduleId && !sourceId && !label) return null;
+  const moduleLabel = TASK_SOURCE_MODULE_LABEL[moduleId] || moduleId || "מקור";
+  const detail = label && label !== moduleLabel ? label : sourceId;
+  return { moduleId, moduleLabel, sourceId, label: label || sourceId || "—", detail };
+};
 const RECUR_LABEL = { weekly: "שבועית", monthly: "חודשית", quarterly: "רבעונית" };
 const RECUR_MS = { weekly: 7 * 86400000, monthly: 30 * 86400000, quarterly: 91 * 86400000 };
 const meetingVisible = (m, session, tasks) => session.role === "admin" || m.ownerId === session.id || (m.participantIds || []).includes(session.id) || (tasks || []).some((t) => (t.meetingId === m.id || (t.linkedMeetingIds || []).includes(m.id)) && (t.ownerId === session.id || (t.responsibleIds || []).includes(session.id)));
@@ -4193,6 +4204,7 @@ function TaskCard({ task, users, session, meetings, saveMeeting, onClose, onSave
   const [note, setNote] = useState("");
   const [linkOpen, setLinkOpen] = useState(false), [linkSel, setLinkSel] = useState("");
   const st = tstOf(task.status), pr = prOf(task.priority);
+  const sourceInfo = taskSourceInfo(task);
   const ownsMtg = (meetings || []).some((mm) => mm.ownerId === session.id && (mm.id === task.meetingId || (task.linkedMeetingIds || []).includes(mm.id)));
   const canManage = session.role === "admin" || task.ownerId === session.id || (task.responsibleIds || []).includes(session.id) || ownsMtg;
   const canDelete = session.role === "admin" || task.ownerId === session.id || ownsMtg;
@@ -4216,6 +4228,7 @@ function TaskCard({ task, users, session, meetings, saveMeeting, onClose, onSave
         <div className="meta-cell"><span className="meta-l">אחראים</span><span className="meta-v">{(task.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "—"}</span></div>
         <div className="meta-cell"><span className="meta-l">נפתחה ע״י</span><span className="meta-v">{task.createdBy?.name || "—"}</span></div>
         <div className="meta-cell"><span className="meta-l">מקור</span><span className="meta-v">{originLabel(task.origin)}</span></div>
+        {sourceInfo && <div className="meta-cell"><span className="meta-l">מקור מערכת</span><span className="meta-v">{sourceInfo.moduleLabel}{sourceInfo.detail ? ` · ${sourceInfo.detail}` : ""}</span></div>}
         {task.locationText && <div className="meta-cell"><span className="meta-l">הקשר</span><span className="meta-v"># {task.locationText}</span></div>}
         {task.dueAt && <div className="meta-cell"><span className="meta-l">תאריך יעד</span><span className="meta-v" style={ovd ? { color: "#DC2626", fontWeight: 700 } : {}}>{fmtDate(task.dueAt)}</span></div>}
         {task.nextActionAt && <div className="meta-cell"><span className="meta-l">מעקב הבא</span><span className="meta-v">{fmtDate(task.nextActionAt)}</span></div>}
@@ -4429,10 +4442,10 @@ function TasksModule(p) {
     setBulkMsg(`${countLabel(deletableSelected.length, "מטלה נמחקה", "מטלות נמחקו")}`);
     setSelectedIds((ids) => ids.filter((id) => !deletableSelected.some((t) => t.id === id)));
   };
-  const taskRow = (t) => { const s = tstOf(t.status), ovd = taskOverdue(t), mtg = mtgOf(t.meetingId), pri = prOf(t.priority), resp = (t.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "—", checked = selectedIds.includes(t.id); return <div key={t.id} role="button" tabIndex={0} className={"task-row" + (ovd ? " ovd" : "") + (checked ? " selected" : "")} onClick={() => setOpenId(t.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(t.id); } }} style={{ borderInlineStartColor: s.color }}>
+  const taskRow = (t) => { const s = tstOf(t.status), ovd = taskOverdue(t), mtg = mtgOf(t.meetingId), pri = prOf(t.priority), resp = (t.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "—", checked = selectedIds.includes(t.id), src = taskSourceInfo(t); return <div key={t.id} role="button" tabIndex={0} className={"task-row" + (ovd ? " ovd" : "") + (checked ? " selected" : "")} onClick={() => setOpenId(t.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(t.id); } }} style={{ borderInlineStartColor: s.color }}>
     <label className="task-row-check" onClick={(e) => e.stopPropagation()} title="בחירת מטלה"><input type="checkbox" checked={checked} onChange={() => toggleTaskSelected(t.id)} aria-label={`בחירת מטלה ${t.title}`} /></label>
     <span className="tr-pri" style={{ background: pri.color }} title={"עדיפות " + pri.label} />
-    <div className="task-row-main"><div className="task-row-t">{t.title}</div>{t.desc && <div className="task-row-desc">{t.desc.split("\n")[0]}</div>}<div className="task-row-sub"><span className="tr-to">ל: {resp}</span>{t.ownerId && t.ownerId !== (t.responsibleIds || [])[0] && <span>· מאת {uName(t.ownerId, users)}</span>}{mtg && <span className="tr-mtg"><CalendarClock size={10} /> {mtg.title}</span>}{t.locationText && <span className="tr-loc" role="button" title="סינון לפי הקשר" onClick={(e) => { e.stopPropagation(); setTagFilter(t.locationText); }}># {t.locationText}</span>}{t.category && <span className="tr-cat">{t.category}</span>}{t.status === "waiting" && t.waitingFor && <span className="tr-wait">⏳ {t.waitingFor}</span>}</div></div>
+    <div className="task-row-main"><div className="task-row-t">{t.title}</div>{t.desc && <div className="task-row-desc">{t.desc.split("\n")[0]}</div>}<div className="task-row-sub"><span className="tr-to">ל: {resp}</span>{t.ownerId && t.ownerId !== (t.responsibleIds || [])[0] && <span>· מאת {uName(t.ownerId, users)}</span>}{src && <span className="tr-src" title={src.detail ? `${src.moduleLabel} · ${src.detail}` : src.moduleLabel}><ClipboardList size={10} /> {src.moduleLabel}{src.detail ? ` · ${src.detail}` : ""}</span>}{mtg && <span className="tr-mtg"><CalendarClock size={10} /> {mtg.title}</span>}{t.locationText && <span className="tr-loc" role="button" title="סינון לפי הקשר" onClick={(e) => { e.stopPropagation(); setTagFilter(t.locationText); }}># {t.locationText}</span>}{t.category && <span className="tr-cat">{t.category}</span>}{t.status === "waiting" && t.waitingFor && <span className="tr-wait">⏳ {t.waitingFor}</span>}</div></div>
     <div className="task-row-side"><span className="badge sm" style={{ color: "#fff", background: s.color }}>{s.label}</span><span className="task-due" style={ovd ? { color: "#DC2626", fontWeight: 700 } : {}}>{dueLabel(t)}</span></div>
   </div>; };
   const grpKey = (t) => grp === "status" ? tstOf(t.status).label : grp === "to" ? ((t.responsibleIds || []).map((id) => uName(id, users))[0] || "ללא אחראי") : grp === "from" ? uName(t.ownerId, users) : grp === "meeting" ? (mtgOf(t.meetingId)?.title || "ללא פגישה") : prOf(t.priority).label;
@@ -9401,6 +9414,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .mtask-gh{font-size:12px;font-weight:700;color:var(--muted);padding:0 2px;}
 .task-row-sub{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:11.5px;color:var(--muted);margin-top:3px;}
 .tr-to{font-weight:600;color:var(--ink);}
+.tr-src{display:inline-flex;align-items:center;gap:3px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ECFDF5;color:#047857;border-radius:6px;padding:1px 7px;font-weight:700;}
+.tr-src svg{flex:none;}
 .tr-mtg{display:inline-flex;align-items:center;gap:3px;background:rgba(124,58,237,0.1);color:#7C3AED;border-radius:6px;padding:1px 7px;font-weight:600;}
 .tr-cat{background:var(--surface-2);border-radius:6px;padding:1px 7px;}
 .tr-wait{color:#B45309;}

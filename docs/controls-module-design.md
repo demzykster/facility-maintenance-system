@@ -427,6 +427,11 @@ Direction:
 - do not create a second corrective-action system;
 - add source links and visibility rules.
 
+Current implementation note:
+
+- saved tasks already preserve the first `source*` fields for future findings/programs/runs;
+- task list rows and task details should show the source context when those fields exist, while manual tasks remain visually unchanged.
+
 Needed future fields:
 
 - `sourceModule`
