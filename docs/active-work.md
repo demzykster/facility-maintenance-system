@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/login-empty-placeholders`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: login screen copy/placeholder cleanup: simplify the Hebrew identity label and remove demo/example placeholders from the identifier, password, PIN, and first-secret fields. No auth/session behavior changes.
 - Latest completed product work:
   - PR #648 compacted the pending PPE issue-request queue so multiple requests stay readable: worker, request summary, requester/date, status, and actions are separated, approve/reject actions use compact icon buttons, and the mobile rejection state no longer squeezes the request text. PPE business logic, storage, inventory, and permissions were not changed.
   - PR #646 added the first gated `בקרות` UI shell behind `controls:view` for admin/manager navigation. It is read-only: planned domains, empty KPIs, and mobile/desktop navigation only; no controls records, scheduling engine, Supabase/KV migration, or cleaning/location migration.

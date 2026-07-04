@@ -5,7 +5,7 @@ const UI_TEXT = {
     "language.label": "שפה",
     "login.title": "כניסה למערכת",
     "login.email": "דוא״ל",
-    "login.identity": "דוא״ל / מספר עובד / קוד טכנאי",
+    "login.identity": "פרטי כניסה",
     "login.remember": "זכור אותי במכשיר זה",
     "login.continue": "המשך",
     "login.signIn": "כניסה",
