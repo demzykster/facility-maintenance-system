@@ -2751,6 +2751,20 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const findingRouteLabel = (finding) => finding?.route?.type === "task"
     ? (finding.route.taskId ? "נפתחה מטלה" : "מיועד למטלה")
     : "לדוח בלבד";
+  const findingTaskCreated = !!savedFinding?.route?.taskId;
+  const resetManualRun = () => {
+    setAnswers({});
+    setNotes("");
+    setSignature("");
+    setFindingTitle("");
+    setFindingDesc("");
+    setSeverity("medium");
+    setRouteType("report_only");
+    setTaskDue("");
+    setSavedRun(null);
+    setSavedFinding(null);
+    setMsg("");
+  };
   const areas = [
     { id: "safety", label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
     { id: "quality", label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
@@ -2823,6 +2837,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const createTask = async () => {
     if (!taskDraft || !saveTask) return;
     if (!savedRun || !savedFinding) return setMsg("שמרו קודם את הבדיקה דרך «סיום בדיקה», ואז צרו מטלה מהממצא.");
+    if (findingTaskCreated) return setMsg("כבר נפתחה מטלה מהממצא הזה.");
     if (!responsibleId) return setMsg("בחרו אחראי למטלה.");
     const now = Date.now();
     setBusy(true); setMsg("");
@@ -2887,7 +2902,10 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
           <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
           <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
           <label className="field"><span>חתימה לסיום הסבב</span><input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={session.name || "שם מבצע"} /></label>
-          <button className="btn-primary full" onClick={finishRun} disabled={busy}><Check size={16} /> {busy ? "שומר…" : "סיום בדיקה"}</button>
+          <div className="control-actions">
+            <button className="btn-primary full" onClick={finishRun} disabled={busy}><Check size={16} /> {busy ? "שומר…" : "סיום בדיקה"}</button>
+            {savedRun && <button className="btn-ghost full" onClick={resetManualRun} disabled={busy}><Plus size={16} /> בדיקה חדשה</button>}
+          </div>
         </div>
         <div className="control-panel">
           <SectionTitle><ListChecks size={15} /> צ'קליסט</SectionTitle>
@@ -2907,7 +2925,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
           <label className="field"><span>תאריך יעד (לא חובה)</span><input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} /></label>
         </div>}
         {taskDraft && <div className="note" style={{ marginTop: 8 }}><b>טיוטת מטלה:</b> {taskDraft.title} · {taskDraft.category} · {taskDraft.priority === "high" ? "עדיפות גבוהה" : taskDraft.priority === "low" ? "עדיפות נמוכה" : "עדיפות בינונית"}{taskDraft.dueAt ? ` · יעד ${fmtDate(taskDraft.dueAt)}` : ""}</div>}
-        {routeType === "task" && <button className="btn-primary full" style={{ marginTop: 10 }} disabled={!taskDraft || busy} onClick={createTask}>{busy ? "יוצר…" : "יצירת מטלה מהממצא"}</button>}
+        {routeType === "task" && <button className="btn-primary full" style={{ marginTop: 10 }} disabled={!taskDraft || busy || findingTaskCreated} onClick={createTask}>{findingTaskCreated ? "מטלה כבר נפתחה מהממצא" : busy ? "יוצר…" : "יצירת מטלה מהממצא"}</button>}
       </div>}
       {msg && <div className={msg === SAVE_FAILED_MESSAGE ? "err" : "note"} style={{ marginTop: 12 }}>{msg}</div>}
       <div className="control-panel" style={{ marginTop: 12 }}>
@@ -2952,7 +2970,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
                   <div className="task-row-main">
                     <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
                     {finding.description && <div className="task-row-desc">{finding.description}</div>}
-                    <div className="task-row-sub">{findingRouteLabel(finding)}{finding.route?.taskId ? ` · ${finding.route.taskId}` : ""}</div>
+                    <div className="task-row-sub">{findingRouteLabel(finding)}</div>
                   </div>
                   <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
                 </div>;
@@ -9663,6 +9681,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .task-row:hover{background:var(--surface-2);}
 .task-row.selected{background:#FFF7ED;border-color:#FDBA74;box-shadow:0 0 0 1px rgba(234,88,12,.12);}
 .control-history-row{align-items:flex-start;}
+.control-actions{display:flex;flex-direction:column;gap:8px;}
 .control-run-detail{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:12px;margin-top:4px;}
 .control-answer-list{display:grid;grid-template-columns:1fr;gap:6px;}
 .control-answer-item,.control-finding-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;}
