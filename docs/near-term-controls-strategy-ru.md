@@ -70,7 +70,7 @@ userGroups foundation
    - one finding;
    - route to report-only or `מטלות`.
 
-Текущий безопасный шаг: draft-only маршрут finding -> `מטלות`. Система может подготовить задачу с `source*` связями, но не должна создавать её автоматически без обычного product action/confirmation.
+Текущий безопасный шаг: первый ручной UI-slice. Один ad-hoc обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Отдельные `controls:*` записи пока не сохраняются.
 
 ## What Not To Do Yet
 

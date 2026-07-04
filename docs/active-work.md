@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/controls-manual-slice`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: first manual `בקרות` UI slice: one ad-hoc control run form, checklist answers, one finding, and optional confirmed creation of a real `מטלות` task with source links. No scheduling engine, no saved controls records, no Supabase/KV migration, and no cleaning/location migration.
 - Latest completed product work:
   - PR #663 added the first draft-only `בקרות` finding-to-`מטלות` route helper: controls findings can prepare a task draft with preserved `source*` links, but no task is created automatically and no controls UI records, scheduling engine, Supabase/KV migration, or cleaning/location migration were added.
   - PR #661 showed saved task source context in `מטלות`: rows now display a compact source chip when `source*` fields exist, task details show `מקור מערכת`, manual tasks stay visually unchanged, and action-layer docs were refreshed for future `בקרות` findings/actions.

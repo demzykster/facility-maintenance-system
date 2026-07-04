@@ -42,6 +42,7 @@ import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { buildInspectionDuePairs, inspectionProgramsForType, migrateInspectionProgramsFromTemplates, normalizeInspectionProgram } from "./inspectionProgramModel.js";
+import { controlFindingTaskDraft } from "./controlsCoreModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -2663,43 +2664,139 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session }) {
+function ControlsHub({ session, users = [], saveTask }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
+  const [name, setName] = useState("סיור בטיחות ידני");
+  const [domain, setDomain] = useState("safety");
+  const [target, setTarget] = useState("");
+  const [checklistText, setChecklistText] = useState("יציאות חירום פתוחות\nמעברים פנויים\nציוד מגן בשימוש");
+  const [answers, setAnswers] = useState({});
+  const [notes, setNotes] = useState("");
+  const [signature, setSignature] = useState("");
+  const [findingTitle, setFindingTitle] = useState("");
+  const [findingDesc, setFindingDesc] = useState("");
+  const [severity, setSeverity] = useState("medium");
+  const [routeType, setRouteType] = useState("report_only");
+  const [responsibleId, setResponsibleId] = useState(session.id || "");
+  const [taskDue, setTaskDue] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
+  const findingCount = checklist.filter((_, i) => answers[i] === "problem").length;
+  const doneCount = checklist.filter((_, i) => answers[i]).length;
+  const activeUsers = useMemo(() => (users || []).filter((u) => u.id !== session.id && u.active !== false && ["admin", "user", "tech", "worker"].includes(u.role)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")), [users, session.id]);
   const areas = [
-    { label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
-    { label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
-    { label: "תפעול", text: "סיורי הנהלה, אזורים, תצפיות ושיפורי תהליך.", Icon: LayoutDashboard, color: "#2563EB" },
-    { label: "בקרת כלים", text: "בקרות ציוד שינוע כחלק מאותו מנוע בקרות.", Icon: Truck, color: "#EA580C" }
+    { id: "safety", label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
+    { id: "quality", label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
+    { id: "operations", label: "תפעול", text: "סיורי הנהלה, אזורים, תצפיות ושיפורי תהליך.", Icon: LayoutDashboard, color: "#2563EB" },
+    { id: "fleet", label: "בקרת כלים", text: "בקרות ציוד שינוע כחלק מאותו מנוע בקרות.", Icon: Truck, color: "#EA580C" }
   ];
+  const currentArea = areas.find((a) => a.id === domain) || areas[0];
+  const finding = {
+    id: "finding-preview",
+    programId: "manual-control",
+    runId: "manual-run-preview",
+    domain,
+    title: findingTitle || (findingCount ? `ממצא מתוך ${name || "בקרה ידנית"}` : ""),
+    description: findingDesc || notes,
+    severity,
+    target: { kind: "location", id: target, label: target },
+    route: { type: routeType, notifyIds: responsibleId ? [responsibleId] : [session.id] },
+    createdById: session.id,
+    createdAt: Date.now()
+  };
+  const taskDraft = routeType === "task" && finding.title ? controlFindingTaskDraft(finding, {
+    responsibleIds: responsibleId ? [responsibleId] : [session.id],
+    dueAt: taskDue ? new Date(taskDue).getTime() : null
+  }) : null;
+  const finishRun = () => {
+    if (!name.trim()) return setMsg("תנו שם לבדיקה.");
+    if (!checklist.length) return setMsg("הוסיפו לפחות סעיף בדיקה אחד.");
+    if (doneCount < checklist.length) return setMsg("סמנו תשובה לכל סעיף לפני סיום.");
+    if (!signature.trim()) return setMsg("נדרשת חתימה אחת לסיום הסבב.");
+    if (findingCount && !finding.title) return setMsg("יש ממצא, צריך כותרת קצרה.");
+    setMsg(findingCount ? "הבדיקה הושלמה. עכשיו בחרו מה עושים עם הממצא." : "הבדיקה הושלמה ללא ממצאים. בשלב הזה אין שמירה נפרדת של בקרות.");
+  };
+  const createTask = async () => {
+    if (!taskDraft || !saveTask) return;
+    const now = Date.now();
+    const findingId = uid();
+    const runId = "manual-run-" + now;
+    setBusy(true); setMsg("");
+    const task = {
+      ...taskDraft,
+      id: uid(),
+      sourceId: findingId,
+      sourceFindingId: findingId,
+      sourceProgramId: "manual-control",
+      sourceRunId: runId,
+      responsibleIds: taskDraft.responsibleIds?.length ? taskDraft.responsibleIds : [session.id],
+      participantIds: [],
+      waitingFor: "",
+      meetingId: null,
+      linkedMeetingIds: [],
+      recur: null,
+      nextActionAt: null,
+      ownerId: session.id,
+      createdBy: { name: session.name, role: session.role },
+      createdAt: now,
+      updatedAt: now,
+      log: [{ at: now, by: session.name, byRole: session.role, text: "נוצרה מתוך בקרת ידנית", kind: "open" }]
+    };
+    const ok = await saveTask(task);
+    setBusy(false);
+    setMsg(ok === false ? SAVE_FAILED_MESSAGE : "נוצרה מטלה מתוך הממצא. תוכלו לראות אותה במסך מטלות עם מקור מערכת בקרות.");
+  };
   return (
     <div>
       <div className="row-between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
         <div>
           <SectionTitle><ClipboardCheck size={15} /> בקרות</SectionTitle>
-          <div className="hint" style={{ maxWidth: 680 }}>שכבת הבקרות החדשה תנהל תכניות, שיוכים, ביצוע סבבים, ממצאים ופעולות המשך. בשלב הזה זהו מסך כניסה בלבד, בלי יצירת רשומות.</div>
+          <div className="hint" style={{ maxWidth: 680 }}>סבב ידני ראשון: בדיקה קצרה, חתימה אחת, ממצא אחד וניתוב לדוח בלבד או ל-מטלות. עדיין בלי מנוע תזמון ובלי שמירת רשומות בקרות נפרדות.</div>
         </div>
         {canManageControls && <span className="badge sm" style={{ background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>ניהול בקרות</span>}
         {!canManageControls && canPerform && <span className="badge sm" style={{ background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0" }}>ביצוע בקרות</span>}
       </div>
       <div className="stat-strip">
-        <div className="stat-box"><div className="stat-num">0</div><div className="stat-lbl">פתוחות</div></div>
-        <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>0</div><div className="stat-lbl">לביצוע</div></div>
-        <div className="stat-box"><div className="stat-num" style={{ color: "#DC2626" }}>0</div><div className="stat-lbl">ממצאים</div></div>
+        <div className="stat-box"><div className="stat-num">{doneCount}/{checklist.length || 0}</div><div className="stat-lbl">סעיפים שסומנו</div></div>
+        <div className="stat-box"><div className="stat-num" style={{ color: "#DC2626" }}>{findingCount}</div><div className="stat-lbl">ממצאים</div></div>
+        <div className="stat-box"><div className="stat-num" style={{ color: taskDraft ? "#0D9488" : "var(--muted)" }}>{taskDraft ? 1 : 0}</div><div className="stat-lbl">טיוטת מטלה</div></div>
       </div>
-      <SectionTitle><Sparkles size={15} /> תחומי בקרה מתוכננים</SectionTitle>
-      <div className="cards" style={{ marginBottom: 12 }}>
-        {areas.map(({ label, text, Icon, color }) => (
-          <div key={label} className="tcard" style={{ borderInlineStartWidth: 1, borderInlineStartColor: "var(--line)", cursor: "default" }}>
-            <span className="avatar" style={{ color, background: color + "16" }}><Icon size={18} /></span>
-            <div className="tcard-main">
-              <div className="tcard-row1"><span className="tcard-subj">{label}</span></div>
-              <div className="tcard-sub">{text}</div>
-            </div>
-          </div>
-        ))}
+      {!canPerform ? <Empty text="אין הרשאת ביצוע בקרות" Icon={ShieldAlert} sub="נדרשת הרשאת controls:request ומעלה כדי לבצע סבב." /> : <>
+      <div className="control-run-grid">
+        <div className="control-panel">
+          <SectionTitle><currentArea.Icon size={15} /> בדיקה ידנית</SectionTitle>
+          <label className="field"><span>שם הבדיקה</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={domain === a.id ? "on" : ""} onClick={() => setDomain(a.id)}>{a.label}</button>)}</div><div className="hint">{currentArea.text}</div></label>
+          <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="לדוגמה: מחסן ראשי / רחבת מלגזות" /></label>
+          <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
+          <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
+          <label className="field"><span>חתימה לסיום הסבב</span><input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={session.name || "שם מבצע"} /></label>
+          <button className="btn-primary full" onClick={finishRun}><Check size={16} /> סיום בדיקה</button>
+        </div>
+        <div className="control-panel">
+          <SectionTitle><ListChecks size={15} /> צ'קליסט</SectionTitle>
+          {checklist.length ? <div className="control-checklist">{checklist.map((item, i) => <div key={i} className="control-check-row"><div className="control-check-title">{item}</div><div className="control-answer-tabs"><button className={answers[i] === "ok" ? "ok on" : ""} onClick={() => setAnswers((s) => ({ ...s, [i]: "ok" }))}>תקין</button><button className={answers[i] === "problem" ? "bad on" : ""} onClick={() => setAnswers((s) => ({ ...s, [i]: "problem" }))}>בעיה</button><button className={answers[i] === "na" ? "na on" : ""} onClick={() => setAnswers((s) => ({ ...s, [i]: "na" }))}>לא רלוונטי</button></div></div>)}</div> : <Empty text="אין סעיפים" Icon={ListChecks} sub="הוסיפו סעיפים בצד ימין כדי להתחיל." />}
+        </div>
       </div>
-      <Empty text="אין עדיין בקרות פעילות" Icon={ClipboardCheck} sub="השלב הבא יהיה UI קטן לתכנית אחת, שיוך אחד, ממצא אחד וניתוב ל-מטלות או לדוח בלבד." />
+      {findingCount > 0 && <div className="control-panel" style={{ marginTop: 12 }}>
+        <SectionTitle><AlertTriangle size={15} /> ממצא ופעולת המשך</SectionTitle>
+        <div className="control-find-grid">
+          <label className="field"><span>כותרת ממצא</span><input value={findingTitle} onChange={(e) => setFindingTitle(e.target.value)} placeholder="מה הבעיה המרכזית?" /></label>
+          <label className="field"><span>חומרה</span><select value={severity} onChange={(e) => setSeverity(e.target.value)}><option value="low">נמוכה</option><option value="medium">בינונית</option><option value="high">גבוהה</option><option value="critical">קריטית</option></select></label>
+        </div>
+        <label className="field"><span>פירוט הממצא</span><textarea rows={3} value={findingDesc} onChange={(e) => setFindingDesc(e.target.value)} placeholder="מה נמצא, איפה, ומה נדרש לבדוק?" /></label>
+        <label className="field"><span>מה עושים?</span><div className="seg-tabs s2"><button className={routeType === "report_only" ? "on" : ""} onClick={() => setRouteType("report_only")}>לדוח בלבד</button><button className={routeType === "task" ? "on" : ""} onClick={() => setRouteType("task")}>פתיחת מטלה</button></div></label>
+        {routeType === "task" && <div className="control-find-grid">
+          <label className="field"><span>אחראי</span><select value={responsibleId} onChange={(e) => setResponsibleId(e.target.value)}><option value={session.id}>{session.name || "אני"}</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
+          <label className="field"><span>תאריך יעד (לא חובה)</span><input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} /></label>
+        </div>}
+        {taskDraft && <div className="note" style={{ marginTop: 8 }}><b>טיוטת מטלה:</b> {taskDraft.title} · {taskDraft.category} · {taskDraft.priority === "high" ? "עדיפות גבוהה" : taskDraft.priority === "low" ? "עדיפות נמוכה" : "עדיפות בינונית"}{taskDraft.dueAt ? ` · יעד ${fmtDate(taskDraft.dueAt)}` : ""}</div>}
+        {routeType === "task" && <button className="btn-primary full" style={{ marginTop: 10 }} disabled={!taskDraft || busy} onClick={createTask}>{busy ? "יוצר…" : "יצירת מטלה מהממצא"}</button>}
+      </div>}
+      {msg && <div className={msg === SAVE_FAILED_MESSAGE ? "err" : "note"} style={{ marginTop: 12 }}>{msg}</div>}
+      </>}
     </div>
   );
 }
@@ -2783,7 +2880,7 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "controls" && mayViewControls ? (<ControlsHub session={session} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "controls" && mayViewControls ? (<ControlsHub {...p} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -5653,7 +5750,7 @@ function AdminApp(p) {
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} />}
-          {activeTab === "controls" && mayViewControls && <ControlsHub session={session} />}
+          {activeTab === "controls" && mayViewControls && <ControlsHub {...p} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
           {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
@@ -9419,6 +9516,18 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .tr-mtg{display:inline-flex;align-items:center;gap:3px;background:rgba(124,58,237,0.1);color:#7C3AED;border-radius:6px;padding:1px 7px;font-weight:600;}
 .tr-cat{background:var(--surface-2);border-radius:6px;padding:1px 7px;}
 .tr-wait{color:#B45309;}
+.control-run-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);gap:12px;align-items:start;}
+.control-panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 1px 3px rgba(15,23,42,.04);}
+.control-checklist{display:flex;flex-direction:column;gap:8px;}
+.control-check-row{display:grid;grid-template-columns:minmax(140px,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--surface-2);}
+.control-check-title{font-weight:700;color:var(--ink);line-height:1.35;}
+.control-answer-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.control-answer-tabs button{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;padding:6px 10px;font-weight:800;cursor:pointer;}
+.control-answer-tabs button.on.ok{background:#ECFDF5;border-color:#A7F3D0;color:#047857;}
+.control-answer-tabs button.on.bad{background:#FEF2F2;border-color:#FECACA;color:#B91C1C;}
+.control-answer-tabs button.on.na{background:var(--surface-2);border-color:#CBD5E1;color:var(--ink);}
+.control-find-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
+@media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row{grid-template-columns:1fr}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}}
 .task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
 .task-due{font-size:11px;color:var(--muted);white-space:nowrap;}
 .ppe-request-list{display:flex;flex-direction:column;gap:8px;}
