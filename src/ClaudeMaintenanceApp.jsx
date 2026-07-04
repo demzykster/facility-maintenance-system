@@ -7833,7 +7833,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const initialPerms = normalizePerms(user);
   const initialRole = user.role || lockRole || "user";
   if (initialRole === "user" && !initialPerms.ppe) initialPerms.ppe = "request";
-  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
+  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(user.dept || lockDept || config.departments[0]), [depts, setDepts] = useState(user.depts?.length ? user.depts : (user.dept ? [user.dept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [cleaningWorkerAccess, setCleaningWorkerAccess] = useState(hasCleaningAccess(user)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
@@ -7867,6 +7867,9 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
     const nextPin = roleUsesPin ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : "";
     const nextPassword = roleUsesPassword ? (canWorkerAccess ? password : (user.password || "")) : "";
+    const nextCleaningAccess = (role === "worker" && cleaningWorkerAccess)
+      ? { enabled: true, canPerformRounds: true, canReceiveComplaints: true, canCloseComplaints: true, canManageCleaningZones: false, canViewCleaningReports: false }
+      : undefined;
     const ok = await onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
@@ -7883,6 +7886,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       active,
       activationToken: "",
       activationStatus: roleUsesLogin && (nextPin || nextPassword || user.authUserId) ? "activated" : "",
+      cleaningAccess: nextCleaningAccess,
       employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
     if (ok === false) setErr(SAVE_FAILED_MESSAGE);
@@ -7924,6 +7928,10 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
         : <label className="field"><span>מחלקה (משויך אליה)</span><select value={dept} onChange={(e) => setDept(e.target.value)}>{config.departments.map((d) => <option key={d}>{d}</option>)}</select><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></label>)}
+      {(role === "worker" || role === "cleaner") && <div className="field"><span>גישה לניקיון</span>
+        <label className="chk-line"><input type="checkbox" checked={role === "cleaner" || cleaningWorkerAccess} disabled={role === "cleaner"} onChange={(e) => setCleaningWorkerAccess(e.target.checked)} /> העובד משתתף בביצוע סבבי ניקיון</label>
+        <div className="hint">{role === "cleaner" ? "תפקיד «עובד ניקיון» הוא מצב מעבר ישן ולכן הגישה לניקיון פעילה תמיד. לעובדים חדשים עדיף לבחור תפקיד «עובד» ולהפעיל כאן גישה לניקיון." : "העובד נשאר עובד רגיל, שומר את מסך העובד הרגיל, ומקבל לשונית ניקיון לביצוע סבבים, קבלת דיווחים וסגירת תלונות ניקיון."}</div>
+      </div>}
       {(role === "worker" || role === "cleaner") && <div className="field"><span>שיוך תעסוקתי (לחישוב חיוב ציוד מגן)</span><div className="seg-tabs s2" style={{ maxWidth: 260 }}><button className={employmentType === "direct" ? "on" : ""} onClick={() => setEmploymentType("direct")}>ישיר (חברה)</button><button className={employmentType === "contractor" ? "on" : ""} onClick={() => setEmploymentType("contractor")}>דרך קבלן</button></div>{employmentType === "contractor" && <input style={{ marginTop: 8 }} value={contractorName} onChange={(e) => setContractorName(e.target.value)} placeholder="שם הקבלן (לא חובה)" />}<div className="hint">עובד דרך קבלן משלם מחיר מלא על ציוד; עובד ישיר — לפי מדיניות המחלקה.</div></div>}
       {role === "tech" ? (<>
         <ActivationControls />
