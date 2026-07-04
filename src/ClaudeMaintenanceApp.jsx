@@ -4369,7 +4369,8 @@ function TaskImportWizard({ users, session, meetings, existing, defaultMeetingId
 function TasksModule(p) {
   const { tasks, users, session, saveTask, delTask, meetings, saveMeeting, delMeeting } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [imp, setImp] = useState(false), [ai, setAi] = useState(false), [openMeetingId, setOpenMeetingId] = useState(null);
-  const [st, setSt] = useState("open"), [who, setWho] = useState("all"), [pr, setPr] = useState("all"), [q, setQ] = useState(""), [grp, setGrp] = useState("status"), [coll, setColl] = useState({}), [quick, setQuick] = useState("all"), [moreOpen, setMoreOpen] = useState(false), [tagFilter, setTagFilter] = useState("");
+  const [st, setSt] = useState("all"), [who, setWho] = useState("all"), [pr, setPr] = useState("all"), [q, setQ] = useState(""), [grp, setGrp] = useState("status"), [coll, setColl] = useState({}), [quick, setQuick] = useState("all"), [moreOpen, setMoreOpen] = useState(false), [tagFilter, setTagFilter] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]), [bulkStatus, setBulkStatus] = useState("todo"), [bulkBusy, setBulkBusy] = useState(false), [bulkMsg, setBulkMsg] = useState(""), [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const isAdmin = session.role === "admin";
   const scope = (tasks || []).filter((t) => taskVisible(t, session, users) && (!t.isPrivate || t.ownerId === session.id));
   const rows = scope.filter((t) => {
@@ -4393,11 +4394,47 @@ function TasksModule(p) {
   const mtgOf = (id) => (meetings || []).find((m) => m.id === id);
   const dueLabel = (t) => t.mode === "permanent" ? "שוטפת" : t.mode === "deferred" ? "ללא תאריך" : (t.dueAt ? fmtDate(t.dueAt) : "—");
   const owners = [...new Set(scope.flatMap((t) => t.responsibleIds || []))];
-  const taskRow = (t) => { const s = tstOf(t.status), ovd = taskOverdue(t), mtg = mtgOf(t.meetingId), pri = prOf(t.priority), resp = (t.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "—"; return <button key={t.id} className={"task-row" + (ovd ? " ovd" : "")} onClick={() => setOpenId(t.id)} style={{ borderInlineStartColor: s.color }}>
+  const rowIds = new Set(rows.map((t) => t.id));
+  const visibleSelectedIds = selectedIds.filter((id) => rowIds.has(id));
+  const selectedTasks = visibleSelectedIds.map((id) => rows.find((t) => t.id === id)).filter(Boolean);
+  const selectedCount = selectedTasks.length;
+  const allFilteredSelected = rows.length > 0 && rows.every((t) => selectedIds.includes(t.id));
+  const ownsMeetingForTask = (t) => { const mtg = mtgOf(t.meetingId); return !!mtg && (mtg.ownerId === session.id || (mtg.participantIds || []).includes(session.id)); };
+  const canBulkManageTask = (t) => isAdmin || t.ownerId === session.id || (t.responsibleIds || []).includes(session.id) || ownsMeetingForTask(t);
+  const canBulkDeleteTask = (t) => isAdmin || t.ownerId === session.id || ownsMeetingForTask(t);
+  const manageableSelected = selectedTasks.filter(canBulkManageTask);
+  const deletableSelected = selectedTasks.filter(canBulkDeleteTask);
+  const toggleTaskSelected = (id) => { setBulkMsg(""); setBulkDeleteConfirm(false); setSelectedIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]); };
+  const toggleAllFiltered = () => { setBulkMsg(""); setBulkDeleteConfirm(false); setSelectedIds((ids) => allFilteredSelected ? ids.filter((id) => !rowIds.has(id)) : [...new Set([...ids, ...rows.map((t) => t.id)])]); };
+  const applyBulkStatus = async () => {
+    if (!manageableSelected.length) return setBulkMsg("אין הרשאה לשינוי המטלות שנבחרו");
+    setBulkBusy(true); setBulkMsg(""); setBulkDeleteConfirm(false);
+    const now = Date.now(), statusLabel = tstOf(bulkStatus).label;
+    for (const task of manageableSelected) {
+      const next = { ...task, status: bulkStatus, waitingFor: bulkStatus === "waiting" ? task.waitingFor : "", updatedAt: now, log: [...(task.log || []), { at: now, by: session.name, byRole: session.role, text: `סטטוס שונה ל${statusLabel} בפעולה מרוכזת`, kind: "other" }] };
+      if (await saveTask(next) === false) { setBulkBusy(false); setBulkMsg(SAVE_FAILED_MESSAGE); return; }
+    }
+    setBulkBusy(false);
+    setBulkMsg(`${countLabel(manageableSelected.length, "מטלה עודכנה", "מטלות עודכנו")}`);
+    setSelectedIds((ids) => ids.filter((id) => !manageableSelected.some((t) => t.id === id)));
+  };
+  const deleteSelectedTasks = async () => {
+    if (!deletableSelected.length) return setBulkMsg("אין הרשאה למחיקת המטלות שנבחרו");
+    if (!bulkDeleteConfirm) { setBulkDeleteConfirm(true); setBulkMsg("לחצו שוב כדי למחוק את המטלות שניתן למחוק"); return; }
+    setBulkBusy(true); setBulkMsg("");
+    for (const task of deletableSelected) {
+      if (await delTask(task.id) === false) { setBulkBusy(false); setBulkMsg(SAVE_FAILED_MESSAGE); return; }
+    }
+    setBulkBusy(false); setBulkDeleteConfirm(false);
+    setBulkMsg(`${countLabel(deletableSelected.length, "מטלה נמחקה", "מטלות נמחקו")}`);
+    setSelectedIds((ids) => ids.filter((id) => !deletableSelected.some((t) => t.id === id)));
+  };
+  const taskRow = (t) => { const s = tstOf(t.status), ovd = taskOverdue(t), mtg = mtgOf(t.meetingId), pri = prOf(t.priority), resp = (t.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "—", checked = selectedIds.includes(t.id); return <div key={t.id} role="button" tabIndex={0} className={"task-row" + (ovd ? " ovd" : "") + (checked ? " selected" : "")} onClick={() => setOpenId(t.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(t.id); } }} style={{ borderInlineStartColor: s.color }}>
+    <label className="task-row-check" onClick={(e) => e.stopPropagation()} title="בחירת מטלה"><input type="checkbox" checked={checked} onChange={() => toggleTaskSelected(t.id)} aria-label={`בחירת מטלה ${t.title}`} /></label>
     <span className="tr-pri" style={{ background: pri.color }} title={"עדיפות " + pri.label} />
     <div className="task-row-main"><div className="task-row-t">{t.title}</div>{t.desc && <div className="task-row-desc">{t.desc.split("\n")[0]}</div>}<div className="task-row-sub"><span className="tr-to">ל: {resp}</span>{t.ownerId && t.ownerId !== (t.responsibleIds || [])[0] && <span>· מאת {uName(t.ownerId, users)}</span>}{mtg && <span className="tr-mtg"><CalendarClock size={10} /> {mtg.title}</span>}{t.locationText && <span className="tr-loc" role="button" title="סינון לפי הקשר" onClick={(e) => { e.stopPropagation(); setTagFilter(t.locationText); }}># {t.locationText}</span>}{t.category && <span className="tr-cat">{t.category}</span>}{t.status === "waiting" && t.waitingFor && <span className="tr-wait">⏳ {t.waitingFor}</span>}</div></div>
     <div className="task-row-side"><span className="badge sm" style={{ color: "#fff", background: s.color }}>{s.label}</span><span className="task-due" style={ovd ? { color: "#DC2626", fontWeight: 700 } : {}}>{dueLabel(t)}</span></div>
-  </button>; };
+  </div>; };
   const grpKey = (t) => grp === "status" ? tstOf(t.status).label : grp === "to" ? ((t.responsibleIds || []).map((id) => uName(id, users))[0] || "ללא אחראי") : grp === "from" ? uName(t.ownerId, users) : grp === "meeting" ? (mtgOf(t.meetingId)?.title || "ללא פגישה") : prOf(t.priority).label;
   const groups = (() => { if (grp === "none") return null; const m = new Map(); rows.forEach((t) => { const k = grpKey(t); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }); if (grp === "status") { const ord = taskStatuses().map((s) => s.label); return [...m.entries()].sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0])); } if (grp === "priority") { const ord = PRIORITIES.map((x) => x.label); return [...m.entries()].sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0])); } return [...m.entries()].sort((a, b) => b[1].length - a[1].length); })();
   const overdueN = scope.filter(taskOverdue).length, openN = scope.filter(taskOpen).length;
@@ -4417,6 +4454,22 @@ function TasksModule(p) {
       <label className="flt-field"><span className="flt-lbl">עדיפות</span><select value={pr} onChange={(e) => setPr(e.target.value)}><option value="all">הכל</option>{PRIORITIES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
     </div>
     <div className="fleet-results-bar"><span className="fleet-count">{rows.length} מטלות</span><div className="group-seg"><span className="group-lbl">קבץ לפי</span>{[["status", "סטטוס"], ["to", "אחראי"], ["from", "מאת"], ["meeting", "פגישה"], ["none", "ללא"]].map(([id, lbl]) => <button key={id} className={grp === id ? "on" : ""} onClick={() => setGrp(id)}>{lbl}</button>)}</div></div>
+    {rows.length > 0 && <div className="fleet-bulk-panel task-bulk-panel">
+      <div className="fleet-bulk-top">
+        <label className="bulk-check"><input type="checkbox" checked={allFilteredSelected} onChange={toggleAllFiltered} /> {allFilteredSelected ? "בטל בחירה מסוננת" : "בחר את כל המסוננות"}</label>
+        <span className="fleet-bulk-count">{selectedCount ? `${countLabel(selectedCount, "מטלה נבחרה", "מטלות נבחרו")}` : "בחרו מטלות כדי לשנות סטטוס או למחוק"}</span>
+      </div>
+      {selectedCount > 0 && <div className="fleet-bulk-actions">
+        <div className="bulk-action">
+          <select value={bulkStatus} onChange={(e) => { setBulkStatus(e.target.value); setBulkDeleteConfirm(false); }} aria-label="סטטוס לעדכון מרוכז">
+            {taskStatuses().map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+          <button className="btn-ghost sm" disabled={bulkBusy || !manageableSelected.length} onClick={applyBulkStatus}><Check size={13} /> שינוי סטטוס</button>
+        </div>
+        <button className={"btn-ghost sm" + (bulkDeleteConfirm ? " danger" : "")} disabled={bulkBusy || !deletableSelected.length} onClick={deleteSelectedTasks}><Trash2 size={13} /> {bulkDeleteConfirm ? "לחצו שוב למחיקה" : "מחיקת נבחרות"}</button>
+        {bulkMsg && <span className={bulkMsg === SAVE_FAILED_MESSAGE || bulkMsg.includes("אין הרשאה") ? "bulk-msg err" : "bulk-msg"}>{bulkMsg}</span>}
+      </div>}
+    </div>}
     {rows.length === 0 ? <Empty text="אין מטלות" Icon={ClipboardList} sub="לחצו «מטלה» כדי להוסיף" />
       : groups ? <div className="fleet-groups">{groups.map(([k, items]) => { const open = !coll[k]; return <div key={k} className="fgroup"><button className="fgroup-head" onClick={() => setColl((c) => ({ ...c, [k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{k}</span><span className="fgroup-count">{items.length}</span></button>{open && <div className="task-list">{items.map(taskRow)}</div>}</div>; })}</div>
       : <div className="task-list">{rows.map(taskRow)}</div>}
@@ -9331,7 +9384,12 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .task-list{display:flex;flex-direction:column;gap:6px;}
 .task-row{display:flex;align-items:center;gap:9px;width:100%;text-align:right;background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid var(--muted);border-radius:11px;padding:9px 11px;cursor:pointer;color:var(--ink);}
 .task-row:hover{background:var(--surface-2);}
+.task-row.selected{background:#FFF7ED;border-color:#FDBA74;box-shadow:0 0 0 1px rgba(234,88,12,.12);}
 .task-row.ovd{background:linear-gradient(90deg,rgba(220,38,38,0.05),transparent 60%);}
+.task-row.selected.ovd{background:linear-gradient(90deg,rgba(220,38,38,0.05),#FFF7ED 60%);}
+.task-row-check{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);cursor:pointer;}
+.task-row-check:hover{border-color:#FDBA74;background:#FFFBEB;}
+.task-row-check input{width:16px;height:16px;accent-color:var(--primary);}
 .tr-pri{width:9px;height:9px;border-radius:50%;flex:none;}
 .task-row-main{flex:1;min-width:0;}
 .task-row-t{font-weight:600;font-size:13.5px;line-height:1.25;}
