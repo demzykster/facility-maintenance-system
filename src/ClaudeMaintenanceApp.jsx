@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History, Play} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import QRCode from "qrcode";
@@ -42,7 +42,7 @@ import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { buildInspectionDuePairs, inspectionProgramsForType, migrateInspectionProgramsFromTemplates, normalizeInspectionProgram } from "./inspectionProgramModel.js";
-import { controlFindingTaskDraft, controlManualRunPresetsForDomain, normalizeControlFinding, normalizeControlRun } from "./controlsCoreModel.js";
+import { controlAssignmentDraftFromProgram, controlFindingTaskDraft, controlManualRunPresetById, controlManualRunPresetsForDomain, controlProgramDraftFromManualPreset, controlRunDraftFromAssignment, normalizeControlAssignment, normalizeControlFinding, normalizeControlProgram, normalizeControlRun } from "./controlsCoreModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -1866,6 +1866,20 @@ export default function App() {
     return true;
   };
   const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
+  const saveControlProgram = async (p) => {
+    const program = normalizeControlProgram(p);
+    if (!program.id || !program.name) return false;
+    if (!await persistShared(`controlProgram:${program.id}`, JSON.stringify(program))) return false;
+    setControlPrograms((s) => [program, ...s.filter((x) => x.id !== program.id)].sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")));
+    return true;
+  };
+  const saveControlAssignment = async (a) => {
+    const assignment = normalizeControlAssignment(a);
+    if (!assignment.id || !assignment.programId) return false;
+    if (!await persistShared(`controlAssignment:${assignment.id}`, JSON.stringify(assignment))) return false;
+    setControlAssignments((s) => [assignment, ...s.filter((x) => x.id !== assignment.id)].sort((x, y) => (y.dueAt || y.createdAt || 0) - (x.dueAt || x.createdAt || 0)));
+    return true;
+  };
   const saveControlRun = async (r) => {
     const run = normalizeControlRun(r);
     if (!run.id) return false;
@@ -2120,7 +2134,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlPrograms, controlAssignments, controlRuns, controlFindings, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlPrograms, controlAssignments, controlRuns, controlFindings, saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -2688,9 +2702,10 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlFindings = [], saveControlRun, saveControlFinding, onOpenTask }) {
+function ControlsHub({ session, users = [], saveTask, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
+  const [controlTab, setControlTab] = useState("run");
   const [name, setName] = useState("סיור בטיחות ידני");
   const [domain, setDomain] = useState("safety");
   const [target, setTarget] = useState("");
@@ -2709,6 +2724,9 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const [savedRun, setSavedRun] = useState(null);
   const [savedFinding, setSavedFinding] = useState(null);
   const [openRunId, setOpenRunId] = useState(null);
+  const [programDraft, setProgramDraft] = useState({ domain: "safety", presetId: "safety-walk-basic", name: "סיור בטיחות ידני", target: "", responsibleId: "", participantId: "" });
+  const [assignmentDrafts, setAssignmentDrafts] = useState({});
+  const [activeAssignmentRun, setActiveAssignmentRun] = useState(null);
   const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
   const domainPresets = useMemo(() => controlManualRunPresetsForDomain(domain), [domain]);
   const targetPlaceholder = domainPresets[0]?.targetPlaceholder || "לדוגמה: מחסן ראשי / רחבת מלגזות";
@@ -2734,12 +2752,29 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     if (responsibleId && activeUsers.some((u) => u.id === responsibleId)) return;
     setResponsibleId(defaultResponsibleId);
   }, [responsibleId, defaultResponsibleId, activeUsers]);
+  useEffect(() => {
+    setProgramDraft((draft) => {
+      if (draft.responsibleId && activeUsers.some((u) => u.id === draft.responsibleId)) return draft;
+      return { ...draft, responsibleId: defaultResponsibleId };
+    });
+  }, [defaultResponsibleId, activeUsers]);
   const runFindingsByRun = useMemo(() => (controlFindings || []).reduce((map, finding) => {
     if (!finding?.runId) return map;
     map[finding.runId] = [...(map[finding.runId] || []), finding];
     return map;
   }, {}), [controlFindings]);
   const recentRuns = useMemo(() => (controlRuns || []).slice(0, 6), [controlRuns]);
+  const programOptions = useMemo(() => (controlPrograms || []).filter((program) => program?.id && program?.active !== false), [controlPrograms]);
+  const assignmentOptions = useMemo(() => (controlAssignments || []).filter((assignment) => assignment?.id), [controlAssignments]);
+  const visibleAssignments = useMemo(() => {
+    const sorted = [...assignmentOptions].sort((a, b) => {
+      const av = a.status === "completed" || a.status === "cancelled" ? 1 : 0;
+      const bv = b.status === "completed" || b.status === "cancelled" ? 1 : 0;
+      return av - bv || String(a.dueAt || "").localeCompare(String(b.dueAt || "")) || (b.createdAt || 0) - (a.createdAt || 0);
+    });
+    if (canManageControls) return sorted;
+    return sorted.filter((assignment) => (assignment.assignedToIds || []).includes(actorUserId));
+  }, [assignmentOptions, canManageControls, actorUserId]);
   const openRun = useMemo(() => recentRuns.find((run) => run.id === openRunId) || null, [recentRuns, openRunId]);
   const openRunFindings = openRun ? (runFindingsByRun[openRun.id] || []) : [];
   const answerMeta = (value) => value === "problem"
@@ -2761,6 +2796,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     : "לדוח בלבד";
   const findingTaskCreated = !!savedFinding?.route?.taskId;
   const resetManualRun = () => {
+    setActiveAssignmentRun(null);
     setAnswers({});
     setNotes("");
     setSignature("");
@@ -2796,9 +2832,118 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     { id: "fleet", label: "בקרת כלים", text: "בקרות ציוד שינוע כחלק מאותו מנוע בקרות.", Icon: Truck, color: "#EA580C" }
   ];
   const currentArea = areas.find((a) => a.id === domain) || areas[0];
+  const programDraftPresets = useMemo(() => controlManualRunPresetsForDomain(programDraft.domain), [programDraft.domain]);
+  const selectedProgramPreset = programDraftPresets.find((preset) => preset.id === programDraft.presetId) || programDraftPresets[0] || null;
+  const domainLabel = (value) => areas.find((a) => a.id === value)?.label || "בקרות";
+  const programById = (id) => programOptions.find((program) => program.id === id) || null;
+  const updateProgramDomain = (nextDomain) => {
+    const presets = controlManualRunPresetsForDomain(nextDomain);
+    const preset = presets[0] || null;
+    setProgramDraft((draft) => ({
+      ...draft,
+      domain: nextDomain,
+      presetId: preset?.id || "",
+      name: preset?.name || draft.name,
+      target: ""
+    }));
+  };
+  const updateProgramPreset = (presetId) => {
+    const preset = controlManualRunPresetById(presetId);
+    setProgramDraft((draft) => ({
+      ...draft,
+      presetId,
+      domain: preset?.domain || draft.domain,
+      name: preset?.name || draft.name
+    }));
+  };
+  const saveProgramDraft = async () => {
+    if (!canManageControls) return setMsg("נדרשת הרשאת ניהול בקרות.");
+    if (!saveControlProgram) return setMsg("שמירת תכניות בקרה אינה זמינה כרגע.");
+    if (!selectedProgramPreset) return setMsg("בחרו תבנית לתכנית.");
+    const program = controlProgramDraftFromManualPreset(selectedProgramPreset.id, {
+      id: uid(),
+      name: programDraft.name,
+      targetIds: programDraft.target ? [programDraft.target] : [],
+      responsibleIds: programDraft.responsibleId ? [programDraft.responsibleId] : [],
+      participantIds: programDraft.participantId ? [programDraft.participantId] : [],
+      notifyIds: programDraft.responsibleId ? [programDraft.responsibleId] : []
+    });
+    if (!program?.name) return setMsg("תנו שם לתכנית.");
+    setBusy(true); setMsg("");
+    const ok = await saveControlProgram(program);
+    setBusy(false);
+    if (ok === false) return setMsg(SAVE_FAILED_MESSAGE);
+    setProgramDraft((draft) => ({ ...draft, name: selectedProgramPreset.name, target: "" }));
+    setMsg("תכנית הבקרה נשמרה. אפשר ליצור ממנה שיוך ידני.");
+  };
+  const saveManualAssignment = async (program) => {
+    if (!canManageControls) return setMsg("נדרשת הרשאת ניהול בקרות.");
+    if (!saveControlAssignment) return setMsg("שמירת שיוכי בקרה אינה זמינה כרגע.");
+    const draft = assignmentDrafts[program.id] || {};
+    const assigneeId = draft.assignedToId || program.responsibleIds?.[0] || defaultResponsibleId;
+    if (!assigneeId) return setMsg("בחרו מבצע לשיוך.");
+    if (!draft.dueAt) return setMsg("בחרו תאריך ביצוע.");
+    const targetLabel = draft.target || program.targetIds?.[0] || "";
+    const assignment = controlAssignmentDraftFromProgram(program, {
+      id: uid(),
+      assignedToIds: [assigneeId],
+      target: { kind: program.targetType || "location", id: targetLabel, locationId: program.targetType === "location" ? targetLabel : undefined, label: targetLabel },
+      dueAt: draft.dueAt,
+      createdAt: Date.now()
+    });
+    setBusy(true); setMsg("");
+    const ok = await saveControlAssignment(assignment);
+    setBusy(false);
+    if (ok === false) return setMsg(SAVE_FAILED_MESSAGE);
+    setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...draft, dueAt: "" } }));
+    setMsg("נוצר שיוך ידני לתכנית.");
+  };
+  const startAssignmentRun = async (assignment) => {
+    const program = programById(assignment.programId);
+    if (!program) return setMsg("לא נמצאה תכנית הבקרה של השיוך.");
+    const runDraft = controlRunDraftFromAssignment(assignment, {
+      id: uid(),
+      performedById: actorUserId,
+      startedAt: Date.now(),
+      status: "in_progress"
+    });
+    if (!runDraft) return setMsg("לא ניתן לפתוח בדיקה מהשיוך הזה.");
+    setActiveAssignmentRun({ assignment, program, runDraft });
+    setControlTab("run");
+    setDomain(program.domain || "general");
+    setName(program.name || "בקרה מתכנית");
+    setChecklistText((program.checklistItems || []).map((item) => item.label || item.id).filter(Boolean).join("\n"));
+    setTarget(assignment.target?.label || assignment.target?.id || "");
+    setAnswers({});
+    setNotes("");
+    setSignature("");
+    setFindingTitle("");
+    setFindingDesc("");
+    setSeverity("medium");
+    setRouteType(program.actionPolicy?.defaultRouteType || "report_only");
+    setTaskDue("");
+    setSavedRun(null);
+    setSavedFinding(null);
+    setMsg("נפתחה בדיקה מתוך שיוך. מלאו צ'קליסט וחתמו לסיום.");
+    if (saveControlAssignment && assignment.status === "planned") {
+      await saveControlAssignment({ ...assignment, status: "in_progress" });
+    }
+  };
+  const activeProgramId = activeAssignmentRun?.program?.id || "manual-control";
+  const activeAssignmentId = activeAssignmentRun?.assignment?.id || undefined;
+  const statusLabel = (status) => ({
+    planned: "מתוכנן",
+    rescheduled: "נדחה",
+    in_progress: "בביצוע",
+    completed: "הושלם",
+    cancelled: "בוטל",
+    missed: "פספס"
+  }[status] || status || "מתוכנן");
+  const userName = (id) => activeUsers.find((u) => u.id === id)?.name || displayUserName(id);
   const finding = {
     id: "finding-preview",
-    programId: "manual-control",
+    programId: activeProgramId,
+    assignmentId: activeAssignmentId,
     runId: "manual-run-preview",
     domain,
     title: findingTitle || (findingCount ? `ממצא מתוך ${name || "בקרה ידנית"}` : ""),
@@ -2825,7 +2970,8 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     const findingId = savedFinding?.id || uid();
     const run = {
       id: runId,
-      programId: "manual-control",
+      programId: activeProgramId,
+      assignmentId: activeAssignmentId,
       performedById: actorUserId,
       participantIds: [],
       target: { kind: "location", id: target, label: target },
@@ -2855,6 +3001,9 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     } else {
       setSavedFinding(null);
     }
+    if (activeAssignmentRun && saveControlAssignment) {
+      await saveControlAssignment({ ...activeAssignmentRun.assignment, status: "completed", completedAt: now, runId });
+    }
     setBusy(false);
     setMsg(findingCount ? "הבדיקה נשמרה. עכשיו אפשר להשאיר לדוח או לפתוח מטלה מהממצא." : "הבדיקה נשמרה ללא ממצאים.");
   };
@@ -2870,7 +3019,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
       id: uid(),
       sourceId: savedFinding.id,
       sourceFindingId: savedFinding.id,
-      sourceProgramId: "manual-control",
+      sourceProgramId: activeProgramId,
       sourceRunId: savedRun.id,
       responsibleIds: taskDraft.responsibleIds?.length ? taskDraft.responsibleIds : [],
       participantIds: [],
@@ -2892,6 +3041,8 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
         ...finding,
         id: savedFinding.id,
         runId: savedRun.id,
+        programId: activeProgramId,
+        assignmentId: activeAssignmentId,
         route: { ...savedFinding.route, type: "task", taskId: task.id, notifyIds: task.responsibleIds, status: "created", decidedById: actorUserId, decidedAt: now },
         status: "routed"
       });
@@ -2906,7 +3057,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
       <div className="row-between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
         <div>
           <SectionTitle><ClipboardCheck size={15} /> בקרות</SectionTitle>
-          <div className="hint" style={{ maxWidth: 680 }}>סבב ידני ראשון: בדיקה קצרה, חתימה אחת, ממצא אחד, שמירת היסטוריה וניתוב לדוח בלבד או ל-מטלות. עדיין בלי מנוע תזמון ובלי תכניות בקרות קבועות.</div>
+          <div className="hint" style={{ maxWidth: 680 }}>סבב ראשון: בדיקה קצרה, חתימה אחת, ממצא אחד, שמירת היסטוריה וניתוב לדוח בלבד או ל-מטלות. אפשר גם ליצור תכנית ידנית ושיוך אחד, עדיין בלי מנוע תזמון.</div>
         </div>
         {canManageControls && <span className="badge sm" style={{ background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>ניהול בקרות</span>}
         {!canManageControls && canPerform && <span className="badge sm" style={{ background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0" }}>ביצוע בקרות</span>}
@@ -2917,6 +3068,65 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
         <div className="stat-box"><div className="stat-num" style={{ color: taskDraft ? "#0D9488" : "var(--muted)" }}>{taskDraft ? 1 : 0}</div><div className="stat-lbl">טיוטת מטלה</div></div>
       </div>
       {!canPerform ? <Empty text="אין הרשאת ביצוע בקרות" Icon={ShieldAlert} sub="נדרשת הרשאת controls:request ומעלה כדי לבצע סבב." /> : <>
+      <div className="control-mode-tabs">
+        <button className={controlTab === "run" ? "on" : ""} onClick={() => setControlTab("run")}><ClipboardCheck size={15} /> ביצוע בדיקה</button>
+        <button className={controlTab === "programs" ? "on" : ""} onClick={() => setControlTab("programs")}><ListChecks size={15} /> תכניות ושיוכים</button>
+      </div>
+      {controlTab === "programs" && <div className="control-programs-wrap">
+        {canManageControls && <div className="control-panel">
+          <SectionTitle><Plus size={15} /> תכנית בקרה חדשה</SectionTitle>
+          <div className="control-program-grid">
+            <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={programDraft.domain === a.id ? "on" : ""} onClick={() => updateProgramDomain(a.id)}>{a.label}</button>)}</div></label>
+            <label className="field"><span>תבנית</span><select value={programDraft.presetId} onChange={(e) => updateProgramPreset(e.target.value)}>{programDraftPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
+            <label className="field"><span>שם התכנית</span><input value={programDraft.name} onChange={(e) => setProgramDraft((draft) => ({ ...draft, name: e.target.value }))} /></label>
+            <label className="field"><span>יעד / אזור</span><input value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))} placeholder={selectedProgramPreset?.targetPlaceholder || "לדוגמה: מחסן ראשי"} /></label>
+            <label className="field"><span>אחראי</span><select value={programDraft.responsibleId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, responsibleId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
+            <label className="field"><span>משתתף נוסף</span><select value={programDraft.participantId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, participantId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
+          </div>
+          <div className="hint" style={{ margin: "4px 0 10px" }}>זהו סבב ראשון צר: תכנית ידנית מתוך תבנית. מנוע תזמון, ימי העדפה, מניעת כפילויות וימי שבתון יגיעו בהמשך.</div>
+          <button className="btn-primary full" onClick={saveProgramDraft} disabled={busy}><Plus size={15} /> שמירת תכנית</button>
+        </div>}
+        <div className="control-program-split">
+          <div className="control-panel">
+            <SectionTitle><ListChecks size={15} /> תכניות פעילות ({programOptions.length})</SectionTitle>
+            {programOptions.length ? <div className="control-program-list">{programOptions.map((program) => {
+              const draft = assignmentDrafts[program.id] || {};
+              return <div key={program.id} className="control-program-card">
+                <div className="control-program-head">
+                  <div>
+                    <div className="tcard-subj">{program.name}</div>
+                    <div className="control-program-meta">{domainLabel(program.domain)} · {(program.checklistItems || []).length} סעיפים{program.targetIds?.length ? ` · ${program.targetIds.join(", ")}` : ""}</div>
+                  </div>
+                  <span className="badge sm" style={{ background: "#F8FAFC", color: "#475569", border: "1px solid var(--line)" }}>{program.responsibleIds?.length ? program.responsibleIds.map(userName).join(", ") : "ללא אחראי"}</span>
+                </div>
+                {canManageControls && <div className="control-assignment-editor">
+                  <label className="field mini"><span>מבצע</span><select value={draft.assignedToId || program.responsibleIds?.[0] || defaultResponsibleId || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), assignedToId: e.target.value } }))}><option value="">בחרו</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
+                  <label className="field mini"><span>תאריך</span><input type="date" value={draft.dueAt || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), dueAt: e.target.value } }))} /></label>
+                  <label className="field mini"><span>יעד</span><input value={draft.target || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), target: e.target.value } }))} placeholder={program.targetIds?.[0] || "לפי התכנית"} /></label>
+                  <button className="btn-ghost sm" onClick={() => saveManualAssignment(program)} disabled={busy}><CalendarClock size={14} /> שיוך</button>
+                </div>}
+              </div>;
+            })}</div> : <Empty text="אין תכניות בקרות" Icon={ListChecks} sub={canManageControls ? "צרו תכנית ראשונה מתבנית." : "מנהל בקרות ייצור תכניות ויקצה אותן."} />}
+          </div>
+          <div className="control-panel">
+            <SectionTitle><CalendarClock size={15} /> שיוכים ({visibleAssignments.length})</SectionTitle>
+            {visibleAssignments.length ? <div className="control-assignment-list">{visibleAssignments.map((assignment) => {
+              const program = programById(assignment.programId);
+              const done = assignment.status === "completed" || assignment.status === "cancelled";
+              return <div key={assignment.id} className={"control-assignment-row" + (done ? " done" : "")}>
+                <div className="task-row-main">
+                  <div className="task-row-t">{program?.name || "תכנית לא זמינה"}</div>
+                  <div className="task-row-desc">{assignment.target?.label || assignment.target?.id || "ללא יעד"} · {assignment.dueAt ? fmtDate(assignment.dueAt) : "ללא תאריך"} · {(assignment.assignedToIds || []).map(userName).join(", ") || "ללא מבצע"}</div>
+                </div>
+                <span className="badge sm" style={{ background: done ? "#F1F5F9" : "#ECFDF5", color: done ? "#64748B" : "#047857", border: "1px solid var(--line)" }}>{statusLabel(assignment.status)}</span>
+                {!done && <button className="btn-primary sm" onClick={() => startAssignmentRun(assignment)} disabled={busy}><Play size={14} /> פתח</button>}
+              </div>;
+            })}</div> : <Empty text="אין שיוכים פתוחים" Icon={CalendarClock} sub="כשתכנית תשויך למבצע, היא תופיע כאן לפתיחה מהירה." />}
+          </div>
+        </div>
+      </div>}
+      {controlTab === "run" && <>
+      {activeAssignmentRun && <div className="note" style={{ marginBottom: 12 }}><b>בדיקה מתוך שיוך:</b> {activeAssignmentRun.program?.name} · {activeAssignmentRun.assignment?.target?.label || activeAssignmentRun.assignment?.target?.id || "ללא יעד"} · {activeAssignmentRun.assignment?.dueAt ? fmtDate(activeAssignmentRun.assignment.dueAt) : "ללא תאריך"}</div>}
       <div className="control-run-grid">
         <div className="control-panel">
           <SectionTitle><currentArea.Icon size={15} /> בדיקה ידנית</SectionTitle>
@@ -3007,6 +3217,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
           </div>}
         </div> : <Empty text="אין עדיין היסטוריית בקרות" Icon={History} sub="סיימו בדיקה ידנית כדי לשמור אותה כאן." />}
       </div>
+      </>}
       </>}
     </div>
   );
@@ -9721,6 +9932,24 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .task-row.selected{background:#FFF7ED;border-color:#FDBA74;box-shadow:0 0 0 1px rgba(234,88,12,.12);}
 .control-history-row{align-items:flex-start;}
 .control-actions{display:flex;flex-direction:column;gap:8px;}
+.control-mode-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0;}
+.control-mode-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:11px;padding:10px 12px;font-size:13px;font-weight:900;cursor:pointer;min-width:0;}
+.control-mode-tabs button.on{background:#FFF7ED;border-color:#FDBA74;color:#C2410C;box-shadow:0 0 0 1px rgba(234,88,12,.08);}
+.control-mode-tabs button svg{flex:none;}
+.control-programs-wrap{display:flex;flex-direction:column;gap:12px;}
+.control-program-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
+.control-program-split{display:grid;grid-template-columns:minmax(320px,1.1fr) minmax(300px,.9fr);gap:12px;align-items:start;}
+.control-program-list,.control-assignment-list{display:flex;flex-direction:column;gap:8px;}
+.control-program-card{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:10px;display:flex;flex-direction:column;gap:9px;}
+.control-program-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.control-program-head>div{min-width:0;}
+.control-program-meta{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.35;}
+.control-assignment-editor{display:grid;grid-template-columns:minmax(110px,1fr) minmax(110px,.8fr) minmax(130px,1fr) auto;gap:8px;align-items:end;}
+.field.mini{margin-bottom:0;}
+.field.mini span{font-size:11.5px;}
+.field.mini input,.field.mini select{min-height:36px;padding:7px 9px;font-size:12px;}
+.control-assignment-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:9px 10px;border-inline-start:4px solid #0D9488;}
+.control-assignment-row.done{border-inline-start-color:#CBD5E1;opacity:.78;}
 .control-preset-row{display:flex;flex-wrap:wrap;gap:6px;}
 .control-preset-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer;max-width:100%;text-align:start;}
 .control-preset-btn:hover{background:var(--surface-2);border-color:#FDBA74;}
@@ -9761,7 +9990,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .control-answer-tabs button.on.bad{background:#FEF2F2;border-color:#FECACA;color:#B91C1C;}
 .control-answer-tabs button.on.na{background:var(--surface-2);border-color:#CBD5E1;color:var(--ink);}
 .control-find-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
-@media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row{grid-template-columns:1fr}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}}
+@media(max-width:980px){.control-program-split,.control-program-grid{grid-template-columns:1fr}.control-assignment-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.control-assignment-editor .btn-ghost{grid-column:1/-1;justify-content:center}}
+@media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row,.control-mode-tabs,.control-assignment-row{grid-template-columns:1fr}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}.control-program-head{flex-direction:column}.control-assignment-editor{grid-template-columns:1fr}}
 .task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
 .task-due{font-size:11px;color:var(--muted);white-space:nowrap;}
 .ppe-request-list{display:flex;flex-direction:column;gap:8px;}

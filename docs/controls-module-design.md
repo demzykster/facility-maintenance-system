@@ -682,7 +682,8 @@ Current implementation note:
 - findings that already created a task can open that linked `מטלה` directly from the run history; raw task ids should remain hidden from the operator UI.
 - manual domain presets are intentionally small: safety walk, fleet/tool check, quality sample, and executive/operations walk. They prefill the manual run name/checklist only; they are not scheduled programs and do not create assignments.
 - the core model can now draft a saved control program from one of those manual presets, and can draft a single manual assignment from a program. This is a bridge toward the first saved Program -> Assignment -> Run scenario, not a scheduling engine.
-- the core model can also draft a run from one assignment while preserving program/assignment/target links. It does not complete the run, create findings, or route actions automatically.
+- the core model can also draft a run from one assignment while preserving program/assignment/target links.
+- current narrow UI work adds the first saved Program -> Assignment -> Run path: create a program from a manual preset, create one manual assignment, open a run from that assignment, and preserve program/assignment links through saved run/finding/task routing. This is still not the scheduling engine, not cleaning/location migration, not executive BI, and not a Supabase table migration.
 
 ## Suggested PR Sequence
 
@@ -700,7 +701,7 @@ This is intentionally conservative.
 10. Done: first narrow manual UI slice: one ad-hoc run, one finding, and route to report-only or confirmed `מטלות` creation.
 11. Done: persist the manual run/finding records in shared KV, show history details, and keep created tasks linked back to the saved finding/run with an operator action to open the linked task.
 12. Done: reserve the stable storage contract for controls programs, assignments, runs, and findings before expanding beyond the manual slice.
-13. Current: first small domain increments: safety, quality, fleet controls, or executive walk. Start with a saved program plus one manual assignment/run path; keep each slice narrow and avoid the scheduling engine until the first scenario is modeled end to end.
+13. Current: first saved program/assignment UI slice. Start with a saved program plus one manual assignment/run path; keep the slice narrow and avoid the scheduling engine until the first scenario is modeled end to end.
 14. Dashboard/insights layer.
 
 Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
