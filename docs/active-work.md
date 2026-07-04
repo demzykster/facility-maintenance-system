@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: codex/brand-site-subtitle-empty.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: small branding display fix. Scope: when `אתר / סניף` is saved empty, login/sidebar brand subtitles should stay empty instead of falling back to the default description.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #640 fixed branding subtitle display so an intentionally empty `אתר / סניף` stays empty in login/sidebar branding instead of falling back to the default system description.
   - PR #638 added a pure controls core model for Program, Assignment, Run, Finding, finding visibility policy, action routes, and dashboard signal envelopes. It is model/test only: no UI, Supabase/KV migration, cleaning migration, scheduling engine, or monolith split.
   - PR #636 added a separate `userGroups` permission module for organizational group coordination, kept it separate from broad user management, and refreshed near-term controls docs now that cleaning-access foundation is complete.
   - PR #634 fixed the mobile role-preview popover after removing the separate cleaning role option: the four remaining role buttons now render as an even 2-column grid with stable button height/wrapping.
@@ -92,7 +93,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: finish and verify the small branding subtitle fix, merge it, then reset this ledger. After that, continue from the agreed pre-controls sequence with small PRs; do not start the broad monolith split.
+- Next exact action: continue from the agreed pre-controls sequence with small PRs. The next likely safe step is owner-approved userGroups UI or the first narrow `בקרות` vertical slice; do not start the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
