@@ -73,7 +73,7 @@ Then read only what the current task needs:
 
 ## Active Product Direction
 
-Current product thread: release stabilization on Vercel + Supabase staging.
+Current product thread: release stabilization on Vercel + Supabase staging, with a narrow `בקרות` build-out already underway.
 
 Current facts:
 
@@ -85,13 +85,15 @@ Current facts:
 - Future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not create a separate AI-only write path.
 - Production auth/session work recently moved toward server-side sessions and HttpOnly cookies. Verify current `main` and `docs/active-work.md` before assuming direct browser-to-Supabase Auth behavior.
 - Broad monolith/module split is still not open. Do not start it until data-layer stability and owner checks are complete.
+- `בקרות` is the shared control engine direction. Current implemented slice already covers manual runs/findings, task routing, saved programs/assignments, and fleet targets linked to real fleet records.
+- Agreed next controls direction: `בקרות -> ניקיון` for managers/admins, while cleaners keep their existing simple cleaning flow. First slice should be read-only cleaning overview plus manual manager cleaning-zone quality checks. Do not rewrite QR/round/windows/compliance, do not migrate cleaning zones into `locations` yet, and do not add a separate right-sidebar menu item.
 
-Current next work is tracked in `docs/active-work.md`. As of the 2026-07-03 reset after PRs #573, #575, #563, and #562:
+Current next work is tracked in `docs/active-work.md`. As of the 2026-07-05 docs sync:
 
 - `main` should be clean.
 - Open PRs should be none.
 - Active branch should be none.
-- There is no active owner-reported work queue. Wait for fresh owner-reported release-stabilization issues before opening product work.
+- There is no active owner-reported bug queue. If the owner asks to continue `בקרות`, the next agreed slice is cleaning controls overview/manual manager check.
 - Deployed first-login/password/PIN behavior was previously verified after the auth/session changes; do not reopen that verification unless the owner reports a fresh auth issue.
 - Internal `appIssue:` reports were cleared at owner request and should not be revived from old chat history.
 - TO/periodic-maintenance redesign and old fleet/catalog wording were removed from the active queue. Wait for a fresh owner formulation before restarting them.
@@ -145,6 +147,7 @@ Read extra docs only if the task needs them:
 - docs/module-growth-architecture.md for fleet maintenance, inspections, new modules, or monolith boundaries
 - docs/release-checklist.md for release-package context
 - docs/settings-site-map.md for settings screen moves
+- docs/controls-module-design.md and docs/controls-product-blueprint-ru.md for `בקרות`, cleaning controls, fleet controls, quality, scheduling, dashboard, and action-layer strategy
 
 Current rule:
 - GitHub/main wins over chat memory.
@@ -155,5 +158,5 @@ Current rule:
 - Work in small branches and PRs.
 
 Current expected next step:
-Wait for fresh owner-reported release-stabilization issues, then work in a small branch/PR from current main.
+If the owner says to continue `בקרות`, start the cleaning-controls slice from current main: manager/admin read-only cleaning overview inside `בקרות -> ניקיון`, then manual manager quality check for a cleaning zone. Keep cleaners in the existing cleaning flow. Do not rewrite QR/round/windows/compliance, do not migrate cleaning zones yet, and do not add a new right-sidebar menu item.
 ```

@@ -22,6 +22,7 @@
 - Первый маленький domain increment уже начат: ручные `בקרות` получили легкие шаблоны для safety walk, fleet/tool check, quality sample и operations/executive walk. Эти шаблоны только заполняют название/чеклист ручного обхода; они не создают расписания, программы, назначения или новые таблицы.
 - Следующий UI-мост: из ручного шаблона можно сохранить первую `Control Program`, из программы создать один ручной `Assignment`, открыть из него `Run`, сохранить `Finding` и при необходимости создать `מטלה` с source links. Это не scheduling engine, не автогенерация назначений и не broad controls dashboard.
 - Fleet controls target rule: `בקרת כלים` is not a generic checklist detached from the fleet list. When the domain is `fleet`, the operator should choose a real fleet record; assignments/runs/findings preserve `target.kind = "fleet"` and `fleetId`.
+- Cleaning controls decision: `בקרת ניקיון` becomes a domain inside `בקרות` for managers/admins, while cleaners keep the existing simple cleaning flow. First step is read-only overview plus manual manager quality checks for cleaning zones, not QR/round/compliance migration.
 - `פגישות` / `פ.ע` согласованы как общий contextual work-event layer: обычная `פ.ע` остается default-сценарием, а встречи из `בקרות`, `מטלות`, `קריאות`, комитетов или executive walk должны получать context/source links вместо отдельной несовместимой логики.
 
 ## Ближайший Правильный Шаг
@@ -36,7 +37,7 @@ first narrow domain increment
 
 Содержание:
 
-- выбрать один узкий домен: safety, quality, fleet controls, или executive walk;
+- выбрать один узкий домен: cleaning controls, safety, quality, fleet controls, или executive walk;
 - не добавлять scheduling engine, пока один реальный сценарий не пройден через Program -> Assignment -> Run -> Finding -> Action;
 - если это quality, держать первый slice минимальным: один QA-процесс, один finding flow, один action route;
 - использовать уже зарезервированные controls collections, но не делать Supabase table migration;
@@ -79,7 +80,8 @@ first narrow domain increment
 Закрыто в первом ручном UI-slice: один ручной обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Completed run/finding сохраняются как shared KV `controlRun:*` / `controlFinding:*`, история показывает детали с подписью/ответами/ממצאים, а finding с созданной задачей открывает связанную `מטלה` из истории.
 
 6. Done: зарезервировать stable storage contract для controls programs/assignments/runs/findings.
-7. Current: tighten the first saved Program -> Assignment -> Run -> Finding -> Action scenario for fleet controls. Scope: `fleet` domain uses real fleet records as targets and stores fleet target links through assignment/run/finding. Без scheduling engine, без fleet bulk import, без cleaning migration, без Supabase table migration и без broad dashboard.
+7. Done: first saved Program -> Assignment -> Run -> Finding -> Action scenario, including fleet target selection from real fleet records.
+8. Next: cleaning controls domain slice. Scope: `בקרות -> ניקיון` read-only overview for managers/admins plus manual manager quality check for a cleaning zone. Без QR rewrite, без automatic complaint/finding conversion, без cleaning zone migration, без Supabase table migration и без broad dashboard.
 
 ## What Not To Do Yet
 

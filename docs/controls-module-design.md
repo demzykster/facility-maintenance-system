@@ -363,6 +363,43 @@ Implementation guardrail:
 
 See `docs/cleaning-worker-access-plan.md`.
 
+## Cleaning Controls Domain
+
+Owner-approved direction:
+
+- `בקרת ניקיון` belongs inside the broader `בקרות` ecosystem, but the existing cleaning module remains the working operational flow for cleaners.
+- Cleaners should not be pushed into the large `בקרות` UI. They keep their simple profile/cleaning flow.
+- Managers/admins use `בקרות` to see cleaning as a control domain: zone quality checks, complaints, missed/late rounds, repeated deviations, findings, and follow-up actions.
+- A normal cleaning round is an operational event, not automatically a full control run.
+- QR, cleaning rounds, time windows, checklists, complaints, and compliance tracking stay in the current cleaning module for now.
+- `בקרות -> ניקיון` should not create another menu item on the right sidebar. It is a domain/tab inside the existing `בקרות` module.
+
+First safe implementation direction:
+
+1. Add a read-only `ניקיון` overview inside `בקרות` for managers/admins:
+   - zones;
+   - recent rounds;
+   - complaints;
+   - missed/late windows;
+   - repeated problems;
+   - linked tasks/tickets/findings when they exist.
+2. Add manual manager quality checks for a cleaning zone:
+   - domain `cleaning`;
+   - target is a cleaning zone/location;
+   - create a control run/finding when the manager performs a quality check.
+3. Route cleaning findings manually at first:
+   - report only;
+   - create `מטלה`;
+   - create `קריאה`.
+
+Do not do in the first cleaning-controls slice:
+
+- do not migrate cleaning zones into `locations`;
+- do not rewrite QR/round/compliance logic;
+- do not automatically convert every cleaning round into a `controlRun`;
+- do not automatically create findings from every complaint or missed window;
+- do not add a separate right-sidebar module.
+
 ## Permissions
 
 The existing permissions model should be extended rather than bypassed.
@@ -685,6 +722,8 @@ Current implementation note:
 - the core model can now draft a saved control program from one of those manual presets, and can draft a single manual assignment from a program. This is a bridge toward the first saved Program -> Assignment -> Run scenario, not a scheduling engine.
 - the core model can also draft a run from one assignment while preserving program/assignment/target links.
 - current narrow UI work adds the first saved Program -> Assignment -> Run path: create a program from a manual preset, create one manual assignment, open a run from that assignment, and preserve program/assignment links through saved run/finding/task routing. This is still not the scheduling engine, not cleaning/location migration, not executive BI, and not a Supabase table migration.
+- fleet controls now choose real fleet records as targets and preserve `target.kind = "fleet"` plus `fleetId` through program/assignment/run/finding.
+- agreed next cleaning-controls direction is read-only cleaning overview plus manual manager cleaning-zone checks inside `בקרות`, without migrating QR/round/compliance logic yet.
 
 ## Suggested PR Sequence
 
@@ -702,8 +741,9 @@ This is intentionally conservative.
 10. Done: first narrow manual UI slice: one ad-hoc run, one finding, and route to report-only or confirmed `מטלות` creation.
 11. Done: persist the manual run/finding records in shared KV, show history details, and keep created tasks linked back to the saved finding/run with an operator action to open the linked task.
 12. Done: reserve the stable storage contract for controls programs, assignments, runs, and findings before expanding beyond the manual slice.
-13. Current: first saved program/assignment UI slice. Start with a saved program plus one manual assignment/run path; keep the slice narrow and avoid the scheduling engine until the first scenario is modeled end to end.
-14. Dashboard/insights layer.
+13. Done: first saved program/assignment UI slice and fleet target selection. Fleet-domain controls choose real fleet records and preserve `fleetId`.
+14. Next narrow product slice: cleaning controls domain overview and manual manager cleaning-zone checks inside `בקרות`, without cleaning migration or QR rewrite.
+15. Dashboard/insights layer.
 
 Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
 
