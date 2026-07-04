@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/suppress-startup-storage-toasts`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: suppress misleading startup/background storage toasts so login/auth bootstrap does not show save-failed or automatic inspection-migration banners before user action.
 - Latest completed product work:
   - PR #652 documented settings ownership boundaries for the upcoming controls/settings cleanup: obsolete default inspection cadence should leave user-facing global settings, live PM/cleaning settings should move only after their owning modules have stable settings surfaces/save handlers, and global notification toggles are system policy rather than personal filters.
   - PR #650 simplified login form copy/placeholders: the Hebrew identity field now reads `פרטי כניסה`, and identifier/password/PIN/first-secret fields no longer show demo examples or placeholder dots. Auth/session behavior was not changed.

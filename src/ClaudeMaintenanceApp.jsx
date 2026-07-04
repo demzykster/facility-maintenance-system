@@ -1349,13 +1349,15 @@ export default function App() {
   const [dismissedVersionCommit, setDismissedVersionCommit] = useState("");
   const [session, setSession] = useState(null);
   const sessionRef = useRef(null);
+  const readyRef = useRef(false);
   const quietSharedFailureKeysRef = useRef(new Set());
   useEffect(() => { sessionRef.current = session; }, [session]);
+  useEffect(() => { readyRef.current = ready; }, [ready]);
   useEffect(() => {
     store._onFail = (details = {}) => {
       const errorId = `client-${Date.now().toString(36)}`;
       const current = sessionRef.current || {};
-      const canToastStorageFailure = !!current.id && !quietSharedFailureKeysRef.current.has(details.key);
+      const canToastStorageFailure = readyRef.current && !!current.id && !quietSharedFailureKeysRef.current.has(details.key);
       if (canToastStorageFailure) {
         setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
       }
@@ -1859,16 +1861,14 @@ export default function App() {
   useEffect(() => {
     if (ready && fleet.length && config.vtMigV !== 2) {
       const vts = buildVehicleTypes(config, fleet);
-      if (vts.length) saveConfig({ ...config, ...flattenVehicleTypes(vts), vtMigV: 2 });
+      if (vts.length) saveConfig({ ...config, ...flattenVehicleTypes(vts), vtMigV: 2 }, { toastOnFail: false });
     }
   }, [ready, fleet, config]);
   useEffect(() => {
     if (!ready || !config || config.vtInspMigV === 1) return;
     const nextConfig = migrateInspectionProgramsFromTemplates(config, templates, config.defaultInspIntervalMonths ?? 2);
     if (nextConfig === config) return;
-    saveConfig(nextConfig).then((ok) => {
-      if (ok !== false && session?.role === "admin") setToast("תכניות בקרה הועברו אוטומטית — אנא בדוק את התדירויות בהגדרות סוגי כלים");
-    });
+    saveConfig(nextConfig, { toastOnFail: false });
   }, [ready, config?.vtInspMigV, templates, session?.role]);
   const setShift = async (on) => { if (!session) return false; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return false; setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); return true; };
   const beat = async () => { if (!session || session.role !== "tech") return; const cur = presence.find((x) => x.id === session.id); if (!cur || !cur.onShift || cur.day !== todayKey()) return; const rec = { ...cur, lastSeen: Date.now() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); };
