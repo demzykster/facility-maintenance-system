@@ -58,6 +58,7 @@ analytics
 cleaning
 users
 userGroups
+controls
 workerAccess
 settings
 audit
@@ -139,6 +140,7 @@ Current implementation note:
 - `tests/permissionsMigration.test.js`, `tests/permissionEditorModules.test.js`, and `tests/permissionCapabilities.test.js` cover the current migration bridge, editor module contract, and capability helpers.
 - The user permission editor now includes `users` as a module separate from `workerAccess`, so HR-like access can be expressed without creating an HR role or another one-off checkbox.
 - The permission editor now includes `userGroups` as a module separate from `users`, so organizational group coordination can be delegated without granting broad user-management authority.
+- The permission editor now includes `controls` for the future `בקרות` module. It uses the shared level model: `view` for read access, `request` as the current perform/run level, `manage` for programs/assignments/follow-up coordination, and `full` for future sensitive controls settings and reports.
 - The `צוות ומשתמשים` screen is gated by `users`: `view` shows the team tree read-only, while `manage` enables creating, editing, archiving, and restoring users.
 - Managers default to `ppe: request`, so they can submit clothing/PPE requests for their scope unless explicitly set to `ppe: none`.
 - The permission editor also includes management modules `analytics`, `suppliers`, `settings`, and `audit`; screen gates should be added against these module keys instead of new one-off flags.
@@ -152,6 +154,7 @@ Possible grouping:
 ```text
 Operations: tickets, fleet, drivers
 Employees: users, userGroups, workerAccess, ppe
+Controls: controls
 Management: suppliers, analytics, settings, audit
 Cleaning: cleaning
 ```
