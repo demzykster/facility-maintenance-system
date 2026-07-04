@@ -2702,6 +2702,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const [busy, setBusy] = useState(false);
   const [savedRun, setSavedRun] = useState(null);
   const [savedFinding, setSavedFinding] = useState(null);
+  const [openRunId, setOpenRunId] = useState(null);
   const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
   const findingCount = checklist.filter((_, i) => answers[i] === "problem").length;
   const doneCount = checklist.filter((_, i) => answers[i]).length;
@@ -2726,6 +2727,25 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     return map;
   }, {}), [controlFindings]);
   const recentRuns = useMemo(() => (controlRuns || []).slice(0, 6), [controlRuns]);
+  const openRun = useMemo(() => recentRuns.find((run) => run.id === openRunId) || null, [recentRuns, openRunId]);
+  const openRunFindings = openRun ? (runFindingsByRun[openRun.id] || []) : [];
+  const answerMeta = (value) => value === "problem"
+    ? { label: "בעיה", color: "#B91C1C", bg: "#FEF2F2", border: "#FECACA" }
+    : value === "ok"
+      ? { label: "תקין", color: "#047857", bg: "#ECFDF5", border: "#A7F3D0" }
+      : value === "na"
+        ? { label: "לא רלוונטי", color: "#64748B", bg: "var(--surface-2)", border: "var(--line)" }
+        : { label: "לא סומן", color: "#64748B", bg: "var(--surface-2)", border: "var(--line)" };
+  const findingSeverityMeta = (value) => value === "critical"
+    ? { label: "קריטית", color: "#991B1B", bg: "#FEE2E2" }
+    : value === "high"
+      ? { label: "גבוהה", color: "#B45309", bg: "#FEF3C7" }
+      : value === "low"
+        ? { label: "נמוכה", color: "#0369A1", bg: "#E0F2FE" }
+        : { label: "בינונית", color: "#7C3AED", bg: "#EDE9FE" };
+  const findingRouteLabel = (finding) => finding?.route?.type === "task"
+    ? (finding.route.taskId ? "נפתחה מטלה" : "מיועד למטלה")
+    : "לדוח בלבד";
   const areas = [
     { id: "safety", label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
     { id: "quality", label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
@@ -2891,15 +2911,49 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
           {recentRuns.map((run) => {
             const findings = runFindingsByRun[run.id] || [];
             const problemCount = findings.length || (run.findingIds || []).length;
-            return <div key={run.id} className="task-row" style={{ cursor: "default", borderInlineStartColor: problemCount ? "#DC2626" : "#0D9488" }}>
+            const active = openRunId === run.id;
+            return <button key={run.id} className={"task-row control-history-row" + (active ? " selected" : "")} style={{ borderInlineStartColor: problemCount ? "#DC2626" : "#0D9488" }} onClick={() => setOpenRunId(active ? null : run.id)}>
               <div className="task-row-main">
                 <div className="task-row-t">{run.target?.label || run.target?.id || "בקרה ידנית"} · {fmtDate(run.finishedAt || run.startedAt)}</div>
                 <div className="task-row-desc">{run.answers?.length || 0} סעיפים · {problemCount ? `${problemCount} ממצאים` : "ללא ממצאים"} · חתימה: {run.overallSignature?.signedByName || uName(run.performedById, users)}</div>
                 {run.notes && <div className="task-row-sub">{run.notes}</div>}
               </div>
               <span className="badge sm" style={{ background: problemCount ? "#FEF2F2" : "#ECFDF5", color: problemCount ? "#B91C1C" : "#047857", border: `1px solid ${problemCount ? "#FECACA" : "#A7F3D0"}` }}>{problemCount ? "עם ממצא" : "תקין"}</span>
-            </div>;
+            </button>;
           })}
+          {openRun && <div className="control-run-detail">
+            <div className="row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>
+              <div>
+                <div className="tcard-subj">{openRun.target?.label || openRun.target?.id || "בקרה ידנית"}</div>
+                <div className="task-row-desc">{fmtDate(openRun.finishedAt || openRun.startedAt)} · מבצע: {uName(openRun.performedById, users)} · חתימה: {openRun.overallSignature?.signedByName || "—"}</div>
+              </div>
+              <span className="badge sm" style={{ background: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }}>פרטי סבב</span>
+            </div>
+            <div className="control-answer-list">
+              {(openRun.answers || []).map((answer, i) => {
+                const meta = answerMeta(answer.value);
+                return <div key={answer.itemId || i} className="control-answer-item">
+                  <span>{answer.label || `סעיף ${i + 1}`}</span>
+                  <span className="badge sm" style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>{meta.label}</span>
+                </div>;
+              })}
+            </div>
+            {openRun.notes && <div className="note" style={{ marginTop: 10 }}>{openRun.notes}</div>}
+            <div className="control-findings-detail">
+              <div className="task-row-t" style={{ marginTop: 10 }}>ממצאים</div>
+              {openRunFindings.length ? openRunFindings.map((finding) => {
+                const sev = findingSeverityMeta(finding.severity);
+                return <div key={finding.id} className="control-finding-item">
+                  <div className="task-row-main">
+                    <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
+                    {finding.description && <div className="task-row-desc">{finding.description}</div>}
+                    <div className="task-row-sub">{findingRouteLabel(finding)}{finding.route?.taskId ? ` · ${finding.route.taskId}` : ""}</div>
+                  </div>
+                  <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
+                </div>;
+              }) : <div className="hint">לא נרשמו ממצאים בסבב הזה.</div>}
+            </div>
+          </div>}
         </div> : <Empty text="אין עדיין היסטוריית בקרות" Icon={History} sub="סיימו בדיקה ידנית כדי לשמור אותה כאן." />}
       </div>
       </>}
@@ -9603,6 +9657,13 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .task-row{display:flex;align-items:center;gap:9px;width:100%;text-align:right;background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid var(--muted);border-radius:11px;padding:9px 11px;cursor:pointer;color:var(--ink);}
 .task-row:hover{background:var(--surface-2);}
 .task-row.selected{background:#FFF7ED;border-color:#FDBA74;box-shadow:0 0 0 1px rgba(234,88,12,.12);}
+.control-history-row{align-items:flex-start;}
+.control-run-detail{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:12px;margin-top:4px;}
+.control-answer-list{display:grid;grid-template-columns:1fr;gap:6px;}
+.control-answer-item,.control-finding-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;}
+.control-answer-item>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
+.control-finding-item{align-items:flex-start;margin-top:6px;}
+.control-findings-detail .task-row-t{font-size:13.5px;}
 .task-row.ovd{background:linear-gradient(90deg,rgba(220,38,38,0.05),transparent 60%);}
 .task-row.selected.ovd{background:linear-gradient(90deg,rgba(220,38,38,0.05),#FFF7ED 60%);}
 .task-row-check{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);cursor:pointer;}
