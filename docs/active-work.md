@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/worker-cleaning-tab`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: add an embedded cleaning tab inside `WorkerApp` for worker users who have cleaning access/capability. This keeps legacy `role === "cleaner"` compatible and intentionally does not change user creation/editing, zone assignment writes, Supabase policies, destructive data cleanup, or the broader controls module.
 - Latest completed product work:
   - PR #608 applied cleaning access helpers to safe monolith UI gates: cleaning event generation, cleaning complaint phone targets, cleaning role-preview candidate selection, CleaningAdmin assignee lists, and worker-like PPE analytics scoping. Routing, user creation/editing, zone assignment writes, Supabase policies, and data cleanup were intentionally not changed.
   - PR #606 replaced the first direct cleaning-role checks with helper-based access in notifications, push subscription metadata, and KV cleaning workflow writes. `worker + cleaningAccess` can now receive cleaning pushes and write cleaning workflow records where allowed, while legacy `role === "cleaner"` remains compatible. No UI, user creation, database migration, or data cleanup was changed.
@@ -77,7 +77,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: pause for owner review before creating actual controls records or UI. If continuing pre-controls cleanup, start with a pure `cleaningAccessModel` helper/test PR that keeps legacy `role === "cleaner"` compatibility and does not yet rewrite UI, Supabase, or KV policies. After that, continue to `userGroups` / organizational memberships. Do not start the broad monolith split.
+- Next exact action: finish and verify the small worker-cleaning tab PR, then ask the owner to manually check the worker-with-cleaning-access flow in the deployed app before proceeding to deeper cleaning-role cleanup or controls work. Do not start the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction

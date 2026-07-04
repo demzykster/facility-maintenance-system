@@ -2121,7 +2121,8 @@ function VersionUpdateBanner({ onRefresh, onDismiss }) {
 /* ============================================================ WORKER (עובד) — דיווח תקלה */
 function WorkerApp(p) {
   const { session, config, fleet, tickets, saveTicket, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key) } = p;
-  const [view, setView] = useState("new"); // new | mine
+  const [view, setView] = useState("new"); // new | mine | ppe | cleaning | activity
+  const cleaningEnabled = canPerformCleaning(session);
   const [track, setTrack] = useState(null);
   const [subject, setSubject] = useState(""), [description, setDescription] = useState(""), [forkliftId, setForkliftId] = useState("");
   const [photo, setPhoto] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [sent, setSent] = useState(false);
@@ -2158,14 +2159,14 @@ function WorkerApp(p) {
     finally { setBusy(false); }
   };
   const toSign = (p.ppeReqs || []).filter((r) => r.workerId === session.id && r.status === "worker_sign");
-  const workerTitle = view === "new" ? t("worker.newReport") : view === "ppe" ? t("worker.myPpe") : view === "activity" ? t("worker.activity") : t("worker.myReports");
+  const workerTitle = view === "new" ? t("worker.newReport") : view === "ppe" ? t("worker.myPpe") : view === "activity" ? t("worker.activity") : view === "cleaning" ? t("cleaner.title") : t("worker.myReports");
   return (<div className="worker-shell">
     <div className="worker-top">
       <div><div className="wk-title">{workerTitle}</div><div className="wk-sub">{session.name}{session.dept ? " · " + session.dept : ""}</div></div>
       <div className="worker-top-actions"><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
     </div>
     {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} language={language} /></div>}
-    <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> {t("worker.newTab")}</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> {t("worker.mineTab")}{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> {t("worker.ppeTab")}{toSign.length ? ` (${toSign.length})` : ""}</button><button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> {t("worker.activityTab")}</button></div>
+    <div className="wk-tabs"><button className={view === "new" ? "on" : ""} onClick={() => setView("new")}><Plus size={16} /> {t("worker.newTab")}</button><button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")}><ListChecks size={16} /> {t("worker.mineTab")}{myReports.length ? ` (${myReports.length})` : ""}</button><button className={view === "ppe" ? "on" : ""} onClick={() => setView("ppe")} style={toSign.length ? { color: "#B91C1C", fontWeight: 700 } : undefined}><PackageCheck size={16} /> {t("worker.ppeTab")}{toSign.length ? ` (${toSign.length})` : ""}</button>{cleaningEnabled && <button className={view === "cleaning" ? "on" : ""} onClick={() => setView("cleaning")}><Sparkles size={16} /> {t("cleaner.title")}</button>}<button className={view === "activity" ? "on" : ""} onClick={() => setView("activity")}><Clock size={16} /> {t("worker.activityTab")}</button></div>
     <div className="worker-body">
       {toSign.length > 0 && view !== "ppe" && <button type="button" onClick={() => setView("ppe")} style={{ width: "100%", textAlign: "start", display: "flex", alignItems: "center", gap: 10, background: "#B91C1C", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px", marginBottom: 12, cursor: "pointer", boxShadow: "0 2px 10px rgba(185,28,28,0.35)" }}><PenLine size={22} /><div style={{ flex: 1 }}><div style={{ fontWeight: 800, fontSize: 15 }}>יש לך {toSign.length === 1 ? "מסמך" : `${toSign.length} מסמכים`} לחתימה</div><div style={{ fontSize: 12.5, opacity: 0.92 }}>לחצו לצפייה ולחתימה על קבלת הציוד</div></div><ChevronLeft size={20} style={{ transform: "scaleX(-1)" }} /></button>}
       
@@ -2191,7 +2192,7 @@ function WorkerApp(p) {
         </>}
         {!track && err && <div className="err">{err}</div>}
         <div style={{ height: 24 }} />
-      </>) : view === "ppe" ? (<PpeMyView ppe={p.ppe} items={p.ppeItems} norms={p.ppeNorms} session={session} reqs={p.ppeReqs} savePpeReq={p.savePpeReq} config={p.config} language={language} />) : view === "activity" ? (
+      </>) : view === "ppe" ? (<PpeMyView ppe={p.ppe} items={p.ppeItems} norms={p.ppeNorms} session={session} reqs={p.ppeReqs} savePpeReq={p.savePpeReq} config={p.config} language={language} />) : view === "cleaning" && cleaningEnabled ? (<CleanerApp {...p} embedded />) : view === "activity" ? (
         <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} language={language} onOpenTicket={(id) => { const t = tickets.find((x) => x.id === id); if (t) setOpen(t); }} />
       ) : (<>
         {myReports.length === 0 ? <Empty text="עדיין לא דיווחת" Icon={ListChecks} sub="פתחו דיווח חדש בלשונית «דיווח חדש»" /> : <div className="cards">{myReports.map((t) => { const s = stOf(t.status); const tr = TRACKS[t.track] || TRACKS.facility; return <button key={t.id} className="wk-card" onClick={() => setOpen(t)}><div className="wk-card-top"><span className="wk-card-subj">{t.subject}</span><span className="badge sm" style={{ background: s.bg, color: s.color }}>{s.label}</span></div><div className="wk-card-sub"><tr.Icon size={13} /> {tr.short} · {fmtDate(t.createdAt)}</div></button>; })}</div>}
@@ -3823,12 +3824,12 @@ function CleanerApp(p) {
     };
     return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{z.cleanerName ? " · " + t("cleaner.coverFor", { name: z.cleanerName }) : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{t("cleaner.reportsBadge", { count: oc })}</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? t("cleaner.cleanedAgo", { time: timeAgo(lr) }) : t("cleaner.neverCleaned")}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
   };
-  return (<div className="worker-shell">
-    <div className="worker-top">
+  return (<div className={"worker-shell" + (p.embedded ? " embedded-cleaning-shell" : "")}>
+    {!p.embedded && <div className="worker-top">
       <div><div className="wk-title">{t("cleaner.title")}</div><div className="wk-sub">{session.name}</div></div>
       <div className="worker-top-actions"><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title={t("common.notifications")} aria-label={t("common.notifications")}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
-    </div>
-    {p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} language={language} /></div>}
+    </div>}
+    {!p.embedded && p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} language={language} /></div>}
     <main className="content">
       {qrArrivalZone && <div className="toast-ok"><MapPin size={16} /> {t("cleaner.qrArrived", { zone: qrArrivalZone.name })}</div>}
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
@@ -9904,6 +9905,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .wk-tabs button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border:none;border-radius:12px 12px 0 0;background:transparent;color:#94A3B8;font-weight:600;font-size:14px;cursor:pointer;}
 .wk-tabs button.on{background:var(--bg);color:var(--ink);}
 .worker-body{padding:18px 16px 40px;flex:1;}
+.embedded-cleaning-shell{min-height:0;max-width:none;background:transparent;margin:0;}
+.embedded-cleaning-shell .content{padding:0;max-width:none;}
 .wk-hint{color:var(--muted);font-size:14px;margin-bottom:14px;}
 .wk-track-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .wk-track{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 10px;border:2px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);font-weight:600;font-size:15px;cursor:pointer;}
