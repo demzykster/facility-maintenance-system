@@ -19,8 +19,8 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning },
   { prefixes: ["ticket:"], roles: ["admin", "user", "tech", "worker"], entityType: AUDIT_ENTITY_TYPES.ticket, auditSensitive: false },
   { prefixes: ["ppereq:"], module: "ppe", minLevel: "request", roles: ["worker", "cleaner"], entityType: AUDIT_ENTITY_TYPES.ppe, auditSensitive: false },
-  { prefixes: ["cround:"], roles: ["admin", "user", "cleaner"], access: "cleaning:perform", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
-  { prefixes: ["ccomplaint:"], roles: ["admin", "user", "cleaner"], access: "cleaning:closeComplaint", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
+  { prefixes: ["cround:"], roles: ["admin", "user"], access: "cleaning:perform", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
+  { prefixes: ["ccomplaint:"], roles: ["admin", "user"], access: "cleaning:closeComplaint", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
   { prefixes: ["presence:"], roles: ["admin", "tech"], entityType: AUDIT_ENTITY_TYPES.user, auditSensitive: false },
   { prefixes: ["mtask:", "mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
   { prefixes: ["appIssue:"], roles: ACTIVE_ROLES, entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false }
