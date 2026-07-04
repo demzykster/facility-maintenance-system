@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/cleaning-access-user-ui`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: add the user-form control that lets an authorized manager/admin mark a regular `worker` as cleaning-capable via `cleaningAccess`. This should make the already-merged worker cleaning tab testable without reviving `cleaner` as the future role. No Supabase/RLS migration, data cleanup, zone assignment rewrite, or controls module work.
 - Latest completed product work:
   - PR #610 added an embedded cleaning tab inside `WorkerApp` for worker users who have cleaning access/capability. Legacy `role === "cleaner"` standalone routing remains compatible; user creation/editing, zone assignment writes, Supabase policies, destructive data cleanup, and broader controls work were intentionally not changed.
   - PR #608 applied cleaning access helpers to safe monolith UI gates: cleaning event generation, cleaning complaint phone targets, cleaning role-preview candidate selection, CleaningAdmin assignee lists, and worker-like PPE analytics scoping. Routing, user creation/editing, zone assignment writes, Supabase policies, and data cleanup were intentionally not changed.
