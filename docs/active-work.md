@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/replace-cleaner-checks`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: first helper-based replacement of direct cleaning role checks. Scope is limited to notification access, push subscription metadata, and KV write policy so `worker + cleaningAccess` can receive/write cleaning workflow records while legacy `role === "cleaner"` stays compatible. No UI rewrite, user creation change, database migration, or data cleanup is part of this branch.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #606 replaced the first direct cleaning-role checks with helper-based access in notifications, push subscription metadata, and KV cleaning workflow writes. `worker + cleaningAccess` can now receive cleaning pushes and write cleaning workflow records where allowed, while legacy `role === "cleaner"` remains compatible. No UI, user creation, database migration, or data cleanup was changed.
   - PR #604 added a pure `userGroups` / organizational membership model and tests: groups stay separate from roles, support leads, members, observers, notify targets, assignment candidates, visible group resolution, and legacy mixed membership field normalization. No UI, database migration, permissions rewrite, controls records, or scheduling engine was changed.
   - PR #602 added a pure cleaning access model helper and tests: future cleaning workers can remain regular `worker` users with cleaning access/capabilities, legacy `role === "cleaner"` remains compatible during transition, and zone management/reporting stay behind module permissions. No UI, KV/Supabase policy, or data cleanup was changed.
   - PR #601 refreshed the controls project documents after the cleaning-access decision and added `docs/near-term-controls-strategy-ru.md` as the short owner/Claude-ready next-step plan.
