@@ -450,6 +450,37 @@ Current concerns:
 - visibility is owner/responsible/participant/admin only;
 - workers/cleaners are not full task participants in current KV write rules.
 
+## Meetings As Contextual Work Events
+
+`פגישות` should remain useful for ordinary `פ.ע` work, not only for controls.
+
+Direction:
+
+- keep one meeting entity;
+- ordinary `פ.ע` / regular meeting is the default context;
+- "with manager", "with colleague", and "group meeting" should be inferred from participants where possible, not required as a hard business type;
+- add source/context semantics so meetings can belong to `בקרות`, `מטלות`, `קריאות`, committees/forums, or executive walks without creating separate meeting systems.
+
+Future fields:
+
+- `meetingContext`
+- `sourceModule`
+- `sourceId`
+- `sourceLabel`
+- `decisionIds` or structured decisions
+- linked `taskIds`
+- linked `findingIds`
+- linked `controlRunIds`
+
+UI direction:
+
+- do not overload the first meeting form with mandatory meeting-type choices;
+- keep regular `פ.ע` fast to create;
+- show context/source when the meeting is opened from another object;
+- keep advanced classification behind an optional section if needed.
+
+This keeps meetings compatible with the broader `בקרות` ecosystem while preserving the simple day-to-day `פ.ע` use case.
+
 ## Quality Domain
 
 For this company, quality should be treated as a large domain inside the shared control engine, not as a tiny checklist.
