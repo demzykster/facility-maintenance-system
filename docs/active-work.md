@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/user-groups-model`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: pure user groups / organizational memberships model PR. Scope is limited to code-level helpers and tests for groups, leads, observers, notifications, and assignment candidates. No UI, database migration, permissions rewrite, or controls records are part of this branch.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #604 added a pure `userGroups` / organizational membership model and tests: groups stay separate from roles, support leads, members, observers, notify targets, assignment candidates, visible group resolution, and legacy mixed membership field normalization. No UI, database migration, permissions rewrite, controls records, or scheduling engine was changed.
   - PR #602 added a pure cleaning access model helper and tests: future cleaning workers can remain regular `worker` users with cleaning access/capabilities, legacy `role === "cleaner"` remains compatible during transition, and zone management/reporting stay behind module permissions. No UI, KV/Supabase policy, or data cleanup was changed.
   - PR #601 refreshed the controls project documents after the cleaning-access decision and added `docs/near-term-controls-strategy-ru.md` as the short owner/Claude-ready next-step plan.
   - PR #600 documented the owner-approved `cleaner` role cleanup direction: future cleaning workers are regular `worker` users with cleaning access/capabilities, contractor status is an employment attribute, legacy `role === "cleaner"` remains compatible during transition, and current app users/history are not valuable for migration unless the owner later says otherwise.
