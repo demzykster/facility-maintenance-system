@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/task-source-context-polish`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: show saved task source context in `מטלות` rows/details and refresh the shared action-layer docs. This is a small preparatory pass for future `בקרות` findings/actions, not a controls UI or scheduling change.
 - Latest completed product work:
   - PR #659 cleaned up settings ownership before broader `בקרות` work: the obsolete user-facing default inspection cadence is gone from global settings, global notification type toggles are tucked into a compact `מדיניות התראות מערכת` block, and settings/control docs now match the current ownership state.
   - PR #656 added multi-select and bulk actions to `מטלות`: filtered select-all, bulk status updates, two-step bulk deletion including completed/cancelled rows where the user has permission, and a truthful `הכל` filter that no longer silently excludes completed/cancelled tasks by default.

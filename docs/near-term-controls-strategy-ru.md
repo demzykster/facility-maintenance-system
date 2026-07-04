@@ -11,7 +11,7 @@
 - Устаревшие Supabase/status docs обновлены.
 - Небезопасный client-side AI path отключен.
 - Legacy `שאלונים` / inspection-template authoring убран.
-- `מטלות` начали становиться shared action layer: задачи сохраняют `source*` связи.
+- `מטלות` начали становиться shared action layer: задачи сохраняют `source*` связи, а UI должен показывать контекст источника там, где эти поля уже есть.
 - `locations` получили migration boundary и pure helper model.
 - Решено: `cleaner` не остается долгосрочной core role. Будущая модель: `worker + cleaning access/capability`.
 - Зафиксировано: текущие users/history/app data не ценны для миграции, пока owner не скажет иначе. Destructive Supabase cleanup все равно только по явной команде.
