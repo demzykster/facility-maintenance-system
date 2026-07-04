@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/user-groups-model`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: pure user groups / organizational memberships model PR. Scope is limited to code-level helpers and tests for groups, leads, observers, notifications, and assignment candidates. No UI, database migration, permissions rewrite, or controls records are part of this branch.
 - Latest completed product work:
   - PR #602 added a pure cleaning access model helper and tests: future cleaning workers can remain regular `worker` users with cleaning access/capabilities, legacy `role === "cleaner"` remains compatible during transition, and zone management/reporting stay behind module permissions. No UI, KV/Supabase policy, or data cleanup was changed.
   - PR #601 refreshed the controls project documents after the cleaning-access decision and added `docs/near-term-controls-strategy-ru.md` as the short owner/Claude-ready next-step plan.
