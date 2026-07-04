@@ -27,6 +27,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs at last check: none.
 - Active work in progress: none.
 - Latest completed product work:
+  - PR #680 reserved shared base `locations` storage as `location:*` / `locations`, wired it through backup/export, app load state, KV allowlist, and permissions, and documented that cleaning remains on `czone:*` until a dedicated migration.
+  - PR #679 removed the visible legacy linked-questionnaire selector from vehicle-type settings while keeping old `insp:` history read-only.
+  - PR #678 refreshed the near-term controls strategy: the next phase is one narrow domain increment, not another foundation/storage step.
   - PR #676 reserved the stable `בקרות` storage contract before broader domain expansion: `controlProgram:*`, `controlAssignment:*`, `controlRun:*`, and `controlFinding:*` now have future table names, backup/export coverage, KV allowlist entries, and write-permission boundaries. The current manual UI still writes only runs/findings; no Supabase table migration or scheduling engine was added.
   - PR #675 documented the completed manual controls history/link slice and moved the controls plan toward stable storage and future domain increments.
   - PR #674 let saved controls findings that already created a `מטלה` open the linked task directly from the controls history.
