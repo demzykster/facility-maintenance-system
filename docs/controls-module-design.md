@@ -645,7 +645,8 @@ Current implementation note:
 
 - the core model can build a `מטלות` task draft from a controls finding when the route is `task`;
 - this is intentionally draft-only: it preserves `sourceModule/sourceFindingId/sourceProgramId/sourceRunId`, but it does not create or save the task without the normal product action/confirmation.
-- the first UI slice is intentionally ad-hoc: one manual control run form, checklist answers, one finding, and optional confirmed task creation. It does not persist separate `controls:*` records yet.
+- the first UI slice is intentionally narrow: one manual control run form, checklist answers, one finding, optional confirmed task creation, and a compact recent-run history.
+- completed manual runs and findings are stored as shared KV records (`controlRun:*`, `controlFinding:*`). This is still not the future scheduling/program engine and not a Supabase table migration.
 
 ## Suggested PR Sequence
 
@@ -660,10 +661,11 @@ This is intentionally conservative.
 7. Done: controls programs/runs/findings/actions model-only PRs with tests.
 8. Done: `controls` was added to the shared permissions model before exposing UI.
 9. Done: minimal gated `בקרות` UI shell.
-10. Current: first narrow manual UI slice: one ad-hoc run, one finding, and route to report-only or confirmed `מטלות` creation.
-11. Next: decide persistence shape for controls programs/runs/findings before expanding beyond the ad-hoc slice.
-12. Domain increments: safety, quality, fleet controls, executive walk.
-13. Dashboard/insights layer.
+10. Done: first narrow manual UI slice: one ad-hoc run, one finding, and route to report-only or confirmed `מטלות` creation.
+11. Current: persist the manual run/finding records in shared KV and keep created tasks linked back to the saved finding/run.
+12. Next: decide the stable Supabase/table shape for controls programs/runs/findings before expanding beyond the manual slice.
+13. Domain increments: safety, quality, fleet controls, executive walk.
+14. Dashboard/insights layer.
 
 Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
 

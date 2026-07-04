@@ -33,6 +33,8 @@ const ALLOWED_KV_PREFIXES = Object.freeze([
   "presence:",
   "mtask:",
   "mmeet:",
+  "controlRun:",
+  "controlFinding:",
   "appIssue:",
   "pushSubscriptions:v1"
 ]);

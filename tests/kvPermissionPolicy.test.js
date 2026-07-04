@@ -24,6 +24,8 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionForKey("ppereq:req-1")).toMatchObject({ module: "ppe", minLevel: "request", auditSensitive: false });
     expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
     expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:closeComplaint", auditSensitive: false });
+    expect(kvWritePermissionForKey("controlRun:run-1")).toMatchObject({ module: "controls", minLevel: "request", auditSensitive: false });
+    expect(kvWritePermissionForKey("controlFinding:finding-1")).toMatchObject({ module: "controls", minLevel: "request", auditSensitive: false });
     expect(kvWritePermissionForKey("appIssue:issue-1")).toMatchObject({ roles: expect.arrayContaining(["worker", "cleaner"]), auditSensitive: false });
   });
 
@@ -67,6 +69,8 @@ describe("KV write permission policy", () => {
     expect(sessionHasKvWritePermission({ role: "worker" }, "presence:worker-1")).toBe(false);
     expect(sessionHasKvWritePermission({ role: "user" }, "mtask:task-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "worker" }, "mtask:task-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ role: "user", permissions: { controls: "request" } }, "controlRun:run-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "user", permissions: { controls: "view" } }, "controlFinding:finding-1")).toBe(false);
     expect(sessionHasKvWritePermission({ role: "cleaner" }, "appIssue:issue-1")).toBe(true);
   });
 
