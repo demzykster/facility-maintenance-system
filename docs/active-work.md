@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/controls-finding-task-route`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: add the first draft-only `בקרות` finding-to-`מטלות` route helper and refresh the controls strategy docs. No controls UI records, scheduling engine, Supabase/KV migration, or automatic task creation.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #663 added the first draft-only `בקרות` finding-to-`מטלות` route helper: controls findings can prepare a task draft with preserved `source*` links, but no task is created automatically and no controls UI records, scheduling engine, Supabase/KV migration, or cleaning/location migration were added.
   - PR #661 showed saved task source context in `מטלות`: rows now display a compact source chip when `source*` fields exist, task details show `מקור מערכת`, manual tasks stay visually unchanged, and action-layer docs were refreshed for future `בקרות` findings/actions.
   - PR #659 cleaned up settings ownership before broader `בקרות` work: the obsolete user-facing default inspection cadence is gone from global settings, global notification type toggles are tucked into a compact `מדיניות התראות מערכת` block, and settings/control docs now match the current ownership state.
   - PR #656 added multi-select and bulk actions to `מטלות`: filtered select-all, bulk status updates, two-step bulk deletion including completed/cancelled rows where the user has permission, and a truthful `הכל` filter that no longer silently excludes completed/cancelled tasks by default.
