@@ -665,8 +665,8 @@ This is intentionally conservative.
 9. Done: minimal gated `בקרות` UI shell.
 10. Done: first narrow manual UI slice: one ad-hoc run, one finding, and route to report-only or confirmed `מטלות` creation.
 11. Done: persist the manual run/finding records in shared KV, show history details, and keep created tasks linked back to the saved finding/run with an operator action to open the linked task.
-12. Current: decide the stable Supabase/table shape for controls programs/runs/findings before expanding beyond the manual slice.
-13. Domain increments: safety, quality, fleet controls, executive walk.
+12. Done: reserve the stable storage contract for controls programs, assignments, runs, and findings before expanding beyond the manual slice.
+13. Current: first small domain increments: safety, quality, fleet controls, or executive walk. Keep each slice narrow and avoid the scheduling engine until the first scenario is modeled end to end.
 14. Dashboard/insights layer.
 
 Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
