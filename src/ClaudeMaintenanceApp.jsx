@@ -7689,7 +7689,7 @@ function SettingsPanel(p) {
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
-  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [defaultInspIntervalMonths, setDefaultInspIntervalMonths] = useState(clampInspIntervalMonths(config.defaultInspIntervalMonths ?? 2)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
+  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
@@ -7711,7 +7711,6 @@ function SettingsPanel(p) {
     lateGraceMin: config.lateGraceMin,
     earlyGraceMin: config.earlyGraceMin,
     pmDailyCapacity: config.pmDailyCapacity,
-    defaultInspIntervalMonths: config.defaultInspIntervalMonths,
     cleaningReminderMins: config.cleaningReminderMins
   });
   useEffect(() => {
@@ -7727,7 +7726,6 @@ function SettingsPanel(p) {
     setWshifts(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
     setShiftGrace(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
     setPmDailyCapacity(clampPmDailyCapacity(config.pmDailyCapacity ?? 4));
-    setDefaultInspIntervalMonths(clampInspIntervalMonths(config.defaultInspIntervalMonths ?? 2));
     setCleaningReminderMins(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   }, [userConfigSyncKey, uEdit, uArchive, arcView]);
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
@@ -7749,7 +7747,7 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), defaultInspIntervalMonths: clampInspIntervalMonths(defaultInspIntervalMonths), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
   const pickLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -7870,25 +7868,22 @@ function SettingsPanel(p) {
         <input type="number" min="1" max="20" value={pmDailyCapacity} onChange={(e) => setPmDailyCapacity(clampPmDailyCapacity(e.target.value))} />
         <div className="hint">טיפול רגיל = 1 יחידה. טיפול כבד = 2 יחידות. ברירת מחדל: 4 (≈ 2 כבדים או 4 רגילים ביום).</div>
       </label>
-      <label className="field" style={{ maxWidth: 360 }}>
-        <span>ברירת מחדל לתדירות בקרה (חודשים)</span>
-        <input type="number" min="1" max="120" value={defaultInspIntervalMonths} onChange={(e) => setDefaultInspIntervalMonths(clampInspIntervalMonths(e.target.value))} />
-        <div className="hint">משמש כברירת מחדל לתכנית בקרה חדשה ולמיגרציה משאלוני הבקרה הישנים.</div>
-      </label>
       <SectionTitle><Sparkles size={15} /> ניקיון</SectionTitle>
       <label className="field" style={{ maxWidth: 360 }}>
         <span>תזכורת לפני סבב (דקות)</span>
         <input type="number" min="5" max="120" value={cleaningReminderMins} onChange={(e) => setCleaningReminderMins(clampCleaningReminderMins(e.target.value))} />
         <div className="hint">כמה דקות לפני פתיחת חלון ניקיון להציג תזכורת לעובד.</div>
       </label>
-      <SectionTitle><Bell size={15} /> סוגי התראות</SectionTitle>
-      <div className="hint" style={{ marginBottom: 8 }}>כיבוי סוג התראה מסתיר אותו לכל המשתמשים. סינון אישי של התצוגה נשאר בפאנל ההתראות.</div>
-      <div className="notify-grid">
-        {NOTIFY_DEFS.map(([id, label]) => <label key={id} className="chk-line notify-kind">
-          <input type="checkbox" checked={notify[id] !== false} onChange={(e) => setNotify((s) => ({ ...s, [id]: e.target.checked }))} />
-          {label}
-        </label>)}
-      </div>
+      <details className="settings-policy-details">
+        <summary><Bell size={15} /> מדיניות התראות מערכת</summary>
+        <div className="hint" style={{ marginBottom: 8 }}>כיבוי סוג התראה מסתיר אותו לכל המשתמשים. סינון אישי של התצוגה נשאר בפאנל ההתראות.</div>
+        <div className="notify-grid">
+          {NOTIFY_DEFS.map(([id, label]) => <label key={id} className="chk-line notify-kind">
+            <input type="checkbox" checked={notify[id] !== false} onChange={(e) => setNotify((s) => ({ ...s, [id]: e.target.checked }))} />
+            {label}
+          </label>)}
+        </div>
+      </details>
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveGeneral}>{saved ? "נשמר ✓" : "שמירת הגדרות"}</button>
       <div className="note">גרסת הדגמה: הנתונים נשמרים בדפדפן הנוכחי בלבד. ה-PIN אינו אבטחה אמיתית — לגרסת ייצור נדרשים שרת ואימות משתמשים.</div>
       {mayFullSettings && <>
@@ -9106,6 +9101,13 @@ a{color:inherit;}
 .chk-line input{width:18px;height:18px;}
 .notify-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 12px;margin-bottom:12px;}
 .notify-kind{margin:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:700;}
+.settings-policy-details{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0;margin:14px 0 0;overflow:hidden;}
+.settings-policy-details summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:12px 14px;font-weight:800;color:var(--ink);list-style:none;}
+.settings-policy-details summary::-webkit-details-marker{display:none;}
+.settings-policy-details summary::before{content:"▸";color:var(--muted);font-size:12px;transition:transform .15s;}
+.settings-policy-details[open] summary::before{transform:rotate(90deg);}
+.settings-policy-details[open]{padding-bottom:12px;}
+.settings-policy-details[open] .hint,.settings-policy-details[open] .notify-grid{margin-inline:14px;}
 .hint{font-size:12.5px;color:var(--muted);margin-top:6px;}
 .err{background:#FEE2E2;color:#B91C1C;font-size:13.5px;font-weight:500;padding:10px 12px;border-radius:10px;margin-bottom:12px;}
 .note.ok{border-color:#86EFAC;color:#166534;background:#DCFCE7;}

@@ -393,7 +393,8 @@ Settings should follow ownership:
 
 Near-term decision:
 
-- remove `ברירת מחדל לתדירות בקרה` from user-facing general settings because fleet inspection programs and future controls programs carry their own cadence;
+- done: remove `ברירת מחדל לתדירות בקרה` from user-facing general settings because fleet inspection programs and future controls programs carry their own cadence;
+- done: keep global notification kind toggles as a compact system policy block while they remain in global settings;
 - do not immediately move every live setting just to clean up the screen;
 - move live settings only when the destination module has a stable settings surface and save handler;
 - use `docs/settings-site-map.md` as the source of truth before moving settings between screens.

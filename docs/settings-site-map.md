@@ -15,7 +15,7 @@ Purpose: define where configuration belongs before moving settings between scree
 | Area | Current Home | Intended Home | Notes |
 | --- | --- | --- | --- |
 | Worker shifts (`משמרות עבודה`) | `צוות ומשתמשים` -> `הגדרות` | Stay in `צוות ומשתמשים` -> `הגדרות` | People data. Owner clarified that workforce settings should share one `הגדרות` sub-tab. |
-| Task statuses (`סטטוסים של מטלות`) | `הגדרות` -> `כללי` | `מטלות` -> settings sub-tab | Task workflow data. Gate editing explicitly before moving. |
+| Task statuses (`סטטוסים של מטלות`) | `מטלות` -> `הגדרות` | Stay in `מטלות` -> `הגדרות` | Task workflow data. Editing is explicitly gated by settings permission inside the tasks module. |
 | Vehicle types (`סוגי כלים`) | `הגדרות` -> `סוגי כלים` | `כלי שינוע` -> settings sub-tab | Fleet data. Split save handling from shared registries before removal. |
 | Maintenance categories | `הגדרות` -> `אחזקה` | Stay in `הגדרות` -> `אחזקה` | Correct global maintenance configuration home. |
 | Maintenance zones | `הגדרות` -> `רישומים` | `הגדרות` -> `אחזקה` | Zone routing belongs with maintenance settings. |
@@ -23,18 +23,18 @@ Purpose: define where configuration belongs before moving settings between scree
 | Suppliers | `הגדרות` -> `רישומים` and supplier module | Supplier module / global registry decision pending | Do not move until supplier ownership is reviewed. |
 | PPE norms and clawback | `ביגוד עובדים` -> `הגדרות` | Stay in PPE module | Already module-local and expected by users. |
 | Periodic maintenance daily capacity (`קיבולת טיפולים יומית`) | `הגדרות` -> `כללי` | `כלי שינוע` -> `לוח טיפולים` / maintenance rules settings | Live setting. It affects PM distribution and belongs next to PM generation/rules, not in company-wide general settings. Move only when the fleet maintenance settings area has a clear home and save handler. |
-| Default inspection interval (`ברירת מחדל לתדירות בקרה`) | `הגדרות` -> `כללי` | Remove from user-facing UI | Obsolete/confusing. Fleet inspection programs and future controls programs define their own intervals. Keep only a technical fallback in code if needed. |
+| Default inspection interval (`ברירת מחדל לתדירות בקרה`) | Removed from user-facing UI | Keep only technical fallback in code if needed | Obsolete/confusing. Fleet inspection programs and future controls programs define their own intervals. |
 | Cleaning round reminder (`תזכורת לפני סבב ניקיון`) | `הגדרות` -> `כללי` | `בקרת ניקיון` -> settings / future operations settings hub | Live setting. It belongs with cleaning rounds/windows, but do not move it until the cleaning module has a stable settings surface. |
-| Global notification type toggles (`סוגי התראות`) | `הגדרות` -> `כללי` | Compact advanced block now; later `מדיניות התראות מערכת` | This is a system-wide notification policy, not personal filtering. Keep distinct from the notification panel's local user filters. Do not make it visually dominant because disabling a kind affects everyone. |
+| Global notification type toggles (`סוגי התראות`) | `הגדרות` -> `כללי` compact `מדיניות התראות מערכת` block | Later dedicated notification policy screen if needed | This is a system-wide notification policy, not personal filtering. Keep distinct from the notification panel's local user filters. Do not make it visually dominant because disabling a kind affects everyone. |
 | Backup/restore | `הגדרות` | Stay in `הגדרות` with `settings:full` | Sensitive system action, not a module setting. |
 
 ## Recommended Move Order
 
-1. Remove `ברירת מחדל לתדירות בקרה` from user-facing general settings; keep only a technical fallback if still needed by old code.
-2. Make `סוגי התראות` a compact advanced `מדיניות התראות מערכת` block if it remains in global settings for now.
+1. Done: remove `ברירת מחדל לתדירות בקרה` from user-facing general settings; keep only a technical fallback if still needed by old code.
+2. Done: make `סוגי התראות` a compact advanced `מדיניות התראות מערכת` block while it remains in global settings.
 3. Move `קיבולת טיפולים יומית` only when it can sit naturally beside fleet PM generation/rules.
 4. Move `תזכורת לפני סבב ניקיון` only when cleaning settings have a stable module-local home.
-5. Move task statuses to `מטלות` settings.
+5. Done: move task statuses to `מטלות` settings.
 6. Move vehicle types to `כלי שינוע` settings.
 7. Move worker shifts to `צוות ומשתמשים`. Done in PR #75.
 8. Move departments into the same `צוות ומשתמשים` -> `הגדרות` sub-tab. Done in PR #77.
