@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/cleaning-worker-profile-home`
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: make cleaning the default worker profile home for cleaning-capable workers, and remove leftover new-user-form paths that still treated `cleaner` as a separate role.
 - Latest completed product work:
   - PR #622 fixed worker cleaning-tab eligibility after first-login/PIN sessions: session mapping now preserves `dept/depts` and manual `cleaningAccess`, and the cleaning access model accepts both local and server session field shapes.
   - PR #620 fixed the bottom spacing in the user create/edit form: active-status hints, advanced permissions, and the save button now sit in a stable footer rhythm so RTL text cannot visually collide with controls.

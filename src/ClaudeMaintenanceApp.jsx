@@ -57,6 +57,7 @@ import { supplierActivityCounts } from "./supplierActivityModel.js";
 import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers } from "./cleaningZoneBlockersModel.js";
 import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
+import { defaultWorkerView } from "./workerProfileModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -2122,8 +2123,8 @@ function VersionUpdateBanner({ onRefresh, onDismiss }) {
 /* ============================================================ WORKER (עובד) — דיווח תקלה */
 function WorkerApp(p) {
   const { session, config, fleet, tickets, saveTicket, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key) } = p;
-  const [view, setView] = useState("new"); // new | mine | ppe | cleaning | activity
   const cleaningEnabled = canPerformCleaning(session);
+  const [view, setView] = useState(() => defaultWorkerView(session)); // new | mine | ppe | cleaning | activity
   const [track, setTrack] = useState(null);
   const [subject, setSubject] = useState(""), [description, setDescription] = useState(""), [forkliftId, setForkliftId] = useState("");
   const [photo, setPhoto] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [sent, setSent] = useState(false);
@@ -7825,7 +7826,7 @@ function SettingsPanel(p) {
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
       {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} onDelete={mayManageUsers ? deleteArchivedWorker : undefined} /></Overlay>}
-      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u, cleanZoneIds) => { if (await saveUser(u) === false) return false; if (u.role === "cleaner" && cleanZoneIds) { for (const z of (p.zones || [])) { const has = z.cleanerId === u.id; const want = cleanZoneIds.includes(z.id); if (has !== want && await saveZone(want ? { ...z, cleanerId: u.id, cleanerName: u.name } : { ...z, cleanerId: "", cleanerName: "" }) === false) return false; } } setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return true; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
+      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u) => { if (await saveUser(u) === false) return false; setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return true; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       </>}
     </>)}
   </div>);
@@ -7834,7 +7835,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const initialPerms = normalizePerms(user);
   const initialRole = user.role === "cleaner" ? "worker" : (user.role || lockRole || "");
   const initialDept = user.role === "cleaner" ? "ניקיון" : (user.dept || lockDept || "");
-  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
+  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
@@ -7878,11 +7879,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     if (role === "tech") {
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
-    else if (role === "worker" || role === "cleaner") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); }
+    else if (role === "worker") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); }
     else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (roleUsesPassword && !validLoginEmail(email)) return setErr("נא להזין דוא״ל תקין, לדוגמה name@chemipal.co.il"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
-    if ((role === "worker" || role === "cleaner") && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
+    if (role === "worker" && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
     const nextPerms = role === "admin" ? {} : cleanPerms(perms);
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
     const nextPin = roleUsesPin ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : "";
@@ -7893,8 +7894,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const ok = await onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
-      workerNo: (role === "worker" || role === "cleaner") ? workerNo.trim() : "",
-      dept: role === "user" ? (depts[0] || "") : (role === "cleaner" ? "" : dept), depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: "", shiftStart: role === "tech" ? shiftStart : "", shiftEnd: role === "tech" ? shiftEnd : "",
+      workerNo: role === "worker" ? workerNo.trim() : "",
+      dept: role === "user" ? (depts[0] || "") : dept, depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: "", shiftStart: role === "tech" ? shiftStart : "", shiftEnd: role === "tech" ? shiftEnd : "",
       lateTolerance: role === "tech" && techGrace !== "" ? Math.max(0, Number(techGrace) || 0) : undefined,
       earlyTolerance: role === "tech" && techGrace !== "" ? Math.max(0, Number(techGrace) || 0) : undefined,
       techScope: role === "tech" ? techScope : undefined,
@@ -7907,8 +7908,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       activationToken: "",
       activationStatus: roleUsesLogin && (nextPin || nextPassword || user.authUserId) ? "activated" : "",
       cleaningAccess: nextCleaningAccess,
-      employmentType: (role === "worker" || role === "cleaner") ? employmentType : (role === "tech" ? "contractor" : ""),
-      contractorName: ((role === "worker" || role === "cleaner") && employmentType === "contractor") ? contractorName.trim() : "" }, role === "cleaner" ? cleanZones : null);
+      employmentType: role === "worker" ? employmentType : (role === "tech" ? "contractor" : ""),
+      contractorName: (role === "worker" && employmentType === "contractor") ? contractorName.trim() : "" });
     if (ok === false) setErr(SAVE_FAILED_MESSAGE);
   };
   const ActivationControls = () => {
@@ -7926,7 +7927,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
-      {(role === "worker" || role === "cleaner") && <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>}
+      {role === "worker" && <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>}
       {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>}
       <label className="field"><span>טלפון</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
       {!lockRole && <div className="field"><span>תפקיד</span><ChoiceGrid columns="role" value={role} onChange={changeRole} options={USER_FORM_ROLE_OPTIONS.map(([id, label]) => ({ id, label, Icon: roleIcons[id] || User }))} /></div>}
@@ -7939,14 +7940,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       {role === "user" && zones && (zones.length === 0
         ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
         : <div className="field"><span>אזורי ניקיון של המחלקה (המנהל יראה את מצב הניקיון והדיווחים בהם)</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (mgrZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z.id)} onChange={() => setMgrZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div></div>)}
-      {role === "cleaner" && zones && (zones.length === 0
-        ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון. הגדירו אזורים תחת «ניקיון».</div>
-        : <div className="field"><span>אזורי הניקיון באחריותו</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (cleanZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={cleanZones.includes(z.id)} onChange={() => setCleanZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div><div className="hint">אותה הגדרה כמו «עובד אחראי» בעריכת האזור — נשמרת לשני הכיוונים. אזור משויך לעובד אחד.</div></div>)}
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
         : <div className="field"><span>מחלקה (משויך אליה)</span><ChoiceGrid columns="dept" value={dept} onChange={setDept} tone="#0D9488" options={config.departments.map((d) => ({ id: d, label: d, Icon: d === "ניקיון" ? Sparkles : Building2 }))} /><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></div>)}
       {role === "worker" && (() => { const access = normalizeCleaningAccess({ ...user, role: "worker", dept, depts: [dept], active, cleaningAccess: cleaningDeptSelected ? false : manualCleaningAccess }); return access.enabled ? <div className="note uf-access-note" style={{ marginTop: -4, marginBottom: 10 }}><Sparkles size={15} /> גישה לניקיון פעילה{access.source === "department" ? " לפי מחלקת ניקיון" : ""}. העובד נשאר עובד רגיל ומקבל לשונית ניקיון לביצוע סבבים.</div> : null; })()}
-      {(role === "worker" || role === "cleaner") && <div className="field"><span>שיוך תעסוקתי (לחישוב חיוב ציוד מגן)</span><div className="seg-tabs s2" style={{ maxWidth: 260 }}><button className={employmentType === "direct" ? "on" : ""} onClick={() => setEmploymentType("direct")}>ישיר (חברה)</button><button className={employmentType === "contractor" ? "on" : ""} onClick={() => setEmploymentType("contractor")}>דרך קבלן</button></div>{employmentType === "contractor" && <input style={{ marginTop: 8 }} value={contractorName} onChange={(e) => setContractorName(e.target.value)} placeholder="שם הקבלן (לא חובה)" />}<div className="hint">עובד דרך קבלן משלם מחיר מלא על ציוד; עובד ישיר — לפי מדיניות המחלקה.</div></div>}
+      {role === "worker" && <div className="field"><span>שיוך תעסוקתי (לחישוב חיוב ציוד מגן)</span><div className="seg-tabs s2" style={{ maxWidth: 260 }}><button className={employmentType === "direct" ? "on" : ""} onClick={() => setEmploymentType("direct")}>ישיר (חברה)</button><button className={employmentType === "contractor" ? "on" : ""} onClick={() => setEmploymentType("contractor")}>דרך קבלן</button></div>{employmentType === "contractor" && <input style={{ marginTop: 8 }} value={contractorName} onChange={(e) => setContractorName(e.target.value)} placeholder="שם הקבלן (לא חובה)" />}<div className="hint">עובד דרך קבלן משלם מחיר מלא על ציוד; עובד ישיר — לפי מדיניות המחלקה.</div></div>}
       {role === "tech" ? (<>
         <ActivationControls />
         <div className="field"><span>פרופיל טכנאי</span><div className="pr-row">
@@ -7957,13 +7955,13 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         {techScope === "transport" && <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— כל הצי (ללא שיוך) —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select><div className="hint">אם נבחר ספק — הטכנאי יראה רק כלים של אותו ספק.</div></label>}
         <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>
         <label className="field"><span>סבילות משמרת אישית (דקות)</span><input type="number" min="0" value={techGrace} onChange={(e) => setTechGrace(e.target.value)} placeholder={`ברירת מחדל: ${Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)}`} /><div className="hint">השאירו ריק כדי להשתמש בברירת המחדל. ערך אישי משנה את בדיקת האיחור והיציאה המוקדמת של הטכנאי הזה בלבד.</div></label>
-      </>) : (role === "worker" || role === "cleaner") ? (<>
+      </>) : role === "worker" ? (<>
         <ActivationControls />
       </>) : (<>
         <ActivationControls />
       </>)}
       <div className="uf-form-footer">
-        {(role === "worker" || role === "cleaner") ? (
+        {role === "worker" ? (
           <div className="hint">סטטוס עובד מנוהל דרך פעולת עזיבת עובד / החזרת ציוד, כדי לא להחזיק שתי הגדרות מקבילות.</div>
         ) : (
           <div className="uf-active-block">
