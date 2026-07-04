@@ -140,6 +140,63 @@ describe("controls core model", () => {
     expect(controlAssignmentDraftFromProgram({})).toBeNull();
   });
 
+  it("preserves fleet targets through program assignments and run drafts", () => {
+    const program = controlProgramDraftFromManualPreset("fleet-yard-check", {
+      id: "prog-fleet-yard",
+      targetType: "fleet",
+      targetIds: ["fleet-123"],
+      responsibleIds: ["manager-1"],
+      notifyIds: ["fleet-manager"]
+    });
+
+    expect(program).toMatchObject({
+      id: "prog-fleet-yard",
+      domain: "fleet",
+      targetType: "fleet",
+      targetIds: ["fleet-123"],
+      actionPolicy: { defaultRouteType: "task" }
+    });
+
+    const assignment = controlAssignmentDraftFromProgram(program, {
+      id: "asg-fleet-123",
+      target: {
+        kind: "fleet",
+        fleetId: "fleet-123",
+        label: "123 · מלגזה · OSE250",
+        sourceModule: "fleet"
+      },
+      dueAt: "2026-07-12"
+    });
+
+    expect(assignment).toMatchObject({
+      id: "asg-fleet-123",
+      target: {
+        kind: "fleet",
+        id: "fleet-123",
+        fleetId: "fleet-123",
+        label: "123 · מלגזה · OSE250",
+        sourceModule: "fleet"
+      }
+    });
+
+    const run = controlRunDraftFromAssignment(assignment, {
+      id: "run-fleet-123",
+      performedById: "manager-1"
+    });
+
+    expect(run).toMatchObject({
+      id: "run-fleet-123",
+      programId: "prog-fleet-yard",
+      target: {
+        kind: "fleet",
+        id: "fleet-123",
+        fleetId: "fleet-123",
+        label: "123 · מלגזה · OSE250",
+        sourceModule: "fleet"
+      }
+    });
+  });
+
   it("keeps assignment due date, target, assignees, and reschedule history explicit", () => {
     const assignment = normalizeControlAssignment({
       id: "asg-1",

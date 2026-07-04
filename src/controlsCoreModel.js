@@ -140,6 +140,7 @@ const normalizeTarget = (target = {}) => {
     kind: cleanString(target.kind || target.type || target.targetType) || "general",
     id: cleanString(target.id || target.targetId || target.locationId || target.fleetId || target.value) || undefined,
     locationId: cleanString(target.locationId) || undefined,
+    fleetId: cleanString(target.fleetId) || undefined,
     label: cleanString(target.label || target.name || target.title) || undefined,
     sourceModule: cleanString(target.sourceModule || target.module) || undefined
   });
@@ -270,6 +271,7 @@ export const controlAssignmentDraftFromProgram = (program = {}, options = {}) =>
     kind: normalized.targetType || "location",
     id: fallbackTargetId || undefined,
     locationId: normalized.targetType === "location" && fallbackTargetId ? fallbackTargetId : undefined,
+    fleetId: normalized.targetType === "fleet" && fallbackTargetId ? fallbackTargetId : undefined,
     label: options.targetLabel
   });
 

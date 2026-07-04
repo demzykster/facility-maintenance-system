@@ -2702,7 +2702,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session, users = [], saveTask, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
+function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [], saveTask, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
   const [controlTab, setControlTab] = useState("run");
@@ -2747,6 +2747,27 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
     return name === "—" ? (fallback || "—") : name;
   };
   const activeUsers = useMemo(() => (users || []).filter((u) => u.id && u.active !== false && ["admin", "user", "tech", "worker"].includes(u.role)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")), [users]);
+  const fleetTargets = useMemo(() => (fleet || [])
+    .filter((unit) => unit?.id && unit.active !== false)
+    .sort((a, b) => String(a.code || "").localeCompare(String(b.code || ""), "he", { numeric: true })), [fleet]);
+  const fleetById = useMemo(() => new Map(fleetTargets.map((unit) => [unit.id, unit])), [fleetTargets]);
+  const fleetTargetLabel = (fleetId) => {
+    const unit = fleetById.get(fleetId);
+    return unit ? (unitLabel(unit, config) || unit.id) : (fleetId || "");
+  };
+  const targetObjectFor = (value, valueDomain = domain) => {
+    const id = String(value || "").trim();
+    if (valueDomain === "fleet") {
+      return { kind: "fleet", id: id || undefined, fleetId: id || undefined, label: fleetTargetLabel(id) || undefined, sourceModule: "fleet" };
+    }
+    return { kind: "location", id: id || undefined, locationId: id || undefined, label: id || undefined };
+  };
+  const programTargetLabel = (program) => {
+    const targetIds = program?.targetIds || [];
+    if (!targetIds.length) return "";
+    if (program.domain === "fleet" || program.targetType === "fleet") return targetIds.map(fleetTargetLabel).filter(Boolean).join(", ");
+    return targetIds.join(", ");
+  };
   const defaultResponsibleId = currentTaskUser?.id || activeUsers[0]?.id || "";
   useEffect(() => {
     if (responsibleId && activeUsers.some((u) => u.id === responsibleId)) return;
@@ -2863,6 +2884,7 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
     const program = controlProgramDraftFromManualPreset(selectedProgramPreset.id, {
       id: uid(),
       name: programDraft.name,
+      targetType: programDraft.domain === "fleet" ? "fleet" : "location",
       targetIds: programDraft.target ? [programDraft.target] : [],
       responsibleIds: programDraft.responsibleId ? [programDraft.responsibleId] : [],
       participantIds: programDraft.participantId ? [programDraft.participantId] : [],
@@ -2883,11 +2905,13 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
     const assigneeId = draft.assignedToId || program.responsibleIds?.[0] || defaultResponsibleId;
     if (!assigneeId) return setMsg("בחרו מבצע לשיוך.");
     if (!draft.dueAt) return setMsg("בחרו תאריך ביצוע.");
-    const targetLabel = draft.target || program.targetIds?.[0] || "";
+    const isFleetProgram = program.domain === "fleet" || program.targetType === "fleet";
+    const targetValue = isFleetProgram ? (draft.targetFleetId || program.targetIds?.[0] || "") : (draft.target || program.targetIds?.[0] || "");
+    if (isFleetProgram && !targetValue) return setMsg("בחרו כלי שינוע לשיוך.");
     const assignment = controlAssignmentDraftFromProgram(program, {
       id: uid(),
       assignedToIds: [assigneeId],
-      target: { kind: program.targetType || "location", id: targetLabel, locationId: program.targetType === "location" ? targetLabel : undefined, label: targetLabel },
+      target: targetObjectFor(targetValue, isFleetProgram ? "fleet" : "location"),
       dueAt: draft.dueAt,
       createdAt: Date.now()
     });
@@ -2913,7 +2937,7 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
     setDomain(program.domain || "general");
     setName(program.name || "בקרה מתכנית");
     setChecklistText((program.checklistItems || []).map((item) => item.label || item.id).filter(Boolean).join("\n"));
-    setTarget(assignment.target?.label || assignment.target?.id || "");
+    setTarget(assignment.target?.fleetId || assignment.target?.id || assignment.target?.label || "");
     setAnswers({});
     setNotes("");
     setSignature("");
@@ -2940,6 +2964,7 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
     missed: "פספס"
   }[status] || status || "מתוכנן");
   const userName = (id) => activeUsers.find((u) => u.id === id)?.name || displayUserName(id);
+  const currentTarget = targetObjectFor(target, domain);
   const finding = {
     id: "finding-preview",
     programId: activeProgramId,
@@ -2949,7 +2974,7 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
     title: findingTitle || (findingCount ? `ממצא מתוך ${name || "בקרה ידנית"}` : ""),
     description: findingDesc || notes,
     severity,
-    target: { kind: "location", id: target, label: target },
+    target: currentTarget,
     route: { type: routeType, notifyIds: responsibleId ? [responsibleId] : [] },
     createdById: actorUserId,
     createdAt: Date.now()
@@ -2960,6 +2985,7 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
   }) : null;
   const finishRun = async () => {
     if (!name.trim()) return setMsg("תנו שם לבדיקה.");
+    if (domain === "fleet" && !target) return setMsg("בחרו כלי שינוע לבדיקה.");
     if (!checklist.length) return setMsg("הוסיפו לפחות סעיף בדיקה אחד.");
     if (doneCount < checklist.length) return setMsg("סמנו תשובה לכל סעיף לפני סיום.");
     if (!signature.trim()) return setMsg("נדרשת חתימה אחת לסיום הסבב.");
@@ -2974,7 +3000,7 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
       assignmentId: activeAssignmentId,
       performedById: actorUserId,
       participantIds: [],
-      target: { kind: "location", id: target, label: target },
+      target: currentTarget,
       startedAt: savedRun?.startedAt || now,
       finishedAt: now,
       answers: checklist.map((label, i) => ({ itemId: `item-${i + 1}`, label, value: answers[i] })),
@@ -3079,7 +3105,9 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
             <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={programDraft.domain === a.id ? "on" : ""} onClick={() => updateProgramDomain(a.id)}>{a.label}</button>)}</div></label>
             <label className="field"><span>תבנית</span><select value={programDraft.presetId} onChange={(e) => updateProgramPreset(e.target.value)}>{programDraftPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
             <label className="field"><span>שם התכנית</span><input value={programDraft.name} onChange={(e) => setProgramDraft((draft) => ({ ...draft, name: e.target.value }))} /></label>
-            <label className="field"><span>יעד / אזור</span><input value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))} placeholder={selectedProgramPreset?.targetPlaceholder || "לדוגמה: מחסן ראשי"} /></label>
+            {programDraft.domain === "fleet"
+              ? <label className="field"><span>כלי שינוע</span><select value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))}><option value="">{fleetTargets.length ? "בחרו כלי" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
+              : <label className="field"><span>יעד / אזור</span><input value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))} placeholder={selectedProgramPreset?.targetPlaceholder || "לדוגמה: מחסן ראשי"} /></label>}
             <label className="field"><span>אחראי</span><select value={programDraft.responsibleId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, responsibleId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
             <label className="field"><span>משתתף נוסף</span><select value={programDraft.participantId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, participantId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
           </div>
@@ -3095,14 +3123,16 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
                 <div className="control-program-head">
                   <div>
                     <div className="tcard-subj">{program.name}</div>
-                    <div className="control-program-meta">{domainLabel(program.domain)} · {(program.checklistItems || []).length} סעיפים{program.targetIds?.length ? ` · ${program.targetIds.join(", ")}` : ""}</div>
+                    <div className="control-program-meta">{domainLabel(program.domain)} · {(program.checklistItems || []).length} סעיפים{programTargetLabel(program) ? ` · ${programTargetLabel(program)}` : ""}</div>
                   </div>
                   <span className="badge sm" style={{ background: "#F8FAFC", color: "#475569", border: "1px solid var(--line)" }}>{program.responsibleIds?.length ? program.responsibleIds.map(userName).join(", ") : "ללא אחראי"}</span>
                 </div>
                 {canManageControls && <div className="control-assignment-editor">
                   <label className="field mini"><span>מבצע</span><select value={draft.assignedToId || program.responsibleIds?.[0] || defaultResponsibleId || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), assignedToId: e.target.value } }))}><option value="">בחרו</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
                   <label className="field mini"><span>תאריך</span><input type="date" value={draft.dueAt || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), dueAt: e.target.value } }))} /></label>
-                  <label className="field mini"><span>יעד</span><input value={draft.target || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), target: e.target.value } }))} placeholder={program.targetIds?.[0] || "לפי התכנית"} /></label>
+                  {(program.domain === "fleet" || program.targetType === "fleet")
+                    ? <label className="field mini"><span>כלי</span><select value={draft.targetFleetId || program.targetIds?.[0] || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), targetFleetId: e.target.value } }))}><option value="">{fleetTargets.length ? "בחרו כלי" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
+                    : <label className="field mini"><span>יעד</span><input value={draft.target || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), target: e.target.value } }))} placeholder={program.targetIds?.[0] || "לפי התכנית"} /></label>}
                   <button className="btn-ghost sm" onClick={() => saveManualAssignment(program)} disabled={busy}><CalendarClock size={14} /> שיוך</button>
                 </div>}
               </div>;
@@ -3133,7 +3163,9 @@ function ControlsHub({ session, users = [], saveTask, controlPrograms = [], cont
           <label className="field"><span>שם הבדיקה</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={domain === a.id ? "on" : ""} onClick={() => setDomain(a.id)}>{a.label}</button>)}</div><div className="hint">{currentArea.text}</div></label>
           {domainPresets.length > 0 && <div className="field"><span>תבניות מהירות</span><div className="control-preset-row">{domainPresets.map((preset) => <button key={preset.id} type="button" className="control-preset-btn" onClick={() => applyManualPreset(preset)}><ListChecks size={14} /> {preset.name}</button>)}</div><div className="hint">בחירת תבנית מחליפה את שם הבדיקה והצ׳קליסט בלבד. היעד נשאר לבחירה ידנית.</div></div>}
-          <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={targetPlaceholder} /></label>
+          {domain === "fleet"
+            ? <label className="field"><span>כלי שינוע</span><select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">{fleetTargets.length ? "בחרו כלי לבדיקה" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
+            : <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={targetPlaceholder} /></label>}
           <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
           <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
           <label className="field"><span>חתימה לסיום הסבב</span><input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={session.name || "שם מבצע"} /></label>
