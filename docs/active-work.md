@@ -27,6 +27,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs at last check: none.
 - Active work in progress: none.
 - Latest completed product work:
+  - PR #682 added lightweight manual `בקרות` domain presets: safety walk, fleet/tool check, quality sample, and operations/executive walk can prefill the manual run name/checklist without creating schedules, assignments, Supabase tables, or cleaning/location migration.
   - PR #680 reserved shared base `locations` storage as `location:*` / `locations`, wired it through backup/export, app load state, KV allowlist, and permissions, and documented that cleaning remains on `czone:*` until a dedicated migration.
   - PR #679 removed the visible legacy linked-questionnaire selector from vehicle-type settings while keeping old `insp:` history read-only.
   - PR #678 refreshed the near-term controls strategy: the next phase is one narrow domain increment, not another foundation/storage step.
@@ -113,7 +114,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: return to the first narrow `בקרות` vertical slice only after confirming scope: one manual control program, one assignment/run path, one finding, and route to report-only or `מטלות`; do not start the broad monolith split.
+- Next exact action: verify the manual `בקרות` preset workflow in app, then take the first saved program/assignment slice only as a narrow end-to-end scenario: one program, one assignment/run path, one finding, and route to report-only or `מטלות`; do not start scheduling engine, cleaning migration, executive BI, or the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction

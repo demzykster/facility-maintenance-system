@@ -19,6 +19,7 @@
 - Controls core model уже закрыт: Program, Assignment, Run, Finding, visibility, action routes, dashboard signal envelope.
 - Первый ручной `בקרות` slice уже закрыт: ручной обход, чеклист, finding, report-only или подтвержденная `מטלה`, сохранение run/finding в KV, история, и открытие связанной `מטלה`.
 - Stable storage contract уже закрыт: зарезервированы `controlProgram:*`, `controlAssignment:*`, `controlRun:*`, `controlFinding:*` и будущие таблицы `control_programs`, `control_assignments`, `control_runs`, `control_findings`.
+- Первый маленький domain increment уже начат: ручные `בקרות` получили легкие шаблоны для safety walk, fleet/tool check, quality sample и operations/executive walk. Эти шаблоны только заполняют название/чеклист ручного обхода; они не создают расписания, программы, назначения или новые таблицы.
 
 ## Ближайший Правильный Шаг
 
@@ -75,7 +76,7 @@ first narrow domain increment
 Закрыто в первом ручном UI-slice: один ручной обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Completed run/finding сохраняются как shared KV `controlRun:*` / `controlFinding:*`, история показывает детали с подписью/ответами/ממצאים, а finding с созданной задачей открывает связанную `מטלה` из истории.
 
 6. Done: зарезервировать stable storage contract для controls programs/assignments/runs/findings.
-7. Current: выбрать первый узкий domain increment и провести его без scheduling engine, без cleaning migration и без broad dashboard.
+7. Current: проверить ручные domain presets в приложении, затем взять первый сохраненный Program -> Assignment -> Run -> Finding -> Action scenario без scheduling engine, без cleaning migration и без broad dashboard.
 
 ## What Not To Do Yet
 
