@@ -23,6 +23,7 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["ccomplaint:"], roles: ["admin", "user"], access: "cleaning:closeComplaint", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
   { prefixes: ["presence:"], roles: ["admin", "tech"], entityType: AUDIT_ENTITY_TYPES.user, auditSensitive: false },
   { prefixes: ["mtask:", "mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
+  { prefixes: ["controlRun:", "controlFinding:"], module: "controls", minLevel: "request", entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
   { prefixes: ["appIssue:"], roles: ACTIVE_ROLES, entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false }
 ]);
 

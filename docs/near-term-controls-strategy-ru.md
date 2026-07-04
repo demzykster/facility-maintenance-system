@@ -70,7 +70,7 @@ userGroups foundation
    - one finding;
    - route to report-only or `מטלות`.
 
-Текущий безопасный шаг: первый ручной UI-slice. Один ad-hoc обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Отдельные `controls:*` записи пока не сохраняются.
+Текущий безопасный шаг: закрепить первый ручной UI-slice сохранением истории. Один ручной обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Completed run/finding сохраняются как shared KV `controlRun:*` / `controlFinding:*`, но это ещё не scheduling engine и не финальная Supabase-схема.
 
 ## What Not To Do Yet
 

@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
 import QRCode from "qrcode";
@@ -42,7 +42,7 @@ import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { buildInspectionDuePairs, inspectionProgramsForType, migrateInspectionProgramsFromTemplates, normalizeInspectionProgram } from "./inspectionProgramModel.js";
-import { controlFindingTaskDraft } from "./controlsCoreModel.js";
+import { controlFindingTaskDraft, normalizeControlFinding, normalizeControlRun } from "./controlsCoreModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -1449,6 +1449,8 @@ export default function App() {
   const [complaints, setComplaints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [meetings, setMeetings] = useState([]);
+  const [controlRuns, setControlRuns] = useState([]);
+  const [controlFindings, setControlFindings] = useState([]);
   const [ppe, setPpe] = useState([]);
   const [ppeItems, setPpeItems] = useState([]);
   const [ppeNorms, setPpeNorms] = useState([]);
@@ -1612,10 +1614,10 @@ export default function App() {
     return ok;
   };
   async function reloadAll() {
-    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
+    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, crun, cfind, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
       "ticket:", "pm:", "fleet:", "insp:",
       "itpl:", "presence:", "user:",
-      "czone:", "cround:", "ccomplaint:", "cabsence:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
+      "czone:", "cround:", "ccomplaint:", "cabsence:", "mtask:", "mmeet:", "controlRun:", "controlFinding:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
@@ -1632,6 +1634,8 @@ export default function App() {
     apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
     apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
     apply("mmeet", mmt, setMeetings, (a, b) => b.at - a.at);
+    apply("controlRun", crun, setControlRuns, (a, b) => (b.finishedAt || b.startedAt || 0) - (a.finishedAt || a.startedAt || 0));
+    apply("controlFinding", cfind, setControlFindings, (a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     apply("ppe", pp, setPpe, (a, b) => b.at - a.at);
     apply("ppeitem", ppit, setPpeItems, (a, b) => (a.name > b.name ? 1 : -1));
     apply("ppenorm", ppn, setPpeNorms, null);
@@ -1856,6 +1860,20 @@ export default function App() {
     return true;
   };
   const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
+  const saveControlRun = async (r) => {
+    const run = normalizeControlRun(r);
+    if (!run.id) return false;
+    if (!await persistShared(`controlRun:${run.id}`, JSON.stringify(run))) return false;
+    setControlRuns((s) => [run, ...s.filter((x) => x.id !== run.id)].sort((a, b) => (b.finishedAt || b.startedAt || 0) - (a.finishedAt || a.startedAt || 0)));
+    return true;
+  };
+  const saveControlFinding = async (f) => {
+    const finding = normalizeControlFinding(f);
+    if (!finding.id) return false;
+    if (!await persistShared(`controlFinding:${finding.id}`, JSON.stringify(finding))) return false;
+    setControlFindings((s) => [finding, ...s.filter((x) => x.id !== finding.id)].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    return true;
+  };
   const saveMeeting = async (m) => { if (!await persistShared(`mmeet:${m.id}`, JSON.stringify(m))) return false; setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); return true; };
   const delMeeting = async (id) => { if (!await deleteShared(`mmeet:${id}`)) return false; setMeetings((s) => s.filter((x) => x.id !== id)); return true; };
   const savePpeItem = async (x) => { if (!await persistShared(`ppeitem:${x.id}`, JSON.stringify(x))) return false; setPpeItems((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (a.name > b.name ? 1 : -1))); return true; };
@@ -2050,7 +2068,7 @@ export default function App() {
       config,
       collections: {
         users, fleet, tickets, pm, insp, templates, presence, zones, rounds, complaints, absences,
-        tasks, meetings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, appIssues,
+        tasks, meetings, controlRuns, controlFindings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, appIssues,
       },
       photos,
     });
@@ -2096,7 +2114,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlRuns, controlFindings, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -2664,7 +2682,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session, users = [], saveTask }) {
+function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlFindings = [], saveControlRun, saveControlFinding }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
   const [name, setName] = useState("סיור בטיחות ידני");
@@ -2682,10 +2700,18 @@ function ControlsHub({ session, users = [], saveTask }) {
   const [taskDue, setTaskDue] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [savedRun, setSavedRun] = useState(null);
+  const [savedFinding, setSavedFinding] = useState(null);
   const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
   const findingCount = checklist.filter((_, i) => answers[i] === "problem").length;
   const doneCount = checklist.filter((_, i) => answers[i]).length;
   const activeUsers = useMemo(() => (users || []).filter((u) => u.id !== session.id && u.active !== false && ["admin", "user", "tech", "worker"].includes(u.role)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")), [users, session.id]);
+  const runFindingsByRun = useMemo(() => (controlFindings || []).reduce((map, finding) => {
+    if (!finding?.runId) return map;
+    map[finding.runId] = [...(map[finding.runId] || []), finding];
+    return map;
+  }, {}), [controlFindings]);
+  const recentRuns = useMemo(() => (controlRuns || []).slice(0, 6), [controlRuns]);
   const areas = [
     { id: "safety", label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
     { id: "quality", label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
@@ -2710,27 +2736,63 @@ function ControlsHub({ session, users = [], saveTask }) {
     responsibleIds: responsibleId ? [responsibleId] : [session.id],
     dueAt: taskDue ? new Date(taskDue).getTime() : null
   }) : null;
-  const finishRun = () => {
+  const finishRun = async () => {
     if (!name.trim()) return setMsg("תנו שם לבדיקה.");
     if (!checklist.length) return setMsg("הוסיפו לפחות סעיף בדיקה אחד.");
     if (doneCount < checklist.length) return setMsg("סמנו תשובה לכל סעיף לפני סיום.");
     if (!signature.trim()) return setMsg("נדרשת חתימה אחת לסיום הסבב.");
     if (findingCount && !finding.title) return setMsg("יש ממצא, צריך כותרת קצרה.");
-    setMsg(findingCount ? "הבדיקה הושלמה. עכשיו בחרו מה עושים עם הממצא." : "הבדיקה הושלמה ללא ממצאים. בשלב הזה אין שמירה נפרדת של בקרות.");
+    if (!saveControlRun || !saveControlFinding) return setMsg("שמירת בקרות אינה זמינה כרגע.");
+    const now = Date.now();
+    const runId = savedRun?.id || uid();
+    const findingId = savedFinding?.id || uid();
+    const run = {
+      id: runId,
+      programId: "manual-control",
+      performedById: session.id,
+      participantIds: [],
+      target: { kind: "location", id: target, label: target },
+      startedAt: savedRun?.startedAt || now,
+      finishedAt: now,
+      answers: checklist.map((label, i) => ({ itemId: `item-${i + 1}`, label, value: answers[i] })),
+      findingIds: findingCount ? [findingId] : [],
+      overallSignature: { signedById: session.id, signedByName: signature.trim(), signedAt: now },
+      notes,
+      status: "completed"
+    };
+    setBusy(true); setMsg("");
+    const okRun = await saveControlRun(run);
+    if (!okRun) { setBusy(false); return setMsg(SAVE_FAILED_MESSAGE); }
+    setSavedRun(normalizeControlRun(run));
+    if (findingCount) {
+      const findingRecord = {
+        ...finding,
+        id: findingId,
+        runId,
+        createdAt: savedFinding?.createdAt || now,
+        status: routeType === "task" ? "triage" : "open"
+      };
+      const okFinding = await saveControlFinding(findingRecord);
+      if (!okFinding) { setBusy(false); return setMsg(SAVE_FAILED_MESSAGE); }
+      setSavedFinding(normalizeControlFinding(findingRecord));
+    } else {
+      setSavedFinding(null);
+    }
+    setBusy(false);
+    setMsg(findingCount ? "הבדיקה נשמרה. עכשיו אפשר להשאיר לדוח או לפתוח מטלה מהממצא." : "הבדיקה נשמרה ללא ממצאים.");
   };
   const createTask = async () => {
     if (!taskDraft || !saveTask) return;
+    if (!savedRun || !savedFinding) return setMsg("שמרו קודם את הבדיקה דרך «סיום בדיקה», ואז צרו מטלה מהממצא.");
     const now = Date.now();
-    const findingId = uid();
-    const runId = "manual-run-" + now;
     setBusy(true); setMsg("");
     const task = {
       ...taskDraft,
       id: uid(),
-      sourceId: findingId,
-      sourceFindingId: findingId,
+      sourceId: savedFinding.id,
+      sourceFindingId: savedFinding.id,
       sourceProgramId: "manual-control",
-      sourceRunId: runId,
+      sourceRunId: savedRun.id,
       responsibleIds: taskDraft.responsibleIds?.length ? taskDraft.responsibleIds : [session.id],
       participantIds: [],
       waitingFor: "",
@@ -2745,6 +2807,18 @@ function ControlsHub({ session, users = [], saveTask }) {
       log: [{ at: now, by: session.name, byRole: session.role, text: "נוצרה מתוך בקרת ידנית", kind: "open" }]
     };
     const ok = await saveTask(task);
+    if (ok !== false) {
+      const nextFinding = normalizeControlFinding({
+        ...savedFinding,
+        ...finding,
+        id: savedFinding.id,
+        runId: savedRun.id,
+        route: { ...savedFinding.route, type: "task", taskId: task.id, notifyIds: task.responsibleIds, status: "created", decidedById: session.id, decidedAt: now },
+        status: "routed"
+      });
+      const okFinding = await saveControlFinding(nextFinding);
+      if (okFinding !== false) setSavedFinding(nextFinding);
+    }
     setBusy(false);
     setMsg(ok === false ? SAVE_FAILED_MESSAGE : "נוצרה מטלה מתוך הממצא. תוכלו לראות אותה במסך מטלות עם מקור מערכת בקרות.");
   };
@@ -2753,7 +2827,7 @@ function ControlsHub({ session, users = [], saveTask }) {
       <div className="row-between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
         <div>
           <SectionTitle><ClipboardCheck size={15} /> בקרות</SectionTitle>
-          <div className="hint" style={{ maxWidth: 680 }}>סבב ידני ראשון: בדיקה קצרה, חתימה אחת, ממצא אחד וניתוב לדוח בלבד או ל-מטלות. עדיין בלי מנוע תזמון ובלי שמירת רשומות בקרות נפרדות.</div>
+          <div className="hint" style={{ maxWidth: 680 }}>סבב ידני ראשון: בדיקה קצרה, חתימה אחת, ממצא אחד, שמירת היסטוריה וניתוב לדוח בלבד או ל-מטלות. עדיין בלי מנוע תזמון ובלי תכניות בקרות קבועות.</div>
         </div>
         {canManageControls && <span className="badge sm" style={{ background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>ניהול בקרות</span>}
         {!canManageControls && canPerform && <span className="badge sm" style={{ background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0" }}>ביצוע בקרות</span>}
@@ -2773,7 +2847,7 @@ function ControlsHub({ session, users = [], saveTask }) {
           <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
           <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
           <label className="field"><span>חתימה לסיום הסבב</span><input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={session.name || "שם מבצע"} /></label>
-          <button className="btn-primary full" onClick={finishRun}><Check size={16} /> סיום בדיקה</button>
+          <button className="btn-primary full" onClick={finishRun} disabled={busy}><Check size={16} /> {busy ? "שומר…" : "סיום בדיקה"}</button>
         </div>
         <div className="control-panel">
           <SectionTitle><ListChecks size={15} /> צ'קליסט</SectionTitle>
@@ -2796,6 +2870,23 @@ function ControlsHub({ session, users = [], saveTask }) {
         {routeType === "task" && <button className="btn-primary full" style={{ marginTop: 10 }} disabled={!taskDraft || busy} onClick={createTask}>{busy ? "יוצר…" : "יצירת מטלה מהממצא"}</button>}
       </div>}
       {msg && <div className={msg === SAVE_FAILED_MESSAGE ? "err" : "note"} style={{ marginTop: 12 }}>{msg}</div>}
+      <div className="control-panel" style={{ marginTop: 12 }}>
+        <SectionTitle><History size={15} /> היסטוריית בקרות אחרונות</SectionTitle>
+        {recentRuns.length ? <div className="task-list">
+          {recentRuns.map((run) => {
+            const findings = runFindingsByRun[run.id] || [];
+            const problemCount = findings.length || (run.findingIds || []).length;
+            return <div key={run.id} className="task-row" style={{ cursor: "default", borderInlineStartColor: problemCount ? "#DC2626" : "#0D9488" }}>
+              <div className="task-row-main">
+                <div className="task-row-t">{run.target?.label || run.target?.id || "בקרה ידנית"} · {fmtDate(run.finishedAt || run.startedAt)}</div>
+                <div className="task-row-desc">{run.answers?.length || 0} סעיפים · {problemCount ? `${problemCount} ממצאים` : "ללא ממצאים"} · חתימה: {run.overallSignature?.signedByName || uName(run.performedById, users)}</div>
+                {run.notes && <div className="task-row-sub">{run.notes}</div>}
+              </div>
+              <span className="badge sm" style={{ background: problemCount ? "#FEF2F2" : "#ECFDF5", color: problemCount ? "#B91C1C" : "#047857", border: `1px solid ${problemCount ? "#FECACA" : "#A7F3D0"}` }}>{problemCount ? "עם ממצא" : "תקין"}</span>
+            </div>;
+          })}
+        </div> : <Empty text="אין עדיין היסטוריית בקרות" Icon={History} sub="סיימו בדיקה ידנית כדי לשמור אותה כאן." />}
+      </div>
       </>}
     </div>
   );

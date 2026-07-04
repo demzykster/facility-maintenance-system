@@ -17,6 +17,8 @@ describe("backup model", () => {
       "absences",
       "tasks",
       "meetings",
+      "controlRuns",
+      "controlFindings",
       "ppe",
       "ppeItems",
       "ppeNorms",
@@ -39,6 +41,8 @@ describe("backup model", () => {
       { key: "absences", prefix: "cabsence:" },
       { key: "tasks", prefix: "mtask:" },
       { key: "meetings", prefix: "mmeet:" },
+      { key: "controlRuns", prefix: "controlRun:" },
+      { key: "controlFindings", prefix: "controlFinding:" },
       { key: "ppe", prefix: "ppe:" },
       { key: "ppeItems", prefix: "ppeitem:" },
       { key: "ppeNorms", prefix: "ppenorm:" },
@@ -71,6 +75,8 @@ describe("backup model", () => {
       photos: { "photo:ticket-1": "data:image/png;base64,abc" },
     });
     expect(payload.meetings).toEqual([]);
+    expect(payload.controlRuns).toEqual([]);
+    expect(payload.controlFindings).toEqual([]);
     expect(payload.ppe).toEqual([]);
     expect(payload.ppeItems).toEqual([]);
     expect(payload.ppeNorms).toEqual([]);
