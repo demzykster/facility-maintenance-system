@@ -2696,7 +2696,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const [findingDesc, setFindingDesc] = useState("");
   const [severity, setSeverity] = useState("medium");
   const [routeType, setRouteType] = useState("report_only");
-  const [responsibleId, setResponsibleId] = useState(session.id || "");
+  const [responsibleId, setResponsibleId] = useState("");
   const [taskDue, setTaskDue] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2705,7 +2705,21 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
   const findingCount = checklist.filter((_, i) => answers[i] === "problem").length;
   const doneCount = checklist.filter((_, i) => answers[i]).length;
-  const activeUsers = useMemo(() => (users || []).filter((u) => u.id !== session.id && u.active !== false && ["admin", "user", "tech", "worker"].includes(u.role)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")), [users, session.id]);
+  const currentTaskUser = useMemo(() => {
+    const list = users || [];
+    const sessionEmail = String(session.email || "").toLowerCase();
+    return list.find((u) => u.id === session.id)
+      || list.find((u) => session.authUserId && u.authUserId === session.authUserId)
+      || list.find((u) => sessionEmail && String(u.email || "").toLowerCase() === sessionEmail)
+      || list.find((u) => session.name && u.name === session.name)
+      || null;
+  }, [users, session.id, session.authUserId, session.email, session.name]);
+  const activeUsers = useMemo(() => (users || []).filter((u) => u.id && u.active !== false && ["admin", "user", "tech", "worker"].includes(u.role)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")), [users]);
+  const defaultResponsibleId = currentTaskUser?.id || activeUsers[0]?.id || "";
+  useEffect(() => {
+    if (responsibleId && activeUsers.some((u) => u.id === responsibleId)) return;
+    setResponsibleId(defaultResponsibleId);
+  }, [responsibleId, defaultResponsibleId, activeUsers]);
   const runFindingsByRun = useMemo(() => (controlFindings || []).reduce((map, finding) => {
     if (!finding?.runId) return map;
     map[finding.runId] = [...(map[finding.runId] || []), finding];
@@ -2728,12 +2742,12 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     description: findingDesc || notes,
     severity,
     target: { kind: "location", id: target, label: target },
-    route: { type: routeType, notifyIds: responsibleId ? [responsibleId] : [session.id] },
+    route: { type: routeType, notifyIds: responsibleId ? [responsibleId] : [] },
     createdById: session.id,
     createdAt: Date.now()
   };
-  const taskDraft = routeType === "task" && finding.title ? controlFindingTaskDraft(finding, {
-    responsibleIds: responsibleId ? [responsibleId] : [session.id],
+  const taskDraft = routeType === "task" && finding.title && responsibleId ? controlFindingTaskDraft(finding, {
+    responsibleIds: [responsibleId],
     dueAt: taskDue ? new Date(taskDue).getTime() : null
   }) : null;
   const finishRun = async () => {
@@ -2784,6 +2798,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const createTask = async () => {
     if (!taskDraft || !saveTask) return;
     if (!savedRun || !savedFinding) return setMsg("שמרו קודם את הבדיקה דרך «סיום בדיקה», ואז צרו מטלה מהממצא.");
+    if (!responsibleId) return setMsg("בחרו אחראי למטלה.");
     const now = Date.now();
     setBusy(true); setMsg("");
     const task = {
@@ -2793,7 +2808,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
       sourceFindingId: savedFinding.id,
       sourceProgramId: "manual-control",
       sourceRunId: savedRun.id,
-      responsibleIds: taskDraft.responsibleIds?.length ? taskDraft.responsibleIds : [session.id],
+      responsibleIds: taskDraft.responsibleIds?.length ? taskDraft.responsibleIds : [],
       participantIds: [],
       waitingFor: "",
       meetingId: null,
@@ -2863,7 +2878,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
         <label className="field"><span>פירוט הממצא</span><textarea rows={3} value={findingDesc} onChange={(e) => setFindingDesc(e.target.value)} placeholder="מה נמצא, איפה, ומה נדרש לבדוק?" /></label>
         <label className="field"><span>מה עושים?</span><div className="seg-tabs s2"><button className={routeType === "report_only" ? "on" : ""} onClick={() => setRouteType("report_only")}>לדוח בלבד</button><button className={routeType === "task" ? "on" : ""} onClick={() => setRouteType("task")}>פתיחת מטלה</button></div></label>
         {routeType === "task" && <div className="control-find-grid">
-          <label className="field"><span>אחראי</span><select value={responsibleId} onChange={(e) => setResponsibleId(e.target.value)}><option value={session.id}>{session.name || "אני"}</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
+          <label className="field"><span>אחראי</span><select value={responsibleId} onChange={(e) => setResponsibleId(e.target.value)}><option value="">{activeUsers.length ? "בחרו אחראי" : "אין משתמשים זמינים"}</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
           <label className="field"><span>תאריך יעד (לא חובה)</span><input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} /></label>
         </div>}
         {taskDraft && <div className="note" style={{ marginTop: 8 }}><b>טיוטת מטלה:</b> {taskDraft.title} · {taskDraft.category} · {taskDraft.priority === "high" ? "עדיפות גבוהה" : taskDraft.priority === "low" ? "עדיפות נמוכה" : "עדיפות בינונית"}{taskDraft.dueAt ? ` · יעד ${fmtDate(taskDraft.dueAt)}` : ""}</div>}
