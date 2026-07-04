@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/user-form-bottom-spacing`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: fix bottom spacing in the user create/edit form so status hints, advanced permissions, and the save button cannot overlap or visually collide in RTL layouts.
 - Latest completed product work:
   - PR #618 refined the user-create form defaults and field order: new users now start with no preselected role, department, or extra permission; role choices read left-to-right by hierarchy (`worker`, `tech`, `department manager`, `system admin`); login identifier fields sit near the name; advanced permissions stay at the bottom of the form.
   - PR #616 improved the user-create/edit form UX: role, shift, and worker department choices now use compact RTL-friendly choice buttons; advanced module permissions use permission cards with level buttons instead of stacked native selects; cleaning access stays automatic for `worker + ניקיון`, with manual cleaning-round exception kept inside advanced permissions.
