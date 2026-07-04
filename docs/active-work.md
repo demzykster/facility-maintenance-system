@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/user-form-defaults-order`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: finish user-create form UX defaults: new users should start with no preselected role/department/extra permission, role choice should read left-to-right by hierarchy, login identifier fields should sit near the name, and advanced permissions should stay at the bottom of the form.
 - Latest completed product work:
   - PR #616 improved the user-create/edit form UX: role, shift, and worker department choices now use compact RTL-friendly choice buttons; advanced module permissions use permission cards with level buttons instead of stacked native selects; cleaning access stays automatic for `worker + ניקיון`, with manual cleaning-round exception kept inside advanced permissions.
   - PR #614 removed `cleaner` from the new-user role selector and made cleaning access automatic for regular `worker` users assigned to the `ניקיון` department. Demo/default cleaning users now use `worker + ניקיון`; low-level legacy `role === "cleaner"` compatibility remains for old records/events.
