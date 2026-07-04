@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/user-form-advanced-cleaning-zones`
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: move manager cleaning-zone visibility into advanced permissions and reduce first-login status noise for new user creation.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #628 moved manager cleaning-zone visibility into the advanced permissions section, hid first-login status copy while creating a new user, and kept the existing manager-zone save shape unchanged.
   - PR #626 polished user-form permission UX and cleaning wording: the advanced-permissions summary is compact/count-based, permission controls have better wrapping/spacing guards, and cleaning-zone UI now talks about round responsibility/access instead of a separate cleaner role.
   - PR #624 made cleaning the default worker profile home for cleaning-capable workers, added a small tested worker profile model for future profile-specific defaults, and removed leftover new-user-form paths that still treated `cleaner` as a separate editable role.
   - PR #622 fixed worker cleaning-tab eligibility after first-login/PIN sessions: session mapping now preserves `dept/depts` and manual `cleaningAccess`, and the cleaning access model accepts both local and server session field shapes.
