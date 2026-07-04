@@ -42,7 +42,7 @@ import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { buildInspectionDuePairs, inspectionProgramsForType, migrateInspectionProgramsFromTemplates, normalizeInspectionProgram } from "./inspectionProgramModel.js";
-import { controlFindingTaskDraft, normalizeControlFinding, normalizeControlRun } from "./controlsCoreModel.js";
+import { controlFindingTaskDraft, controlManualRunPresetsForDomain, normalizeControlFinding, normalizeControlRun } from "./controlsCoreModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -2710,6 +2710,8 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
   const [savedFinding, setSavedFinding] = useState(null);
   const [openRunId, setOpenRunId] = useState(null);
   const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
+  const domainPresets = useMemo(() => controlManualRunPresetsForDomain(domain), [domain]);
+  const targetPlaceholder = domainPresets[0]?.targetPlaceholder || "לדוגמה: מחסן ראשי / רחבת מלגזות";
   const findingCount = checklist.filter((_, i) => answers[i] === "problem").length;
   const doneCount = checklist.filter((_, i) => answers[i]).length;
   const currentTaskUser = useMemo(() => {
@@ -2766,6 +2768,22 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     setFindingDesc("");
     setSeverity("medium");
     setRouteType("report_only");
+    setTaskDue("");
+    setSavedRun(null);
+    setSavedFinding(null);
+    setMsg("");
+  };
+  const applyManualPreset = (preset) => {
+    if (!preset) return;
+    setName(preset.name);
+    setChecklistText((preset.checklistItems || []).join("\n"));
+    setAnswers({});
+    setNotes("");
+    setSignature("");
+    setFindingTitle("");
+    setFindingDesc("");
+    setSeverity(preset.defaultSeverity || "medium");
+    setRouteType(preset.routeType || "report_only");
     setTaskDue("");
     setSavedRun(null);
     setSavedFinding(null);
@@ -2904,7 +2922,8 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
           <SectionTitle><currentArea.Icon size={15} /> בדיקה ידנית</SectionTitle>
           <label className="field"><span>שם הבדיקה</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={domain === a.id ? "on" : ""} onClick={() => setDomain(a.id)}>{a.label}</button>)}</div><div className="hint">{currentArea.text}</div></label>
-          <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="לדוגמה: מחסן ראשי / רחבת מלגזות" /></label>
+          {domainPresets.length > 0 && <div className="field"><span>תבניות מהירות</span><div className="control-preset-row">{domainPresets.map((preset) => <button key={preset.id} type="button" className="control-preset-btn" onClick={() => applyManualPreset(preset)}><ListChecks size={14} /> {preset.name}</button>)}</div><div className="hint">בחירת תבנית מחליפה את שם הבדיקה והצ׳קליסט בלבד. היעד נשאר לבחירה ידנית.</div></div>}
+          <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={targetPlaceholder} /></label>
           <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
           <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
           <label className="field"><span>חתימה לסיום הסבב</span><input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={session.name || "שם מבצע"} /></label>
@@ -9702,6 +9721,10 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .task-row.selected{background:#FFF7ED;border-color:#FDBA74;box-shadow:0 0 0 1px rgba(234,88,12,.12);}
 .control-history-row{align-items:flex-start;}
 .control-actions{display:flex;flex-direction:column;gap:8px;}
+.control-preset-row{display:flex;flex-wrap:wrap;gap:6px;}
+.control-preset-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer;max-width:100%;text-align:start;}
+.control-preset-btn:hover{background:var(--surface-2);border-color:#FDBA74;}
+.control-preset-btn svg{flex:none;color:var(--muted);}
 .control-run-detail{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:12px;margin-top:4px;}
 .control-answer-list{display:grid;grid-template-columns:1fr;gap:6px;}
 .control-answer-item,.control-finding-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;}

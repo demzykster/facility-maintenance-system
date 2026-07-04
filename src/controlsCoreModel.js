@@ -18,6 +18,45 @@ export const CONTROL_FINDING_SEVERITIES = ["info", "low", "medium", "high", "cri
 export const CONTROL_FINDING_STATUSES = ["open", "triage", "routed", "in_progress", "closed", "dismissed"];
 export const CONTROL_ACTION_ROUTE_TYPES = ["report_only", "task", "ticket", "notify", "follow_up", "training", "capa"];
 
+export const CONTROL_MANUAL_RUN_PRESETS = Object.freeze([
+  {
+    id: "safety-walk-basic",
+    domain: "safety",
+    name: "סיור בטיחות ידני",
+    targetPlaceholder: "לדוגמה: מחסן ראשי / רציפי טעינה",
+    checklistItems: ["יציאות חירום פתוחות", "מעברים פנויים", "ציוד מגן בשימוש", "אין מפגעי החלקה/מעידה"],
+    defaultSeverity: "medium",
+    routeType: "report_only"
+  },
+  {
+    id: "fleet-yard-check",
+    domain: "fleet",
+    name: "בקרת כלי שינוע ידנית",
+    targetPlaceholder: "לדוגמה: רחבת מלגזות / כלי מסוים",
+    checklistItems: ["רישיון/תסקיר בתוקף", "אין נזילות או נזק גלוי", "צופר/אורות/בלמים תקינים", "טעינה/חניה במקום מתאים"],
+    defaultSeverity: "medium",
+    routeType: "task"
+  },
+  {
+    id: "quality-returns-sample",
+    domain: "quality",
+    name: "דגימת איכות ידנית",
+    targetPlaceholder: "לדוגמה: החזרות / פגומים / ליקוט",
+    checklistItems: ["זיהוי פריט/לקוח ברור", "סיבת חריגה מתועדת", "כמות/מצב תואמים לרשומה", "נדרש המשך טיפול ברור"],
+    defaultSeverity: "medium",
+    routeType: "report_only"
+  },
+  {
+    id: "operations-executive-walk",
+    domain: "operations",
+    name: "סיור הנהלה ידני",
+    targetPlaceholder: "לדוגמה: מחסן, קבלה, הפצה",
+    checklistItems: ["תהליך זורם ללא חסימה", "סדר ונראות תקינים", "פער תפעולי לתיעוד", "נושא לשיפור או החלטה"],
+    defaultSeverity: "low",
+    routeType: "report_only"
+  }
+]);
+
 const CONTROL_DOMAIN_LABELS = {
   safety: "בטיחות",
   quality: "איכות",
@@ -50,6 +89,16 @@ const normalizeStatus = (value, allowed, fallback) => {
 const normalizeSeverity = (severity) => {
   const value = cleanString(severity || "medium") || "medium";
   return CONTROL_FINDING_SEVERITIES.includes(value) ? value : "medium";
+};
+
+export const controlManualRunPresetsForDomain = (domain = "general") => {
+  const normalized = normalizeDomain(domain);
+  return CONTROL_MANUAL_RUN_PRESETS.filter((preset) => preset.domain === normalized);
+};
+
+export const controlManualRunPresetById = (id = "") => {
+  const presetId = cleanString(id);
+  return CONTROL_MANUAL_RUN_PRESETS.find((preset) => preset.id === presetId) || null;
 };
 
 const normalizeTarget = (target = {}) => {
