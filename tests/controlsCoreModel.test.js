@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   controlSignalEnvelope,
+  controlFindingTaskDraft,
   normalizeActionRoute,
   normalizeControlAssignment,
   normalizeControlFinding,
@@ -183,5 +184,39 @@ describe("controls core model", () => {
       sourceModule: "controls",
       sourceId: "finding-1"
     });
+  });
+
+  it("builds a task draft from a finding only when the route is a task", () => {
+    const draft = controlFindingTaskDraft({
+      id: "finding-task-1",
+      programId: "program-1",
+      runId: "run-1",
+      domain: "safety",
+      title: "Blocked emergency exit",
+      description: "Pallet blocks the emergency exit.",
+      severity: "critical",
+      target: { kind: "location", id: "loc-a", label: "Warehouse A" },
+      route: { type: "task", notifyIds: ["manager-1", "manager-1"] }
+    }, { dueAt: 1783209600000 });
+
+    expect(draft).toMatchObject({
+      title: "Blocked emergency exit",
+      desc: "Pallet blocks the emergency exit.\nהקשר: Warehouse A",
+      responsibleIds: ["manager-1"],
+      priority: "high",
+      status: "todo",
+      mode: "deadline",
+      dueAt: 1783209600000,
+      category: "בטיחות",
+      locationText: "Warehouse A",
+      sourceModule: "controls",
+      sourceId: "finding-task-1",
+      sourceFindingId: "finding-task-1",
+      sourceProgramId: "program-1",
+      sourceRunId: "run-1",
+      sourceLabel: "Blocked emergency exit"
+    });
+
+    expect(controlFindingTaskDraft({ id: "finding-report-1", route: { type: "report_only" } })).toBeNull();
   });
 });

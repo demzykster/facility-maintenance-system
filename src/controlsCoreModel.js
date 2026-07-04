@@ -18,6 +18,25 @@ export const CONTROL_FINDING_SEVERITIES = ["info", "low", "medium", "high", "cri
 export const CONTROL_FINDING_STATUSES = ["open", "triage", "routed", "in_progress", "closed", "dismissed"];
 export const CONTROL_ACTION_ROUTE_TYPES = ["report_only", "task", "ticket", "notify", "follow_up", "training", "capa"];
 
+const CONTROL_DOMAIN_LABELS = {
+  safety: "בטיחות",
+  quality: "איכות",
+  operations: "תפעול",
+  fleet: "בקרת כלים",
+  cleaning: "ניקיון",
+  executive_walk: "סיור הנהלה",
+  maintenance: "אחזקה",
+  general: "בקרות"
+};
+
+const CONTROL_TASK_PRIORITY_BY_SEVERITY = {
+  critical: "high",
+  high: "high",
+  medium: "medium",
+  low: "low",
+  info: "low"
+};
+
 const normalizeDomain = (domain) => {
   const value = cleanString(domain || "general") || "general";
   return CONTROL_DOMAINS.includes(value) ? value : "general";
@@ -202,6 +221,42 @@ export const normalizeControlFinding = (finding = {}) => {
     createdById: cleanString(finding.createdById || finding.userId) || undefined,
     createdAt: finding.createdAt || null,
     status: normalizeStatus(finding.status, CONTROL_FINDING_STATUSES, "open")
+  });
+};
+
+export const controlFindingTaskDraft = (finding = {}, options = {}) => {
+  const normalized = normalizeControlFinding(finding);
+  const route = normalizeActionRoute(options.route || normalized.route);
+  if (route.type !== "task" && options.force !== true) return null;
+
+  const targetLabel = cleanString(normalized.target?.label || normalized.locationId || normalized.target?.id);
+  const title = cleanString(options.title || normalized.title) || "טיפול בממצא בקרה";
+  const sourceLabel = cleanString(options.sourceLabel || normalized.title || CONTROL_DOMAIN_LABELS[normalized.domain]) || "ממצא בקרה";
+  const descriptionParts = [
+    cleanString(normalized.description),
+    cleanString(normalized.impact) ? `השפעה: ${cleanString(normalized.impact)}` : "",
+    targetLabel ? `הקשר: ${targetLabel}` : ""
+  ].filter(Boolean);
+
+  return compactObject({
+    title,
+    desc: cleanString(options.desc) || descriptionParts.join("\n") || undefined,
+    responsibleIds: uniqueStrings(options.responsibleIds || route.notifyIds),
+    participantIds: uniqueStrings(options.participantIds),
+    priority: CONTROL_TASK_PRIORITY_BY_SEVERITY[normalized.severity] || "medium",
+    status: "todo",
+    mode: options.dueAt ? "deadline" : "deferred",
+    dueAt: options.dueAt || null,
+    category: cleanString(options.category) || CONTROL_DOMAIN_LABELS[normalized.domain] || "בקרות",
+    locationText: targetLabel || undefined,
+    isPrivate: normalized.visibility?.scope === "private" || undefined,
+    origin: "manual",
+    sourceModule: "controls",
+    sourceId: normalized.id || undefined,
+    sourceFindingId: normalized.id || undefined,
+    sourceProgramId: normalized.programId || undefined,
+    sourceRunId: normalized.runId || undefined,
+    sourceLabel
   });
 };
 
