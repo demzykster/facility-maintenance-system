@@ -18,7 +18,7 @@ import { store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
-import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
+import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, isWorkerLoginRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
@@ -1926,11 +1926,9 @@ export default function App() {
   const firstTech = (users || []).find((u) => u.role === "tech" && u.active !== false);
   const firstMgr = (users || []).find((u) => u.role === "user" && u.active !== false);
   const firstWorker = (users || []).find((u) => u.role === "worker" && u.active !== false);
-  const firstCleaner = (users || []).find((u) => isActiveCleaningWorker(u) && (zones || []).some((z) => z.cleanerId === u.id)) || (users || []).find(isActiveCleaningWorker);
   const effSession = !impersonating ? session
     : rolePreviewRole === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", shiftId: "", techScope: "transport", techCats: [] })
     : rolePreviewRole === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })
-    : rolePreviewRole === "cleaner" ? (firstCleaner ? { id: firstCleaner.id, name: firstCleaner.name, role: "cleaner" } : { ...session, role: "cleaner" })
     : (firstMgr ? { id: firstMgr.id, name: firstMgr.name, role: "user", dept: firstMgr.dept || config.departments[0] || "", depts: userDepts(firstMgr).length ? userDepts(firstMgr) : [config.departments[0] || ""], email: firstMgr.email || "", mgrZones: firstMgr.mgrZones || [], shift: firstMgr.shift || "", perms: normalizePerms(firstMgr) } : { ...session, role: "user", dept: session.dept || config.departments[0] || "", mgrZones: session.mgrZones || [] });
   const effLogout = impersonating ? (async () => setRolePreviewRole(null)) : logout;
   // В режиме просмотра роли пишем присутствие под выбранным техником — чтобы статус был сквозным (видно и админу, и менеджеру).
@@ -4568,10 +4566,10 @@ const ppeMinTotal = (it) => ppeSizes(it).reduce((s, sz) => s + ppeMinOf(it, sz),
 const ppeDeficits = (it) => ppeSizes(it).map((sz) => ({ size: sz, need: Math.max(0, ppeMinOf(it, sz) - ppeStockOf(it, sz)) })).filter((d) => d.need > 0);
 const ppeOnOrder = (it, sz, orders) => (orders || []).filter((o) => o.status === "draft" || o.status === "sent").reduce((s, o) => s + (o.lines || []).filter((l) => l.itemId === it.id && l.size === sz).reduce((s2, l) => s2 + Math.max(0, (l.qty || 0) - (l.received || 0)), 0), 0);
 const ppeNetDeficits = (it, orders) => ppeSizes(it).map((sz) => ({ size: sz, need: Math.max(0, ppeMinOf(it, sz) - ppeStockOf(it, sz) - ppeOnOrder(it, sz, orders)) })).filter((d) => d.need > 0);
-const ppeRecipients = (users) => (users || []).filter((u) => ["worker", "cleaner", "tech"].includes(u.role) && u.active !== false).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
+const ppeRecipients = (users) => (users || []).filter((u) => (isWorkerLike(u) || u.role === "tech") && u.active !== false).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
 const employLabel = (t) => t === "contractor" ? "קבלן" : "ישיר";
 const empOf = (u) => u ? (u.employmentType || (u.role === "tech" ? "contractor" : "direct")) : "direct";
-const ppeWorkerDept = (u) => u ? (u.dept || (u.role === "cleaner" ? "ניקיון" : u.role === "tech" ? "אחזקה" : "")) : "";
+const ppeWorkerDept = (u) => u ? (u.dept || (normalizeCleaningAccess(u).source === "legacy-role" ? "ניקיון" : u.role === "tech" ? "אחזקה" : "")) : "";
 const PPE_CAT_ICON = { clothing: Shirt, shoes: Footprints, gloves: Hand, head: HardHat, eye: Glasses, ear: Headphones, hivis: Shirt, other: Package };
 const ppeCatIcon = (c) => PPE_CAT_ICON[c] || Package;
 const ppeNeedGroup = (it) => it ? (it.needGroup || (it.category === "shoes" ? "shoes" : it.category) || it.id) : "";
@@ -5106,7 +5104,7 @@ const ppeArchiveWorker = async (worker, plan, deps) => {
 function PpeExitSettlement({ ppe, users, items, config, session, savePpe, savePpeItem, saveUser, onClose, initialWid }) {
   const [q, setQ] = useState(""), [wid, setWid] = useState(initialWid || ""), [ret, setRet] = useState({}), [done, setDone] = useState(false), [err, setErr] = useState("");
   const now = Date.now(), table = ppeClawbackTable(config);
-  const recips = (users || []).filter((u) => ["worker", "cleaner", "tech"].includes(u.role) && u.active !== false);
+  const recips = (users || []).filter((u) => (isWorkerLike(u) || u.role === "tech") && u.active !== false);
   const ql = q.trim().toLowerCase();
   const matches = ql ? recips.filter((u) => (u.name || "").toLowerCase().includes(ql) || String(u.workerNo || "").includes(q.trim())).slice(0, 8) : [];
   const worker = recips.find((u) => u.id === wid);
@@ -7431,7 +7429,7 @@ function UserTree({ list, departments, onPick, expandAll, shifts }) {
   const techs = list.filter((u) => u.role === "tech");
   const allDepts = [...new Set([...(departments || []), ...list.filter((u) => u.role !== "admin" && u.role !== "tech").flatMap((u) => u.role === "user" ? mgrDepts(u) : [u.dept]).filter(Boolean)])];
   const unassigned = list.filter((u) => u.role !== "admin" && u.role !== "tech" && (u.role === "user" ? mgrDepts(u).length === 0 : !(u.dept || "")));
-  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; const RowTag = pickable ? "button" : "div"; return <RowTag className={"tcard" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14, cursor: pickable ? "pointer" : "default" }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : (u.role === "worker" || u.role === "cleaner") ? `מס׳ ${u.workerNo || "—"} · ${workerLoginStateText(u)}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></RowTag>; };
+  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; const RowTag = pickable ? "button" : "div"; return <RowTag className={"tcard" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14, cursor: pickable ? "pointer" : "default" }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : isWorkerLike(u) ? `מס׳ ${u.workerNo || "—"} · ${workerLoginStateText(u)}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></RowTag>; };
   const Group = ({ k, title, count, color, children }) => <div style={{ marginBottom: 10 }}><button type="button" aria-expanded={!!isOpen(k)} onClick={() => toggle(k)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", borderInlineStartWidth: 4, borderInlineStartColor: color || "var(--border)", background: "var(--surface-2)", cursor: "pointer", textAlign: "start" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>{title}<span className="badge sm" style={{ background: "var(--surface)", color: "var(--muted)" }}>{count}</span></span><ChevronLeft size={16} style={{ transform: isOpen(k) ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></button>{isOpen(k) && <div style={{ marginTop: 6, paddingInlineStart: 6 }}>{children}</div>}</div>;
   const Col = ({ title, color, people }) => <div style={{ flex: "1 1 220px", minWidth: 200 }}><div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: color || "inherit", marginBottom: 6 }}>{color ? <span style={{ width: 8, height: 8, borderRadius: 4, background: color }} /> : null}{title}<span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{people.length}</span></div><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{people.length === 0 ? <div className="hint" style={{ paddingInlineStart: 6 }}>אין עובדים</div> : people}</div></div>;
   if (list.length === 0) return <div className="note">לא נמצאו משתמשים</div>;
@@ -7439,7 +7437,7 @@ function UserTree({ list, departments, onPick, expandAll, shifts }) {
     {admins.length > 0 && <Group k="_admin" title="הנהלה" count={admins.length} color="#7C3AED"><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{admins.map((u) => <PersonRow key={u.id} u={u} lead />)}</div></Group>}
     {allDepts.map((d) => {
       const mgrs = list.filter((u) => u.role === "user" && mgrDepts(u).includes(d));
-      const workers = list.filter((u) => (u.role === "worker" || u.role === "cleaner") && (u.dept || "") === d);
+      const workers = list.filter((u) => isWorkerLike(u) && (u.dept || "") === d);
       if (mgrs.length + workers.length === 0) return null;
       const noShiftWk = workers.filter((u) => !u.shift);
       const noShiftMgrs = mgrs.filter((u) => !u.shift);
@@ -7985,8 +7983,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       </div>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full uf-save-btn" onClick={save}>{lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש"}</button>
-      {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
-      {canDelete && !(onArchive && ["worker", "cleaner", "tech"].includes(role)) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
+      {onArchive && user.id && (isWorkerLoginRole(role) || role === "tech") && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
+      {canDelete && !(onArchive && (isWorkerLoginRole(role) || role === "tech")) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
 }
@@ -8653,7 +8651,7 @@ function AppIssuesSettings({ issues, session, onSave }) {
 }
 
 /* ============================================================ SHARED UI */
-const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus], ["cleaner", "ניקיון", Sparkles]];
+const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus]];
 
 function BrandMark({ logo, small = false }) {
   return <div className={"brand-mark" + (small ? " sm" : "") + (logo ? " has-logo" : "")}>

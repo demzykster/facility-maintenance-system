@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/cleaner-role-tail-cleanup`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: cleaning-role tail cleanup: remove remaining new-role creation/preview paths for `cleaner`, keep legacy compatibility through helpers/session login, and tighten cleaning KV writes around cleaning capabilities.
 - Latest completed product work:
   - PR #630 documented the future user activity/status direction: new-user creation stays quiet, existing profiles may later show compact login/activity status, and last-visit/activity analytics must come from real server-side login/session telemetry.
   - PR #628 moved manager cleaning-zone visibility into the advanced permissions section, hid first-login status copy while creating a new user, and kept the existing manager-zone save shape unchanged.

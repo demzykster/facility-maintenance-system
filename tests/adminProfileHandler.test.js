@@ -64,6 +64,13 @@ describe("admin profile handler", () => {
     });
   });
 
+  it("does not allow creating or syncing cleaner as a new profile role", () => {
+    expect(validateAdminProfilePayload({
+      authUserId: "auth-1",
+      patch: { role: "cleaner" }
+    })).toEqual({ ok: false, error: "role_invalid" });
+  });
+
   it("lets an active admin sync a disabled user profile", async () => {
     const profileClient = {
       getAuthUser: vi.fn().mockResolvedValue({ id: "admin-auth-1", email: "owner@example.com" }),

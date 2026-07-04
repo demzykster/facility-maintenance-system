@@ -22,8 +22,8 @@ describe("KV write permission policy", () => {
   it("maps ordinary workflow records to explicit role or module rules", () => {
     expect(kvWritePermissionForKey("ticket:T-001")).toMatchObject({ roles: ["admin", "user", "tech", "worker"], auditSensitive: false });
     expect(kvWritePermissionForKey("ppereq:req-1")).toMatchObject({ module: "ppe", minLevel: "request", auditSensitive: false });
-    expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user", "cleaner"], access: "cleaning:perform", auditSensitive: false });
-    expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user", "cleaner"], access: "cleaning:closeComplaint", auditSensitive: false });
+    expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
+    expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:closeComplaint", auditSensitive: false });
     expect(kvWritePermissionForKey("appIssue:issue-1")).toMatchObject({ roles: expect.arrayContaining(["worker", "cleaner"]), auditSensitive: false });
   });
 

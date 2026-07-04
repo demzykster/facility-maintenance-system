@@ -56,7 +56,7 @@ export function validateAdminProfilePayload(body = {}) {
       patch[field] = normalizeString(value) || null;
     } else if (field === "role") {
       const role = normalizeString(value) || "user";
-      if (!["admin", "user", "tech", "worker", "cleaner"].includes(role)) return { ok: false, error: "role_invalid" };
+      if (!["admin", "user", "tech", "worker"].includes(role)) return { ok: false, error: "role_invalid" };
       patch.role = role;
     } else if (field === "active") {
       patch.active = value !== false;
