@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/controls-run-history`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: add persistence for the first manual `בקרות` slice: save completed manual control runs and findings to shared KV, show a compact recent-run history, keep task creation linked back to the saved finding/run, and register the new prefixes in backup/data/permission maps. No scheduling engine, no controls programs UI, no Supabase table migration, and no cleaning/location migration.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #667 added persistence for the first manual `בקרות` slice: completed manual control runs and findings are saved to shared KV, a compact recent-run history is shown in `בקרות`, created `מטלות` tasks stay linked back to the saved finding/run, and `controlRun:` / `controlFinding:` are registered in KV allowlist, permission policy, backup/data collection maps, and tests. It does not add scheduling, controls programs UI, Supabase table migration, or cleaning/location migration.
   - PR #665 added the first manual `בקרות` UI slice: one ad-hoc control run form, checklist answers, one finding, and optional confirmed creation of a real `מטלות` task with source links. It does not add a scheduling engine, saved controls records, Supabase/KV migration, or cleaning/location migration.
   - PR #663 added the first draft-only `בקרות` finding-to-`מטלות` route helper: controls findings can prepare a task draft with preserved `source*` links, but no task is created automatically and no controls UI records, scheduling engine, Supabase/KV migration, or cleaning/location migration were added.
   - PR #661 showed saved task source context in `מטלות`: rows now display a compact source chip when `source*` fields exist, task details show `מקור מערכת`, manual tasks stay visually unchanged, and action-layer docs were refreshed for future `בקרות` findings/actions.
