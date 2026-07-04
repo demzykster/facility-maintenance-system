@@ -69,7 +69,7 @@ const SAVE_FAILED_MESSAGE = "השמירה נכשלה. בדקו חיבור ונס
 
 /* ---------- domain ---------- */
 const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
-const USER_FORM_ROLE_OPTIONS = Object.entries(ROLE_LABEL).filter(([role]) => role !== "cleaner");
+const USER_FORM_ROLE_OPTIONS = ["worker", "tech", "user", "admin"].map((role) => [role, ROLE_LABEL[role]]);
 const isActiveCleaningWorker = (user = {}) => user?.active !== false && hasCleaningAccess(user);
 const localizedUiLabel = (language, key, fallback) => {
   const value = uiText(language || DEFAULT_LANGUAGE, key);
@@ -7832,9 +7832,8 @@ function SettingsPanel(p) {
 }
 function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, canManageWorkerAccess: canWorkerAccess = false, onCancel, onSave, onDelete, onArchive }) {
   const initialPerms = normalizePerms(user);
-  const initialRole = user.role === "cleaner" ? "worker" : (user.role || lockRole || "user");
-  const initialDept = user.role === "cleaner" ? "ניקיון" : (user.dept || lockDept || config.departments[0]);
-  if (initialRole === "user" && !initialPerms.ppe) initialPerms.ppe = "request";
+  const initialRole = user.role === "cleaner" ? "worker" : (user.role || lockRole || "");
+  const initialDept = user.role === "cleaner" ? "ניקיון" : (user.dept || lockDept || "");
   const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [cleanZones, setCleanZones] = useState((zones || []).filter((z) => z.cleanerId === user.id).map((z) => z.id)), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
@@ -7875,6 +7874,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   };
   const save = async () => {
     if (!name.trim()) return setErr("נא להזין שם");
+    if (!role) return setErr("בחרו תפקיד");
     if (role === "tech") {
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
@@ -7926,23 +7926,16 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+      {(role === "worker" || role === "cleaner") && <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>}
+      {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>}
       <label className="field"><span>טלפון</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
       {!lockRole && <div className="field"><span>תפקיד</span><ChoiceGrid columns="role" value={role} onChange={changeRole} options={USER_FORM_ROLE_OPTIONS.map(([id, label]) => ({ id, label, Icon: roleIcons[id] || User }))} /></div>}
-      {role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} tone="#0EA5E9" options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
+      {role && role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} tone="#0EA5E9" options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
       {role === "user" && (lockDept
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
         </div>)}
-      {role !== "admin" && <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
-        <div className="hint">התפקיד קובע את הגישה הבסיסית. אם אותו אדם מחזיק כמה תחומי אחריות, מוסיפים כאן הרשאות מודול לפי הצורך במקום ליצור תפקיד חדש.</div>
-        {role === "worker" && (() => { const access = normalizeCleaningAccess({ ...user, role: "worker", dept, depts: [dept], active, cleaningAccess: cleaningDeptSelected ? false : manualCleaningAccess }); const byDept = access.source === "department"; return <div className={"perm-card cleaning-access-card" + (access.enabled ? " active" : "")}>
-          <div className="perm-card-main"><span className="perm-ic"><Sparkles size={17} /></span><div><div className="perm-name">סבבי ניקיון</div><div className="perm-hint">{byDept ? "פעיל אוטומטית לפי מחלקת ניקיון." : "אישור חריג לעובד שאינו במחלקת ניקיון להשתתף בסבבים."}</div></div></div>
-          <div className="perm-levels"><button type="button" className={!access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(false)}>אין</button><button type="button" className={access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(true)}>מבצע סבבים</button></div>
-        </div>; })()}
-        <div className="perm-card-grid">{USER_PERMISSION_MODULES.map((m) => <PermCard key={m.mod} {...m} />)}</div>
-        <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
-      </details>}
       {role === "user" && zones && (zones.length === 0
         ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
         : <div className="field"><span>אזורי ניקיון של המחלקה (המנהל יראה את מצב הניקיון והדיווחים בהם)</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (mgrZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z.id)} onChange={() => setMgrZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div></div>)}
@@ -7965,10 +7958,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>
         <label className="field"><span>סבילות משמרת אישית (דקות)</span><input type="number" min="0" value={techGrace} onChange={(e) => setTechGrace(e.target.value)} placeholder={`ברירת מחדל: ${Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)}`} /><div className="hint">השאירו ריק כדי להשתמש בברירת המחדל. ערך אישי משנה את בדיקת האיחור והיציאה המוקדמת של הטכנאי הזה בלבד.</div></label>
       </>) : (role === "worker" || role === "cleaner") ? (<>
-        <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>
         <ActivationControls />
       </>) : (<>
-        <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>
         <ActivationControls />
       </>)}
       {(role === "worker" || role === "cleaner") ? (
@@ -7979,6 +7970,15 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
           <div className="hint" style={{ marginTop: -4 }}>בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו.</div>
         </>
       )}
+      {role && role !== "admin" && <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
+        <div className="hint">התפקיד קובע את הגישה הבסיסית. אם אותו אדם מחזיק כמה תחומי אחריות, מוסיפים כאן הרשאות מודול לפי הצורך במקום ליצור תפקיד חדש.</div>
+        {role === "worker" && (() => { const access = normalizeCleaningAccess({ ...user, role: "worker", dept, depts: [dept], active, cleaningAccess: cleaningDeptSelected ? false : manualCleaningAccess }); const byDept = access.source === "department"; return <div className={"perm-card cleaning-access-card" + (access.enabled ? " active" : "")}>
+          <div className="perm-card-main"><span className="perm-ic"><Sparkles size={17} /></span><div><div className="perm-name">סבבי ניקיון</div><div className="perm-hint">{byDept ? "פעיל אוטומטית לפי מחלקת ניקיון." : "אישור חריג לעובד שאינו במחלקת ניקיון להשתתף בסבבים."}</div></div></div>
+          <div className="perm-levels"><button type="button" className={!access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(false)}>אין</button><button type="button" className={access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(true)}>מבצע סבבים</button></div>
+        </div>; })()}
+        <div className="perm-card-grid">{USER_PERMISSION_MODULES.map((m) => <PermCard key={m.mod} {...m} />)}</div>
+        <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
+      </details>}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>{lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש"}</button>
       {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
@@ -9710,10 +9710,10 @@ button.notif-perm:hover{background:#D1FAE5;}
 .perm-fold > .field,.perm-fold > .hint{margin:0 14px 10px;}
 .perm-fold > .hint:first-of-type{margin-top:-2px;}
 .uf-choice-grid{display:grid;gap:8px;}
-.uf-choice-grid.cols-role{grid-template-columns:repeat(4,minmax(0,1fr));}
+.uf-choice-grid.cols-role{grid-template-columns:repeat(4,minmax(0,1fr));direction:ltr;}
 .uf-choice-grid.cols-shift{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));}
 .uf-choice-grid.cols-dept{grid-template-columns:repeat(auto-fit,minmax(128px,1fr));}
-.uf-choice{min-height:48px;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 10px;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--ink);font-size:13px;font-weight:750;cursor:pointer;text-align:center;line-height:1.15;}
+.uf-choice{min-height:48px;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 10px;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--ink);font-size:13px;font-weight:750;cursor:pointer;text-align:center;line-height:1.15;direction:rtl;}
 .uf-choice small{display:block;font-size:11px;color:var(--muted);font-weight:600;}
 .uf-choice:hover{border-color:var(--primary);}
 .uf-choice.on{box-shadow:0 1px 6px rgba(15,23,42,.08);}
