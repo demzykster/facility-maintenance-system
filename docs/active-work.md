@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/controls-ui-shell`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: add the first gated `בקרות` UI shell using the existing controls permission model; no controls records or workflow writes.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #646 added the first gated `בקרות` UI shell behind `controls:view` for admin/manager navigation. It is read-only: planned domains, empty KPIs, and mobile/desktop navigation only; no controls records, scheduling engine, Supabase/KV migration, or cleaning/location migration.
   - PR #644 added `controls` to the shared permission editor/model for the future `בקרות` module. It uses the existing `none/view/request/manage/full` levels, with `request` documented as the current perform/run level; no controls UI, Supabase/KV migration, scheduling engine, or cleaning/location migration was added.
   - PR #642 added an explicit PPE dashboard section flow so pending issue-request cards and KPI cards keep stable spacing instead of visually sticking together.
   - PR #640 fixed branding subtitle display so an intentionally empty `אתר / סניף` stays empty in login/sidebar branding instead of falling back to the default system description.
@@ -95,7 +96,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: finish and merge the gated `בקרות` UI shell PR, then reset this ledger back to `Active branch: none.` before implementing the first real controls vertical slice.
+- Next exact action: implement the first narrow `בקרות` vertical slice only after confirming scope: one manual control program, one assignment/run path, one finding, and route to report-only or `מטלות`; do not start the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
