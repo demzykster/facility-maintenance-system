@@ -304,6 +304,25 @@ export const normalizeControlRun = (run = {}) => compactObject({
   status: normalizeStatus(run.status, CONTROL_RUN_STATUSES, "draft")
 });
 
+export const controlRunDraftFromAssignment = (assignment = {}, options = {}) => {
+  const normalized = normalizeControlAssignment(assignment);
+  if (!normalized.id || !normalized.programId) return null;
+
+  return normalizeControlRun({
+    id: options.id,
+    programId: normalized.programId,
+    assignmentId: normalized.id,
+    performedById: options.performedById,
+    participantIds: options.participantIds || normalized.participantIds,
+    target: options.target || normalized.target,
+    startedAt: options.startedAt || null,
+    answers: options.answers,
+    overallSignature: options.overallSignature || options.signature,
+    notes: options.notes,
+    status: options.status || "draft"
+  });
+};
+
 export const normalizeControlFinding = (finding = {}) => {
   const domain = normalizeDomain(finding.domain);
 
