@@ -7848,12 +7848,30 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const canResetStoredLogin = loginConfigured && !user.authUserId;
   const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
   const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
+  const explicitCleaningAccess = hasCleaningAccess({ role: "worker", active: true, cleaningAccess: user.cleaningAccess });
+  const [manualCleaningAccess, setManualCleaningAccess] = useState(explicitCleaningAccess);
+  const cleaningDeptSelected = ["ניקיון", "נקיון", "cleaning"].includes(String(dept || "").trim().toLowerCase());
+  const roleIcons = { admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus };
+  const permIcons = { fleetDocs: FileText, fleetTickets: ClipboardList, ppe: Shirt, workerAccess: KeyRound, users: Users, analytics: BarChart3, suppliers: Truck, settings: Settings, audit: Clock };
+  const permLevelLabels = { none: "אין", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
+  const pickCard = (on, tone = "#EA580C") => ({ borderColor: on ? tone : undefined, background: on ? "var(--primary-soft,#FFF4ED)" : undefined, color: on ? "var(--primary)" : undefined });
   const changeRole = (nextRole) => {
     setRole(nextRole);
   };
-  const PermSelect = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
-    const labels = { none: "אין גישה", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
-    return <label className="field" style={{ marginTop: 8 }}><span>{label}</span><select aria-label={`הרשאה: ${label}`} value={perms[mod] || "none"} onChange={(e) => setPerm(mod, e.target.value)}>{levels.map((l) => <option key={l} value={l}>{labels[l]}</option>)}</select>{hint && <div className="hint">{hint}</div>}</label>;
+  const ChoiceGrid = ({ options, value, onChange, columns = "auto", tone = "#EA580C" }) => (
+    <div className={"uf-choice-grid cols-" + columns}>{options.map((opt) => {
+      const Icon = opt.Icon;
+      const on = value === opt.id;
+      return <button key={opt.id} type="button" className={"uf-choice" + (on ? " on" : "")} onClick={() => onChange(opt.id)} style={pickCard(on, tone)}>{Icon && <Icon size={17} />}<span>{opt.label}</span>{opt.sub && <small>{opt.sub}</small>}</button>;
+    })}</div>
+  );
+  const PermCard = ({ mod, label, hint, levels = ["none", "view", "request", "manage", "full"] }) => {
+    const Icon = permIcons[mod] || ShieldCheck;
+    const current = perms[mod] || "none";
+    return <div className={"perm-card" + (permRank(current) > 0 ? " active" : "")}>
+      <div className="perm-card-main"><span className="perm-ic"><Icon size={17} /></span><div><div className="perm-name">{label}</div>{hint && <div className="perm-hint">{hint}</div>}</div></div>
+      <div className="perm-levels">{levels.map((l) => <button key={l} type="button" className={current === l ? "on" : ""} onClick={() => setPerm(mod, l)}>{permLevelLabels[l] || l}</button>)}</div>
+    </div>;
   };
   const save = async () => {
     if (!name.trim()) return setErr("נא להזין שם");
@@ -7869,7 +7887,9 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
     const nextPin = roleUsesPin ? (canWorkerAccess ? pin.trim() : (user.pin || "")) : "";
     const nextPassword = roleUsesPassword ? (canWorkerAccess ? password : (user.password || "")) : "";
-    const nextCleaningAccess = role === "worker" && user.cleaningAccess ? user.cleaningAccess : undefined;
+    const nextCleaningAccess = (role === "worker" && manualCleaningAccess && !cleaningDeptSelected)
+      ? { enabled: true, canPerformRounds: true, canReceiveComplaints: true, canCloseComplaints: true, canManageCleaningZones: false, canViewCleaningReports: false }
+      : undefined;
     const ok = await onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
@@ -7907,8 +7927,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
       <label className="field"><span>טלפון</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
-      {!lockRole && <label className="field"><span>תפקיד</span><select value={role} onChange={(e) => changeRole(e.target.value)}>{USER_FORM_ROLE_OPTIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>}
-      {role !== "admin" && <label className="field"><span>משמרת</span><select value={shift} onChange={(e) => setShift(e.target.value)}><option value="">ללא משמרת</option>{workShiftsOf(config).map((sh) => <option key={sh.id} value={sh.id}>{sh.label}</option>)}</select></label>}
+      {!lockRole && <div className="field"><span>תפקיד</span><ChoiceGrid columns="role" value={role} onChange={changeRole} options={USER_FORM_ROLE_OPTIONS.map(([id, label]) => ({ id, label, Icon: roleIcons[id] || User }))} /></div>}
+      {role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} tone="#0EA5E9" options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
       {role === "user" && (lockDept
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
@@ -7916,7 +7936,11 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         </div>)}
       {role !== "admin" && <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
         <div className="hint">התפקיד קובע את הגישה הבסיסית. אם אותו אדם מחזיק כמה תחומי אחריות, מוסיפים כאן הרשאות מודול לפי הצורך במקום ליצור תפקיד חדש.</div>
-        {USER_PERMISSION_MODULES.map((m) => <PermSelect key={m.mod} {...m} />)}
+        {role === "worker" && (() => { const access = normalizeCleaningAccess({ ...user, role: "worker", dept, depts: [dept], active, cleaningAccess: cleaningDeptSelected ? false : manualCleaningAccess }); const byDept = access.source === "department"; return <div className={"perm-card cleaning-access-card" + (access.enabled ? " active" : "")}>
+          <div className="perm-card-main"><span className="perm-ic"><Sparkles size={17} /></span><div><div className="perm-name">סבבי ניקיון</div><div className="perm-hint">{byDept ? "פעיל אוטומטית לפי מחלקת ניקיון." : "אישור חריג לעובד שאינו במחלקת ניקיון להשתתף בסבבים."}</div></div></div>
+          <div className="perm-levels"><button type="button" className={!access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(false)}>אין</button><button type="button" className={access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(true)}>מבצע סבבים</button></div>
+        </div>; })()}
+        <div className="perm-card-grid">{USER_PERMISSION_MODULES.map((m) => <PermCard key={m.mod} {...m} />)}</div>
         <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
       </details>}
       {role === "user" && zones && (zones.length === 0
@@ -7927,8 +7951,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         : <div className="field"><span>אזורי הניקיון באחריותו</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (cleanZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={cleanZones.includes(z.id)} onChange={() => setCleanZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div><div className="hint">אותה הגדרה כמו «עובד אחראי» בעריכת האזור — נשמרת לשני הכיוונים. אזור משויך לעובד אחד.</div></div>)}
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
-        : <label className="field"><span>מחלקה (משויך אליה)</span><select value={dept} onChange={(e) => setDept(e.target.value)}>{config.departments.map((d) => <option key={d}>{d}</option>)}</select><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></label>)}
-      {role === "worker" && (() => { const access = normalizeCleaningAccess({ ...user, role: "worker", dept, depts: [dept], active, cleaningAccess: user.cleaningAccess }); return access.enabled ? <div className="note" style={{ marginTop: -4, marginBottom: 10 }}>גישה לניקיון פעילה{access.source === "department" ? " לפי מחלקת ניקיון" : ""}. העובד נשאר עובד רגיל ומקבל לשונית ניקיון לביצוע סבבים.</div> : null; })()}
+        : <div className="field"><span>מחלקה (משויך אליה)</span><ChoiceGrid columns="dept" value={dept} onChange={setDept} tone="#0D9488" options={config.departments.map((d) => ({ id: d, label: d, Icon: d === "ניקיון" ? Sparkles : Building2 }))} /><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></div>)}
+      {role === "worker" && (() => { const access = normalizeCleaningAccess({ ...user, role: "worker", dept, depts: [dept], active, cleaningAccess: cleaningDeptSelected ? false : manualCleaningAccess }); return access.enabled ? <div className="note uf-access-note" style={{ marginTop: -4, marginBottom: 10 }}><Sparkles size={15} /> גישה לניקיון פעילה{access.source === "department" ? " לפי מחלקת ניקיון" : ""}. העובד נשאר עובד רגיל ומקבל לשונית ניקיון לביצוע סבבים.</div> : null; })()}
       {(role === "worker" || role === "cleaner") && <div className="field"><span>שיוך תעסוקתי (לחישוב חיוב ציוד מגן)</span><div className="seg-tabs s2" style={{ maxWidth: 260 }}><button className={employmentType === "direct" ? "on" : ""} onClick={() => setEmploymentType("direct")}>ישיר (חברה)</button><button className={employmentType === "contractor" ? "on" : ""} onClick={() => setEmploymentType("contractor")}>דרך קבלן</button></div>{employmentType === "contractor" && <input style={{ marginTop: 8 }} value={contractorName} onChange={(e) => setContractorName(e.target.value)} placeholder="שם הקבלן (לא חובה)" />}<div className="hint">עובד דרך קבלן משלם מחיר מלא על ציוד; עובד ישיר — לפי מדיניות המחלקה.</div></div>}
       {role === "tech" ? (<>
         <ActivationControls />
@@ -9685,6 +9709,29 @@ button.notif-perm:hover{background:#D1FAE5;}
 .perm-summary{margin-inline-start:auto;color:var(--muted);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:52%;}
 .perm-fold > .field,.perm-fold > .hint{margin:0 14px 10px;}
 .perm-fold > .hint:first-of-type{margin-top:-2px;}
+.uf-choice-grid{display:grid;gap:8px;}
+.uf-choice-grid.cols-role{grid-template-columns:repeat(4,minmax(0,1fr));}
+.uf-choice-grid.cols-shift{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));}
+.uf-choice-grid.cols-dept{grid-template-columns:repeat(auto-fit,minmax(128px,1fr));}
+.uf-choice{min-height:48px;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 10px;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--ink);font-size:13px;font-weight:750;cursor:pointer;text-align:center;line-height:1.15;}
+.uf-choice small{display:block;font-size:11px;color:var(--muted);font-weight:600;}
+.uf-choice:hover{border-color:var(--primary);}
+.uf-choice.on{box-shadow:0 1px 6px rgba(15,23,42,.08);}
+.perm-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:0 14px 10px;}
+.perm-card{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:11px;display:grid;gap:10px;align-items:start;}
+.perm-card.active{border-color:#FDBA74;background:#FFF7ED;}
+.app-dark .perm-card.active{background:rgba(234,88,12,.14);}
+.perm-card-main{display:flex;align-items:flex-start;gap:9px;min-width:0;}
+.perm-ic{width:30px;height:30px;border-radius:9px;background:var(--surface);border:1px solid var(--line);color:var(--primary);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.perm-name{font-weight:800;font-size:13.5px;color:var(--ink);line-height:1.25;}
+.perm-hint{font-size:11.5px;color:var(--muted);line-height:1.35;margin-top:2px;}
+.perm-levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:5px;}
+.perm-levels button{border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);min-height:32px;padding:5px 7px;font-size:11.5px;font-weight:800;cursor:pointer;}
+.perm-levels button.on{background:var(--ink);border-color:var(--ink);color:var(--surface);}
+.perm-levels button:disabled{opacity:.7;cursor:not-allowed;}
+.cleaning-access-card{margin:0 14px 10px;}
+.uf-access-note{display:flex;align-items:center;gap:7px;line-height:1.45;}
+@media(max-width:520px){.uf-choice-grid.cols-role{grid-template-columns:repeat(2,minmax(0,1fr));}.perm-card-grid{grid-template-columns:1fr;}.perm-summary{max-width:42%;}}
 .shift-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:14px;}
 .shift-info{display:flex;align-items:center;gap:9px;}
 .shift-stat{font-weight:700;font-size:14px;}
