@@ -21,6 +21,7 @@
 - Stable storage contract уже закрыт: зарезервированы `controlProgram:*`, `controlAssignment:*`, `controlRun:*`, `controlFinding:*` и будущие таблицы `control_programs`, `control_assignments`, `control_runs`, `control_findings`.
 - Первый маленький domain increment уже начат: ручные `בקרות` получили легкие шаблоны для safety walk, fleet/tool check, quality sample и operations/executive walk. Эти шаблоны только заполняют название/чеклист ручного обхода; они не создают расписания, программы, назначения или новые таблицы.
 - Следующий model-only мост: из ручного шаблона можно подготовить draft сохраненной программы, из программы - один ручной assignment draft, а из assignment - run draft. Это не scheduling engine, не автогенерация назначений и не автозакрытие обхода.
+- `פגישות` / `פ.ע` согласованы как общий contextual work-event layer: обычная `פ.ע` остается default-сценарием, а встречи из `בקרות`, `מטלות`, `קריאות`, комитетов или executive walk должны получать context/source links вместо отдельной несовместимой логики.
 
 ## Ближайший Правильный Шаг
 
