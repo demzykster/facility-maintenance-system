@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/controls-program-assignment-ui`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: first narrow `בקרות` Program -> Assignment -> Run UI slice. Scope is limited to creating a saved program from a manual preset, creating one manual assignment, opening a run from that assignment, and preserving program/assignment links through run/finding/task routing. Do not add scheduling engine, cleaning/location migration, executive BI, Supabase table migration, or broad monolith split in this branch.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #689 added the first narrow saved `בקרות` Program -> Assignment -> Run UI slice: create a control program from a manual preset, create one manual assignment, open a run from that assignment, and preserve program/assignment links through run/finding/task routing. It does not add a scheduling engine, cleaning/location migration, executive BI, Supabase table migration, or a broad monolith split.
   - PR #686 added a model-only `בקרות` helper/test to draft a control run from one assignment while preserving program, assignment, participant, and target links. It does not complete the run, create findings, route actions, add UI, start scheduling, or migrate data.
   - PR #684 added model-only `בקרות` helpers/tests so a manual domain preset can become a saved control program draft and a control program can create one manual assignment draft. It is only a bridge toward the first saved Program -> Assignment -> Run flow; it does not add UI, scheduling, Supabase migration, or cleaning/location migration.
   - PR #682 added lightweight manual `בקרות` domain presets: safety walk, fleet/tool check, quality sample, and operations/executive walk can prefill the manual run name/checklist without creating schedules, assignments, Supabase tables, or cleaning/location migration.
@@ -116,7 +117,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: finish and verify the first saved program/assignment UI slice in app: one program, one manual assignment/run path, one finding, and route to report-only or `מטלות`; do not start scheduling engine, cleaning migration, executive BI, or the broad monolith split.
+- Next exact action: verify the deployed #689 `בקרות` program/assignment UI on production after Vercel finishes deploying, then continue with the next narrow controls slice only from fresh owner feedback.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
