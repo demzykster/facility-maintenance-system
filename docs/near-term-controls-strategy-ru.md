@@ -76,6 +76,7 @@ userGroups foundation
 - Do not build full scheduling engine before first real scenario.
 - Do not start QA scoring, CAPA, client SLA, or executive BI in the first slice.
 - Do not migrate cleaning rounds/QR/compliance while building the first controls models.
+- Do not move live module settings only to clean up `הגדרות`; remove obsolete settings first, and move live settings only after their module has a stable settings surface/save handler.
 - Do not silently clean Supabase data without an explicit owner request.
 
 ## Strategy In One Sentence
