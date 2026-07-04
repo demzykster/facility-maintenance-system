@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/task-bulk-actions`.
+- Active branch: `codex/reset-active-work-after-task-bulk`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: add multi-select and bulk status/delete actions to `מטלות`, and make the `הכל` task filter include completed/cancelled tasks as its label promises.
+- Active work in progress: reset this ledger after PR #656 (`מטלות` bulk actions) was merged.
 - Latest completed product work:
+  - PR #656 added multi-select and bulk actions to `מטלות`: filtered select-all, bulk status updates, two-step bulk deletion including completed/cancelled rows where the user has permission, and a truthful `הכל` filter that no longer silently excludes completed/cancelled tasks by default.
   - PR #654 suppressed misleading startup/background storage toasts: global storage-failure banners now wait until the app is ready and a real session exists, automatic vehicle/inspection migrations save quietly, and the old automatic inspection-migration toast no longer appears during app startup.
   - PR #652 documented settings ownership boundaries for the upcoming controls/settings cleanup: obsolete default inspection cadence should leave user-facing global settings, live PM/cleaning settings should move only after their owning modules have stable settings surfaces/save handlers, and global notification toggles are system policy rather than personal filters.
   - PR #650 simplified login form copy/placeholders: the Hebrew identity field now reads `פרטי כניסה`, and identifier/password/PIN/first-secret fields no longer show demo examples or placeholder dots. Auth/session behavior was not changed.
