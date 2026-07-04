@@ -6,6 +6,7 @@ Status: draft for owner/Claude review.
 Source of truth date: 2026-07-03.
 
 Companion product blueprint in Russian: `docs/controls-product-blueprint-ru.md`.
+Short near-term implementation strategy in Russian: `docs/near-term-controls-strategy-ru.md`.
 
 ## Purpose
 
@@ -619,14 +620,16 @@ All accepted writes must use normal product operations, permissions, validation,
 
 This is intentionally conservative.
 
-1. Docs-only PR with this design and current-state audit.
-2. Cleanup PR for stale docs/branches guidance and legacy inspection wording.
-3. Legacy inspection cleanup PR for `שאלונים` / `inspection_templates`, if owner confirms no useful data.
-4. Model-only PRs with tests: locations, userGroups, controls programs/runs/findings/actions.
-5. Task/action-layer alignment PR.
-6. Minimal `בקרות` UI shell.
-7. Domain increments: safety, quality, fleet controls, executive walk.
-8. Dashboard/insights layer.
+1. Done: docs-only PRs for this design, current-state audit, stale docs cleanup, and legacy inspection wording.
+2. Done: legacy `שאלונים` / `inspection_templates` authoring removed after owner confirmed no useful data.
+3. Done: task/action source-link helpers and shared location helpers.
+4. Next: pure `cleaningAccessModel` helper/test PR with legacy `role === "cleaner"` compatibility. No UI, Supabase, or KV policy rewrite in that first PR.
+5. Then: replace direct cleaner role checks and update server/KV/session policies so `worker + cleaningAccess` works.
+6. Then: pure `userGroups` / organizational memberships model PR.
+7. Then: controls programs/runs/findings/actions model-only PRs with tests.
+8. Minimal `בקרות` UI shell.
+9. Domain increments: safety, quality, fleet controls, executive walk.
+10. Dashboard/insights layer.
 
 Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
 

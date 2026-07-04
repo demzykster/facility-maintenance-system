@@ -48,8 +48,8 @@ Source of truth in code:
 | manager/user | blocked department unit | `escalate` | `ticketId` wins; `go: "dept"` ignored | none critical |
 | manager/user | driver request outcome | `driver` | exact department fleet card via `go: "dept"` + `fleetId` | fixed after matrix creation |
 | manager/user | cleaning complaints in managed zones | `cleaning` | cleaning module via `go: "cleaning"` | none found |
-| cleaner | due/overdue cleaning rounds | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
-| cleaner | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | fixed after matrix creation |
+| legacy cleaner / future worker with cleaning access | due/overdue cleaning rounds | `cleaning` | cleaning module via `go: "cleaning"` | future code should route by cleaning access helper, not only role |
+| legacy cleaner / future worker with cleaning access | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | future code should route by cleaning access helper, not only role |
 | all relevant roles | tasks and meetings | `task` | tasks module via `go: "tasks"` | none found |
 
 ## Optional Follow-Up

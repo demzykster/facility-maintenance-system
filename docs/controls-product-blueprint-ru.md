@@ -661,16 +661,16 @@ AI должен быть server-side / edge-side, не browser API call с provi
 
 Работа должна идти маленькими PR:
 
-1. Зафиксировать документы.
-2. Убрать legacy inspection/questionnaire хвосты.
-3. Подготовить общий location model.
-4. Подготовить `מטלות` как action layer.
-5. Создать skeleton `בקרות`.
-6. Добавить первый vertical slice.
-7. Расширить scheduling.
-8. Расширить domains.
-9. Добавить dashboard/attention layer.
-10. Добавить server-side AI assistance.
+1. Уже сделано: зафиксировать документы и текущий аудит.
+2. Уже сделано: убрать legacy inspection/questionnaire хвосты.
+3. Уже сделано: подготовить `מטלות` как action layer.
+4. Уже сделано: подготовить общий location model на уровне helpers/tests.
+5. Ближайшее: подготовить `cleaningAccessModel`, чтобы `cleaner` стал legacy-compatible переходом к `worker + cleaning access`.
+6. Затем: заменить прямые проверки `role === "cleaner"` на helpers и обновить server/KV/session policies.
+7. Затем: подготовить `userGroups`.
+8. Затем: создать core models для `בקרות`.
+9. Затем: skeleton `בקרות` и первый vertical slice.
+10. Затем: scheduling, domains, dashboard/attention layer, server-side AI assistance.
 
 Главный принцип: не строить новую большую систему поверх старой путаницы. Сначала убрать противоречия, затем добавить общий движок, затем расширять домены.
 
@@ -691,6 +691,7 @@ Program -> Assignment -> Run -> Finding -> Action -> Follow-up -> Insight
 - не делать `בקרת כלים` отдельным миром;
 - использовать `מטלות` как общий action layer;
 - locations сделать общей базой;
+- cleaning workers должны быть `worker + cleaning access`, а `cleaner` остается только legacy bridge на переходе;
 - userGroups сделать отдельным слоем над ролями;
 - dashboard для руководства должен показывать важное, а не всё подряд;
 - AI добавлять позже и только поверх правильной server-side модели.
