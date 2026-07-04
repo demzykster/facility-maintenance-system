@@ -623,10 +623,10 @@ This is intentionally conservative.
 1. Done: docs-only PRs for this design, current-state audit, stale docs cleanup, and legacy inspection wording.
 2. Done: legacy `שאלונים` / `inspection_templates` authoring removed after owner confirmed no useful data.
 3. Done: task/action source-link helpers and shared location helpers.
-4. Next: pure `cleaningAccessModel` helper/test PR with legacy `role === "cleaner"` compatibility. No UI, Supabase, or KV policy rewrite in that first PR.
-5. Then: replace direct cleaner role checks and update server/KV/session policies so `worker + cleaningAccess` works.
-6. Then: pure `userGroups` / organizational memberships model PR.
-7. Then: controls programs/runs/findings/actions model-only PRs with tests.
+4. Done: pure `cleaningAccessModel` helper/test PR with legacy `role === "cleaner"` compatibility.
+5. Done: replace direct cleaner role checks and update server/KV/session policies so `worker + cleaningAccess` works.
+6. Done: pure `userGroups` / organizational memberships model and separate `userGroups` permission foundation.
+7. Current: controls programs/runs/findings/actions model-only PRs with tests.
 8. Minimal `בקרות` UI shell.
 9. Domain increments: safety, quality, fleet controls, executive walk.
 10. Dashboard/insights layer.
