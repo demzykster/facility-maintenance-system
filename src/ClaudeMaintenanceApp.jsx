@@ -56,6 +56,7 @@ import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js"
 import { supplierActivityCounts } from "./supplierActivityModel.js";
 import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers } from "./cleaningZoneBlockersModel.js";
 import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
+import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike } from "./cleaningAccessModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -68,6 +69,7 @@ const SAVE_FAILED_MESSAGE = "השמירה נכשלה. בדקו חיבור ונס
 
 /* ---------- domain ---------- */
 const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
+const isActiveCleaningWorker = (user = {}) => user?.active !== false && hasCleaningAccess(user);
 const localizedUiLabel = (language, key, fallback) => {
   const value = uiText(language || DEFAULT_LANGUAGE, key);
   return value && value !== key ? value : fallback;
@@ -1116,7 +1118,7 @@ const analyticsScopeForSession = (session, data = {}) => {
   const scopedZones = zones.filter((z) => zoneSet.has(z.id));
   const scopedZoneIds = new Set(scopedZones.map((z) => z.id));
   const scopedPpe = ppe.filter((x) => {
-    if (session.role === "worker" || session.role === "cleaner") return x.workerId === session.id;
+    if (isWorkerLike(session)) return x.workerId === session.id;
     return deptSet.size > 0 && x.dept && deptSet.has(x.dept);
   });
   const scopedPpeItemIds = new Set(scopedPpe.map((x) => x.itemId).filter(Boolean));
@@ -1232,13 +1234,13 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
       }
     });
   };
-  if (session.role === "cleaner") {
+  if (canPerformCleaning(session) && !["admin", "user", "tech"].includes(session.role)) {
     const nowTs = Date.now();
     (zones || []).filter((z) => z.active !== false && z.cleanerId === session.id).forEach((z) => zoneTodayStatuses(z, rounds, nowTs, cfg).forEach(({ win, status, slotStart }) => {
       if ((status === "due" || status === "overdue") && !isAbsentOn(session.id, absences)) ev.push({ key: `cls-${z.id}-${win.id}-${todayKey()}`, at: windowAbs(win, nowTs) - (+win.tol || 0) * 60000, kind: "cleaning", go: "cleaning", title: status === "overdue" ? "סבב ניקיון באיחור" : "סבב ניקיון לביצוע כעת", body: `${z.name}${zoneLoc(z) ? " · " + zoneLoc(z) : ""} · חלון ${win.time}` });
       if (status === "upcoming" && !isAbsentOn(session.id, absences)) ev.push({ key: `upcoming-${z.id}-${win.id}-${todayKey()}`, at: slotStart - clampCleaningReminderMins(cfg?.cleaningReminderMins ?? 30) * 60000, kind: "cleaning", go: "cleaning", title: "סבב מתחיל בקרוב", body: `${z.name} · בעוד ${Math.max(1, Math.round((slotStart - nowTs) / 60000))} דקות` });
     }));
-    (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && c.reportedById !== session.id && (zones || []).some((z) => z.id === c.zoneId && z.cleanerId === session.id)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "דווחה תקלה באזור שלך" : "דווח לכלוך באזור שלך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}${c.text ? " · " + c.text : ""}` }));
+    (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && c.reportedById !== session.id && canReceiveCleaningComplaints(session) && (zones || []).some((z) => z.id === c.zoneId && z.cleanerId === session.id)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "דווחה תקלה באזור שלך" : "דווח לכלוך באזור שלך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}${c.text ? " · " + c.text : ""}` }));
     return ev.sort((a, b) => b.at - a.at);
   }
   if (session.role === "admin") {
@@ -1674,7 +1676,7 @@ export default function App() {
     const zone = (zones || []).find((z) => z.id === complaint.zoneId);
     activeUserList().forEach((u) => {
       if (u.role === "admin") add(u.id);
-      else if (u.role === "cleaner" && zone?.cleanerId === u.id) add(u.id);
+      else if (canReceiveCleaningComplaints(u) && zone?.cleanerId === u.id) add(u.id);
       else if (u.role === "user" && (u.mgrZones || []).includes(complaint.zoneId)) add(u.id);
     });
     return ids;
@@ -1922,7 +1924,7 @@ export default function App() {
   const firstTech = (users || []).find((u) => u.role === "tech" && u.active !== false);
   const firstMgr = (users || []).find((u) => u.role === "user" && u.active !== false);
   const firstWorker = (users || []).find((u) => u.role === "worker" && u.active !== false);
-  const firstCleaner = (users || []).find((u) => u.role === "cleaner" && u.active !== false && (zones || []).some((z) => z.cleanerId === u.id)) || (users || []).find((u) => u.role === "cleaner" && u.active !== false);
+  const firstCleaner = (users || []).find((u) => isActiveCleaningWorker(u) && (zones || []).some((z) => z.cleanerId === u.id)) || (users || []).find(isActiveCleaningWorker);
   const effSession = !impersonating ? session
     : rolePreviewRole === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", shiftId: "", techScope: "transport", techCats: [] })
     : rolePreviewRole === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })
@@ -3361,7 +3363,7 @@ function ZoneTag({ zone, onClose }) {
 
 function CleaningAdmin(p) {
   const { zones, rounds, users, absences, saveZone, delZone, saveUser, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint } = p;
-  const cleaners = useMemo(() => (users || []).filter((u) => u.role === "cleaner" && u.active !== false), [users]);
+  const cleaners = useMemo(() => (users || []).filter(isActiveCleaningWorker), [users]);
   const managers = useMemo(() => (users || []).filter((u) => u.role === "user" && u.active !== false), [users]);
   const [tab, setTab] = useState("today"), [edit, setEdit] = useState(null), [tag, setTag] = useState(null), [rep, setRep] = useState(null), [showClosed, setShowClosed] = useState(false);
   const [rZone, setRZone] = useState("all"), [rProblems, setRProblems] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null);
