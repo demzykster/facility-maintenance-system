@@ -17,6 +17,7 @@ The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
 | `rounds` | `cround:` | `cleaning_rounds` |
 | `complaints` | `ccomplaint:` | `cleaning_complaints` |
 | `absences` | `cabsence:` | `worker_absences` |
+| `locations` | `location:` | `locations` |
 | `tasks` | `mtask:` | `maintenance_tasks` |
 | `meetings` | `mmeet:` | `maintenance_meetings` |
 | `controlPrograms` | `controlProgram:` | `control_programs` |

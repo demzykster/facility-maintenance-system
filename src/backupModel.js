@@ -1,7 +1,7 @@
 import { DATA_COLLECTIONS, DATA_COLLECTION_KEYS } from "./dataCollections.js";
 
 export const BACKUP_APP_ID = "maintenance-cmms";
-export const BACKUP_VERSION = 5;
+export const BACKUP_VERSION = 6;
 
 export const BACKUP_COLLECTIONS = DATA_COLLECTIONS;
 

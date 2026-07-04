@@ -17,6 +17,7 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["fleet:", "pm:", "insp:", "itpl:", "photo:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
   { prefixes: ["ppe:", "ppeitem:", "ppenorm:", "ppeorder:"], module: "ppe", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.ppe },
   { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning },
+  { prefixes: ["location:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings },
   { prefixes: ["ticket:"], roles: ["admin", "user", "tech", "worker"], entityType: AUDIT_ENTITY_TYPES.ticket, auditSensitive: false },
   { prefixes: ["ppereq:"], module: "ppe", minLevel: "request", roles: ["worker", "cleaner"], entityType: AUDIT_ENTITY_TYPES.ppe, auditSensitive: false },
   { prefixes: ["cround:"], roles: ["admin", "user"], access: "cleaning:perform", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },

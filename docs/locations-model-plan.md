@@ -126,7 +126,7 @@ Cleaning execution remains driven by the cleaning profile. Existing `cround:*` a
 
 ## Open Decisions Before Code Migration
 
-- Storage key/table for base locations: new `location:*` KV prefix and future `locations` table, or compatibility through existing `czone:*` until normalized tables arrive.
+- Decided: base locations use a separate `location:*` KV prefix and future `locations` table. This does not migrate cleaning zones; `czone:*` remains the cleaning execution/profile record until a dedicated migration.
 - Whether maintenance string zones should auto-create inactive/base locations or remain manual.
 - Who can manage base locations versus cleaning profiles.
 - Whether departments should have default/owned locations.

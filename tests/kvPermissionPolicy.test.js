@@ -17,6 +17,7 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionForKey("fleet:truck-1")).toMatchObject({ module: "settings", minLevel: "manage" });
     expect(kvWritePermissionForKey("ppeitem:helmet")).toMatchObject({ module: "ppe", minLevel: "manage" });
     expect(kvWritePermissionForKey("czone:north")).toMatchObject({ module: "settings", minLevel: "manage" });
+    expect(kvWritePermissionForKey("location:warehouse-a")).toMatchObject({ module: "settings", minLevel: "manage" });
   });
 
   it("maps ordinary workflow records to explicit role or module rules", () => {
