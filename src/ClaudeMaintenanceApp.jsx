@@ -58,6 +58,7 @@ import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers } from "./cleaning
 import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 import { defaultWorkerView } from "./workerProfileModel.js";
+import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -2604,7 +2605,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
     <div className="login-bg">
       <div className="login-card">
         <div className="login-card-head">
-          <div className="brand"><BrandMark logo={config?.brandLogo} /><div><div className="brand-title">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
+          <div className="brand"><BrandMark logo={config?.brandLogo} /><div><div className="brand-title">{brandCompanyName(config)}</div>{brandSiteSubtitle(config) && <div className="brand-sub">{brandSiteSubtitle(config)}</div>}</div></div>
           <button className="login-theme" onClick={toggleTheme} aria-label={theme === "dark" ? "מצב בהיר" : "מצב כהה"}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
         <LanguagePicker value={language} onChange={setLanguage} />
@@ -8681,7 +8682,7 @@ function RolePreviewBox({ rolePreview, language = DEFAULT_LANGUAGE, compact = fa
 
 function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, rolePreview, theme, toggleTheme, onReportIssue, onProfile }) {
   return (<aside className="sidebar">
-    <div className="side-brand"><BrandMark logo={config?.brandLogo} small /><div><div className="brand-title sm">{config?.companyName?.trim() || "CMMS CDSL"}</div><div className="brand-sub sm">{config?.siteName?.trim() || "ניהול תחזוקה, ציוד, משימות ותפעול"}</div></div></div>
+    <div className="side-brand"><BrandMark logo={config?.brandLogo} small /><div><div className="brand-title sm">{brandCompanyName(config)}</div>{brandSiteSubtitle(config) && <div className="brand-sub sm">{brandSiteSubtitle(config)}</div>}</div></div>
     {primary && <button className="side-newbtn" onClick={primary.onClick}><Plus size={18} /> {primary.label}</button>}
     <div className="side-nav">{nav.map((n) => <button key={n.id} className={"side-item" + (n.active ? " on" : "")} onClick={n.onClick}><n.Icon size={19} /><span>{n.label}</span></button>)}<button className="side-item" onClick={onBell}><Bell size={19} /><span>התראות</span>{notif?.unread > 0 && <span className="side-badge">{notif.unread}</span>}</button></div>
     <div className="side-foot">
