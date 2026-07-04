@@ -15,28 +15,28 @@
 - `locations` получили migration boundary и pure helper model.
 - Решено: `cleaner` не остается долгосрочной core role. Будущая модель: `worker + cleaning access/capability`.
 - Зафиксировано: текущие users/history/app data не ценны для миграции, пока owner не скажет иначе. Destructive Supabase cleanup все равно только по явной команде.
+- Cleaning-access foundation уже закрыт: helper/model, UI-пути, session/KV write paths, cleanup роли при создании пользователя, профильный экран уборки для cleaning worker и мобильный role-preview уже прошли через последние merged PR.
 
 ## Ближайший Правильный Шаг
 
 Сначала не строить UI `בקרות`.
 
-Следующий безопасный PR:
+Следующий безопасный блок:
 
 ```text
-codex/cleaning-access-model
+userGroups foundation
 ```
 
 Содержание:
 
-- pure model/helper file;
-- tests;
-- legacy `role === "cleaner"` compatibility;
-- no UI rewrite;
-- no Supabase migration;
-- no KV policy rewrite yet;
-- no data cleanup.
+- держать `userGroups` как организационный слой над ролями;
+- дать ему отдельный permission key (`userGroups`), а не прятать внутри `users`;
+- держать group model/test работу чистой, пока маленький UI явно не открыт;
+- пока без Supabase migration;
+- пока без controls records;
+- пока без scheduling engine.
 
-Ожидаемые helpers:
+Уже закрытые cleaning helpers:
 
 - `isWorkerLike(user)`
 - `hasCleaningAccess(user)`
@@ -48,21 +48,22 @@ codex/cleaning-access-model
 
 ## После Этого
 
-1. Replace direct `role === "cleaner"` checks with helpers.
-2. Update server/KV/session policies so `worker + cleaningAccess` can write required cleaning records.
-3. Stop creating new `cleaner` users; create workers with cleaning access.
-4. Add `userGroups` model for organizational memberships:
+1. Добавить/закончить `userGroups` model и permission foundation для организационных membership:
    - `ועדת בטיחות`
    - `צוות חירום`
    - `נאמני בטיחות`
    - QA / leadership / observer groups
-5. Add controls core model:
+2. Затем добавить маленький userGroups UI только когда owner одобрит этот экран:
+   - create/edit group;
+   - назначение lead/member/observer;
+   - без scheduling и без controls run.
+3. Добавить controls core model:
    - Program
    - Assignment
    - Run
    - Finding
    - Action route
-6. Build first small vertical slice:
+4. Собрать первый маленький vertical slice:
    - manual safety/control walk;
    - one location target;
    - one finding;
