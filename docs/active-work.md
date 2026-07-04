@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/cleaner-role-tail-cleanup`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: cleaning-role tail cleanup: remove remaining new-role creation/preview paths for `cleaner`, keep legacy compatibility through helpers/session login, and tighten cleaning KV writes around cleaning capabilities.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #632 cleaned up remaining `cleaner` new-role paths: admin role preview no longer offers cleaning as a separate role, admin profile sync rejects `role: cleaner`, cleaning workflow KV writes use cleaning capabilities, and UI filters use worker/legacy-cleaner helpers where appropriate.
   - PR #630 documented the future user activity/status direction: new-user creation stays quiet, existing profiles may later show compact login/activity status, and last-visit/activity analytics must come from real server-side login/session telemetry.
   - PR #628 moved manager cleaning-zone visibility into the advanced permissions section, hid first-login status copy while creating a new user, and kept the existing manager-zone save shape unchanged.
   - PR #626 polished user-form permission UX and cleaning wording: the advanced-permissions summary is compact/count-based, permission controls have better wrapping/spacing guards, and cleaning-zone UI now talks about round responsibility/access instead of a separate cleaner role.
