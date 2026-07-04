@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/cleaning-access-ui-gates`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: first UI-gate pass for cleaning access helpers. Scope is limited to safe read/targeting gates in the monolith: cleaning event generation, cleaning complaint phone targets, cleaning role preview candidate selection, cleaning assignee list, and worker-like PPE analytics scoping. Routing, user creation/editing, zone assignment writes, Supabase policies, and data cleanup are intentionally not part of this branch.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #608 applied cleaning access helpers to safe monolith UI gates: cleaning event generation, cleaning complaint phone targets, cleaning role-preview candidate selection, CleaningAdmin assignee lists, and worker-like PPE analytics scoping. Routing, user creation/editing, zone assignment writes, Supabase policies, and data cleanup were intentionally not changed.
   - PR #606 replaced the first direct cleaning-role checks with helper-based access in notifications, push subscription metadata, and KV cleaning workflow writes. `worker + cleaningAccess` can now receive cleaning pushes and write cleaning workflow records where allowed, while legacy `role === "cleaner"` remains compatible. No UI, user creation, database migration, or data cleanup was changed.
   - PR #604 added a pure `userGroups` / organizational membership model and tests: groups stay separate from roles, support leads, members, observers, notify targets, assignment candidates, visible group resolution, and legacy mixed membership field normalization. No UI, database migration, permissions rewrite, controls records, or scheduling engine was changed.
   - PR #602 added a pure cleaning access model helper and tests: future cleaning workers can remain regular `worker` users with cleaning access/capabilities, legacy `role === "cleaner"` remains compatible during transition, and zone management/reporting stay behind module permissions. No UI, KV/Supabase policy, or data cleanup was changed.
