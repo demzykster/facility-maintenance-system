@@ -75,7 +75,7 @@ Why it matters:
 - A CMMS with wrong access is dangerous even if the UI looks correct.
 
 Done means:
-- Admin, manager, technician, worker, and cleaner each have a verified path to their expected modules.
+- Admin, manager, technician, worker, and legacy cleaner each have a verified path to their expected modules during transition.
 - Users with view-only permissions cannot edit.
 - Users with manage permissions can reach the relevant controls without needing unrelated admin access.
 - Worker login setup/reset remains gated by `workerAccess:manage`.
@@ -85,7 +85,7 @@ Closed notes:
 - Manager/user routes now respect `users`, `audit`, `suppliers`, `analytics`, `settings`, and PPE management permissions.
 - View/manage split was checked for the newly exposed routes: suppliers edit controls still require `suppliers:manage`, analytics damage fields are read-only in manager/user route, sensitive settings actions still require `settings:full`.
 - Worker login setup/reset remains gated by `workerAccess:manage`.
-- Role-smoke passed for admin, manager, technician, and worker; cleaner shell renders cleanly and shows the empty-zone state when current local data has no assigned cleaner.
+- Role-smoke passed for admin, manager, technician, and worker; legacy cleaner shell renders cleanly and shows the empty-zone state when current local data has no assigned cleaner. Future cleaning workers should use `worker` plus cleaning access/capabilities.
 
 ### R5 — Screen Audit And Visual Noise
 

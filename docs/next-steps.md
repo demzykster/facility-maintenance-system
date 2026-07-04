@@ -37,7 +37,8 @@ Remaining suggested work:
 - Treat "HR" as permissions, not a separate role for now.
 - Plan worker onboarding around first-login password/PIN setup without showing old codes.
 - Use `workerAccess` for future worker login setup/reset controls.
-- Keep worker lifecycle in one place: worker/cleaner forms should not show a separate `active` checkbox when the "worker left / equipment return" flow exists.
+- Keep worker lifecycle in one place: worker and legacy-cleaner forms should not show a separate `active` checkbox when the "worker left / equipment return" flow exists.
+- Treat `cleaner` as a legacy transition role. Future cleaning workers should be `worker` users with cleaning access/capabilities; see `docs/cleaning-worker-access-plan.md`.
 - New login-capable users should be saved without generated passwords, PINs, or activation links.
 - First login by email or worker number creates the user's own password/PIN with confirmation.
 - Reset clears the stored secret and is gated by `workerAccess: manage` (admin has this through role defaults).
@@ -47,7 +48,7 @@ DoD:
 - `npm test` passes.
 - `npm run build` passes.
 - Any UI change is small and does not change Supabase/Auth/RLS/backend behavior.
-- Existing behavior remains understandable for admin, manager, technician, worker, and cleaner.
+- Existing behavior remains understandable for admin, manager, technician, worker, and legacy cleaner during transition.
 
 ## Later - Audit Dependencies
 
