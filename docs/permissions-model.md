@@ -57,6 +57,7 @@ suppliers
 analytics
 cleaning
 users
+userGroups
 workerAccess
 settings
 audit
@@ -137,6 +138,7 @@ Current implementation note:
 - UI gates should use `hasPermission`, `canView`, `canRequest`, `canManage`, or `canFull` from `src/permissionModel.js`, not ad hoc level comparisons.
 - `tests/permissionsMigration.test.js`, `tests/permissionEditorModules.test.js`, and `tests/permissionCapabilities.test.js` cover the current migration bridge, editor module contract, and capability helpers.
 - The user permission editor now includes `users` as a module separate from `workerAccess`, so HR-like access can be expressed without creating an HR role or another one-off checkbox.
+- The permission editor now includes `userGroups` as a module separate from `users`, so organizational group coordination can be delegated without granting broad user-management authority.
 - The `צוות ומשתמשים` screen is gated by `users`: `view` shows the team tree read-only, while `manage` enables creating, editing, archiving, and restoring users.
 - Managers default to `ppe: request`, so they can submit clothing/PPE requests for their scope unless explicitly set to `ppe: none`.
 - The permission editor also includes management modules `analytics`, `suppliers`, `settings`, and `audit`; screen gates should be added against these module keys instead of new one-off flags.
@@ -149,7 +151,7 @@ Possible grouping:
 
 ```text
 Operations: tickets, fleet, drivers
-Employees: users, workerAccess, ppe
+Employees: users, userGroups, workerAccess, ppe
 Management: suppliers, analytics, settings, audit
 Cleaning: cleaning
 ```

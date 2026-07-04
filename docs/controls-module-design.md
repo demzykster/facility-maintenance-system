@@ -366,14 +366,14 @@ See `docs/cleaning-worker-access-plan.md`.
 
 The existing permissions model should be extended rather than bypassed.
 
-Likely future permissions:
+Permission direction:
 
 - `controls:view`
 - `controls:perform`
 - `controls:manage`
 - `controls:full`
 - `quality:view/manage` if separated later;
-- `userGroups:manage`
+- `userGroups:view/manage` exists as a separate permission module for organizational group coordination;
 - `workCalendar:manage`
 - `tasks:view/manage` if tasks become formal shared action layer.
 

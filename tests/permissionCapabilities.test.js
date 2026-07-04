@@ -36,6 +36,17 @@ describe("permission capability helpers", () => {
     expect(canManage(basicManager, "users")).toBe(false);
   });
 
+  it("keeps organizational group management separate from user management", () => {
+    const groupCoordinator = { role: "user", perms: { userGroups: "manage", users: "view" } };
+    const userManager = { role: "user", perms: { users: "manage" } };
+
+    expect(canView(groupCoordinator, "userGroups")).toBe(true);
+    expect(canManage(groupCoordinator, "userGroups")).toBe(true);
+    expect(canManage(groupCoordinator, "users")).toBe(false);
+    expect(canManage(userManager, "users")).toBe(true);
+    expect(canView(userManager, "userGroups")).toBe(false);
+  });
+
   it("supports management module permissions without role-specific checks", () => {
     const analyst = { role: "user", perms: { analytics: "view", suppliers: "manage", audit: "view" } };
     const supplierViewer = { role: "user", perms: { suppliers: "view" } };
