@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: codex/controls-responsible-user-fix.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: fix `בקרות` finding-to-task routing so new tasks use a real app-user responsible id instead of a session/auth id that renders as `—` in `מטלות`.
 - Latest completed product work:
   - PR #667 added persistence for the first manual `בקרות` slice: completed manual control runs and findings are saved to shared KV, a compact recent-run history is shown in `בקרות`, created `מטלות` tasks stay linked back to the saved finding/run, and `controlRun:` / `controlFinding:` are registered in KV allowlist, permission policy, backup/data collection maps, and tests. It does not add scheduling, controls programs UI, Supabase table migration, or cleaning/location migration.
   - PR #665 added the first manual `בקרות` UI slice: one ad-hoc control run form, checklist answers, one finding, and optional confirmed creation of a real `מטלות` task with source links. It does not add a scheduling engine, saved controls records, Supabase/KV migration, or cleaning/location migration.
