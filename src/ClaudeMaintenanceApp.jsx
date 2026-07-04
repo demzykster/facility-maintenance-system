@@ -7962,15 +7962,16 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       </>) : (<>
         <ActivationControls />
       </>)}
-      {(role === "worker" || role === "cleaner") ? (
-        <div className="hint" style={{ marginTop: 0 }}>סטטוס עובד מנוהל דרך פעולת עזיבת עובד / החזרת ציוד, כדי לא להחזיק שתי הגדרות מקבילות.</div>
-      ) : (
-        <>
-          <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> משתמש פעיל</label>
-          <div className="hint" style={{ marginTop: -4 }}>בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו.</div>
-        </>
-      )}
-      {role && role !== "admin" && <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
+      <div className="uf-form-footer">
+        {(role === "worker" || role === "cleaner") ? (
+          <div className="hint">סטטוס עובד מנוהל דרך פעולת עזיבת עובד / החזרת ציוד, כדי לא להחזיק שתי הגדרות מקבילות.</div>
+        ) : (
+          <div className="uf-active-block">
+            <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> משתמש פעיל</label>
+            <div className="hint">בטל סימון כדי לחסום כניסה למשתמש מבלי למחוק אותו.</div>
+          </div>
+        )}
+        {role && role !== "admin" && <details className="perm-fold"><summary><span>הרשאות אישיות / אחריות נוספת</span><span className="perm-summary">{permSummary}</span></summary>
         <div className="hint">התפקיד קובע את הגישה הבסיסית. אם אותו אדם מחזיק כמה תחומי אחריות, מוסיפים כאן הרשאות מודול לפי הצורך במקום ליצור תפקיד חדש.</div>
         {role === "worker" && (() => { const access = normalizeCleaningAccess({ ...user, role: "worker", dept, depts: [dept], active, cleaningAccess: cleaningDeptSelected ? false : manualCleaningAccess }); const byDept = access.source === "department"; return <div className={"perm-card cleaning-access-card" + (access.enabled ? " active" : "")}>
           <div className="perm-card-main"><span className="perm-ic"><Sparkles size={17} /></span><div><div className="perm-name">סבבי ניקיון</div><div className="perm-hint">{byDept ? "פעיל אוטומטית לפי מחלקת ניקיון." : "אישור חריג לעובד שאינו במחלקת ניקיון להשתתף בסבבים."}</div></div></div>
@@ -7978,9 +7979,10 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         </div>; })()}
         <div className="perm-card-grid">{USER_PERMISSION_MODULES.map((m) => <PermCard key={m.mod} {...m} />)}</div>
         <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
-      </details>}
+        </details>}
+      </div>
       {err && <div className="err">{err}</div>}
-      <button className="btn-primary full" onClick={save}>{lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש"}</button>
+      <button className="btn-primary full uf-save-btn" onClick={save}>{lockRole === "worker" ? "שמירת עובד" : "שמירת משתמש"}</button>
       {onArchive && user.id && ["worker", "cleaner", "tech"].includes(role) && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={() => onArchive(user)}><PackageCheck size={15} /> עזיבת עובד / החזרת ציוד</button>}
       {canDelete && !(onArchive && ["worker", "cleaner", "tech"].includes(role)) && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקה" onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
@@ -9717,6 +9719,11 @@ button.notif-perm:hover{background:#D1FAE5;}
 .uf-choice small{display:block;font-size:11px;color:var(--muted);font-weight:600;}
 .uf-choice:hover{border-color:var(--primary);}
 .uf-choice.on{box-shadow:0 1px 6px rgba(15,23,42,.08);}
+.uf-form-footer{display:grid;gap:12px;margin-top:14px;}
+.uf-active-block{display:grid;gap:6px;align-items:start;}
+.uf-active-block .chk-line{margin:0;}
+.uf-active-block .hint{margin:0;line-height:1.45;max-width:100%;overflow-wrap:anywhere;}
+.uf-save-btn{margin-top:14px;}
 .perm-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:0 14px 10px;}
 .perm-card{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:11px;display:grid;gap:10px;align-items:start;}
 .perm-card.active{border-color:#FDBA74;background:#FFF7ED;}
