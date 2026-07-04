@@ -9589,8 +9589,9 @@ button.notif-perm:hover{background:#D1FAE5;}
 .rp-toggle-txt small{font-size:10px;font-weight:500;color:var(--side-ink);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rp-toggle-chev{color:var(--side-ink);transition:transform .15s ease;flex:none;}
 .rp-toggle.on .rp-toggle-chev{transform:rotate(-90deg);}
-.rp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:6px;padding:7px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff06;}
-.rp-btn{display:flex;align-items:center;justify-content:center;gap:4px;min-height:28px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff08;color:var(--side-ink);font-size:11px;font-weight:600;}
+.rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px;padding:7px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff06;}
+.rp-btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:34px;min-width:0;border:1px solid #ffffff18;border-radius:10px;background:#ffffff08;color:var(--side-ink);font-size:11px;font-weight:700;line-height:1.15;text-align:center;}
+.rp-btn span{min-width:0;overflow-wrap:anywhere;}
 .rp-btn:hover{background:#ffffff14;color:#fff;}
 .rp-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
 .side-report{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--side-ink);border:1px solid #ffffff14;border-radius:999px;padding:7px 10px;font-size:11.5px;font-weight:700;background:#ffffff08;}
@@ -9994,7 +9995,8 @@ button.notif-perm:hover{background:#D1FAE5;}
   .tb-role-preview .rp-toggle-ic{width:24px;height:24px;}
   .tb-role-preview .rp-toggle-txt b{font-size:11px;}
   .tb-role-preview .rp-toggle-txt small{font-size:9.5px;}
-  .tb-role-preview .rp-grid{position:absolute;top:calc(100% + 7px);inset-inline-end:0;width:min(270px,calc(100vw - 24px));grid-template-columns:repeat(3,minmax(0,1fr));padding:6px;gap:4px;background:var(--slate);box-shadow:0 18px 42px rgba(0,0,0,.32);z-index:42;}
+  .tb-role-preview .rp-grid{position:absolute;top:calc(100% + 7px);inset-inline-end:0;width:min(292px,calc(100vw - 24px));grid-template-columns:repeat(2,minmax(0,1fr));padding:7px;gap:6px;background:var(--slate);box-shadow:0 18px 42px rgba(0,0,0,.32);z-index:42;}
+  .tb-role-preview .rp-btn{min-height:44px;font-size:12px;}
   .modal2-body{padding:14px;}
   .profile-head{margin-bottom:10px;}
   .avatar.big{width:34px;height:34px;font-size:16px;}

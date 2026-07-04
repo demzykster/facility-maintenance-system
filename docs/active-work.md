@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/mobile-role-preview-grid`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: fix mobile role-preview layout after removing the separate cleaning role option, so the four remaining roles render as an even 2x2 grid without overflow or a lonely last item.
 - Latest completed product work:
   - PR #632 cleaned up remaining `cleaner` new-role paths: admin role preview no longer offers cleaning as a separate role, admin profile sync rejects `role: cleaner`, cleaning workflow KV writes use cleaning capabilities, and UI filters use worker/legacy-cleaner helpers where appropriate.
   - PR #630 documented the future user activity/status direction: new-user creation stays quiet, existing profiles may later show compact login/activity status, and last-visit/activity analytics must come from real server-side login/session telemetry.
