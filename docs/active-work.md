@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: codex/controls-core-model.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: model-only controls core foundation. Scope: pure helpers/tests for Program, Assignment, Run, Finding, Action route, finding visibility policy, and dashboard signal envelope. No UI, Supabase/KV migration, cleaning migration, scheduling engine, or monolith split.
 - Latest completed product work:
   - PR #636 added a separate `userGroups` permission module for organizational group coordination, kept it separate from broad user management, and refreshed near-term controls docs now that cleaning-access foundation is complete.
   - PR #634 fixed the mobile role-preview popover after removing the separate cleaning role option: the four remaining role buttons now render as an even 2-column grid with stable button height/wrapping.
@@ -91,7 +91,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: ask the owner to manually check the deployed worker-with-cleaning-access flow before proceeding to deeper cleaning-role cleanup or controls work. Do not start the broad monolith split.
+- Next exact action: finish and verify the model-only controls core PR, then reset this ledger after merge. Do not start the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction

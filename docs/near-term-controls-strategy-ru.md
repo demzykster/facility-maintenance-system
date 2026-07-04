@@ -48,7 +48,7 @@ userGroups foundation
 
 ## После Этого
 
-1. Добавить/закончить `userGroups` model и permission foundation для организационных membership:
+1. Done: добавить/закончить `userGroups` model и permission foundation для организационных membership:
    - `ועדת בטיחות`
    - `צוות חירום`
    - `נאמני בטיחות`
@@ -57,7 +57,7 @@ userGroups foundation
    - create/edit group;
    - назначение lead/member/observer;
    - без scheduling и без controls run.
-3. Добавить controls core model:
+3. Current: добавить controls core model:
    - Program
    - Assignment
    - Run
