@@ -3320,7 +3320,7 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>{WEEKDAYS.map((w) => { const on = activeDays.includes(w.d); return <button key={w.d} type="button" onClick={() => toggleDay(w.d)} className={"pr-pick" + (on ? " on" : "")} style={on ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9", minWidth: 40, justifyContent: "center" } : { minWidth: 40, justifyContent: "center" }}>{w.short}</button>; })}</div>
         <div className="hint">בימים שלא נבחרו לא ייווצרו סבבים ולא יירשם «פוספס». ברירת מחדל: ראשון–חמישי.</div>
       </div>
-      <label className="field"><span>עובד ניקיון אחראי</span><select value={cleanerId} onChange={(e) => setCleanerId(e.target.value)}><option value="">— ללא שיוך —</option>{cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="hint">כל עובד ניקיון יכול לבצע סבב בכל אזור (כיסוי), אך זה האזור של האחראי.</div></label>
+      <label className="field"><span>אחראי סבבים</span><select value={cleanerId} onChange={(e) => setCleanerId(e.target.value)}><option value="">— ללא שיוך —</option>{cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="hint">כל עובד עם גישה לניקיון יכול לבצע סבב ככיסוי. האחראי הוא ברירת המחדל של האזור.</div></label>
       {managers && <div className="field"><span>מנהלי מחלקה שרואים את האזור</span>{managers.length === 0 ? <div className="hint">אין מנהלי מחלקה. הוסיפו תחת «צוות ומשתמשים».</div> : <div className="chk-grid">{managers.map((m) => <label key={m.id} className={"chk-pill" + (mgrIds.includes(m.id) ? " on" : "")}><input type="checkbox" checked={mgrIds.includes(m.id)} onChange={() => setMgrIds((s) => s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id])} /> {m.name}</label>)}</div>}<div className="hint">אותה הגדרה כמו ב«צוות ומשתמשים» של המנהל — נשמרת לשני הכיוונים.</div></div>}
       <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> אזור פעיל</label>
       {canDelete && blockerCount > 0 && <div className="note" style={{ marginTop: 8, borderColor: "#FDE68A" }}><AlertTriangle size={14} /> אי אפשר למחוק אזור שיש לו פעילות מקושרת. פתחו את הרשומות ונקו אותן קודם.
@@ -3424,7 +3424,7 @@ function CleaningAdmin(p) {
       : tab === "complaints" ? (<>
         <div className="u-filters" style={{ marginBottom: 12 }}><select value={cZone} onChange={(e) => setCZone(e.target.value)}><option value="all">כל האזורים</option>{list.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}</select>{cZone !== "all" && <button className="btn-ghost sm" onClick={() => setCZone("all")}>ניקוי סינון</button>}</div>
         {(pending.length + openC.length + closedC.length) === 0 ? <Empty text="אין דיווחים" Icon={Sparkles} sub="דיווחי לכלוך ותקלות יופיעו כאן" /> : <>
-        {pending.length > 0 && <><SectionTitle><Clock size={15} /> ממתין לאישורך ({pending.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדים, מעובד ניקיון ומדיווח אנונימי. הקישו לפתיחה — אישור או דחייה עם סיבה.</div><div className="cards">{pending.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
+        {pending.length > 0 && <><SectionTitle><Clock size={15} /> ממתין לאישורך ({pending.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדים, מאחראי סבבים ומדיווח אנונימי. הקישו לפתיחה — אישור או דחייה עם סיבה.</div><div className="cards">{pending.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {escC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הועבר אליך לטיפול ({escC.length})</SectionTitle><div className="cards">{escC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {adminOwnedC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> בטיפולך ({adminOwnedC.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדי הניקיון שקיבלת לטיפול. סגרו כטופל לאחר הטיפול — העובד יראה את התגובה.</div><div className="cards">{adminOwnedC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {plainOpenC.length > 0 && <><SectionTitle><Clock size={15} /> אצל עובד הניקיון ({plainOpenC.length})</SectionTitle><div className="cards">{plainOpenC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
@@ -3433,7 +3433,7 @@ function CleaningAdmin(p) {
       </>)
       : (<>
         <div className="row-between"><SectionTitle><Sparkles size={15} /> אזורי ניקיון ({list.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> אזור חדש</button></div>
-        {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדי ניקיון. הוסיפו אותם תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור. בינתיים קיים עובד ניקיון לדוגמה לכניסה (מס׳ 1050 · קוד 1234).</div>}
+        {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדים עם גישה לניקיון. הוסיפו עובד למחלקת ניקיון תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור.</div>}
         {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : <div className="cards">{list.map((z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}</div>}
       </>)}
     {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} managers={managers} canDelete={!!edit.id} deleteBlockers={editDeleteBlockers} onOpenBlocker={openZoneBlocker} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
@@ -7846,8 +7846,8 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const validLoginEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim().toLowerCase());
   const loginConfigured = roleUsesLogin && userHasLoginSecret({ ...user, role, pin, password });
   const canResetStoredLogin = loginConfigured && !user.authUserId;
-  const activePermLabels = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).map((m) => m.label);
-  const permSummary = activePermLabels.length ? `${activePermLabels.slice(0, 2).join(", ")}${activePermLabels.length > 2 ? ` ועוד ${activePermLabels.length - 2}` : ""}` : "אין הרשאות נוספות";
+  const activePermCount = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).length;
+  const permSummary = activePermCount ? `${countLabel(activePermCount, "תחום פעיל", "תחומים פעילים")}` : "אין הרשאות נוספות";
   const explicitCleaningAccess = hasCleaningAccess({ role: "worker", active: true, cleaningAccess: user.cleaningAccess });
   const [manualCleaningAccess, setManualCleaningAccess] = useState(explicitCleaningAccess);
   const cleaningDeptSelected = ["ניקיון", "נקיון", "cleaning"].includes(String(dept || "").trim().toLowerCase());
@@ -9700,24 +9700,24 @@ button.notif-perm:hover{background:#D1FAE5;}
 .chk-pill{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;background:var(--surface);white-space:normal;min-width:0;max-width:100%;}
 .chk-pill input{width:16px;height:16px;flex-shrink:0;margin:0;}
 .chk-pill.on{border-color:var(--primary);background:var(--primary-soft,#FFF4ED);color:var(--primary);}
-.perm-fold{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0;}
-.perm-fold summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;}
+.perm-fold{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0;overflow:hidden;}
+.perm-fold summary{list-style:none;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:12px 14px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;}
 .perm-fold summary > span:first-child{min-width:0;}
 .perm-fold summary::-webkit-details-marker{display:none;}
 .perm-fold summary::after{content:"▾";color:var(--muted);font-size:12px;transition:transform .15s ease;}
 .perm-fold[open] summary::after{transform:rotate(180deg);}
-.perm-summary{margin-inline-start:auto;color:var(--muted);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:52%;}
+.perm-summary{color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 8px;}
 .perm-fold > .field,.perm-fold > .hint{margin:0 14px 10px;}
 .perm-fold > .hint:first-of-type{margin-top:-2px;}
 .uf-choice-grid{display:grid;gap:8px;}
 .uf-choice-grid.cols-role{grid-template-columns:repeat(4,minmax(0,1fr));direction:ltr;}
 .uf-choice-grid.cols-shift{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));}
 .uf-choice-grid.cols-dept{grid-template-columns:repeat(auto-fit,minmax(128px,1fr));}
-.uf-choice{min-height:48px;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 10px;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--ink);font-size:13px;font-weight:750;cursor:pointer;text-align:center;line-height:1.15;direction:rtl;}
+.uf-choice{min-height:48px;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 10px;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--ink);font-size:13px;font-weight:750;cursor:pointer;text-align:center;line-height:1.15;direction:rtl;min-width:0;overflow-wrap:anywhere;}
 .uf-choice small{display:block;font-size:11px;color:var(--muted);font-weight:600;}
 .uf-choice:hover{border-color:var(--primary);}
 .uf-choice.on{box-shadow:0 1px 6px rgba(15,23,42,.08);}
-.uf-form-footer{display:grid;gap:12px;margin-top:14px;}
+.uf-form-footer{display:grid;gap:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line);}
 .uf-active-block{display:grid;gap:6px;align-items:start;}
 .uf-active-block .chk-line{margin:0;}
 .uf-active-block .hint{margin:0;line-height:1.45;max-width:100%;overflow-wrap:anywhere;}
@@ -9728,15 +9728,15 @@ button.notif-perm:hover{background:#D1FAE5;}
 .app-dark .perm-card.active{background:rgba(234,88,12,.14);}
 .perm-card-main{display:flex;align-items:flex-start;gap:9px;min-width:0;}
 .perm-ic{width:30px;height:30px;border-radius:9px;background:var(--surface);border:1px solid var(--line);color:var(--primary);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
-.perm-name{font-weight:800;font-size:13.5px;color:var(--ink);line-height:1.25;}
+.perm-name{font-weight:800;font-size:13.5px;color:var(--ink);line-height:1.25;overflow-wrap:anywhere;}
 .perm-hint{font-size:11.5px;color:var(--muted);line-height:1.35;margin-top:2px;}
-.perm-levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:5px;}
-.perm-levels button{border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);min-height:32px;padding:5px 7px;font-size:11.5px;font-weight:800;cursor:pointer;}
+.perm-levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr));gap:5px;}
+.perm-levels button{border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);min-height:32px;padding:5px 7px;font-size:11.5px;font-weight:800;cursor:pointer;line-height:1.15;}
 .perm-levels button.on{background:var(--ink);border-color:var(--ink);color:var(--surface);}
 .perm-levels button:disabled{opacity:.7;cursor:not-allowed;}
 .cleaning-access-card{margin:0 14px 10px;}
 .uf-access-note{display:flex;align-items:center;gap:7px;line-height:1.45;}
-@media(max-width:520px){.uf-choice-grid.cols-role{grid-template-columns:repeat(2,minmax(0,1fr));}.perm-card-grid{grid-template-columns:1fr;}.perm-summary{max-width:42%;}}
+@media(max-width:520px){.uf-choice-grid.cols-role{grid-template-columns:repeat(2,minmax(0,1fr));}.perm-card-grid{grid-template-columns:1fr;}.perm-fold summary{grid-template-columns:minmax(0,1fr) auto auto;}.perm-summary{font-size:11px;padding-inline:7px;}}
 .shift-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:14px;}
 .shift-info{display:flex;align-items:center;gap:9px;}
 .shift-stat{font-weight:700;font-size:14px;}
