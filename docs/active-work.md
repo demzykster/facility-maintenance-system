@@ -27,6 +27,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Open PRs at last check: none.
 - Active work in progress: none.
 - Latest completed product work:
+  - PR #691 made `בקרת כלים` inside `בקרות` target real fleet records: fleet-domain programs/assignments/runs preserve `target.kind = "fleet"` and `fleetId` instead of only free-text labels.
   - PR #689 added the first narrow saved `בקרות` Program -> Assignment -> Run UI slice: create a control program from a manual preset, create one manual assignment, open a run from that assignment, and preserve program/assignment links through run/finding/task routing. It does not add a scheduling engine, cleaning/location migration, executive BI, Supabase table migration, or a broad monolith split.
   - PR #686 added a model-only `בקרות` helper/test to draft a control run from one assignment while preserving program, assignment, participant, and target links. It does not complete the run, create findings, route actions, add UI, start scheduling, or migrate data.
   - PR #684 added model-only `בקרות` helpers/tests so a manual domain preset can become a saved control program draft and a control program can create one manual assignment draft. It is only a bridge toward the first saved Program -> Assignment -> Run flow; it does not add UI, scheduling, Supabase migration, or cleaning/location migration.
@@ -115,9 +116,9 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
+- Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed `בקרות` sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: verify the deployed #689 `בקרות` program/assignment UI on production after Vercel finishes deploying, then continue with the next narrow controls slice only from fresh owner feedback.
+- Next exact action: if continuing `בקרות`, start the agreed cleaning-controls slice: `בקרות -> ניקיון` read-only overview for managers/admins plus manual manager cleaning-zone quality check. Do not rewrite QR/round/windows/compliance, do not migrate cleaning zones yet, and do not add a separate right-sidebar menu item.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
@@ -130,6 +131,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 - Target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage.
 - Future AI-agent work must reuse shared server/product operations with validation, authorization, and audit. Do not build a separate AI-only data-write path.
 - Do not start the broad monolith/module split until the data layer is stable and the owner explicitly opens that phase.
+- Cleaning controls direction: the existing cleaning module remains the operational flow for cleaners; `בקרות` sees cleaning as a manager/admin control domain for overview, zone quality checks, findings, and action routing.
 
 ## Current Facts To Preserve
 
