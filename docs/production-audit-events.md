@@ -72,3 +72,16 @@ supabase/migrations/20260627200000_audit_events.sql
 ```
 
 The next production step is to keep extending this pattern as more workflow writes move from the KV bridge into normalized server-side endpoints.
+
+## Future User Activity Events
+
+User activity analytics should be based on real server-side session/audit facts, not UI guesses.
+
+Future login/session telemetry should support:
+
+- compact profile status for existing users;
+- `lastSeenAt` or equivalent last successful activity timestamp;
+- append-only login/session events such as login success, login failure, first-login completion, logout, and session restore;
+- later dashboard trends for system adoption and inactive users.
+
+This is intentionally not shown in the new-user creation form. At creation time, the important contract is that login-capable users are saved without generated secrets and complete first-login setup themselves.
