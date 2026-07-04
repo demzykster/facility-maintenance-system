@@ -12,6 +12,8 @@ export const DATA_COLLECTIONS = Object.freeze([
   { key: "absences", prefix: "cabsence:", table: "worker_absences" },
   { key: "tasks", prefix: "mtask:", table: "maintenance_tasks" },
   { key: "meetings", prefix: "mmeet:", table: "maintenance_meetings" },
+  { key: "controlPrograms", prefix: "controlProgram:", table: "control_programs" },
+  { key: "controlAssignments", prefix: "controlAssignment:", table: "control_assignments" },
   { key: "controlRuns", prefix: "controlRun:", table: "control_runs" },
   { key: "controlFindings", prefix: "controlFinding:", table: "control_findings" },
   { key: "ppe", prefix: "ppe:", table: "ppe_movements" },

@@ -646,7 +646,8 @@ Current implementation note:
 - the core model can build a `מטלות` task draft from a controls finding when the route is `task`;
 - this is intentionally draft-only: it preserves `sourceModule/sourceFindingId/sourceProgramId/sourceRunId`, but it does not create or save the task without the normal product action/confirmation.
 - the first UI slice is intentionally narrow: one manual control run form, checklist answers, one finding, optional confirmed task creation, and a compact recent-run history.
-- completed manual runs and findings are stored as shared KV records (`controlRun:*`, `controlFinding:*`). This is still not the future scheduling/program engine and not a Supabase table migration.
+- controls storage reserves the full program/assignment/run/finding contract as shared KV prefixes and future table names: `controlProgram:*` -> `control_programs`, `controlAssignment:*` -> `control_assignments`, `controlRun:*` -> `control_runs`, and `controlFinding:*` -> `control_findings`.
+- the current manual UI writes only completed runs and findings. Program and assignment records are reserved for the future scheduling/program engine; this is still not a Supabase table migration.
 - findings that already created a task can open that linked `מטלה` directly from the run history; raw task ids should remain hidden from the operator UI.
 
 ## Suggested PR Sequence

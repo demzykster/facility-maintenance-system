@@ -19,6 +19,10 @@ The current source of truth is `DATA_COLLECTIONS` in `src/dataCollections.js`.
 | `absences` | `cabsence:` | `worker_absences` |
 | `tasks` | `mtask:` | `maintenance_tasks` |
 | `meetings` | `mmeet:` | `maintenance_meetings` |
+| `controlPrograms` | `controlProgram:` | `control_programs` |
+| `controlAssignments` | `controlAssignment:` | `control_assignments` |
+| `controlRuns` | `controlRun:` | `control_runs` |
+| `controlFindings` | `controlFinding:` | `control_findings` |
 | `ppe` | `ppe:` | `ppe_movements` |
 | `ppeItems` | `ppeitem:` | `ppe_items` |
 | `ppeNorms` | `ppenorm:` | `ppe_norms` |
