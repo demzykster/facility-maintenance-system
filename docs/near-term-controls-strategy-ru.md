@@ -64,13 +64,15 @@ userGroups foundation
    - `manage` для программ/назначений/контроля исполнения;
    - `full` для будущих чувствительных настроек и отчетов.
 4. Done: собрать первый маленький controls UI shell.
-5. Current: собрать первый рабочий сценарий небольшими model/UI шагами:
+5. Done: собрать первый рабочий сценарий небольшими model/UI шагами:
    - manual safety/control walk;
    - one location target;
    - one finding;
    - route to report-only or `מטלות`.
 
-Текущий безопасный шаг: закрепить первый ручной UI-slice сохранением истории. Один ручной обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Completed run/finding сохраняются как shared KV `controlRun:*` / `controlFinding:*`, но это ещё не scheduling engine и не финальная Supabase-схема.
+Закрыто в первом ручном UI-slice: один ручной обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Completed run/finding сохраняются как shared KV `controlRun:*` / `controlFinding:*`, история показывает детали с подписью/ответами/ממצאים, а finding с созданной задачей открывает связанную `מטלה` из истории.
+
+Текущий безопасный следующий шаг: не расширять UI, а решить stable Supabase/table shape для controls programs/runs/findings before expanding beyond the manual slice. До этого не строить scheduling engine и не мигрировать cleaning.
 
 ## What Not To Do Yet
 

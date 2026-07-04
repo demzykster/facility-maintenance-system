@@ -647,6 +647,7 @@ Current implementation note:
 - this is intentionally draft-only: it preserves `sourceModule/sourceFindingId/sourceProgramId/sourceRunId`, but it does not create or save the task without the normal product action/confirmation.
 - the first UI slice is intentionally narrow: one manual control run form, checklist answers, one finding, optional confirmed task creation, and a compact recent-run history.
 - completed manual runs and findings are stored as shared KV records (`controlRun:*`, `controlFinding:*`). This is still not the future scheduling/program engine and not a Supabase table migration.
+- findings that already created a task can open that linked `מטלה` directly from the run history; raw task ids should remain hidden from the operator UI.
 
 ## Suggested PR Sequence
 
@@ -662,8 +663,8 @@ This is intentionally conservative.
 8. Done: `controls` was added to the shared permissions model before exposing UI.
 9. Done: minimal gated `בקרות` UI shell.
 10. Done: first narrow manual UI slice: one ad-hoc run, one finding, and route to report-only or confirmed `מטלות` creation.
-11. Current: persist the manual run/finding records in shared KV and keep created tasks linked back to the saved finding/run.
-12. Next: decide the stable Supabase/table shape for controls programs/runs/findings before expanding beyond the manual slice.
+11. Done: persist the manual run/finding records in shared KV, show history details, and keep created tasks linked back to the saved finding/run with an operator action to open the linked task.
+12. Current: decide the stable Supabase/table shape for controls programs/runs/findings before expanding beyond the manual slice.
 13. Domain increments: safety, quality, fleet controls, executive walk.
 14. Dashboard/insights layer.
 
