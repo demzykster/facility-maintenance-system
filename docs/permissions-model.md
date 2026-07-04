@@ -106,6 +106,10 @@ Editing a worker profile without `workerAccess: manage` must preserve existing l
 
 Current implementation saves new login-capable users without generated secrets. First login by email or worker number opens the password/PIN creation form.
 
+New-user forms should not show noisy login-status text. Login/activity status belongs on existing user profiles, where it can be shown as a compact indicator near the user name.
+
+Future activity status must come from real server-side telemetry, for example `lastSeenAt` and append-only login/session events. Do not infer "last visit" from local UI state or add decorative status text that is not backed by durable audit/session data.
+
 The worker active/inactive state should be handled by lifecycle actions such as "worker left" and restore-from-archive, not by a generic "active user" checkbox in the worker form.
 
 ## Cleaning Access Direction

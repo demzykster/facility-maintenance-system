@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/document-user-activity-telemetry`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: docs-only note for future user activity telemetry and existing-profile login/activity status.
 - Latest completed product work:
   - PR #628 moved manager cleaning-zone visibility into the advanced permissions section, hid first-login status copy while creating a new user, and kept the existing manager-zone save shape unchanged.
   - PR #626 polished user-form permission UX and cleaning wording: the advanced-permissions summary is compact/count-based, permission controls have better wrapping/spacing guards, and cleaning-zone UI now talks about round responsibility/access instead of a separate cleaner role.
