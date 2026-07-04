@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONTROL_MANUAL_RUN_PRESETS,
   controlSignalEnvelope,
   controlFindingTaskDraft,
+  controlManualRunPresetById,
+  controlManualRunPresetsForDomain,
   normalizeActionRoute,
   normalizeControlAssignment,
   normalizeControlFinding,
@@ -11,6 +14,29 @@ import {
 } from "../src/controlsCoreModel.js";
 
 describe("controls core model", () => {
+  it("keeps manual domain presets explicit and domain-scoped", () => {
+    expect(CONTROL_MANUAL_RUN_PRESETS.map((preset) => preset.id)).toEqual([
+      "safety-walk-basic",
+      "fleet-yard-check",
+      "quality-returns-sample",
+      "operations-executive-walk"
+    ]);
+
+    expect(controlManualRunPresetsForDomain("safety")).toHaveLength(1);
+    expect(controlManualRunPresetsForDomain("safety")[0]).toMatchObject({
+      id: "safety-walk-basic",
+      domain: "safety",
+      name: "סיור בטיחות ידני",
+      routeType: "report_only"
+    });
+    expect(controlManualRunPresetsForDomain("fleet")[0]).toMatchObject({
+      id: "fleet-yard-check",
+      domain: "fleet",
+      routeType: "task"
+    });
+    expect(controlManualRunPresetById("missing")).toBeNull();
+  });
+
   it("normalizes a control program with group coordination and schedule guardrails", () => {
     const program = normalizeControlProgram({
       id: "prog-safety-zone-a",
