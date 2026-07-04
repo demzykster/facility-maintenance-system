@@ -9,6 +9,8 @@ import {
 describe("notification access model", () => {
   it("keeps role-based operational notifications working without duplicate module flags", () => {
     expect(notificationAllowedByAccess({ role: "cleaner" }, "cleaning")).toBe(true);
+    expect(notificationAllowedByAccess({ role: "worker", cleaningAccess: true }, "cleaning")).toBe(true);
+    expect(notificationAllowedByAccess({ role: "worker" }, "cleaning")).toBe(false);
     expect(notificationAllowedByAccess({ role: "tech" }, "new")).toBe(true);
     expect(notificationAllowedByAccess({ role: "user" }, "driver")).toBe(true);
   });

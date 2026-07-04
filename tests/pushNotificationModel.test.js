@@ -25,8 +25,17 @@ describe("push notification model", () => {
   });
 
   it("upserts one subscription per endpoint and preserves user metadata", () => {
-    const first = upsertPushSubscription([], subscription, { id: "u1", name: "Vadim", role: "admin", perms: { settings: "full" }, notificationPrefs: { enabled: { sla: false } } }, 100);
-    const second = upsertPushSubscription(first.list, subscription, { id: "u1", name: "Vadim", role: "admin", perms: { settings: "full" }, notificationPrefs: { enabled: { sla: false } } }, 200);
+    const user = {
+      id: "u1",
+      name: "Vadim",
+      role: "admin",
+      perms: { settings: "full" },
+      cleaningAccess: { enabled: true, canReceiveComplaints: true },
+      userGroups: ["leadership"],
+      notificationPrefs: { enabled: { sla: false } }
+    };
+    const first = upsertPushSubscription([], subscription, user, 100);
+    const second = upsertPushSubscription(first.list, subscription, user, 200);
 
     expect(second.ok).toBe(true);
     expect(second.list).toHaveLength(1);
@@ -35,6 +44,8 @@ describe("push notification model", () => {
       userName: "Vadim",
       userRole: "admin",
       userPermissions: { settings: "full" },
+      userCleaningAccess: { enabled: true, canReceiveComplaints: true },
+      userGroups: ["leadership"],
       notificationPrefs: { enabled: { sla: false } },
       createdAt: 100,
       updatedAt: 200,
@@ -84,11 +95,13 @@ describe("push notification model", () => {
     const list = [
       ...upsertPushSubscription([], subscription, { id: "cleaner", role: "cleaner", notificationPrefs: { enabled: { cleaning: false } } }, 100).list,
       ...upsertPushSubscription([], { ...subscription, endpoint: "https://push.example/device/2" }, { id: "worker", role: "worker" }, 100).list,
-      ...upsertPushSubscription([], { ...subscription, endpoint: "https://push.example/device/3" }, { id: "ppe", role: "worker", perms: { ppe: "request" } }, 100).list
+      ...upsertPushSubscription([], { ...subscription, endpoint: "https://push.example/device/3" }, { id: "ppe", role: "worker", perms: { ppe: "request" } }, 100).list,
+      ...upsertPushSubscription([], { ...subscription, endpoint: "https://push.example/device/4" }, { id: "cleaning-worker", role: "worker", cleaningAccess: true }, 100).list
     ];
 
     expect(selectPushNotificationTargets(list, ["cleaner"], "cleaning")).toEqual([]);
     expect(selectPushNotificationTargets(list, ["worker"], "sla")).toEqual([]);
     expect(selectPushNotificationTargets(list, ["ppe"], "ppe").map((item) => item.userId)).toEqual(["ppe"]);
+    expect(selectPushNotificationTargets(list, ["cleaning-worker"], "cleaning").map((item) => item.userId)).toEqual(["cleaning-worker"]);
   });
 });

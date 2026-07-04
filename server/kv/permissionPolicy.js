@@ -1,4 +1,5 @@
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
+import { canCloseCleaningComplaints, canPerformCleaning } from "../../src/cleaningAccessModel.js";
 
 const LEVEL_RANK = Object.freeze({
   none: 0,
@@ -18,7 +19,8 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning },
   { prefixes: ["ticket:"], roles: ["admin", "user", "tech", "worker"], entityType: AUDIT_ENTITY_TYPES.ticket, auditSensitive: false },
   { prefixes: ["ppereq:"], module: "ppe", minLevel: "request", roles: ["worker", "cleaner"], entityType: AUDIT_ENTITY_TYPES.ppe, auditSensitive: false },
-  { prefixes: ["cround:", "ccomplaint:"], roles: ["admin", "user", "cleaner"], entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
+  { prefixes: ["cround:"], roles: ["admin", "user", "cleaner"], access: "cleaning:perform", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
+  { prefixes: ["ccomplaint:"], roles: ["admin", "user", "cleaner"], access: "cleaning:closeComplaint", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
   { prefixes: ["presence:"], roles: ["admin", "tech"], entityType: AUDIT_ENTITY_TYPES.user, auditSensitive: false },
   { prefixes: ["mtask:", "mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
   { prefixes: ["appIssue:"], roles: ACTIVE_ROLES, entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false }
@@ -54,7 +56,12 @@ export function sessionHasKvWritePermission(session = {}, key = "") {
     ? permissionLevelRank(sessionPermissionLevel(session, rule.module)) >= permissionLevelRank(rule.minLevel)
     : false;
   const hasRolePermission = Array.isArray(rule.roles) && rule.roles.includes(session.role);
-  return hasModulePermission || hasRolePermission;
+  const hasAccessPermission = rule.access === "cleaning:perform"
+    ? canPerformCleaning(session)
+    : rule.access === "cleaning:closeComplaint"
+      ? canCloseCleaningComplaints(session)
+      : false;
+  return hasModulePermission || hasRolePermission || hasAccessPermission;
 }
 
 export function sessionCanReadUserSecrets(session = {}) {
@@ -98,6 +105,7 @@ export function kvWritePermissionError(session = {}, key = "") {
   const rule = kvWritePermissionForKey(key);
   if (!rule || sessionHasKvWritePermission(session, key)) return null;
   if (rule.module) return `permission_required:${rule.module}:${rule.minLevel}`;
+  if (rule.access) return `permission_required:${rule.access}`;
   return `permission_required:role:${(rule.roles || []).join("|")}`;
 }
 

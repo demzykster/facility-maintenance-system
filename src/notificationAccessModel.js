@@ -1,4 +1,5 @@
 import { canManage, canRequest, canView, normalizePerms } from "./permissionModel.js";
+import { canReceiveCleaningComplaints } from "./cleaningAccessModel.js";
 
 export const NOTIFICATION_ACCESS_RULES = Object.freeze({
   new: { module: "fleetTickets", level: "view" },
@@ -55,14 +56,16 @@ export function notificationSessionFromSubscription(subscriptionRecord = {}) {
     role: subscriptionRecord.userRole || subscriptionRecord.role || "",
     perms: normalizePerms({
       perms: subscriptionRecord.userPermissions || subscriptionRecord.permissions || subscriptionRecord.perms || {}
-    })
+    }),
+    cleaningAccess: subscriptionRecord.cleaningAccess || subscriptionRecord.userCleaningAccess || false,
+    groups: subscriptionRecord.userGroups || subscriptionRecord.groups || []
   };
 }
 
 export function notificationAllowedByAccess(user = {}, kind = "system") {
   const role = user?.role || user?.userRole || "";
   if (role === "admin") return true;
-  if (kind === "cleaning" && role === "cleaner") return true;
+  if (kind === "cleaning" && canReceiveCleaningComplaints(user)) return true;
   if (["new", "upd", "ready", "confirm", "escalate", "back"].includes(kind) && ["user", "tech"].includes(role)) return true;
   if (["pm", "doc"].includes(kind) && ["user", "tech"].includes(role)) return true;
   if (kind === "driver" && role === "user") return true;
