@@ -7914,6 +7914,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   };
   const ActivationControls = () => {
     if (!roleUsesLogin) return null;
+    if (!user.id) return null;
     const pendingText = loginConfigured
       ? (roleUsesPassword ? "כניסה מוגדרת: המשתמש הגדיר סיסמה. הסיסמה אינה מוצגת למנהלים." : "כניסה מוגדרת: המשתמש הגדיר קוד אישי. הקוד אינו מוצג למנהלים.")
       : loginSetupPrompt({ ...user, role });
@@ -7937,9 +7938,6 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
         </div>)}
-      {role === "user" && zones && (zones.length === 0
-        ? <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
-        : <div className="field"><span>אזורי ניקיון של המחלקה (המנהל יראה את מצב הניקיון והדיווחים בהם)</span><div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (mgrZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z.id)} onChange={() => setMgrZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div></div>)}
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
         : <div className="field"><span>מחלקה (משויך אליה)</span><ChoiceGrid columns="dept" value={dept} onChange={setDept} tone="#0D9488" options={config.departments.map((d) => ({ id: d, label: d, Icon: d === "ניקיון" ? Sparkles : Building2 }))} /><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></div>)}
@@ -7975,6 +7973,12 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
           <div className="perm-card-main"><span className="perm-ic"><Sparkles size={17} /></span><div><div className="perm-name">סבבי ניקיון</div><div className="perm-hint">{byDept ? "פעיל אוטומטית לפי מחלקת ניקיון." : "אישור חריג לעובד שאינו במחלקת ניקיון להשתתף בסבבים."}</div></div></div>
           <div className="perm-levels"><button type="button" className={!access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(false)}>אין</button><button type="button" className={access.enabled ? "on" : ""} disabled={byDept} onClick={() => setManualCleaningAccess(true)}>מבצע סבבים</button></div>
         </div>; })()}
+        {role === "user" && zones && (zones.length === 0
+          ? <div className="hint" style={{ margin: "0 14px 10px" }}>אין עדיין אזורי ניקיון להצמדה. הגדירו אזורים תחת «ניקיון».</div>
+          : <div className="perm-card cleaning-zone-scope-card">
+            <div className="perm-card-main"><span className="perm-ic"><Sparkles size={17} /></span><div><div className="perm-name">אזורי ניקיון לצפייה</div><div className="perm-hint">המנהל יראה את מצב הניקיון והדיווחים באזורים שנבחרו.</div></div></div>
+            <div className="chk-grid">{zones.slice().sort(zoneSort).map((z) => <label key={z.id} className={"chk-pill" + (mgrZones.includes(z.id) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z.id)} onChange={() => setMgrZones((s) => s.includes(z.id) ? s.filter((x) => x !== z.id) : [...s, z.id])} /> {z.name}{zoneLoc(z) ? " · " + zoneLoc(z) : ""}</label>)}</div>
+          </div>)}
         <div className="perm-card-grid">{USER_PERMISSION_MODULES.map((m) => <PermCard key={m.mod} {...m} />)}</div>
         <div className="hint">הרשאות חדשות יתווספו כאן לפי מודולים, במקום להוסיף עוד תיבות סימון נפרדות.</div>
         </details>}
@@ -9735,6 +9739,7 @@ button.notif-perm:hover{background:#D1FAE5;}
 .perm-levels button.on{background:var(--ink);border-color:var(--ink);color:var(--surface);}
 .perm-levels button:disabled{opacity:.7;cursor:not-allowed;}
 .cleaning-access-card{margin:0 14px 10px;}
+.cleaning-zone-scope-card{margin:0 14px 10px;}
 .uf-access-note{display:flex;align-items:center;gap:7px;line-height:1.45;}
 @media(max-width:520px){.uf-choice-grid.cols-role{grid-template-columns:repeat(2,minmax(0,1fr));}.perm-card-grid{grid-template-columns:1fr;}.perm-fold summary{grid-template-columns:minmax(0,1fr) auto auto;}.perm-summary{font-size:11px;padding-inline:7px;}}
 .shift-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:14px;}
