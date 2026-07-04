@@ -2715,6 +2715,11 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
       || list.find((u) => session.name && u.name === session.name)
       || null;
   }, [users, session.id, session.authUserId, session.email, session.name]);
+  const actorUserId = currentTaskUser?.id || session.id;
+  const displayUserName = (id, fallback) => {
+    const name = uName(id, users);
+    return name === "—" ? (fallback || "—") : name;
+  };
   const activeUsers = useMemo(() => (users || []).filter((u) => u.id && u.active !== false && ["admin", "user", "tech", "worker"].includes(u.role)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")), [users]);
   const defaultResponsibleId = currentTaskUser?.id || activeUsers[0]?.id || "";
   useEffect(() => {
@@ -2763,7 +2768,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     severity,
     target: { kind: "location", id: target, label: target },
     route: { type: routeType, notifyIds: responsibleId ? [responsibleId] : [] },
-    createdById: session.id,
+    createdById: actorUserId,
     createdAt: Date.now()
   };
   const taskDraft = routeType === "task" && finding.title && responsibleId ? controlFindingTaskDraft(finding, {
@@ -2783,14 +2788,14 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
     const run = {
       id: runId,
       programId: "manual-control",
-      performedById: session.id,
+      performedById: actorUserId,
       participantIds: [],
       target: { kind: "location", id: target, label: target },
       startedAt: savedRun?.startedAt || now,
       finishedAt: now,
       answers: checklist.map((label, i) => ({ itemId: `item-${i + 1}`, label, value: answers[i] })),
       findingIds: findingCount ? [findingId] : [],
-      overallSignature: { signedById: session.id, signedByName: signature.trim(), signedAt: now },
+      overallSignature: { signedById: actorUserId, signedByName: signature.trim(), signedAt: now },
       notes,
       status: "completed"
     };
@@ -2848,7 +2853,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
         ...finding,
         id: savedFinding.id,
         runId: savedRun.id,
-        route: { ...savedFinding.route, type: "task", taskId: task.id, notifyIds: task.responsibleIds, status: "created", decidedById: session.id, decidedAt: now },
+        route: { ...savedFinding.route, type: "task", taskId: task.id, notifyIds: task.responsibleIds, status: "created", decidedById: actorUserId, decidedAt: now },
         status: "routed"
       });
       const okFinding = await saveControlFinding(nextFinding);
@@ -2915,7 +2920,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
             return <button key={run.id} className={"task-row control-history-row" + (active ? " selected" : "")} style={{ borderInlineStartColor: problemCount ? "#DC2626" : "#0D9488" }} onClick={() => setOpenRunId(active ? null : run.id)}>
               <div className="task-row-main">
                 <div className="task-row-t">{run.target?.label || run.target?.id || "בקרה ידנית"} · {fmtDate(run.finishedAt || run.startedAt)}</div>
-                <div className="task-row-desc">{run.answers?.length || 0} סעיפים · {problemCount ? `${problemCount} ממצאים` : "ללא ממצאים"} · חתימה: {run.overallSignature?.signedByName || uName(run.performedById, users)}</div>
+                <div className="task-row-desc">{run.answers?.length || 0} סעיפים · {problemCount ? `${problemCount} ממצאים` : "ללא ממצאים"} · חתימה: {run.overallSignature?.signedByName || displayUserName(run.performedById)}</div>
                 {run.notes && <div className="task-row-sub">{run.notes}</div>}
               </div>
               <span className="badge sm" style={{ background: problemCount ? "#FEF2F2" : "#ECFDF5", color: problemCount ? "#B91C1C" : "#047857", border: `1px solid ${problemCount ? "#FECACA" : "#A7F3D0"}` }}>{problemCount ? "עם ממצא" : "תקין"}</span>
@@ -2925,7 +2930,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
             <div className="row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>
               <div>
                 <div className="tcard-subj">{openRun.target?.label || openRun.target?.id || "בקרה ידנית"}</div>
-                <div className="task-row-desc">{fmtDate(openRun.finishedAt || openRun.startedAt)} · מבצע: {uName(openRun.performedById, users)} · חתימה: {openRun.overallSignature?.signedByName || "—"}</div>
+                <div className="task-row-desc">{fmtDate(openRun.finishedAt || openRun.startedAt)} · מבצע: {displayUserName(openRun.performedById, openRun.overallSignature?.signedByName)} · חתימה: {openRun.overallSignature?.signedByName || "—"}</div>
               </div>
               <span className="badge sm" style={{ background: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }}>פרטי סבב</span>
             </div>
