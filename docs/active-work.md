@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/user-form-bottom-spacing`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: fix bottom spacing in the user create/edit form so status hints, advanced permissions, and the save button cannot overlap or visually collide in RTL layouts.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #620 fixed the bottom spacing in the user create/edit form: active-status hints, advanced permissions, and the save button now sit in a stable footer rhythm so RTL text cannot visually collide with controls.
   - PR #618 refined the user-create form defaults and field order: new users now start with no preselected role, department, or extra permission; role choices read left-to-right by hierarchy (`worker`, `tech`, `department manager`, `system admin`); login identifier fields sit near the name; advanced permissions stay at the bottom of the form.
   - PR #616 improved the user-create/edit form UX: role, shift, and worker department choices now use compact RTL-friendly choice buttons; advanced module permissions use permission cards with level buttons instead of stacked native selects; cleaning access stays automatic for `worker + ניקיון`, with manual cleaning-round exception kept inside advanced permissions.
   - PR #614 removed `cleaner` from the new-user role selector and made cleaning access automatic for regular `worker` users assigned to the `ניקיון` department. Demo/default cleaning users now use `worker + ניקיון`; low-level legacy `role === "cleaner"` compatibility remains for old records/events.
