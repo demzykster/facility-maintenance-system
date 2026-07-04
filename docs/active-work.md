@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: codex/controls-core-model.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: model-only controls core foundation. Scope: pure helpers/tests for Program, Assignment, Run, Finding, Action route, finding visibility policy, and dashboard signal envelope. No UI, Supabase/KV migration, cleaning migration, scheduling engine, or monolith split.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #638 added a pure controls core model for Program, Assignment, Run, Finding, finding visibility policy, action routes, and dashboard signal envelopes. It is model/test only: no UI, Supabase/KV migration, cleaning migration, scheduling engine, or monolith split.
   - PR #636 added a separate `userGroups` permission module for organizational group coordination, kept it separate from broad user management, and refreshed near-term controls docs now that cleaning-access foundation is complete.
   - PR #634 fixed the mobile role-preview popover after removing the separate cleaning role option: the four remaining role buttons now render as an even 2-column grid with stable button height/wrapping.
   - PR #632 cleaned up remaining `cleaner` new-role paths: admin role preview no longer offers cleaning as a separate role, admin profile sync rejects `role: cleaner`, cleaning workflow KV writes use cleaning capabilities, and UI filters use worker/legacy-cleaner helpers where appropriate.
@@ -91,7 +92,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: finish and verify the model-only controls core PR, then reset this ledger after merge. Do not start the broad monolith split.
+- Next exact action: continue from the agreed pre-controls sequence with small PRs. The next likely safe step is owner-approved userGroups UI or the first narrow `בקרות` vertical slice; do not start the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
