@@ -252,9 +252,11 @@ export const normalizeControlAssignment = (assignment = {}) => {
     scheduledAt: assignment.scheduledAt || null,
     dueAt: assignment.dueAt || assignment.scheduledAt || null,
     status: normalizeStatus(assignment.status, CONTROL_ASSIGNMENT_STATUSES, "planned"),
+    runId: cleanString(assignment.runId || assignment.controlRunId) || undefined,
     rescheduleHistory: arrayFrom(assignment.rescheduleHistory),
     generatedBy: cleanString(assignment.generatedBy || assignment.source) || "manual",
     createdAt: assignment.createdAt || null,
+    completedAt: assignment.completedAt || null,
     sourceProgramId: cleanString(assignment.sourceProgramId || assignment.programId) || undefined
   });
 };

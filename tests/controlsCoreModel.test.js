@@ -150,8 +150,10 @@ describe("controls core model", () => {
       scheduledAt: "2026-07-05",
       dueAt: "2026-07-09",
       status: "rescheduled",
+      runId: "run-1",
       rescheduleHistory: [{ from: "2026-07-03", to: "2026-07-05", reason: "absence" }],
-      generatedBy: "schedule"
+      generatedBy: "schedule",
+      completedAt: "2026-07-09T09:30:00Z"
     });
 
     expect(assignment).toMatchObject({
@@ -163,7 +165,9 @@ describe("controls core model", () => {
       scheduledAt: "2026-07-05",
       dueAt: "2026-07-09",
       status: "rescheduled",
-      generatedBy: "schedule"
+      runId: "run-1",
+      generatedBy: "schedule",
+      completedAt: "2026-07-09T09:30:00Z"
     });
     expect(assignment.rescheduleHistory).toHaveLength(1);
   });
