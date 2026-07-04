@@ -28,6 +28,7 @@ const ALLOWED_KV_PREFIXES = Object.freeze([
   "cround:",
   "ccomplaint:",
   "cabsence:",
+  "location:",
   "ticket:",
   "ppereq:",
   "presence:",

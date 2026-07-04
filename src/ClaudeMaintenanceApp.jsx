@@ -1449,6 +1449,7 @@ export default function App() {
   const [complaints, setComplaints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [meetings, setMeetings] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [controlPrograms, setControlPrograms] = useState([]);
   const [controlAssignments, setControlAssignments] = useState([]);
   const [controlRuns, setControlRuns] = useState([]);
@@ -1616,10 +1617,10 @@ export default function App() {
     return ok;
   };
   async function reloadAll() {
-    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, mtk, mmt, cprog, casg, crun, cfind, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
+    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, locs, mtk, mmt, cprog, casg, crun, cfind, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
       "ticket:", "pm:", "fleet:", "insp:",
       "itpl:", "presence:", "user:",
-      "czone:", "cround:", "ccomplaint:", "cabsence:", "mtask:", "mmeet:", "controlProgram:", "controlAssignment:", "controlRun:", "controlFinding:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
+      "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "controlProgram:", "controlAssignment:", "controlRun:", "controlFinding:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
@@ -1634,6 +1635,7 @@ export default function App() {
     apply("czone", zn, setZones, zoneSort);
     apply("cround", rd, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
+    apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
     apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
     apply("mmeet", mmt, setMeetings, (a, b) => b.at - a.at);
     apply("controlProgram", cprog, setControlPrograms, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
@@ -2071,7 +2073,7 @@ export default function App() {
     return buildBackupPayload({
       config,
       collections: {
-        users, fleet, tickets, pm, insp, templates, presence, zones, rounds, complaints, absences,
+        users, fleet, tickets, pm, insp, templates, presence, zones, rounds, complaints, absences, locations,
         tasks, meetings, controlPrograms, controlAssignments, controlRuns, controlFindings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, appIssues,
       },
       photos,
@@ -2118,7 +2120,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlPrograms, controlAssignments, controlRuns, controlFindings, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlPrograms, controlAssignments, controlRuns, controlFindings, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />

@@ -15,6 +15,7 @@ describe("backup model", () => {
       "rounds",
       "complaints",
       "absences",
+      "locations",
       "tasks",
       "meetings",
       "controlPrograms",
@@ -41,6 +42,7 @@ describe("backup model", () => {
       { key: "rounds", prefix: "cround:" },
       { key: "complaints", prefix: "ccomplaint:" },
       { key: "absences", prefix: "cabsence:" },
+      { key: "locations", prefix: "location:" },
       { key: "tasks", prefix: "mtask:" },
       { key: "meetings", prefix: "mmeet:" },
       { key: "controlPrograms", prefix: "controlProgram:" },
@@ -79,6 +81,7 @@ describe("backup model", () => {
       photos: { "photo:ticket-1": "data:image/png;base64,abc" },
     });
     expect(payload.meetings).toEqual([]);
+    expect(payload.locations).toEqual([]);
     expect(payload.controlPrograms).toEqual([]);
     expect(payload.controlAssignments).toEqual([]);
     expect(payload.controlRuns).toEqual([]);
