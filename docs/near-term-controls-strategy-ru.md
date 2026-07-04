@@ -58,17 +58,19 @@ userGroups foundation
    - create/edit group;
    - назначение lead/member/observer;
    - без scheduling и без controls run.
-3. Current: добавить `controls` в общую модель прав:
+3. Done: добавить `controls` в общую модель прав:
    - `view` для чтения;
    - `request` как временный уровень "выполнить назначенный обход";
    - `manage` для программ/назначений/контроля исполнения;
    - `full` для будущих чувствительных настроек и отчетов.
-4. Затем собрать первый маленький controls UI shell.
-5. После этого собрать первый рабочий сценарий:
+4. Done: собрать первый маленький controls UI shell.
+5. Current: собрать первый рабочий сценарий небольшими model/UI шагами:
    - manual safety/control walk;
    - one location target;
    - one finding;
    - route to report-only or `מטלות`.
+
+Текущий безопасный шаг: draft-only маршрут finding -> `מטלות`. Система может подготовить задачу с `source*` связями, но не должна создавать её автоматически без обычного product action/confirmation.
 
 ## What Not To Do Yet
 

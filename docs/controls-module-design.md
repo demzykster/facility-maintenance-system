@@ -641,6 +641,11 @@ Human confirmation is required for consequential writes.
 
 All accepted writes must use normal product operations, permissions, validation, and audit.
 
+Current implementation note:
+
+- the core model can build a `מטלות` task draft from a controls finding when the route is `task`;
+- this is intentionally draft-only: it preserves `sourceModule/sourceFindingId/sourceProgramId/sourceRunId`, but it does not create or save the task without the normal product action/confirmation.
+
 ## Suggested PR Sequence
 
 This is intentionally conservative.
@@ -652,10 +657,11 @@ This is intentionally conservative.
 5. Done: replace direct cleaner role checks and update server/KV/session policies so `worker + cleaningAccess` works.
 6. Done: pure `userGroups` / organizational memberships model and separate `userGroups` permission foundation.
 7. Done: controls programs/runs/findings/actions model-only PRs with tests.
-8. Current: add `controls` to the shared permissions model before exposing UI.
-9. Minimal `בקרות` UI shell.
-10. Domain increments: safety, quality, fleet controls, executive walk.
-11. Dashboard/insights layer.
+8. Done: `controls` was added to the shared permissions model before exposing UI.
+9. Done: minimal gated `בקרות` UI shell.
+10. Current: first narrow vertical-slice helpers, starting with finding-to-`מטלות` routing as a draft-only model path.
+11. Domain increments: safety, quality, fleet controls, executive walk.
+12. Dashboard/insights layer.
 
 Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
 
