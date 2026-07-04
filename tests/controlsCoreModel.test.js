@@ -22,6 +22,7 @@ describe("controls core model", () => {
       "safety-walk-basic",
       "fleet-yard-check",
       "quality-returns-sample",
+      "cleaning-zone-quality-check",
       "operations-executive-walk"
     ]);
 
@@ -36,6 +37,11 @@ describe("controls core model", () => {
       id: "fleet-yard-check",
       domain: "fleet",
       routeType: "task"
+    });
+    expect(controlManualRunPresetsForDomain("cleaning")[0]).toMatchObject({
+      id: "cleaning-zone-quality-check",
+      domain: "cleaning",
+      routeType: "report_only"
     });
     expect(controlManualRunPresetById("missing")).toBeNull();
   });
@@ -193,6 +199,61 @@ describe("controls core model", () => {
         fleetId: "fleet-123",
         label: "123 · מלגזה · OSE250",
         sourceModule: "fleet"
+      }
+    });
+  });
+
+  it("preserves cleaning zone targets without migrating them to locations", () => {
+    const program = controlProgramDraftFromManualPreset("cleaning-zone-quality-check", {
+      id: "prog-cleaning-quality",
+      targetType: "cleaning_zone",
+      targetIds: ["zone-a"],
+      responsibleIds: ["manager-1"]
+    });
+
+    expect(program).toMatchObject({
+      id: "prog-cleaning-quality",
+      domain: "cleaning",
+      targetType: "cleaning_zone",
+      targetIds: ["zone-a"],
+      actionPolicy: { defaultRouteType: "report_only" }
+    });
+
+    const assignment = controlAssignmentDraftFromProgram(program, {
+      id: "asg-cleaning-zone-a",
+      target: {
+        kind: "cleaning_zone",
+        id: "zone-a",
+        label: "שירותים קומה 1",
+        sourceModule: "cleaning"
+      },
+      dueAt: "2026-07-12"
+    });
+
+    expect(assignment).toMatchObject({
+      id: "asg-cleaning-zone-a",
+      target: {
+        kind: "cleaning_zone",
+        id: "zone-a",
+        label: "שירותים קומה 1",
+        sourceModule: "cleaning"
+      }
+    });
+    expect(assignment.target).not.toHaveProperty("locationId");
+
+    const run = controlRunDraftFromAssignment(assignment, {
+      id: "run-cleaning-zone-a",
+      performedById: "manager-1"
+    });
+
+    expect(run).toMatchObject({
+      id: "run-cleaning-zone-a",
+      programId: "prog-cleaning-quality",
+      target: {
+        kind: "cleaning_zone",
+        id: "zone-a",
+        label: "שירותים קומה 1",
+        sourceModule: "cleaning"
       }
     });
   });

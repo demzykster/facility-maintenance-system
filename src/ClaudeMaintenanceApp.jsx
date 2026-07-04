@@ -2702,7 +2702,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [], saveTask, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
+function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [], zones = [], rounds = [], complaints = [], saveTask, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
   const [controlTab, setControlTab] = useState("run");
@@ -2755,10 +2755,23 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     const unit = fleetById.get(fleetId);
     return unit ? (unitLabel(unit, config) || unit.id) : (fleetId || "");
   };
+  const cleaningTargets = useMemo(() => (zones || [])
+    .filter((zone) => zone?.id && zone.active !== false)
+    .slice()
+    .sort(zoneSort), [zones]);
+  const cleaningZoneById = useMemo(() => new Map(cleaningTargets.map((zone) => [zone.id, zone])), [cleaningTargets]);
+  const cleaningTargetLabel = (zoneId) => {
+    const zone = cleaningZoneById.get(zoneId);
+    if (!zone) return zoneId || "";
+    return [zone.name, zoneLoc(zone)].filter(Boolean).join(" · ") || zone.id;
+  };
   const targetObjectFor = (value, valueDomain = domain) => {
     const id = String(value || "").trim();
     if (valueDomain === "fleet") {
       return { kind: "fleet", id: id || undefined, fleetId: id || undefined, label: fleetTargetLabel(id) || undefined, sourceModule: "fleet" };
+    }
+    if (valueDomain === "cleaning") {
+      return { kind: "cleaning_zone", id: id || undefined, label: cleaningTargetLabel(id) || undefined, sourceModule: "cleaning" };
     }
     return { kind: "location", id: id || undefined, locationId: id || undefined, label: id || undefined };
   };
@@ -2766,6 +2779,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     const targetIds = program?.targetIds || [];
     if (!targetIds.length) return "";
     if (program.domain === "fleet" || program.targetType === "fleet") return targetIds.map(fleetTargetLabel).filter(Boolean).join(", ");
+    if (program.domain === "cleaning" || program.targetType === "cleaning_zone") return targetIds.map(cleaningTargetLabel).filter(Boolean).join(", ");
     return targetIds.join(", ");
   };
   const defaultResponsibleId = currentTaskUser?.id || activeUsers[0]?.id || "";
@@ -2849,6 +2863,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
   const areas = [
     { id: "safety", label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
     { id: "quality", label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
+    { id: "cleaning", label: "ניקיון", text: "מבט מנהלים על אזורי ניקיון ובדיקת איכות ידנית.", Icon: Sparkles, color: "#0EA5E9" },
     { id: "operations", label: "תפעול", text: "סיורי הנהלה, אזורים, תצפיות ושיפורי תהליך.", Icon: LayoutDashboard, color: "#2563EB" },
     { id: "fleet", label: "בקרת כלים", text: "בקרות ציוד שינוע כחלק מאותו מנוע בקרות.", Icon: Truck, color: "#EA580C" }
   ];
@@ -2857,6 +2872,29 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
   const selectedProgramPreset = programDraftPresets.find((preset) => preset.id === programDraft.presetId) || programDraftPresets[0] || null;
   const domainLabel = (value) => areas.find((a) => a.id === value)?.label || "בקרות";
   const programById = (id) => programOptions.find((program) => program.id === id) || null;
+  const cleaningOverview = useMemo(() => {
+    const now = Date.now();
+    const openComplaints = (complaints || []).filter((c) => c.status === "open" || c.status === "pending");
+    const rows = cleaningTargets.map((zone) => {
+      const statuses = zoneTodayStatuses(zone, rounds, now, config);
+      const missed = statuses.filter((s) => s.status === "missed").length;
+      const due = statuses.filter((s) => s.status === "due" || s.status === "overdue").length;
+      const zoneComplaints = openComplaints.filter((c) => c.zoneId === zone.id);
+      const latestRoundAt = lastRoundOf(zone.id, rounds);
+      return { zone, statuses, missed, due, openComplaints: zoneComplaints.length, latestRoundAt };
+    });
+    const attentionRows = rows
+      .filter((row) => row.missed || row.due || row.openComplaints)
+      .sort((a, b) => b.missed - a.missed || b.openComplaints - a.openComplaints || b.due - a.due || (b.latestRoundAt || 0) - (a.latestRoundAt || 0))
+      .slice(0, 6);
+    return {
+      activeZones: cleaningTargets.length,
+      openComplaints: openComplaints.length,
+      missedWindows: rows.reduce((sum, row) => sum + row.missed, 0),
+      dueWindows: rows.reduce((sum, row) => sum + row.due, 0),
+      attentionRows
+    };
+  }, [cleaningTargets, rounds, complaints, config]);
   const updateProgramDomain = (nextDomain) => {
     const presets = controlManualRunPresetsForDomain(nextDomain);
     const preset = presets[0] || null;
@@ -2884,7 +2922,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     const program = controlProgramDraftFromManualPreset(selectedProgramPreset.id, {
       id: uid(),
       name: programDraft.name,
-      targetType: programDraft.domain === "fleet" ? "fleet" : "location",
+      targetType: programDraft.domain === "fleet" ? "fleet" : programDraft.domain === "cleaning" ? "cleaning_zone" : "location",
       targetIds: programDraft.target ? [programDraft.target] : [],
       responsibleIds: programDraft.responsibleId ? [programDraft.responsibleId] : [],
       participantIds: programDraft.participantId ? [programDraft.participantId] : [],
@@ -2906,12 +2944,14 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     if (!assigneeId) return setMsg("בחרו מבצע לשיוך.");
     if (!draft.dueAt) return setMsg("בחרו תאריך ביצוע.");
     const isFleetProgram = program.domain === "fleet" || program.targetType === "fleet";
-    const targetValue = isFleetProgram ? (draft.targetFleetId || program.targetIds?.[0] || "") : (draft.target || program.targetIds?.[0] || "");
+    const isCleaningProgram = program.domain === "cleaning" || program.targetType === "cleaning_zone";
+    const targetValue = isFleetProgram ? (draft.targetFleetId || program.targetIds?.[0] || "") : isCleaningProgram ? (draft.targetCleaningZoneId || program.targetIds?.[0] || "") : (draft.target || program.targetIds?.[0] || "");
     if (isFleetProgram && !targetValue) return setMsg("בחרו כלי שינוע לשיוך.");
+    if (isCleaningProgram && !targetValue) return setMsg("בחרו אזור ניקיון לשיוך.");
     const assignment = controlAssignmentDraftFromProgram(program, {
       id: uid(),
       assignedToIds: [assigneeId],
-      target: targetObjectFor(targetValue, isFleetProgram ? "fleet" : "location"),
+      target: targetObjectFor(targetValue, isFleetProgram ? "fleet" : isCleaningProgram ? "cleaning" : "location"),
       dueAt: draft.dueAt,
       createdAt: Date.now()
     });
@@ -2986,6 +3026,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
   const finishRun = async () => {
     if (!name.trim()) return setMsg("תנו שם לבדיקה.");
     if (domain === "fleet" && !target) return setMsg("בחרו כלי שינוע לבדיקה.");
+    if (domain === "cleaning" && !target) return setMsg("בחרו אזור ניקיון לבדיקה.");
     if (!checklist.length) return setMsg("הוסיפו לפחות סעיף בדיקה אחד.");
     if (doneCount < checklist.length) return setMsg("סמנו תשובה לכל סעיף לפני סיום.");
     if (!signature.trim()) return setMsg("נדרשת חתימה אחת לסיום הסבב.");
@@ -3102,11 +3143,13 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
         {canManageControls && <div className="control-panel">
           <SectionTitle><Plus size={15} /> תכנית בקרה חדשה</SectionTitle>
           <div className="control-program-grid">
-            <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={programDraft.domain === a.id ? "on" : ""} onClick={() => updateProgramDomain(a.id)}>{a.label}</button>)}</div></label>
+            <label className="field"><span>תחום</span><div className="seg-tabs control-domain-tabs">{areas.map((a) => <button key={a.id} className={programDraft.domain === a.id ? "on" : ""} onClick={() => updateProgramDomain(a.id)}>{a.label}</button>)}</div></label>
             <label className="field"><span>תבנית</span><select value={programDraft.presetId} onChange={(e) => updateProgramPreset(e.target.value)}>{programDraftPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
             <label className="field"><span>שם התכנית</span><input value={programDraft.name} onChange={(e) => setProgramDraft((draft) => ({ ...draft, name: e.target.value }))} /></label>
             {programDraft.domain === "fleet"
               ? <label className="field"><span>כלי שינוע</span><select value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))}><option value="">{fleetTargets.length ? "בחרו כלי" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
+              : programDraft.domain === "cleaning"
+                ? <label className="field"><span>אזור ניקיון</span><select value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))}><option value="">{cleaningTargets.length ? "בחרו אזור" : "אין אזורי ניקיון פעילים"}</option>{cleaningTargets.map((zone) => <option key={zone.id} value={zone.id}>{cleaningTargetLabel(zone.id)}</option>)}</select></label>
               : <label className="field"><span>יעד / אזור</span><input value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))} placeholder={selectedProgramPreset?.targetPlaceholder || "לדוגמה: מחסן ראשי"} /></label>}
             <label className="field"><span>אחראי</span><select value={programDraft.responsibleId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, responsibleId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
             <label className="field"><span>משתתף נוסף</span><select value={programDraft.participantId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, participantId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
@@ -3132,6 +3175,8 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
                   <label className="field mini"><span>תאריך</span><input type="date" value={draft.dueAt || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), dueAt: e.target.value } }))} /></label>
                   {(program.domain === "fleet" || program.targetType === "fleet")
                     ? <label className="field mini"><span>כלי</span><select value={draft.targetFleetId || program.targetIds?.[0] || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), targetFleetId: e.target.value } }))}><option value="">{fleetTargets.length ? "בחרו כלי" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
+                    : (program.domain === "cleaning" || program.targetType === "cleaning_zone")
+                      ? <label className="field mini"><span>אזור ניקיון</span><select value={draft.targetCleaningZoneId || program.targetIds?.[0] || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), targetCleaningZoneId: e.target.value } }))}><option value="">{cleaningTargets.length ? "בחרו אזור" : "אין אזורי ניקיון פעילים"}</option>{cleaningTargets.map((zone) => <option key={zone.id} value={zone.id}>{cleaningTargetLabel(zone.id)}</option>)}</select></label>
                     : <label className="field mini"><span>יעד</span><input value={draft.target || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), target: e.target.value } }))} placeholder={program.targetIds?.[0] || "לפי התכנית"} /></label>}
                   <button className="btn-ghost sm" onClick={() => saveManualAssignment(program)} disabled={busy}><CalendarClock size={14} /> שיוך</button>
                 </div>}
@@ -3157,14 +3202,43 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
       </div>}
       {controlTab === "run" && <>
       {activeAssignmentRun && <div className="note" style={{ marginBottom: 12 }}><b>בדיקה מתוך שיוך:</b> {activeAssignmentRun.program?.name} · {activeAssignmentRun.assignment?.target?.label || activeAssignmentRun.assignment?.target?.id || "ללא יעד"} · {activeAssignmentRun.assignment?.dueAt ? fmtDate(activeAssignmentRun.assignment.dueAt) : "ללא תאריך"}</div>}
+      {domain === "cleaning" && <div className="control-panel cleaning-control-overview">
+        <div className="row-between" style={{ alignItems: "flex-start", gap: 10 }}>
+          <div>
+            <SectionTitle><Sparkles size={15} /> ניקיון · מבט בקרה</SectionTitle>
+            <div className="hint">קריאה בלבד מתוך מודול הניקיון הקיים: אזורים, סבבים ודיווחים. בדיקת איכות ידנית נשמרת כרשומת בקרות נפרדת.</div>
+          </div>
+          <span className="badge sm" style={{ background: "#E0F2FE", color: "#0369A1", border: "1px solid #BAE6FD" }}>ללא שינוי QR/סבבים</span>
+        </div>
+        <div className="control-cleaning-kpis">
+          <div className="kpi-mini"><span className="kpi-mini-v">{cleaningOverview.activeZones}</span><span className="kpi-mini-l">אזורים פעילים</span></div>
+          <div className="kpi-mini"><span className="kpi-mini-v" style={cleaningOverview.dueWindows ? { color: "#B45309" } : {}}>{cleaningOverview.dueWindows}</span><span className="kpi-mini-l">חלונות לביצוע/באיחור</span></div>
+          <div className="kpi-mini"><span className="kpi-mini-v" style={cleaningOverview.missedWindows ? { color: "#DC2626" } : {}}>{cleaningOverview.missedWindows}</span><span className="kpi-mini-l">חלונות שפוספסו היום</span></div>
+          <div className="kpi-mini"><span className="kpi-mini-v" style={cleaningOverview.openComplaints ? { color: "#DC2626" } : {}}>{cleaningOverview.openComplaints}</span><span className="kpi-mini-l">דיווחים פתוחים</span></div>
+        </div>
+        {cleaningOverview.attentionRows.length ? <div className="control-cleaning-list">{cleaningOverview.attentionRows.map(({ zone, statuses, missed, due, openComplaints, latestRoundAt }) => <div key={zone.id} className="control-cleaning-row">
+          <div className="task-row-main">
+            <div className="task-row-t">{zone.name}</div>
+            <div className="task-row-desc">{zoneLoc(zone) || "—"} · {zone.cleanerName || "ללא אחראי"} · {latestRoundAt ? "נוקה " + timeAgo(latestRoundAt) : "טרם נוקה"}</div>
+            <div className="win-chips">{statuses.length ? statuses.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>) : <span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span>}</div>
+          </div>
+          <div className="task-row-side">
+            {!!missed && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{missed} פוספסו</span>}
+            {!!due && <span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309" }}>{due} לביצוע</span>}
+            {!!openComplaints && <span className="badge sm" style={{ background: "#E0F2FE", color: "#0369A1" }}>{openComplaints} דיווחים</span>}
+          </div>
+        </div>)}</div> : <div className="note" style={{ marginTop: 10 }}>אין כרגע אזורי ניקיון שדורשים תשומת לב לפי חלונות היום או דיווחים פתוחים.</div>}
+      </div>}
       <div className="control-run-grid">
         <div className="control-panel">
           <SectionTitle><currentArea.Icon size={15} /> בדיקה ידנית</SectionTitle>
           <label className="field"><span>שם הבדיקה</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={domain === a.id ? "on" : ""} onClick={() => setDomain(a.id)}>{a.label}</button>)}</div><div className="hint">{currentArea.text}</div></label>
+          <label className="field"><span>תחום</span><div className="seg-tabs control-domain-tabs">{areas.map((a) => <button key={a.id} className={domain === a.id ? "on" : ""} onClick={() => setDomain(a.id)}>{a.label}</button>)}</div><div className="hint">{currentArea.text}</div></label>
           {domainPresets.length > 0 && <div className="field"><span>תבניות מהירות</span><div className="control-preset-row">{domainPresets.map((preset) => <button key={preset.id} type="button" className="control-preset-btn" onClick={() => applyManualPreset(preset)}><ListChecks size={14} /> {preset.name}</button>)}</div><div className="hint">בחירת תבנית מחליפה את שם הבדיקה והצ׳קליסט בלבד. היעד נשאר לבחירה ידנית.</div></div>}
           {domain === "fleet"
             ? <label className="field"><span>כלי שינוע</span><select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">{fleetTargets.length ? "בחרו כלי לבדיקה" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
+            : domain === "cleaning"
+              ? <label className="field"><span>אזור ניקיון</span><select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">{cleaningTargets.length ? "בחרו אזור לבדיקה" : "אין אזורי ניקיון פעילים"}</option>{cleaningTargets.map((zone) => <option key={zone.id} value={zone.id}>{cleaningTargetLabel(zone.id)}</option>)}</select><div className="hint">הבחירה משתמשת באזור ניקיון קיים בלבד; היא לא משנה חלונות, QR או שיוכי ניקיון.</div></label>
             : <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={targetPlaceholder} /></label>}
           <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
           <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
@@ -9968,6 +10042,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .control-mode-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:11px;padding:10px 12px;font-size:13px;font-weight:900;cursor:pointer;min-width:0;}
 .control-mode-tabs button.on{background:#FFF7ED;border-color:#FDBA74;color:#C2410C;box-shadow:0 0 0 1px rgba(234,88,12,.08);}
 .control-mode-tabs button svg{flex:none;}
+.control-domain-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%;}
+.control-domain-tabs button{min-width:0;white-space:normal;}
 .control-programs-wrap{display:flex;flex-direction:column;gap:12px;}
 .control-program-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
 .control-program-split{display:grid;grid-template-columns:minmax(320px,1.1fr) minmax(300px,.9fr);gap:12px;align-items:start;}
@@ -9986,6 +10062,10 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .control-preset-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer;max-width:100%;text-align:start;}
 .control-preset-btn:hover{background:var(--surface-2);border-color:#FDBA74;}
 .control-preset-btn svg{flex:none;color:var(--muted);}
+.cleaning-control-overview{margin-bottom:12px;border-inline-start:4px solid #0EA5E9;}
+.control-cleaning-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px;}
+.control-cleaning-list{display:flex;flex-direction:column;gap:7px;margin-top:10px;}
+.control-cleaning-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:11px;background:var(--surface-2);padding:9px 10px;}
 .control-run-detail{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:12px;margin-top:4px;}
 .control-answer-list{display:grid;grid-template-columns:1fr;gap:6px;}
 .control-answer-item,.control-finding-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;}
@@ -10023,7 +10103,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .control-answer-tabs button.on.na{background:var(--surface-2);border-color:#CBD5E1;color:var(--ink);}
 .control-find-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
 @media(max-width:980px){.control-program-split,.control-program-grid{grid-template-columns:1fr}.control-assignment-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.control-assignment-editor .btn-ghost{grid-column:1/-1;justify-content:center}}
-@media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row,.control-mode-tabs,.control-assignment-row{grid-template-columns:1fr}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}.control-program-head{flex-direction:column}.control-assignment-editor{grid-template-columns:1fr}}
+@media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row,.control-mode-tabs,.control-assignment-row,.control-cleaning-row{grid-template-columns:1fr}.control-domain-tabs,.control-cleaning-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}.control-program-head{flex-direction:column}.control-assignment-editor{grid-template-columns:1fr}}
 .task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
 .task-due{font-size:11px;color:var(--muted);white-space:nowrap;}
 .ppe-request-list{display:flex;flex-direction:column;gap:8px;}

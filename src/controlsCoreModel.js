@@ -47,6 +47,15 @@ export const CONTROL_MANUAL_RUN_PRESETS = Object.freeze([
     routeType: "report_only"
   },
   {
+    id: "cleaning-zone-quality-check",
+    domain: "cleaning",
+    name: "בדיקת איכות ניקיון",
+    targetPlaceholder: "בחרו אזור ניקיון קיים",
+    checklistItems: ["האזור נקי ומוכן לשימוש", "חומרים מתכלים מלאים", "אין ריח/כתמים/אשפה גלויים", "אין תקלה שמצריכה קריאה"],
+    defaultSeverity: "low",
+    routeType: "report_only"
+  },
+  {
     id: "operations-executive-walk",
     domain: "operations",
     name: "סיור הנהלה ידני",
