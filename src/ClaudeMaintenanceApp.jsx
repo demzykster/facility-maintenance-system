@@ -5213,8 +5213,8 @@ function PpeDashboard({ items, ppe, config, pend, onPend, onCreateOrder, onCatal
   const Kpi = ({ v, l, c, Ic, on, onClick }) => <button type="button" onClick={onClick} disabled={!onClick} style={{ flex: "1 1 130px", textAlign: "start", ...cardBase, borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, cursor: onClick ? "pointer" : "default", outline: on ? "2px solid #0D9488" : "none" }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 28, fontWeight: 800, color: c || "inherit" }}>{v}</span><Ic size={20} color={c || "var(--muted)"} /></div><span style={{ fontSize: 13, color: "var(--muted)" }}>{l}</span></button>;
   const ItemRow = ({ it }) => { const sizes = ppeSizes(it); const lw = ppeLow(it); return <div style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}><div className="row-between"><span style={{ fontWeight: 600 }}>{it.name}{ppeIsUpgrade(it, active) ? " ★" : ""}</span><span style={{ fontSize: 12, color: lw ? "#DC2626" : "var(--muted)" }}>סה״כ {ppeTotalStock(it)}{ppeMinTotal(it) ? ` · מינ׳ ${ppeMinTotal(it)}` : ""} · {ils(it.unitCost || 0)}</span></div><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>{sizes.map((sz) => { const sl = ppeLowSize(it, sz); return <span key={sz} style={{ padding: "2px 8px", borderRadius: 6, background: sl ? "#FEE2E2" : "var(--surface-2)", color: sl ? "#B91C1C" : "inherit", fontSize: 12 }}>{szLbl(sz)}: <b>{ppeStockOf(it, sz)}</b></span>; })}</div></div>; };
   const fltItems = flt === "low" ? low : flt === "out" ? out : null;
-  return (<div>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+  return (<div className="ppe-dashboard">
+    <div className="ppe-kpi-grid">
       <Kpi v={active.length} l={countLabel(active.length, "פריט בקטלוג", "פריטים בקטלוג")} Ic={Package} onClick={onCatalog} />
       {pend ? <Kpi v={pend} l="בקשות ממתינות" c="#B45309" Ic={ClipboardList} onClick={onPend} /> : null}
       <Kpi v={low.length} l="חוסרים לפי מידה" c={low.length ? "#DC2626" : null} Ic={AlertTriangle} on={flt === "low"} onClick={low.length ? (() => setFlt(flt === "low" ? null : "low")) : null} />
@@ -5293,7 +5293,7 @@ function PpeRequests({ ppe, reqs, items, norms, users, config, session, savePpe,
   const lineTxt = (r) => r.lines.map((l) => `${l.itemName}${l.size && l.size !== "אחיד" ? ` (${l.size})` : ""}${l.qty > 1 ? ` ×${l.qty}` : ""}`).join(" · ");
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> בקשות הנפקה</SectionTitle></div>
-    {pend.length === 0 ? <Empty text="אין בקשות ממתינות" Icon={ClipboardList} sub="בקשות מהמנהלים יופיעו כאן לאישור" /> : <div className="task-list">{pend.map((r) => <div key={r.id} className="task-row" style={{ borderInlineStartColor: "#D97706", cursor: "default" }}>
+    {pend.length === 0 ? <Empty text="אין בקשות ממתינות" Icon={ClipboardList} sub="בקשות מהמנהלים יופיעו כאן לאישור" /> : <div className="task-list ppe-request-list">{pend.map((r) => <div key={r.id} className="task-row" style={{ borderInlineStartColor: "#D97706", cursor: "default" }}>
       <div className="task-row-main"><div className="task-row-t">{r.workerName}{r.workerNo ? ` · מס׳ ${r.workerNo}` : ""}{r.dept ? ` · ${r.dept}` : ""}</div><div className="task-row-sub">{lineTxt(r)}</div><div className="task-row-sub">מאת {(r.by && r.by.name) || "—"} · {fmtDate(r.at)}{r.note ? ` · ${r.note}` : ""}</div>
         {rejId === r.id && <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="סיבת דחייה" autoFocus style={{ flex: 1 }} /><button className="btn-danger sm" onClick={() => doReject(r)}>דחה</button><button className="btn-ghost sm" onClick={() => { setRejId(null); setReason(""); }}>בטל</button></div>}</div>
       {rejId !== r.id && <div className="task-row-side" style={{ flexDirection: "column", gap: 6 }}><button className="btn-primary sm" onClick={() => setApprove(r)}>אישור והנפקה</button><button className="btn-ghost sm" onClick={() => { setRejId(r.id); setReason(""); }}>דחייה</button></div>}
@@ -5460,7 +5460,7 @@ function PpeHub(p) {
   return (<>
     <div className="seg-tabs" style={{ flexWrap: "wrap", marginBottom: 14 }}><button className={sub === "dash" ? "on" : ""} onClick={() => setSub("dash")}>לוח מלאי</button><button className={sub === "log" ? "on" : ""} onClick={() => setSub("log")}>תנועות מלאי</button><button className={sub === "catalog" ? "on" : ""} onClick={() => setSub("catalog")}>קטלוג</button><button className={sub === "settings" ? "on" : ""} onClick={() => setSub("settings")}>הגדרות</button></div>
     {(tab === "dash" || tab === "log") && <div className="row-between" style={{ marginBottom: 10, alignItems: "center" }}><span className="hint">נתונים לחודש</span><MonthPicker y={mY} m={mM} onChange={(Y, M) => { setMY(Y); setMM(M); }} /></div>}
-    {tab === "dash" ? <>{pendN > 0 && <PpeRequests ppe={ppe} reqs={ppeReqs} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} compact />}<PpeDashboard items={ppeItems} ppe={ppe} config={config} pend={pendN} onPend={() => window.scrollTo({ top: 0, behavior: "smooth" })} onCreateOrder={openOrder} onCatalog={() => setSub("catalog")} onMovements={() => setSub("log")} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} /></>
+    {tab === "dash" ? <div className="ppe-dash-flow">{pendN > 0 && <section className="ppe-dash-section"><PpeRequests ppe={ppe} reqs={ppeReqs} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} compact /></section>}<section className="ppe-dash-section"><PpeDashboard items={ppeItems} ppe={ppe} config={config} pend={pendN} onPend={() => window.scrollTo({ top: 0, behavior: "smooth" })} onCreateOrder={openOrder} onCatalog={() => setSub("catalog")} onMovements={() => setSub("log")} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} /></section></div>
       : tab === "catalog" ? <PpeCatalog items={ppeItems} ppe={ppe} session={session} savePpe={savePpe} onSave={savePpeItem} onDelete={delPpeItem} />
       : tab === "settings" ? <><PpeNorms items={ppeItems} norms={ppeNorms} config={config} onSave={saveNorm} onDelete={delNorm} /><div style={{ height: 18 }} /><PpeClawbackSettings config={config} onSave={saveConfig} /><div style={{ height: 18 }} /><PpeSignTemplate config={config} onSave={saveConfig} /></>
       : <PpeLog ppe={ppe} items={ppeItems} norms={ppeNorms} users={users} config={config} session={session} deptScope={deptScope} canIssue={true} canExit={true} reqMode={false} mStart={mStart} mEnd={mEnd} mLabel={mLabel} orders={ppeOrders} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpe={savePpe} delPpe={delPpe} savePpeItem={savePpeItem} saveUser={saveUser} />}
@@ -9036,6 +9036,12 @@ a{color:inherit;}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;}
 .kpi-num{font-family:var(--font-head);font-weight:700;font-size:28px;line-height:1;}.kpi-num.sm{font-size:20px;}
 .kpi-lbl{color:var(--muted);font-size:12.5px;margin-top:5px;}
+.ppe-dash-flow{display:flex;flex-direction:column;gap:22px;}
+.ppe-dash-section{min-width:0;}
+.ppe-dashboard{display:flex;flex-direction:column;gap:22px;}
+.ppe-kpi-grid{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;}
+.ppe-kpi-grid>button{min-height:106px;}
+.ppe-request-list{gap:10px;}
 .big-stat{font-family:var(--font-head);font-weight:700;font-size:30px;color:#16A34A;}
 .wtoggles{display:flex;flex-wrap:wrap;gap:8px;}
 .wtoggle{display:flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface-2);border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--muted);}
