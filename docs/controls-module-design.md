@@ -43,6 +43,7 @@ These decisions are considered agreed unless the owner changes direction:
 - Current app users/history are not valuable for migration as of 2026-07-04 unless the owner says otherwise later. This allows architecture cleanup to avoid preserving obsolete local/staging records, but destructive Supabase cleanup still requires an explicit owner request.
 - Legacy `שאלונים` / `inspection_templates` should be removed rather than kept as dead product surface.
 - `בקרת כלים` should become one category/domain inside the future `בקרות` model, not remain a separate parallel inspection universe.
+- Fleet/tool controls should target real fleet records whenever possible. A fleet control assignment/run/finding should preserve a structured target such as `kind: "fleet"` plus `fleetId`, instead of only a free-text target label.
 - `מטלות` should become the shared action/follow-up layer after source links, permissions, and visibility are clarified.
 - Locations/zones should converge into one object-based model; do not add a third location list.
 - Quality (`איכות`) is a large domain inside the shared control engine, not a small checklist add-on.

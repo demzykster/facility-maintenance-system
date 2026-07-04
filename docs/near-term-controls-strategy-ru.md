@@ -21,6 +21,7 @@
 - Stable storage contract уже закрыт: зарезервированы `controlProgram:*`, `controlAssignment:*`, `controlRun:*`, `controlFinding:*` и будущие таблицы `control_programs`, `control_assignments`, `control_runs`, `control_findings`.
 - Первый маленький domain increment уже начат: ручные `בקרות` получили легкие шаблоны для safety walk, fleet/tool check, quality sample и operations/executive walk. Эти шаблоны только заполняют название/чеклист ручного обхода; они не создают расписания, программы, назначения или новые таблицы.
 - Следующий UI-мост: из ручного шаблона можно сохранить первую `Control Program`, из программы создать один ручной `Assignment`, открыть из него `Run`, сохранить `Finding` и при необходимости создать `מטלה` с source links. Это не scheduling engine, не автогенерация назначений и не broad controls dashboard.
+- Fleet controls target rule: `בקרת כלים` is not a generic checklist detached from the fleet list. When the domain is `fleet`, the operator should choose a real fleet record; assignments/runs/findings preserve `target.kind = "fleet"` and `fleetId`.
 - `פגישות` / `פ.ע` согласованы как общий contextual work-event layer: обычная `פ.ע` остается default-сценарием, а встречи из `בקרות`, `מטלות`, `קריאות`, комитетов или executive walk должны получать context/source links вместо отдельной несовместимой логики.
 
 ## Ближайший Правильный Шаг
@@ -78,7 +79,7 @@ first narrow domain increment
 Закрыто в первом ручном UI-slice: один ручной обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Completed run/finding сохраняются как shared KV `controlRun:*` / `controlFinding:*`, история показывает детали с подписью/ответами/ממצאים, а finding с созданной задачей открывает связанную `מטלה` из истории.
 
 6. Done: зарезервировать stable storage contract для controls programs/assignments/runs/findings.
-7. Current: первый сохраненный Program -> Assignment -> Run -> Finding -> Action scenario. Scope: save program from preset, create one manual assignment, start a run from that assignment, preserve program/assignment links through run/finding/task. Без scheduling engine, без cleaning migration, без Supabase table migration и без broad dashboard.
+7. Current: tighten the first saved Program -> Assignment -> Run -> Finding -> Action scenario for fleet controls. Scope: `fleet` domain uses real fleet records as targets and stores fleet target links through assignment/run/finding. Без scheduling engine, без fleet bulk import, без cleaning migration, без Supabase table migration и без broad dashboard.
 
 ## What Not To Do Yet
 
