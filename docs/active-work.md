@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/fix-worker-cleaning-tab`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: fix worker cleaning-tab eligibility after first-login/PIN sessions so cleaning department and manual cleaning access survive session mapping.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #622 fixed worker cleaning-tab eligibility after first-login/PIN sessions: session mapping now preserves `dept/depts` and manual `cleaningAccess`, and the cleaning access model accepts both local and server session field shapes.
   - PR #620 fixed the bottom spacing in the user create/edit form: active-status hints, advanced permissions, and the save button now sit in a stable footer rhythm so RTL text cannot visually collide with controls.
   - PR #618 refined the user-create form defaults and field order: new users now start with no preselected role, department, or extra permission; role choices read left-to-right by hierarchy (`worker`, `tech`, `department manager`, `system admin`); login identifier fields sit near the name; advanced permissions stay at the bottom of the form.
   - PR #616 improved the user-create/edit form UX: role, shift, and worker department choices now use compact RTL-friendly choice buttons; advanced module permissions use permission cards with level buttons instead of stacked native selects; cleaning access stays automatic for `worker + ניקיון`, with manual cleaning-round exception kept inside advanced permissions.
