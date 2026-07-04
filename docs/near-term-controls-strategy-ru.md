@@ -16,6 +16,7 @@
 - Решено: `cleaner` не остается долгосрочной core role. Будущая модель: `worker + cleaning access/capability`.
 - Зафиксировано: текущие users/history/app data не ценны для миграции, пока owner не скажет иначе. Destructive Supabase cleanup все равно только по явной команде.
 - Cleaning-access foundation уже закрыт: helper/model, UI-пути, session/KV write paths, cleanup роли при создании пользователя, профильный экран уборки для cleaning worker и мобильный role-preview уже прошли через последние merged PR.
+- Controls core model уже закрыт: Program, Assignment, Run, Finding, visibility, action routes, dashboard signal envelope.
 
 ## Ближайший Правильный Шаг
 
@@ -57,13 +58,13 @@ userGroups foundation
    - create/edit group;
    - назначение lead/member/observer;
    - без scheduling и без controls run.
-3. Current: добавить controls core model:
-   - Program
-   - Assignment
-   - Run
-   - Finding
-   - Action route
-4. Собрать первый маленький vertical slice:
+3. Current: добавить `controls` в общую модель прав:
+   - `view` для чтения;
+   - `request` как временный уровень "выполнить назначенный обход";
+   - `manage` для программ/назначений/контроля исполнения;
+   - `full` для будущих чувствительных настроек и отчетов.
+4. Затем собрать первый маленький controls UI shell.
+5. После этого собрать первый рабочий сценарий:
    - manual safety/control walk;
    - one location target;
    - one finding;

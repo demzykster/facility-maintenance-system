@@ -369,7 +369,7 @@ The existing permissions model should be extended rather than bypassed.
 Permission direction:
 
 - `controls:view`
-- `controls:perform`
+- `controls:request` as the current perform/run level, because the shared permission model uses `request` rather than a separate `perform` level;
 - `controls:manage`
 - `controls:full`
 - `quality:view/manage` if separated later;
@@ -377,7 +377,7 @@ Permission direction:
 - `workCalendar:manage`
 - `tasks:view/manage` if tasks become formal shared action layer.
 
-Detailed permission naming should be decided before implementation.
+Initial permission naming is now decided for the shared permission editor: one `controls` module with levels `none/view/request/manage/full`. If a later UI needs clearer copy, the UI can label `request` as "ביצוע" without adding a second permission level.
 
 ## Work Calendar
 
@@ -626,16 +626,16 @@ This is intentionally conservative.
 4. Done: pure `cleaningAccessModel` helper/test PR with legacy `role === "cleaner"` compatibility.
 5. Done: replace direct cleaner role checks and update server/KV/session policies so `worker + cleaningAccess` works.
 6. Done: pure `userGroups` / organizational memberships model and separate `userGroups` permission foundation.
-7. Current: controls programs/runs/findings/actions model-only PRs with tests.
-8. Minimal `בקרות` UI shell.
-9. Domain increments: safety, quality, fleet controls, executive walk.
-10. Dashboard/insights layer.
+7. Done: controls programs/runs/findings/actions model-only PRs with tests.
+8. Current: add `controls` to the shared permissions model before exposing UI.
+9. Minimal `בקרות` UI shell.
+10. Domain increments: safety, quality, fleet controls, executive walk.
+11. Dashboard/insights layer.
 
 Quality scope guardrail: the first quality slice should be deliberately narrow: one QA process, one finding flow, and one action route. Do not include worker scoring, CAPA, customer SLA, broad sampling automation, or quality BI in the first controls slice.
 
 ## Open Questions
 
-- Final permission module names and levels.
 - Whether old fleet inspection history remains visible after legacy template removal.
 - Exact migration path from `config.zones` and `czone:*` into shared `locations`.
 - Whether task storage/table naming should remain as compatibility layer or be renamed later.
