@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/user-form-permissions-ux`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: improve the user-create/edit form UX: remove visually noisy native selects for role/shift/worker department, replace permission-module selects with compact RTL-friendly permission cards, and keep cleaning access as an advanced exception while department `ניקיון` stays the automatic source.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #616 improved the user-create/edit form UX: role, shift, and worker department choices now use compact RTL-friendly choice buttons; advanced module permissions use permission cards with level buttons instead of stacked native selects; cleaning access stays automatic for `worker + ניקיון`, with manual cleaning-round exception kept inside advanced permissions.
   - PR #614 removed `cleaner` from the new-user role selector and made cleaning access automatic for regular `worker` users assigned to the `ניקיון` department. Demo/default cleaning users now use `worker + ניקיון`; low-level legacy `role === "cleaner"` compatibility remains for old records/events.
   - PR #612 added the user-form control that lets an authorized manager/admin mark a regular `worker` as cleaning-capable via `cleaningAccess`, making the merged WorkerApp cleaning tab testable without reviving `cleaner` as the future role. Supabase/RLS migration, data cleanup, zone assignment rewrite, and controls work were intentionally not changed.
   - PR #610 added an embedded cleaning tab inside `WorkerApp` for worker users who have cleaning access/capability. Legacy `role === "cleaner"` standalone routing remains compatible; user creation/editing, zone assignment writes, Supabase policies, destructive data cleanup, and broader controls work were intentionally not changed.
