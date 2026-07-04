@@ -2682,7 +2682,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlFindings = [], saveControlRun, saveControlFinding }) {
+function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlFindings = [], saveControlRun, saveControlFinding, onOpenTask }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
   const [name, setName] = useState("סיור בטיחות ידני");
@@ -2972,7 +2972,10 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
                     {finding.description && <div className="task-row-desc">{finding.description}</div>}
                     <div className="task-row-sub">{findingRouteLabel(finding)}</div>
                   </div>
-                  <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
+                  <div className="task-row-side">
+                    <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
+                    {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
+                  </div>
                 </div>;
               }) : <div className="hint">לא נרשמו ממצאים בסבב הזה.</div>}
             </div>
@@ -2988,7 +2991,7 @@ function ControlsHub({ session, users = [], saveTask, controlRuns = [], controlF
 function UserApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
   const [view, setView] = useState("tickets");
-  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null);
+  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null), [taskNav, setTaskNav] = useState(null);
   const goNotif = (go, ev) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); setDeptNav(ev?.fleetId ? { fleetId: ev.fleetId, _t: Date.now() } : null); } };
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
@@ -2996,6 +2999,7 @@ function UserApp(p) {
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
   const openTicket = (id) => setOverlay({ type: "detail", id });
+  const openTaskFromControls = (id) => { setTaskNav({ id, _t: Date.now() }); setView("tasks"); };
   const needAct = mine.filter((t) => isOpen(t) && (ballIn(t) === "manager" || (isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework")))).length;
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
@@ -3063,7 +3067,7 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} />) : activeView === "controls" && mayViewControls ? (<ControlsHub {...p} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "controls" && mayViewControls ? (<ControlsHub {...p} onOpenTask={openTaskFromControls} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -4664,6 +4668,13 @@ function TasksModule(p) {
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [imp, setImp] = useState(false), [ai, setAi] = useState(false), [openMeetingId, setOpenMeetingId] = useState(null);
   const [st, setSt] = useState("all"), [who, setWho] = useState("all"), [pr, setPr] = useState("all"), [q, setQ] = useState(""), [grp, setGrp] = useState("status"), [coll, setColl] = useState({}), [quick, setQuick] = useState("all"), [moreOpen, setMoreOpen] = useState(false), [tagFilter, setTagFilter] = useState("");
   const [selectedIds, setSelectedIds] = useState([]), [bulkStatus, setBulkStatus] = useState("todo"), [bulkBusy, setBulkBusy] = useState(false), [bulkMsg, setBulkMsg] = useState(""), [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  useEffect(() => {
+    const id = typeof p.focusTaskId === "string" ? p.focusTaskId : p.focusTaskId?.id;
+    if (id && (tasks || []).some((t) => t.id === id)) {
+      setOpenId(id);
+      p.onTaskFocusConsumed?.();
+    }
+  }, [p.focusTaskId, tasks, p.onTaskFocusConsumed]);
   const isAdmin = session.role === "admin";
   const scope = (tasks || []).filter((t) => taskVisible(t, session, users) && (!t.isPrivate || t.ownerId === session.id));
   const rows = scope.filter((t) => {
@@ -4924,6 +4935,9 @@ function MeetingsModule(p) {
 function ManageHub(p) {
   const [sub, setSub] = useState("tasks");
   const canEditSettings = canManageSettings(p.session);
+  useEffect(() => {
+    if (p.focusTaskId) setSub("tasks");
+  }, [p.focusTaskId]);
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 420, marginBottom: 14 }}><button className={sub === "tasks" ? "on" : ""} onClick={() => setSub("tasks")}>מטלות</button><button className={sub === "meetings" ? "on" : ""} onClick={() => setSub("meetings")}>פגישות</button>{canEditSettings && <button className={sub === "settings" ? "on" : ""} onClick={() => setSub("settings")}>הגדרות</button>}</div>
     {sub === "settings" && canEditSettings ? <TaskStatusSettings config={p.config} saveConfig={p.saveConfig} /> : sub === "meetings" ? <MeetingsModule {...p} /> : <TasksModule {...p} />}
@@ -5885,13 +5899,14 @@ function PpeHub(p) {
 
 function AdminApp(p) {
   const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
-  const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null);
+  const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
   const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const clearTicketFilter = () => setTFilter(null);
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
   const goPpe = (nav = {}) => { setPpeNav({ ...nav, _t: Date.now() }); setTab("ppe"); };
+  const openTaskFromControls = (id) => { setTaskNav({ id, _t: Date.now() }); setTab("tasks"); };
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
   const mayViewAnalytics = canViewAnalytics(session);
@@ -5932,8 +5947,8 @@ function AdminApp(p) {
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
-          {activeTab === "tasks" && <ManageHub {...p} />}
-          {activeTab === "controls" && mayViewControls && <ControlsHub {...p} />}
+          {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
+          {activeTab === "controls" && mayViewControls && <ControlsHub {...p} onOpenTask={openTaskFromControls} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
           {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
