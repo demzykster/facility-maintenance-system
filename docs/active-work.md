@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/controls-program-assignment-drafts`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: model-only controls program/assignment draft helpers; no UI, scheduling engine, Supabase migration, or cleaning/location migration.
 - Latest completed product work:
   - PR #682 added lightweight manual `בקרות` domain presets: safety walk, fleet/tool check, quality sample, and operations/executive walk can prefill the manual run name/checklist without creating schedules, assignments, Supabase tables, or cleaning/location migration.
   - PR #680 reserved shared base `locations` storage as `location:*` / `locations`, wired it through backup/export, app load state, KV allowlist, and permissions, and documented that cleaning remains on `czone:*` until a dedicated migration.

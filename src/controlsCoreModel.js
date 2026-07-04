@@ -101,6 +101,35 @@ export const controlManualRunPresetById = (id = "") => {
   return CONTROL_MANUAL_RUN_PRESETS.find((preset) => preset.id === presetId) || null;
 };
 
+export const controlProgramDraftFromManualPreset = (presetId = "", options = {}) => {
+  const preset = controlManualRunPresetById(presetId);
+  if (!preset) return null;
+
+  return normalizeControlProgram({
+    id: options.id,
+    name: options.name || preset.name,
+    domain: preset.domain,
+    process: options.process,
+    active: options.active,
+    targetType: options.targetType || "location",
+    targetRules: options.targetRules,
+    targetIds: options.targetIds,
+    checklistItems: preset.checklistItems,
+    responsiblePolicy: options.responsiblePolicy,
+    responsibleIds: options.responsibleIds,
+    participantIds: options.participantIds,
+    notifyIds: options.notifyIds,
+    groupIds: options.groupIds,
+    visibility: options.visibility,
+    actionPolicy: {
+      defaultRouteType: preset.routeType,
+      ...objectOrEmpty(options.actionPolicy)
+    },
+    photoPolicy: options.photoPolicy,
+    sourcePresetId: preset.id
+  });
+};
+
 const normalizeTarget = (target = {}) => {
   if (!target || typeof target !== "object" || Array.isArray(target)) {
     const id = cleanString(target);
@@ -190,6 +219,7 @@ export const normalizeControlProgram = (program = {}) => {
     id,
     name,
     domain,
+    sourcePresetId: cleanString(program.sourcePresetId || program.presetId) || undefined,
     process: cleanString(program.process) || undefined,
     active: program.active !== false,
     targetType: cleanString(program.targetType || program.targetKind) || "location",
@@ -226,6 +256,35 @@ export const normalizeControlAssignment = (assignment = {}) => {
     generatedBy: cleanString(assignment.generatedBy || assignment.source) || "manual",
     createdAt: assignment.createdAt || null,
     sourceProgramId: cleanString(assignment.sourceProgramId || assignment.programId) || undefined
+  });
+};
+
+export const controlAssignmentDraftFromProgram = (program = {}, options = {}) => {
+  const normalized = normalizeControlProgram(program);
+  if (!normalized.id || !normalized.name) return null;
+
+  const fallbackTargetId = normalized.targetIds?.[0] || "";
+  const target = options.target || compactObject({
+    kind: normalized.targetType || "location",
+    id: fallbackTargetId || undefined,
+    locationId: normalized.targetType === "location" && fallbackTargetId ? fallbackTargetId : undefined,
+    label: options.targetLabel
+  });
+
+  return normalizeControlAssignment({
+    id: options.id,
+    programId: normalized.id,
+    assignedToIds: options.assignedToIds || normalized.responsibleIds,
+    participantIds: options.participantIds || normalized.participantIds,
+    groupIds: options.groupIds || normalized.groupIds,
+    target,
+    scheduledAt: options.scheduledAt || options.dueAt || null,
+    dueAt: options.dueAt || options.scheduledAt || null,
+    status: options.status || "planned",
+    rescheduleHistory: options.rescheduleHistory,
+    generatedBy: options.generatedBy || "manual",
+    createdAt: options.createdAt || null,
+    sourceProgramId: normalized.id
   });
 };
 

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   CONTROL_MANUAL_RUN_PRESETS,
+  controlAssignmentDraftFromProgram,
   controlSignalEnvelope,
   controlFindingTaskDraft,
   controlManualRunPresetById,
   controlManualRunPresetsForDomain,
+  controlProgramDraftFromManualPreset,
   normalizeActionRoute,
   normalizeControlAssignment,
   normalizeControlFinding,
@@ -78,6 +80,63 @@ describe("controls core model", () => {
       { id: "item-1", label: "Emergency exits", photoPolicy: "optional_on_problem" },
       { id: "ppe", label: "PPE", photoRequired: true, photoPolicy: "required_on_problem" }
     ]);
+  });
+
+  it("builds a saved program and manual assignment draft from a domain preset without scheduling", () => {
+    const program = controlProgramDraftFromManualPreset("safety-walk-basic", {
+      id: "prog-safety-main-warehouse",
+      name: "Weekly safety walk - main warehouse",
+      targetIds: ["loc-main"],
+      responsibleIds: ["manager-1"],
+      participantIds: ["safety-1"],
+      notifyIds: ["safety-lead"],
+      groupIds: ["safety-committee"]
+    });
+
+    expect(program).toMatchObject({
+      id: "prog-safety-main-warehouse",
+      name: "Weekly safety walk - main warehouse",
+      domain: "safety",
+      sourcePresetId: "safety-walk-basic",
+      targetType: "location",
+      targetIds: ["loc-main"],
+      responsibleIds: ["manager-1"],
+      participantIds: ["safety-1"],
+      notifyIds: ["safety-lead"],
+      groupIds: ["safety-committee"],
+      actionPolicy: { defaultRouteType: "report_only" }
+    });
+    expect(program.checklistItems.map((item) => item.label)).toEqual([
+      "יציאות חירום פתוחות",
+      "מעברים פנויים",
+      "ציוד מגן בשימוש",
+      "אין מפגעי החלקה/מעידה"
+    ]);
+
+    const assignment = controlAssignmentDraftFromProgram(program, {
+      id: "asg-safety-main-warehouse-1",
+      target: { kind: "location", locationId: "loc-main", label: "Main warehouse" },
+      dueAt: "2026-07-12",
+      createdAt: "2026-07-04T08:00:00Z"
+    });
+
+    expect(assignment).toMatchObject({
+      id: "asg-safety-main-warehouse-1",
+      programId: "prog-safety-main-warehouse",
+      sourceProgramId: "prog-safety-main-warehouse",
+      assignedToIds: ["manager-1"],
+      participantIds: ["safety-1"],
+      groupIds: ["safety-committee"],
+      target: { kind: "location", id: "loc-main", locationId: "loc-main", label: "Main warehouse" },
+      scheduledAt: "2026-07-12",
+      dueAt: "2026-07-12",
+      status: "planned",
+      generatedBy: "manual",
+      createdAt: "2026-07-04T08:00:00Z"
+    });
+    expect(program).not.toHaveProperty("assignments");
+    expect(controlProgramDraftFromManualPreset("missing")).toBeNull();
+    expect(controlAssignmentDraftFromProgram({})).toBeNull();
   });
 
   it("keeps assignment due date, target, assignees, and reschedule history explicit", () => {
