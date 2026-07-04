@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/document-user-activity-telemetry`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: docs-only note for future user activity telemetry and existing-profile login/activity status.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #630 documented the future user activity/status direction: new-user creation stays quiet, existing profiles may later show compact login/activity status, and last-visit/activity analytics must come from real server-side login/session telemetry.
   - PR #628 moved manager cleaning-zone visibility into the advanced permissions section, hid first-login status copy while creating a new user, and kept the existing manager-zone save shape unchanged.
   - PR #626 polished user-form permission UX and cleaning wording: the advanced-permissions summary is compact/count-based, permission controls have better wrapping/spacing guards, and cleaning-zone UI now talks about round responsibility/access instead of a separate cleaner role.
   - PR #624 made cleaning the default worker profile home for cleaning-capable workers, added a small tested worker profile model for future profile-specific defaults, and removed leftover new-user-form paths that still treated `cleaner` as a separate editable role.
