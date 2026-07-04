@@ -33,7 +33,9 @@ const isCleaningDepartment = (user = {}) => {
   if ((user.role || user.userRole) !== "worker") return false;
   const deptNames = [
     user.dept,
-    ...(Array.isArray(user.depts) ? user.depts : [])
+    user.department,
+    ...(Array.isArray(user.depts) ? user.depts : []),
+    ...(Array.isArray(user.departments) ? user.departments : [])
   ].map(cleanString).filter(Boolean);
   return deptNames.some((dept) => CLEANING_DEPARTMENT_NAMES.has(dept.toLowerCase()));
 };

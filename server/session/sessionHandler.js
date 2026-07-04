@@ -124,6 +124,7 @@ export function buildCmmsPinSessionPayload(tokenSession, storedUser) {
       techScope: storedUser.techScope || "transport",
       supplier: storedUser.supplier || "",
       permissions: storedUser.perms || storedUser.permissions || {},
+      cleaningAccess: storedUser.cleaningAccess || storedUser.cleaning || false,
       mustChangePassword: storedUser.mustChangePassword === true
     }
   };

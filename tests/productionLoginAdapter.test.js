@@ -68,6 +68,25 @@ describe("productionLoginAdapter", () => {
     });
   });
 
+  it("keeps first-login worker dept and cleaning access in the CMMS session shape", () => {
+    expect(cmmsSessionFromProductionUser({
+      id: "worker-1",
+      name: "Cleaner Worker",
+      role: "worker",
+      workerNo: "1234",
+      dept: "ניקיון",
+      depts: ["ניקיון"],
+      cleaningAccess: { enabled: true, canPerformRounds: true }
+    })).toMatchObject({
+      id: "worker-1",
+      role: "worker",
+      workerNo: "1234",
+      dept: "ניקיון",
+      depts: ["ניקיון"],
+      cleaningAccess: { enabled: true, canPerformRounds: true }
+    });
+  });
+
   it("signs in through the CMMS cookie login endpoint", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,

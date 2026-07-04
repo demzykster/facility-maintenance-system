@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/fix-worker-cleaning-tab`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: fix worker cleaning-tab eligibility after first-login/PIN sessions so cleaning department and manual cleaning access survive session mapping.
 - Latest completed product work:
   - PR #620 fixed the bottom spacing in the user create/edit form: active-status hints, advanced permissions, and the save button now sit in a stable footer rhythm so RTL text cannot visually collide with controls.
   - PR #618 refined the user-create form defaults and field order: new users now start with no preselected role, department, or extra permission; role choices read left-to-right by hierarchy (`worker`, `tech`, `department manager`, `system admin`); login identifier fields sit near the name; advanced permissions stay at the bottom of the form.

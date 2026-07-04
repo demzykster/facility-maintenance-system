@@ -124,7 +124,31 @@ describe("session handler", () => {
         techScope: "transport",
         supplier: "",
         permissions: { cleaning: "request" },
+        cleaningAccess: false,
         mustChangePassword: false
+      }
+    });
+  });
+
+  it("keeps CMMS PIN worker cleaning access in the session payload", () => {
+    expect(buildCmmsPinSessionPayload({
+      id: "worker-1",
+      role: "worker",
+      workerNo: "1042"
+    }, {
+      id: "worker-1",
+      role: "worker",
+      name: "Worker",
+      workerNo: "1042",
+      active: true,
+      dept: "מחסן",
+      cleaningAccess: { enabled: true, canPerformRounds: true }
+    })).toMatchObject({
+      ok: true,
+      user: {
+        role: "worker",
+        department: "מחסן",
+        cleaningAccess: { enabled: true, canPerformRounds: true }
       }
     });
   });

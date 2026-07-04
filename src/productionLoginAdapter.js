@@ -78,13 +78,17 @@ async function fetchWithTimeout(fetchImpl, url, options = {}, timeoutMs = DEFAUL
 }
 
 export function cmmsSessionFromProductionUser(user = {}) {
+  const dept = user.dept || user.department || "";
+  const depts = Array.isArray(user.depts)
+    ? user.depts
+    : (Array.isArray(user.departments) ? user.departments : (dept ? [dept] : []));
   return {
     id: user.id || user.appUserId || "",
     authUserId: user.authUserId || "",
     name: user.name || user.email || "",
     role: user.role || "user",
-    dept: user.department || "",
-    depts: Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []),
+    dept,
+    depts,
     email: user.email || "",
     phone: user.phone || "",
     workerNo: user.workerNo || "",
@@ -97,6 +101,7 @@ export function cmmsSessionFromProductionUser(user = {}) {
     mgrZones: Array.isArray(user.mgrZones) ? user.mgrZones : [],
     shift: user.shift || "",
     perms: user.permissions || user.perms || {},
+    cleaningAccess: user.cleaningAccess || user.cleaning || false,
     mustChangePassword: user.mustChangePassword === true,
     productionSession: true
   };
