@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/ppe-pending-request-queue-ui`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: compact the pending PPE issue-request queue so multiple requests remain readable, action buttons do not stair-step, and requester/worker/item/quantity/date/status are visually separated. No PPE business logic, storage model, inventory logic, or permissions are being changed.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #648 compacted the pending PPE issue-request queue so multiple requests stay readable: worker, request summary, requester/date, status, and actions are separated, approve/reject actions use compact icon buttons, and the mobile rejection state no longer squeezes the request text. PPE business logic, storage, inventory, and permissions were not changed.
   - PR #646 added the first gated `בקרות` UI shell behind `controls:view` for admin/manager navigation. It is read-only: planned domains, empty KPIs, and mobile/desktop navigation only; no controls records, scheduling engine, Supabase/KV migration, or cleaning/location migration.
   - PR #644 added `controls` to the shared permission editor/model for the future `בקרות` module. It uses the existing `none/view/request/manage/full` levels, with `request` documented as the current perform/run level; no controls UI, Supabase/KV migration, scheduling engine, or cleaning/location migration was added.
   - PR #642 added an explicit PPE dashboard section flow so pending issue-request cards and KPI cards keep stable spacing instead of visually sticking together.
@@ -96,7 +97,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed pre-controls cleanup sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: finish/verify/merge `codex/ppe-pending-request-queue-ui`, then reset this ledger back to no active branch. After that, return to the first narrow `בקרות` vertical slice only after confirming scope: one manual control program, one assignment/run path, one finding, and route to report-only or `מטלות`; do not start the broad monolith split.
+- Next exact action: return to the first narrow `בקרות` vertical slice only after confirming scope: one manual control program, one assignment/run path, one finding, and route to report-only or `מטלות`; do not start the broad monolith split.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
