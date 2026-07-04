@@ -7,6 +7,7 @@ import {
   controlManualRunPresetById,
   controlManualRunPresetsForDomain,
   controlProgramDraftFromManualPreset,
+  controlRunDraftFromAssignment,
   normalizeActionRoute,
   normalizeControlAssignment,
   normalizeControlFinding,
@@ -191,6 +192,39 @@ describe("controls core model", () => {
       overallSignature: { signedById: "manager-1", signedAt: "2026-07-04T09:00:00Z" },
       status: "completed"
     });
+  });
+
+  it("builds a run draft from one assignment without completing it automatically", () => {
+    const run = controlRunDraftFromAssignment({
+      id: "asg-safety-main-warehouse-1",
+      programId: "prog-safety-main-warehouse",
+      assignedToIds: ["manager-1"],
+      participantIds: ["safety-1", "safety-1"],
+      target: { kind: "location", locationId: "loc-main", label: "Main warehouse" },
+      dueAt: "2026-07-12",
+      status: "planned"
+    }, {
+      id: "run-safety-main-warehouse-1",
+      performedById: "manager-1",
+      startedAt: "2026-07-12T07:30:00Z",
+      status: "in_progress"
+    });
+
+    expect(run).toEqual({
+      id: "run-safety-main-warehouse-1",
+      programId: "prog-safety-main-warehouse",
+      assignmentId: "asg-safety-main-warehouse-1",
+      performedById: "manager-1",
+      participantIds: ["safety-1"],
+      target: { kind: "location", id: "loc-main", locationId: "loc-main", label: "Main warehouse" },
+      startedAt: "2026-07-12T07:30:00Z",
+      finishedAt: null,
+      answers: [],
+      findingIds: [],
+      overallSignature: {},
+      status: "in_progress"
+    });
+    expect(controlRunDraftFromAssignment({ id: "missing-program" })).toBeNull();
   });
 
   it("uses a visibility policy object for sensitive findings instead of a boolean-only model", () => {

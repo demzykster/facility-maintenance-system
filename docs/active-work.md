@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/controls-assignment-run-draft`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: model-only controls assignment-to-run draft helper; no UI, scheduling engine, Supabase migration, or cleaning/location migration.
 - Latest completed product work:
   - PR #684 added model-only `בקרות` helpers/tests so a manual domain preset can become a saved control program draft and a control program can create one manual assignment draft. It is only a bridge toward the first saved Program -> Assignment -> Run flow; it does not add UI, scheduling, Supabase migration, or cleaning/location migration.
   - PR #682 added lightweight manual `בקרות` domain presets: safety walk, fleet/tool check, quality sample, and operations/executive walk can prefill the manual run name/checklist without creating schedules, assignments, Supabase tables, or cleaning/location migration.
