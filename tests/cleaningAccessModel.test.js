@@ -53,6 +53,27 @@ describe("cleaning access model", () => {
     });
   });
 
+  it("treats workers in the cleaning department as cleaning-capable", () => {
+    const user = { role: "worker", dept: "ניקיון" };
+
+    expect(normalizeCleaningAccess(user)).toMatchObject({
+      enabled: true,
+      canPerformRounds: true,
+      canReceiveComplaints: true,
+      canCloseComplaints: true,
+      source: "department"
+    });
+    expect(canPerformCleaning(user)).toBe(true);
+  });
+
+  it("supports cleaning department through worker department lists", () => {
+    expect(canPerformCleaning({ role: "worker", depts: ["מחסן", "ניקיון"] })).toBe(true);
+  });
+
+  it("does not grant cleaning access just because a manager owns the cleaning department", () => {
+    expect(canPerformCleaning({ role: "user", dept: "ניקיון" })).toBe(false);
+  });
+
   it("allows capability flags to narrow worker cleaning access", () => {
     const access = normalizeCleaningAccess({
       role: "worker",
