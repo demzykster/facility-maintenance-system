@@ -2,7 +2,7 @@
 
 Дата: 2026-07-04.
 
-Этот документ коротко фиксирует ближайший порядок после cleanup PR #591-#600.
+Этот документ коротко фиксирует ближайший порядок после cleanup и первого ручного `בקרות` slice.
 
 ## Что Уже Закрыто
 
@@ -17,25 +17,27 @@
 - Зафиксировано: текущие users/history/app data не ценны для миграции, пока owner не скажет иначе. Destructive Supabase cleanup все равно только по явной команде.
 - Cleaning-access foundation уже закрыт: helper/model, UI-пути, session/KV write paths, cleanup роли при создании пользователя, профильный экран уборки для cleaning worker и мобильный role-preview уже прошли через последние merged PR.
 - Controls core model уже закрыт: Program, Assignment, Run, Finding, visibility, action routes, dashboard signal envelope.
+- Первый ручной `בקרות` slice уже закрыт: ручной обход, чеклист, finding, report-only или подтвержденная `מטלה`, сохранение run/finding в KV, история, и открытие связанной `מטלה`.
+- Stable storage contract уже закрыт: зарезервированы `controlProgram:*`, `controlAssignment:*`, `controlRun:*`, `controlFinding:*` и будущие таблицы `control_programs`, `control_assignments`, `control_runs`, `control_findings`.
 
 ## Ближайший Правильный Шаг
 
-Сначала не строить UI `בקרות`.
+Не строить сразу большой модуль `בקרות`.
 
 Следующий безопасный блок:
 
 ```text
-userGroups foundation
+first narrow domain increment
 ```
 
 Содержание:
 
-- держать `userGroups` как организационный слой над ролями;
-- дать ему отдельный permission key (`userGroups`), а не прятать внутри `users`;
-- держать group model/test работу чистой, пока маленький UI явно не открыт;
-- пока без Supabase migration;
-- пока без controls records;
-- пока без scheduling engine.
+- выбрать один узкий домен: safety, quality, fleet controls, или executive walk;
+- не добавлять scheduling engine, пока один реальный сценарий не пройден через Program -> Assignment -> Run -> Finding -> Action;
+- если это quality, держать первый slice минимальным: один QA-процесс, один finding flow, один action route;
+- использовать уже зарезервированные controls collections, но не делать Supabase table migration;
+- не мигрировать cleaning/location систему в том же PR;
+- пока без executive BI и AI-assisted dashboard.
 
 Уже закрытые cleaning helpers:
 
@@ -72,7 +74,8 @@ userGroups foundation
 
 Закрыто в первом ручном UI-slice: один ручной обход, чеклист, один finding, выбор report-only или подтвержденное создание реальной `מטלה` с `source*` связями. Completed run/finding сохраняются как shared KV `controlRun:*` / `controlFinding:*`, история показывает детали с подписью/ответами/ממצאים, а finding с созданной задачей открывает связанную `מטלה` из истории.
 
-Текущий безопасный следующий шаг: не расширять UI, а решить stable Supabase/table shape для controls programs/runs/findings before expanding beyond the manual slice. До этого не строить scheduling engine и не мигрировать cleaning.
+6. Done: зарезервировать stable storage contract для controls programs/assignments/runs/findings.
+7. Current: выбрать первый узкий domain increment и провести его без scheduling engine, без cleaning migration и без broad dashboard.
 
 ## What Not To Do Yet
 
