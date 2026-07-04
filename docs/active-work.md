@@ -22,10 +22,10 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: none.
+- Active branch: `codex/settings-ownership-cleanup`.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: none.
+- Active work in progress: clean up settings ownership before broader `בקרות` work: remove obsolete user-facing default inspection cadence and make global notification policy less dominant.
 - Latest completed product work:
   - PR #656 added multi-select and bulk actions to `מטלות`: filtered select-all, bulk status updates, two-step bulk deletion including completed/cancelled rows where the user has permission, and a truthful `הכל` filter that no longer silently excludes completed/cancelled tasks by default.
   - PR #654 suppressed misleading startup/background storage toasts: global storage-failure banners now wait until the app is ready and a real session exists, automatic vehicle/inspection migrations save quietly, and the old automatic inspection-migration toast no longer appears during app startup.
