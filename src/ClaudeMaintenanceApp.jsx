@@ -46,10 +46,11 @@ import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdap
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
+import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
-import { DEFAULT_LANGUAGE, languageDirection, languageOptions, normalizeLanguageCode } from "./languageModel.js";
+import { DEFAULT_LANGUAGE, languageCookieString, languageDirection, languageFromCookie, languageOptions, normalizeLanguageCode, preferredInitialLanguage } from "./languageModel.js";
 import { uiText } from "./uiI18nModel.js";
 import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js";
 import { supplierActivityCounts } from "./supplierActivityModel.js";
@@ -1362,6 +1363,7 @@ export default function App() {
   const sessionRef = useRef(null);
   const readyRef = useRef(false);
   const quietSharedFailureKeysRef = useRef(new Set());
+  const automaticAppIssueKeysRef = useRef(new Map());
   useEffect(() => { sessionRef.current = session; }, [session]);
   useEffect(() => { readyRef.current = ready; }, [ready]);
   useEffect(() => {
@@ -1465,12 +1467,17 @@ export default function App() {
   const [issueReportDraft, setIssueReportDraft] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [theme, setTheme] = useState("light");
-  const [language, setLanguageState] = useState(DEFAULT_LANGUAGE);
+  const [language, setLanguageState] = useState(() => preferredInitialLanguage({ cookie: typeof document !== "undefined" ? document.cookie : "", navigator: typeof navigator !== "undefined" ? navigator : undefined }));
   const snapRef = useRef({});
-  const setLanguage = (nextLanguage) => {
+  const persistLanguagePreference = (nextLanguage) => {
     const normalized = normalizeLanguageCode(nextLanguage);
-    setLanguageState(normalized);
+    if (typeof document !== "undefined") document.cookie = languageCookieString(normalized);
     store.set("language:v1", normalized, false);
+    return normalized;
+  };
+  const setLanguage = (nextLanguage) => {
+    const normalized = persistLanguagePreference(nextLanguage);
+    setLanguageState(normalized);
   };
   useEffect(() => {
     document.documentElement.lang = language;
@@ -1499,7 +1506,18 @@ export default function App() {
   useEffect(() => { (async () => {
     try {
     const th = await store.get("theme:v1", false); if (th) setTheme(th);
-    const savedLanguage = await store.get("language:v1", false); if (savedLanguage) setLanguageState(normalizeLanguageCode(savedLanguage));
+    const savedLanguage = await store.get("language:v1", false);
+    const cookieLanguage = typeof document !== "undefined" ? languageFromCookie(document.cookie) : "";
+    if (cookieLanguage) {
+      store.set("language:v1", cookieLanguage, false);
+    } else if (savedLanguage) {
+      const normalizedLanguage = normalizeLanguageCode(savedLanguage);
+      setLanguageState(normalizedLanguage);
+      if (typeof document !== "undefined") document.cookie = languageCookieString(normalizedLanguage);
+    } else if (typeof document !== "undefined") {
+      document.cookie = languageCookieString(language);
+      store.set("language:v1", language, false);
+    }
     if (SEED_POLICY.requiresServerBootstrapAdmin) {
       fetchPublicZones({ url: PUBLIC_ZONES_URL })
         .then((publicZones) => { if (publicZones.length > 0) setZones(publicZones); })
@@ -1585,13 +1603,52 @@ export default function App() {
     }
     return Promise.all(prefixes.map((prefix) => loadColl(prefix)));
   }
+  const recordAutomaticAppIssue = async ({ kind = "storage_save_failed", action = "", key = "", message = "" } = {}) => {
+    const current = sessionRef.current || {};
+    if (!current.id) return;
+    const issueKey = `${kind}:${action}:${key || "unknown"}`;
+    const now = Date.now();
+    const last = automaticAppIssueKeysRef.current.get(issueKey) || 0;
+    if (now - last < 5 * 60 * 1000) return;
+    automaticAppIssueKeysRef.current.set(issueKey, now);
+    const screenshotContext = appIssueScreenContext();
+    const description = [
+      "תקלה אוטומטית בשמירת נתונים.",
+      action ? `פעולה: ${action}` : "",
+      key ? `רשומה: ${key}` : "",
+      message ? `פרטים: ${message}` : "",
+    ].filter(Boolean).join("\n");
+    let issue;
+    try {
+      issue = {
+        ...createAppIssue({
+          description,
+          screenshotContext,
+          session: current,
+          location: screenshotContext.location || "",
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        }),
+        source: "automatic_storage_failure",
+        kind,
+        storageAction: action,
+        storageKey: key,
+      };
+    } catch {
+      return;
+    }
+    const ok = await store.set(`appIssue:${issue.id}`, JSON.stringify(issue), true);
+    if (ok) setAppIssues((items) => [issue, ...items.filter((item) => item.id !== issue.id)].sort((a, b) => b.at - a.at));
+  };
   const persistShared = async (key, value, options = {}) => {
     const toastOnFail = options.toastOnFail !== false;
     if (!toastOnFail) quietSharedFailureKeysRef.current.add(key);
     const ok = await store.set(key, value, true).finally(() => {
       if (!toastOnFail) quietSharedFailureKeysRef.current.delete(key);
     });
-    if (!ok && toastOnFail) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+    if (!ok && toastOnFail) {
+      setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+      void recordAutomaticAppIssue({ kind: "storage_save_failed", action: "set", key, message: "Shared record save failed" });
+    }
     return ok;
   };
   const persistSharedMany = async (records, options = {}) => {
@@ -1608,13 +1665,19 @@ export default function App() {
         if (failKey) quietSharedFailureKeysRef.current.delete(failKey);
       }
     });
-    if (!ok && toastOnFail) setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+    if (!ok && toastOnFail) {
+      setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+      void recordAutomaticAppIssue({ kind: "storage_save_failed", action: "setMany", key: failKey || `${keys.length} records`, message: "Shared batch save failed" });
+    }
     return ok;
   };
   const deleteShared = async (key, options = {}) => {
     const toastOnFail = options.toastOnFail !== false;
     const ok = await store.del(key, true);
-    if (!ok && toastOnFail) setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+    if (!ok && toastOnFail) {
+      setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+      void recordAutomaticAppIssue({ kind: "storage_delete_failed", action: "delete", key, message: "Shared record delete failed" });
+    }
     return ok;
   };
   async function reloadAll() {
@@ -2272,15 +2335,25 @@ const BUILTIN_LOGINS = [
   { id: "builtin_cleaner", name: "עובד ניקיון", role: "worker", workerNo: "1050", pin: "1234", dept: "ניקיון", depts: ["ניקיון"] },
 ];
 const ANON_PROBLEMS = [{ label: "רצפה מלוכלכת / שלולית", kind: "dirty" }, { label: "אין סבון", kind: "dirty" }, { label: "אין נייר טואלט", kind: "dirty" }, { label: "פח מלא", kind: "dirty" }, { label: "ריח רע", kind: "dirty" }, { label: "שבר / תקלה (ברז · דלת · תאורה)", kind: "broken" }, { label: "אחר", kind: "dirty" }];
-function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false, language = DEFAULT_LANGUAGE, setLanguage = () => {} }) {
+function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false, language = DEFAULT_LANGUAGE }) {
   const t = (key, vars) => uiText(language, key, vars);
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
-  const effectiveScannedZone = scannedZone || (scannedZoneId ? { id: scannedZoneId, name: t("public.scannedZoneFallback"), active: true } : null);
-  const [zone, setZone] = useState(effectiveScannedZone || null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false);
+  const [zone, setZone] = useState(scannedZone || null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false), [showScanner, setShowScanner] = useState(false);
   const fileRef = useRef(null);
-  useEffect(() => { if (effectiveScannedZone && (!zone || zone.id !== effectiveScannedZone.id)) setZone(effectiveScannedZone); }, [effectiveScannedZone?.id]);
+  useEffect(() => { if (scannedZone && (!zone || zone.id !== scannedZone.id)) setZone(scannedZone); }, [scannedZone?.id]);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); setErr(""); }; img.src = e.target.result; }; r.readAsDataURL(file); };
+  const acceptQrScan = (raw) => {
+    setShowScanner(false);
+    const scanned = extractCzoneFromRaw(raw);
+    const found = findScannedCleaningZone(active, scanned);
+    if (!found) {
+      setErr(t("public.wrongQr"));
+      return;
+    }
+    setZone(found);
+    setErr("");
+  };
   const submit = async () => {
     if (busy) return;
     if (!prob) return setErr("נא לבחור סוג בעיה");
@@ -2306,15 +2379,14 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
   };
   return (<div className="pub-wrap"><div className="pub-card">
     <button className="icon-btn pub-x" aria-label={t("common.close")} onClick={onClose}><X size={20} /></button>
-    <LanguagePicker value={language} onChange={setLanguage} compact />
     {done ? <div className="pub-done"><CheckCircle2 size={44} color="#16A34A" /><div className="pub-done-t">{t("public.received")}</div><div className="pub-done-s">{t("public.receivedSub")}</div><button className="btn-primary full" onClick={onClose}>{t("common.close")}</button></div>
       : !zone ? <>
         <div className="pub-logo"><Sparkles size={24} /></div>
         <div className="pub-title">{t("public.title")}</div>
         <div className="pub-sub">{t("public.scanRequired")}</div>
         {active.length === 0 ? <div className="note">{t("public.noZones")}</div>
-          : allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>
-          : <div className="note">{scannedZoneId ? t("public.wrongQr") : t("public.qrOnly")}</div>}
+          : <><button className="btn-primary full pub-scan-btn" onClick={() => { setErr(""); setShowScanner(true); }}><Camera size={16} /> {t("cleaningQr.scanButton")}</button>{allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div> : <div className="note">{scannedZoneId ? t("public.wrongQr") : t("public.qrOnly")}</div>}</>}
+        {err && <div className="err">{err}</div>}
       </> : <>
         <div className="pub-title">{zone.name}</div>
         <div className="pub-sub">{zoneLoc(zone) || ""}</div>
@@ -2326,6 +2398,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
         <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setZone(null); setProb(null); setPhoto(null); setText(""); }}>{t("common.back")}</button>
         <div className="pub-foot">{t("public.approvalFoot")}</div>
       </>}
+    {showScanner && <QRScannerOverlay onScan={acceptQrScan} onManual={() => { setShowScanner(false); setErr(t("cleaningQr.scanUnsupported")); }} onCancel={() => setShowScanner(false)} />}
   </div></div>);
 }
 
@@ -2667,7 +2740,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         <InstallAppPrompt language={language} />
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> {t("login.reportWithoutLogin")}</button>
       </div>
-      {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} language={language} setLanguage={setLanguage} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
+      {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} language={language} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
     </div>
   );
 }
@@ -3308,14 +3381,17 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
   const [activeDays, setActiveDays] = useState(Array.isArray(zone.activeDays) ? zone.activeDays : (zone.id ? [0, 1, 2, 3, 4, 5, 6] : WORK_WEEK));
   const [mgrIds, setMgrIds] = useState((managers || []).filter((m) => (m.mgrZones || []).includes(zone.id)).map((m) => m.id));
   const [openWin, setOpenWin] = useState(null);
+  const [openChecklistTranslations, setOpenChecklistTranslations] = useState({});
   const blockerCount = cleaningZoneBlockerCount(deleteBlockers);
   const toggleDay = (d) => setActiveDays((s) => (s.includes(d) ? s.filter((x) => x !== d) : [...s, d]).sort((a, b) => a - b));
   const toggleWinItem = (i, id) => setWindows((s) => s.map((w, j) => { if (j !== i) return w; const valid = checklist.filter((c) => (c.label || "").trim()).map((c) => c.id); const cur = Array.isArray(w.items) ? w.items.filter((x) => valid.includes(x)) : valid.slice(); const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]; return { ...w, items: next.length >= valid.length ? null : next }; }));
   const setCl = (i, v) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, label: v } : x)));
+  const setClTranslation = (i, code, value) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, translations: { ...(x.translations || {}), [code]: value } } : x)));
+  const draftClTranslations = (i) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, translations: draftCleaningChecklistTranslations(x.label, x.translations) } : x)));
   const setWin = (i, k, v) => setWindows((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const save = async () => {
     if (!name.trim()) return setErr("נא להזין שם אזור");
-    const cl = checklist.filter((c) => (c.label || "").trim()).map((c) => ({ id: c.id || uid(), label: c.label.trim(), ...(c.translations ? { translations: c.translations } : {}) }));
+    const cl = checklist.filter((c) => (c.label || "").trim()).map((c) => normalizeCleaningChecklistItem({ ...c, id: c.id || uid() }));
     if (!cl.length) return setErr("נא להוסיף לפחות פריט אחד בצ׳קליסט");
     if (!activeDays.length) return setErr("נא לבחור לפחות יום פעילות אחד");
     const cleaner = cleaners.find((c) => c.id === cleanerId);
@@ -3336,7 +3412,18 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
       <label className="field"><span>שם האזור *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: שירותים קומה 2 — אגף מזרח" /></label>
       <div className="field-row"><label className="field"><span>בניין</span><input value={building} onChange={(e) => setBuilding(e.target.value)} placeholder="בניין A" /></label><label className="field"><span>קומה</span><input value={floor} onChange={(e) => setFloor(e.target.value)} placeholder="קומה 2" /></label></div>
       <div className="field"><span>צ׳קליסט האזור *</span>
-        {checklist.map((c, i) => <div key={c.id || i} className="cl-row"><input value={c.label} onChange={(e) => setCl(i, e.target.value)} placeholder="פריט לבדיקה" /><button className="icon-btn sm" aria-label={`מחק פריט צ׳קליסט: ${c.label || "ללא שם"}`} onClick={() => setChecklist((s) => s.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>)}
+        {checklist.map((c, i) => {
+          const rowKey = c.id || String(i);
+          const translationsOpen = !!openChecklistTranslations[rowKey];
+          return <div key={rowKey} className="cl-edit-block">
+            <div className="cl-row"><input value={c.label} onChange={(e) => setCl(i, e.target.value)} placeholder="פריט לבדיקה" /><button className="btn-ghost sm cl-translate-btn" type="button" onClick={() => setOpenChecklistTranslations((s) => ({ ...s, [rowKey]: !translationsOpen }))}>{translationsOpen ? "סגירת תרגומים" : "תרגומים"}</button><button className="icon-btn sm" aria-label={`מחק פריט צ׳קליסט: ${c.label || "ללא שם"}`} onClick={() => setChecklist((s) => s.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>
+            {translationsOpen && <div className="cl-translations">
+              <div className="cl-translation-head"><span>תרגומים לעובדים</span><button className="btn-ghost sm" type="button" onClick={() => draftClTranslations(i)}>טיוטת תרגום</button></div>
+              <div className="hint">התרגום נשמר רק אחרי בדיקה. אם שפה נשארת ריקה, העובד יראה את הטקסט המקורי בעברית.</div>
+              {cleaningChecklistTranslationLanguages().map((language) => <label key={language.code} className="field cl-translation-field"><span>{language.nativeName}</span><input dir={language.dir} value={(c.translations || {})[language.code] || ""} onChange={(e) => setClTranslation(i, language.code, e.target.value)} placeholder={language.englishName} /></label>)}
+            </div>}
+          </div>;
+        })}
         <button className="btn-ghost sm" onClick={() => setChecklist((s) => [...s, { id: uid(), label: "" }])}><Plus size={14} /> הוספת פריט</button>
       </div>
       <div className="field"><span>חלונות סבב (שעה + סטייה מותרת בדקות)</span>
@@ -3883,7 +3970,7 @@ function CleanerApp(p) {
         {showAbs && <div className="panel" style={{ marginTop: 6 }}>
           <div className="hint" style={{ marginBottom: 8 }}>{t("cleaner.absenceHint")}</div>
           {myAbs.map((a) => <div key={a.id} className="reg-row" style={{ marginBottom: 6 }}><span style={{ flex: 1 }}>{fmtDate(new Date(a.from).getTime())}{(a.to && a.to !== a.from) ? " – " + fmtDate(new Date(a.to).getTime()) : ""}</span><button className="reg-del" onClick={() => delAbsence(a.id)}><Trash2 size={15} /></button></div>)}
-          <div className="field-row" style={{ marginTop: 6 }}><label className="field"><span>{t("cleaner.fromDate")}</span><input type="date" value={absFrom} onChange={(e) => setAbsFrom(e.target.value)} /></label><label className="field"><span>{t("cleaner.toDate")}</span><input type="date" value={absTo} onChange={(e) => setAbsTo(e.target.value)} /></label></div>
+          <div className="field-row absence-date-row" style={{ marginTop: 6 }}><label className="field"><span>{t("cleaner.fromDate")}</span><input type="date" value={absFrom} onChange={(e) => setAbsFrom(e.target.value)} /></label><label className="field"><span>{t("cleaner.toDate")}</span><input type="date" value={absTo} onChange={(e) => setAbsTo(e.target.value)} /></label></div>
           <button className="btn-ghost sm" disabled={!absFrom || (absTo && absTo < absFrom)} onClick={() => { saveAbsence({ id: uid(), userId: session.id, name: session.name, from: absFrom, to: absTo || absFrom, at: Date.now() }); setAbsFrom(""); setAbsTo(""); }}><Plus size={14} /> {t("cleaner.addAbsence")}</button>
         </div>}
       </div>; })()}
@@ -9587,9 +9674,14 @@ button.notif-perm:hover{background:#D1FAE5;}
 .icon-btn.light{color:#fff;}
 .icon-btn.sm{width:32px;height:32px;}
 .field-row{display:flex;gap:10px;}.field-row .field{flex:1;}
+.cl-edit-block{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:7px;margin-bottom:8px;}
 .cl-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .cl-row input[type=text],.cl-row > input{flex:1;}
 .cl-row input{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;}
+.cl-translate-btn{flex:0 0 auto;min-height:34px;padding:7px 10px;font-size:12px;}
+.cl-translations{border-top:1px dashed var(--line);padding-top:8px;margin-top:4px;display:grid;gap:8px;}
+.cl-translation-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;color:var(--muted);}
+.cl-translation-field{margin:0;}
 .win-tol{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);white-space:nowrap;}
 .win-tol input{width:64px;}
 .tcard-actions{display:flex;gap:4px;align-items:center;margin-inline-start:auto;}
@@ -9649,12 +9741,11 @@ button.notif-perm:hover{background:#D1FAE5;}
 .pub-entry:hover{border-color:#0EA5E9;color:#0EA5E9;}
 .pub-wrap{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;}
 .pub-card{position:relative;width:100%;max-width:420px;background:var(--surface);border-radius:18px;padding:22px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
-.pub-card .language-picker{width:max-content;max-width:calc(100% - 48px);margin:0 0 16px;margin-inline-end:48px;}
-.pub-card .language-picker.compact select{background:var(--surface);color:var(--ink);border-color:var(--line);}
 .pub-x{position:absolute;inset-inline-end:12px;top:12px;}
 .pub-logo{width:52px;height:52px;border-radius:14px;background:#0EA5E91a;color:#0EA5E9;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
 .pub-title{font-size:20px;font-weight:800;}
 .pub-sub{font-size:13px;color:var(--muted);margin:4px 0 16px;line-height:1.5;}
+.pub-scan-btn{margin-bottom:10px;}
 .pub-zones{display:flex;flex-direction:column;gap:8px;}
 .pub-zone{text-align:start;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;cursor:pointer;color:var(--ink);}
 .pub-zone:hover{border-color:#0EA5E9;}
@@ -10143,18 +10234,23 @@ button.notif-perm:hover{background:#D1FAE5;}
   .modal2-body{padding:14px;}
   .profile-head{margin-bottom:10px;}
   .avatar.big{width:34px;height:34px;font-size:16px;}
-  .worker-top{display:grid;grid-template-columns:1fr;gap:10px;padding:14px 12px 10px;}
-  .worker-top-actions{justify-content:space-between;width:100%;gap:6px;}
+  .worker-top{display:grid;grid-template-columns:1fr;gap:10px;padding:calc(16px + env(safe-area-inset-top)) 12px 10px;}
+  .worker-top-actions{justify-content:center;width:100%;gap:6px;flex-wrap:nowrap;}
   .worker-top .icon-btn{width:40px;height:40px;flex:0 0 40px;}
-  .worker-action-btn{min-height:40px;padding:0 10px;flex:0 0 auto;}
-  .language-picker.compact{min-width:96px;flex:1;}
+  .worker-action-btn{width:40px;min-height:40px;padding:0;flex:0 0 40px;justify-content:center;}
+  .worker-action-btn span{display:none;}
+  .language-picker.compact{min-width:0;flex:0 0 96px;}
   .language-picker.compact select{width:100%;min-height:40px;}
   .wk-title{font-size:19px;}
   .worker-preview{padding:0 12px 10px;}
-  .wk-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:10px 8px 0;align-items:stretch;}
-  .wk-tabs button{min-width:0;min-height:64px;flex-direction:column;gap:4px;padding:8px 4px;font-size:12px;line-height:1.12;text-align:center;white-space:normal;overflow-wrap:anywhere;}
+  .wk-tabs{display:flex;gap:6px;padding:10px 8px 0;align-items:stretch;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;}
+  .wk-tabs::-webkit-scrollbar{width:0;height:0;display:none;}
+  .wk-tabs button{min-width:82px;flex:0 0 82px;min-height:64px;flex-direction:column;gap:4px;padding:8px 4px;font-size:12px;line-height:1.12;text-align:center;white-space:normal;overflow-wrap:anywhere;}
   .wk-tabs button svg{width:15px;height:15px;flex-shrink:0;}
   .worker-body{padding:16px 12px 40px;}
+  .absence-date-row{display:grid;grid-template-columns:1fr;gap:10px;}
+  .absence-date-row .field{min-width:0;}
+  .absence-date-row input[type="date"]{width:100%;min-height:48px;color:var(--ink);background:var(--input);-webkit-appearance:none;appearance:none;}
   .ppe-request-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"worker actions" "main main" "by status";align-items:start;gap:8px;padding:10px;}
   .ppe-request-row.rejecting{grid-template-areas:"worker status" "main main" "by by" "reject reject";}
   .ppe-req-worker{grid-area:worker;}
@@ -10175,8 +10271,9 @@ button.notif-perm:hover{background:#D1FAE5;}
 }
 @media(max-width:390px){
   .wk-tabs{gap:3px;padding-inline:6px;}
-  .wk-tabs button{min-height:62px;padding:7px 3px;font-size:11.5px;}
-  .worker-action-btn span{display:none;}
+  .wk-tabs button{min-width:78px;flex-basis:78px;min-height:62px;padding:7px 3px;font-size:11.5px;}
+  .worker-top .icon-btn,.worker-action-btn{width:38px;height:38px;flex-basis:38px;}
+  .language-picker.compact{flex-basis:88px;}
 }
 `}</style>);
 }
