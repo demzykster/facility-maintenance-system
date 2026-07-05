@@ -1,6 +1,6 @@
 # Backlog
 
-This file is the active grouped task list. It collects open items from the handoff docs, UI audit, permissions model, and engineering dialogue so work can proceed by code area without rereading every historical document.
+This file is historical context for earlier stabilization work. It is not the active task queue.
 
 ## Working Rules
 
@@ -13,20 +13,9 @@ This file is the active grouped task list. It collects open items from the hando
 
 ## Release Closure Route
 
-Use `docs/release-checklist.md` as the active route for finishing the current stabilization phase.
+Use `docs/active-work.md` and `docs/release-checklist.md` as the active route for finishing the current stabilization phase.
 
-The backlog below remains useful for historical detail and code-area context, but broad topics should not stay open forever under vague labels. When working toward release readiness, close packages through the checklist acceptance criteria.
-
-## Current Product-Quality Follow-Ups
-
-### Internal app issue reporter — capture current screen
-
-Status: open.
-
-Goal:
-- Keep manual screenshot upload, but add an optional quick action that captures the current visible screen and attaches it to the internal bug report.
-- The feature should be useful on desktop and mobile where supported, and gracefully fall back to manual upload where browser screen capture is unavailable.
-- Do not turn internal technical logs into user-facing noise; keep the owner-facing issue list focused on useful bug reports and grouped auto-error summaries.
+The backlog below remains useful for historical detail and code-area context, but broad product polish should not stay open under vague labels. New UI/copy fixes should start only from a concrete owner-reported issue.
 
 ## Verified Planning Facts
 
@@ -443,26 +432,6 @@ Current code:
 Open follow-up:
 - None for the current pass.
 - PR #125 chose the advisory path for older/incomplete backups: warn before restore, do not block.
-
-## Copy / Hebrew / Visual Polish
-
-### Hebrew copy pass
-
-Status: open, broad; notification panel copy polished in current pass.
-
-Goal:
-- Continue plural/count grammar cleanup outside the already fixed day/period cases.
-
-Approach:
-- Do this by screen or component, not as a whole-app text sweep.
-
-Implementation so far:
-- Notification panel display settings now use clearer Hebrew copy for filtering notification types.
-- The panel shows how many notifications are currently displayed and clarifies that hiding categories only affects the user's local view.
-- PR #169: Notification defaults now explicitly include task, driver, PPE, and cleaning kinds instead of relying on missing keys being treated as enabled.
-- PR #170: Global Settings notification-type editor was added; personal filtering remains in the notification panel.
-- PR #166 polished Analytics parts-wait card singular/plural Hebrew wording for delayed tickets and SLA breaches.
-- PR #167 polished the Dashboard parts-wait chip to lifecycle-compatible wording after the count moved to `waiting:parts`.
 
 ## Deferred / Out Of Scope For Now
 

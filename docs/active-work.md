@@ -4,7 +4,7 @@
 
 - Active branch: none.
 - Current branch: `main`.
-- Last completed work: removed the abandoned experimental module direction from the current product surface, runtime contracts, tests, live docs, and monolith leftovers.
+- Last completed work: closed broad historical backlog/documentation tails so only live handoff and release checklist drive new work.
 
 ## Current Product Direction
 
@@ -22,3 +22,4 @@
 ## Notes For Next Agent
 
 - Treat removed storage prefixes and docs as intentionally retired, not as migration backlog.
+- Do not invent broad product-polish backlog from screenshots or old notes. Wait for a concrete owner-reported issue.
