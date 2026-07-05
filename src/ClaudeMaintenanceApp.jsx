@@ -2731,7 +2731,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
 function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], users = [], saveTask, saveInsp, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
-  const [controlTab, setControlTab] = useState("run");
+  const [controlTab, setControlTab] = useState("overview");
   const [name, setName] = useState("סיור בטיחות ידני");
   const [domain, setDomain] = useState("safety");
   const [target, setTarget] = useState("");
@@ -2755,7 +2755,9 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], 
   const [assignmentDrafts, setAssignmentDrafts] = useState({});
   const [activeAssignmentRun, setActiveAssignmentRun] = useState(null);
   const [activeFleetPlanRun, setActiveFleetPlanRun] = useState(null);
-  const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
+  const checklistItems = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean), [checklistText]);
+  const checklist = useMemo(() => checklistItems.slice(0, 8), [checklistItems]);
+  const hiddenChecklistCount = Math.max(0, checklistItems.length - checklist.length);
   const domainPresets = useMemo(() => controlManualRunPresetsForDomain(domain), [domain]);
   const targetPlaceholder = domainPresets[0]?.targetPlaceholder || "לדוגמה: מחסן ראשי / רחבת מלגזות";
   const findingCount = checklist.filter((_, i) => answers[i] === "problem").length;
@@ -2887,6 +2889,10 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], 
     if (canManageControls) return sorted;
     return sorted.filter((assignment) => (assignment.assignedToIds || []).includes(actorUserId));
   }, [assignmentOptions, canManageControls, actorUserId]);
+  const activeAssignments = useMemo(() => visibleAssignments.filter((assignment) => !["completed", "cancelled"].includes(assignment.status)), [visibleAssignments]);
+  const overdueAssignments = useMemo(() => activeAssignments.filter((assignment) => assignment.dueAt && startOfDay(assignment.dueAt) < startOfDay(Date.now())), [activeAssignments]);
+  const unresolvedFindings = useMemo(() => findingRows.filter((finding) => !["closed", "resolved", "cancelled"].includes(finding.status)), [findingRows]);
+  const fleetDueCount = useMemo(() => fleetInspectionPlan.reduce((sum, group) => sum + (group.dueCount || 0), 0), [fleetInspectionPlan]);
   const openRun = useMemo(() => recentRuns.find((run) => run.id === openRunId) || null, [recentRuns, openRunId]);
   const openRunFindings = openRun ? (runFindingsByRun[openRun.id] || []) : [];
   const answerMeta = (value) => value === "problem"
@@ -3216,25 +3222,134 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], 
       <div className="row-between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
         <div>
           <SectionTitle><ClipboardCheck size={15} /> בקרות</SectionTitle>
-          <div className="hint" style={{ maxWidth: 680 }}>סבב ראשון: בדיקה קצרה, חתימה אחת, ממצא אחד, שמירת היסטוריה וניתוב לדוח בלבד או ל-מטלות. אפשר גם ליצור תכנית ידנית ושיוך אחד, עדיין בלי מנוע תזמון.</div>
+          <div className="hint" style={{ maxWidth: 680 }}>תמונת מצב של בקרות, ממצאים ושיוכים פתוחים. התחילו בדיקה רק כשצריך לבצע סבב חדש.</div>
         </div>
         {canManageControls && <span className="badge sm" style={{ background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>ניהול בקרות</span>}
         {!canManageControls && canPerform && <span className="badge sm" style={{ background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0" }}>ביצוע בקרות</span>}
       </div>
       <div className="stat-strip">
-        <div className="stat-box"><div className="stat-num">{doneCount}/{checklist.length || 0}</div><div className="stat-lbl">סעיפים שסומנו</div></div>
-        <div className="stat-box"><div className="stat-num" style={{ color: "#DC2626" }}>{findingCount}</div><div className="stat-lbl">ממצאים</div></div>
-        <div className="stat-box"><div className="stat-num" style={{ color: taskDraft ? "#0D9488" : "var(--muted)" }}>{taskDraft ? 1 : 0}</div><div className="stat-lbl">טיוטת מטלה</div></div>
+        <div className="stat-box"><div className="stat-num">{activeAssignments.length}</div><div className="stat-lbl">שיוכים פתוחים</div></div>
+        <div className="stat-box"><div className="stat-num" style={{ color: overdueAssignments.length ? "#DC2626" : "var(--ink)" }}>{overdueAssignments.length}</div><div className="stat-lbl">באיחור</div></div>
+        <div className="stat-box"><div className="stat-num" style={{ color: unresolvedFindings.length ? "#DC2626" : "var(--ink)" }}>{unresolvedFindings.length}</div><div className="stat-lbl">ממצאים פתוחים</div></div>
+        <div className="stat-box"><div className="stat-num" style={{ color: fleetDueCount ? "#EA580C" : "var(--ink)" }}>{fleetDueCount}</div><div className="stat-lbl">כלים לבקרה</div></div>
       </div>
       {!canPerform ? <Empty text="אין הרשאת ביצוע בקרות" Icon={ShieldAlert} sub="נדרשת הרשאת controls:request ומעלה כדי לבצע סבב." /> : <>
       <div className="control-mode-tabs">
+        <button className={controlTab === "overview" ? "on" : ""} onClick={() => setControlTab("overview")}><LayoutDashboard size={15} /> סקירה</button>
         <button className={controlTab === "run" ? "on" : ""} onClick={() => setControlTab("run")}><ClipboardCheck size={15} /> ביצוע בדיקה</button>
         <button className={controlTab === "fleet" ? "on" : ""} onClick={() => setControlTab("fleet")}><Truck size={15} /> בקרת כלים</button>
         <button className={controlTab === "programs" ? "on" : ""} onClick={() => setControlTab("programs")}><ListChecks size={15} /> תכניות ושיוכים</button>
       </div>
+      {controlTab === "overview" && <div className="control-overview">
+        <div className="control-overview-grid">
+          <div className="control-panel">
+            <div className="row-between" style={{ alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <SectionTitle><AlertTriangle size={15} /> ממצאים אחרונים</SectionTitle>
+              <span className="badge sm" style={{ background: "#F8FAFC", color: "#475569", border: "1px solid var(--line)" }}>{filteredFindingRows.length}/{findingRows.length}</span>
+            </div>
+            <div className="qchips compact" style={{ marginBottom: 10 }}>
+              {[
+                ["all", `הכל (${findingFilterStats.all})`],
+                ["task", `עם מטלה (${findingFilterStats.task})`],
+                ["pending", `ללא מטלה (${findingFilterStats.pending})`],
+                ["report", `לדוח בלבד (${findingFilterStats.report})`]
+              ].map(([id, label]) => <button key={id} className={"qchip" + (historyFilter === id ? " on" : "")} onClick={() => setHistoryFilter(id)}>{label}</button>)}
+            </div>
+            {filteredFindingRows.length ? <div className="control-finding-list">{filteredFindingRows.slice(0, 8).map((finding) => {
+              const sev = findingSeverityMeta(finding.severity);
+              const run = (controlRuns || []).find((item) => item.id === finding.runId);
+              return <div key={finding.id} className="control-finding-item">
+                <div className="task-row-main">
+                  <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
+                  {finding.description && <div className="task-row-desc">{finding.description}</div>}
+                  <div className="task-row-sub">{findingRouteLabel(finding)} · {run?.target?.label || run?.target?.id || finding.target?.label || finding.target?.id || "ללא יעד"} · {fmtDate(finding.createdAt || run?.finishedAt || run?.startedAt)}</div>
+                </div>
+                <div className="task-row-side">
+                  <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
+                  {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
+                </div>
+              </div>;
+            })}</div> : <div className="hint">{findingRows.length ? "אין ממצאים במסנן הזה." : "אין עדיין ממצאים שמורים."}</div>}
+          </div>
+          <div className="control-panel">
+            <SectionTitle><CalendarClock size={15} /> עבודה פתוחה</SectionTitle>
+            {activeAssignments.length ? <div className="control-assignment-list">{activeAssignments.slice(0, 6).map((assignment) => {
+              const program = programById(assignment.programId);
+              const overdue = assignment.dueAt && startOfDay(assignment.dueAt) < startOfDay(Date.now());
+              return <div key={assignment.id} className={"control-assignment-row" + (overdue ? " overdue" : "")}>
+                <div className="task-row-main">
+                  <div className="task-row-t">{program?.name || "תכנית לא זמינה"}</div>
+                  <div className="task-row-desc">{assignment.target?.label || assignment.target?.id || "ללא יעד"} · {assignment.dueAt ? fmtDate(assignment.dueAt) : "ללא תאריך"} · {(assignment.assignedToIds || []).map(userName).join(", ") || "ללא מבצע"}</div>
+                </div>
+                <span className="badge sm" style={{ background: overdue ? "#FEF2F2" : "#ECFDF5", color: overdue ? "#B91C1C" : "#047857", border: "1px solid var(--line)" }}>{overdue ? "באיחור" : statusLabel(assignment.status)}</span>
+                <button className="btn-primary sm" onClick={() => startAssignmentRun(assignment)} disabled={busy}><Play size={14} /> פתח</button>
+              </div>;
+            })}</div> : <Empty text="אין שיוכים פתוחים" Icon={CalendarClock} sub="שיוכים מתוכננים יופיעו כאן לביצוע מהיר." />}
+            <div className="control-overview-actions">
+              <button className="btn-primary sm" onClick={() => setControlTab("run")}><ClipboardCheck size={14} /> בדיקה ידנית</button>
+              <button className="btn-ghost sm" onClick={() => setControlTab("fleet")}><Truck size={14} /> בקרת כלים</button>
+              {canManageControls && <button className="btn-ghost sm" onClick={() => setControlTab("programs")}><ListChecks size={14} /> תכניות</button>}
+            </div>
+          </div>
+        </div>
+        <div className="control-panel">
+          <SectionTitle><History size={15} /> היסטוריית בקרות אחרונות</SectionTitle>
+          {recentRuns.length ? <div className="task-list">
+            {recentRuns.map((run) => {
+              const findings = runFindingsByRun[run.id] || [];
+              const problemCount = findings.length || (run.findingIds || []).length;
+              const active = openRunId === run.id;
+              return <button key={run.id} className={"task-row control-history-row" + (active ? " selected" : "")} style={{ borderInlineStartColor: problemCount ? "#DC2626" : "#0D9488" }} onClick={() => setOpenRunId(active ? null : run.id)}>
+                <div className="task-row-main">
+                  <div className="task-row-t">{run.target?.label || run.target?.id || "בקרה ידנית"} · {fmtDate(run.finishedAt || run.startedAt)}</div>
+                  <div className="task-row-desc">{run.answers?.length || 0} סעיפים · {problemCount ? `${problemCount} ממצאים` : "ללא ממצאים"} · חתימה: {run.overallSignature?.signedByName || displayUserName(run.performedById)}</div>
+                  {run.notes && <div className="task-row-sub">{run.notes}</div>}
+                </div>
+                <span className="badge sm" style={{ background: problemCount ? "#FEF2F2" : "#ECFDF5", color: problemCount ? "#B91C1C" : "#047857", border: `1px solid ${problemCount ? "#FECACA" : "#A7F3D0"}` }}>{problemCount ? "עם ממצא" : "תקין"}</span>
+              </button>;
+            })}
+            {openRun && <div className="control-run-detail">
+              <div className="row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <div className="tcard-subj">{openRun.target?.label || openRun.target?.id || "בקרה ידנית"}</div>
+                  <div className="task-row-desc">{fmtDate(openRun.finishedAt || openRun.startedAt)} · מבצע: {displayUserName(openRun.performedById, openRun.overallSignature?.signedByName)} · חתימה: {openRun.overallSignature?.signedByName || "—"}</div>
+                </div>
+                <span className="badge sm" style={{ background: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }}>פרטי סבב</span>
+              </div>
+              <div className="control-answer-list">
+                {(openRun.answers || []).map((answer, i) => {
+                  const meta = answerMeta(answer.value);
+                  return <div key={answer.itemId || i} className="control-answer-item">
+                    <span>{answer.label || `סעיף ${i + 1}`}</span>
+                    <span className="badge sm" style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>{meta.label}</span>
+                  </div>;
+                })}
+              </div>
+              {openRun.notes && <div className="note" style={{ marginTop: 10 }}>{openRun.notes}</div>}
+              <div className="control-findings-detail">
+                <div className="task-row-t" style={{ marginTop: 10 }}>ממצאים</div>
+                {openRunFindings.length ? openRunFindings.map((finding) => {
+                  const sev = findingSeverityMeta(finding.severity);
+                  return <div key={finding.id} className="control-finding-item">
+                    <div className="task-row-main">
+                      <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
+                      {finding.description && <div className="task-row-desc">{finding.description}</div>}
+                      <div className="task-row-sub">{findingRouteLabel(finding)}</div>
+                    </div>
+                    <div className="task-row-side">
+                      <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
+                      {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
+                    </div>
+                  </div>;
+                }) : <div className="hint">לא נרשמו ממצאים בסבב הזה.</div>}
+              </div>
+            </div>}
+          </div> : <Empty text="אין עדיין היסטוריית בקרות" Icon={History} sub="סיימו בדיקה ידנית כדי לשמור אותה כאן." />}
+        </div>
+      </div>}
       {controlTab === "fleet" && <div className="control-panel">
         <SectionTitle><Truck size={15} /> תכנית בדיקות כלי שינוע</SectionTitle>
-        <div className="hint" style={{ marginBottom: 10 }}>הבדיקות מוצגות לפי סוג כלי ותכנית הבקרה שמוגדרת בסוגי כלי השינוע. זהו חיבור ראשון ל-בקרות: עדיין בלי מנוע שיבוץ אוטומטי, אבל עם תדירות, בדיקה אחרונה ובדיקה הבאה.</div>
+        <div className="hint" style={{ marginBottom: 10 }}>בדיקות לפי סוג כלי ותכנית הבקרה שמוגדרת בסוגי כלי השינוע. כל בדיקה נפתחת על כלי שינוע אמיתי ונשמרת בהיסטוריית הבקרות.</div>
         {fleetInspectionPlan.length ? <div className="fleet-control-groups">{fleetInspectionPlan.map((group) => (
           <div key={group.key} className="fleet-control-group">
             <div className="fleet-control-head">
@@ -3275,7 +3390,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], 
             <label className="field"><span>אחראי</span><select value={programDraft.responsibleId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, responsibleId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
             <label className="field"><span>משתתף נוסף</span><select value={programDraft.participantId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, participantId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
           </div>
-          <div className="hint" style={{ margin: "4px 0 10px" }}>זהו סבב ראשון צר: תכנית ידנית מתוך תבנית. מנוע תזמון, ימי העדפה, מניעת כפילויות וימי שבתון יגיעו בהמשך.</div>
+          <div className="hint" style={{ margin: "4px 0 10px" }}>צרו תכנית ידנית מתבנית ושייכו אותה למבצע, יעד ותאריך לביצוע.</div>
           <button className="btn-primary full" onClick={saveProgramDraft} disabled={busy}><Plus size={15} /> שמירת תכנית</button>
         </div>}
         <div className="control-program-split">
@@ -3332,6 +3447,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], 
             ? <label className="field"><span>כלי שינוע</span><select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">{fleetTargets.length ? "בחרו כלי לבדיקה" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
             : <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={targetPlaceholder} /></label>}
           <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
+          {hiddenChecklistCount > 0 && <div className="hint" style={{ color: "#B45309", marginTop: -6 }}>{hiddenChecklistCount} סעיפים נוספים לא מוצגים בבדיקה זו. שמרו עד 8 סעיפים או פצלו את הבדיקה.</div>}
           <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
           <label className="field"><span>חתימה לסיום הסבב</span><input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={session.name || "שם מבצע"} /></label>
           <div className="control-actions">
@@ -3360,92 +3476,6 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], 
         {routeType === "task" && <button className="btn-primary full" style={{ marginTop: 10 }} disabled={!taskDraft || busy || findingTaskCreated} onClick={createTask}>{findingTaskCreated ? "מטלה כבר נפתחה מהממצא" : busy ? "יוצר…" : "יצירת מטלה מהממצא"}</button>}
       </div>}
       {msg && <div className={msg === SAVE_FAILED_MESSAGE ? "err" : "note"} style={{ marginTop: 12 }}>{msg}</div>}
-      <div className="control-panel" style={{ marginTop: 12 }}>
-        <SectionTitle><History size={15} /> היסטוריית בקרות אחרונות</SectionTitle>
-        <div className="control-findings-overview">
-          <div className="row-between" style={{ alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <div>
-              <div className="task-row-t">ממצאים אחרונים</div>
-              <div className="hint">סינון מהיר לפי טיפול: נפתחה מטלה, מיועד למטלה, או לדוח בלבד.</div>
-            </div>
-            <span className="badge sm" style={{ background: "#F8FAFC", color: "#475569", border: "1px solid var(--line)" }}>{filteredFindingRows.length}/{findingRows.length}</span>
-          </div>
-          <div className="qchips compact" style={{ marginBottom: 10 }}>
-            {[
-              ["all", `הכל (${findingFilterStats.all})`],
-              ["task", `עם מטלה (${findingFilterStats.task})`],
-              ["pending", `ללא מטלה (${findingFilterStats.pending})`],
-              ["report", `לדוח בלבד (${findingFilterStats.report})`]
-            ].map(([id, label]) => <button key={id} className={"qchip" + (historyFilter === id ? " on" : "")} onClick={() => setHistoryFilter(id)}>{label}</button>)}
-          </div>
-          {filteredFindingRows.length ? <div className="control-finding-list">{filteredFindingRows.slice(0, 8).map((finding) => {
-            const sev = findingSeverityMeta(finding.severity);
-            const run = (controlRuns || []).find((item) => item.id === finding.runId);
-            return <div key={finding.id} className="control-finding-item">
-              <div className="task-row-main">
-                <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
-                {finding.description && <div className="task-row-desc">{finding.description}</div>}
-                <div className="task-row-sub">{findingRouteLabel(finding)} · {run?.target?.label || run?.target?.id || finding.target?.label || finding.target?.id || "ללא יעד"} · {fmtDate(finding.createdAt || run?.finishedAt || run?.startedAt)}</div>
-              </div>
-              <div className="task-row-side">
-                <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
-                {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
-              </div>
-            </div>;
-          })}</div> : <div className="hint">{findingRows.length ? "אין ממצאים במסנן הזה." : "עדיין אין ממצאים שמורים. ממצא שייווצר מבדיקה יופיע כאן עם מצב הטיפול שלו."}</div>}
-        </div>
-        {recentRuns.length ? <div className="task-list">
-          {recentRuns.map((run) => {
-            const findings = runFindingsByRun[run.id] || [];
-            const problemCount = findings.length || (run.findingIds || []).length;
-            const active = openRunId === run.id;
-            return <button key={run.id} className={"task-row control-history-row" + (active ? " selected" : "")} style={{ borderInlineStartColor: problemCount ? "#DC2626" : "#0D9488" }} onClick={() => setOpenRunId(active ? null : run.id)}>
-              <div className="task-row-main">
-                <div className="task-row-t">{run.target?.label || run.target?.id || "בקרה ידנית"} · {fmtDate(run.finishedAt || run.startedAt)}</div>
-                <div className="task-row-desc">{run.answers?.length || 0} סעיפים · {problemCount ? `${problemCount} ממצאים` : "ללא ממצאים"} · חתימה: {run.overallSignature?.signedByName || displayUserName(run.performedById)}</div>
-                {run.notes && <div className="task-row-sub">{run.notes}</div>}
-              </div>
-              <span className="badge sm" style={{ background: problemCount ? "#FEF2F2" : "#ECFDF5", color: problemCount ? "#B91C1C" : "#047857", border: `1px solid ${problemCount ? "#FECACA" : "#A7F3D0"}` }}>{problemCount ? "עם ממצא" : "תקין"}</span>
-            </button>;
-          })}
-          {openRun && <div className="control-run-detail">
-            <div className="row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>
-              <div>
-                <div className="tcard-subj">{openRun.target?.label || openRun.target?.id || "בקרה ידנית"}</div>
-                <div className="task-row-desc">{fmtDate(openRun.finishedAt || openRun.startedAt)} · מבצע: {displayUserName(openRun.performedById, openRun.overallSignature?.signedByName)} · חתימה: {openRun.overallSignature?.signedByName || "—"}</div>
-              </div>
-              <span className="badge sm" style={{ background: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }}>פרטי סבב</span>
-            </div>
-            <div className="control-answer-list">
-              {(openRun.answers || []).map((answer, i) => {
-                const meta = answerMeta(answer.value);
-                return <div key={answer.itemId || i} className="control-answer-item">
-                  <span>{answer.label || `סעיף ${i + 1}`}</span>
-                  <span className="badge sm" style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>{meta.label}</span>
-                </div>;
-              })}
-            </div>
-            {openRun.notes && <div className="note" style={{ marginTop: 10 }}>{openRun.notes}</div>}
-            <div className="control-findings-detail">
-              <div className="task-row-t" style={{ marginTop: 10 }}>ממצאים</div>
-              {openRunFindings.length ? openRunFindings.map((finding) => {
-                const sev = findingSeverityMeta(finding.severity);
-                return <div key={finding.id} className="control-finding-item">
-                  <div className="task-row-main">
-                    <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
-                    {finding.description && <div className="task-row-desc">{finding.description}</div>}
-                    <div className="task-row-sub">{findingRouteLabel(finding)}</div>
-                  </div>
-                  <div className="task-row-side">
-                    <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
-                    {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
-                  </div>
-                </div>;
-              }) : <div className="hint">לא נרשמו ממצאים בסבב הזה.</div>}
-            </div>
-          </div>}
-        </div> : <Empty text="אין עדיין היסטוריית בקרות" Icon={History} sub="סיימו בדיקה ידנית כדי לשמור אותה כאן." />}
-      </div>
       </>}
       </>}
     </div>
@@ -10287,10 +10317,13 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .task-row.selected{background:#FFF7ED;border-color:#FDBA74;box-shadow:0 0 0 1px rgba(234,88,12,.12);}
 .control-history-row{align-items:flex-start;}
 .control-actions{display:flex;flex-direction:column;gap:8px;}
-.control-mode-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0;}
+.control-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0;}
 .control-mode-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:11px;padding:10px 12px;font-size:13px;font-weight:900;cursor:pointer;min-width:0;}
 .control-mode-tabs button.on{background:#FFF7ED;border-color:#FDBA74;color:#C2410C;box-shadow:0 0 0 1px rgba(234,88,12,.08);}
 .control-mode-tabs button svg{flex:none;}
+.control-overview{display:flex;flex-direction:column;gap:12px;}
+.control-overview-grid{display:grid;grid-template-columns:minmax(320px,1.1fr) minmax(300px,.9fr);gap:12px;align-items:start;}
+.control-overview-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .control-programs-wrap{display:flex;flex-direction:column;gap:12px;}
 .control-program-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
 .control-program-split{display:grid;grid-template-columns:minmax(320px,1.1fr) minmax(300px,.9fr);gap:12px;align-items:start;}
@@ -10313,6 +10346,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .field.mini input,.field.mini select{min-height:36px;padding:7px 9px;font-size:12px;}
 .control-assignment-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:9px 10px;border-inline-start:4px solid #0D9488;}
 .control-assignment-row.done{border-inline-start-color:#CBD5E1;opacity:.78;}
+.control-assignment-row.overdue{border-inline-start-color:#DC2626;}
 .control-preset-row{display:flex;flex-wrap:wrap;gap:6px;}
 .control-preset-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer;max-width:100%;text-align:start;}
 .control-preset-btn:hover{background:var(--surface-2);border-color:#FDBA74;}
@@ -10353,7 +10387,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .control-answer-tabs button.on.bad{background:#FEF2F2;border-color:#FECACA;color:#B91C1C;}
 .control-answer-tabs button.on.na{background:var(--surface-2);border-color:#CBD5E1;color:var(--ink);}
 .control-find-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
-@media(max-width:980px){.control-program-split,.control-program-grid{grid-template-columns:1fr}.control-assignment-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.control-assignment-editor .btn-ghost{grid-column:1/-1;justify-content:center}}
+@media(max-width:980px){.control-overview-grid,.control-program-split,.control-program-grid{grid-template-columns:1fr}.control-mode-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.control-assignment-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.control-assignment-editor .btn-ghost{grid-column:1/-1;justify-content:center}}
 @media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row,.control-mode-tabs,.control-assignment-row,.fleet-control-unit{grid-template-columns:1fr}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}.control-program-head,.fleet-control-head{flex-direction:column}.fleet-control-counts{justify-content:flex-start}.control-assignment-editor{grid-template-columns:1fr}}
 .task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
 .task-due{font-size:11px;color:var(--muted);white-space:nowrap;}
