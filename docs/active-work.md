@@ -118,7 +118,8 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #526 clarified supplier linked activity counts.
 - Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed `בקרות` sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
-- Next exact action: if continuing `בקרות`, start the agreed cleaning-controls slice: `בקרות -> ניקיון` read-only overview for managers/admins plus manual manager cleaning-zone quality check. Do not rewrite QR/round/windows/compliance, do not migrate cleaning zones yet, and do not add a separate right-sidebar menu item.
+- Closed/deferred draft: PR #693 (`codex/cleaning-controls-slice`) intentionally stayed unmerged and was closed because it was mostly a future-direction bridge, not a needed production feature. The cleaning-controls direction remains documented in the blueprint/strategy docs.
+- Next exact action: no active code task is open. If the owner explicitly reopens `בקרות -> ניקיון`, rebuild it from fresh `main` as a concrete product slice: read-only manager/admin overview plus manual manager cleaning-zone quality check. Do not rewrite QR/round/windows/compliance, do not migrate cleaning zones yet, and do not add a separate right-sidebar menu item.
 - Short strategy handoff: `docs/near-term-controls-strategy-ru.md`.
 
 ## Current Product Direction
