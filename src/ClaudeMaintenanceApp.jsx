@@ -41,7 +41,7 @@ import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatal
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
-import { buildInspectionDuePairs, inspectionProgramsForType, migrateInspectionProgramsFromTemplates, normalizeInspectionProgram } from "./inspectionProgramModel.js";
+import { buildInspectionDuePairs, inspectionProgramsForType, migrateInspectionProgramsFromTemplates, nextInspectionDue, normalizeInspectionProgram } from "./inspectionProgramModel.js";
 import { controlAssignmentDraftFromProgram, controlFindingTaskDraft, controlManualRunPresetById, controlManualRunPresetsForDomain, controlProgramDraftFromManualPreset, controlRunDraftFromAssignment, normalizeControlAssignment, normalizeControlFinding, normalizeControlProgram, normalizeControlRun } from "./controlsCoreModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
@@ -2719,7 +2719,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [], saveTask, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
+function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], users = [], saveTask, saveInsp, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
   const canPerform = canRequest(session, "controls");
   const canManageControls = canManage(session, "controls");
   const [controlTab, setControlTab] = useState("run");
@@ -2745,6 +2745,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
   const [programDraft, setProgramDraft] = useState({ domain: "safety", presetId: "safety-walk-basic", name: "סיור בטיחות ידני", target: "", responsibleId: "", participantId: "" });
   const [assignmentDrafts, setAssignmentDrafts] = useState({});
   const [activeAssignmentRun, setActiveAssignmentRun] = useState(null);
+  const [activeFleetPlanRun, setActiveFleetPlanRun] = useState(null);
   const checklist = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 8), [checklistText]);
   const domainPresets = useMemo(() => controlManualRunPresetsForDomain(domain), [domain]);
   const targetPlaceholder = domainPresets[0]?.targetPlaceholder || "לדוגמה: מחסן ראשי / רחבת מלגזות";
@@ -2773,6 +2774,53 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     const unit = fleetById.get(fleetId);
     return unit ? (unitLabel(unit, config) || unit.id) : (fleetId || "");
   };
+  const fleetInspectionPlan = useMemo(() => {
+    const vehicleTypes = Array.isArray(config?.vehicleTypes) ? config.vehicleTypes : [];
+    const latest = {};
+    (Array.isArray(insp) ? insp : []).forEach((record) => {
+      if (!record?.fleetId) return;
+      const key = `${record.fleetId}::${record.programId || `tpl::${record.templateId || ""}`}`;
+      if (!latest[key] || (Number(record.at) || 0) > (Number(latest[key].at) || 0)) latest[key] = record;
+    });
+    const findType = (unit) => {
+      const model = unitModelCode(unit);
+      const type = unitTypeName(unit, config);
+      return vehicleTypes.find((vt) =>
+        (Array.isArray(vt.models) && model && vt.models.includes(model)) ||
+        (type && vt.name === type)
+      ) || null;
+    };
+    const groups = new Map();
+    fleetTargets.forEach((unit) => {
+      const vehicleType = findType(unit);
+      const typeName = vehicleType?.name || unitTypeName(unit, config) || "ללא סוג";
+      const programs = inspectionProgramsForType(vehicleType || {});
+      const activePrograms = programs.length ? programs : [null];
+      activePrograms.forEach((program) => {
+        const programKey = program?.id || `tpl::${vehicleType?.inspTpl || typeName}`;
+        const last = latest[`${unit.id}::${program?.id || `tpl::${vehicleType?.inspTpl || ""}`}`] || null;
+        const lastAt = last?.at || null;
+        const nextAt = program ? nextInspectionDue(program, lastAt) : (lastAt ? lastAt + 30 * 86400000 : 0);
+        const due = !lastAt || (nextAt && nextAt <= Date.now());
+        const key = `${typeName}::${programKey}`;
+        if (!groups.has(key)) groups.set(key, {
+          key,
+          typeName,
+          program,
+          legacy: !program,
+          units: []
+        });
+        groups.get(key).units.push({ unit, lastAt, nextAt, due });
+      });
+    });
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        units: group.units.sort((a, b) => (a.due === b.due ? String(a.unit.code || "").localeCompare(String(b.unit.code || ""), "he", { numeric: true }) : a.due ? -1 : 1)),
+        dueCount: group.units.filter((item) => item.due).length
+      }))
+      .sort((a, b) => b.dueCount - a.dueCount || a.typeName.localeCompare(b.typeName, "he") || String(a.program?.name || "").localeCompare(String(b.program?.name || ""), "he"));
+  }, [config, fleetTargets, insp]);
   const targetObjectFor = (value, valueDomain = domain) => {
     const id = String(value || "").trim();
     if (valueDomain === "fleet") {
@@ -2852,6 +2900,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
   const findingTaskCreated = !!savedFinding?.route?.taskId;
   const resetManualRun = () => {
     setActiveAssignmentRun(null);
+    setActiveFleetPlanRun(null);
     setAnswers({});
     setNotes("");
     setSignature("");
@@ -2866,6 +2915,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
   };
   const applyManualPreset = (preset) => {
     if (!preset) return;
+    setActiveFleetPlanRun(null);
     setName(preset.name);
     setChecklistText((preset.checklistItems || []).join("\n"));
     setAnswers({});
@@ -2967,6 +3017,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     });
     if (!runDraft) return setMsg("לא ניתן לפתוח בדיקה מהשיוך הזה.");
     setActiveAssignmentRun({ assignment, program, runDraft });
+    setActiveFleetPlanRun(null);
     setControlTab("run");
     setDomain(program.domain || "general");
     setName(program.name || "בקרה מתכנית");
@@ -2987,7 +3038,29 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
       await saveControlAssignment({ ...assignment, status: "in_progress" });
     }
   };
-  const activeProgramId = activeAssignmentRun?.program?.id || "manual-control";
+  const startFleetPlanRun = (unit, program, typeName) => {
+    const fallback = controlManualRunPresetById("fleet-yard-check");
+    const checklistItems = (program?.checklist || []).map((item) => item.label || item.name || item).filter(Boolean);
+    setActiveAssignmentRun(null);
+    setActiveFleetPlanRun({ unitId: unit.id, rawProgramId: program?.id || null, programId: program?.id ? `fleetInspection:${program.id}` : "fleetInspection:legacy", programName: program?.name || "בקרה כללית", typeName });
+    setControlTab("run");
+    setDomain("fleet");
+    setTarget(unit.id);
+    setName(program?.name || fallback?.name || "בקרת כלי שינוע");
+    setChecklistText((checklistItems.length ? checklistItems : (fallback?.checklistItems || [])).join("\n"));
+    setAnswers({});
+    setNotes("");
+    setSignature("");
+    setFindingTitle("");
+    setFindingDesc("");
+    setSeverity("medium");
+    setRouteType(program?.autoTicket === false ? "report_only" : "task");
+    setTaskDue("");
+    setSavedRun(null);
+    setSavedFinding(null);
+    setMsg("נפתחה בדיקת כלי מתוך תכנית לפי סוג. מלאו צ'קליסט וחתמו לסיום.");
+  };
+  const activeProgramId = activeAssignmentRun?.program?.id || activeFleetPlanRun?.programId || "manual-control";
   const activeAssignmentId = activeAssignmentRun?.assignment?.id || undefined;
   const statusLabel = (status) => ({
     planned: "מתוכנן",
@@ -3064,6 +3137,23 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     if (activeAssignmentRun && saveControlAssignment) {
       await saveControlAssignment({ ...activeAssignmentRun.assignment, status: "completed", completedAt: now, runId });
     }
+    if (activeFleetPlanRun && saveInsp) {
+      const inspectionRecord = {
+        id: uid(),
+        fleetId: activeFleetPlanRun.unitId,
+        programId: activeFleetPlanRun.rawProgramId || null,
+        templateId: null,
+        by: signature.trim() || session.name,
+        at: now,
+        results: run.answers.map((answer) => ({ text: answer.label, ok: answer.value !== "problem", note: answer.value === "problem" ? (findingDesc || findingTitle || notes || "") : "" })),
+        problems: run.answers.filter((answer) => answer.value === "problem").map((answer) => `${answer.label}${findingTitle ? " — " + findingTitle : ""}`),
+        passed: findingCount === 0,
+        sourceControlRunId: runId,
+        sourceModule: "controls"
+      };
+      const okInspection = await saveInsp(inspectionRecord);
+      if (okInspection === false) { setBusy(false); return setMsg(SAVE_FAILED_MESSAGE); }
+    }
     setBusy(false);
     setMsg(findingCount ? "הבדיקה נשמרה. עכשיו אפשר להשאיר לדוח או לפתוח מטלה מהממצא." : "הבדיקה נשמרה ללא ממצאים.");
   };
@@ -3130,8 +3220,39 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
       {!canPerform ? <Empty text="אין הרשאת ביצוע בקרות" Icon={ShieldAlert} sub="נדרשת הרשאת controls:request ומעלה כדי לבצע סבב." /> : <>
       <div className="control-mode-tabs">
         <button className={controlTab === "run" ? "on" : ""} onClick={() => setControlTab("run")}><ClipboardCheck size={15} /> ביצוע בדיקה</button>
+        <button className={controlTab === "fleet" ? "on" : ""} onClick={() => setControlTab("fleet")}><Truck size={15} /> בקרת כלים</button>
         <button className={controlTab === "programs" ? "on" : ""} onClick={() => setControlTab("programs")}><ListChecks size={15} /> תכניות ושיוכים</button>
       </div>
+      {controlTab === "fleet" && <div className="control-panel">
+        <SectionTitle><Truck size={15} /> תכנית בדיקות כלי שינוע</SectionTitle>
+        <div className="hint" style={{ marginBottom: 10 }}>הבדיקות מוצגות לפי סוג כלי ותכנית הבקרה שמוגדרת בסוגי כלי השינוע. זהו חיבור ראשון ל-בקרות: עדיין בלי מנוע שיבוץ אוטומטי, אבל עם תדירות, בדיקה אחרונה ובדיקה הבאה.</div>
+        {fleetInspectionPlan.length ? <div className="fleet-control-groups">{fleetInspectionPlan.map((group) => (
+          <div key={group.key} className="fleet-control-group">
+            <div className="fleet-control-head">
+              <div>
+                <div className="tcard-subj">{group.typeName}</div>
+                <div className="control-program-meta">{group.program?.name || "בקרה כללית"} · {group.program ? `כל ${group.program.intervalMonths} חודשים` : "ברירת מחדל 30 יום"} · {(group.program?.checklist || []).length || controlManualRunPresetById("fleet-yard-check")?.checklistItems?.length || 0} סעיפים</div>
+              </div>
+              <div className="fleet-control-counts">
+                <span className="badge sm" style={{ background: group.dueCount ? "#FEF2F2" : "#ECFDF5", color: group.dueCount ? "#B91C1C" : "#047857", border: "1px solid var(--line)" }}>{group.dueCount ? `${group.dueCount} לביצוע` : "הכל בזמן"}</span>
+                <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)", border: "1px solid var(--line)" }}>{group.units.length} כלים</span>
+              </div>
+            </div>
+            <div className="fleet-control-units">{group.units.map(({ unit, lastAt, nextAt, due }) => {
+              const delta = nextAt ? daysLeft(nextAt) : null;
+              const statusText = !lastAt ? "לא נבדק" : due ? `באיחור ${Math.abs(delta || 0)} י׳` : delta === 0 ? "היום" : `בעוד ${delta} י׳`;
+              return <div key={`${group.key}-${unit.id}`} className={"fleet-control-unit" + (due ? " due" : "")}>
+                <div className="task-row-main">
+                  <div className="task-row-t">{unitLabel(unit, config)}</div>
+                  <div className="task-row-desc">אחרונה: {lastAt ? fmtDate(lastAt) : "—"} · הבאה: {nextAt ? fmtDate(nextAt) : "עכשיו"}</div>
+                </div>
+                <span className="badge sm" style={{ background: due ? "#FEF2F2" : "var(--surface-2)", color: due ? "#B91C1C" : "var(--muted)", border: "1px solid var(--line)" }}>{statusText}</span>
+                <button className="btn-primary sm" onClick={() => startFleetPlanRun(unit, group.program, group.typeName)}><Play size={14} /> בדיקה</button>
+              </div>;
+            })}</div>
+          </div>
+        ))}</div> : <Empty text="אין כלי שינוע זמינים" Icon={Truck} sub="הוסיפו כלי שינוע וסוגי כלי כדי לראות כאן תכנית בדיקות לפי סוג." />}
+      </div>}
       {controlTab === "programs" && <div className="control-programs-wrap">
         {canManageControls && <div className="control-panel">
           <SectionTitle><Plus size={15} /> תכנית בקרה חדשה</SectionTitle>
@@ -3191,6 +3312,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
       </div>}
       {controlTab === "run" && <>
       {activeAssignmentRun && <div className="note" style={{ marginBottom: 12 }}><b>בדיקה מתוך שיוך:</b> {activeAssignmentRun.program?.name} · {activeAssignmentRun.assignment?.target?.label || activeAssignmentRun.assignment?.target?.id || "ללא יעד"} · {activeAssignmentRun.assignment?.dueAt ? fmtDate(activeAssignmentRun.assignment.dueAt) : "ללא תאריך"}</div>}
+      {activeFleetPlanRun && <div className="note" style={{ marginBottom: 12 }}><b>בדיקת כלי מתוך תכנית:</b> {activeFleetPlanRun.programName} · {activeFleetPlanRun.typeName} · {fleetTargetLabel(activeFleetPlanRun.unitId)}</div>}
       <div className="control-run-grid">
         <div className="control-panel">
           <SectionTitle><currentArea.Icon size={15} /> בדיקה ידנית</SectionTitle>
@@ -10038,6 +10160,14 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .control-program-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
 .control-program-split{display:grid;grid-template-columns:minmax(320px,1.1fr) minmax(300px,.9fr);gap:12px;align-items:start;}
 .control-program-list,.control-assignment-list{display:flex;flex-direction:column;gap:8px;}
+.fleet-control-groups{display:flex;flex-direction:column;gap:10px;}
+.fleet-control-group{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:10px;display:flex;flex-direction:column;gap:9px;border-inline-start:4px solid #EA580C;}
+.fleet-control-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.fleet-control-head>div:first-child{min-width:0;}
+.fleet-control-counts{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;}
+.fleet-control-units{display:flex;flex-direction:column;gap:7px;}
+.fleet-control-unit{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:8px 10px;}
+.fleet-control-unit.due{border-inline-start:4px solid #DC2626;}
 .control-program-card{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:10px;display:flex;flex-direction:column;gap:9px;}
 .control-program-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
 .control-program-head>div{min-width:0;}
@@ -10089,7 +10219,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .control-answer-tabs button.on.na{background:var(--surface-2);border-color:#CBD5E1;color:var(--ink);}
 .control-find-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;}
 @media(max-width:980px){.control-program-split,.control-program-grid{grid-template-columns:1fr}.control-assignment-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.control-assignment-editor .btn-ghost{grid-column:1/-1;justify-content:center}}
-@media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row,.control-mode-tabs,.control-assignment-row{grid-template-columns:1fr}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}.control-program-head{flex-direction:column}.control-assignment-editor{grid-template-columns:1fr}}
+@media(max-width:760px){.control-run-grid,.control-find-grid,.control-check-row,.control-mode-tabs,.control-assignment-row,.fleet-control-unit{grid-template-columns:1fr}.control-answer-tabs{justify-content:stretch}.control-answer-tabs button{flex:1;min-width:88px}.control-program-head,.fleet-control-head{flex-direction:column}.fleet-control-counts{justify-content:flex-start}.control-assignment-editor{grid-template-columns:1fr}}
 .task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
 .task-due{font-size:11px;color:var(--muted);white-space:nowrap;}
 .ppe-request-list{display:flex;flex-direction:column;gap:8px;}
