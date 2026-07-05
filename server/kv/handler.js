@@ -17,8 +17,6 @@ const ALLOWED_KV_PREFIXES = Object.freeze([
   "config:v1",
   "fleet:",
   "pm:",
-  "insp:",
-  "itpl:",
   "photo:",
   "ppe:",
   "ppeitem:",
@@ -34,10 +32,6 @@ const ALLOWED_KV_PREFIXES = Object.freeze([
   "presence:",
   "mtask:",
   "mmeet:",
-  "controlProgram:",
-  "controlAssignment:",
-  "controlRun:",
-  "controlFinding:",
   "appIssue:",
   "pushSubscriptions:v1"
 ]);

@@ -43,10 +43,9 @@ describe("auditEventModel", () => {
     expect(() => normalizeAuditEvent({ entityType: AUDIT_ENTITY_TYPES.ticket, action: "other" })).toThrow("audit_action_invalid");
   });
 
-  it("accepts task, meeting, and controls entity types for workflow audit taxonomy", () => {
+  it("accepts task and meeting entity types for workflow audit taxonomy", () => {
     expect(normalizeAuditEvent({ entityType: AUDIT_ENTITY_TYPES.task, entityId: "mtask-1", action: AUDIT_ACTIONS.update })).toMatchObject({ entityType: "task", entityId: "mtask-1" });
     expect(normalizeAuditEvent({ entityType: AUDIT_ENTITY_TYPES.meeting, entityId: "mmeet-1", action: AUDIT_ACTIONS.update })).toMatchObject({ entityType: "meeting", entityId: "mmeet-1" });
-    expect(normalizeAuditEvent({ entityType: AUDIT_ENTITY_TYPES.controls, entityId: "controlRun-1", action: AUDIT_ACTIONS.update })).toMatchObject({ entityType: "controls", entityId: "controlRun-1" });
   });
 
   it("builds ticket status events for lifecycle trust", () => {

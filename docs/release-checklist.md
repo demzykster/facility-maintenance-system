@@ -105,7 +105,7 @@ Closed notes:
 - `ביגוד עובדים`: empty order states, order-line labels, net-deficit suggestions, catalog/settings labels, and movement search were stabilized.
 - `הגדרות`: duplicate module settings were moved to their module homes; waiting reasons, downtime levels, notifications, demo/backup copy, and delete actions were clarified.
 - `צוות ומשתמשים`: permissions UI, read-only cards, group toggles, worker first-login setup flow, duplicate login warning, departments, and worker shifts were stabilized.
-- `כלי שינוע`: fleet search, driver coverage search, driver request labels, warning dismissal, vehicle-type settings, PM/detail edit labels, and inspection controls were stabilized.
+- `כלי שינוע`: fleet search, driver coverage search, driver request labels, warning dismissal, vehicle-type settings, and PM/detail edit labels were stabilized.
 - `בקרת ניקיון`: zone setup, delete actions, report/spec actions, cleaner/manager/admin paths, and notification/report labels were stabilized.
 - Final browser pass over all seven R5 screens found no visible unlabeled controls. Remaining broad redesign ideas should be tracked as explicit new packages, not as R5 leftovers.
 

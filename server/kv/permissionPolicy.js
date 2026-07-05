@@ -14,7 +14,7 @@ const ACTIVE_ROLES = Object.freeze(["admin", "user", "tech", "worker", "cleaner"
 const WRITE_RULES = Object.freeze([
   { prefixes: ["user:"], module: "users", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.user },
   { prefixes: ["config:v1"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings },
-  { prefixes: ["fleet:", "pm:", "insp:", "itpl:", "photo:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
+  { prefixes: ["fleet:", "pm:", "photo:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
   { prefixes: ["ppe:", "ppeitem:", "ppenorm:", "ppeorder:"], module: "ppe", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.ppe },
   { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning },
   { prefixes: ["location:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings },
@@ -25,8 +25,6 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["presence:"], roles: ["admin", "tech"], entityType: AUDIT_ENTITY_TYPES.user, auditSensitive: false },
   { prefixes: ["mtask:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.task, auditSensitive: false },
   { prefixes: ["mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.meeting, auditSensitive: false },
-  { prefixes: ["controlProgram:", "controlAssignment:"], module: "controls", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.controls, auditSensitive: false },
-  { prefixes: ["controlRun:", "controlFinding:"], module: "controls", minLevel: "request", entityType: AUDIT_ENTITY_TYPES.controls, auditSensitive: false },
   { prefixes: ["appIssue:"], roles: ACTIVE_ROLES, entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false }
 ]);
 

@@ -16,7 +16,7 @@ describe("production data collections", () => {
   });
 
   it("names every future production table explicitly", () => {
-    expect(DATA_COLLECTIONS).toHaveLength(24);
+    expect(DATA_COLLECTIONS).toHaveLength(18);
     expect(DATA_COLLECTIONS.every((collection) => collection.table && collection.table.includes(" ") === false)).toBe(true);
   });
 });

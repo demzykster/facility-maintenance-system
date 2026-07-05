@@ -36,7 +36,6 @@ describe("supabase profile foundation", () => {
     expect(SUPABASE_PERMISSION_MODULE_KEYS).toEqual(USER_PERMISSION_MODULES.map((module) => module.mod));
     expect(SUPABASE_PERMISSION_MODULE_KEYS).toContain("users");
     expect(SUPABASE_PERMISSION_MODULE_KEYS).toContain("workerAccess");
-    expect(SUPABASE_PERMISSION_MODULE_KEYS).toContain("controls");
   });
 
   it("normalizes app user profiles for the future Supabase auth adapter", () => {

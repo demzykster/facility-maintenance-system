@@ -4,14 +4,14 @@ import { normalizeTaskActionRecord, taskActionSignal, taskActionSourceFields } f
 describe("task action model", () => {
   it("keeps explicit source links for future findings and programs", () => {
     const patch = taskActionSourceFields({
-      sourceModule: "controls",
+      sourceModule: "fleet",
       sourceFindingId: "finding-1",
       sourceProgramId: "program-1",
       sourceLabel: "בטיחות מחסן"
     });
 
     expect(patch).toEqual({
-      sourceModule: "controls",
+      sourceModule: "fleet",
       sourceFindingId: "finding-1",
       sourceProgramId: "program-1",
       sourceLabel: "בטיחות מחסן"
@@ -26,7 +26,7 @@ describe("task action model", () => {
       participantIds: ["u2", null, "u2"],
       linkedMeetingIds: ["m1", "m1"],
       sourceRef: {
-        module: "controls",
+        module: "fleet",
         findingId: "finding-1",
         programId: "program-1",
         label: "Safety walk"
@@ -34,13 +34,13 @@ describe("task action model", () => {
     });
 
     expect(task).toMatchObject({
-      sourceModule: "controls",
+      sourceModule: "fleet",
       sourceId: "finding-1",
       responsibleIds: ["u1"],
       participantIds: ["u2"],
       linkedMeetingIds: ["m1"],
       sourceRef: {
-        module: "controls",
+        module: "fleet",
         findingId: "finding-1",
         programId: "program-1",
         label: "Safety walk"
@@ -52,7 +52,7 @@ describe("task action model", () => {
     const original = {
       id: "mt-2",
       title: "Old title",
-      sourceModule: "controls",
+      sourceModule: "fleet",
       sourceFindingId: "finding-2",
       sourceProgramId: "program-2"
     };
@@ -68,7 +68,7 @@ describe("task action model", () => {
     expect(normalizeTaskActionRecord(formSave)).toMatchObject({
       id: "mt-2",
       title: "New title",
-      sourceModule: "controls",
+      sourceModule: "fleet",
       sourceId: "finding-2",
       sourceFindingId: "finding-2",
       sourceProgramId: "program-2"
@@ -81,14 +81,14 @@ describe("task action model", () => {
       status: "waiting",
       responsibleIds: ["u1", "u2"],
       dueAt: 123,
-      sourceModule: "controls",
+      sourceModule: "fleet",
       sourceId: "finding-3"
     })).toEqual({
       severity: "high",
       status: "waiting",
       assignedTo: ["u1", "u2"],
       dueAt: 123,
-      sourceModule: "controls",
+      sourceModule: "fleet",
       sourceId: "finding-3"
     });
   });

@@ -47,22 +47,6 @@ describe("permission capability helpers", () => {
     expect(canView(userManager, "userGroups")).toBe(false);
   });
 
-  it("models controls access with request as the perform level", () => {
-    const performer = { role: "user", perms: { controls: "request" } };
-    const coordinator = { role: "user", perms: { controls: "manage" } };
-    const owner = { role: "user", perms: { controls: "full" } };
-
-    expect(canView(performer, "controls")).toBe(true);
-    expect(canRequest(performer, "controls")).toBe(true);
-    expect(canManage(performer, "controls")).toBe(false);
-
-    expect(canRequest(coordinator, "controls")).toBe(true);
-    expect(canManage(coordinator, "controls")).toBe(true);
-    expect(canFull(coordinator, "controls")).toBe(false);
-
-    expect(canFull(owner, "controls")).toBe(true);
-  });
-
   it("supports management module permissions without role-specific checks", () => {
     const analyst = { role: "user", perms: { analytics: "view", suppliers: "manage", audit: "view" } };
     const supplierViewer = { role: "user", perms: { suppliers: "view" } };

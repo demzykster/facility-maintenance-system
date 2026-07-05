@@ -65,7 +65,7 @@ describe("fleetMaintenancePolicyModel", () => {
     ]);
   });
 
-  it("keeps checklist templates reusable by vehicle type or model", () => {
+  it("keeps checklist items reusable by vehicle type or model", () => {
     const checklist = {
       name: "בדיקת מלגזת היגש",
       items: ["בלמים", "צופר", "נזילות"],
@@ -76,7 +76,7 @@ describe("fleetMaintenancePolicyModel", () => {
     expect(checklistTemplateMatchesUnit(checklist, fleet[1])).toBe(false);
   });
 
-  it("keeps periodic-maintenance checklist items separate from inspection templates", () => {
+  it("keeps periodic-maintenance checklist items separate from general checklist templates", () => {
     const rules = normalizeMaintenanceRules([
       {
         id: "to-500",

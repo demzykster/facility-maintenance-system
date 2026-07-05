@@ -9,7 +9,6 @@ export const AUDIT_ENTITY_TYPES = Object.freeze({
   ppe: "ppe",
   task: "task",
   meeting: "meeting",
-  controls: "controls",
   system: "system"
 });
 

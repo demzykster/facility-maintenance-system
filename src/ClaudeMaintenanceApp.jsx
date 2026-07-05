@@ -41,8 +41,6 @@ import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatal
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
-import { buildInspectionDuePairs, inspectionProgramsForType, migrateInspectionProgramsFromTemplates, nextInspectionDue, normalizeInspectionProgram } from "./inspectionProgramModel.js";
-import { controlAssignmentDraftFromProgram, controlFindingTaskDraft, controlManualRunPresetById, controlManualRunPresetsForDomain, controlProgramDraftFromManualPreset, controlRunDraftFromAssignment, normalizeControlAssignment, normalizeControlFinding, normalizeControlProgram, normalizeControlRun } from "./controlsCoreModel.js";
 import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
@@ -225,7 +223,7 @@ const MEETING_TYPE_CFG = {
 const mtgCfg = (type) => MEETING_TYPE_CFG[type] || { importExcel: false, standingTopics: false, taskMulti: false, taskLocation: false, hint: "" };
 const ORIGIN_LABEL = { manual: "ידני", excel: "מ-Excel", ai: "ניתוח AI", meeting: "מפגישה", boss_meeting: "מפגישת הממונה", boss_excel: "Excel של הממונה" };
 const originLabel = (o) => ORIGIN_LABEL[o] || "ידני";
-const TASK_SOURCE_MODULE_LABEL = { controls: "בקרות", fleet: "כלי שינוע", cleaning: "ניקיון", tickets: "קריאה", ticket: "קריאה", meetings: "פגישה", meeting: "פגישה", ppe: "ביגוד עובדים", pm: "טיפול תקופתי" };
+const TASK_SOURCE_MODULE_LABEL = { fleet: "כלי שינוע", cleaning: "ניקיון", tickets: "קריאה", ticket: "קריאה", meetings: "פגישה", meeting: "פגישה", ppe: "ביגוד עובדים", pm: "טיפול תקופתי" };
 const taskSourceInfo = (task = {}) => {
   const ref = task.sourceRef && typeof task.sourceRef === "object" ? task.sourceRef : {};
   const moduleId = task.sourceModule || ref.module || "";
@@ -369,7 +367,7 @@ const pmFreqForUnit = (f, cfg) => (cfg?.typeMeta?.[unitTypeName(f, cfg)]?.pmFreq
 const WIDGETS = [
   { id: "kpis", label: "מדדים ראשיים" }, { id: "docs", label: "מסמכים פגי-תוקף" },
   { id: "downtime", label: "השבתות קריטיות" }, { id: "sla", label: "חריגות SLA" },
-  { id: "insp", label: "בקרת כלים לביצוע" }, { id: "pm", label: "תחזוקה מונעת" }, { id: "presence", label: "נוכחות טכנאים" }, { id: "costs", label: "עלויות החודש" },
+  { id: "pm", label: "תחזוקה מונעת" }, { id: "presence", label: "נוכחות טכנאים" }, { id: "costs", label: "עלויות החודש" },
 ];
 const DEFAULT_CONFIG = {
   companyName: "CMMS CDSL", siteName: "ניהול תחזוקה, ציוד, משימות ותפעול",
@@ -388,7 +386,7 @@ const DEFAULT_CONFIG = {
   mgrWidgets: { tickets: true, pm: true, sla: true },
   notify: { ...DEFAULT_NOTIFY_CONFIG },
   defaultShiftStart: "07:30", defaultShiftEnd: "16:30", lateGraceMin: 10, earlyGraceMin: 10,
-  vehicleTypes: [], modelSupplier: {}, modelType: {}, maintenanceRules: [], pmDailyCapacity: 4, defaultInspIntervalMonths: 2, cleaningReminderMins: 30, shifts: [], workShifts: [],
+  vehicleTypes: [], modelSupplier: {}, modelType: {}, maintenanceRules: [], pmDailyCapacity: 4, cleaningReminderMins: 30, shifts: [], workShifts: [],
 };
 
 /* ---------- helpers ---------- */
@@ -555,7 +553,7 @@ const buildVehicleTypes = (cfg, fleet) => {
     const e = byName.get(name); if (!e.models.includes(m)) e.models.push(m);
   });
   let i = 0;
-  return [...byName.values()].map((e) => { const meta = e.meta, sla = e.sla; return { id: "vt" + (i++) + "_" + (e.name || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 8), name: e.name, high: sla.high ?? 4, medium: sla.medium ?? 24, low: sla.low ?? 72, tasrir: !!(meta.tasrir ?? meta.hydraulics), license: !!meta.license, insurance: !!meta.insurance, lease: !!meta.lease, inspTpl: meta.inspTpl || "", pmFreq: meta.pmFreq || "monthly", models: e.models }; });
+  return [...byName.values()].map((e) => { const meta = e.meta, sla = e.sla; return { id: "vt" + (i++) + "_" + (e.name || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 8), name: e.name, high: sla.high ?? 4, medium: sla.medium ?? 24, low: sla.low ?? 72, tasrir: !!(meta.tasrir ?? meta.hydraulics), license: !!meta.license, insurance: !!meta.insurance, lease: !!meta.lease, pmFreq: meta.pmFreq || "monthly", models: e.models }; });
 };
 const flattenVehicleTypes = (vts) => {
   const forkliftTypes = [], typeSla = {}, typeMeta = {}, modelSupplier = {}, modelType = {};
@@ -565,12 +563,12 @@ const flattenVehicleTypes = (vts) => {
     const typeName = (vt.name || "").trim();
     if (typeName) {
       typeSla[typeName] = { high: Number(vt.high) || 4, medium: Number(vt.medium) || 24, low: Number(vt.low) || 72 };
-      typeMeta[typeName] = { tasrir: !!vt.tasrir, license: !!vt.license, insurance: !!vt.insurance, lease: !!vt.lease, inspTpl: vt.inspTpl || "", pmFreq: vt.pmFreq || "monthly" };
+      typeMeta[typeName] = { tasrir: !!vt.tasrir, license: !!vt.license, insurance: !!vt.insurance, lease: !!vt.lease, pmFreq: vt.pmFreq || "monthly" };
     }
     list.forEach((m) => {
       if (!forkliftTypes.includes(m)) forkliftTypes.push(m);
       typeSla[m] = { high: Number(vt.high) || 4, medium: Number(vt.medium) || 24, low: Number(vt.low) || 72 };
-      typeMeta[m] = { tasrir: !!vt.tasrir, license: !!vt.license, insurance: !!vt.insurance, lease: !!vt.lease, inspTpl: vt.inspTpl || "", pmFreq: vt.pmFreq || "monthly" };
+      typeMeta[m] = { tasrir: !!vt.tasrir, license: !!vt.license, insurance: !!vt.insurance, lease: !!vt.lease, pmFreq: vt.pmFreq || "monthly" };
       modelSupplier[m] = vt.supplier || ""; modelType[m] = (vt.name || "").trim();
     });
   });
@@ -662,7 +660,6 @@ const canManageSuppliers = (session) => canManage(session, "suppliers");
 const canManageSettings = (session) => canManage(session, "settings");
 const canFullSettings = (session) => canFull(session, "settings");
 const canViewAudit = (session) => canView(session, "audit");
-const canViewControls = (session) => canView(session, "controls");
 const fleetForSession = (session, fleet) => { if (!session || session.role === "admin") return fleet || []; const md = userDepts(session); if (!md.length) return fleet || []; return (fleet || []).filter((f) => fleetDepts(f).some((d) => md.includes(d))); };
 const pushDriverEvent = (cfg, evt) => ({ ...cfg, driverEvents: [{ id: uid(), at: Date.now(), ...evt }, ...((cfg.driverEvents || []).slice(0, 299))] });
 const pendingDriverReqs = (fleet) => { const out = []; (fleet || []).forEach((f) => DRIVER_SHIFTS.forEach((s) => { const d = driverOf(f, s.id); if (driverPending(d)) out.push({ unit: f, cat: s.id, driver: d }); })); return out.sort((a, b) => (b.driver.reqAt || 0) - (a.driver.reqAt || 0)); };
@@ -684,7 +681,7 @@ const crossSuggestions = (scoped) => {
   });
   return out;
 };
-const problemUnits = (fleet, tickets, insp, config) => (fleet || []).map((f) => { const h = assetHealth(f, tickets, insp, config); const rel = (tickets || []).filter((t) => t.forkliftId === f.id && Date.now() - t.createdAt <= 90 * 86400000); const byCat = {}; rel.forEach((t) => { const c = t.categoryLabel || "אחר"; byCat[c] = (byCat[c] || 0) + 1; }); const reasons = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 3); return { f, h, reasons }; }).filter((x) => x.h.count90 >= 3 || x.h.score < 60).sort((a, b) => b.h.count90 - a.h.count90 || a.h.score - b.h.score);
+const problemUnits = (fleet, tickets, config) => (fleet || []).map((f) => { const h = assetHealth(f, tickets, config); const rel = (tickets || []).filter((t) => t.forkliftId === f.id && Date.now() - t.createdAt <= 90 * 86400000); const byCat = {}; rel.forEach((t) => { const c = t.categoryLabel || "אחר"; byCat[c] = (byCat[c] || 0) + 1; }); const reasons = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 3); return { f, h, reasons }; }).filter((x) => x.h.count90 >= 3 || x.h.score < 60).sort((a, b) => b.h.count90 - a.h.count90 || a.h.score - b.h.score);
 const driverEvtText = (ev) => { const cat = driverShiftMeta(ev.category).label; const who = (ev.driverName || "") + (ev.workNo ? ` (#${ev.workNo})` : ""); switch (ev.type) {
   case "add_req": return `בקשת הוספת נהג: ${who} · ${ev.unitCode} · ${cat}${ev.needsChip ? " · צריך צ׳יפ" : ""}`;
   case "add": return `נהג נוסף: ${who} · ${ev.unitCode} · ${cat}`;
@@ -968,7 +965,7 @@ function computeRisk(ticket, fleet, config) {
   return { score, level, color: colors[level], label: labels[level], reasons };
 }
 // ---- Asset Health (профиль актива) ----
-function assetHealth(f, tickets, insp, config) {
+function assetHealth(f, tickets, config) {
   const now = Date.now(), D = 86400000;
   const rel = tickets.filter((t) => t.forkliftId === f.id);
   const last90 = rel.filter((t) => now - t.createdAt <= 90 * D);
@@ -1236,7 +1233,7 @@ const NOTIF_KINDS = [
 ];
 const NOTIF_KIND_LABEL = (k) => (NOTIF_KINDS.find((x) => x.kind === k) || {}).label || k;
 const DEFAULT_NOTIF_PREFS = DEFAULT_LOCAL_NOTIFICATION_PREFS;
-function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
+function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const ev = []; const vis = visibleTickets(session, tickets, fleet);
   (tasks || []).forEach((t) => { if (!taskOpen(t)) return; if (!(t.ownerId === session.id || (t.responsibleIds || []).includes(session.id))) return; if (taskOverdue(t)) ev.push({ key: "task-ovd-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה באיחור · ${t.title}`, body: tstOf(t.status).label }); else if ((t.mode === "deadline" || t.mode === "recurring") && t.dueAt && t.dueAt - Date.now() < 2 * 86400000) ev.push({ key: "task-due-" + t.id, at: t.dueAt, kind: "task", go: "tasks", title: `מטלה לקראת יעד · ${t.title}`, body: fmtDate(t.dueAt) }); else if (t.nextActionAt && t.nextActionAt - Date.now() < 86400000) ev.push({ key: "task-na-" + t.id, at: t.nextActionAt, kind: "task", go: "tasks", title: `מעקב מטלה · ${t.title}`, body: "הגיע תאריך מעקב" }); });
   (meetings || []).forEach((m) => { if (m.status !== "planned") return; if (!(m.ownerId === session.id || (m.participantIds || []).includes(session.id))) return; const dt = m.at - Date.now(); if (dt > -3600000 && dt < 24 * 3600000) ev.push({ key: "mtg-" + m.id, at: m.at, kind: "task", go: "tasks", title: `פגישה קרובה · ${m.title}`, body: `${fmtDate(m.at)} ${fmtTime(m.at)}` }); });
@@ -1281,12 +1278,6 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
     tickets.filter((t) => needsHandler(t, users, fleet)).forEach((t) => ev.push({ key: "orphan-" + t.id, at: t.createdAt, ticketId: t.id, kind: "escalate", go: "tickets", title: `קריאה ללא מטפל · #${ticketNo(t)}`, body: `${t.subject} — ${t.assignee ? "המטפל אינו פעיל עוד" : "אין טכנאי פעיל לקבל"}. נדרש שיבוץ.` }));
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי קרוב", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
     pendingDriverReqs(fleet).forEach(({ unit, cat, driver }) => ev.push({ key: "drvreq-" + unit.id + cat, at: driver.reqAt || Date.now(), kind: "driver", go: "fleet", fleetId: unit.id, title: driver.status === "pending_add" ? "בקשת הוספת נהג — ממתין לאישורך" : "בקשת העברת נהג — ממתין לאישורך", body: `${driver.name} · ${unit.code} (${driverShiftMeta(cat).label})${driver.status === "pending_move" && driver.moveTo ? ` → ${driver.moveTo.unitCode}` : ""}${driver.needsChip ? " · צריך להנפיק צ׳יפ" : ""} · מ-${driver.addedByName || "מנהל"}` }));
-    { const lastInsp = {}; (insp || []).forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
-      const due = (fleet || []).filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
-      if (due.length) ev.push({ key: "inspdue-admin", at: Date.now(), kind: "doc", go: "insp", title: "בקרת כלים חודשית חסרה", body: `${countLabel(due.length, "כלי ממתין", "כלים ממתינים")} לבקרה חודשית` }); }
-    { const duePairs = buildInspectionDuePairs({ fleet, insps: insp, config: cfg, now: Date.now(), unitModelCode, unitTypeName });
-      const myDuePairs = duePairs.filter(({ prog }) => !prog || !(prog.responsibleIds || []).length || (prog.responsibleIds || []).includes(session.id));
-      if (myDuePairs.length > 0) ev.push({ key: "inspdue-programs", at: Date.now(), kind: "doc", go: "insp", title: "בקרות נדרשות", body: myDuePairs.length === 1 ? `${unitLabel(myDuePairs[0].f, cfg)} · ${myDuePairs[0].prog?.name || "בקרה"}` : `${myDuePairs.length} בקרות חסרות` }); }
     { const pend = (ppeReqs || []).filter(ppeRequestNeedsAction);
       if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", ppeSub: "dash", title: "בקשות ביגוד ממתינות", body: `${countLabel(pend.length, "בקשה", "בקשות")} לאישור או חתימת עובד` }); }
     { const low = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
@@ -1320,7 +1311,7 @@ function computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones =
   }
   return ev.sort((a, b) => b.at - a.at);
 }
-function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
+function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const skey = `seen:${session.role}:${session.name}`;
   const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
   const [readState, setReadState] = useState(null), [toast, setToast] = useState(null);
@@ -1343,7 +1334,7 @@ function useNotifications(session, tickets, pm, fleet, insp, cfg, presence, zone
     return () => { cancelled = true; };
   }, [pkey]);
   const setPrefs = (patch) => setPrefsState((p) => { const np = { ...p, ...patch }; store.set(pkey, JSON.stringify(np), false); return np; });
-  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, insp, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders]);
+  const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
   const unreadKeys = useMemo(() => readState == null ? new Set() : unreadNotificationKeySet(visible, readState), [visible, readState]);
@@ -1457,8 +1448,6 @@ export default function App() {
   const [tickets, setTickets] = useState([]);
   const [pm, setPm] = useState([]);
   const [fleet, setFleet] = useState([]);
-  const [insp, setInsp] = useState([]);
-  const [templates, setTemplates] = useState([]);
   const [presence, setPresence] = useState([]);
   const [zones, setZones] = useState([]);
   const [rounds, setRounds] = useState([]);
@@ -1467,10 +1456,6 @@ export default function App() {
   const [tasks, setTasks] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [controlPrograms, setControlPrograms] = useState([]);
-  const [controlAssignments, setControlAssignments] = useState([]);
-  const [controlRuns, setControlRuns] = useState([]);
-  const [controlFindings, setControlFindings] = useState([]);
   const [ppe, setPpe] = useState([]);
   const [ppeItems, setPpeItems] = useState([]);
   const [ppeNorms, setPpeNorms] = useState([]);
@@ -1634,10 +1619,10 @@ export default function App() {
     return ok;
   };
   async function reloadAll() {
-    const [tk, pmv, fl, ins, tpl, pres, us, zn, rd, cp, abs, locs, mtk, mmt, cprog, casg, crun, cfind, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
-      "ticket:", "pm:", "fleet:", "insp:",
-      "itpl:", "presence:", "user:",
-      "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "controlProgram:", "controlAssignment:", "controlRun:", "controlFinding:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
+    const [tk, pmv, fl, pres, us, zn, rd, cp, abs, locs, mtk, mmt, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
+      "ticket:", "pm:", "fleet:",
+      "presence:", "user:",
+      "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
@@ -1647,18 +1632,12 @@ export default function App() {
     apply("ticket", tk, setTickets, (a, b) => b.createdAt - a.createdAt);
     apply("pm", pmv, setPm, (a, b) => a.nextDue - b.nextDue);
     apply("fleet", fl, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
-    apply("insp", ins, setInsp, (a, b) => b.at - a.at);
-    apply("itpl", tpl, setTemplates, null);
     apply("czone", zn, setZones, zoneSort);
     apply("cround", rd, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
     apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
     apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
     apply("mmeet", mmt, setMeetings, (a, b) => b.at - a.at);
-    apply("controlProgram", cprog, setControlPrograms, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
-    apply("controlAssignment", casg, setControlAssignments, (a, b) => (b.dueAt || b.createdAt || 0) - (a.dueAt || a.createdAt || 0));
-    apply("controlRun", crun, setControlRuns, (a, b) => (b.finishedAt || b.startedAt || 0) - (a.finishedAt || a.startedAt || 0));
-    apply("controlFinding", cfind, setControlFindings, (a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     apply("ppe", pp, setPpe, (a, b) => b.at - a.at);
     apply("ppeitem", ppit, setPpeItems, (a, b) => (a.name > b.name ? 1 : -1));
     apply("ppenorm", ppn, setPpeNorms, null);
@@ -1841,7 +1820,6 @@ export default function App() {
   const resolveComplaint = async (c) => persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name });
   const progressComplaint = async (c) => persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() });
   const delFleet = async (id, options = {}) => { if (!await deleteShared(`fleet:${id}`, options)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
-  const saveInsp = async (i) => { if (!await persistShared(`insp:${i.id}`, JSON.stringify(i))) return false; setInsp((s) => [i, ...s.filter((x) => x.id !== i.id)].sort((a, b) => b.at - a.at)); return true; };
   const syncAdminProfileUser = async (u) => {
     if (!u?.authUserId) return;
     const accessToken = PRODUCTION_AUTH_STORE.get()?.accessToken || "";
@@ -1892,34 +1870,6 @@ export default function App() {
     return true;
   };
   const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
-  const saveControlProgram = async (p) => {
-    const program = normalizeControlProgram(p);
-    if (!program.id || !program.name) return false;
-    if (!await persistShared(`controlProgram:${program.id}`, JSON.stringify(program))) return false;
-    setControlPrograms((s) => [program, ...s.filter((x) => x.id !== program.id)].sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")));
-    return true;
-  };
-  const saveControlAssignment = async (a) => {
-    const assignment = normalizeControlAssignment(a);
-    if (!assignment.id || !assignment.programId) return false;
-    if (!await persistShared(`controlAssignment:${assignment.id}`, JSON.stringify(assignment))) return false;
-    setControlAssignments((s) => [assignment, ...s.filter((x) => x.id !== assignment.id)].sort((x, y) => (y.dueAt || y.createdAt || 0) - (x.dueAt || x.createdAt || 0)));
-    return true;
-  };
-  const saveControlRun = async (r) => {
-    const run = normalizeControlRun(r);
-    if (!run.id) return false;
-    if (!await persistShared(`controlRun:${run.id}`, JSON.stringify(run))) return false;
-    setControlRuns((s) => [run, ...s.filter((x) => x.id !== run.id)].sort((a, b) => (b.finishedAt || b.startedAt || 0) - (a.finishedAt || a.startedAt || 0)));
-    return true;
-  };
-  const saveControlFinding = async (f) => {
-    const finding = normalizeControlFinding(f);
-    if (!finding.id) return false;
-    if (!await persistShared(`controlFinding:${finding.id}`, JSON.stringify(finding))) return false;
-    setControlFindings((s) => [finding, ...s.filter((x) => x.id !== finding.id)].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
-    return true;
-  };
   const saveMeeting = async (m) => { if (!await persistShared(`mmeet:${m.id}`, JSON.stringify(m))) return false; setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); return true; };
   const delMeeting = async (id) => { if (!await deleteShared(`mmeet:${id}`)) return false; setMeetings((s) => s.filter((x) => x.id !== id)); return true; };
   const savePpeItem = async (x) => { if (!await persistShared(`ppeitem:${x.id}`, JSON.stringify(x))) return false; setPpeItems((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (a.name > b.name ? 1 : -1))); return true; };
@@ -1940,12 +1890,6 @@ export default function App() {
       if (vts.length) saveConfig({ ...config, ...flattenVehicleTypes(vts), vtMigV: 2 }, { toastOnFail: false });
     }
   }, [ready, fleet, config]);
-  useEffect(() => {
-    if (!ready || !config || config.vtInspMigV === 1) return;
-    const nextConfig = migrateInspectionProgramsFromTemplates(config, templates, config.defaultInspIntervalMonths ?? 2);
-    if (nextConfig === config) return;
-    saveConfig(nextConfig, { toastOnFail: false });
-  }, [ready, config?.vtInspMigV, templates, session?.role]);
   const setShift = async (on) => { if (!session) return false; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return false; setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); return true; };
   const beat = async () => { if (!session || session.role !== "tech") return; const cur = presence.find((x) => x.id === session.id); if (!cur || !cur.onShift || cur.day !== todayKey()) return; const rec = { ...cur, lastSeen: Date.now() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); };
   useEffect(() => { if (!session || session.role !== "tech") return; const id = setInterval(beat, 60000); return () => clearInterval(id); }, [session, presence]);
@@ -2095,7 +2039,7 @@ export default function App() {
   };
   const clearDemo = async () => {
     const dels = [];
-    for (const pre of ["ticket:", "fleet:", "pm:", "insp:", "photo:", "user:", "czone:", "cround:", "ccomplaint:", "cabsence:", "presence:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:"]) {
+    for (const pre of ["ticket:", "fleet:", "pm:", "photo:", "user:", "czone:", "cround:", "ccomplaint:", "cabsence:", "presence:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:"]) {
       const arr = await loadColl(pre);
       arr.filter((x) => x && (x.demo || (pre === "fleet:" && String(x.id).startsWith("v-")))).forEach((x) => dels.push(store.del(`${pre}${x.id}`, true)));
     }
@@ -2113,8 +2057,8 @@ export default function App() {
     return buildBackupPayload({
       config,
       collections: {
-        users, fleet, tickets, pm, insp, templates, presence, zones, rounds, complaints, absences, locations,
-        tasks, meetings, controlPrograms, controlAssignments, controlRuns, controlFindings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, appIssues,
+        users, fleet, tickets, pm, presence, zones, rounds, complaints, absences, locations,
+        tasks, meetings, ppe, ppeItems, ppeNorms, ppeReqs, ppeOrders, appIssues,
       },
       photos,
     });
@@ -2160,7 +2104,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlPrograms, controlAssignments, controlRuns, controlFindings, saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -2728,773 +2672,18 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   );
 }
 
-function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], insp = [], users = [], saveTask, saveInsp, controlPrograms = [], controlAssignments = [], controlRuns = [], controlFindings = [], saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, onOpenTask }) {
-  const canPerform = canRequest(session, "controls");
-  const canManageControls = canManage(session, "controls");
-  const [controlTab, setControlTab] = useState("overview");
-  const [name, setName] = useState("סיור בטיחות ידני");
-  const [domain, setDomain] = useState("safety");
-  const [target, setTarget] = useState("");
-  const [checklistText, setChecklistText] = useState("יציאות חירום פתוחות\nמעברים פנויים\nציוד מגן בשימוש");
-  const [answers, setAnswers] = useState({});
-  const [notes, setNotes] = useState("");
-  const [signature, setSignature] = useState("");
-  const [findingTitle, setFindingTitle] = useState("");
-  const [findingDesc, setFindingDesc] = useState("");
-  const [severity, setSeverity] = useState("medium");
-  const [routeType, setRouteType] = useState("report_only");
-  const [responsibleId, setResponsibleId] = useState("");
-  const [taskDue, setTaskDue] = useState("");
-  const [msg, setMsg] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [savedRun, setSavedRun] = useState(null);
-  const [savedFinding, setSavedFinding] = useState(null);
-  const [openRunId, setOpenRunId] = useState(null);
-  const [historyFilter, setHistoryFilter] = useState("all");
-  const [programDraft, setProgramDraft] = useState({ domain: "safety", presetId: "safety-walk-basic", name: "סיור בטיחות ידני", target: "", responsibleId: "", participantId: "" });
-  const [assignmentDrafts, setAssignmentDrafts] = useState({});
-  const [activeAssignmentRun, setActiveAssignmentRun] = useState(null);
-  const [activeFleetPlanRun, setActiveFleetPlanRun] = useState(null);
-  const checklistItems = useMemo(() => checklistText.split("\n").map((item) => item.trim()).filter(Boolean), [checklistText]);
-  const checklist = useMemo(() => checklistItems.slice(0, 8), [checklistItems]);
-  const hiddenChecklistCount = Math.max(0, checklistItems.length - checklist.length);
-  const domainPresets = useMemo(() => controlManualRunPresetsForDomain(domain), [domain]);
-  const targetPlaceholder = domainPresets[0]?.targetPlaceholder || "לדוגמה: מחסן ראשי / רחבת מלגזות";
-  const findingCount = checklist.filter((_, i) => answers[i] === "problem").length;
-  const doneCount = checklist.filter((_, i) => answers[i]).length;
-  const currentTaskUser = useMemo(() => {
-    const list = users || [];
-    const sessionEmail = String(session.email || "").toLowerCase();
-    return list.find((u) => u.id === session.id)
-      || list.find((u) => session.authUserId && u.authUserId === session.authUserId)
-      || list.find((u) => sessionEmail && String(u.email || "").toLowerCase() === sessionEmail)
-      || list.find((u) => session.name && u.name === session.name)
-      || null;
-  }, [users, session.id, session.authUserId, session.email, session.name]);
-  const actorUserId = currentTaskUser?.id || session.id;
-  const displayUserName = (id, fallback) => {
-    const name = uName(id, users);
-    return name === "—" ? (fallback || "—") : name;
-  };
-  const activeUsers = useMemo(() => (users || []).filter((u) => u.id && u.active !== false && ["admin", "user", "tech", "worker"].includes(u.role)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")), [users]);
-  const fleetTargets = useMemo(() => (fleet || [])
-    .filter((unit) => unit?.id && unit.active !== false)
-    .sort((a, b) => String(a.code || "").localeCompare(String(b.code || ""), "he", { numeric: true })), [fleet]);
-  const fleetById = useMemo(() => new Map(fleetTargets.map((unit) => [unit.id, unit])), [fleetTargets]);
-  const fleetTargetLabel = (fleetId) => {
-    const unit = fleetById.get(fleetId);
-    return unit ? (unitLabel(unit, config) || unit.id) : (fleetId || "");
-  };
-  const fleetInspectionPlan = useMemo(() => {
-    const vehicleTypes = Array.isArray(config?.vehicleTypes) ? config.vehicleTypes : [];
-    const latest = {};
-    (Array.isArray(insp) ? insp : []).forEach((record) => {
-      if (!record?.fleetId) return;
-      const key = `${record.fleetId}::${record.programId || `tpl::${record.templateId || ""}`}`;
-      if (!latest[key] || (Number(record.at) || 0) > (Number(latest[key].at) || 0)) latest[key] = record;
-    });
-    const findType = (unit) => {
-      const model = unitModelCode(unit);
-      const type = unitTypeName(unit, config);
-      return vehicleTypes.find((vt) =>
-        (Array.isArray(vt.models) && model && vt.models.includes(model)) ||
-        (type && vt.name === type)
-      ) || null;
-    };
-    const groups = new Map();
-    fleetTargets.forEach((unit) => {
-      const vehicleType = findType(unit);
-      const typeName = vehicleType?.name || unitTypeName(unit, config) || "ללא סוג";
-      const programs = inspectionProgramsForType(vehicleType || {});
-      const activePrograms = programs.length ? programs : [null];
-      activePrograms.forEach((program) => {
-        const programKey = program?.id || `tpl::${vehicleType?.inspTpl || typeName}`;
-        const last = latest[`${unit.id}::${program?.id || `tpl::${vehicleType?.inspTpl || ""}`}`] || null;
-        const lastAt = last?.at || null;
-        const nextAt = program ? nextInspectionDue(program, lastAt) : (lastAt ? lastAt + 30 * 86400000 : 0);
-        const due = !lastAt || (nextAt && nextAt <= Date.now());
-        const key = `${typeName}::${programKey}`;
-        if (!groups.has(key)) groups.set(key, {
-          key,
-          typeName,
-          program,
-          legacy: !program,
-          units: []
-        });
-        groups.get(key).units.push({ unit, lastAt, nextAt, due });
-      });
-    });
-    return [...groups.values()]
-      .map((group) => ({
-        ...group,
-        units: group.units.sort((a, b) => (a.due === b.due ? String(a.unit.code || "").localeCompare(String(b.unit.code || ""), "he", { numeric: true }) : a.due ? -1 : 1)),
-        dueCount: group.units.filter((item) => item.due).length
-      }))
-      .sort((a, b) => b.dueCount - a.dueCount || a.typeName.localeCompare(b.typeName, "he") || String(a.program?.name || "").localeCompare(String(b.program?.name || ""), "he"));
-  }, [config, fleetTargets, insp]);
-  const targetObjectFor = (value, valueDomain = domain) => {
-    const id = String(value || "").trim();
-    if (valueDomain === "fleet") {
-      return { kind: "fleet", id: id || undefined, fleetId: id || undefined, label: fleetTargetLabel(id) || undefined, sourceModule: "fleet" };
-    }
-    return { kind: "location", id: id || undefined, locationId: id || undefined, label: id || undefined };
-  };
-  const programTargetLabel = (program) => {
-    const targetIds = program?.targetIds || [];
-    if (!targetIds.length) return "";
-    if (program.domain === "fleet" || program.targetType === "fleet") return targetIds.map(fleetTargetLabel).filter(Boolean).join(", ");
-    return targetIds.join(", ");
-  };
-  const defaultResponsibleId = currentTaskUser?.id || activeUsers[0]?.id || "";
-  useEffect(() => {
-    if (responsibleId && activeUsers.some((u) => u.id === responsibleId)) return;
-    setResponsibleId(defaultResponsibleId);
-  }, [responsibleId, defaultResponsibleId, activeUsers]);
-  useEffect(() => {
-    setProgramDraft((draft) => {
-      if (draft.responsibleId && activeUsers.some((u) => u.id === draft.responsibleId)) return draft;
-      return { ...draft, responsibleId: defaultResponsibleId };
-    });
-  }, [defaultResponsibleId, activeUsers]);
-  const runFindingsByRun = useMemo(() => (controlFindings || []).reduce((map, finding) => {
-    if (!finding?.runId) return map;
-    map[finding.runId] = [...(map[finding.runId] || []), finding];
-    return map;
-  }, {}), [controlFindings]);
-  const recentRuns = useMemo(() => (controlRuns || []).slice(0, 6), [controlRuns]);
-  const findingRows = useMemo(() => (controlFindings || [])
-    .filter((finding) => finding?.id)
-    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-    .slice(0, 24), [controlFindings]);
-  const filteredFindingRows = useMemo(() => findingRows.filter((finding) => {
-    if (historyFilter === "task") return !!finding.route?.taskId;
-    if (historyFilter === "pending") return finding.route?.type === "task" && !finding.route?.taskId;
-    if (historyFilter === "report") return finding.route?.type !== "task";
-    return true;
-  }), [findingRows, historyFilter]);
-  const findingFilterStats = useMemo(() => ({
-    all: findingRows.length,
-    task: findingRows.filter((finding) => !!finding.route?.taskId).length,
-    pending: findingRows.filter((finding) => finding.route?.type === "task" && !finding.route?.taskId).length,
-    report: findingRows.filter((finding) => finding.route?.type !== "task").length
-  }), [findingRows]);
-  const programOptions = useMemo(() => (controlPrograms || []).filter((program) => program?.id && program?.active !== false), [controlPrograms]);
-  const assignmentOptions = useMemo(() => (controlAssignments || []).filter((assignment) => assignment?.id), [controlAssignments]);
-  const visibleAssignments = useMemo(() => {
-    const sorted = [...assignmentOptions].sort((a, b) => {
-      const av = a.status === "completed" || a.status === "cancelled" ? 1 : 0;
-      const bv = b.status === "completed" || b.status === "cancelled" ? 1 : 0;
-      return av - bv || String(a.dueAt || "").localeCompare(String(b.dueAt || "")) || (b.createdAt || 0) - (a.createdAt || 0);
-    });
-    if (canManageControls) return sorted;
-    return sorted.filter((assignment) => (assignment.assignedToIds || []).includes(actorUserId));
-  }, [assignmentOptions, canManageControls, actorUserId]);
-  const activeAssignments = useMemo(() => visibleAssignments.filter((assignment) => !["completed", "cancelled"].includes(assignment.status)), [visibleAssignments]);
-  const overdueAssignments = useMemo(() => activeAssignments.filter((assignment) => assignment.dueAt && startOfDay(assignment.dueAt) < startOfDay(Date.now())), [activeAssignments]);
-  const unresolvedFindings = useMemo(() => findingRows.filter((finding) => !["closed", "resolved", "cancelled"].includes(finding.status)), [findingRows]);
-  const fleetDueCount = useMemo(() => fleetInspectionPlan.reduce((sum, group) => sum + (group.dueCount || 0), 0), [fleetInspectionPlan]);
-  const openRun = useMemo(() => recentRuns.find((run) => run.id === openRunId) || null, [recentRuns, openRunId]);
-  const openRunFindings = openRun ? (runFindingsByRun[openRun.id] || []) : [];
-  const answerMeta = (value) => value === "problem"
-    ? { label: "בעיה", color: "#B91C1C", bg: "#FEF2F2", border: "#FECACA" }
-    : value === "ok"
-      ? { label: "תקין", color: "#047857", bg: "#ECFDF5", border: "#A7F3D0" }
-      : value === "na"
-        ? { label: "לא רלוונטי", color: "#64748B", bg: "var(--surface-2)", border: "var(--line)" }
-        : { label: "לא סומן", color: "#64748B", bg: "var(--surface-2)", border: "var(--line)" };
-  const findingSeverityMeta = (value) => value === "critical"
-    ? { label: "קריטית", color: "#991B1B", bg: "#FEE2E2" }
-    : value === "high"
-      ? { label: "גבוהה", color: "#B45309", bg: "#FEF3C7" }
-      : value === "low"
-        ? { label: "נמוכה", color: "#0369A1", bg: "#E0F2FE" }
-        : { label: "בינונית", color: "#7C3AED", bg: "#EDE9FE" };
-  const findingRouteLabel = (finding) => finding?.route?.type === "task"
-    ? (finding.route.taskId ? "נפתחה מטלה" : "מיועד למטלה")
-    : "לדוח בלבד";
-  const findingTaskCreated = !!savedFinding?.route?.taskId;
-  const resetManualRun = () => {
-    setActiveAssignmentRun(null);
-    setActiveFleetPlanRun(null);
-    setAnswers({});
-    setNotes("");
-    setSignature("");
-    setFindingTitle("");
-    setFindingDesc("");
-    setSeverity("medium");
-    setRouteType("report_only");
-    setTaskDue("");
-    setSavedRun(null);
-    setSavedFinding(null);
-    setMsg("");
-  };
-  const applyManualPreset = (preset) => {
-    if (!preset) return;
-    setActiveFleetPlanRun(null);
-    setName(preset.name);
-    setChecklistText((preset.checklistItems || []).join("\n"));
-    setAnswers({});
-    setNotes("");
-    setSignature("");
-    setFindingTitle("");
-    setFindingDesc("");
-    setSeverity(preset.defaultSeverity || "medium");
-    setRouteType(preset.routeType || "report_only");
-    setTaskDue("");
-    setSavedRun(null);
-    setSavedFinding(null);
-    setMsg("");
-  };
-  const areas = [
-    { id: "safety", label: "בטיחות", text: "סיורים, מפגעים, חריגות חוזרות ופעולות המשך.", Icon: ShieldAlert, color: "#DC2626" },
-    { id: "quality", label: "איכות", text: "דגימות תהליך, ממצאים וניתוב למנהלים הרלוונטיים.", Icon: ClipboardCheck, color: "#0D9488" },
-    { id: "operations", label: "תפעול", text: "סיורי הנהלה, אזורים, תצפיות ושיפורי תהליך.", Icon: LayoutDashboard, color: "#2563EB" },
-    { id: "fleet", label: "בקרת כלים", text: "בקרות ציוד שינוע כחלק מאותו מנוע בקרות.", Icon: Truck, color: "#EA580C" }
-  ];
-  const currentArea = areas.find((a) => a.id === domain) || areas[0];
-  const programDraftPresets = useMemo(() => controlManualRunPresetsForDomain(programDraft.domain), [programDraft.domain]);
-  const selectedProgramPreset = programDraftPresets.find((preset) => preset.id === programDraft.presetId) || programDraftPresets[0] || null;
-  const domainLabel = (value) => areas.find((a) => a.id === value)?.label || "בקרות";
-  const programById = (id) => programOptions.find((program) => program.id === id) || null;
-  const updateProgramDomain = (nextDomain) => {
-    const presets = controlManualRunPresetsForDomain(nextDomain);
-    const preset = presets[0] || null;
-    setProgramDraft((draft) => ({
-      ...draft,
-      domain: nextDomain,
-      presetId: preset?.id || "",
-      name: preset?.name || draft.name,
-      target: ""
-    }));
-  };
-  const updateProgramPreset = (presetId) => {
-    const preset = controlManualRunPresetById(presetId);
-    setProgramDraft((draft) => ({
-      ...draft,
-      presetId,
-      domain: preset?.domain || draft.domain,
-      name: preset?.name || draft.name
-    }));
-  };
-  const saveProgramDraft = async () => {
-    if (!canManageControls) return setMsg("נדרשת הרשאת ניהול בקרות.");
-    if (!saveControlProgram) return setMsg("שמירת תכניות בקרה אינה זמינה כרגע.");
-    if (!selectedProgramPreset) return setMsg("בחרו תבנית לתכנית.");
-    const program = controlProgramDraftFromManualPreset(selectedProgramPreset.id, {
-      id: uid(),
-      name: programDraft.name,
-      targetType: programDraft.domain === "fleet" ? "fleet" : "location",
-      targetIds: programDraft.target ? [programDraft.target] : [],
-      responsibleIds: programDraft.responsibleId ? [programDraft.responsibleId] : [],
-      participantIds: programDraft.participantId ? [programDraft.participantId] : [],
-      notifyIds: programDraft.responsibleId ? [programDraft.responsibleId] : []
-    });
-    if (!program?.name) return setMsg("תנו שם לתכנית.");
-    setBusy(true); setMsg("");
-    const ok = await saveControlProgram(program);
-    setBusy(false);
-    if (ok === false) return setMsg(SAVE_FAILED_MESSAGE);
-    setProgramDraft((draft) => ({ ...draft, name: selectedProgramPreset.name, target: "" }));
-    setMsg("תכנית הבקרה נשמרה. אפשר ליצור ממנה שיוך ידני.");
-  };
-  const saveManualAssignment = async (program) => {
-    if (!canManageControls) return setMsg("נדרשת הרשאת ניהול בקרות.");
-    if (!saveControlAssignment) return setMsg("שמירת שיוכי בקרה אינה זמינה כרגע.");
-    const draft = assignmentDrafts[program.id] || {};
-    const assigneeId = draft.assignedToId || program.responsibleIds?.[0] || defaultResponsibleId;
-    if (!assigneeId) return setMsg("בחרו מבצע לשיוך.");
-    if (!draft.dueAt) return setMsg("בחרו תאריך ביצוע.");
-    const isFleetProgram = program.domain === "fleet" || program.targetType === "fleet";
-    const targetValue = isFleetProgram ? (draft.targetFleetId || program.targetIds?.[0] || "") : (draft.target || program.targetIds?.[0] || "");
-    if (isFleetProgram && !targetValue) return setMsg("בחרו כלי שינוע לשיוך.");
-    const assignment = controlAssignmentDraftFromProgram(program, {
-      id: uid(),
-      assignedToIds: [assigneeId],
-      target: targetObjectFor(targetValue, isFleetProgram ? "fleet" : "location"),
-      dueAt: draft.dueAt,
-      createdAt: Date.now()
-    });
-    setBusy(true); setMsg("");
-    const ok = await saveControlAssignment(assignment);
-    setBusy(false);
-    if (ok === false) return setMsg(SAVE_FAILED_MESSAGE);
-    setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...draft, dueAt: "" } }));
-    setMsg("נוצר שיוך ידני לתכנית.");
-  };
-  const startAssignmentRun = async (assignment) => {
-    const program = programById(assignment.programId);
-    if (!program) return setMsg("לא נמצאה תכנית הבקרה של השיוך.");
-    const runDraft = controlRunDraftFromAssignment(assignment, {
-      id: uid(),
-      performedById: actorUserId,
-      startedAt: Date.now(),
-      status: "in_progress"
-    });
-    if (!runDraft) return setMsg("לא ניתן לפתוח בדיקה מהשיוך הזה.");
-    setActiveAssignmentRun({ assignment, program, runDraft });
-    setActiveFleetPlanRun(null);
-    setControlTab("run");
-    setDomain(program.domain || "general");
-    setName(program.name || "בקרה מתכנית");
-    setChecklistText((program.checklistItems || []).map((item) => item.label || item.id).filter(Boolean).join("\n"));
-    setTarget(assignment.target?.fleetId || assignment.target?.id || assignment.target?.label || "");
-    setAnswers({});
-    setNotes("");
-    setSignature("");
-    setFindingTitle("");
-    setFindingDesc("");
-    setSeverity("medium");
-    setRouteType(program.actionPolicy?.defaultRouteType || "report_only");
-    setTaskDue("");
-    setSavedRun(null);
-    setSavedFinding(null);
-    setMsg("נפתחה בדיקה מתוך שיוך. מלאו צ'קליסט וחתמו לסיום.");
-    if (saveControlAssignment && assignment.status === "planned") {
-      await saveControlAssignment({ ...assignment, status: "in_progress" });
-    }
-  };
-  const startFleetPlanRun = (unit, program, typeName) => {
-    const fallback = controlManualRunPresetById("fleet-yard-check");
-    const checklistItems = (program?.checklist || []).map((item) => item.label || item.name || item).filter(Boolean);
-    setActiveAssignmentRun(null);
-    setActiveFleetPlanRun({ unitId: unit.id, rawProgramId: program?.id || null, programId: program?.id ? `fleetInspection:${program.id}` : "fleetInspection:legacy", programName: program?.name || "בקרה כללית", typeName });
-    setControlTab("run");
-    setDomain("fleet");
-    setTarget(unit.id);
-    setName(program?.name || fallback?.name || "בקרת כלי שינוע");
-    setChecklistText((checklistItems.length ? checklistItems : (fallback?.checklistItems || [])).join("\n"));
-    setAnswers({});
-    setNotes("");
-    setSignature("");
-    setFindingTitle("");
-    setFindingDesc("");
-    setSeverity("medium");
-    setRouteType(program?.autoTicket === false ? "report_only" : "task");
-    setTaskDue("");
-    setSavedRun(null);
-    setSavedFinding(null);
-    setMsg("נפתחה בדיקת כלי מתוך תכנית לפי סוג. מלאו צ'קליסט וחתמו לסיום.");
-  };
-  const activeProgramId = activeAssignmentRun?.program?.id || activeFleetPlanRun?.programId || "manual-control";
-  const activeAssignmentId = activeAssignmentRun?.assignment?.id || undefined;
-  const statusLabel = (status) => ({
-    planned: "מתוכנן",
-    rescheduled: "נדחה",
-    in_progress: "בביצוע",
-    completed: "הושלם",
-    cancelled: "בוטל",
-    missed: "פספס"
-  }[status] || status || "מתוכנן");
-  const userName = (id) => activeUsers.find((u) => u.id === id)?.name || displayUserName(id);
-  const currentTarget = targetObjectFor(target, domain);
-  const finding = {
-    id: "finding-preview",
-    programId: activeProgramId,
-    assignmentId: activeAssignmentId,
-    runId: "manual-run-preview",
-    domain,
-    title: findingTitle || (findingCount ? `ממצא מתוך ${name || "בקרה ידנית"}` : ""),
-    description: findingDesc || notes,
-    severity,
-    target: currentTarget,
-    route: { type: routeType, notifyIds: responsibleId ? [responsibleId] : [] },
-    createdById: actorUserId,
-    createdAt: Date.now()
-  };
-  const taskDraft = routeType === "task" && finding.title && responsibleId ? controlFindingTaskDraft(finding, {
-    responsibleIds: [responsibleId],
-    dueAt: taskDue ? new Date(taskDue).getTime() : null
-  }) : null;
-  const finishRun = async () => {
-    if (!name.trim()) return setMsg("תנו שם לבדיקה.");
-    if (domain === "fleet" && !target) return setMsg("בחרו כלי שינוע לבדיקה.");
-    if (!checklist.length) return setMsg("הוסיפו לפחות סעיף בדיקה אחד.");
-    if (doneCount < checklist.length) return setMsg("סמנו תשובה לכל סעיף לפני סיום.");
-    if (!signature.trim()) return setMsg("נדרשת חתימה אחת לסיום הסבב.");
-    if (findingCount && !finding.title) return setMsg("יש ממצא, צריך כותרת קצרה.");
-    if (!saveControlRun || !saveControlFinding) return setMsg("שמירת בקרות אינה זמינה כרגע.");
-    const now = Date.now();
-    const runId = savedRun?.id || uid();
-    const findingId = savedFinding?.id || uid();
-    const run = {
-      id: runId,
-      programId: activeProgramId,
-      assignmentId: activeAssignmentId,
-      performedById: actorUserId,
-      participantIds: [],
-      target: currentTarget,
-      startedAt: savedRun?.startedAt || now,
-      finishedAt: now,
-      answers: checklist.map((label, i) => ({ itemId: `item-${i + 1}`, label, value: answers[i] })),
-      findingIds: findingCount ? [findingId] : [],
-      overallSignature: { signedById: actorUserId, signedByName: signature.trim(), signedAt: now },
-      notes,
-      status: "completed"
-    };
-    setBusy(true); setMsg("");
-    const okRun = await saveControlRun(run);
-    if (!okRun) { setBusy(false); return setMsg(SAVE_FAILED_MESSAGE); }
-    setSavedRun(normalizeControlRun(run));
-    if (findingCount) {
-      const findingRecord = {
-        ...finding,
-        id: findingId,
-        runId,
-        createdAt: savedFinding?.createdAt || now,
-        status: routeType === "task" ? "triage" : "open"
-      };
-      const okFinding = await saveControlFinding(findingRecord);
-      if (!okFinding) { setBusy(false); return setMsg(SAVE_FAILED_MESSAGE); }
-      setSavedFinding(normalizeControlFinding(findingRecord));
-    } else {
-      setSavedFinding(null);
-    }
-    if (activeAssignmentRun && saveControlAssignment) {
-      await saveControlAssignment({ ...activeAssignmentRun.assignment, status: "completed", completedAt: now, runId });
-    }
-    if (activeFleetPlanRun && saveInsp) {
-      const inspectionRecord = {
-        id: uid(),
-        fleetId: activeFleetPlanRun.unitId,
-        programId: activeFleetPlanRun.rawProgramId || null,
-        templateId: null,
-        by: signature.trim() || session.name,
-        at: now,
-        results: run.answers.map((answer) => ({ text: answer.label, ok: answer.value !== "problem", note: answer.value === "problem" ? (findingDesc || findingTitle || notes || "") : "" })),
-        problems: run.answers.filter((answer) => answer.value === "problem").map((answer) => `${answer.label}${findingTitle ? " — " + findingTitle : ""}`),
-        passed: findingCount === 0,
-        sourceControlRunId: runId,
-        sourceModule: "controls"
-      };
-      const okInspection = await saveInsp(inspectionRecord);
-      if (okInspection === false) { setBusy(false); return setMsg(SAVE_FAILED_MESSAGE); }
-    }
-    setBusy(false);
-    setMsg(findingCount ? "הבדיקה נשמרה. עכשיו אפשר להשאיר לדוח או לפתוח מטלה מהממצא." : "הבדיקה נשמרה ללא ממצאים.");
-  };
-  const createTask = async () => {
-    if (!taskDraft || !saveTask) return;
-    if (!savedRun || !savedFinding) return setMsg("שמרו קודם את הבדיקה דרך «סיום בדיקה», ואז צרו מטלה מהממצא.");
-    if (findingTaskCreated) return setMsg("כבר נפתחה מטלה מהממצא הזה.");
-    if (!responsibleId) return setMsg("בחרו אחראי למטלה.");
-    const now = Date.now();
-    setBusy(true); setMsg("");
-    const task = {
-      ...taskDraft,
-      id: uid(),
-      sourceId: savedFinding.id,
-      sourceFindingId: savedFinding.id,
-      sourceProgramId: activeProgramId,
-      sourceRunId: savedRun.id,
-      responsibleIds: taskDraft.responsibleIds?.length ? taskDraft.responsibleIds : [],
-      participantIds: [],
-      waitingFor: "",
-      meetingId: null,
-      linkedMeetingIds: [],
-      recur: null,
-      nextActionAt: null,
-      ownerId: session.id,
-      createdBy: { name: session.name, role: session.role },
-      createdAt: now,
-      updatedAt: now,
-      log: [{ at: now, by: session.name, byRole: session.role, text: "נוצרה מתוך בקרת ידנית", kind: "open" }]
-    };
-    const ok = await saveTask(task);
-    if (ok !== false) {
-      const nextFinding = normalizeControlFinding({
-        ...savedFinding,
-        ...finding,
-        id: savedFinding.id,
-        runId: savedRun.id,
-        programId: activeProgramId,
-        assignmentId: activeAssignmentId,
-        route: { ...savedFinding.route, type: "task", taskId: task.id, notifyIds: task.responsibleIds, status: "created", decidedById: actorUserId, decidedAt: now },
-        status: "routed"
-      });
-      const okFinding = await saveControlFinding(nextFinding);
-      if (okFinding !== false) setSavedFinding(nextFinding);
-    }
-    setBusy(false);
-    setMsg(ok === false ? SAVE_FAILED_MESSAGE : "נוצרה מטלה מתוך הממצא. תוכלו לראות אותה במסך מטלות עם מקור מערכת בקרות.");
-  };
-  return (
-    <div>
-      <div className="row-between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
-        <div>
-          <SectionTitle><ClipboardCheck size={15} /> בקרות</SectionTitle>
-          <div className="hint" style={{ maxWidth: 680 }}>תמונת מצב של בקרות, ממצאים ושיוכים פתוחים. התחילו בדיקה רק כשצריך לבצע סבב חדש.</div>
-        </div>
-        {canManageControls && <span className="badge sm" style={{ background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA" }}>ניהול בקרות</span>}
-        {!canManageControls && canPerform && <span className="badge sm" style={{ background: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0" }}>ביצוע בקרות</span>}
-      </div>
-      <div className="stat-strip">
-        <div className="stat-box"><div className="stat-num">{activeAssignments.length}</div><div className="stat-lbl">שיוכים פתוחים</div></div>
-        <div className="stat-box"><div className="stat-num" style={{ color: overdueAssignments.length ? "#DC2626" : "var(--ink)" }}>{overdueAssignments.length}</div><div className="stat-lbl">באיחור</div></div>
-        <div className="stat-box"><div className="stat-num" style={{ color: unresolvedFindings.length ? "#DC2626" : "var(--ink)" }}>{unresolvedFindings.length}</div><div className="stat-lbl">ממצאים פתוחים</div></div>
-        <div className="stat-box"><div className="stat-num" style={{ color: fleetDueCount ? "#EA580C" : "var(--ink)" }}>{fleetDueCount}</div><div className="stat-lbl">כלים לבקרה</div></div>
-      </div>
-      {!canPerform ? <Empty text="אין הרשאת ביצוע בקרות" Icon={ShieldAlert} sub="נדרשת הרשאת controls:request ומעלה כדי לבצע סבב." /> : <>
-      <div className="control-mode-tabs">
-        <button className={controlTab === "overview" ? "on" : ""} onClick={() => setControlTab("overview")}><LayoutDashboard size={15} /> סקירה</button>
-        <button className={controlTab === "run" ? "on" : ""} onClick={() => setControlTab("run")}><ClipboardCheck size={15} /> ביצוע בדיקה</button>
-        <button className={controlTab === "fleet" ? "on" : ""} onClick={() => setControlTab("fleet")}><Truck size={15} /> בקרת כלים</button>
-        <button className={controlTab === "programs" ? "on" : ""} onClick={() => setControlTab("programs")}><ListChecks size={15} /> תכניות ושיוכים</button>
-      </div>
-      {controlTab === "overview" && <div className="control-overview">
-        <div className="control-overview-grid">
-          <div className="control-panel">
-            <div className="row-between" style={{ alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <SectionTitle><AlertTriangle size={15} /> ממצאים אחרונים</SectionTitle>
-              <span className="badge sm" style={{ background: "#F8FAFC", color: "#475569", border: "1px solid var(--line)" }}>{filteredFindingRows.length}/{findingRows.length}</span>
-            </div>
-            <div className="qchips compact" style={{ marginBottom: 10 }}>
-              {[
-                ["all", `הכל (${findingFilterStats.all})`],
-                ["task", `עם מטלה (${findingFilterStats.task})`],
-                ["pending", `ללא מטלה (${findingFilterStats.pending})`],
-                ["report", `לדוח בלבד (${findingFilterStats.report})`]
-              ].map(([id, label]) => <button key={id} className={"qchip" + (historyFilter === id ? " on" : "")} onClick={() => setHistoryFilter(id)}>{label}</button>)}
-            </div>
-            {filteredFindingRows.length ? <div className="control-finding-list">{filteredFindingRows.slice(0, 8).map((finding) => {
-              const sev = findingSeverityMeta(finding.severity);
-              const run = (controlRuns || []).find((item) => item.id === finding.runId);
-              return <div key={finding.id} className="control-finding-item">
-                <div className="task-row-main">
-                  <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
-                  {finding.description && <div className="task-row-desc">{finding.description}</div>}
-                  <div className="task-row-sub">{findingRouteLabel(finding)} · {run?.target?.label || run?.target?.id || finding.target?.label || finding.target?.id || "ללא יעד"} · {fmtDate(finding.createdAt || run?.finishedAt || run?.startedAt)}</div>
-                </div>
-                <div className="task-row-side">
-                  <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
-                  {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
-                </div>
-              </div>;
-            })}</div> : <div className="hint">{findingRows.length ? "אין ממצאים במסנן הזה." : "אין עדיין ממצאים שמורים."}</div>}
-          </div>
-          <div className="control-panel">
-            <SectionTitle><CalendarClock size={15} /> עבודה פתוחה</SectionTitle>
-            {activeAssignments.length ? <div className="control-assignment-list">{activeAssignments.slice(0, 6).map((assignment) => {
-              const program = programById(assignment.programId);
-              const overdue = assignment.dueAt && startOfDay(assignment.dueAt) < startOfDay(Date.now());
-              return <div key={assignment.id} className={"control-assignment-row" + (overdue ? " overdue" : "")}>
-                <div className="task-row-main">
-                  <div className="task-row-t">{program?.name || "תכנית לא זמינה"}</div>
-                  <div className="task-row-desc">{assignment.target?.label || assignment.target?.id || "ללא יעד"} · {assignment.dueAt ? fmtDate(assignment.dueAt) : "ללא תאריך"} · {(assignment.assignedToIds || []).map(userName).join(", ") || "ללא מבצע"}</div>
-                </div>
-                <span className="badge sm" style={{ background: overdue ? "#FEF2F2" : "#ECFDF5", color: overdue ? "#B91C1C" : "#047857", border: "1px solid var(--line)" }}>{overdue ? "באיחור" : statusLabel(assignment.status)}</span>
-                <button className="btn-primary sm" onClick={() => startAssignmentRun(assignment)} disabled={busy}><Play size={14} /> פתח</button>
-              </div>;
-            })}</div> : <Empty text="אין שיוכים פתוחים" Icon={CalendarClock} sub="שיוכים מתוכננים יופיעו כאן לביצוע מהיר." />}
-            <div className="control-overview-actions">
-              <button className="btn-primary sm" onClick={() => setControlTab("run")}><ClipboardCheck size={14} /> בדיקה ידנית</button>
-              <button className="btn-ghost sm" onClick={() => setControlTab("fleet")}><Truck size={14} /> בקרת כלים</button>
-              {canManageControls && <button className="btn-ghost sm" onClick={() => setControlTab("programs")}><ListChecks size={14} /> תכניות</button>}
-            </div>
-          </div>
-        </div>
-        <div className="control-panel">
-          <SectionTitle><History size={15} /> היסטוריית בקרות אחרונות</SectionTitle>
-          {recentRuns.length ? <div className="task-list">
-            {recentRuns.map((run) => {
-              const findings = runFindingsByRun[run.id] || [];
-              const problemCount = findings.length || (run.findingIds || []).length;
-              const active = openRunId === run.id;
-              return <button key={run.id} className={"task-row control-history-row" + (active ? " selected" : "")} style={{ borderInlineStartColor: problemCount ? "#DC2626" : "#0D9488" }} onClick={() => setOpenRunId(active ? null : run.id)}>
-                <div className="task-row-main">
-                  <div className="task-row-t">{run.target?.label || run.target?.id || "בקרה ידנית"} · {fmtDate(run.finishedAt || run.startedAt)}</div>
-                  <div className="task-row-desc">{run.answers?.length || 0} סעיפים · {problemCount ? `${problemCount} ממצאים` : "ללא ממצאים"} · חתימה: {run.overallSignature?.signedByName || displayUserName(run.performedById)}</div>
-                  {run.notes && <div className="task-row-sub">{run.notes}</div>}
-                </div>
-                <span className="badge sm" style={{ background: problemCount ? "#FEF2F2" : "#ECFDF5", color: problemCount ? "#B91C1C" : "#047857", border: `1px solid ${problemCount ? "#FECACA" : "#A7F3D0"}` }}>{problemCount ? "עם ממצא" : "תקין"}</span>
-              </button>;
-            })}
-            {openRun && <div className="control-run-detail">
-              <div className="row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>
-                <div>
-                  <div className="tcard-subj">{openRun.target?.label || openRun.target?.id || "בקרה ידנית"}</div>
-                  <div className="task-row-desc">{fmtDate(openRun.finishedAt || openRun.startedAt)} · מבצע: {displayUserName(openRun.performedById, openRun.overallSignature?.signedByName)} · חתימה: {openRun.overallSignature?.signedByName || "—"}</div>
-                </div>
-                <span className="badge sm" style={{ background: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }}>פרטי סבב</span>
-              </div>
-              <div className="control-answer-list">
-                {(openRun.answers || []).map((answer, i) => {
-                  const meta = answerMeta(answer.value);
-                  return <div key={answer.itemId || i} className="control-answer-item">
-                    <span>{answer.label || `סעיף ${i + 1}`}</span>
-                    <span className="badge sm" style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>{meta.label}</span>
-                  </div>;
-                })}
-              </div>
-              {openRun.notes && <div className="note" style={{ marginTop: 10 }}>{openRun.notes}</div>}
-              <div className="control-findings-detail">
-                <div className="task-row-t" style={{ marginTop: 10 }}>ממצאים</div>
-                {openRunFindings.length ? openRunFindings.map((finding) => {
-                  const sev = findingSeverityMeta(finding.severity);
-                  return <div key={finding.id} className="control-finding-item">
-                    <div className="task-row-main">
-                      <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
-                      {finding.description && <div className="task-row-desc">{finding.description}</div>}
-                      <div className="task-row-sub">{findingRouteLabel(finding)}</div>
-                    </div>
-                    <div className="task-row-side">
-                      <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
-                      {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
-                    </div>
-                  </div>;
-                }) : <div className="hint">לא נרשמו ממצאים בסבב הזה.</div>}
-              </div>
-            </div>}
-          </div> : <Empty text="אין עדיין היסטוריית בקרות" Icon={History} sub="סיימו בדיקה ידנית כדי לשמור אותה כאן." />}
-        </div>
-      </div>}
-      {controlTab === "fleet" && <div className="control-panel">
-        <SectionTitle><Truck size={15} /> תכנית בדיקות כלי שינוע</SectionTitle>
-        <div className="hint" style={{ marginBottom: 10 }}>בדיקות לפי סוג כלי ותכנית הבקרה שמוגדרת בסוגי כלי השינוע. כל בדיקה נפתחת על כלי שינוע אמיתי ונשמרת בהיסטוריית הבקרות.</div>
-        {fleetInspectionPlan.length ? <div className="fleet-control-groups">{fleetInspectionPlan.map((group) => (
-          <div key={group.key} className="fleet-control-group">
-            <div className="fleet-control-head">
-              <div>
-                <div className="tcard-subj">{group.typeName}</div>
-                <div className="control-program-meta">{group.program?.name || "בקרה כללית"} · {group.program ? `כל ${group.program.intervalMonths} חודשים` : "ברירת מחדל 30 יום"} · {(group.program?.checklist || []).length || controlManualRunPresetById("fleet-yard-check")?.checklistItems?.length || 0} סעיפים</div>
-              </div>
-              <div className="fleet-control-counts">
-                <span className="badge sm" style={{ background: group.dueCount ? "#FEF2F2" : "#ECFDF5", color: group.dueCount ? "#B91C1C" : "#047857", border: "1px solid var(--line)" }}>{group.dueCount ? `${group.dueCount} לביצוע` : "הכל בזמן"}</span>
-                <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)", border: "1px solid var(--line)" }}>{group.units.length} כלים</span>
-              </div>
-            </div>
-            <div className="fleet-control-units">{group.units.map(({ unit, lastAt, nextAt, due }) => {
-              const delta = nextAt ? daysLeft(nextAt) : null;
-              const statusText = !lastAt ? "לא נבדק" : due ? `באיחור ${Math.abs(delta || 0)} י׳` : delta === 0 ? "היום" : `בעוד ${delta} י׳`;
-              return <div key={`${group.key}-${unit.id}`} className={"fleet-control-unit" + (due ? " due" : "")}>
-                <div className="task-row-main">
-                  <div className="task-row-t">{unitLabel(unit, config)}</div>
-                  <div className="task-row-desc">אחרונה: {lastAt ? fmtDate(lastAt) : "—"} · הבאה: {nextAt ? fmtDate(nextAt) : "עכשיו"}</div>
-                </div>
-                <span className="badge sm" style={{ background: due ? "#FEF2F2" : "var(--surface-2)", color: due ? "#B91C1C" : "var(--muted)", border: "1px solid var(--line)" }}>{statusText}</span>
-                <button className="btn-primary sm" onClick={() => startFleetPlanRun(unit, group.program, group.typeName)}><Play size={14} /> בדיקה</button>
-              </div>;
-            })}</div>
-          </div>
-        ))}</div> : <Empty text="אין כלי שינוע זמינים" Icon={Truck} sub="הוסיפו כלי שינוע וסוגי כלי כדי לראות כאן תכנית בדיקות לפי סוג." />}
-      </div>}
-      {controlTab === "programs" && <div className="control-programs-wrap">
-        {canManageControls && <div className="control-panel">
-          <SectionTitle><Plus size={15} /> תכנית בקרה חדשה</SectionTitle>
-          <div className="control-program-grid">
-            <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={programDraft.domain === a.id ? "on" : ""} onClick={() => updateProgramDomain(a.id)}>{a.label}</button>)}</div></label>
-            <label className="field"><span>תבנית</span><select value={programDraft.presetId} onChange={(e) => updateProgramPreset(e.target.value)}>{programDraftPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
-            <label className="field"><span>שם התכנית</span><input value={programDraft.name} onChange={(e) => setProgramDraft((draft) => ({ ...draft, name: e.target.value }))} /></label>
-            {programDraft.domain === "fleet"
-              ? <label className="field"><span>כלי שינוע</span><select value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))}><option value="">{fleetTargets.length ? "בחרו כלי" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
-              : <label className="field"><span>יעד / אזור</span><input value={programDraft.target} onChange={(e) => setProgramDraft((draft) => ({ ...draft, target: e.target.value }))} placeholder={selectedProgramPreset?.targetPlaceholder || "לדוגמה: מחסן ראשי"} /></label>}
-            <label className="field"><span>אחראי</span><select value={programDraft.responsibleId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, responsibleId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
-            <label className="field"><span>משתתף נוסף</span><select value={programDraft.participantId} onChange={(e) => setProgramDraft((draft) => ({ ...draft, participantId: e.target.value }))}><option value="">ללא</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
-          </div>
-          <div className="hint" style={{ margin: "4px 0 10px" }}>צרו תכנית ידנית מתבנית ושייכו אותה למבצע, יעד ותאריך לביצוע.</div>
-          <button className="btn-primary full" onClick={saveProgramDraft} disabled={busy}><Plus size={15} /> שמירת תכנית</button>
-        </div>}
-        <div className="control-program-split">
-          <div className="control-panel">
-            <SectionTitle><ListChecks size={15} /> תכניות פעילות ({programOptions.length})</SectionTitle>
-            {programOptions.length ? <div className="control-program-list">{programOptions.map((program) => {
-              const draft = assignmentDrafts[program.id] || {};
-              return <div key={program.id} className="control-program-card">
-                <div className="control-program-head">
-                  <div>
-                    <div className="tcard-subj">{program.name}</div>
-                    <div className="control-program-meta">{domainLabel(program.domain)} · {(program.checklistItems || []).length} סעיפים{programTargetLabel(program) ? ` · ${programTargetLabel(program)}` : ""}</div>
-                  </div>
-                  <span className="badge sm" style={{ background: "#F8FAFC", color: "#475569", border: "1px solid var(--line)" }}>{program.responsibleIds?.length ? program.responsibleIds.map(userName).join(", ") : "ללא אחראי"}</span>
-                </div>
-                {canManageControls && <div className="control-assignment-editor">
-                  <label className="field mini"><span>מבצע</span><select value={draft.assignedToId || program.responsibleIds?.[0] || defaultResponsibleId || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), assignedToId: e.target.value } }))}><option value="">בחרו</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
-                  <label className="field mini"><span>תאריך</span><input type="date" value={draft.dueAt || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), dueAt: e.target.value } }))} /></label>
-                  {(program.domain === "fleet" || program.targetType === "fleet")
-                    ? <label className="field mini"><span>כלי</span><select value={draft.targetFleetId || program.targetIds?.[0] || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), targetFleetId: e.target.value } }))}><option value="">{fleetTargets.length ? "בחרו כלי" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
-                    : <label className="field mini"><span>יעד</span><input value={draft.target || ""} onChange={(e) => setAssignmentDrafts((state) => ({ ...state, [program.id]: { ...(state[program.id] || {}), target: e.target.value } }))} placeholder={program.targetIds?.[0] || "לפי התכנית"} /></label>}
-                  <button className="btn-ghost sm" onClick={() => saveManualAssignment(program)} disabled={busy}><CalendarClock size={14} /> שיוך</button>
-                </div>}
-              </div>;
-            })}</div> : <Empty text="אין תכניות בקרות" Icon={ListChecks} sub={canManageControls ? "צרו תכנית ראשונה מתבנית." : "מנהל בקרות ייצור תכניות ויקצה אותן."} />}
-          </div>
-          <div className="control-panel">
-            <SectionTitle><CalendarClock size={15} /> שיוכים ({visibleAssignments.length})</SectionTitle>
-            {visibleAssignments.length ? <div className="control-assignment-list">{visibleAssignments.map((assignment) => {
-              const program = programById(assignment.programId);
-              const done = assignment.status === "completed" || assignment.status === "cancelled";
-              return <div key={assignment.id} className={"control-assignment-row" + (done ? " done" : "")}>
-                <div className="task-row-main">
-                  <div className="task-row-t">{program?.name || "תכנית לא זמינה"}</div>
-                  <div className="task-row-desc">{assignment.target?.label || assignment.target?.id || "ללא יעד"} · {assignment.dueAt ? fmtDate(assignment.dueAt) : "ללא תאריך"} · {(assignment.assignedToIds || []).map(userName).join(", ") || "ללא מבצע"}</div>
-                </div>
-                <span className="badge sm" style={{ background: done ? "#F1F5F9" : "#ECFDF5", color: done ? "#64748B" : "#047857", border: "1px solid var(--line)" }}>{statusLabel(assignment.status)}</span>
-                {!done && <button className="btn-primary sm" onClick={() => startAssignmentRun(assignment)} disabled={busy}><Play size={14} /> פתח</button>}
-              </div>;
-            })}</div> : <Empty text="אין שיוכים פתוחים" Icon={CalendarClock} sub="כשתכנית תשויך למבצע, היא תופיע כאן לפתיחה מהירה." />}
-          </div>
-        </div>
-      </div>}
-      {controlTab === "run" && <>
-      {activeAssignmentRun && <div className="note" style={{ marginBottom: 12 }}><b>בדיקה מתוך שיוך:</b> {activeAssignmentRun.program?.name} · {activeAssignmentRun.assignment?.target?.label || activeAssignmentRun.assignment?.target?.id || "ללא יעד"} · {activeAssignmentRun.assignment?.dueAt ? fmtDate(activeAssignmentRun.assignment.dueAt) : "ללא תאריך"}</div>}
-      {activeFleetPlanRun && <div className="note" style={{ marginBottom: 12 }}><b>בדיקת כלי מתוך תכנית:</b> {activeFleetPlanRun.programName} · {activeFleetPlanRun.typeName} · {fleetTargetLabel(activeFleetPlanRun.unitId)}</div>}
-      <div className="control-run-grid">
-        <div className="control-panel">
-          <SectionTitle><currentArea.Icon size={15} /> בדיקה ידנית</SectionTitle>
-          <label className="field"><span>שם הבדיקה</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label className="field"><span>תחום</span><div className="seg-tabs s4">{areas.map((a) => <button key={a.id} className={domain === a.id ? "on" : ""} onClick={() => setDomain(a.id)}>{a.label}</button>)}</div><div className="hint">{currentArea.text}</div></label>
-          {domainPresets.length > 0 && <div className="field"><span>תבניות מהירות</span><div className="control-preset-row">{domainPresets.map((preset) => <button key={preset.id} type="button" className="control-preset-btn" onClick={() => applyManualPreset(preset)}><ListChecks size={14} /> {preset.name}</button>)}</div><div className="hint">בחירת תבנית מחליפה את שם הבדיקה והצ׳קליסט בלבד. היעד נשאר לבחירה ידנית.</div></div>}
-          {domain === "fleet"
-            ? <label className="field"><span>כלי שינוע</span><select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">{fleetTargets.length ? "בחרו כלי לבדיקה" : "אין כלי שינוע זמינים"}</option>{fleetTargets.map((unit) => <option key={unit.id} value={unit.id}>{fleetTargetLabel(unit.id)}</option>)}</select></label>
-            : <label className="field"><span>יעד / אזור</span><input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={targetPlaceholder} /></label>}
-          <label className="field"><span>סעיפי בדיקה (שורה לכל סעיף)</span><textarea rows={4} value={checklistText} onChange={(e) => { setChecklistText(e.target.value); setAnswers({}); }} /></label>
-          {hiddenChecklistCount > 0 && <div className="hint" style={{ color: "#B45309", marginTop: -6 }}>{hiddenChecklistCount} סעיפים נוספים לא מוצגים בבדיקה זו. שמרו עד 8 סעיפים או פצלו את הבדיקה.</div>}
-          <label className="field"><span>הערות כלליות</span><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="מה ראיתם בסבב?" /></label>
-          <label className="field"><span>חתימה לסיום הסבב</span><input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={session.name || "שם מבצע"} /></label>
-          <div className="control-actions">
-            <button className="btn-primary full" onClick={finishRun} disabled={busy}><Check size={16} /> {busy ? "שומר…" : "סיום בדיקה"}</button>
-            {savedRun && <button className="btn-ghost full" onClick={resetManualRun} disabled={busy}><Plus size={16} /> בדיקה חדשה</button>}
-          </div>
-        </div>
-        <div className="control-panel">
-          <SectionTitle><ListChecks size={15} /> צ'קליסט</SectionTitle>
-          {checklist.length ? <div className="control-checklist">{checklist.map((item, i) => <div key={i} className="control-check-row"><div className="control-check-title">{item}</div><div className="control-answer-tabs"><button className={answers[i] === "ok" ? "ok on" : ""} onClick={() => setAnswers((s) => ({ ...s, [i]: "ok" }))}>תקין</button><button className={answers[i] === "problem" ? "bad on" : ""} onClick={() => setAnswers((s) => ({ ...s, [i]: "problem" }))}>בעיה</button><button className={answers[i] === "na" ? "na on" : ""} onClick={() => setAnswers((s) => ({ ...s, [i]: "na" }))}>לא רלוונטי</button></div></div>)}</div> : <Empty text="אין סעיפים" Icon={ListChecks} sub="הוסיפו סעיפים בצד ימין כדי להתחיל." />}
-        </div>
-      </div>
-      {findingCount > 0 && <div className="control-panel" style={{ marginTop: 12 }}>
-        <SectionTitle><AlertTriangle size={15} /> ממצא ופעולת המשך</SectionTitle>
-        <div className="control-find-grid">
-          <label className="field"><span>כותרת ממצא</span><input value={findingTitle} onChange={(e) => setFindingTitle(e.target.value)} placeholder="מה הבעיה המרכזית?" /></label>
-          <label className="field"><span>חומרה</span><select value={severity} onChange={(e) => setSeverity(e.target.value)}><option value="low">נמוכה</option><option value="medium">בינונית</option><option value="high">גבוהה</option><option value="critical">קריטית</option></select></label>
-        </div>
-        <label className="field"><span>פירוט הממצא</span><textarea rows={3} value={findingDesc} onChange={(e) => setFindingDesc(e.target.value)} placeholder="מה נמצא, איפה, ומה נדרש לבדוק?" /></label>
-        <label className="field"><span>מה עושים?</span><div className="seg-tabs s2"><button className={routeType === "report_only" ? "on" : ""} onClick={() => setRouteType("report_only")}>לדוח בלבד</button><button className={routeType === "task" ? "on" : ""} onClick={() => setRouteType("task")}>פתיחת מטלה</button></div></label>
-        {routeType === "task" && <div className="control-find-grid">
-          <label className="field"><span>אחראי</span><select value={responsibleId} onChange={(e) => setResponsibleId(e.target.value)}><option value="">{activeUsers.length ? "בחרו אחראי" : "אין משתמשים זמינים"}</option>{activeUsers.map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role] || u.role}</option>)}</select></label>
-          <label className="field"><span>תאריך יעד (לא חובה)</span><input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} /></label>
-        </div>}
-        {taskDraft && <div className="note" style={{ marginTop: 8 }}><b>טיוטת מטלה:</b> {taskDraft.title} · {taskDraft.category} · {taskDraft.priority === "high" ? "עדיפות גבוהה" : taskDraft.priority === "low" ? "עדיפות נמוכה" : "עדיפות בינונית"}{taskDraft.dueAt ? ` · יעד ${fmtDate(taskDraft.dueAt)}` : ""}</div>}
-        {routeType === "task" && <button className="btn-primary full" style={{ marginTop: 10 }} disabled={!taskDraft || busy || findingTaskCreated} onClick={createTask}>{findingTaskCreated ? "מטלה כבר נפתחה מהממצא" : busy ? "יוצר…" : "יצירת מטלה מהממצא"}</button>}
-      </div>}
-      {msg && <div className={msg === SAVE_FAILED_MESSAGE ? "err" : "note"} style={{ marginTop: 12 }}>{msg}</div>}
-      </>}
-      </>}
-    </div>
-  );
-}
-
 /* ============================================================ USER APP */
 function UserApp(p) {
-  const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
+  const { session, config, fleet, tickets, pm, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
   const [view, setView] = useState("tickets");
   const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null), [taskNav, setTaskNav] = useState(null);
   const goNotif = (go, ev) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); setDeptNav(ev?.fleetId ? { fleetId: ev.fleetId, _t: Date.now() } : null); } };
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
+  const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
   const myPm = useMemo(() => pmVisible(session, pm, fleet), [pm, fleet, session]);
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
   const openTicket = (id) => setOverlay({ type: "detail", id });
-  const openTaskFromControls = (id) => { setTaskNav({ id, _t: Date.now() }); setView("tasks"); };
   const needAct = mine.filter((t) => isOpen(t) && (ballIn(t) === "manager" || (isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework")))).length;
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
@@ -3504,17 +2693,15 @@ function UserApp(p) {
   const mayViewSuppliers = canViewSuppliers(session);
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
-  const mayViewControls = canViewControls(session);
   const analyticsScope = useMemo(() => analyticsScopeForSession(session, {
     tickets, fleet, pm, zones, rounds, complaints, tasks: p.tasks, meetings: p.meetings,
     ppe: p.ppe, ppeItems: p.ppeItems, users
   }), [session, tickets, fleet, pm, zones, rounds, complaints, p.tasks, p.meetings, p.ppe, p.ppeItems, users]);
-  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "teamAdmin" && !mayViewUsers ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view === "controls" && !mayViewControls ? "tickets" : view;
-  const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "controls" ? "בקרות" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
+  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "teamAdmin" && !mayViewUsers ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view;
+  const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   const userNav = [
     { id: "tickets", Icon: ListChecks, label: "קריאות", active: activeView === "tickets", onClick: () => setView("tickets") },
     { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") },
-    mayViewControls ? { id: "controls", Icon: ClipboardCheck, label: "בקרות", active: activeView === "controls", onClick: () => setView("controls") } : null,
     { id: "dept", Icon: Users, label: "המחלקה", active: activeView === "dept", onClick: () => setView("dept") },
     mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null,
     mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null,
@@ -3562,7 +2749,7 @@ function UserApp(p) {
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "controls" && mayViewControls ? (<ControlsHub {...p} onOpenTask={openTaskFromControls} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -3577,7 +2764,7 @@ function UserApp(p) {
         </div>
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
-      <MobileBottomNav nav={userNav} primaryIds={["tickets", "tasks", "controls", "dept"]} />
+      <MobileBottomNav nav={userNav} primaryIds={["tickets", "tasks", "dept"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
@@ -3592,10 +2779,10 @@ function UserApp(p) {
 
 /* ============================================================ TECH APP */
 function TechApp(p) {
-  const { session, config, fleet, tickets, pm, insp, presence, savePm, saveTicket, setShift, techNames, onLogout, theme, toggleTheme } = p;
+  const { session, config, fleet, tickets, pm, presence, savePm, saveTicket, setShift, techNames, onLogout, theme, toggleTheme } = p;
   const [view, setView] = useState("tickets");
   const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmRun, setPmRun] = useState(null);
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence);
+  const notif = useNotifications(session, tickets, pm, fleet, config, presence);
   const myShift = presenceOf(presence, session.id);
   const myIdle = shiftIdle(myShift, session, config);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
@@ -3928,8 +3115,8 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
     {access && <Overlay persistent onClose={() => setAccess(null)}><AccessPicker allFleet={fleet} config={config} driver={access.driver} seatUnitId={access.unit.id} onCancel={() => setAccess(null)} onSave={submitAccess} /></Overlay>}
   </>);
 }
-function ProblemUnitsPanel({ fleet, tickets, insp, config, onOpen }) {
-  const list = useMemo(() => problemUnits(fleet, tickets, insp, config), [fleet, tickets, insp, config]);
+function ProblemUnitsPanel({ fleet, tickets, config, onOpen }) {
+  const list = useMemo(() => problemUnits(fleet, tickets, config), [fleet, tickets, config]);
   if (!list.length) return null;
   return (<div style={{ marginBottom: 14 }}>
     <SectionTitle><AlertTriangle size={15} /> כלים בעייתיים — תקלות חוזרות</SectionTitle>
@@ -3942,7 +3129,7 @@ function ProblemUnitsPanel({ fleet, tickets, insp, config, onOpen }) {
   </div>);
 }
 function ManagerFleet(p) {
-  const { session, fleet, config, tickets, insp, saveFleet, saveConfig, deptNav } = p;
+  const { session, fleet, config, tickets, saveFleet, saveConfig, deptNav } = p;
   const [tab, setTab] = useState("units"), [openId, setOpenId] = useState(null), [pmView, setPmView] = useState(null);
   const scoped = useMemo(() => fleetForSession(session, fleet).slice().sort((a, b) => (a.code > b.code ? 1 : -1)), [session, fleet]);
   const myPm = useMemo(() => pmVisible(session, p.pm, fleet), [p.pm, fleet, session]);
@@ -3954,11 +3141,11 @@ function ManagerFleet(p) {
     {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
       : tab === "pm" ? <><div className="note" style={{ marginBottom: 10 }}>טיפולים תקופתיים לכלי המחלקה. יש להוציא את הכלי לטכנאי במועד; הטכנאי יעדכן ביצוע.</div><PMSchedule items={myPm} fleet={fleet} onOpen={(x) => setPmView(x)} config={config} /></>
       : <>
-      <ProblemUnitsPanel fleet={scoped} tickets={tickets} insp={insp} config={config} onOpen={(id) => setOpenId(id)} />
+      <ProblemUnitsPanel fleet={scoped} tickets={tickets} config={config} onOpen={(id) => setOpenId(id)} />
       <SectionTitle><Truck size={15} /> כלי השינוע של מחלקותיי ({scoped.length})</SectionTitle>
       {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
     </>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
     {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
   </>);
 }
@@ -4591,11 +3778,11 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_L
 }
 
 function CleanerApp(p) {
-  const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, insp, config, presence, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key), absences, saveAbsence, delAbsence } = p;
+  const { session, zones, rounds, complaints, saveRound, resolveComplaint, escalateComplaint, fileComplaint, tickets, pm, fleet, config, presence, onLogout, theme, toggleTheme, language, setLanguage, t = (key) => uiText(language, key), absences, saveAbsence, delAbsence } = p;
   const [run, setRun] = useState(null), [qrBlockedZone, setQrBlockedZone] = useState(null), [sent, setSent] = useState(false), [doneRound, setDoneRound] = useState(null), [showNotif, setShowNotif] = useState(false), [showDone, setShowDone] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null), [showCover, setShowCover] = useState(false), [showAbs, setShowAbs] = useState(false), [absFrom, setAbsFrom] = useState(""), [absTo, setAbsTo] = useState("");
   const [qrArrivalZone, setQrArrivalZone] = useState(null);
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, [], absences);
+  const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, [], absences);
   const now = Date.now();
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const mine = useMemo(() => active.filter((z) => z.cleanerId === session.id), [active, session.id]);
@@ -4732,8 +3919,8 @@ function AssetsHub(p) {
   const [t, setT] = useState("fleet");
   useEffect(() => { if (assetNav?.tab) setT(assetNav.tab); }, [assetNav?._t]);
   return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 520, marginBottom: 14 }}><button className={t === "fleet" ? "on" : ""} onClick={() => setT("fleet")}>כלים ונהגים</button><button className={t === "insp" ? "on" : ""} onClick={() => setT("insp")}>בקרת כלים</button><button className={t === "pm" ? "on" : ""} onClick={() => setT("pm")}>לוח טיפולים</button></div>
-    {t === "insp" ? <InspectionsModule {...p} /> : t === "pm" ? <PMModule {...p} /> : <FleetModule {...p} openFleetId={assetNav?.tab === "fleet" ? assetNav.fleetId : null} navT={assetNav?._t} />}
+    <div className="seg-tabs s2" style={{ maxWidth: 360, marginBottom: 14 }}><button className={t === "fleet" ? "on" : ""} onClick={() => setT("fleet")}>כלים ונהגים</button><button className={t === "pm" ? "on" : ""} onClick={() => setT("pm")}>לוח טיפולים</button></div>
+    {t === "pm" ? <PMModule {...p} /> : <FleetModule {...p} openFleetId={assetNav?.tab === "fleet" ? assetNav.fleetId : null} navT={assetNav?._t} />}
   </>);
 }
 function CleaningAnalytics({ zones, rounds, complaints }) {
@@ -6393,15 +5580,14 @@ function PpeHub(p) {
 }
 
 function AdminApp(p) {
-  const { session, config, fleet, tickets, pm, insp, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
+  const { session, config, fleet, tickets, pm, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
   const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
-  const notif = useNotifications(session, tickets, pm, fleet, insp, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
+  const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const clearTicketFilter = () => setTFilter(null);
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
   const goPpe = (nav = {}) => { setPpeNav({ ...nav, _t: Date.now() }); setTab("ppe"); };
-  const openTaskFromControls = (id) => { setTaskNav({ id, _t: Date.now() }); setTab("tasks"); };
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
   const mayViewAnalytics = canViewAnalytics(session);
@@ -6409,10 +5595,8 @@ function AdminApp(p) {
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
   const mayViewAudit = canViewAudit(session);
-  const mayViewControls = canViewControls(session);
   const blockedTab = {
     insights: !mayViewAnalytics,
-    controls: !mayViewControls,
     team: !mayViewUsers,
     suppliers: !mayViewSuppliers,
     activity: !mayViewAudit,
@@ -6423,7 +5607,6 @@ function AdminApp(p) {
     { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
     { id: "tasks", Icon: ClipboardList, label: "מטלות" },
-    mayViewControls ? { id: "controls", Icon: ClipboardCheck, label: "בקרות" } : null,
     { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" },
     { id: "assets", Icon: Truck, label: "כלי שינוע" },
     mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה" } : null,
@@ -6443,7 +5626,6 @@ function AdminApp(p) {
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
-          {activeTab === "controls" && mayViewControls && <ControlsHub {...p} onOpenTask={openTaskFromControls} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
           {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
@@ -6453,11 +5635,11 @@ function AdminApp(p) {
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
-      <MobileBottomNav nav={nav} primaryIds={["dash", "tickets", "tasks", "controls"]} />
+      <MobileBottomNav nav={nav} primaryIds={["dash", "tickets", "tasks"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "insp") goAsset({ tab: "insp" }); else if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
@@ -6488,7 +5670,7 @@ function computeInsights(tickets, fleet, pm, config) {
   if (pmOver.length >= 3) out.push({ sev: "warn", text: `${countLabel(pmOver.length, "טיפול תקופתי באיחור", "טיפולים תקופתיים באיחור")}.`, go: "pm" });
   return out.slice(0, 6);
 }
-function Dashboard({ session, tickets: allTickets, pm, fleet, insp, config, users, presence, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo, clearDemo }) {
+function Dashboard({ session, tickets: allTickets, pm, fleet, config, users, presence, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo, clearDemo }) {
   const [cfgOpen, setCfgOpen] = useState(false);
   const [demoBusy, setDemoBusy] = useState("");
   const [dashTrackLocal, setDashTrackLocal] = useState("all");
@@ -6522,8 +5704,6 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, insp, config, user
   const critActive = critNow.filter((t) => !critEscIds.has(t.id));
   const expDocs = fleet.map((f) => ({ f, s: docStatus(f, config) })).filter((x) => x.s.d != null && x.s.d <= 30).sort((a, b) => a.s.d - b.s.d);
   const pmSoon = (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue);
-  const lastInsp = {}; (insp || []).forEach((i) => { if (!lastInsp[i.fleetId] || i.at > lastInsp[i.fleetId]) lastInsp[i.fleetId] = i.at; });
-  const inspDue = fleet.filter((f) => !lastInsp[f.id] || daysLeft(lastInsp[f.id] + 30 * 86400000) <= 0);
   const monthCost = tickets.filter((t) => t.closure && Date.now() - t.closure.signedAt < 30 * 86400000).reduce((a, t) => a + (t.closure.costAmount || 0), 0);
   const insights = computeInsights(tickets, dashTrack === "facility" ? [] : fleet, dashTrack === "facility" ? [] : pm, config);
   const lifecycleOptions = {
@@ -6583,7 +5763,6 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, insp, config, user
     dashTrack !== "facility" && expDocs.length ? { sev: 1, Icon: Truck, text: "מסמכי כלים פגי/קרובי תוקף", n: expDocs.length, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") } : null,
     ordRecv.length ? { sev: 0, Icon: Package, text: "הזמנות רכש לקליטה", n: ordRecv.length, go: () => setTab("ppe") } : null,
     dashTrack !== "facility" && pmSoon.length ? { sev: 0, Icon: Truck, text: "תחזוקות מתוכננות קרובות", n: pmSoon.length, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") } : null,
-    dashTrack !== "facility" && inspDue.length ? { sev: 0, Icon: Truck, text: "כלים שטרם סוקרו החודש", n: inspDue.length, go: () => onAsset ? onAsset({ tab: "insp" }) : setTab("assets") } : null,
   ].filter(Boolean).sort((a, b) => b.sev - a.sev);
   
   return (<>
@@ -6625,8 +5804,6 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, insp, config, user
     {w.docs && dashTrack !== "facility" && <><SectionTitle><FileText size={15} /> מסמכי כלי שינוע פגי-תוקף (30 ימים){expDocs.length ? ` · ${expDocs.length}` : ""}</SectionTitle>
       {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
         : <div className="cards">{expDocs.map(({ f, s }) => <button key={f.id} type="button" className="doc-line doc-line-click" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><span className="doc-line-action" aria-hidden="true"><PenLine size={15} /></span></button>)}</div>}</>}
-    {w.insp && dashTrack !== "facility" && <><SectionTitle><ClipboardCheck size={15} /> בקרת כלים לביצוע (חודשי)</SectionTitle>
-      {inspDue.length === 0 ? <div className="note">כל כלי השינוע סוקרו החודש.</div> : <div className="note" style={{ borderColor: "#FCD34D", cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "insp" }) : setTab("assets")}>{countLabel(inspDue.length, "כלי ממתין", "כלים ממתינים")} לבקרה חודשית. גשו ללשונית "בקרת כלים".</div>}</>}
     {w.pm && dashTrack !== "facility" && pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים קרובים</SectionTitle><div className="pm-mini">{pmSoon.slice(0, 5).map((x) => { const d = daysLeft(x.nextDue); const f = fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId); return <div key={x.id} className="pm-mini-item" style={{ cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span className="dot-lg" style={{ background: pmColor(d) }} /><span className="pm-mini-t">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="pm-mini-d" style={{ color: pmColor(d) }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></div>; })}</div></>}
     {w.presence && <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle><div className="panel">{(users || []).filter((u) => u.role === "tech" && u.active !== false).length === 0 ? <div className="note" style={{ margin: 0 }}>אין טכנאים מוגדרים.</div> : (users || []).filter((u) => u.role === "tech" && u.active !== false).map((u) => { const pr = presenceOf(presence, u.id); return <div key={u.id} className="presence-row"><span className={"presence-dot" + (pr.onShift ? " on" : "")} /><span className="presence-name">{u.name}{u.supplier ? <span className="presence-sup"> · {u.supplier}</span> : ""}</span><span className="presence-stat">{pr.onShift ? lastSeenText(pr.lastSeen) || "במשמרת" : "לא במשמרת"}</span></div>; })}</div></>}
     {w.costs && <><SectionTitle><DollarSign size={15} /> עלויות 30 ימים אחרונים</SectionTitle><div className="panel"><div className="big-stat">{ils(monthCost)}</div></div></>}
@@ -6760,7 +5937,6 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
 function FleetTypeSettings({ config, fleet, users = [], saveConfig }) {
   const [saved, setSaved] = useState(false), [typeMsg, setTypeMsg] = useState(""), [openType, setOpenType] = useState(null);
   const [openRule, setOpenRule] = useState(null);
-  const [openProg, setOpenProg] = useState(null), [progDraft, setProgDraft] = useState(null), [progErr, setProgErr] = useState("");
   const [vtypes, setVtypes] = useState(() => vehicleCatalogBase({
     config,
     fleet,
@@ -6824,49 +6000,6 @@ function FleetTypeSettings({ config, fleet, users = [], saveConfig }) {
     setRules((s) => [...s, { id: "mr" + Date.now().toString(36), name: "", intervalMonths: 1, weight: 1, active: true, target: { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [] }, maintenanceChecklistItems: [] }]);
     setOpenRule(nextIndex);
   };
-  const inspectionUsers = (users || []).filter((u) => (u.role === "user" || u.role === "admin") && u.active !== false && u.status !== "archived");
-  const checklistText = (program) => (program?.checklist || []).map((item) => item.label || item.name || item).filter(Boolean).join("\n");
-  const setTypePrograms = (typeIdx, updater) => setVtypes((s) => s.map((type, idx) => idx === typeIdx ? { ...type, inspectionPrograms: updater(Array.isArray(type.inspectionPrograms) ? type.inspectionPrograms : []) } : type));
-  const toggleProgUser = (field, userId) => setProgDraft((draft) => {
-    const current = new Set(draft?.[field] || []);
-    current.has(userId) ? current.delete(userId) : current.add(userId);
-    return { ...draft, [field]: [...current] };
-  });
-  const openProgram = (typeIdx, programIdx, program) => {
-    setOpenType(typeIdx);
-    setOpenProg(programIdx);
-    setProgDraft({ ...program, _checklistText: checklistText(program) });
-    setProgErr("");
-  };
-  const saveProgram = (typeIdx) => {
-    const lines = String(progDraft?._checklistText || "").split("\n").map((line) => line.trim()).filter(Boolean);
-    const updated = { ...progDraft, checklist: lines.map((label, idx) => ({ id: `ci-${idx}`, label })) };
-    delete updated._checklistText;
-    const normalized = normalizeInspectionProgram(updated);
-    if (!normalized) { setProgErr("שם ותדירות הם שדות חובה"); return false; }
-    const saved = { ...updated, ...normalized };
-    setTypePrograms(typeIdx, (programs) => programs.map((program, idx) => idx === openProg ? saved : program));
-    setOpenProg(null);
-    setProgDraft(null);
-    setProgErr("");
-    return true;
-  };
-  const deleteProgram = (typeIdx, programIdx) => {
-    setTypePrograms(typeIdx, (programs) => programs.filter((_, idx) => idx !== programIdx));
-    setOpenProg(null);
-    setProgDraft(null);
-    setProgErr("");
-  };
-  const addProgram = (typeIdx) => {
-    const blank = { name: "", intervalMonths: config.defaultInspIntervalMonths ?? 2, responsibleIds: [], notifyIds: [], autoTicket: true, checklist: [], active: true };
-    const programs = Array.isArray(vtypes[typeIdx]?.inspectionPrograms) ? vtypes[typeIdx].inspectionPrograms : [];
-    const nextIndex = programs.length;
-    setTypePrograms(typeIdx, (list) => [...list, blank]);
-    setOpenType(typeIdx);
-    setOpenProg(nextIndex);
-    setProgDraft({ ...blank, _checklistText: "" });
-    setProgErr("");
-  };
   const ruleTargetText = (rule) => {
     const t = rule.target || {};
     if (t.allFleet) return "כל הפארק";
@@ -6893,18 +6026,20 @@ function FleetTypeSettings({ config, fleet, users = [], saveConfig }) {
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
   const save = async ({ nextVtypes = vtypes, nextRules = rules } = {}) => {
     setTypeMsg("");
-    let invalidInspectionProgram = false;
-    const list = nextVtypes.filter((t) => (t.name || "").trim()).map((type) => {
-      const drafts = Array.isArray(type.inspectionPrograms) ? type.inspectionPrograms : [];
-      const meaningful = drafts.filter((program) => (program.name || "").trim() || Number(program.intervalMonths) || (program.checklist || []).length);
-      const cleanPrograms = meaningful.map(normalizeInspectionProgram).filter(Boolean);
-      if (meaningful.length !== cleanPrograms.length) invalidInspectionProgram = true;
-      return { ...type, inspectionPrograms: cleanPrograms };
-    });
-    if (invalidInspectionProgram) {
-      setTypeMsg("בדקו שכל תכנית בקרה כוללת שם ותדירות תקינים.");
-      return false;
-    }
+    const list = nextVtypes.filter((t) => (t.name || "").trim()).map((type) => ({
+      id: type.id,
+      name: type.name,
+      supplier: type.supplier || "",
+      high: type.high,
+      medium: type.medium,
+      low: type.low,
+      tasrir: !!type.tasrir,
+      license: !!type.license,
+      insurance: !!type.insurance,
+      lease: !!type.lease,
+      pmFreq: type.pmFreq || "monthly",
+      models: Array.isArray(type.models) ? type.models : []
+    }));
     const ruleDrafts = nextRules.filter((rule) => (rule.name || "").trim() || ruleHasTarget(rule));
     const cleanRules = normalizeMaintenanceRules(ruleDrafts);
     if (ruleDrafts.length !== cleanRules.length) {
@@ -6961,22 +6096,6 @@ function FleetTypeSettings({ config, fleet, users = [], saveConfig }) {
         <div className="hint" style={{ marginTop: 8, marginBottom: 8 }}>התכניות הגמישות למטה הן הדרך הראשית להגדיר TO 500, TO 1000 ותדירויות לפי חודשים. השדה הזה נשאר רק לשיבוצים ישנים שלא נוצרו מתכנית.</div>
         <label className="field"><span>תדירות טיפול תקופתי ישנה</span><select value={t.pmFreq || "monthly"} onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, pmFreq: e.target.value } : x))}>{FREQS.map((fr) => <option key={fr.id} value={fr.id}>{fr.label}</option>)}</select></label>
       </details>
-      <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>תכניות בקרה</div>
-      {((t.inspectionPrograms || []).length === 0) && <div className="hint" style={{ marginBottom: 8 }}>אין תכניות בקרה לסוג זה.</div>}
-      {(t.inspectionPrograms || []).map((program, pi) => {
-        const opProg = openType === i && openProg === pi;
-        const current = opProg ? (progDraft || program) : program;
-        return <div key={program.id || pi} className="reg-item"><div className="reg-row">{opProg ? <input className="reg-name" value={current.name || ""} placeholder="שם התכנית" onChange={(e) => setProgDraft((p) => ({ ...p, name: e.target.value }))} /> : <span className="reg-label">{program.name || "תכנית ללא שם"}<span className="reg-count">{program.intervalMonths || 1} חודשים · {(program.checklist || []).length} סעיפים</span></span>}<button className="reg-edit" title={opProg ? "שמור" : "ערוך"} onClick={() => opProg ? saveProgram(i) : openProgram(i, pi, program)}>{opProg ? <Check size={15} /> : <PenLine size={15} />}</button><button className="reg-del" title="מחק" onClick={() => deleteProgram(i, pi)}><Trash2 size={15} /></button></div>{opProg && <>
-          {progErr && <div className="err">{progErr}</div>}
-          <label className="field"><span>תדירות בחודשים</span><input type="number" min="1" max="120" value={current.intervalMonths || 1} onChange={(e) => setProgDraft((p) => ({ ...p, intervalMonths: e.target.value }))} /></label>
-          <div className="field"><span>אחראים</span>{inspectionUsers.length ? inspectionUsers.map((u) => <label key={u.id} className="chk-line"><input type="checkbox" checked={(current.responsibleIds || []).includes(u.id)} onChange={() => toggleProgUser("responsibleIds", u.id)} /> {u.name} · {ROLE_LABEL[u.role] || u.role}</label>) : <div className="hint">אין משתמשי הנהלה/מנהלי מחלקות לבחירה.</div>}<div className="hint">ריק = כל מנהל מערכת או מנהל מחלקה יכול לבצע.</div></div>
-          <div className="field"><span>להודיע בעת ממצאים</span>{inspectionUsers.length ? inspectionUsers.map((u) => <label key={u.id} className="chk-line"><input type="checkbox" checked={(current.notifyIds || []).includes(u.id)} onChange={() => toggleProgUser("notifyIds", u.id)} /> {u.name} · {ROLE_LABEL[u.role] || u.role}</label>) : <div className="hint">אין משתמשים לבחירה.</div>}</div>
-          <label className="chk-line"><input type="checkbox" checked={current.autoTicket !== false} onChange={(e) => setProgDraft((p) => ({ ...p, autoTicket: e.target.checked }))} /> פתיחת קריאה אוטומטית בממצאים</label>
-          <label className="field"><span>פריטי בדיקה</span><textarea rows={6} className="ta" value={current._checklistText || ""} onChange={(e) => setProgDraft((p) => ({ ...p, _checklistText: e.target.value }))} placeholder={"בלמים\nצמיגים\nצופר"} /></label>
-          <button className="btn-ghost sm" onClick={() => { if (!program.id && !(program.name || "").trim() && !(program.checklist || []).length) deleteProgram(i, pi); else { setOpenProg(null); setProgDraft(null); setProgErr(""); } }}>ביטול</button>
-        </>}</div>;
-      })}
-      <button className="btn-ghost sm" onClick={() => addProgram(i)}><Plus size={14} /> תכנית בקרה</button>
       <div className="hint" style={{ marginTop: 10, marginBottom: 4 }}>דגמים בסוג זה:</div>{(t.models || []).map((m, mi) => { const modelInUse = vehicleTypeInUseCodes({ name: m, models: [m] }, fleet); return <div key={mi} className="reg-row" style={{ marginBottom: 6 }}><input className="reg-name" value={m} placeholder="דגם" onChange={(e) => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: x.models.map((mm, k) => k === mi ? e.target.value : mm) } : x))} /><button className="reg-del" aria-disabled={modelInUse.length > 0} style={modelInUse.length ? { opacity: 0.45 } : undefined} title={modelInUse.length ? "דגם בשימוש — עדכנו או מחקו את הכלים לפני המחיקה" : "מחק"} onClick={() => {
         const inUse = vehicleTypeInUseCodes({ name: m, models: [m] }, fleet);
         if (inUse.length) {
@@ -6991,7 +6110,7 @@ function FleetTypeSettings({ config, fleet, users = [], saveConfig }) {
       <button className="btn-ghost sm" onClick={() => setVtypes((s) => s.map((x, j) => j === i ? { ...x, models: [...(x.models || []), ""] } : x))}><Plus size={14} /> דגם</button>
     </>}</div>;
     })}
-    <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, inspTpl: "", inspectionPrograms: [], pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
+    <button className="btn-ghost full" onClick={() => { const id = "vt" + Date.now().toString(36); setVtypes((s) => [...s, { id, name: "", supplier: "", high: 4, medium: 24, low: 72, tasrir: false, license: false, insurance: false, lease: false, pmFreq: "monthly", models: [] }]); setOpenType(vtypes.length); }}><Plus size={15} /> סוג כלי</button>
     <SectionTitle>תכניות טיפול תקופתי</SectionTitle>
     <div className="note" style={{ marginBottom: 10 }}>כאן מגדירים תכניות כמו TO 500 או TO 1000: שם חופשי, תדירות בחודשים, סוגי כלי/דגמים שעליהם זה חל, וצ׳ק-ליסט טיפול ייעודי. זה נפרד לגמרי מ-בקרת כלים.</div>
     {rules.map((rule, i) => { const op = openRule === i; const target = { allFleet: false, vehicleTypeNames: [], modelCodes: [], fleetIds: [], ...(rule.target || {}) }; const checklist = Array.isArray(rule.maintenanceChecklistItems) ? rule.maintenanceChecklistItems : []; const affectedCount = ruleAffectedCount(rule); return <div key={rule.id || i} className="reg-item"><div className="reg-row">{op ? <input className="reg-name" value={rule.name || ""} placeholder="שם תכנית, למשל TO 500" onChange={(e) => setRule(i, { name: e.target.value })} /> : <span className="reg-label">{rule.name || "תכנית ללא שם"}<span className="reg-count">{rule.intervalMonths || 1} חודשים{rule.weight === 2 ? " · כבד" : ""} · {ruleTargetText(rule)} · {affectedCount} כלים{checklist.length ? ` · ${checklist.length} סעיפים` : ""}</span></span>}<button className="reg-edit" title={op ? "שמור וסגור" : "ערוך"} onClick={async () => {
@@ -7110,7 +6229,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
 }
 
 function FleetModule(p) {
-  const { fleet, config, tickets, insp, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveTicket, session, saveConfig } = p;
+  const { fleet, config, tickets, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units"), [imp, setImp] = useState(false);
   const canEditSettings = canManageSettings(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
@@ -7298,7 +6417,7 @@ function FleetModule(p) {
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { const ok = await saveFleet(x); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
     {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units, adds) => saveFleetImportBatch(units, adds, { toastOnFail: false })} onDelete={(id) => delFleet(id, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { if (await delFleet(openId) !== false) setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) if (await saveTicket(t) === false) return false; return true; }} onBlock={async (reason) => saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason))} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { if (await delFleet(openId) !== false) setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) if (await saveTicket(t) === false) return false; return true; }} onBlock={async (reason) => saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason))} /></Overlay>}
   </>);
 }
 function FleetForm({ item, config, onCancel, onSave }) {
@@ -7345,12 +6464,11 @@ function FleetForm({ item, config, onCancel, onSave }) {
       <button className="btn-primary full" disabled={busy} onClick={save}>{busy ? "שומר..." : "שמירה"}</button><div style={{ height: 24 }} />
     </div></div>);
 }
-function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, onReturnService, onBlock, canDocs = true, canTickets = true }) {
+function FleetCard({ fleet, config, tickets, onClose, onEdit, onDelete, onReturnService, onBlock, canDocs = true, canTickets = true }) {
   const f = fleet; if (!f) return null;
   const [blocking, setBlocking] = useState(false), [blkReason, setBlkReason] = useState("");
   const blk = unitBlock(f, tickets, config);
   const related = tickets.filter((t) => t.forkliftId === f.id).sort((a, b) => b.createdAt - a.createdAt);
-  const inspections = insp.filter((i) => i.fleetId === f.id).sort((a, b) => b.at - a.at);
   const dt = related.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }} aria-label="עריכת כלי"><PenLine size={18} /></button>}</div>
     <div className="body">
@@ -7366,16 +6484,14 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, on
         <Meta Icon={Users} label="מחלקה" value={fleetDepts(f).join(", ") || "—"} />
         <Meta Icon={Clock} label="השבתה מצטברת" value={dt ? fmtDur(dt) : "—"} />
       </div>
-      {canTickets && (() => { const h = assetHealth(f, tickets, insp, config); return (<div className="health-panel" style={{ borderColor: h.color + "55" }}>
+      {canTickets && (() => { const h = assetHealth(f, tickets, config); return (<div className="health-panel" style={{ borderColor: h.color + "55" }}>
         <div className="health-top"><div className="health-score" style={{ color: h.color }}>{h.score}<span className="health-max">/100</span></div><div className="health-info"><div className="health-label" style={{ color: h.color }}>מצב הכלי · {h.label}</div><div className="health-stats">{countLabel(h.count90, "קריאה", "קריאות")} ב-90 ימים · MTTR {h.mttr ? fmtDur(h.mttr) : "—"} · עלות 90 ימים {ils(h.cost90)}</div></div></div>
         <div className="health-rec"><Sparkles size={13} /> {h.rec}</div>
       </div>); })()}
       {canDocs && <><SectionTitle><FileText size={15} /> מסמכים</SectionTitle>
       <div className="panel">{machineDocs(f, config).map((d) => { const doc = f.docs?.[d.id]; const ts = dateToTs(doc?.date); const dl = ts ? daysLeft(ts) : null; const missing = ts == null; const col = missing ? "#DC2626" : docWarnColor(dl, config); return <div key={d.id} className="doc-view"><span className="dot-lg" style={{ background: col }} /><span className="doc-name">{d.label}</span><span className="doc-date" style={{ color: col }}>{doc?.date ? fmtDate(ts) : "חסר"}{dl != null && (dl < 0 ? " · פג" : ` · ${dl} י׳`)}</span>{doc?.link && <a href={doc.link} target="_blank" rel="noreferrer" className="doc-link" onClick={(e) => e.stopPropagation()}><ExternalLink size={15} /></a>}</div>; })}</div></>}
       {unitNote(f, config) && <><SectionTitle>הערות</SectionTitle><div className="desc-box">{unitNote(f, config)}</div></>}
-      {canTickets && <><SectionTitle><ClipboardCheck size={15} /> היסטוריית סיקורים ({inspections.length})</SectionTitle>
-      {inspections.length === 0 ? <div className="note">טרם בוצעו סיקורים.</div> : <div className="timeline">{inspections.slice(0, 6).map((i) => <div className="tl-item" key={i.id}><div className="tl-dot" style={{ background: i.passed ? "#16A34A" : "#DC2626" }} /><div className="tl-body"><div className="tl-text">{i.passed ? "תקין" : `נמצאו ${i.problems.length} ממצאים`}</div><div className="tl-meta">{i.by} · {fmtDate(i.at)}</div></div></div>)}</div>}
-      <SectionTitle><ListChecks size={15} /> קריאות לכלי זה ({related.length})</SectionTitle>
+      {canTickets && <><SectionTitle><ListChecks size={15} /> קריאות לכלי זה ({related.length})</SectionTitle>
       {related.length === 0 ? <div className="note">אין קריאות.</div> : <div className="cards">{related.slice(0, 8).map((t) => <div key={t.id} className="mini-ticket"><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">{t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></div>)}</div>}
       {related.length >= 3 && <div className="repeat-warn"><RefreshCw size={14} /> כלי זה נפתחו עליו {related.length} קריאות — שקלו טיפול שורש.</div>}</>}
       {!blk && onBlock && (blocking ? <div className="blk-set-panel">
@@ -7389,160 +6505,6 @@ function FleetCard({ fleet, config, tickets, insp, onClose, onEdit, onDelete, on
 }
 
 /* ============================================================ INSPECTIONS */
-function InspectionsModule(p) {
-  const { fleet, templates, insp, saveInsp, saveTicket, session, config } = p;
-  const [run, setRun] = useState(null), [detail, setDetail] = useState(null);
-  const [mode, setMode] = useState("todo");
-  const [igrp, setIgrp] = useState("none"), [icoll, setIcoll] = useState({});
-  const duePairs = useMemo(() => buildInspectionDuePairs({ fleet, insps: insp, config, now: Date.now(), unitModelCode, unitTypeName }), [fleet, insp, config]);
-  const dueFleetIds = new Set(duePairs.map(({ f }) => f.id));
-  const okCount = fleet.filter((f) => !dueFleetIds.has(f.id)).length;
-  const hasUnconfiguredTypes = fleet.length > 0 && (config.vehicleTypes || []).some((vt) => !inspectionProgramsForType(vt).length);
-  return (<>
-    <div className="note" style={{ marginBottom: 10 }}>תכניות בקרה חדשות מוגדרות בהגדרות ← סוגי כלי השינוע. שאלוני הבקרה הישנים הוסרו מעריכת המוצר ונשארים לקריאת היסטוריה בלבד.</div>
-      <div className="seg-tabs" style={{ maxWidth: 320 }}><button className={mode === "todo" ? "on" : ""} onClick={() => setMode("todo")}>לביצוע{duePairs.length ? ` (${duePairs.length})` : ""}</button><button className={mode === "hist" ? "on" : ""} onClick={() => setMode("hist")}>היסטוריה</button></div>
-      {mode === "todo" ? (
-        duePairs.length === 0 ? (hasUnconfiguredTypes ? <div className="empty-setup"><div className="empty-title">אין בקרות לביצוע</div><div className="empty-sub">להגדרת תכניות בקרה: הגדרות ← סוגי כלי השינוע ← תכניות בקרה</div></div> : <Empty text="הכל תקין" Icon={ClipboardCheck} />)
-          : (() => {
-            const dueCard = ({ f, prog, lastAt, legacy }) => <button key={`${f.id}-${prog?.id || "legacy"}`} className="tcard" onClick={() => setRun({ fleet: f, program: prog || null })} style={{ borderInlineStartColor: "#EA580C" }}><div className="tcard-icon" style={{ background: "var(--surface-2)" }}><Truck size={20} color={TRACKS.transport.color} /></div><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{unitLabel(f, config)}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{legacy ? "בקרה כללית" : prog.name}</span></div><div className="tcard-sub">{resolveHydraulics(f, config) ? "תסקיר · " : ""}{unitDesc(f, config)}{fleetDepts(f).length ? " · " + fleetDepts(f).join(", ") : ""}</div><div className="tcard-badges"><span className="badge sm" style={{ color: "#EA580C", background: "var(--surface-2)" }}>{lastAt ? "נסקר " + fmtDate(lastAt) : "לא נבדק"}</span><span className="badge sm ovd">לביצוע</span></div></div></button>;
-            const igKey = (pair) => igrp === "type" ? (unitTypeName(pair.f, config) || pair.f.type || "אחר") : (fleetDepts(pair.f)[0] || "ללא מחלקה");
-            const ftr = <>{okCount > 0 && <div className="note">{countLabel(okCount, "כלי נוסף תקין", "כלים נוספים תקינים")} — ראו "היסטוריה".</div>}</>;
-            if (igrp === "none") return <><div className="insp-grp-bar"><span className="group-lbl">קבץ לפי</span><div className="group-seg">{[["none", "ללא"], ["type", "סוג"], ["dept", "מחלקה"]].map(([id, lbl]) => <button key={id} className={igrp === id ? "on" : ""} onClick={() => setIgrp(id)}>{lbl}</button>)}</div></div><div className="cards">{duePairs.map(dueCard)}{ftr}</div></>;
-            const m = new Map(); duePairs.forEach((pair) => { const k = igKey(pair); if (!m.has(k)) m.set(k, []); m.get(k).push(pair); });
-            const arr = [...m.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "he"));
-            return <><div className="insp-grp-bar"><span className="group-lbl">קבץ לפי</span><div className="group-seg">{[["none", "ללא"], ["type", "סוג"], ["dept", "מחלקה"]].map(([id, lbl]) => <button key={id} className={igrp === id ? "on" : ""} onClick={() => setIgrp(id)}>{lbl}</button>)}</div></div>
-              <div className="fleet-groups">{arr.map(([k, items]) => { const open = !icoll[k]; return <div key={k} className="fgroup"><button className="fgroup-head" onClick={() => setIcoll((c) => ({ ...c, [k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{k}</span><span className="fgroup-count">{items.length}</span></button>{open && <div className="cards">{items.map(dueCard)}</div>}</div>; })}{ftr}</div></>;
-          })()
-      ) : (
-        <InspHistory pool={fleet} insp={insp} templates={templates} config={config} onRun={(f) => setRun({ fleet: f, program: null })} onView={(i) => setDetail(i)} />
-      )}
-    {detail && <Overlay onClose={() => setDetail(null)}><InspDetail rec={detail} fleet={fleet} templates={templates} onClose={() => setDetail(null)} /></Overlay>}
-    {run && <Overlay persistent onClose={() => setRun(null)}><InspectionRun fleet={run.fleet} program={run.program || null} session={session} config={config} onClose={() => setRun(null)} onFinish={async (record, ticket) => { if (await saveInsp(record) === false) return false; if (ticket && await saveTicket(ticket) === false) return false; setRun(null); return true; }} /></Overlay>}
-  </>);
-}
-function InspHistory({ pool, insp, templates, onRun, onView, config }) {
-  const [openId, setOpenId] = useState(null), [view, setView] = useState("fleet"), [repHtml, setRepHtml] = useState(null);
-  const [rFleet, setRFleet] = useState("all"), [rType, setRType] = useState("all"), [rResult, setRResult] = useState("all"), [rSort, setRSort] = useState("date_desc");
-  const tplName = (id) => (templates.find((t) => t.id === id)?.name || "בקרה");
-  const progName = (programId) => {
-    for (const vt of config.vehicleTypes || []) {
-      const p = (vt.inspectionPrograms || []).find((x) => x.id === programId);
-      if (p) return p.name;
-    }
-    return null;
-  };
-  const inspLabel = (rec) => progName(rec.programId) || tplName(rec.templateId) || "בקרה";
-  const NEXT_DAYS = 30;
-  const byFleet = pool.map((f) => ({ f, list: insp.filter((i) => i.fleetId === f.id).sort((a, b) => b.at - a.at) })).filter((x) => x.list.length > 0);
-  if (byFleet.length === 0) return <Empty text="אין היסטוריית בקרות" Icon={ClipboardCheck} sub="לאחר ביצוע בקרה היא תירשם כאן לפי תאריך" />;
-  const all = byFleet.flatMap(({ f, list }) => list.map((i) => ({ i, f }))).sort((a, b) => b.i.at - a.i.at);
-  const months = {}; all.forEach((r) => { const k = new Date(r.i.at).toLocaleDateString("he-IL", { month: "long", year: "numeric" }); (months[k] = months[k] || []).push(r); });
-  const item = (i, f) => <button className="tl-item insp-hist-item" key={i.id} onClick={() => onView(i)}><div className="tl-dot" style={{ background: i.passed ? "#16A34A" : "#DC2626" }} /><div className="tl-body"><div className="tl-text">{fmtDate(i.at)} · {f ? f.code : "כלי"} · {i.passed ? "תקין" : `${i.problems.length} ממצאים`}</div><div className="tl-meta">{inspLabel(i)} · {i.by}</div>{!i.passed && i.problems?.length > 0 && <div className="tl-meta">{i.problems.slice(0, 3).join(" · ")}</div>}</div><ChevronLeft size={15} className="tl-chev" /></button>;
-  // ---- Cumulative report ----
-  const types = [...new Set(pool.map((f) => unitTypeName(f, config)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
-  let report = all.filter((r) => {
-    if (rFleet !== "all" && r.f.id !== rFleet) return false;
-    if (rType !== "all" && unitTypeName(r.f, config) !== rType) return false;
-    if (rResult === "ok" && !r.i.passed) return false;
-    if (rResult === "issues" && r.i.passed) return false;
-    return true;
-  });
-  report = [...report].sort((a, b) => rSort === "date_asc" ? a.i.at - b.i.at : b.i.at - a.i.at);
-  const nextDue = (at) => at + NEXT_DAYS * 86400000;
-  const exportXlsx = async () => {
-    const data = report.map((r) => ({ "תאריך בדיקה": fmtDate(r.i.at), "כלי": r.f ? r.f.code : "", "סוג": r.f ? unitTypeName(r.f, config) : "", "דגם": r.f ? unitModelCode(r.f) : "", "שאלון": inspLabel(r.i), "תוצאה": r.i.passed ? "תקין" : `${r.i.problems.length} ממצאים`, "ממצאים": (r.i.problems || []).join(" · "), "נבדק ע״י": r.i.by || "", "בדיקה הבאה": fmtDate(nextDue(r.i.at)) }));
-    const ws = XLSX.utils.json_to_sheet(rowsSafe(data)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "דוח בקרות"); downloadXlsx(wb, "inspection-report.xlsx");
-  };
-  const exportPdf = () => {
-    const rowsHtml = report.map((r) => `<tr><td>${fmtDate(r.i.at)}</td><td>${r.f ? esc(unitLabel(r.f, config)) : ""}</td><td>${esc(inspLabel(r.i))}</td><td style="color:${r.i.passed ? "#16A34A" : "#DC2626"}">${r.i.passed ? "תקין" : (r.i.problems.length + " ממצאים")}</td><td>${esc((r.i.problems || []).join(" · "))}</td><td>${esc(r.i.by || "")}</td><td>${fmtDate(nextDue(r.i.at))}</td></tr>`).join("");
-    const html = `<html dir="rtl"><head><meta charset="utf8"><style>body{font-family:Arial;padding:20px}h2{color:#16202E;margin-bottom:4px}.sub{color:#666;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:6px;text-align:right}th{background:#16202E;color:#fff}</style></head><body><h2>דוח בקרות כלים מצטבר</h2><div class="sub">${config?.companyName ? esc(config.companyName) + (config?.siteName ? " · " + esc(config.siteName) : "") + " · " : ""}${report.length} בדיקות · הופק ${fmtDate(Date.now())}</div><table><tr><th>תאריך</th><th>כלי</th><th>שאלון</th><th>תוצאה</th><th>ממצאים</th><th>נבדק ע״י</th><th>בדיקה הבאה</th></tr>${rowsHtml}</table></body></html>`;
-    setRepHtml(html);
-  };
-  return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 360, marginBottom: 12 }}><button className={view === "fleet" ? "on" : ""} onClick={() => setView("fleet")}>לפי כלי</button><button className={view === "month" ? "on" : ""} onClick={() => setView("month")}>לפי חודש</button><button className={view === "report" ? "on" : ""} onClick={() => setView("report")}>דוח מצטבר</button></div>
-    {view === "report" ? (<>
-      <div className="fleet-filters">
-        <label className="flt-field"><span className="flt-lbl">כלי</span><select value={rFleet} onChange={(e) => setRFleet(e.target.value)}><option value="all">הכל</option>{pool.map((f) => <option key={f.id} value={f.id}>{unitLabel(f, config)}</option>)}</select></label>
-        <label className="flt-field"><span className="flt-lbl">דגם</span><select value={rType} onChange={(e) => setRType(e.target.value)}><option value="all">הכל</option>{types.map((t) => <option key={t}>{t}</option>)}</select></label>
-        <label className="flt-field"><span className="flt-lbl">תוצאה</span><select value={rResult} onChange={(e) => setRResult(e.target.value)}><option value="all">הכל</option><option value="ok">תקין</option><option value="issues">עם ממצאים</option></select></label>
-        <label className="flt-field"><span className="flt-lbl">מיון</span><select value={rSort} onChange={(e) => setRSort(e.target.value)}><option value="date_desc">חדש לישן</option><option value="date_asc">ישן לחדש</option></select></label>
-      </div>
-      <div className="fleet-results-bar"><span className="fleet-count">{report.length} בדיקות</span><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportXlsx}><FileText size={14} /> Excel</button><button className="btn-ghost sm" onClick={exportPdf}><FileText size={14} /> PDF</button></div></div>
-      {report.length === 0 ? <Empty text="אין נתונים לסינון הנוכחי" Icon={Search} />
-        : <div className="ftable"><div className="ftable-head insp-rep-head"><span>תאריך</span><span>כלי</span><span>תוצאה</span><span>בדיקה הבאה</span></div>
-          {report.map((r) => <button key={r.i.id} className="ftable-row insp-rep-row" onClick={() => onView(r.i)}>
-            <span>{fmtDate(r.i.at)}</span>
-            <span><b>{r.f ? r.f.code : "כלי"}</b> · {r.f ? unitDesc(r.f, config) : ""}</span>
-            <span style={{ color: r.i.passed ? "#16A34A" : "#DC2626", fontWeight: 700 }}>{r.i.passed ? "תקין" : `${r.i.problems.length} ממצאים`}</span>
-            <span>{fmtDate(nextDue(r.i.at))}</span>
-          </button>)}
-        </div>}
-    </>) : view === "month" ? (
-      <div className="cards">{Object.entries(months).map(([m, recs]) => <div key={m} className="panel" style={{ padding: 12 }}><div className="row-between"><div className="tcard-subj">{m}</div><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel(recs.length, "בקרה", "בקרות")}</span></div><div className="timeline" style={{ marginTop: 10 }}>{recs.map((r) => item(r.i, r.f))}</div></div>)}</div>
-    ) : (
-      <div className="cards">{byFleet.map(({ f, list }) => { const open = openId === f.id; const shown = open ? list : list.slice(0, 2); return (
-        <div key={f.id} className="panel" style={{ padding: 12 }}>
-          <div className="row-between"><div><div className="tcard-subj">{unitLabel(f, config)}</div><div className="tcard-sub" style={{ margin: 0 }}>{countLabel(list.length, "בקרה", "בקרות")} · אחרונה {fmtDate(list[0].at)} · הבאה {fmtDate(list[0].at + NEXT_DAYS * 86400000)}</div></div><button className="btn-ghost sm" onClick={() => onRun(f)}><ClipboardCheck size={14} /> בקרה חדשה</button></div>
-          <div className="timeline" style={{ marginTop: 10 }}>{shown.map((i) => item(i, f))}</div>
-          {list.length > 2 && <button className="repeat-link" onClick={() => setOpenId(open ? null : f.id)}>{open ? "הסתר" : `הצג הכל (${list.length})`}</button>}
-        </div>); })}</div>
-    )}
-    {repHtml && <ReportView html={repHtml} onClose={() => setRepHtml(null)} />}
-  </>);
-}
-function InspDetail({ rec, fleet, templates, onClose }) {
-  const f = fleet.find((x) => x.id === rec.fleetId);
-  const tpl = templates.find((t) => t.id === rec.templateId);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">בקרה · {f ? f.code : "כלי"}</div></div>
-    <div className="body">
-      <div className="insp-sum"><span className="badge" style={{ background: (rec.passed ? "#16A34A" : "#DC2626") + "22", color: rec.passed ? "#16A34A" : "#DC2626" }}>{rec.passed ? "תקין" : `${rec.problems?.length || 0} ממצאים`}</span><span className="tcard-sub" style={{ margin: 0 }}>{fmtDate(rec.at)} · {rec.by}</span></div>
-      {tpl && <div className="hint" style={{ marginBottom: 10 }}>שאלון: {tpl.name}</div>}
-      <div className="hint" style={{ marginBottom: 8 }}>רישום היסטורי — לקריאה בלבד</div>
-      <SectionTitle><ClipboardCheck size={15} /> סעיפי הבדיקה</SectionTitle>
-      <div className="timeline">{(rec.results || []).map((r, idx) => <div className="tl-item" key={idx}><div className="tl-dot" style={{ background: r.ok ? "#16A34A" : "#DC2626" }} /><div className="tl-body"><div className="tl-text">{r.ok ? "✓" : "✗"} {r.text}</div>{r.note && <div className="tl-meta">{r.note}</div>}</div></div>)}</div>
-      <div style={{ height: 20 }} />
-    </div></div>);
-}
-const GENERAL_INSPECTION_CHECKLIST = [
-  { id: "general-visual", label: "בדיקה חזותית כללית" },
-  { id: "general-safety", label: "בטיחות שימוש בסיסית" },
-  { id: "general-damage", label: "נזקים / נזילות / חריגות" },
-];
-function InspectionRun({ fleet, program, session, config, onClose, onFinish }) {
-  const checklist = program ? (program.checklist || []) : GENERAL_INSPECTION_CHECKLIST;
-  const [res, setRes] = useState({});
-  const [sev, setSev] = useState("minor");
-  const set = (i, ok) => setRes((s) => ({ ...s, [i]: { ...s[i], ok } }));
-  const note = (i, n) => setRes((s) => ({ ...s, [i]: { ...s[i], note: n } }));
-  const problems = checklist.map((it, i) => ({ it: it.label || it, i })).filter(({ i }) => res[i]?.ok === false);
-  const hasChecklist = checklist.length > 0;
-  const allChecked = hasChecklist && checklist.every((_, i) => res[i]?.ok != null);
-  const finish = () => {
-    const now = Date.now(); const passed = problems.length === 0;
-    const probTexts = problems.map(({ it, i }) => `${it}${res[i]?.note ? " — " + res[i].note : ""}`);
-    const record = { id: uid(), fleetId: fleet.id, programId: program?.id || null, templateId: null, by: session.name, at: now, results: checklist.map((it, i) => ({ text: it.label || it, ok: res[i]?.ok !== false, note: res[i]?.note || "" })), problems: probTexts, passed };
-    let ticket = null;
-    if (!passed && (!program || program.autoTicket === true)) {
-      const tid = uid();
-      record.ticketId = tid;
-      const lvl = dtOf(sev, config);
-      ticket = { id: tid, track: "transport", subject: `ממצאי סיקור · ${fleet.code}`, category: "transport", priority: lvl.prio || "medium", zone: "רחבת מלגזות", asset: fleet.code, forkliftId: fleet.id, downtimeType: sev, description: `נפתח אוטומטית מבקרת כלי${program?.name ? " · " + program.name : ""}. ממצאים:\n• ` + probTexts.join("\n• "), status: "new", assignee: "", wearType: null, downtimeStart: now, downtimeEnd: null, createdBy: { name: session.name, role: session.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: fleet.id, priority: lvl.prio || "medium" }, config, [fleet]) * 3600000, hasPhoto: false, closure: null, sourceInspectionId: record.id, log: [{ at: now, by: session.name, byRole: session.role, text: "נפתח אוטומטית מסיקור", kind: "open" }] };
-    }
-    onFinish(record, ticket);
-  };
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">בקרת כלי · {fleet.code}</div></div>
-    <div className="body">
-        <div className="detail-caption" style={{ color: TRACKS.transport.color }}><ClipboardList size={14} /> {program ? program.name : "בקרה כללית"}</div>
-        <SectionTitle>סעיפי בדיקה</SectionTitle>
-        {!hasChecklist && <div className="note" style={{ borderColor: "#FCD34D" }}>אין סעיפי בדיקה בתכנית זו.</div>}
-        {checklist.map((it, i) => <div key={it.id || i} className="insp-item"><div className="insp-row"><span className="insp-name">{it.label || it}</span><div className="insp-btns"><button className={"ins-ok" + (res[i]?.ok === true ? " on" : "")} onClick={() => set(i, true)}><Check size={16} /></button><button className={"ins-bad" + (res[i]?.ok === false ? " on" : "")} onClick={() => set(i, false)}><X size={16} /></button></div></div>{res[i]?.ok === false && <input className="insp-note" value={res[i]?.note || ""} onChange={(e) => note(i, e.target.value)} placeholder="תיאור הממצא…" />}</div>)}
-        {problems.length > 0 && <><div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2" }}>{problems.length} ממצאים{program && program.autoTicket === false ? " — לא תיפתח קריאה אוטומטית לתכנית זו." : " — עם סיום הסיקור תיפתח אוטומטית קריאת טיפול לטכנאי."}</div>
-        <div className="field"><span>מצב הכלי בעקבות הממצאים *</span><div className="dt-list">{dtLevels(config).map((d) => <button key={d.id} type="button" className={"dt-pick" + (sev === d.id ? " on" : "")} onClick={() => setSev(d.id)} style={sev === d.id ? { borderColor: d.color, background: d.color + "14" } : {}}><span className="dt-dot" style={{ background: d.color }} /><div><div className="dt-name">{d.label}{d.oos ? " · מושבת" : ""}</div><div className="dt-desc">{d.desc}</div></div></button>)}</div></div></>}
-        <button className="btn-primary full" style={{ marginTop: 14 }} onClick={finish} disabled={!allChecked}>{allChecked ? "סיום סיקור" + (problems.length && (!program || program.autoTicket === true) ? " ופתיחת קריאה" : "") : "השלימו את כל הסעיפים"}</button>
-      <div style={{ height: 24 }} />
-    </div></div>);
-}
-
 /* ============================================================ PM — לוח טיפולים תקופתיים (schedule) */
 const pmFleet = (x, fleet) => fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId);
 const pmOpenRepairSuggestion = (task, tickets = [], fleet = [], config = {}) => {
@@ -7766,7 +6728,7 @@ function PMHistory({ pm, fleet, onOpen, config }) {
     </div>
     <div className="fleet-results-bar"><span className="fleet-count">{filtered.length} רשומות</span><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportXlsx}><FileText size={14} /> Excel</button><button className="btn-ghost sm" onClick={exportPdf}><FileText size={14} /> PDF</button></div></div>
     {filtered.length === 0 ? <Empty text="אין היסטוריית טיפולים" Icon={CalendarClock} sub="לאחר ביצוע טיפול הוא יירשם כאן" />
-      : <div className="cards">{filtered.map((r) => { const done = r.type !== "missed"; return <button key={r.key} className="tl-item insp-hist-item" onClick={() => onOpen(r.pm)}><div className="tl-dot" style={{ background: done ? "#16A34A" : "#CA8A04" }} /><div className="tl-body"><div className="tl-text">{fmtDate(r.at)} · {r.f ? `${unitLabel(r.f, config)}` : "כלי"} · {r.ruleTitle || "טיפול תקופתי"} · {done ? "בוצע" : "לא הגיע"}{r.hadPaid ? " · עבודות המשך" : ""}</div><div className="tl-meta">{r.by || "—"}{r.paidNote ? ` · ${r.paidNote}` : ""}</div></div><ChevronLeft size={15} className="tl-chev" /></button>; })}</div>}
+      : <div className="cards">{filtered.map((r) => { const done = r.type !== "missed"; return <button key={r.key} className="tl-item pm-hist-item" onClick={() => onOpen(r.pm)}><div className="tl-dot" style={{ background: done ? "#16A34A" : "#CA8A04" }} /><div className="tl-body"><div className="tl-text">{fmtDate(r.at)} · {r.f ? `${unitLabel(r.f, config)}` : "כלי"} · {r.ruleTitle || "טיפול תקופתי"} · {done ? "בוצע" : "לא הגיע"}{r.hadPaid ? " · עבודות המשך" : ""}</div><div className="tl-meta">{r.by || "—"}{r.paidNote ? ` · ${r.paidNote}` : ""}</div></div><ChevronLeft size={15} className="tl-chev" /></button>; })}</div>}
     {report && <ReportView html={report} onClose={() => setReport(null)} />}
   </>);
 }
@@ -8598,7 +7560,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
 }
 
 function SettingsPanel(p) {
-  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, templates, fleet, tickets, appIssues, saveAppIssue, getBackup, importBackup } = p;
+  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, fleet, tickets, appIssues, saveAppIssue, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
@@ -8650,7 +7612,7 @@ function SettingsPanel(p) {
     try { const data = JSON.parse(await f.text());
       const analysis = analyzeBackupPayload(data);
       if (!analysis.valid) { setImpMsg("הקובץ אינו גיבוי תקין של המערכת"); return; }
-      setPendImport({ data, analysis, counts: { fleet: (data.fleet || []).length, tickets: (data.tickets || []).length, users: (data.users || []).length, pm: (data.pm || []).length, insp: (data.insp || []).length, tasks: (data.tasks || []).length, meetings: (data.meetings || []).length, ppeReqs: (data.ppeReqs || []).length, ppeOrders: (data.ppeOrders || []).length } });
+      setPendImport({ data, analysis, counts: { fleet: (data.fleet || []).length, tickets: (data.tickets || []).length, users: (data.users || []).length, pm: (data.pm || []).length, tasks: (data.tasks || []).length, meetings: (data.meetings || []).length, ppeReqs: (data.ppeReqs || []).length, ppeOrders: (data.ppeOrders || []).length } });
     } catch (er) { setImpMsg("קריאת הקובץ נכשלה — JSON לא תקין"); }
   };
   const runImport = async () => { if (!pendImport) return; setImpBusy(true); try { await importBackup(pendImport.data); setPendImport(null); setImpMsg("השחזור הושלם ✓"); } catch (er) { setImpMsg("השחזור נכשל"); } finally { setImpBusy(false); } };
@@ -8806,7 +7768,7 @@ function SettingsPanel(p) {
       <button className="btn-ghost full" onClick={doExport}><FileText size={15} /> ייצוא גיבוי (JSON)</button>
       {importBackup && <label className="btn-ghost full" style={{ marginTop: 10, cursor: "pointer" }}><input type="file" accept="application/json,.json" style={{ display: "none" }} onChange={onPickBackup} /><RefreshCw size={15} /> שחזור מקובץ גיבוי</label>}
       {pendImport && <div className="dev-box" style={{ marginTop: 10, borderStyle: "solid" }}>
-        <div className="hint" style={{ marginBottom: 8 }}>נמצא גיבוי: {countLabel(pendImport.counts.fleet, "כלי", "כלים")} · {countLabel(pendImport.counts.tickets, "קריאה", "קריאות")} · {countLabel(pendImport.counts.pm, "טיפול", "טיפולים")} · {countLabel(pendImport.counts.insp, "בקרה", "בקרות")} · {countLabel(pendImport.counts.users, "משתמש", "משתמשים")}. לשחזר ולמזג למערכת?</div>
+        <div className="hint" style={{ marginBottom: 8 }}>נמצא גיבוי: {countLabel(pendImport.counts.fleet, "כלי", "כלים")} · {countLabel(pendImport.counts.tickets, "קריאה", "קריאות")} · {countLabel(pendImport.counts.pm, "טיפול", "טיפולים")} · {countLabel(pendImport.counts.users, "משתמש", "משתמשים")}. לשחזר ולמזג למערכת?</div>
         <div className="hint" style={{ marginBottom: 8 }}>כולל גם: {countLabel(pendImport.counts.tasks, "משימה", "משימות")} · {countLabel(pendImport.counts.meetings, "פגישה", "פגישות")} · {countLabel(pendImport.counts.ppeReqs, "בקשת ביגוד", "בקשות ביגוד")} · {countLabel(pendImport.counts.ppeOrders, "הזמנת רכש", "הזמנות רכש")}.</div>
         {pendImport.analysis?.legacy && <div className="note" style={{ color: "#B45309", marginBottom: 8 }}>זה נראה כמו גיבוי ישן או חלקי. שחזור ימשיך, אבל ייתכן שחסרים בו נתוני ביגוד, משימות או פגישות שלא היו קיימים בגרסת הגיבוי.</div>}
         <button className="btn-primary full" disabled={impBusy} onClick={runImport}>{impBusy ? "משחזר…" : "שחזר ומזג"}</button>
@@ -10212,10 +9174,9 @@ a{color:inherit;}
 .equip-wait-msg{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#9A3412;}
 .app-dark .equip-wait-msg{color:#fdba74;}
 .repeat-link{color:var(--primary);text-decoration:underline;font-weight:600;}
-.insp-hist-item{width:100%;text-align:inherit;background:none;border:1px solid transparent;border-radius:10px;cursor:pointer;padding:6px;transition:background .15s,border-color .15s;}
-.insp-hist-item:hover{background:var(--surface-2);border-color:var(--line);}
-.insp-hist-item .tl-chev{align-self:center;color:var(--muted);flex-shrink:0;}
-.insp-sum{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.pm-hist-item{width:100%;text-align:inherit;background:none;border:1px solid transparent;border-radius:10px;cursor:pointer;padding:6px;transition:background .15s,border-color .15s;}
+.pm-hist-item:hover{background:var(--surface-2);border-color:var(--line);}
+.pm-hist-item .tl-chev{align-self:center;color:var(--muted);flex-shrink:0;}
 .timeline{position:relative;padding-inline-start:6px;}
 .tl-item{display:flex;gap:11px;padding-bottom:13px;position:relative;}
 .tl-body,.ni-body{flex:1;min-width:0;}
@@ -10297,8 +9258,6 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .bulk-msg.err{color:#B91C1C;}
 .group-seg{display:inline-flex;align-items:center;gap:4px;margin-inline-start:auto;}
 .group-lbl{color:var(--muted);font-size:12px;margin-inline-end:2px;}
-.insp-grp-bar{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
-.insp-grp-bar .group-seg{margin-inline-start:0;}
 .dt-edit-row{border:1px solid var(--line);border-radius:11px;padding:9px 10px;margin-bottom:8px;background:var(--surface);}
 .dt-edit-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .dt-edit-line + .dt-edit-line{margin-top:8px;}
@@ -10529,14 +9488,9 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .doc-name{flex:1;font-size:13.5px;font-weight:500;}.doc-date{font-size:12.5px;font-weight:600;}
 .doc-link{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);color:var(--primary);}
 
-.insp-item{border-bottom:1px solid var(--line);padding:11px 0;}
-.insp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-.insp-name{font-size:14px;font-weight:500;}
-.insp-btns{display:flex;gap:6px;flex-shrink:0;}
 .ins-ok,.ins-bad{width:38px;height:34px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--muted);}
 .ins-ok.on{background:#16A34A;border-color:#16A34A;color:#fff;}
 .ins-bad.on{background:#DC2626;border-color:#DC2626;color:#fff;}
-.insp-note{width:100%;margin-top:8px;border:1.5px solid #FCA5A5;border-radius:9px;padding:9px 11px;background:var(--input);}
 
 .sla-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;}
 .sla-cell{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;}

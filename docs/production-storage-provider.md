@@ -1,187 +1,37 @@
 # Production Storage Provider
 
-This document defines the frontend storage-provider boundary for production.
+The shared KV API only accepts known v1 prefixes. Keep `server/kv/handler.js`, `server/kv/permissionPolicy.js`, and `src/dataCollections.js` aligned.
 
-## Current Providers
+## Current Prefix Families
 
-### `local`
+- `config:v1`
+- `user:`
+- `fleet:`
+- `ticket:`
+- `pm:`
+- `photo:`
+- `presence:`
+- `location:`
+- `czone:`
+- `cround:`
+- `ccomplaint:`
+- `cabsence:`
+- `mtask:`
+- `mmeet:`
+- `ppe:`
+- `ppeitem:`
+- `ppenorm:`
+- `ppereq:`
+- `ppeorder:`
+- `appIssue:`
+- `pushSubscriptions:v1`
 
-- Default provider.
-- Uses the current browser/app storage path.
-- Valid for local development, demo, training, and Vercel staging review.
-- Not valid as the final production data layer because every browser/device can hold different data.
+## Permission Boundaries
 
-### `api`
-
-- Future production provider.
-- Selected with:
-
-```env
-VITE_CMMS_STORAGE_PROVIDER=api
-VITE_CMMS_STORAGE_API_URL=https://example.com/api
-```
-
-- The frontend uses `src/apiStorageAdapter.js` to talk to the backend.
-- `/api/kv` route skeleton exists, but it is closed by default until server Auth/backend storage are configured.
-- When a production session exists, the frontend sends same-site credentials and the backend reads the HttpOnly session cookie. Legacy/direct mode can still send `Authorization: Bearer ...`.
-- API storage does not use the browser memory fallback. If the backend is unavailable, writes fail instead of pretending that production data was saved locally.
-
-### `upstash` server driver
-
-The first durable backend driver is Upstash/Vercel Redis over server-side REST.
-
-Server-only env:
-
-```env
-CMMS_KV_DRIVER=upstash
-KV_REST_API_URL=...
-KV_REST_API_TOKEN=...
-```
-
-The same driver also accepts `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
-
-These values must remain server-only. Do not expose them as `VITE_*`.
-
-This driver is a bridge/cache path, not the final CMMS database. The selected target production platform is Supabase Postgres/Auth/RLS/Storage; see `docs/production-platform-decision.md`.
-
-### `supabase` server driver
-
-The preferred production bridge driver is Supabase Postgres over server-side PostgREST.
-
-Server-only env:
-
-```env
-CMMS_KV_DRIVER=supabase
-SUPABASE_URL=...
-SUPABASE_SERVICE_ROLE_KEY=...
-CMMS_KV_SUPABASE_TABLE=cmms_kv_records
-```
-
-`CMMS_KV_SUPABASE_TABLE` is optional and defaults to `cmms_kv_records`.
-
-The table is created by:
-
-```text
-supabase/migrations/20260627190000_cmms_kv_records.sql
-```
-
-This driver is a bridge so the existing monolith can use shared Postgres storage before each business collection is normalized into final tables.
-
-## API Contract
-
-The first production adapter keeps the same key/value contract as the current store so the monolith does not need a broad rewrite before backend work.
-
-- `GET /kv/:key?shared=1|0`
-  - returns `{ "value": "..." }` or `null`.
-- `PUT /kv/:key`
-  - body: `{ "value": "...", "shared": true|false }`.
-- `DELETE /kv/:key?shared=1|0`
-- `GET /kv?prefix=ticket%3A&shared=1|0`
-  - returns `{ "keys": ["ticket:..."] }`.
-
-## Server Route Status
-
-Current server route files:
-
-- `api/kv/index.js`
-- `api/kv/[key].js`
-- `api/files/index.js`
-
-Internal route logic lives outside Vercel's route tree so helper modules are not deployed as separate Serverless Functions:
-
-- `server/kv/handler.js`
-- `server/kv/supabaseDriver.js`
-- `server/kv/upstashDriver.js`
-- `server/files/handler.js`
-- `server/files/supabaseFileDriver.js`
-
-The handler is intentionally safe by default:
-
-- without server auth configuration it returns `storage_auth_not_configured`;
-- without a backend driver it returns `storage_backend_not_configured`;
-- it must not be treated as production storage until it is connected to a durable database and real Auth/RLS.
-
-Temporary bearer-token auth exists only as an interim server-side guard:
-
-```env
-CMMS_KV_BEARER_TOKEN=...
-```
-
-Do not put this token into frontend `VITE_*` variables. Browser-visible secrets are not production security.
-
-The preferred server-side auth mode is Supabase user-session auth:
-
-```env
-CMMS_KV_AUTH=supabase
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-```
-
-In this mode `/api/kv` accepts the frontend's Supabase access token, verifies the linked CMMS `app_users` profile, blocks disabled users, and blocks users that still require first-password change.
-
-Supabase-authenticated `PUT`/`DELETE` requests also apply a server-side sensitive-write guard for the bridge keys that can change system structure or privileged data:
-
-- `user:*` requires `users:manage`;
-- `config:v1`, `fleet:*`, `pm:*`, `insp:*`, `itpl:*`, `czone:*`, and `cabsence:*` require `settings:manage`;
-- `ppe:*`, `ppeitem:*`, `ppenorm:*`, and `ppeorder:*` require `ppe:manage`;
-- ordinary workflow bridge records such as tickets, PPE requests, cleaning rounds, and cleaning complaints remain writable by an active authenticated user until those flows move to normalized tables/RLS.
-
-This is an interim server permission layer for the KV bridge. It does not replace final normalized Supabase tables and row-level policies.
-
-Sensitive bridge writes can also be mirrored into the production audit table when the optional audit driver is configured:
-
-```env
-CMMS_AUDIT_DRIVER=supabase
-CMMS_AUDIT_SUPABASE_TABLE=audit_events
-```
-
-See `docs/production-audit-events.md`.
-
-For production release checks, API storage is accepted only when the server-side KV bridge is also configured for Supabase:
-
-```env
-CMMS_KV_AUTH=supabase
-CMMS_KV_DRIVER=supabase
-CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-```
-
-`CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true` is intentionally explicit. The KV bridge is an interim compatibility layer for the monolith, not the final normalized RLS data model. Do not set it unless the owner accepts that release stage knowingly.
-
-Production release checks also require file/photo storage to be explicitly configured:
-
-```env
-CMMS_FILE_DRIVER=supabase
-CMMS_FILE_BUCKET=cmms-files
-CMMS_FILE_METADATA_DRIVER=supabase
-```
-
-See `docs/production-file-storage.md`.
-
-Production release checks also require audit storage to be explicitly configured:
-
-```env
-CMMS_AUDIT_DRIVER=supabase
-```
-
-See `docs/production-audit-events.md`.
-
-## Production Gate
-
-`VITE_CMMS_APP_MODE=production` is not production-data-ready unless:
-
-- `VITE_CMMS_STORAGE_PROVIDER=api`;
-- `VITE_CMMS_STORAGE_API_URL` is configured;
-- the backend enforces real Auth/RLS/server-side permissions.
-
-Run the current frontend configuration gate with:
-
-```bash
-npm run release:check
-```
-
-The gate fails production mode when the storage provider is still local/browser storage. It does not claim that Auth/RLS/files/AI are done; those backend items remain separate production blockers.
-
-This is a bridge, not the final normalized database model. The normalized tables are tracked in `docs/production-data-model.md`.
+- User profile writes require `users:manage`.
+- Config, fleet, PM, photos, locations, cleaning setup, and absences require `settings:manage`.
+- Ticket writes are workflow writes for admin, manager, technician, and worker roles.
+- Cleaning rounds and complaints use cleaning access helpers.
+- Task and meeting writes are workflow writes for admin and manager roles.
+- PPE catalog/order writes require `ppe:manage`; PPE requests require `ppe:request` or worker/cleaner request flow.
+- App issue reports are accepted from active product roles.

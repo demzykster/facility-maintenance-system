@@ -8,8 +8,6 @@ describe("backup model", () => {
       "fleet",
       "tickets",
       "pm",
-      "insp",
-      "templates",
       "presence",
       "zones",
       "rounds",
@@ -18,10 +16,6 @@ describe("backup model", () => {
       "locations",
       "tasks",
       "meetings",
-      "controlPrograms",
-      "controlAssignments",
-      "controlRuns",
-      "controlFindings",
       "ppe",
       "ppeItems",
       "ppeNorms",
@@ -35,8 +29,6 @@ describe("backup model", () => {
       { key: "fleet", prefix: "fleet:" },
       { key: "tickets", prefix: "ticket:" },
       { key: "pm", prefix: "pm:" },
-      { key: "insp", prefix: "insp:" },
-      { key: "templates", prefix: "itpl:" },
       { key: "presence", prefix: "presence:" },
       { key: "zones", prefix: "czone:" },
       { key: "rounds", prefix: "cround:" },
@@ -45,10 +37,6 @@ describe("backup model", () => {
       { key: "locations", prefix: "location:" },
       { key: "tasks", prefix: "mtask:" },
       { key: "meetings", prefix: "mmeet:" },
-      { key: "controlPrograms", prefix: "controlProgram:" },
-      { key: "controlAssignments", prefix: "controlAssignment:" },
-      { key: "controlRuns", prefix: "controlRun:" },
-      { key: "controlFindings", prefix: "controlFinding:" },
       { key: "ppe", prefix: "ppe:" },
       { key: "ppeItems", prefix: "ppeitem:" },
       { key: "ppeNorms", prefix: "ppenorm:" },
@@ -82,10 +70,6 @@ describe("backup model", () => {
     });
     expect(payload.meetings).toEqual([]);
     expect(payload.locations).toEqual([]);
-    expect(payload.controlPrograms).toEqual([]);
-    expect(payload.controlAssignments).toEqual([]);
-    expect(payload.controlRuns).toEqual([]);
-    expect(payload.controlFindings).toEqual([]);
     expect(payload.ppe).toEqual([]);
     expect(payload.ppeItems).toEqual([]);
     expect(payload.ppeNorms).toEqual([]);
