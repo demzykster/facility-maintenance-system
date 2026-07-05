@@ -3551,7 +3551,7 @@ function UserApp(p) {
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
-      {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
+      {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return ok; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
@@ -3632,7 +3632,7 @@ function TechApp(p) {
       <nav className="bottom-nav"><NavBtn active={view === "tickets"} onClick={() => setView("tickets")} Icon={Truck} label="קריאות" /><NavBtn active={view === "pm"} onClick={() => setView("pm")} Icon={CalendarClock} label="טיפולים" /><NavBtn active={view === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" /></nav>
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} /></Overlay>}
-      {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
+      {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
@@ -3929,7 +3929,7 @@ function ManagerFleet(p) {
       {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
     </>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} insp={insp} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
-    {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
+    {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
   </>);
 }
 /* ============================================================ CLEANING TRACK (ניקיון / סבבים) — Phase 1 */
@@ -7515,6 +7515,17 @@ function InspectionRun({ fleet, program, session, config, onClose, onFinish }) {
 
 /* ============================================================ PM — לוח טיפולים תקופתיים (schedule) */
 const pmFleet = (x, fleet) => fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId);
+const pmOpenRepairSuggestion = (task, tickets = [], fleet = [], config = {}) => {
+  const fleetId = task?.forkliftId || task?.equipmentId;
+  if (!fleetId || !task?.nextDue) return null;
+  const d = daysLeft(task.nextDue);
+  if (d > 7) return null;
+  const open = (tickets || [])
+    .filter((t) => t?.track === "transport" && t.forkliftId === fleetId && isOpen(t) && t.sourcePmId !== task.id)
+    .sort((a, b) => (b.priority === "high") - (a.priority === "high") || (a.dueAt || a.createdAt || 0) - (b.dueAt || b.createdAt || 0));
+  if (!open.length) return null;
+  return { ticket: open[0], label: d < 0 ? `באיחור ${-d} ימים` : d === 0 ? "היום" : `בעוד ${d} ימים`, waitLabel: ticketWaitReasonLabel(open[0], config) };
+};
 const pmVisible = (session, pm, fleet) => {
   const act = pm.filter((x) => x.active !== false);
   if (session.role === "tech") return act.filter((x) => { const f = pmFleet(x, fleet); return techCanSeeFleet(session, f); });
@@ -7524,7 +7535,7 @@ const pmVisible = (session, pm, fleet) => {
 };
 const techCanSeeFleet = (session, f) => { if (!f) return false; if (!session.supplier) return true; return f.supplier === session.supplier; };
 function PMModule(p) {
-  const { pm, fleet, config, savePm, savePmMany, delPm, delPmMany, saveTicket, session, saveConfig } = p;
+  const { pm, fleet, tickets, config, savePm, savePmMany, delPm, delPmMany, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [run, setRun] = useState(null), [bulkRules, setBulkRules] = useState(false);
   const [pmTab, setPmTab] = useState("schedule");
   const [selectedPmIds, setSelectedPmIds] = useState([]);
@@ -7564,7 +7575,7 @@ function PMModule(p) {
       <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} onGoRules={() => setPmTab("rules")} selectedIds={selectedPmIds} onToggleSelected={toggleSelectedPm} />
       {bulkRules && <Overlay persistent onClose={() => setBulkRules(false)}><PMRuleBulkScheduleForm pm={pm} fleet={fleet} config={config} onCancel={() => setBulkRules(false)} onSave={async (tasks) => { const ok = await savePmMany(tasks); if (ok !== false) setBulkRules(false); return ok; }} /></Overlay>}
       {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await savePm(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
-      {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
+      {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} tickets={tickets} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
     </>}
   </>);
 }
@@ -8020,12 +8031,13 @@ function PMForm({ task, fleet, config, onCancel, onSave }) {
       <button className="btn-primary full" onClick={save}>שמירה</button><div style={{ height: 24 }} />
     </div></div>);
 }
-function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, onEdit, onSave, onDelete }) {
+function PMEntry({ task, session, fleet, tickets = [], config, canManage, onTicket, onClose, onEdit, onSave, onDelete }) {
   const f = pmFleet(task, fleet);
   const d = daysLeft(task.nextDue);
   const [followUp, setFollowUp] = useState(false), [paidNote, setPaidNote] = useState("");
   const [fuWear, setFuWear] = useState(null), [fuStatus, setFuStatus] = useState("in_progress"), [fuWaitReason, setFuWaitReason] = useState(null);
   const isTech = session.role === "tech";
+  const repairSuggestion = useMemo(() => pmOpenRepairSuggestion(task, tickets, fleet, config), [task, tickets, fleet, config]);
   const ruleChecklist = (pmRules(config).find((rule) => rule.id === (task.maintenanceRuleId || task.ruleId))?.maintenanceChecklistItems) || [];
   const maintenanceChecklist = (Array.isArray(task.maintenanceChecklistItems) && task.maintenanceChecklistItems.length ? task.maintenanceChecklistItems : ruleChecklist).filter((item) => item?.id && item?.label);
   const checklistKey = maintenanceChecklist.map((item) => item.id).join("|");
@@ -8071,6 +8083,9 @@ function PMEntry({ task, session, fleet, config, canManage, onTicket, onClose, o
         <Meta Icon={CalendarClock} label="מועד" value={fmtDate(task.nextDue)} />
         <Meta Icon={Package} label="ספק" value={f?.supplier || "—"} />
       </div>
+      {repairSuggestion && <div className="note" style={{ marginTop: 10, borderColor: "#F59E0B", background: "#FFFBEB", color: "#92400E" }}>
+        <AlertTriangle size={14} /> הכלי כבר נמצא בקריאת תיקון פתוחה: #{ticketNo(repairSuggestion.ticket)} · {repairSuggestion.ticket.subject || "קריאת שינוע"}{repairSuggestion.waitLabel ? ` · ${repairSuggestion.waitLabel}` : ""}. הטיפול התקופתי {repairSuggestion.label}. כדאי לשקול לבצע אותו יחד עם התיקון, אחרי תיאום בין המנהל לטכנאי. המערכת לא מאחדת אוטומטית.
+      </div>}
 
       {isTech ? (<>
         <SectionTitle>עדכון</SectionTitle>
