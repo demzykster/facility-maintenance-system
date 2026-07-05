@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleaningQrAccess,
+  cleaningQrMatchesZone,
   cleaningQrUrl,
   extractCzoneFromRaw,
   findScannedCleaningZone,
@@ -61,5 +62,14 @@ describe("cleaningQrModel", () => {
     expect(findScannedCleaningZone(zones, "a")).toEqual(zones[0]);
     expect(findScannedCleaningZone(zones, "b")).toBeNull();
     expect(findScannedCleaningZone(zones, "c")).toBeNull();
+  });
+
+  it("accepts the printed manual zone code as well as the QR payload id", () => {
+    const zone = { id: "czone-123", code: "ZL7QK", active: true };
+    expect(cleaningQrMatchesZone("https://cmms.example/?z=czone:czone-123", zone)).toBe(true);
+    expect(cleaningQrMatchesZone("ZL7QK", zone)).toBe(true);
+    expect(cleaningQrMatchesZone(" zl7qk ", zone)).toBe(true);
+    expect(cleaningQrMatchesZone("ZL7QX", zone)).toBe(false);
+    expect(cleaningQrMatchesZone("ZL7QK", { ...zone, active: false })).toBe(false);
   });
 });
