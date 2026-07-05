@@ -4,14 +4,14 @@
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Product line: v1/main only.
-- Active cleanup branch: `codex/remove-retired-checks-v1`
-- Open PRs at start of cleanup: none.
+- Active cleanup branch: none.
+- Open PRs at last check: none.
 
 ## Owner Decision
 
 The owner chose to remove the abandoned separate checks direction from the current v1 release. The project should now focus on finishing the existing working areas with minimal time investment.
 
-## What This Cleanup Does
+## What The Completed Cleanup Did
 
 - Removes retired UI entry points.
 - Removes retired runtime collections and KV prefixes.
