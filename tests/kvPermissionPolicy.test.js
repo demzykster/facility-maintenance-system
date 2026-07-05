@@ -24,7 +24,7 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionForKey("ticket:T-001")).toMatchObject({ roles: ["admin", "user", "tech", "worker"], auditSensitive: false });
     expect(kvWritePermissionForKey("ppereq:req-1")).toMatchObject({ module: "ppe", minLevel: "request", auditSensitive: false });
     expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
-    expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:closeComplaint", auditSensitive: false });
+    expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
     expect(kvWritePermissionForKey("mtask:task-1")).toMatchObject({ roles: ["admin", "user"], entityType: "task", auditSensitive: false });
     expect(kvWritePermissionForKey("mmeet:meeting-1")).toMatchObject({ roles: ["admin", "user"], entityType: "meeting", auditSensitive: false });
     expect(kvWritePermissionForKey("appIssue:issue-1")).toMatchObject({ roles: expect.arrayContaining(["worker", "cleaner"]), auditSensitive: false });
@@ -62,10 +62,10 @@ describe("KV write permission policy", () => {
     expect(sessionHasKvWritePermission({ role: "cleaner" }, "cround:round-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "worker", cleaningAccess: true }, "cround:round-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "worker" }, "cround:round-1")).toBe(false);
-    expect(sessionHasKvWritePermission({ role: "worker", cleaningAccess: { enabled: true, canCloseComplaints: false } }, "ccomplaint:issue-1")).toBe(false);
-    expect(sessionHasKvWritePermission({ role: "worker", cleaningAccess: { enabled: true, canCloseComplaints: true } }, "ccomplaint:issue-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "worker", cleaningAccess: { enabled: true, canPerformRounds: true, canCloseComplaints: false } }, "ccomplaint:issue-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "worker", cleaningAccess: { enabled: true, canPerformRounds: false, canCloseComplaints: true } }, "ccomplaint:issue-1")).toBe(false);
     expect(sessionHasKvWritePermission({ role: "tech" }, "ccomplaint:issue-1")).toBe(false);
-    expect(kvWritePermissionError({ role: "tech" }, "ccomplaint:issue-1")).toBe("permission_required:cleaning:closeComplaint");
+    expect(kvWritePermissionError({ role: "tech" }, "ccomplaint:issue-1")).toBe("permission_required:cleaning:perform");
     expect(sessionHasKvWritePermission({ role: "tech" }, "presence:tech-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "worker" }, "presence:worker-1")).toBe(false);
     expect(sessionHasKvWritePermission({ role: "user" }, "mtask:task-1")).toBe(true);

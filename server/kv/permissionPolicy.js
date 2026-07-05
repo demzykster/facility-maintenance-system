@@ -21,7 +21,7 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["ticket:"], roles: ["admin", "user", "tech", "worker"], entityType: AUDIT_ENTITY_TYPES.ticket, auditSensitive: false },
   { prefixes: ["ppereq:"], module: "ppe", minLevel: "request", roles: ["worker", "cleaner"], entityType: AUDIT_ENTITY_TYPES.ppe, auditSensitive: false },
   { prefixes: ["cround:"], roles: ["admin", "user"], access: "cleaning:perform", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
-  { prefixes: ["ccomplaint:"], roles: ["admin", "user"], access: "cleaning:closeComplaint", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
+  { prefixes: ["ccomplaint:"], roles: ["admin", "user"], access: "cleaning:perform", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
   { prefixes: ["presence:"], roles: ["admin", "tech"], entityType: AUDIT_ENTITY_TYPES.user, auditSensitive: false },
   { prefixes: ["mtask:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.task, auditSensitive: false },
   { prefixes: ["mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.meeting, auditSensitive: false },

@@ -3152,7 +3152,18 @@ function ManagerFleet(p) {
 /* ============================================================ CLEANING TRACK (ניקיון / סבבים) — Phase 1 */
 const zoneLoc = (z) => [z.building, z.floor].filter(Boolean).join(" · ");
 const zoneSort = (a, b) => (a.building || "").localeCompare(b.building || "", "he") || (a.floor || "").localeCompare(b.floor || "", "he") || (a.name || "").localeCompare(b.name || "", "he");
-const DEFAULT_CLEAN_CHECKLIST = [{ id: "floor", label: "שטיפת רצפה" }, { id: "soap", label: "מילוי סבון" }, { id: "paper", label: "נייר טואלט" }, { id: "towels", label: "מגבות נייר" }, { id: "bins", label: "פינוי פחים" }, { id: "surfaces", label: "ניגוב משטחים" }];
+const DEFAULT_CLEAN_CHECKLIST = [
+  { id: "floor", label: "שטיפת רצפה", translations: { en: "Floor washing", ru: "Мытье пола", ar: "غسل الأرضية", hi: "फर्श धोना", ti: "መሬት ምሕጻብ" } },
+  { id: "soap", label: "מילוי סבון", translations: { en: "Refill soap", ru: "Пополнить мыло", ar: "تعبئة الصابون", hi: "साबुन भरना", ti: "ሳሙና ምምላእ" } },
+  { id: "paper", label: "נייר טואלט", translations: { en: "Toilet paper", ru: "Туалетная бумага", ar: "ورق تواليت", hi: "टॉयलेट पेपर", ti: "ናይ ሽቓቕ ወረቐት" } },
+  { id: "towels", label: "מגבות נייר", translations: { en: "Paper towels", ru: "Бумажные полотенца", ar: "مناشف ورقية", hi: "पेपर टॉवल", ti: "ናይ ወረቐት መንጸፊ" } },
+  { id: "bins", label: "פינוי פחים", translations: { en: "Empty bins", ru: "Вынести мусор", ar: "تفريغ السلال", hi: "कूड़ेदान खाली करना", ti: "መጕሓፊ ምፍሳስ" } },
+  { id: "surfaces", label: "ניגוב משטחים", translations: { en: "Wipe surfaces", ru: "Протереть поверхности", ar: "مسح الأسطح", hi: "सतह पोंछना", ti: "ገጻት ምድራዝ" } }
+];
+const cleaningChecklistLabel = (item, language = DEFAULT_LANGUAGE) => {
+  const code = normalizeLanguageCode(language);
+  return (code !== DEFAULT_LANGUAGE && item?.translations?.[code]) || item?.label || "";
+};
 const lastRoundOf = (zoneId, rounds) => (rounds || []).filter((r) => r.zoneId === zoneId).reduce((m, r) => (r.at > m ? r.at : m), 0);
 const dayStart = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const dayLabel = (ts) => { const t = dayStart(Date.now()); if (ts === t) return "היום"; if (ts === t - 86400000) return "אתמול"; return fmtDate(ts); };
@@ -3304,7 +3315,7 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
   const setWin = (i, k, v) => setWindows((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const save = async () => {
     if (!name.trim()) return setErr("נא להזין שם אזור");
-    const cl = checklist.filter((c) => (c.label || "").trim()).map((c) => ({ id: c.id || uid(), label: c.label.trim() }));
+    const cl = checklist.filter((c) => (c.label || "").trim()).map((c) => ({ id: c.id || uid(), label: c.label.trim(), ...(c.translations ? { translations: c.translations } : {}) }));
     if (!cl.length) return setErr("נא להוסיף לפחות פריט אחד בצ׳קליסט");
     if (!activeDays.length) return setErr("נא לבחור לפחות יום פעילות אחד");
     const cleaner = cleaners.find((c) => c.id === cleanerId);
@@ -3476,7 +3487,8 @@ function CleaningAdmin(p) {
   </>);
 }
 
-function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, config }) {
+function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, config, language = DEFAULT_LANGUAGE }) {
+  const t = (key, vars) => uiText(language, key, vars);
   const [done, setDone] = useState({}), [issues, setIssues] = useState({}), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [scanOk, setScanOk] = useState(!appModeRequiresCleaningQr(APP_MODE) || !!scanToken), [showScanner, setShowScanner] = useState(false), [showManual, setShowManual] = useState(false), [manualReason, setManualReason] = useState(""), [manualEntry, setManualEntry] = useState(null);
   const fileRef = useRef(null); const photoTarget = useRef(null);
@@ -3490,14 +3502,14 @@ function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, co
   const grabIssuePhoto = (file) => { const id = photoTarget.current; if (!id) return; resize(file, (d) => setIssues((s) => ({ ...s, [id]: { ...s[id], photo: d } }))); };
   const acceptScan = (raw) => {
     const scanned = extractCzoneFromRaw(raw);
-    if (scanned !== zone.id) return setErr(scanned ? "ה-QR שייך לאזור אחר" : "לא נמצא קוד אזור בסריקה");
+    if (scanned !== zone.id) return setErr(scanned ? t("cleaningRound.qrWrong") : t("cleaningRound.qrMissing"));
     setErr("");
     setShowScanner(false);
     setScanOk(true);
   };
   const submitManualEntry = () => {
     const reason = manualReason.trim();
-    if (!reason) return setErr("יש לציין סיבה");
+    if (!reason) return setErr(t("cleaningRound.manualReasonRequired"));
     setManualEntry({ reason, at: Date.now() });
     setScanOk(true);
     setShowManual(false);
@@ -3505,50 +3517,50 @@ function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, co
   };
   const submit = async () => {
     if (busy) return;
-    const issArr = Object.entries(issues).map(([itemId, v]) => ({ itemId, label: (cl.find((c) => c.id === itemId) || {}).label || "", reason: (v.reason || "").trim(), photo: v.photo || null, kind: v.kind === "broken" ? "broken" : "dirty" }));
-    if (issArr.some((i) => !i.reason)) return setErr("יש למלא סיבה לכל פריט שסומן כבעיה (או לבטל את הסימון)");
+    const issArr = Object.entries(issues).map(([itemId, v]) => ({ itemId, label: cleaningChecklistLabel(cl.find((c) => c.id === itemId) || {}, language), reason: (v.reason || "").trim(), photo: v.photo || null, kind: v.kind === "broken" ? "broken" : "dirty" }));
+    if (issArr.some((i) => !i.reason)) return setErr(t("cleaningRound.issueReasonRequired"));
     const unaddressed = cl.filter((c) => !done[c.id] && !issues[c.id]);
-    if (unaddressed.length) return setErr("יש להתייחס לכל פריט: לסמן ✓ שבוצע, או לסמן בעיה. נותרו: " + unaddressed.map((c) => c.label).join(", "));
+    if (unaddressed.length) return setErr(t("cleaningRound.unaddressed", { items: unaddressed.map((c) => cleaningChecklistLabel(c, language)).join(", ") }));
     setErr("");
     setBusy(true);
     try {
       const ok = await onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr, manualEntry: !!manualEntry, manualEntryReason: manualEntry?.reason || "" });
       if (ok === false) {
-        setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+        setErr(t("cleaningRound.saveFailed"));
         setBusy(false);
       }
     } catch {
-      setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
+      setErr(t("cleaningRound.saveFailed"));
       setBusy(false);
     }
   };
-  if (!scanOk) return <div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">נדרשת סריקת QR</div></div>
+  if (!scanOk) return <div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label={t("common.close")} onClick={onCancel}><X size={22} /></button><div className="form-title">{t("cleaningRound.scanRequiredTitle")}</div></div>
     <div className="body">
-      <div className="scan-required"><div>יש לסרוק את ה-QR של האזור לפני ביצוע הסבב</div><button className="btn-primary full" onClick={() => setShowScanner(true)}><Camera size={16} /> סרוק QR</button><button className="btn-ghost full" onClick={() => setShowManual(true)}>לא מצליח לסרוק</button></div>
-      {showManual && <div className="manual-entry"><div>תאר את הבעיה עם הסריקה (שדה חובה)</div><textarea rows={3} value={manualReason} onChange={(e) => setManualReason(e.target.value)} /><button className="btn-primary full" onClick={submitManualEntry}>המשך ללא סריקה</button></div>}
+      <div className="scan-required"><div>{t("cleaningRound.scanRequiredBody")}</div><button className="btn-primary full" onClick={() => setShowScanner(true)}><Camera size={16} /> {t("cleaningRound.scanQr")}</button><button className="btn-ghost full" onClick={() => setShowManual(true)}>{t("cleaningRound.scanTrouble")}</button></div>
+      {showManual && <div className="manual-entry"><div>{t("cleaningRound.manualReasonLabel")}</div><textarea rows={3} value={manualReason} onChange={(e) => setManualReason(e.target.value)} /><button className="btn-primary full" onClick={submitManualEntry}>{t("cleaningRound.continueManual")}</button></div>}
       {err && <div className="err">{err}</div>}
       {showScanner && <QRScannerOverlay onScan={acceptScan} onManual={() => { setShowScanner(false); setShowManual(true); }} onCancel={() => setShowScanner(false)} />}
     </div></div>;
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">סבב ניקיון{win?.time ? " · " + win.time : ""}</div></div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label={t("common.close")} onClick={onCancel}><X size={22} /></button><div className="form-title">{t("cleaningRound.title")}{win?.time ? " · " + win.time : ""}</div></div>
     <div className="body">
-      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{win?.time ? " · סבב " + win.time : ""}</div>{isCover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>כיסוי{zone.cleanerName ? " · עבור " + zone.cleanerName : " — לא האזור שלך"}</span>}</div>
+      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{win?.time ? " · " + t("cleaningRound.roundAt", { time: win.time }) : ""}</div>{isCover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{zone.cleanerName ? " · " + t("cleaner.coverFor", { name: zone.cleanerName }) : " — " + t("cleaningRound.notYourZone")}</span>}</div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabIssuePhoto(e.target.files?.[0])} />
-      <div className="field"><span>צ׳קליסט · {doneCount}/{countLabel(cl.length, "פריט", "פריטים")}{Object.keys(issues).length ? ` · ${countLabel(Object.keys(issues).length, "הערה", "הערות")}` : ""}</span>
+      <div className="field"><span>{t("cleaningRound.checklist")} · {doneCount}/{t("cleaningRound.itemsCount", { count: cl.length })}{Object.keys(issues).length ? ` · ${t("cleaningRound.issuesCount", { count: Object.keys(issues).length })}` : ""}</span>
         <div className="round-cl">{cl.map((c) => { const iss = issues[c.id]; return <div key={c.id} style={{ border: iss ? "1.5px solid #FCA5A5" : "1px solid var(--line)", borderRadius: 10, marginBottom: 6, overflow: "hidden", background: iss ? "#FEF2F2" : "transparent" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px" }}>
-            <label className={"round-item" + (done[c.id] ? " on" : "")} style={{ flex: 1, margin: 0, border: "none", padding: 0, background: "transparent" }}><input type="checkbox" checked={!!done[c.id]} onChange={(e) => { const v = e.target.checked; setDone((s) => ({ ...s, [c.id]: v })); if (v) setIssues((s) => { if (!s[c.id]) return s; const n = { ...s }; delete n[c.id]; return n; }); }} /><span className="ri-box">{done[c.id] && <Check size={14} />}</span>{c.label}</label>
-            <button type="button" className="icon-btn sm" title={iss ? "ביטול סימון בעיה" : "סימון בעיה בפריט זה"} aria-label={iss ? "ביטול סימון בעיה בפריט זה" : "סימון בעיה בפריט זה"} onClick={() => toggleIssue(c.id)} style={{ color: iss ? "#DC2626" : "var(--muted)", background: iss ? "#FEE2E2" : "var(--surface-2)" }}>{iss ? <X size={16} /> : <AlertTriangle size={16} />}</button>
+            <label className={"round-item" + (done[c.id] ? " on" : "")} style={{ flex: 1, margin: 0, border: "none", padding: 0, background: "transparent" }}><input type="checkbox" checked={!!done[c.id]} onChange={(e) => { const v = e.target.checked; setDone((s) => ({ ...s, [c.id]: v })); if (v) setIssues((s) => { if (!s[c.id]) return s; const n = { ...s }; delete n[c.id]; return n; }); }} /><span className="ri-box">{done[c.id] && <Check size={14} />}</span>{cleaningChecklistLabel(c, language)}</label>
+            <button type="button" className="icon-btn sm" title={iss ? t("cleaningRound.clearIssue") : t("cleaningRound.markIssue")} aria-label={iss ? t("cleaningRound.clearIssue") : t("cleaningRound.markIssue")} onClick={() => toggleIssue(c.id)} style={{ color: iss ? "#DC2626" : "var(--muted)", background: iss ? "#FEE2E2" : "var(--surface-2)" }}>{iss ? <X size={16} /> : <AlertTriangle size={16} />}</button>
           </div>
           {iss && <div style={{ padding: "0 10px 10px" }}>
-            <div className="pr-row" style={{ marginBottom: 6 }}><button type="button" className={"pr-pick" + (iss.kind !== "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "dirty")} style={iss.kind !== "broken" ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9" } : {}}>לכלוך / מתכלה</button><button type="button" className={"pr-pick" + (iss.kind === "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "broken")} style={iss.kind === "broken" ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" } : {}}>תקלה / שבר</button></div>
-            <textarea rows={2} value={iss.reason} onChange={(e) => setIssueReason(c.id, e.target.value)} placeholder={iss.kind === "broken" ? "מה התקלה? (חובה) — ייפתח דיווח תקלה לתיקון" : "מה הבעיה? (חובה) — לדוגמה: חסר נייר, כתם שלא יורד"} />
-            <div style={{ marginTop: 6 }}>{iss.photo ? <div className="photo-prev"><img src={iss.photo} alt="" /><button className="photo-x" onClick={() => setIssues((s) => ({ ...s, [c.id]: { ...s[c.id], photo: null } }))}><X size={16} /></button></div> : <button type="button" className="photo-add" onClick={() => { photoTarget.current = c.id; fileRef.current?.click(); }}><Camera size={18} /> צילום (רשות)</button>}</div>
+            <div className="pr-row" style={{ marginBottom: 6 }}><button type="button" className={"pr-pick" + (iss.kind !== "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "dirty")} style={iss.kind !== "broken" ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9" } : {}}>{t("cleaningRound.dirtyKind")}</button><button type="button" className={"pr-pick" + (iss.kind === "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "broken")} style={iss.kind === "broken" ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" } : {}}>{t("cleaningRound.brokenKind")}</button></div>
+            <textarea rows={2} value={iss.reason} onChange={(e) => setIssueReason(c.id, e.target.value)} placeholder={iss.kind === "broken" ? t("cleaningRound.brokenPlaceholder") : t("cleaningRound.dirtyPlaceholder")} />
+            <div style={{ marginTop: 6 }}>{iss.photo ? <div className="photo-prev"><img src={iss.photo} alt="" /><button className="photo-x" onClick={() => setIssues((s) => ({ ...s, [c.id]: { ...s[c.id], photo: null } }))}><X size={16} /></button></div> : <button type="button" className="photo-add" onClick={() => { photoTarget.current = c.id; fileRef.current?.click(); }}><Camera size={18} /> {t("cleaningRound.photoOptional")}</button>}</div>
           </div>}
         </div>; })}</div>
-        <div className="hint">יש להתייחס לכל פריט: סמנו ✓ למה שבוצע, או הקישו על המשולש לסימון בעיה (סיבה + תמונה). פריט עם בעיה ייפתח כדיווח אוטומטי.</div>
+        <div className="hint">{t("cleaningRound.hint")}</div>
       </div>
       {err && <div className="err">{err}</div>}
-      {(() => { const addressed = cl.filter((c) => done[c.id] || issues[c.id]).length; const ni = Object.keys(issues).length; return <button className="btn-primary full" onClick={submit} disabled={busy}>{addressed === cl.length ? (ni ? `סיום סבב · ${countLabel(ni, "הערה", "הערות")}` : "סיום סבב") : `סיום סבב (${addressed}/${countLabel(cl.length, "פריט", "פריטים")} טופלו)`}</button>; })()}
+      {(() => { const addressed = cl.filter((c) => done[c.id] || issues[c.id]).length; const ni = Object.keys(issues).length; return <button className="btn-primary full" onClick={submit} disabled={busy}>{addressed === cl.length ? (ni ? t("cleaningRound.finishWithIssues", { count: ni }) : t("cleaningRound.finish")) : t("cleaningRound.finishProgress", { done: addressed, total: cl.length })}</button>; })()}
       <div style={{ height: 20 }} />
     </div></div>);
 }
@@ -3807,7 +3819,8 @@ function CleanerApp(p) {
   const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
   const myReports = useMemo(() => (complaints || []).filter((c) => c.reportedById === session.id).sort((a, b) => b.at - a.at).slice(0, 30), [complaints, session.id]);
   const doSave = async (r) => {
-    if (await saveRound(r) === false) return false;
+    const roundRecord = { ...r, issues: (r.issues || []).map((issue) => issue.photo ? { ...issue, photo: null, hasPhoto: true } : issue) };
+    if (await saveRound(roundRecord) === false) return false;
     const iss = r.issues || [];
     const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${countLabel(list.length, kind === "broken" ? "תקלה" : "הערה", kind === "broken" ? "תקלות" : "הערות")} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role });
     const broken = iss.filter((x) => x.kind === "broken");
@@ -3875,7 +3888,7 @@ function CleanerApp(p) {
         </div>}
       </div>; })()}
     </main>
-    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} scanToken={run.scanToken} config={config} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
+    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} scanToken={run.scanToken} config={config} language={language} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
     {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setQrBlockedZone(null)} onScanSuccess={() => { const target = actionableRoundForZone(qrBlockedZone); setQrBlockedZone(null); if (target) setRun({ zone: qrBlockedZone, win: target.win, scanToken: true }); }} /></Overlay>}
     {doneRound && <Overlay onClose={() => setDoneRound(null)}><RoundDoneScreen round={doneRound} zones={zones} rounds={rounds} session={session} config={config} onClose={() => setDoneRound(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
