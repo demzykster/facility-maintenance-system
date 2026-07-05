@@ -168,40 +168,64 @@ export function nextWorkingDay(tsMs) {
   return day.getTime();
 }
 
-export function distributeNewTasks(assignments = [], { startAt, dailyCapacity = 4 } = {}) {
+export function distributeNewTasks(assignments = [], { startAt, endAt, dailyCapacity = 4, perTypeDailyLimits = {} } = {}) {
   const original = Array.isArray(assignments) ? assignments : [];
   const capacity = Math.max(1, Math.floor(Number(dailyCapacity) || 4));
   const rawStart = Number(startAt) || Date.now();
   const firstDay = rawStart >= MIN_REAL_DATE_MS ? nextWorkingDay(rawStart) : rawStart;
   const nextDay = (day) => rawStart >= MIN_REAL_DATE_MS ? nextWorkingDay(day + DAY_MS) : day + DAY_MS;
+  const rawEnd = Number(endAt) || 0;
+  const lastDay = rawEnd >= MIN_REAL_DATE_MS ? nextWorkingDay(rawEnd) : rawEnd;
+  const typeLimits = Object.fromEntries(Object.entries(perTypeDailyLimits || {})
+    .map(([key, value]) => [trim(key), Math.max(0, Math.floor(Number(value) || 0))])
+    .filter(([key, value]) => key && value > 0));
+  const hasTypeLimits = Object.keys(typeLimits).length > 0;
   const sorted = original
-    .map((assignment, index) => ({ assignment, index, weight: assignment?.weight === 2 ? 2 : 1 }))
+    .map((assignment, index) => ({ assignment, index, weight: assignment?.weight === 2 ? 2 : 1, typeName: trim(assignment?.typeName || assignment?.task?.vehicleTypeName) }))
     .sort((a, b) => b.weight - a.weight || a.index - b.index);
   const days = [];
   const addDay = () => {
     const date = days.length ? nextDay(days[days.length - 1].date) : firstDay;
-    const day = { date, remaining: capacity, hasHeavy: false };
+    const day = { date, remaining: capacity, hasHeavy: false, typeCounts: {}, used: 0 };
     days.push(day);
     return day;
   };
-
-  sorted.forEach(({ assignment, weight }) => {
-    let target = null;
-    if (weight === 2) {
-      target = days.find((day) => !day.hasHeavy && day.remaining >= weight);
-    } else {
-      target = days.find((day) => day.remaining >= weight);
+  if (lastDay && lastDay >= firstDay) {
+    let date = firstDay;
+    while (date <= lastDay) {
+      days.push({ date, remaining: capacity, hasHeavy: false, typeCounts: {}, used: 0 });
+      date = nextDay(date);
     }
+  }
+
+  const canFit = (day, weight, typeName) => {
+    if (!day || day.remaining < Math.min(weight, capacity)) return false;
+    if (weight === 2 && day.hasHeavy) return false;
+    const limit = hasTypeLimits && typeName ? typeLimits[typeName] : 0;
+    if (limit && (day.typeCounts[typeName] || 0) >= limit) return false;
+    return true;
+  };
+  const assignToDay = (day, assignment, weight, typeName) => {
+    if (weight === 2) day.hasHeavy = true;
+    if (typeName) day.typeCounts[typeName] = (day.typeCounts[typeName] || 0) + 1;
+    day.used += weight;
+    if (assignment?.task) assignment.task.nextDue = day.date;
+    day.remaining = Math.max(0, day.remaining - Math.min(weight, capacity));
+  };
+
+  sorted.forEach(({ assignment, weight, typeName }) => {
+    let target = days
+      .filter((day) => canFit(day, weight, typeName))
+      .sort((a, b) => a.used - b.used || a.date - b.date)[0] || null;
     if (!target) target = addDay();
-    if (weight === 2) target.hasHeavy = true;
-    if (assignment?.task) assignment.task.nextDue = target.date;
-    target.remaining = Math.max(0, target.remaining - Math.min(weight, capacity));
+    while (!canFit(target, weight, typeName)) target = addDay();
+    assignToDay(target, assignment, weight, typeName);
   });
 
   return original;
 }
 
-export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], existingTasks = [], startAt, now, dailyCapacity = 4, idFactory } = {}) {
+export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], existingTasks = [], startAt, endAt, now, dailyCapacity = 4, perTypeDailyLimits = {}, idFactory } = {}) {
   const cleanRules = normalizeMaintenanceRules(rules);
   const ruleWeights = new Map(cleanRules.map((rule) => [rule.id, rule.weight === 2 ? 2 : 1]));
   const units = (Array.isArray(fleetRefs) ? fleetRefs : [])
@@ -238,6 +262,7 @@ export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], 
         maintenanceRuleName: rule.name,
         intervalMonths: rule.intervalMonths,
         maintenanceRuleWeight: rule.weight === 2 ? 2 : 1,
+        vehicleTypeName: unit.vehicleTypeName,
         maintenanceChecklistItems: rule.maintenanceChecklistItems || [],
         nextDue: Number(base.nextDue) || firstDue,
         active: base.active !== false,
@@ -253,8 +278,8 @@ export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], 
   });
 
   distributeNewTasks(
-    toDistribute.map((task) => ({ task, weight: ruleWeights.get(task.maintenanceRuleId) || 1 })),
-    { startAt: firstDue, dailyCapacity }
+    toDistribute.map((task) => ({ task, weight: ruleWeights.get(task.maintenanceRuleId) || 1, typeName: task.vehicleTypeName })),
+    { startAt: firstDue, endAt, dailyCapacity, perTypeDailyLimits }
   );
   const tasks = [...preserved, ...toDistribute];
 

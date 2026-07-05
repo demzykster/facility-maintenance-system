@@ -1761,6 +1761,15 @@ export default function App() {
     return true;
   };
   const delPm = async (id) => { if (!await deleteShared(`pm:${id}`)) return false; setPm((s) => s.filter((x) => x.id !== id)); return true; };
+  const delPmMany = async (ids = []) => {
+    const cleanIds = [...new Set((ids || []).filter(Boolean))];
+    if (!cleanIds.length) return true;
+    for (const id of cleanIds) {
+      if (!await deleteShared(`pm:${id}`)) return false;
+    }
+    setPm((s) => s.filter((x) => !cleanIds.includes(x.id)));
+    return true;
+  };
   const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
   const saveFleet = async (f, options = {}) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
   const saveFleetMany = async (items, options = {}) => {
@@ -2151,7 +2160,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlPrograms, controlAssignments, controlRuns, controlFindings, saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, insp, templates, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, controlPrograms, controlAssignments, controlRuns, controlFindings, saveControlProgram, saveControlAssignment, saveControlRun, saveControlFinding, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveInsp, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -7515,10 +7524,27 @@ const pmVisible = (session, pm, fleet) => {
 };
 const techCanSeeFleet = (session, f) => { if (!f) return false; if (!session.supplier) return true; return f.supplier === session.supplier; };
 function PMModule(p) {
-  const { pm, fleet, config, savePm, savePmMany, delPm, saveTicket, session, saveConfig } = p;
+  const { pm, fleet, config, savePm, savePmMany, delPm, delPmMany, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [run, setRun] = useState(null), [bulkRules, setBulkRules] = useState(false);
   const [pmTab, setPmTab] = useState("schedule");
+  const [selectedPmIds, setSelectedPmIds] = useState([]);
+  const [bulkMsg, setBulkMsg] = useState("");
   const items = pm.filter((x) => x.active !== false);
+  const visibleIds = useMemo(() => items.map((x) => x.id).filter(Boolean), [items]);
+  const selectedVisibleIds = selectedPmIds.filter((id) => visibleIds.includes(id));
+  useEffect(() => {
+    setSelectedPmIds((ids) => ids.filter((id) => visibleIds.includes(id)));
+  }, [visibleIds.join("|")]);
+  const toggleSelectedPm = (id) => setSelectedPmIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  const selectAllPm = () => setSelectedPmIds((ids) => selectedVisibleIds.length === visibleIds.length ? [] : visibleIds);
+  const deleteSelectedPm = async () => {
+    setBulkMsg("");
+    if (!selectedVisibleIds.length || typeof delPmMany !== "function") return;
+    const ok = await delPmMany(selectedVisibleIds);
+    if (ok === false) return setBulkMsg(SAVE_FAILED_MESSAGE);
+    setBulkMsg(`${selectedVisibleIds.length} שיבוצים נמחקו מהלוח הנוכחי.`);
+    setSelectedPmIds([]);
+  };
   return (<>
     <div className="seg-tabs s2" style={{ maxWidth: 320, marginBottom: 12 }}>
       <button className={pmTab === "schedule" ? "on" : ""} onClick={() => setPmTab("schedule")}>לוח טיפולים</button>
@@ -7526,7 +7552,16 @@ function PMModule(p) {
     </div>
     {pmTab === "rules" ? <PMRulesPanel config={config} saveConfig={saveConfig} fleet={fleet} /> : <>
       <div className="row-between"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={() => setBulkRules(true)}><ClipboardList size={15} /> הפקה מרגולציות</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div></div>
-      <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} onGoRules={() => setPmTab("rules")} />
+      {items.length > 0 && <div className="pm-bulk-panel">
+        <label className="bulk-check"><input type="checkbox" checked={visibleIds.length > 0 && selectedVisibleIds.length === visibleIds.length} onChange={selectAllPm} /> בחירת כל השיבוצים בלוח הנוכחי</label>
+        <span className="fleet-bulk-count">{selectedVisibleIds.length ? `${selectedVisibleIds.length} נבחרו` : "לא נבחרו שיבוצים"}</span>
+        <div className="pm-bulk-actions">
+          {selectedVisibleIds.length ? <ConfirmBtn className="btn-ghost danger sm" label="מחיקת נבחרים" onConfirm={deleteSelectedPm} /> : <button className="btn-ghost danger sm" disabled><Trash2 size={15} /> מחיקת נבחרים</button>}
+          {selectedVisibleIds.length > 0 && <button className="btn-ghost sm" onClick={() => setSelectedPmIds([])}>ניקוי בחירה</button>}
+        </div>
+        {bulkMsg && <div className={bulkMsg === SAVE_FAILED_MESSAGE ? "bulk-msg err" : "bulk-msg"}>{bulkMsg}</div>}
+      </div>}
+      <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} onGoRules={() => setPmTab("rules")} selectedIds={selectedPmIds} onToggleSelected={toggleSelectedPm} />
       {bulkRules && <Overlay persistent onClose={() => setBulkRules(false)}><PMRuleBulkScheduleForm pm={pm} fleet={fleet} config={config} onCancel={() => setBulkRules(false)} onSave={async (tasks) => { const ok = await savePmMany(tasks); if (ok !== false) setBulkRules(false); return ok; }} /></Overlay>}
       {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await savePm(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
       {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
@@ -7644,7 +7679,7 @@ function PMRulesPanel({ config, saveConfig, fleet }) {
     <button className="btn-ghost full" style={{ marginTop: 12 }} onClick={addRule}><Plus size={14} /> הוסף כלל טיפול</button>
   </div>);
 }
-function PMSchedule({ items, fleet, onOpen, allPm, config, onGoRules }) {
+function PMSchedule({ items, fleet, onOpen, allPm, config, onGoRules, selectedIds = [], onToggleSelected }) {
   const [mode, setMode] = useState("calendar");
   const overdue = items.filter((x) => startOfDay(x.nextDue) < startOfDay(Date.now())).sort((a, b) => a.nextDue - b.nextDue);
   const hasRules = pmRules(config).length > 0;
@@ -7654,7 +7689,7 @@ function PMSchedule({ items, fleet, onOpen, allPm, config, onGoRules }) {
     {mode === "history" ? <PMHistory pm={allPm || items} fleet={fleet} onOpen={onOpen} config={config} />
       : items.length === 0 ? emptyState
       : mode === "year" ? <PMYearMatrix items={items} fleet={fleet} onOpen={onOpen} config={config} />
-      : mode === "calendar" ? <PMCalendar items={items} fleet={fleet} onOpen={onOpen} overdue={overdue} config={config} /> : <PMList items={items} fleet={fleet} onOpen={onOpen} config={config} />}
+      : mode === "calendar" ? <PMCalendar items={items} fleet={fleet} onOpen={onOpen} overdue={overdue} config={config} /> : <PMList items={items} fleet={fleet} onOpen={onOpen} config={config} selectedIds={selectedIds} onToggleSelected={onToggleSelected} />}
   </>);
 }
 function PMHistory({ pm, fleet, onOpen, config }) {
@@ -7773,10 +7808,12 @@ function PMYearMatrix({ items, fleet, onOpen, config }) {
     </table></div>}
   </div>);
 }
-function PMList({ items, fleet, onOpen, config }) {
+function PMList({ items, fleet, onOpen, config, selectedIds = [], onToggleSelected }) {
   const sorted = [...items].sort((a, b) => a.nextDue - b.nextDue);
+  const selectable = typeof onToggleSelected === "function";
   return (<div className="cards">{sorted.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); const last = (x.history || [])[x.history.length - 1]; return (
-    <div key={x.id} className="pm-card" onClick={() => onOpen(x)}>
+    <div key={x.id} className={"pm-card" + (selectedIds.includes(x.id) ? " selected" : "")} onClick={() => onOpen(x)}>
+      {selectable && <label className="pm-select" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(x.id)} onChange={() => onToggleSelected(x.id)} aria-label={`בחירת שיבוץ ${f ? unitLabel(f, config) : x.id}`} /></label>}
       <span className="pm-bar" style={{ background: pmColor(d) }} />
       <div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי לא ידוע"}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{pmRuleTitle(x, config)} · {pmIntervalLabel(x, config)}</span></div>
         <div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)}{fleetDepts(f).length ? <> · <Users size={12} /> {fleetDepts(f).join(", ")}</> : null}</div>
@@ -7819,25 +7856,58 @@ function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "—
 }
 function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
   const [date, setDate] = useState(tsToDate(toWorkday(Date.now())));
+  const [endDate, setEndDate] = useState(tsToDate(toWorkday(Date.now() + 30 * 86400000)));
+  const [typeLimits, setTypeLimits] = useState({});
   const [err, setErr] = useState("");
   const rules = pmRules(config);
   const rawStartAt = dateToTs(date);
   const startAt = rawStartAt ? toWorkday(rawStartAt) : null;
+  const rawEndAt = dateToTs(endDate);
+  const endAt = rawEndAt ? toWorkday(rawEndAt) : null;
   const dailyCapacity = clampPmDailyCapacity(config?.pmDailyCapacity ?? 4);
   const fleetRefs = useMemo(() => (fleet || []).map((unit) => normalizeFleetUnitRef(unit, { modelType: config?.modelType || {} })), [fleet, config]);
+  const affectedTypeNames = useMemo(() => {
+    const names = new Set();
+    fleetRefs.forEach((unit) => {
+      if (maintenanceRulesForUnit(rules, unit).length) names.add(unit.vehicleTypeName || "ללא סוג");
+    });
+    return [...names].sort((a, b) => a.localeCompare(b, "he"));
+  }, [fleetRefs, rules]);
+  useEffect(() => {
+    setTypeLimits((state) => Object.fromEntries(affectedTypeNames.map((name) => [name, state[name] || 1])));
+  }, [affectedTypeNames.join("|")]);
+  const cleanTypeLimits = useMemo(() => Object.fromEntries(Object.entries(typeLimits)
+    .map(([name, value]) => [name, Math.max(1, Math.min(20, Number(value) || 1))])), [typeLimits]);
   const plan = useMemo(() => buildMaintenanceScheduleFromRules({
     rules,
     fleetRefs,
     existingTasks: pm,
     startAt,
+    endAt,
     now: Date.now(),
-    dailyCapacity
-  }), [rules, fleetRefs, pm, startAt, dailyCapacity]);
+    dailyCapacity,
+    perTypeDailyLimits: cleanTypeLimits
+  }), [rules, fleetRefs, pm, startAt, endAt, dailyCapacity, cleanTypeLimits]);
   const affectedUnits = new Set(plan.tasks.map((task) => task.forkliftId)).size;
   const spreadDays = new Set(plan.tasks.map((task) => tsToDate(task.nextDue)).filter(Boolean)).size;
+  const dayLoad = useMemo(() => {
+    const map = new Map();
+    plan.tasks.forEach((task) => {
+      const day = tsToDate(task.nextDue);
+      if (!day) return;
+      const row = map.get(day) || { day, total: 0, byType: {} };
+      const typeName = task.vehicleTypeName || "ללא סוג";
+      row.total += 1;
+      row.byType[typeName] = (row.byType[typeName] || 0) + 1;
+      map.set(day, row);
+    });
+    return [...map.values()].sort((a, b) => a.day.localeCompare(b.day));
+  }, [plan.tasks]);
+  const overloadedDays = dayLoad.filter((row) => row.total > dailyCapacity || Object.entries(row.byType).some(([typeName, count]) => count > (cleanTypeLimits[typeName] || dailyCapacity)));
   const save = async () => {
     setErr("");
     if (!startAt) return setErr("נא לבחור תאריך ראשון תקין");
+    if (!endAt || endAt < startAt) return setErr("נא לבחור תאריך אחרון תקין שאינו לפני תאריך ההתחלה");
     if (!rules.length) return setErr("אין רגולציות טיפול תקופתי פעילות בהגדרות כלי השינוע");
     if (!plan.tasks.length) return setErr("לא נמצאו כלים שמתאימים לרגולציות שהוגדרו");
     const ok = await onSave(plan.tasks);
@@ -7850,13 +7920,31 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
         <div className="note" style={{ color: "#B45309", background: "#FEF3C7", borderRadius: 10, padding: "12px 14px", marginTop: 12 }}>לא הוגדרו כללי טיפול — לא ניתן להפיק לוח. עברו לכרטיסיית ״כללי טיפול״ כדי להוסיף כללים.</div>
         <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={onCancel}>סגור</button><div style={{ height: 24 }} />
       </> : <>
-        <label className="field" style={{ marginTop: 12 }}><span>תאריך ראשון לשיבוצים חדשים</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><div className="hint">שיבוצים קיימים ישמרו את מועד הטיפול הבא שכבר נקבע להם.</div></label>
+        <div className="row2" style={{ marginTop: 12 }}>
+          <label className="field"><span>תאריך ראשון לשיבוצים חדשים</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <label className="field"><span>לפרוס עד תאריך</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+        </div>
+        <div className="hint">שיבוצים קיימים עם תאריך עתידי ישמרו את מועד הטיפול הבא שכבר נקבע להם. שיבוצים באיחור או חדשים ייפרסו בתוך חלון התכנון.</div>
+        {affectedTypeNames.length > 0 && <div className="pm-type-limits">
+          <div className="task-row-t">עומס יומי לפי סוג כלי</div>
+          <div className="hint">כמה טיפולים מותר לשים ביום מאותו סוג. ברירת המחדל: 1 לכל סוג.</div>
+          <div className="pm-type-limit-grid">{affectedTypeNames.map((name) => <label key={name} className="field mini"><span>{name}</span><input type="number" min="1" max="20" value={cleanTypeLimits[name] || 1} onChange={(e) => setTypeLimits((state) => ({ ...state, [name]: e.target.value }))} /></label>)}</div>
+        </div>}
         <div className="grid2" style={{ marginTop: 12 }}>
           <div className="metric"><b>{plan.created}</b><span>שיבוצים חדשים</span></div>
           <div className="metric"><b>{plan.updated}</b><span>שיבוצים קיימים לעדכון</span></div>
         </div>
         <div className="note" style={{ marginTop: 12 }}><CalendarClock size={13} /> {rules.length} רגולציות פעילות · {affectedUnits} כלים מתאימים · {plan.total} שיבוצים בסך הכל.</div>
-        <div className="hint" style={{ marginTop: 6 }}>פריסה על פני ~{spreadDays} ימי עבודה</div>
+        <div className="hint" style={{ marginTop: 6 }}>פריסה על פני ~{spreadDays} ימי עבודה · קיבולת כללית: {dailyCapacity} טיפולים ביום</div>
+        {dayLoad.length > 0 && <div className="pm-plan-preview">
+          {dayLoad.slice(0, 10).map((row) => <div key={row.day} className="pm-plan-day">
+            <b>{fmtDate(dateToTs(row.day))}</b>
+            <span>{row.total} טיפולים</span>
+            <em>{Object.entries(row.byType).map(([typeName, count]) => `${typeName}: ${count}`).join(" · ")}</em>
+          </div>)}
+          {dayLoad.length > 10 && <div className="hint">ועוד {dayLoad.length - 10} ימי עבודה בתכנית.</div>}
+        </div>}
+        {overloadedDays.length > 0 && <div className="note" style={{ marginTop: 10, color: "#B45309", background: "#FEF3C7" }}>יש ימים שחרגו מהעומס שהוגדר. הגדילו את חלון התכנון או את המגבלות לפי סוג.</div>}
         <div className="hint" style={{ marginTop: 10 }}>צ׳ק-ליסטים של טיפול תקופתי נשמרים בתוך רגולציות הטיפול בלבד, ולא נלקחים משאלוני בקרת כלים.</div>
         {err && <div className="err">{err}</div>}
         <button className="btn-primary full" onClick={save}>שמירת לוח טיפולים</button><div style={{ height: 24 }} />
@@ -10098,9 +10186,22 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .sign-note{font-size:13px;color:var(--muted);background:var(--surface-2);border-radius:10px;padding:12px;margin-bottom:14px;line-height:1.5;}
 .sign-row{display:flex;justify-content:space-between;font-size:14px;margin-bottom:14px;}
 
-.pm-card{display:flex;width:100%;text-align:right;background:var(--surface);border:1px solid var(--line);border-radius:13px;overflow:hidden;cursor:pointer;transition:.15s;}
+.pm-card{display:flex;width:100%;text-align:right;background:var(--surface);border:1px solid var(--line);border-radius:13px;overflow:hidden;cursor:pointer;transition:.15s;position:relative;}
 .pm-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.08);}.pm-card.off{opacity:.6;}
+.pm-card.selected{border-color:#FDBA74;background:#FFF7ED;box-shadow:0 0 0 1px rgba(234,88,12,.12);}
 .pm-bar{width:5px;flex-shrink:0;}.pm-body{flex:1;min-width:0;padding:13px;}
+.pm-select{display:flex;align-items:center;justify-content:center;width:38px;border-inline-end:1px solid var(--line);cursor:pointer;background:var(--surface);}
+.pm-card.selected .pm-select{background:#FFEDD5;}
+.pm-select input{width:16px;height:16px;accent-color:var(--primary);}
+.pm-bulk-panel{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.pm-bulk-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-inline-start:auto;}
+.pm-type-limits{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:11px 12px;margin-top:12px;}
+.pm-type-limit-grid{display:grid;grid-template-columns:repeat(2,minmax(160px,1fr));gap:8px;margin-top:8px;}
+.pm-plan-preview{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:8px;margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;}
+.pm-plan-day{display:grid;grid-template-columns:minmax(92px,.75fr) minmax(80px,.55fr) minmax(0,1.7fr);gap:8px;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:7px 9px;font-size:12.5px;}
+.pm-plan-day b{font-weight:800;white-space:nowrap;}
+.pm-plan-day span{font-weight:800;color:var(--primary);white-space:nowrap;}
+.pm-plan-day em{font-style:normal;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .checklist{display:flex;flex-direction:column;gap:8px;}
 .chk{display:flex;align-items:center;gap:10px;width:100%;text-align:right;background:var(--surface);border:1.5px solid var(--line);border-radius:11px;padding:12px;font-size:14px;color:var(--ink);}
 .chk.on{border-color:#16A34A;background:#16a34a14;}
