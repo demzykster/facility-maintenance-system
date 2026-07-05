@@ -401,6 +401,15 @@ const rowsSafe = (rows) => (Array.isArray(rows) ? rows : []).map((r) => (r && ty
 const clampPmDailyCapacity = (value) => Math.max(1, Math.min(20, Number(value) || 4));
 const clampInspIntervalMonths = (value) => Math.max(1, Math.min(120, Number(value) || 2));
 const clampCleaningReminderMins = (value) => Math.max(5, Math.min(120, Number(value) || 30));
+const notifyUser = (message) => {
+  try {
+    if (typeof window === "undefined" || !window.dispatchEvent) return;
+    const event = typeof CustomEvent !== "undefined"
+      ? new CustomEvent("cmms:notice", { detail: { message } })
+      : Object.assign(new Event("cmms:notice"), { detail: { message } });
+    window.dispatchEvent(event);
+  } catch (e) {}
+};
 // Надёжная выгрузка: пробуем несколько методов, т.к. песочница артефакта часто блокирует download/popup
 const downloadBlob = (blob, filename) => {
   try {
@@ -414,7 +423,7 @@ const downloadBlob = (blob, filename) => {
 const downloadXlsx = (wb, filename) => {
   const fallback = () => {
     if (downloadWorkbookFallback(wb, filename)) return;
-    alert("הסביבה חוסמת הורדת קבצים. נסו בדפדפן/בגרסת הענן.");
+    notifyUser("הסביבה חוסמת הורדת קבצים. נסו בדפדפן/בגרסת הענן.");
   };
   try {
     workbookToBlob(wb)
@@ -442,12 +451,12 @@ const downloadWorkbookFallback = (wb, filename) => {
 // ---- Excel למטלות: ייצוא + ייבוא חכם ----
 const exportTasksXlsx = (tasks, users) => {
   const rows = (tasks || []).map((t) => ({ "כותרת": t.title, "אחראים": (t.responsibleIds || []).map((id) => uName(id, users)).join(", "), "סטטוס": tstOf(t.status).label, "עדיפות": prOf(t.priority).label, "סוג": taskModeLabel(t.mode), "תאריך יעד": t.dueAt ? fmtDate(t.dueAt) : "", "מעקב הבא": t.nextActionAt ? fmtDate(t.nextActionAt) : "", "קטגוריה": t.category || "", "ממתין ל": t.waitingFor || "", "נפתח ע״י": t.createdBy?.name || "", "נפתח בתאריך": t.createdAt ? fmtDate(t.createdAt) : "" }));
-  if (!rows.length) { alert("אין מטלות לייצוא"); return; }
+  if (!rows.length) { notifyUser("אין מטלות לייצוא"); return; }
   try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 18 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "מטלות"); downloadXlsx(wb, `מטלות_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {}
 };
 const exportMeetingsXlsx = (meetings, tasks, users) => {
   const rows = (meetings || []).slice().sort((a, b) => b.at - a.at).map((m) => ({ "נושא": m.title, "סוג": mtgType(m.type).label, "מועד": `${fmtDate(m.at)} ${fmtTime(m.at)}`, "סטטוס": m.status === "done" ? "בוצעה" : m.status === "cancelled" ? "בוטלה" : "מתוכננת", "חזרתיות": m.recur ? RECUR_LABEL[m.recur] : "חד-פעמית", "משתתפים": (m.participantIds || []).map((id) => uName(id, users)).join(", "), "מטלות פתוחות": (tasks || []).filter((t) => t.meetingId === m.id && taskOpen(t)).length }));
-  if (!rows.length) { alert("אין פגישות לייצוא"); return; }
+  if (!rows.length) { notifyUser("אין פגישות לייצוא"); return; }
   try { const ws = XLSX.utils.json_to_sheet(rowsSafe(rows)); ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 18 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "פגישות"); downloadXlsx(wb, `פגישות_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {}
 };
 const XL_DATE = (v) => { if (v == null || v === "") return null; if (v instanceof Date && !isNaN(v)) return v.getTime(); if (typeof v === "number") { const d = new Date(Math.round((v - 25569) * 86400000)); return isNaN(d) ? null : d.getTime(); } const s = String(v).trim(); const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/); if (m) { let [, d, mo, y] = m; y = y.length === 2 ? "20" + y : y; const dt = new Date(+y, +mo - 1, +d); return isNaN(dt) ? null : dt.getTime(); } const dt = new Date(s); return isNaN(dt) ? null : dt.getTime(); };
@@ -508,7 +517,7 @@ const openReport = (html) => {
     setTimeout(() => { try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (e) {} setTimeout(() => { try { document.body.removeChild(frame); } catch (e) {} }, 1500); }, 500);
     return true;
   } catch (e) {}
-  alert("הסביבה חוסמת פתיחת חלון להדפסה. נסו בדפדפן/בגרסת הענן.");
+  notifyUser("הסביבה חוסמת פתיחת חלון להדפסה. נסו בדפדפן/בגרסת הענן.");
   return false;
 };
 const tkLetter = (t) => ((t?.track === "transport") || (!t?.track && t?.forkliftId)) ? "T" : "F";
@@ -789,14 +798,14 @@ function buildDemoData(config) {
   const todayAt = (h, m = 0) => { const d = new Date(now); d.setHours(h, m, 0, 0); return d.getTime(); };
   const _MD = config.departments || [];
   const _fn = ["דוד", "יוסי", "משה", "אבי", "עמית", "רן", "ניר", "גיל", "עידו", "תום", "ליאור", "שי", "נדב", "אורי", "יואב", "אסף", "רועי", "דניאל", "איתי", "עומר"];
-  const demoMgrs = _MD.map((d, i) => ({ id: `demo-u-mgr-${i}`, name: `מנהל ${d}`, role: "user", email: `mgr${i}@chemipal.co.il`, password: "1234", pin: "", dept: d, depts: [d], mgrZones: [], shift: "morning", demo: true }));
-  if (_MD[0]) demoMgrs.push({ id: "demo-u-mgr-x", name: `מנהל ${_MD[0]} (משנה)`, role: "user", email: "mgrx@chemipal.co.il", password: "1234", pin: "", dept: _MD[0], depts: [_MD[0]], mgrZones: [], shift: "night", demo: true });
+  const demoMgrs = _MD.map((d, i) => ({ id: `demo-u-mgr-${i}`, name: `מנהל ${d}`, role: "user", email: `mgr${i}@example.local`, password: "1234", pin: "", dept: d, depts: [d], mgrZones: [], shift: "morning", demo: true }));
+  if (_MD[0]) demoMgrs.push({ id: "demo-u-mgr-x", name: `מנהל ${_MD[0]} (משנה)`, role: "user", email: "mgrx@example.local", password: "1234", pin: "", dept: _MD[0], depts: [_MD[0]], mgrZones: [], shift: "night", demo: true });
   const demoWorkers = _MD.flatMap((d, i) => [
     { id: `demo-u-w-${i}-a`, name: `${_fn[(i * 2) % _fn.length]} (${d})`, role: "worker", workerNo: String(3000 + i * 2), pin: "1234", email: "", password: "", dept: d, shift: "morning", employmentType: i % 3 === 0 ? "contractor" : "direct", contractorName: i % 3 === 0 ? "כ״א חיצוני בע״מ" : "", demo: true },
     { id: `demo-u-w-${i}-b`, name: `${_fn[(i * 2 + 1) % _fn.length]} (${d})`, role: "worker", workerNo: String(3001 + i * 2), pin: "1234", email: "", password: "", dept: d, shift: "night", employmentType: "direct", contractorName: "", demo: true },
   ]);
   const dusers = [
-    { id: "demo-u-mgr1", name: "אורן (מנהל ניקיון)", role: "user", email: "oren@chemipal.co.il", password: "1234", pin: "", dept: "ניקיון", depts: ["ניקיון"], mgrZones: ["demo-z1", "demo-z2", "demo-z3"], demo: true },
+    { id: "demo-u-mgr1", name: "אורן (מנהל ניקיון)", role: "user", email: "oren@example.local", password: "1234", pin: "", dept: "ניקיון", depts: ["ניקיון"], mgrZones: ["demo-z1", "demo-z2", "demo-z3"], demo: true },
     { id: "demo-u-cl1", name: "רונן", role: "worker", workerNo: "2001", pin: "1234", email: "", password: "", dept: "ניקיון", depts: ["ניקיון"], demo: true },
     { id: "demo-u-cl2", name: "מאיה", role: "worker", workerNo: "2002", pin: "1234", email: "", password: "", dept: "ניקיון", depts: ["ניקיון"], demo: true },
     { id: "demo-u-cl3", name: "דמיטרי", role: "worker", workerNo: "2003", pin: "1234", email: "", password: "", dept: "ניקיון", depts: ["ניקיון"], demo: true },
@@ -1390,6 +1399,14 @@ export default function App() {
     return () => { store._onFail = null; };
   }, []);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
+  useEffect(() => {
+    const onNotice = (event) => {
+      const message = event?.detail?.message;
+      if (message) setToast(message);
+    };
+    window.addEventListener("cmms:notice", onNotice);
+    return () => window.removeEventListener("cmms:notice", onNotice);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const checkVersion = async () => {
@@ -6988,14 +7005,14 @@ function FleetModule(p) {
         "הערות": f.notes || ""
       };
     });
-    if (!data.length) { alert("אין כלים לייצוא"); return; }
+    if (!data.length) { notifyUser("אין כלים לייצוא"); return; }
     try {
       const ws = XLSX.utils.json_to_sheet(rowsSafe(data));
       ws["!cols"] = Object.keys(data[0]).map(() => ({ wch: 16 }));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "פארק כלי שינוע");
       downloadXlsx(wb, `fleet_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (e) { alert("ייצוא כלי שינוע נכשל. נסו דפדפן אחר."); }
+    } catch (e) { notifyUser("ייצוא כלי שינוע נכשל. נסו דפדפן אחר."); }
   };
   const Sel = ({ label, value, onChange, children }) => (
     <label className="flt-field">
@@ -7968,7 +7985,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(pmRows)), "טיפולים תקופתיים");
       }
       downloadXlsx(wb, `דוח_אחזקה_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (e) { alert("ייצוא ל-Excel נכשל בסביבת ההדגמה. נסו דפדפן אחר או הגרסה עם שרת."); }
+    } catch (e) { notifyUser("ייצוא ל-Excel נכשל בסביבת ההדגמה. נסו דפדפן אחר או הגרסה עם שרת."); }
   };
 
   const exportPdf = () => {
@@ -8396,7 +8413,7 @@ function SettingsPanel(p) {
           {logoMsg && <div className="hint" style={{ marginTop: 6 }}>{logoMsg}</div>}
         </div>
       </div>
-      <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => setCoName(e.target.value)} placeholder="לדוגמה: כימיפל בע״מ" /></label>
+      <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => setCoName(e.target.value)} placeholder="לדוגמה: חברה לדוגמה בע״מ" /></label>
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
       <SectionTitle>סיבות המתנה</SectionTitle>
@@ -8575,7 +8592,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
     else if (role === "worker") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); }
-    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (roleUsesPassword && !validLoginEmail(email)) return setErr("נא להזין דוא״ל תקין, לדוגמה name@chemipal.co.il"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
+    else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (roleUsesPassword && !validLoginEmail(email)) return setErr("נא להזין דוא״ל תקין, לדוגמה name@example.local"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
     if (role === "worker" && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
@@ -8624,7 +8641,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
       {role === "worker" && <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>}
-      {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@chemipal.co.il" /></label>}
+      {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@example.local" /></label>}
       <label className="field"><span>טלפון</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
       {!lockRole && <div className="field"><span>תפקיד</span><ChoiceGrid columns="role" value={role} onChange={changeRole} options={USER_FORM_ROLE_OPTIONS.map(([id, label]) => ({ id, label, Icon: roleIcons[id] || User }))} /></div>}
       {role && role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} tone="#0EA5E9" options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
