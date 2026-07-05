@@ -6532,13 +6532,12 @@ function PMModule(p) {
   const [selectedPmIds, setSelectedPmIds] = useState([]);
   const [bulkMsg, setBulkMsg] = useState("");
   const items = pm.filter((x) => x.active !== false);
-  const visibleIds = useMemo(() => items.map((x) => x.id).filter(Boolean), [items]);
-  const selectedVisibleIds = selectedPmIds.filter((id) => visibleIds.includes(id));
+  const itemIds = useMemo(() => items.map((x) => x.id).filter(Boolean), [items]);
+  const selectedVisibleIds = selectedPmIds.filter((id) => itemIds.includes(id));
   useEffect(() => {
-    setSelectedPmIds((ids) => ids.filter((id) => visibleIds.includes(id)));
-  }, [visibleIds.join("|")]);
+    setSelectedPmIds((ids) => ids.filter((id) => itemIds.includes(id)));
+  }, [itemIds.join("|")]);
   const toggleSelectedPm = (id) => setSelectedPmIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
-  const selectAllPm = () => setSelectedPmIds((ids) => selectedVisibleIds.length === visibleIds.length ? [] : visibleIds);
   const deleteSelectedPm = async () => {
     setBulkMsg("");
     if (!selectedVisibleIds.length || typeof delPmMany !== "function") return;
@@ -6553,17 +6552,8 @@ function PMModule(p) {
       <button className={pmTab === "rules" ? "on" : ""} onClick={() => setPmTab("rules")}>כללי טיפול{pmRules(config).length === 0 && <span className="tab-badge" style={{ background: "#F59E0B" }}>!</span>}</button>
     </div>
     {pmTab === "rules" ? <PMRulesPanel config={config} saveConfig={saveConfig} fleet={fleet} /> : <>
-      <div className="row-between"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={() => setBulkRules(true)}><ClipboardList size={15} /> הפקה מרגולציות</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div></div>
-      {items.length > 0 && <div className="pm-bulk-panel">
-        <label className="bulk-check"><input type="checkbox" checked={visibleIds.length > 0 && selectedVisibleIds.length === visibleIds.length} onChange={selectAllPm} /> בחירת כל השיבוצים בלוח הנוכחי</label>
-        <span className="fleet-bulk-count">{selectedVisibleIds.length ? `${selectedVisibleIds.length} נבחרו` : "לא נבחרו שיבוצים"}</span>
-        <div className="pm-bulk-actions">
-          {selectedVisibleIds.length ? <ConfirmBtn className="btn-ghost danger sm" label="מחיקת נבחרים" onConfirm={deleteSelectedPm} /> : <button className="btn-ghost danger sm" disabled><Trash2 size={15} /> מחיקת נבחרים</button>}
-          {selectedVisibleIds.length > 0 && <button className="btn-ghost sm" onClick={() => setSelectedPmIds([])}>ניקוי בחירה</button>}
-        </div>
-        {bulkMsg && <div className={bulkMsg === SAVE_FAILED_MESSAGE ? "bulk-msg err" : "bulk-msg"}>{bulkMsg}</div>}
-      </div>}
-      <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} onGoRules={() => setPmTab("rules")} selectedIds={selectedPmIds} onToggleSelected={toggleSelectedPm} />
+      <div className="pm-topbar"><SectionTitle><CalendarClock size={15} /> לוח טיפולים תקופתיים</SectionTitle><div className="pm-top-actions"><button className="btn-ghost sm" onClick={() => setBulkRules(true)}><ClipboardList size={15} /> הפקה מרגולציות</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> שיבוץ טיפול</button></div></div>
+      <PMSchedule items={items} allPm={pm} fleet={fleet} onOpen={(x) => setRun(x)} config={config} onGoRules={() => setPmTab("rules")} selectedIds={selectedPmIds} onToggleSelected={toggleSelectedPm} onSetSelected={setSelectedPmIds} onDeleteSelected={deleteSelectedPm} onClearSelected={() => { setSelectedPmIds([]); setBulkMsg(""); }} bulkMsg={bulkMsg} />
       {bulkRules && <Overlay persistent onClose={() => setBulkRules(false)}><PMRuleBulkScheduleForm pm={pm} fleet={fleet} config={config} onCancel={() => setBulkRules(false)} onSave={async (tasks) => { const ok = await savePmMany(tasks); if (ok !== false) setBulkRules(false); return ok; }} /></Overlay>}
       {edit && <Overlay persistent onClose={() => setEdit(null)}><PMForm task={edit} fleet={fleet} config={config} onCancel={() => setEdit(null)} onSave={async (t) => { const ok = await savePm(t); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
       {run && <Overlay onClose={() => setRun(null)}><PMEntry task={pm.find((x) => x.id === run.id) || run} session={session} fleet={fleet} tickets={tickets} config={config} canManage onTicket={saveTicket} onClose={() => setRun(null)} onEdit={() => { setEdit(run); setRun(null); }} onSave={savePm} onDelete={async () => { if (await delPm(run.id) !== false) setRun(null); }} /></Overlay>}
@@ -6681,7 +6671,7 @@ function PMRulesPanel({ config, saveConfig, fleet }) {
     <button className="btn-ghost full" style={{ marginTop: 12 }} onClick={addRule}><Plus size={14} /> הוסף כלל טיפול</button>
   </div>);
 }
-function PMSchedule({ items, fleet, onOpen, allPm, config, onGoRules, selectedIds = [], onToggleSelected }) {
+function PMSchedule({ items, fleet, onOpen, allPm, config, onGoRules, selectedIds = [], onToggleSelected, onSetSelected, onDeleteSelected, onClearSelected, bulkMsg }) {
   const [mode, setMode] = useState("calendar");
   const overdue = items.filter((x) => startOfDay(x.nextDue) < startOfDay(Date.now())).sort((a, b) => a.nextDue - b.nextDue);
   const hasRules = pmRules(config).length > 0;
@@ -6691,7 +6681,7 @@ function PMSchedule({ items, fleet, onOpen, allPm, config, onGoRules, selectedId
     {mode === "history" ? <PMHistory pm={allPm || items} fleet={fleet} onOpen={onOpen} config={config} />
       : items.length === 0 ? emptyState
       : mode === "year" ? <PMYearMatrix items={items} fleet={fleet} onOpen={onOpen} config={config} />
-      : mode === "calendar" ? <PMCalendar items={items} fleet={fleet} onOpen={onOpen} overdue={overdue} config={config} /> : <PMList items={items} fleet={fleet} onOpen={onOpen} config={config} selectedIds={selectedIds} onToggleSelected={onToggleSelected} />}
+      : mode === "calendar" ? <PMCalendar items={items} fleet={fleet} onOpen={onOpen} overdue={overdue} config={config} /> : <PMList items={items} fleet={fleet} onOpen={onOpen} config={config} selectedIds={selectedIds} onToggleSelected={onToggleSelected} onSetSelected={onSetSelected} onDeleteSelected={onDeleteSelected} onClearSelected={onClearSelected} bulkMsg={bulkMsg} />}
   </>);
 }
 function PMHistory({ pm, fleet, onOpen, config }) {
@@ -6810,17 +6800,66 @@ function PMYearMatrix({ items, fleet, onOpen, config }) {
     </table></div>}
   </div>);
 }
-function PMList({ items, fleet, onOpen, config, selectedIds = [], onToggleSelected }) {
-  const sorted = [...items].sort((a, b) => a.nextDue - b.nextDue);
+function PMList({ items, fleet, onOpen, config, selectedIds = [], onToggleSelected, onSetSelected, onDeleteSelected, onClearSelected, bulkMsg }) {
+  const [q, setQ] = useState(""), [typeFilter, setTypeFilter] = useState("all"), [statusFilter, setStatusFilter] = useState("all"), [sort, setSort] = useState("date_asc");
+  const types = useMemo(() => [...new Set((items || []).map((x) => unitTypeName(pmFleet(x, fleet), config)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")), [items, fleet, config]);
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const rows = (items || []).filter((x) => {
+      const f = pmFleet(x, fleet);
+      const type = unitTypeName(f, config);
+      const d = daysLeft(x.nextDue);
+      if (typeFilter !== "all" && type !== typeFilter) return false;
+      if (statusFilter === "overdue" && d >= 0) return false;
+      if (statusFilter === "today" && d !== 0) return false;
+      if (statusFilter === "week" && (d < 1 || d > 7)) return false;
+      if (statusFilter === "later" && d <= 7) return false;
+      if (!needle) return true;
+      const hay = `${f?.code || ""} ${unitLabel(f, config)} ${type} ${unitModelCode(f)} ${pmRuleTitle(x, config)} ${fmtDate(x.nextDue)} ${fleetDepts(f).join(" ")}`.toLowerCase();
+      return hay.includes(needle);
+    });
+    return rows.sort((a, b) => {
+      const af = pmFleet(a, fleet), bf = pmFleet(b, fleet);
+      if (sort === "date_desc") return b.nextDue - a.nextDue;
+      if (sort === "type") return (unitTypeName(af, config) || "").localeCompare(unitTypeName(bf, config) || "", "he") || (af?.code || "").localeCompare(bf?.code || "", "he", { numeric: true });
+      if (sort === "code") return (af?.code || "").localeCompare(bf?.code || "", "he", { numeric: true });
+      return a.nextDue - b.nextDue;
+    });
+  }, [items, fleet, config, q, typeFilter, statusFilter, sort]);
   const selectable = typeof onToggleSelected === "function";
-  return (<div className="cards">{sorted.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); const last = (x.history || [])[x.history.length - 1]; return (
+  const filteredIds = filtered.map((x) => x.id).filter(Boolean);
+  const selectedFilteredCount = filteredIds.filter((id) => selectedIds.includes(id)).length;
+  const allFilteredSelected = filteredIds.length > 0 && selectedFilteredCount === filteredIds.length;
+  const toggleFilteredSelection = () => {
+    if (!onSetSelected) return;
+    onSetSelected((ids) => allFilteredSelected ? ids.filter((id) => !filteredIds.includes(id)) : [...new Set([...ids, ...filteredIds])]);
+  };
+  return (<>
+    <div className="pm-list-tools">
+      <div className="search-wrap sm pm-list-search"><Search size={16} /><input aria-label="חיפוש שיבוץ טיפול לפי כלי, סוג, דגם או תאריך" placeholder="חיפוש לפי מספר / סוג / תאריך…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <label className="flt-field"><span className="flt-lbl">סוג כלי</span><select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}><option value="all">הכל</option>{types.map((t) => <option key={t}>{t}</option>)}</select></label>
+      <label className="flt-field"><span className="flt-lbl">מועד</span><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="all">הכל</option><option value="overdue">באיחור</option><option value="today">היום</option><option value="week">השבוע</option><option value="later">מאוחר יותר</option></select></label>
+      <label className="flt-field"><span className="flt-lbl">מיון</span><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="date_asc">תאריך קרוב</option><option value="date_desc">תאריך רחוק</option><option value="type">סוג כלי</option><option value="code">מספר כלי</option></select></label>
+    </div>
+    <div className="pm-list-bar">
+      <span className="fleet-count">{filtered.length} שיבוצים</span>
+      {selectable && <div className="pm-list-bulk">
+        <label className="bulk-check"><input type="checkbox" checked={allFilteredSelected} disabled={!filteredIds.length} onChange={toggleFilteredSelection} /> {allFilteredSelected ? "בטל בחירה מסוננת" : "בחר מסוננים"}</label>
+        <span className="fleet-bulk-count">{selectedIds.length ? `${selectedIds.length} נבחרו` : "אין בחירה"}</span>
+        {selectedIds.length ? <ConfirmBtn className="btn-ghost danger sm" label="מחיקת נבחרים" onConfirm={onDeleteSelected} /> : <button className="btn-ghost danger sm" disabled><Trash2 size={15} /> מחיקת נבחרים</button>}
+        {selectedIds.length > 0 && <button className="btn-ghost sm" onClick={onClearSelected}>ניקוי</button>}
+        {bulkMsg && <span className={bulkMsg === SAVE_FAILED_MESSAGE ? "bulk-msg err" : "bulk-msg"}>{bulkMsg}</span>}
+      </div>}
+    </div>
+    {filtered.length === 0 ? <Empty text="לא נמצאו שיבוצי טיפול" Icon={CalendarClock} sub="נסו לשנות חיפוש, סוג כלי או מועד" /> : <div className="cards">{filtered.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); const last = (x.history || [])[x.history.length - 1]; return (
     <div key={x.id} className={"pm-card" + (selectedIds.includes(x.id) ? " selected" : "")} onClick={() => onOpen(x)}>
       {selectable && <label className="pm-select" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(x.id)} onChange={() => onToggleSelected(x.id)} aria-label={`בחירת שיבוץ ${f ? unitLabel(f, config) : x.id}`} /></label>}
       <span className="pm-bar" style={{ background: pmColor(d) }} />
       <div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי לא ידוע"}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{pmRuleTitle(x, config)} · {pmIntervalLabel(x, config)}</span></div>
         <div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)}{fleetDepts(f).length ? <> · <Users size={12} /> {fleetDepts(f).join(", ")}</> : null}</div>
         <div className="tcard-badges"><span className="badge sm" style={{ color: pmColor(d), background: "var(--surface-2)" }}>{d < 0 ? `באיחור ${-d} י׳` : d === 0 ? "היום" : `בעוד ${d} ימים`}</span>{last && <span className="tcard-time">{last.type === "missed" ? "לא הגיע " : "בוצע "}{fmtDate(last.at)}</span>}</div>
-      </div></div>); })}</div>);
+      </div></div>); })}</div>}
+  </>);
 }
 function PMCalendar({ items, fleet, onOpen, overdue, config }) {
   const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
@@ -6849,7 +6888,7 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
     <div className="cal-grid">{weeks.map((row, wi) => row.map((day, di) => { const inMonth = day.getMonth() === month; const k = startOfDay(day.getTime()); const list = byDay[k] || []; const isToday = k === todayK; return (
       <div key={wi + "-" + di} className={"cal-cell" + (inMonth ? "" : " out") + (isToday ? " today" : "")}>
         <div className="cal-daynum">{day.getDate()}</div>
-        {list.slice(0, 3).map(({ task: x, projected }) => { const f = pmFleet(x, fleet); const od = k < todayK; return <button key={`${x.id}-${k}`} className={"cal-pill" + (projected ? " projected" : "")} style={{ background: od ? "#FEE2E2" : projected ? "#EEF2FF" : "#FFEDD5", color: od ? "#B91C1C" : projected ? "#4338CA" : "#9A3412" }} onClick={() => onOpen(x)}>{f ? f.code : "כלי"}</button>; })}
+        {list.slice(0, 3).map(({ task: x, projected }) => { const f = pmFleet(x, fleet); const od = k < todayK; const type = unitTypeName(f, config) || unitModelCode(f) || "כלי"; return <button key={`${x.id}-${k}`} className={"cal-pill pm-cal-pill" + (projected ? " projected" : "")} style={{ background: od ? "#FEE2E2" : projected ? "#EEF2FF" : "#FFEDD5", color: od ? "#B91C1C" : projected ? "#4338CA" : "#9A3412" }} onClick={() => onOpen(x)} title={f ? unitLabel(f, config) : "כלי"}><span className="pm-cal-type">{type}</span><span className="pm-cal-code">{f?.code || "—"}</span></button>; })}
         {list.length > 3 && <div className="cal-more">+{list.length - 3}</div>}
       </div>); }))}</div>
     {overdue.length > 0 && <><SectionTitle><AlertTriangle size={15} /> באיחור</SectionTitle><div className="cards">{overdue.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); return <div key={x.id} className="pm-card" onClick={() => onOpen(x)}><span className="pm-bar" style={{ background: "#DC2626" }} /><div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span></div><div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)} · באיחור {-d} ימים{fleetDepts(f).length ? <> · {fleetDepts(f).join(", ")}</> : null}</div></div></div>; })}</div></>}
@@ -9216,8 +9255,13 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .pm-select{display:flex;align-items:center;justify-content:center;width:38px;border-inline-end:1px solid var(--line);cursor:pointer;background:var(--surface);}
 .pm-card.selected .pm-select{background:#FFEDD5;}
 .pm-select input{width:16px;height:16px;accent-color:var(--primary);}
-.pm-bulk-panel{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-.pm-bulk-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-inline-start:auto;}
+.pm-topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin:10px 0 14px;}
+.pm-topbar .section-title{margin:0;}
+.pm-top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.pm-list-tools{display:grid;grid-template-columns:minmax(220px,1.7fr) repeat(3,minmax(130px,1fr));gap:10px;align-items:end;margin:12px 0 8px;}
+.pm-list-search{margin:0;min-height:44px;}
+.pm-list-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.pm-list-bulk{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
 .pm-type-limits{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:11px 12px;margin-top:12px;}
 .pm-type-limit-grid{display:grid;grid-template-columns:repeat(2,minmax(160px,1fr));gap:8px;margin-top:8px;}
 .pm-plan-preview{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:8px;margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;}
@@ -9226,6 +9270,9 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .pm-plan-day span{font-weight:800;color:var(--primary);white-space:nowrap;}
 .pm-plan-day em{font-style:normal;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cal-pill.projected{border:1px dashed #818CF8;}
+.pm-cal-pill{display:flex;flex-direction:column;align-items:flex-end;gap:1px;width:100%;min-height:32px;line-height:1.1;}
+.pm-cal-type{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:800;}
+.pm-cal-code{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:900;font-variant-numeric:tabular-nums;}
 .checklist{display:flex;flex-direction:column;gap:8px;}
 .chk{display:flex;align-items:center;gap:10px;width:100%;text-align:right;background:var(--surface);border:1.5px solid var(--line);border-radius:11px;padding:12px;font-size:14px;color:var(--ink);}
 .chk.on{border-color:#16A34A;background:#16a34a14;}
@@ -9712,12 +9759,24 @@ button.notif-perm:hover{background:#D1FAE5;}
 .cal-dows{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px;}
 .cal-dow{text-align:center;font-size:12px;font-weight:700;color:var(--muted);}
 .cal-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
-.cal-cell{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:74px;padding:5px 5px 6px;display:flex;flex-direction:column;gap:3px;}
+.cal-cell{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:86px;padding:5px 5px 6px;display:flex;flex-direction:column;gap:3px;}
 .cal-cell.out{opacity:.4;}
 .cal-cell.today{border-color:var(--primary);box-shadow:0 0 0 2px rgba(234,88,12,.18);}
 .cal-daynum{font-size:12px;font-weight:600;color:var(--muted);}
 .cal-pill{font-size:11px;font-weight:600;border-radius:7px;padding:3px 6px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cal-more{font-size:10.5px;color:var(--muted);font-weight:600;}
+
+@media(max-width:760px){
+  .pm-topbar{flex-direction:column;align-items:stretch;}
+  .pm-top-actions{justify-content:stretch;}
+  .pm-top-actions .btn-ghost,.pm-top-actions .btn-primary{flex:1;}
+  .pm-list-tools{grid-template-columns:1fr;}
+  .pm-list-bulk{justify-content:flex-start;}
+  .cal-grid,.cal-dows{gap:4px;}
+  .cal-cell{min-height:78px;padding:4px;}
+  .pm-cal-type{font-size:9.5px;}
+  .pm-cal-code{font-size:10.5px;}
+}
 
 .sec-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:16px 0 8px;font-family:var(--font-head);font-weight:700;font-size:14.5px;color:var(--ink);}
 .sec-toggle:hover{border-color:var(--primary);}
