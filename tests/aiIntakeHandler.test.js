@@ -79,7 +79,7 @@ describe("AI intake handler", () => {
         source: "mobile",
         allowedToWrite: false,
         writePolicy: "human_confirmation_required",
-        action: "draft_safety_inspection"
+        action: "draft_ticket"
       }
     });
   });

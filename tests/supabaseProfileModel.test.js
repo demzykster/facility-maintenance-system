@@ -38,7 +38,7 @@ describe("supabase profile foundation", () => {
     expect(SUPABASE_PERMISSION_MODULE_KEYS).toContain("workerAccess");
   });
 
-  it("normalizes app user profiles for the future Supabase auth adapter", () => {
+  it("normalizes app user profiles for the Supabase auth adapter", () => {
     expect(normalizeSupabaseAppUserProfile({
       auth_user_id: "auth-1",
       id: "app-user-1",

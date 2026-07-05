@@ -30,7 +30,7 @@ async function checkAiIntake(url) {
   if (data?.ok !== true) throw new Error("ok_missing");
   if (draft.module !== "safety") throw new Error(`module_${draft.module || "missing"}`);
   if (draft.severity !== "critical") throw new Error(`severity_${draft.severity || "missing"}`);
-  if (draft.action !== "draft_safety_inspection") throw new Error(`action_${draft.action || "missing"}`);
+  if (draft.action !== "draft_ticket") throw new Error(`action_${draft.action || "missing"}`);
   if (draft.allowedToWrite !== false) throw new Error("draft_must_not_write");
   if (draft.writePolicy !== "human_confirmation_required") throw new Error(`write_policy_${draft.writePolicy || "missing"}`);
   return draft;

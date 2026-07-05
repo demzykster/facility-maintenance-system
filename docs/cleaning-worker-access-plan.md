@@ -4,7 +4,7 @@ This document records the owner-approved direction for replacing `cleaner` as a 
 
 ## Decision
 
-Future cleaning workers should be modeled as ordinary workers with a permanent cleaning capability/group, not as a separate core role.
+Cleaning workers should be modeled as ordinary workers with a permanent cleaning capability/group, not as a separate core role.
 
 Target user shape:
 
@@ -44,7 +44,7 @@ Management access is separate:
 - manage cleaning zones, windows, checklists, assignments;
 - view cleaning reports/analytics.
 
-Management access should come from module permissions or future group/capability configuration, not from being a cleaning worker.
+Management access should come from module permissions or group/capability configuration, not from being a cleaning worker.
 
 ## Contractor Workers
 
@@ -57,7 +57,7 @@ employmentType: "contractor"
 contractorName: "..."
 ```
 
-This keeps the same worker login and cleaning UX while allowing future reporting by contractor, complaint volume, overdue rounds, and quality trends.
+This keeps the same worker login and cleaning UX while supporting reporting by contractor, complaint volume, overdue rounds, and quality trends.
 
 ## Current Data Assumption
 

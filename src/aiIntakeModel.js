@@ -17,7 +17,6 @@ export const AI_INTAKE_ACTIONS = Object.freeze([
   "draft_ticket",
   "draft_cleaning_report",
   "draft_ppe_request",
-  "draft_safety_inspection",
   "draft_task",
   "route_to_human",
   "no_action"
@@ -128,7 +127,6 @@ export function aiIntakeClarifyingQuestions(draft = {}) {
 export function aiIntakeActionForModule(module = "unknown") {
   if (module === "cleaning") return "draft_cleaning_report";
   if (module === "ppe") return "draft_ppe_request";
-  if (module === "safety") return "draft_safety_inspection";
   if (module === "task") return "draft_task";
   if (module === "unknown") return "ask_clarification";
   return "draft_ticket";

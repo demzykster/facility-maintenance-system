@@ -23,7 +23,7 @@ Production requirement:
 - shared database;
 - server-side writes;
 - production starts empty of demo/local browser data;
-- optional future import tools for real owner-provided data, not migration of current fake demo records.
+- explicit import tools for real owner-provided data, not migration of current fake demo records.
 
 ### P0 — Real Auth And Server-Side Permissions
 
@@ -68,16 +68,6 @@ Production requirement:
 - extract production boundaries first: storage, auth, backend adapters, schema/migration, pure workflow models;
 - split visual modules only after data/auth boundaries are stable.
 
-### P1 — Modular Growth Without Duplicate Systems
-
-Current state:
-- the product will continue to grow with broad future modules such as budget and safety inspections.
-
-Production requirement:
-- new modules must reuse shared CMMS entities: users, departments, tickets, assets, suppliers, files, status history, notifications, permissions, analytics, and audit;
-- broad future modules must extend existing workflows instead of creating duplicate users, suppliers, tickets, approvals, files, or analytics;
-- `docs/module-growth-architecture.md` is the rule for future module design.
-
 ### P0 — Production Seed Boundary
 
 Current state:
@@ -100,7 +90,7 @@ Production requirement:
 - the first production environment is initialized with no business records;
 - the only required bootstrap is the first administrator;
 - the first administrator must be created server-side and forced through a credential-change/bootstrap-completion flow;
-- real business data is entered later through the app UI or future explicit imports.
+- real business data is entered through the app UI or explicit imports.
 
 ## Execution Order
 
@@ -114,7 +104,7 @@ Production requirement:
 8. Add server-side permission/RLS model.
 9. Move photos/files to object storage.
 10. Move AI calls to server-side endpoint.
-11. Add optional future import tools only for real owner-provided data.
+11. Add explicit import tools only for real owner-provided data.
 12. Run production release gate.
 
 ## Progress
@@ -122,7 +112,6 @@ Production requirement:
 - Storage boundary extracted in PR #268.
 - Production collection map started in `src/dataCollections.js`.
 - First production data model documented in `docs/production-data-model.md`.
-- Modular growth rules documented in `docs/module-growth-architecture.md`.
 - Production seed policy started in `src/seedPolicyModel.js` and documented in `docs/production-seed-policy.md`.
 - Storage provider policy and the first API storage-client contract are documented in `docs/production-storage-provider.md`.
 - `/api/kv` route skeleton exists and is intentionally closed until server auth and a durable backend driver are configured.

@@ -50,7 +50,7 @@ Goal:
 - Replace role tabs with one identifier-first flow.
 - Resolve email, worker number, or technician code.
 - Block archived users.
-- Keep the lookup as a pure/testable function that can later become an API call.
+- Keep the lookup as a pure/testable function that can become an API call.
 
 Suggested PR sequence:
 1. Extract/test `resolveIdentifier(input, users)` with archived-user guard.
@@ -64,7 +64,7 @@ Implementation:
 - PR #84 added a pure `resolveIdentifier` helper and unit tests.
 - The helper resolves email, worker number, and technician code, and returns `archived` before any password/PIN check.
 - PR #85 replaced the role-tab login UI with one identifier field and a conditional password/PIN step.
-- The activation-link flow was later replaced by first-login password/PIN setup.
+- The activation-link flow was replaced by first-login password/PIN setup.
 
 Remaining:
 - None for the current identifier-first demo login pass.
@@ -210,7 +210,7 @@ Status: done in PR #68.
 Goal:
 - Move `סטטוסים של מטלות` from global Settings to a settings sub-tab on `מטלות`.
 - Preserve the config shape.
-- Gate editing explicitly, likely through settings/manage or a future tasks-manage permission.
+- Gate editing explicitly through settings/manage or a tasks-manage permission.
 
 Ship separately from Topics 11 and 12.
 

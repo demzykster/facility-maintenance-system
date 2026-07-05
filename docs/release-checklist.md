@@ -27,18 +27,16 @@ Done means:
 - A release configuration gate blocks production mode when it still points at local/browser storage.
 - Auth, permissions/RLS, files/photos, AI calls, and backup/migration risks are explicitly tracked before implementation.
 - The monolith extraction path is adapter/model-first, not a whole-file rewrite.
-- Future broad modules have a shared-entity growth rule so budget, safety inspections, and current modules do not duplicate users/assets/tickets/suppliers/files/analytics.
 
 Current notes:
 - Owner opened the production backend/auth phase after R8.
 - `docs/production-hardening-plan.md` is the active risk/order document.
 - First implementation step: storage boundary extraction.
-- `src/dataCollections.js` is the first shared map from current backup/storage collections to future production tables.
-- `docs/module-growth-architecture.md` defines how future budget and safety-inspection modules should reuse shared CMMS entities.
+- `src/dataCollections.js` is the first shared map from current backup/storage collections to production tables.
 - `src/seedPolicyModel.js` and `docs/production-seed-policy.md` define the production empty-start and first-admin bootstrap boundary.
-- Current demo/local records are not a migration source; future imports are optional and only for real owner-provided data.
+- Current demo/local records are not a migration source; imports are only for real owner-provided data.
 - Before a real fleet workbook is loaded into the empty system, fleet Excel import must handle unknown vehicle models/types by previewing proposed catalog additions instead of leaving imported units with unconfigured SLA/document/PM rules.
-- `src/storageProviderModel.js`, `src/apiStorageAdapter.js`, and `docs/production-storage-provider.md` define the future backend storage path.
+- `src/storageProviderModel.js`, `src/apiStorageAdapter.js`, and `docs/production-storage-provider.md` define the backend storage path.
 - `/api/kv` route skeleton exists but remains closed until server auth and a durable backend driver are configured.
 - `npm run release:check` validates the current production storage-provider boundary.
 - `docs/production-platform-decision.md` selects Vercel frontend + Supabase Postgres/Auth/RLS/Storage as the target production platform.
@@ -65,7 +63,7 @@ Closed notes:
 - The notification matrix now covers the important role/process pairs.
 - Critical routes open exact tickets, exact fleet cards, or clearly focused module tabs.
 - Global notification toggles and personal notification-panel filters are available.
-- Optional future polish: exact PPE record focus when aggregate PPE notifications represent a single request/order/item.
+- Optional polish: exact PPE record focus when aggregate PPE notifications represent a single request/order/item.
 
 ### R4 — Permissions And Role Reality Check
 
@@ -85,7 +83,7 @@ Closed notes:
 - Manager/user routes now respect `users`, `audit`, `suppliers`, `analytics`, `settings`, and PPE management permissions.
 - View/manage split was checked for the newly exposed routes: suppliers edit controls still require `suppliers:manage`, analytics damage fields are read-only in manager/user route, sensitive settings actions still require `settings:full`.
 - Worker login setup/reset remains gated by `workerAccess:manage`.
-- Role-smoke passed for admin, manager, technician, and worker; legacy cleaner shell renders cleanly and shows the empty-zone state when current local data has no assigned cleaner. Future cleaning workers should use `worker` plus cleaning access/capabilities.
+- Role-smoke passed for admin, manager, technician, and worker; legacy cleaner shell renders cleanly and shows the empty-zone state when current local data has no assigned cleaner. Cleaning workers should use `worker` plus cleaning access/capabilities.
 
 ### R5 — Screen Audit And Visual Noise
 
@@ -137,7 +135,7 @@ Done means:
 - Known localStorage/demo limitations are documented in one short place.
 - Backup/restore is verified after the latest collection changes.
 - Vercel demo status is understood.
-- Supabase/Auth/RLS/database was out of scope for this package at the time; the owner later opened the Supabase-backed staging/auth phase.
+- Supabase/Auth/RLS/database was out of scope for this package at the time; the owner opened the Supabase-backed staging/auth phase after this package.
 
 Closed notes:
 - `docs/pre-production-readiness.md` now names Vercel as demo/staging, not production.

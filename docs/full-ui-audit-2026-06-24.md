@@ -16,7 +16,7 @@ Scope: admin and manager demo flows, Hebrew UI, dashboard, tickets, fleet, analy
 
 - Ticket cards are still dense. They now avoid one duplicate status phrase, suppress medium-risk card badges, and reduce waiting-status duplication, but the card still carries SLA, ball-holder, downtime and time labels. Next pass should decide which labels are primary vs secondary.
 - Cleaning "today" view is now less duplicated at the top. The full daily overview still repeats the same zones below by design, as a control list.
-- Settings are not currently duplicated as code: `צוות ומשתמשים` opens users only, while `הגדרות` opens global settings. PPE has its own domain settings inside the PPE hub. This is acceptable for now, but a later information-architecture pass should document the site map.
+- Settings are not currently duplicated as code: `צוות ומשתמשים` opens users only, while `הגדרות` opens global settings. PPE has its own domain settings inside the PPE hub. This is acceptable for now; an information-architecture pass should document the site map.
 - Vercel remains demo/staging. No password protection was added because the owner explicitly chose to keep it open for now.
 - No Supabase/Auth/RLS/modular split work was started.
 

@@ -91,10 +91,10 @@ Current permissions work:
 - The user form has started moving old manager toggles into a single `perms` editor.
 - `workerAccess` is the planned permission for worker login setup/reset flows.
 - Worker/legacy-cleaner lists now show whether login is configured or still waiting for first-login setup.
-- Future cleaning workers should be modeled as `worker` users with cleaning access/capabilities. Legacy `role === "cleaner"` remains a compatibility bridge until helper-based access checks, session/KV policies, and UI are updated.
+- Cleaning workers should be modeled as `worker` users with cleaning access/capabilities. Legacy `role === "cleaner"` remains a compatibility bridge until helper-based access checks, session/KV policies, and UI are updated.
 - Personal codes are hidden from managers; reset clears the stored secret so the user creates a new one on next login.
 - New login-capable users are saved without generated passwords, PINs, or activation links.
 - First-login setup rules have a Vitest harness covering status labels, first-secret setup, and reset preservation.
 - New user saves write module permissions through `perms`; legacy `fleetDocs/fleetTickets` flags are read only as a migration bridge.
 - Legacy permission migration into `perms` is covered by a Vitest harness.
-- `docs/settings-site-map.md` defines current and intended homes for future settings moves.
+- `docs/settings-site-map.md` defines current and intended settings homes.

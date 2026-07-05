@@ -24,7 +24,7 @@ describe("cleaning access model", () => {
     expect(normalizeCleaningAccess(user).source).toBe("legacy-role");
   });
 
-  it("treats future cleaning workers as workers with cleaning access", () => {
+  it("treats cleaning workers as workers with cleaning access", () => {
     const user = {
       role: "worker",
       employmentType: "contractor",

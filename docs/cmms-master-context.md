@@ -19,8 +19,6 @@ Do not use this file as permission to start broad architecture work. Read the cu
 
 The previous separate checks direction was removed from the v1 product surface and runtime contracts. Do not treat removed files, prefixes, or deleted docs as a backlog to resume.
 
-If the owner later wants this area again, start from a fresh product brief and fresh UX work.
-
 ## Source Layout
 
 The current v1 app remains in the existing source layout. Do not create `src/app`, `src/features`, or `src/shared` in this workstream.

@@ -31,14 +31,14 @@ git checkout -b codex/permissions-model
 Remaining suggested work:
 
 - Replace scattered user-form permission toggles with one permissions concept.
-- Do not create duplicate settings for PPE, fleet docs, fleet tickets, worker login setup, or future modules.
+- Do not create duplicate settings for PPE, fleet docs, fleet tickets, or worker login setup.
 - Use `docs/settings-site-map.md` before moving Settings sections into module pages.
 - Keep roles as defaults and use individual permission overrides for exceptions.
 - Treat "HR" as permissions, not a separate role for now.
 - Plan worker onboarding around first-login password/PIN setup without showing old codes.
-- Use `workerAccess` for future worker login setup/reset controls.
+- Use `workerAccess` for worker login setup/reset controls.
 - Keep worker lifecycle in one place: worker and legacy-cleaner forms should not show a separate `active` checkbox when the "worker left / equipment return" flow exists.
-- Treat `cleaner` as a legacy transition role. Future cleaning workers should be `worker` users with cleaning access/capabilities; see `docs/cleaning-worker-access-plan.md`.
+- Treat `cleaner` as a legacy transition role. Cleaning workers should be `worker` users with cleaning access/capabilities; see `docs/cleaning-worker-access-plan.md`.
 - New login-capable users should be saved without generated passwords, PINs, or activation links.
 - First login by email or worker number creates the user's own password/PIN with confirmation.
 - Reset clears the stored secret and is gated by `workerAccess: manage` (admin has this through role defaults).

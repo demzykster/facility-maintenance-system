@@ -135,7 +135,7 @@ describe("fileMetadataModel", () => {
     })).toBe(true);
   });
 
-  it("documents the future Supabase table fields in one contract", () => {
+  it("documents the Supabase table fields in one contract", () => {
     expect(FILE_METADATA_TABLE_CONTRACT).toEqual([
       "id",
       "owner_type",

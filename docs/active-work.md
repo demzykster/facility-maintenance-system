@@ -22,4 +22,3 @@
 ## Notes For Next Agent
 
 - Treat removed storage prefixes and docs as intentionally retired, not as migration backlog.
-- If this direction is revisited later, start from a fresh product decision and a fresh design, not from the removed implementation.

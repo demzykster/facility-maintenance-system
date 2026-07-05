@@ -1,8 +1,8 @@
 # Production Data Model
 
-`src/dataCollections.js` is the source of truth for business collections that round-trip through backup/restore and future production storage.
+`src/dataCollections.js` is the source of truth for business collections that round-trip through backup/restore and production storage.
 
-| Key | KV prefix | Future table |
+| Key | KV prefix | Production table |
 | --- | --- | --- |
 | `users` | `user:` | `app_users` |
 | `fleet` | `fleet:` | `fleet_units` |

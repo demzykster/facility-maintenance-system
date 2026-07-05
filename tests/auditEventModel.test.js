@@ -124,7 +124,7 @@ describe("auditEventModel", () => {
     });
   });
 
-  it("documents the future audit table fields in one contract", () => {
+  it("documents the audit table fields in one contract", () => {
     expect(AUDIT_EVENTS_TABLE_CONTRACT).toEqual([
       "id",
       "at",

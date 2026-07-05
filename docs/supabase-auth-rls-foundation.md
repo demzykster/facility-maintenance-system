@@ -17,7 +17,7 @@ CMMS owns operational profile data in `public.app_users`:
 - module permissions as `jsonb`;
 - bootstrap/password-change metadata.
 
-Direction note: future cleaning workers should be stored as `role: "worker"` with cleaning access/capabilities. Legacy `role: "cleaner"` remains valid only as a compatibility bridge until UI, session, KV, and RLS policies are updated.
+Direction note: cleaning workers should be stored as `role: "worker"` with cleaning access/capabilities. Legacy `role: "cleaner"` remains valid only as a compatibility bridge until UI, session, KV, and RLS policies are updated.
 
 This avoids a duplicate login system while still keeping CMMS business rules outside the Auth system table.
 
@@ -38,7 +38,7 @@ It creates:
 - `cmms_has_permission(module, min_level)`;
 - initial RLS policies for self-read, users-permission read, and admin-only writes.
 
-Non-admin profile writes are intentionally not opened in the first RLS layer. Future manager user-management actions should go through server code or RPC that validates exactly which fields can be changed, instead of allowing broad direct updates to `public.app_users`.
+Non-admin profile writes are intentionally not opened in the first RLS layer. Manager user-management actions should go through server code or RPC that validates exactly which fields can be changed, instead of allowing broad direct updates to `public.app_users`.
 
 ## Current Boundary
 

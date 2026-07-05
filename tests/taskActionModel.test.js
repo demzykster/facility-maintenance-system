@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeTaskActionRecord, taskActionSignal, taskActionSourceFields } from "../src/taskActionModel.js";
 
 describe("task action model", () => {
-  it("keeps explicit source links for future findings and programs", () => {
+  it("keeps explicit source links for external findings and programs", () => {
     const patch = taskActionSourceFields({
       sourceModule: "fleet",
       sourceFindingId: "finding-1",

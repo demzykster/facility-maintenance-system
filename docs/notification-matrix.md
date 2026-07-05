@@ -32,7 +32,7 @@ Source of truth in code:
 | admin | orphan ticket | `escalate` | exact ticket via `ticketId` | none found |
 | admin | PM due soon | `pm` | PM tab via `go: "pm"` | none found |
 | admin | driver requests | `driver` | exact unit card via `go: "fleet"` + `fleetId` | fixed after matrix creation |
-| admin | PPE requests/stock/orders | `ppe` | PPE module via `go: "ppe"` + `ppeSub` | now focuses dashboard for requests/low stock and stock log for open orders; exact record focus can be added later |
+| admin | PPE requests/stock/orders | `ppe` | PPE module via `go: "ppe"` + `ppeSub` | now focuses dashboard for requests/low stock and stock log for open orders |
 | admin | technician shift exceptions | `confirm` / `escalate` / `back` | team page via `go: "team"` | fixed after matrix creation |
 | admin | cleaning rounds/complaints | `cleaning` | cleaning module via `go: "cleaning"` | none found |
 | tech | new transport tickets | `new` | exact ticket via `ticketId` | none found |
@@ -46,8 +46,8 @@ Source of truth in code:
 | manager/user | blocked department unit | `escalate` | `ticketId` wins; `go: "dept"` ignored | none critical |
 | manager/user | driver request outcome | `driver` | exact department fleet card via `go: "dept"` + `fleetId` | fixed after matrix creation |
 | manager/user | cleaning complaints in managed zones | `cleaning` | cleaning module via `go: "cleaning"` | none found |
-| legacy cleaner / future worker with cleaning access | due/overdue cleaning rounds | `cleaning` | cleaning module via `go: "cleaning"` | future code should route by cleaning access helper, not only role |
-| legacy cleaner / future worker with cleaning access | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | future code should route by cleaning access helper, not only role |
+| legacy cleaner / worker with cleaning access | due/overdue cleaning rounds | `cleaning` | cleaning module via `go: "cleaning"` | route by cleaning access helper, not only role |
+| legacy cleaner / worker with cleaning access | complaints in owned zones | `cleaning` | cleaning module via `go: "cleaning"` | route by cleaning access helper, not only role |
 | all relevant roles | tasks and meetings | `task` | tasks module via `go: "tasks"` | none found |
 
 ## Optional Follow-Up

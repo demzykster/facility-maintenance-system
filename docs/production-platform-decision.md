@@ -14,7 +14,7 @@ Target production platform:
 
 ## Why
 
-CMMS is relational operational software. Tickets, users, departments, fleet units, status history, permissions, PPE, cleaning, suppliers, files, analytics, and future modules such as budget and safety inspections need shared entities and queryable relationships.
+CMMS is relational operational software. Tickets, users, departments, fleet units, status history, permissions, PPE, cleaning, suppliers, files, and analytics need shared entities and queryable relationships.
 
 Postgres is a better final source of truth than key/value storage for this domain.
 
@@ -36,7 +36,7 @@ It can be used as:
 - cache/session/rate-limit storage;
 - a safe stepping stone for `/api/kv` tests.
 
-It should not become the long-term source of truth for tickets, users, fleet, permissions, files, analytics, or future broad modules.
+It should not become the long-term source of truth for tickets, users, fleet, permissions, files, or analytics.
 
 ## What This Means For Next Work
 
@@ -52,5 +52,3 @@ Next implementation work should move toward:
 The first-admin bootstrap contract is documented in `docs/production-bootstrap.md`.
 
 The first Auth/profile/RLS schema layer is documented in `docs/supabase-auth-rls-foundation.md`.
-
-Do not design future budget/safety-inspection modules as isolated stores. They must reuse the shared CMMS Postgres entities.

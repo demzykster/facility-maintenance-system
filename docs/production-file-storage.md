@@ -63,13 +63,13 @@ The frontend adapter is `createApiFileProvider` in `src/apiFileAdapter.js`. It f
 
 ## Metadata Contract
 
-Protected file bytes live in Supabase Storage. Their business ownership belongs in a future `file_metadata` database table.
+Protected file bytes live in Supabase Storage. Their business ownership belongs in the `file_metadata` database table.
 
 The first shared metadata contract is documented in `docs/production-file-metadata.md`, modeled in `src/fileMetadataModel.js`, and backed by `server/files/supabaseFileMetadataDriver.js`.
 
 ## Next Implementation Step
 
-Finish the production file boundary around backup/export and future normalized tables:
+Finish the production file boundary around backup/export and normalized tables:
 
 - keep production business records as metadata/path references, not embedded base64;
 - persist file ownership metadata server-side when upload flows are moved fully behind Supabase tables/RLS;

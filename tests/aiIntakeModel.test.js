@@ -59,7 +59,7 @@ describe("aiIntakeModel", () => {
     expect(detectAiIntakeSeverity("צריך לבדוק בהמשך")).toBe("normal");
   });
 
-  it("keeps a stable output schema for later server/provider integration", () => {
+  it("keeps a stable output schema for server/provider integration", () => {
     expect(aiIntakeOutputSchema()).toMatchObject({
       version: 1,
       writePolicy: "human_confirmation_required",

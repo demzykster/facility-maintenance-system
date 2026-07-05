@@ -4,11 +4,11 @@ This is a post-pilot architecture note, not a v1 production AI feature.
 
 ## Principle
 
-Future AI assistance must use the same product operations as the UI. It must not become a separate chatbot path that edits data without the normal permission, validation, audit, and storage boundaries.
+Server-backed AI assistance must use the same product operations as the UI. It must not become a separate chatbot path that edits data without the normal permission, validation, audit, and storage boundaries.
 
 ## Operation Contract
 
-Every future agent-capable operation should have:
+Every agent-capable operation should have:
 
 - `actor`: authenticated user or anonymous public channel identity.
 - `intent`: the requested business action, such as create ticket, classify problem, route work, update status, attach file, or summarize history.
@@ -16,7 +16,7 @@ Every future agent-capable operation should have:
 - `validation`: deterministic checks before writing.
 - `authorization`: the same role/module/object permission checks as the UI/API.
 - `audit`: one business audit event for accepted changes and one safe system error event for rejected or failed operations where useful.
-- `result`: structured data for UI, mobile, API clients, and later agent replies.
+- `result`: structured data for UI, mobile, API clients, and agent replies.
 
 ## Universal Intake Contract
 
@@ -33,7 +33,7 @@ Output:
 - severity and risk signals, including people risk, production impact, exact location, asset hint, photo hint, and QR hint;
 - missing information and clarifying questions;
 - a user-facing reply that explains what is known, what is risky, and what else is needed;
-- a draft action, such as draft ticket, draft cleaning report, draft PPE request, draft safety inspection, route to human, or ask clarification.
+- a draft action, such as draft ticket, draft cleaning report, draft PPE request, route to human, or ask clarification.
 
 Guardrails:
 
@@ -44,7 +44,7 @@ Guardrails:
 
 The initial code contract lives in `src/aiIntakeModel.js`. It is deterministic and provider-free so it can be tested before connecting any model.
 
-The first server entrypoint is `POST /api/ai/intake`. It returns the same read-only draft contract and does not call an AI provider, read/write KV, write Supabase rows, or mutate files. It exists so future UI, mobile, public-report, and model-provider work can share one intake boundary.
+The first server entrypoint is `POST /api/ai/intake`. It returns the same read-only draft contract and does not call an AI provider, read/write KV, write Supabase rows, or mutate files. It exists so UI, mobile, public-report, and model-provider work can share one intake boundary.
 
 ## V1 Boundary
 
@@ -54,4 +54,4 @@ For the first pilot:
 - categories, routing, priority, SLA, departments, zones, and vehicle types stay data-driven;
 - public reports, tickets, files, cleaning rounds, and settings should keep moving toward shared server-side operations.
 
-This keeps the product ready for an AI agent later without delaying the empty staging pilot.
+This keeps the product ready for server-backed AI assistance without delaying the empty staging pilot.

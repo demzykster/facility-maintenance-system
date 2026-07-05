@@ -39,7 +39,7 @@ The endpoint creates:
 - a Supabase Auth user with admin role metadata and `must_change_password` metadata;
 - a matching `public.app_users` CMMS profile linked by `auth_user_id`.
 
-The Auth user is only the identity. The CMMS profile is the operational source for role, active state, permissions, and later department/scope rules.
+The Auth user is only the identity. The CMMS profile is the operational source for role, active state, permissions, and department/scope rules.
 
 ## Safety
 

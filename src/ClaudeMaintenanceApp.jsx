@@ -8204,7 +8204,7 @@ function TicketDetail(p) {
     const qualityLabels = { resolved: "טופל לחלוטין", temporary: "פתרון זמני", likely_repeat: "עשוי לחזור", purchase_needed: "נדרשת רכש", external_needed: "נדרש קבלן חוץ" };
     const qLabel = qualityLabels[closure.quality] || "";
     const logText = `נסגרה ואושרה ע״י ${session.name} · עלות ${ils(closure.costAmount || 0)}${qLabel ? ` · ${qLabel}` : ""}`;
-    onUpdate({ ...ticket, status: "done", updatedAt: now, downtimeEnd: closedAt, closure: { costAmount: closure.costAmount, costSupplier: closure.costSupplier, costNote: closure.costNote, quality: closure.quality, estimatedFutureCost: null, signedBy: session.name, signedAt: closedAt, recordedAt: now }, log: [...(ticket.log || []), e(logText, "close")] });
+    onUpdate({ ...ticket, status: "done", updatedAt: now, downtimeEnd: closedAt, closure: { costAmount: closure.costAmount, costSupplier: closure.costSupplier, costNote: closure.costNote, quality: closure.quality, signedBy: session.name, signedAt: closedAt, recordedAt: now }, log: [...(ticket.log || []), e(logText, "close")] });
     setClosing(false);
   };
   const repeat = () => onRepeat && onRepeat({ track: track, category: ticket.category, forkliftId: ticket.forkliftId, downtimeType: ticket.downtimeType, zone: ticket.zone, asset: ticket.asset, subject: ticket.subject, priority: ticket.priority });
@@ -8387,7 +8387,7 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
     { id: "purchase_needed", label: "נדרשת רכש/החלפה", color: "#7C3AED" },
     { id: "external_needed", label: "נדרש קבלן חוץ", color: "#0EA5E9" },
   ];
-  const finish = () => { if (busy) return; setBusy(true); const closedAt = realDt ? new Date(realDt).getTime() : null; onClose({ costAmount: Number(amount) || 0, costSupplier: supplier, costNote: note.trim(), closedAt, quality, estimatedFutureCost: null /* budget placeholder */ }); };
+  const finish = () => { if (busy) return; setBusy(true); const closedAt = realDt ? new Date(realDt).getTime() : null; onClose({ costAmount: Number(amount) || 0, costSupplier: supplier, costNote: note.trim(), closedAt, quality }); };
   const qItem = QUALITY.find((x) => x.id === quality) || QUALITY[0];
   return (<div className="ovl-backdrop modal2" onClick={onCancel}><div className="modal2-panel" onClick={(e) => e.stopPropagation()}>
     <div className="modal2-head"><div className="form-title">{step === 1 ? "איכות הסגירה" : step === 2 ? "עלויות" : "אישור סגירה"}</div><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={20} /></button></div>
