@@ -1818,6 +1818,7 @@ export default function App() {
   const escalateComplaint = async (c) => persistComplaint({ ...c, status: "open", escalatedTo: "admin", escalatedAt: Date.now(), escalatedBy: effSession.name });
   const resolveComplaint = async (c) => persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name });
   const progressComplaint = async (c) => persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() });
+  const delComplaint = async (id) => { if (!await deleteShared(`ccomplaint:${id}`)) return false; setComplaints((s) => s.filter((x) => x.id !== id)); return true; };
   const delFleet = async (id, options = {}) => { if (!await deleteShared(`fleet:${id}`, options)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
   const syncAdminProfileUser = async (u) => {
     if (!u?.authUserId) return;
@@ -2103,7 +2104,7 @@ export default function App() {
     });
     setIssueReportOpen(true);
   };
-  const shared = { session: effSession, config, users, tickets, pm, fleet, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
+  const shared = { session: effSession, config, users, tickets, pm, fleet, presence, techNames, zones, rounds, complaints, absences, locations, tasks, saveTask, delTask, meetings, saveMeeting, delMeeting, ppe, ppeItems, savePpe, delPpe, savePpeItem, delPpeItem, ppeNorms, saveNorm, delNorm, ppeReqs, savePpeReq, delPpeReq, ppeOrders, savePpeOrder, delPpeOrder, appIssues, saveAppIssue, saveAbsence, delAbsence, saveZone, delZone, saveRound, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, escalateComplaint, delComplaint, saveTicket, delTicket, savePm, savePmMany, delPm, delPmMany, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveUser, delUser, saveConfig, setShift: effSetShift, onLogout: effLogout, onProfile: () => setProfileOpen(true), onReportIssue: openIssueReport, rolePreview, theme, toggleTheme, language, setLanguage, t: (key, vars) => uiText(language, key, vars), reloadAll, loadDemo: SEED_POLICY.allowDemoData ? loadDemo : null, clearDemo: SEED_POLICY.allowDemoData ? clearDemo : null, demoActive, getBackup: buildBackup, importBackup: SEED_POLICY.allowBackupImport ? importBackup : null };
   return (
     <div dir={languageDirection(language)} lang={language} className={theme === "dark" ? "app-dark" : ""} style={{ fontFamily: "var(--font-body)" }}>
       <Style />
@@ -3248,7 +3249,7 @@ function ComplaintCard({ c, onResolve, onApprove, onReject, onEscalate, onOpen }
   </div>);
 }
 
-function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve, onProgress, onEscalate, onClose }) {
+function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve, onProgress, onEscalate, onDelete, onClose }) {
   const k = COMPLAINT_KIND[c.kind] || COMPLAINT_KIND.dirty; const Ic = k.Icon;
   const [rejectMode, setRejectMode] = useState(false), [reason, setReason] = useState(""), [resolveMode, setResolveMode] = useState(false), [note, setNote] = useState(""), [progMode, setProgMode] = useState(false), [pNote, setPNote] = useState(c.progressNote || "");
   const inProg = c.progress === "in_progress";
@@ -3279,6 +3280,7 @@ function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve,
         {cp.resolve && c.status === "open" && !inProg && (progMode ? <button className="btn-primary sm" disabled={!pNote.trim()} onClick={() => onProgress({ ...c, progressNote: pNote.trim() })}><Clock size={14} /> שמירת סטטוס</button> : <button className="btn-ghost sm" onClick={() => setProgMode(true)}><Clock size={14} /> סמן «בטיפול»</button>)}
         {cp.resolve && c.status === "open" && (resolveMode ? <button className="btn-primary sm" onClick={() => onResolve({ ...c, response: note.trim() })}><Check size={14} /> סגירה כטופל</button> : <button className="btn-primary sm" onClick={() => setResolveMode(true)}><Check size={14} /> סומן כטופל</button>)}
         {cp.escalate && c.status === "open" && c.escalatedTo !== "admin" && c.ownerRole !== "admin" && <button className="btn-ghost sm" onClick={() => onEscalate(c)}>העברה למנהל המערכת</button>}
+        {cp.delete && <ConfirmBtn className="btn-danger sm" label="מחיקת דיווח" onConfirm={() => onDelete(c)} />}
       </div>
       <div style={{ height: 20 }} />
     </div></div>);
@@ -3384,7 +3386,7 @@ function ZoneTag({ zone, onClose }) {
 }
 
 function CleaningAdmin(p) {
-  const { zones, rounds, users, absences, saveZone, delZone, saveUser, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint } = p;
+  const { zones, rounds, users, absences, saveZone, delZone, saveUser, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, delComplaint } = p;
   const cleaners = useMemo(() => (users || []).filter(isActiveCleaningWorker), [users]);
   const managers = useMemo(() => (users || []).filter((u) => u.role === "user" && u.active !== false), [users]);
   const [tab, setTab] = useState("today"), [edit, setEdit] = useState(null), [tag, setTag] = useState(null), [rep, setRep] = useState(null), [showClosed, setShowClosed] = useState(false);
@@ -3469,7 +3471,7 @@ function CleaningAdmin(p) {
     }} onDelete={async () => { if (await delZone(edit.id)) setEdit(null); }} /></Overlay>}
     {tag && <Overlay onClose={() => setTag(null)}><ZoneTag zone={tag} onClose={() => setTag(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
-    {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ approve: true, reject: true, resolve: cDetail.ownerRole === "admin" || cDetail.escalatedTo === "admin" }} onApprove={(c) => { approveComplaint(c); setCDetail(null); }} onReject={(c) => { rejectComplaint(c); setCDetail(null); }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onProgress={(c) => { progressComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
+    {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ approve: true, reject: true, resolve: cDetail.ownerRole === "admin" || cDetail.escalatedTo === "admin", delete: true }} onApprove={(c) => { approveComplaint(c); setCDetail(null); }} onReject={(c) => { rejectComplaint(c); setCDetail(null); }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onProgress={(c) => { progressComplaint(c); setCDetail(null); }} onDelete={async (c) => { if (await delComplaint(c.id)) setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
     {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={p.session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /></Overlay>}
   </>);
 }
@@ -6408,10 +6410,10 @@ function FleetModule(p) {
     {rows.length === 0 ? <Empty text={fleet.length ? "אין תוצאות לפילטר הנוכחי" : "הפארק ריק"} sub={fleet.length ? "נסו לנקות את הפילטרים" : "הוסיפו כלי שינוע ראשון"} />
       : groups ? <div className="fleet-groups">{groups.map((g) => { const open = !collapsed[g.k]; return <div key={g.k} className="fgroup">
           <button className="fgroup-head" onClick={() => setCollapsed((c) => ({ ...c, [g.k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{g.k}</span><span className="fgroup-count">{g.items.length}</span>{g.blocked > 0 && <span className="fgroup-blk"><ShieldAlert size={11} /> {g.blocked} מושבתים</span>}</button>
-          {open && <div className="ftable fleet-unit-table"><div className="ftable-head fleet-unit-row"><span></span><span>מספר</span><span>סוג</span><span>דגם</span><span>ספק</span><span>מסמכים</span></div>{g.items.map(renderRow)}</div>}
+          {open && <div className="ftable fleet-unit-table"><div className="ftable-head fleet-unit-row"><span className="ft-select"></span><span className="ft-code">מספר</span><span className="ft-type">סוג</span><span className="ft-model">דגם</span><span className="ft-sup">ספק</span><span className="ft-doc">מסמכים</span></div>{g.items.map(renderRow)}</div>}
         </div>; })}</div>
       : <div className="ftable fleet-unit-table">
-          <div className="ftable-head fleet-unit-row"><span></span><span>מספר</span><span>סוג</span><span>דגם</span><span>ספק</span><span>מסמכים</span></div>
+          <div className="ftable-head fleet-unit-row"><span className="ft-select"></span><span className="ft-code">מספר</span><span className="ft-type">סוג</span><span className="ft-model">דגם</span><span className="ft-sup">ספק</span><span className="ft-doc">מסמכים</span></div>
           {rows.map(renderRow)}
         </div>}
     </>}
@@ -9447,12 +9449,15 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .more-menu button:hover{background:var(--surface-2);}
 .ftable-head{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
 .ftable-row{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;cursor:pointer;}
-.fleet-unit-table .fleet-unit-row{direction:ltr;grid-template-columns:34px minmax(82px,.65fr) minmax(170px,1.25fr) minmax(110px,.8fr) minmax(110px,.8fr) minmax(210px,1.35fr);gap:12px;text-align:left;}
-.fleet-unit-table .fleet-unit-row>span,.fleet-unit-table .fleet-unit-row>label{direction:rtl;text-align:right;min-width:0;}
-.fleet-unit-table .ft-code{direction:ltr;text-align:left;unicode-bidi:isolate;font-variant-numeric:tabular-nums;font-weight:800;}
+.fleet-unit-table .fleet-unit-row{grid-template-columns:minmax(82px,.65fr) minmax(170px,1.25fr) minmax(110px,.8fr) minmax(110px,.8fr) minmax(210px,1.35fr) 34px;gap:12px;text-align:right;}
+.fleet-unit-table .fleet-unit-row>span,.fleet-unit-table .fleet-unit-row>label{text-align:right;min-width:0;}
+.fleet-unit-table .ft-code{grid-column:1;direction:ltr;text-align:right;unicode-bidi:isolate;font-variant-numeric:tabular-nums;font-weight:800;}
+.fleet-unit-table .ft-type{grid-column:2;}
 .fleet-unit-table .ft-type b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.fleet-unit-table .ft-model{direction:ltr;text-align:left;unicode-bidi:isolate;font-weight:800;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.fleet-unit-table .ft-sup{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:700;}
+.fleet-unit-table .ft-model{grid-column:3;direction:ltr;text-align:right;unicode-bidi:isolate;font-weight:800;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fleet-unit-table .ft-sup{grid-column:4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:700;}
+.fleet-unit-table .ft-doc{grid-column:5;}
+.fleet-unit-table .ft-select{grid-column:6;}
 .manager-fleet-row{grid-template-columns:minmax(118px,0.95fr) minmax(240px,1.75fr) minmax(96px,0.85fr) minmax(96px,0.8fr);}
 .manager-fleet-table .ft-code{min-width:0;direction:ltr;unicode-bidi:isolate;text-align:start;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .manager-fleet-table .ft-model{min-width:0;line-height:1.3;}
@@ -10046,6 +10051,13 @@ button.notif-perm:hover{background:#D1FAE5;}
   .ai-back{align-items:center;}.ai-panel{max-width:560px;height:80vh;border-radius:18px;}
   .ai-fab{inset-inline-end:28px;bottom:28px;}.toast{bottom:24px;width:380px;}.version-update-banner{bottom:24px;flex-direction:row;align-items:center;justify-content:space-between;}.version-update-refresh{flex:0 0 auto;}
   .cat-grid{grid-template-columns:repeat(3,1fr);}
+}
+@media(max-width:640px){
+  .ovl-backdrop{align-items:stretch;justify-content:stretch;padding:0;}
+  .ovl-panel{height:100dvh;max-height:100dvh;overflow:hidden;}
+  .ovl-inner{height:100dvh;min-height:0;}
+  .ovl-inner>.form-head{position:relative;top:auto;flex:0 0 auto;padding-top:calc(12px + env(safe-area-inset-top));}
+  .ovl-inner>.body{min-height:0;flex:1;overflow-y:auto;padding-bottom:calc(24px + env(safe-area-inset-bottom));}
 }
 @media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:34px 0.7fr 1.4fr 1fr 1fr;}}
 .ymx-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
