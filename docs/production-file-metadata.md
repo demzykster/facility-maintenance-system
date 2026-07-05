@@ -68,6 +68,8 @@ For known protected file owners, upload metadata must also match the storage pat
 
 Ticket photo uploads now pass explicit file metadata through `/api/files`. Cleaning complaint main photos, cleaning complaint issue photos, and cleaning round issue photos now pass explicit file metadata through `/api/files`.
 
+Public unauthenticated cleaning quick reports are the exception to the client API path: `/api/public/complaints` accepts the required photo from the public caller, creates the complaint id server-side, uploads the photo to Supabase Storage with service credentials, and writes the `file_metadata` row before saving the complaint record without embedded base64.
+
 File deletes through `/api/files` soft-delete matching metadata rows by storage path with `deleted_at` instead of deleting ownership history.
 
 When a metadata lookup sink is configured, `/api/files` download and delete require an active `file_metadata` row for the requested path. The active metadata row must also pass the known owner/path check. This keeps protected file access tied to known business ownership instead of relying only on storage path prefixes.

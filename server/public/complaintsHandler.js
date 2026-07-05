@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
+import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js";
+import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
 import { sendServerError } from "../httpErrors.js";
+import { cleaningComplaintPhotoMetadata } from "../../src/fileMetadataModel.js";
 
 const MAX_BODY_BYTES = 2_200_000;
 const MAX_PHOTO_CHARS = 2_000_000;
@@ -44,6 +47,22 @@ const safePhoto = (value) => {
   if (!photo || photo.length > MAX_PHOTO_CHARS) return "";
   return /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=\s]+$/.test(photo) ? photo : "";
 };
+
+const photoFileFromDataUrl = (value = "") => {
+  const photo = safePhoto(value);
+  const match = photo.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i);
+  if (!match) return null;
+  const contentType = match[1].toLowerCase() === "image/jpg" ? "image/jpeg" : match[1].toLowerCase();
+  return {
+    contentType,
+    ext: contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg",
+    buffer: Buffer.from(match[2].replace(/\s+/g, ""), "base64")
+  };
+};
+
+const safePathSegment = (value) => String(value || "item").replace(/[^a-zA-Z0-9._-]/g, "-");
+
+const publicComplaintPhotoPath = (complaintId, file) => `cleaning/complaints/${safePathSegment(complaintId)}/photo.${file.ext}`;
 
 const requestFingerprint = (req) => {
   const forwarded = String(getHeader(req.headers, "x-forwarded-for") || "").split(",")[0].trim();
@@ -116,6 +135,8 @@ export function validatePublicComplaintPayload(body = {}) {
 
 export function createPublicComplaintHandler({
   driver = null,
+  fileDriver = null,
+  metadataDriver = null,
   env = process.env,
   now = () => Date.now(),
   createId = () => randomUUID(),
@@ -125,6 +146,11 @@ export function createPublicComplaintHandler({
     || (env.CMMS_PUBLIC_COMPLAINTS_DRIVER === "supabase" || env.CMMS_KV_DRIVER === "supabase"
       ? createSupabaseKvDriverFromEnv(env, fetchImpl)
       : null);
+  const requireFileStorage = env.CMMS_FILE_DRIVER === "supabase";
+  const backendFileDriver = fileDriver
+    || (requireFileStorage ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
+  const backendMetadataDriver = metadataDriver
+    || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
 
   return async function publicComplaintHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
@@ -142,6 +168,8 @@ export function createPublicComplaintHandler({
       const body = await readBody(req);
       const validated = validatePublicComplaintPayload(body);
       if (!validated.ok) return json(res, validated.status, { error: validated.error });
+      if (requireFileStorage && !backendFileDriver) return json(res, 503, { error: "public_complaint_file_storage_not_configured" });
+      if (requireFileStorage && !backendMetadataDriver) return json(res, 503, { error: "public_complaint_file_metadata_not_configured" });
 
       const currentTime = now();
       const rateKey = `publicComplaintRate:${hashKey(requestFingerprint(req))}`;
@@ -159,6 +187,31 @@ export function createPublicComplaintHandler({
         now: currentTime,
         id: createId()
       });
+      if (requireFileStorage) {
+        const file = photoFileFromDataUrl(complaint.photo);
+        if (!file || !file.buffer.length) return json(res, 400, { error: "photo_required" });
+        const photoPath = publicComplaintPhotoPath(complaint.id, file);
+        const metadata = cleaningComplaintPhotoMetadata(complaint, photoPath, {
+          contentType: file.contentType,
+          sizeBytes: file.buffer.length,
+          createdByRole: "anonymous",
+          createdAt: complaint.at
+        });
+        await backendFileDriver.upload(photoPath, file.buffer, file.contentType, {
+          id: "",
+          name: "דיווח אנונימי",
+          role: "anonymous"
+        });
+        try {
+          await backendMetadataDriver.upsert(metadata);
+        } catch (error) {
+          try { await backendFileDriver.delete?.(photoPath); } catch {}
+          throw error;
+        }
+        complaint.photo = null;
+        complaint.photoPath = photoPath;
+        complaint.hasPhoto = true;
+      }
 
       await backendDriver.set(rateKey, String(currentTime), false);
       await backendDriver.set(`ccomplaint:${complaint.id}`, JSON.stringify(complaint), true);
