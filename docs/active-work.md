@@ -22,11 +22,12 @@ Then explain what is inconsistent, why it is risky, and the safe options.
 
 ## Current Active Item
 
-- Active branch: `codex/project-hygiene-audit`.
+- Active branch: none.
 - Current main: verify with `git log --oneline origin/main -1` at session start. This live ledger intentionally does not pin a main SHA, because the SHA changes as soon as a docs-only sync PR is merged.
 - Open PRs at last check: none.
-- Active work in progress: small hygiene/audit cleanup before the next product slice. Scope: replace browser `alert()` export/print notices with app-native toast feedback, remove old real-looking demo/placeholders, and document legacy inventory. No Supabase data cleanup, storage migration, QR/round/compliance rewrite, or broad monolith split.
+- Active work in progress: none.
 - Latest completed product work:
+  - PR #695 cleaned up project hygiene tails before the next product slice: remaining browser `alert()` export/print notices now use app-native toast feedback, old real-looking demo/placeholders use neutral examples, and `docs/hygiene-audit-2026-07-05.md` records legacy inventory. It did not clean/reseed Supabase data, migrate storage, rewrite QR/round/compliance, or start a broad monolith split.
   - PR #691 made `בקרת כלים` inside `בקרות` target real fleet records: fleet-domain programs/assignments/runs preserve `target.kind = "fleet"` and `fleetId` instead of only free-text labels.
   - PR #689 added the first narrow saved `בקרות` Program -> Assignment -> Run UI slice: create a control program from a manual preset, create one manual assignment, open a run from that assignment, and preserve program/assignment links through run/finding/task routing. It does not add a scheduling engine, cleaning/location migration, executive BI, Supabase table migration, or a broad monolith split.
   - PR #686 added a model-only `בקרות` helper/test to draft a control run from one assignment while preserving program, assignment, participant, and target links. It does not complete the run, create findings, route actions, add UI, start scheduling, or migrate data.
@@ -116,7 +117,7 @@ Then explain what is inconsistent, why it is risky, and the safe options.
   - PR #528 matched periodic-maintenance rules by imported vehicle type while keeping `דגם` as model.
   - PR #527 kept fleet catalog `סוג כלי` and `דגם` separate during import/catalog validation.
   - PR #526 clarified supplier linked activity counts.
-- Current owner-reported work queue: hygiene/audit cleanup is active on `codex/project-hygiene-audit`. Continue other product work only after this branch is merged or closed.
+- Current owner-reported work queue: none. Continue only from fresh owner-reported issues or the already-agreed `בקרות` sequence.
 - Removed from active queue at owner request: internal `appIssue:` reports, TO/periodic-maintenance redesign, and the old fleet/catalog task wording. Wait for fresh owner formulations before restarting those tasks.
 - Closed/deferred draft: PR #693 (`codex/cleaning-controls-slice`) intentionally stayed unmerged and was closed because it was mostly a future-direction bridge, not a needed production feature. The cleaning-controls direction remains documented in the blueprint/strategy docs.
 - Next exact action: no active code task is open. If the owner explicitly reopens `בקרות -> ניקיון`, rebuild it from fresh `main` as a concrete product slice: read-only manager/admin overview plus manual manager cleaning-zone quality check. Do not rewrite QR/round/windows/compliance, do not migrate cleaning zones yet, and do not add a separate right-sidebar menu item.
