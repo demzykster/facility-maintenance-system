@@ -1,4 +1,3 @@
-const CLEANING_GROUP_IDS = new Set(["cleaning-team", "cleaning", "cleaners"]);
 const CLEANING_DEPARTMENT_NAMES = new Set(["ניקיון", "נקיון", "cleaning"]);
 
 const LEVEL_RANK = Object.freeze({
@@ -21,14 +20,6 @@ const permissionLevel = (user = {}, module) => {
 const hasPermission = (user = {}, module, minLevel = "view") =>
   (LEVEL_RANK[permissionLevel(user, module)] ?? 0) >= (LEVEL_RANK[minLevel] ?? 0);
 
-const groupIdsOf = (user = {}) => [
-  ...(Array.isArray(user.groups) ? user.groups : []),
-  ...(Array.isArray(user.userGroups) ? user.userGroups : []),
-  ...(Array.isArray(user.groupIds) ? user.groupIds : [])
-].map(cleanString).filter(Boolean);
-
-const hasCleaningGroup = (user = {}) => groupIdsOf(user).some((id) => CLEANING_GROUP_IDS.has(id));
-
 const isCleaningDepartment = (user = {}) => {
   if ((user.role || user.userRole) !== "worker") return false;
   const deptNames = [
@@ -50,7 +41,7 @@ export const normalizeCleaningAccess = (user = {}) => {
   const enabledByFlag = truthy(raw) || truthy(user.canClean) || truthy(user.isCleaner);
   const enabled = user.active === false
     ? false
-    : isLegacyCleanerRole(user) || enabledByFlag || hasCleaningGroup(user) || isCleaningDepartment(user) || truthy(objectAccess.enabled);
+    : isLegacyCleanerRole(user) || enabledByFlag || isCleaningDepartment(user) || truthy(objectAccess.enabled);
 
   return {
     enabled,
@@ -64,9 +55,7 @@ export const normalizeCleaningAccess = (user = {}) => {
       ? "legacy-role"
       : enabledByFlag || truthy(objectAccess.enabled)
         ? "cleaning-access"
-        : hasCleaningGroup(user)
-          ? "group"
-          : isCleaningDepartment(user)
+        : isCleaningDepartment(user)
             ? "department"
             : "none"
   };

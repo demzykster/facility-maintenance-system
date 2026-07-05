@@ -31,7 +31,6 @@ describe("push notification model", () => {
       role: "admin",
       perms: { settings: "full" },
       cleaningAccess: { enabled: true, canReceiveComplaints: true },
-      userGroups: ["leadership"],
       notificationPrefs: { enabled: { sla: false } }
     };
     const first = upsertPushSubscription([], subscription, user, 100);
@@ -45,7 +44,6 @@ describe("push notification model", () => {
       userRole: "admin",
       userPermissions: { settings: "full" },
       userCleaningAccess: { enabled: true, canReceiveComplaints: true },
-      userGroups: ["leadership"],
       notificationPrefs: { enabled: { sla: false } },
       createdAt: 100,
       updatedAt: 200,

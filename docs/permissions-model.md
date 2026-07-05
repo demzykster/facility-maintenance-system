@@ -15,7 +15,6 @@ Permission levels are defined in `src/permissionModel.js`:
 - `ppe`
 - `workerAccess`
 - `users`
-- `userGroups`
 - `analytics`
 - `suppliers`
 - `settings`
