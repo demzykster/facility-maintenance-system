@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Branch: `codex/remove-retired-checks-v1`
-- Scope: v1/main cleanup only.
-- Goal: remove the abandoned control/inspection direction from the current product surface, runtime contracts, tests, and live docs.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: removed the abandoned experimental module direction from the current product surface, runtime contracts, tests, live docs, and monolith leftovers.
 
 ## Current Product Direction
 
@@ -15,7 +15,7 @@
   - cleaning operations;
   - PPE;
   - tasks, meetings, users, suppliers, settings, audit, and production login.
-- Do not continue the removed control/inspection direction in this release.
+- Do not reintroduce the removed experimental module direction in this release.
 - Do not create new `src/app`, `src/features`, or `src/shared` structure in v1 cleanup work.
 - Do not touch v2 or Claude branches from this workstream.
 

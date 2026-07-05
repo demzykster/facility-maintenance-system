@@ -83,8 +83,8 @@ describe("fleetMaintenancePolicyModel", () => {
         name: "TO 500",
         intervalMonths: 3,
         vehicleTypeNames: ["מלגזת היגש"],
-        checklistTemplateId: "inspection-template-should-not-be-used",
-        checklistItems: [{ id: "inspection-row", label: "לא לקחת מבקרת כלים" }],
+        checklistTemplateId: "general-template-should-not-be-used",
+        checklistItems: [{ id: "general-row", label: "לא לקחת מרשימת בדיקה כללית" }],
         maintenanceChecklistItems: [
           { id: "oil", label: "בדיקת שמן" },
           { id: "brakes", label: "בדיקת בלמים" },
@@ -100,7 +100,7 @@ describe("fleetMaintenancePolicyModel", () => {
     expect(rules[0].checklistTemplateId).toBeUndefined();
   });
 
-  it("normalizes periodic-maintenance checklist items without borrowing inspection data", () => {
+  it("normalizes periodic-maintenance checklist items without borrowing general checklist data", () => {
     expect(normalizeMaintenanceChecklistItems(["שמן", "", { id: "brake", label: "בלמים" }, { label: "שמן" }])).toEqual([
       expect.objectContaining({ label: "שמן" }),
       { id: "brake", label: "בלמים" }
