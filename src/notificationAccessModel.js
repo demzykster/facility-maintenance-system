@@ -57,8 +57,7 @@ export function notificationSessionFromSubscription(subscriptionRecord = {}) {
     perms: normalizePerms({
       perms: subscriptionRecord.userPermissions || subscriptionRecord.permissions || subscriptionRecord.perms || {}
     }),
-    cleaningAccess: subscriptionRecord.cleaningAccess || subscriptionRecord.userCleaningAccess || false,
-    groups: subscriptionRecord.userGroups || subscriptionRecord.groups || []
+    cleaningAccess: subscriptionRecord.cleaningAccess || subscriptionRecord.userCleaningAccess || false
   };
 }
 

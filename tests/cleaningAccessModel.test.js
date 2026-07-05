@@ -41,18 +41,6 @@ describe("cleaning access model", () => {
     expect(canViewCleaningReports(user)).toBe(false);
   });
 
-  it("supports group-based cleaning access without creating another role", () => {
-    const user = { role: "worker", groups: ["cleaning-team"] };
-
-    expect(normalizeCleaningAccess(user)).toMatchObject({
-      enabled: true,
-      canPerformRounds: true,
-      canReceiveComplaints: true,
-      canCloseComplaints: true,
-      source: "group"
-    });
-  });
-
   it("treats workers in the cleaning department as cleaning-capable", () => {
     const user = { role: "worker", dept: "ניקיון" };
 

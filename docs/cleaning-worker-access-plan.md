@@ -4,7 +4,7 @@ This document records the owner-approved direction for replacing `cleaner` as a 
 
 ## Decision
 
-Cleaning workers should be modeled as ordinary workers with a permanent cleaning capability/group, not as a separate core role.
+Cleaning workers should be modeled as ordinary workers with a permanent cleaning capability, not as a separate core role.
 
 Target user shape:
 
@@ -13,7 +13,6 @@ Target user shape:
   role: "worker",
   employmentType: "direct" | "contractor",
   contractorName: "",
-  groups: ["cleaning-team"],
   cleaningAccess: {
     canPerformRounds: true,
     canReceiveComplaints: true,
@@ -104,6 +103,4 @@ The current app still treats `cleaner` as a real role in several places:
 - cleaning shell routing and role-specific UI labels;
 - tests and release docs.
 
-This is why the change should be separate from `userGroups`.
-
-`userGroups` is an organizational layer. Cleaning access is an operational capability that already affects login, permissions, writes, and notifications.
+Cleaning access is an operational capability that already affects login, permissions, writes, and notifications.

@@ -13,7 +13,7 @@ Do not use this file as permission to start broad architecture work. Read the cu
 - Cleaning zones, rounds, complaints, absences, and public QR reporting.
 - PPE catalog, issue flow, worker requests, stock, orders, and norms.
 - Tasks and meetings.
-- Users, worker access, groups, permissions, suppliers, settings, audit, production login, backup/restore.
+- Users, worker access, permissions, suppliers, settings, audit, production login, backup/restore.
 
 ## Retired Direction
 
