@@ -132,6 +132,79 @@ describe("public complaint handler", () => {
       source: "public_endpoint",
       demo: false
     });
+    expect(complaint.photo).toBe(photo);
+  });
+
+  it("stores public complaint photos in file storage without embedding base64 when configured", async () => {
+    const driver = {
+      get: vi.fn(async (key) => {
+        if (key.startsWith("publicComplaintRate:")) return null;
+        if (key === "czone:zone-1") return JSON.stringify({
+          id: "zone-1",
+          name: "Lobby",
+          building: "A",
+          floor: "1"
+        });
+        return null;
+      }),
+      set: vi.fn()
+    };
+    const fileDriver = { upload: vi.fn().mockResolvedValue({ path: "cleaning/complaints/complaint-1/photo.jpg" }) };
+    const metadataDriver = { upsert: vi.fn().mockResolvedValue({ ok: true }) };
+    const handler = createPublicComplaintHandler({
+      driver,
+      fileDriver,
+      metadataDriver,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true", CMMS_FILE_DRIVER: "supabase", CMMS_FILE_METADATA_DRIVER: "supabase" },
+      now: () => 123456,
+      createId: () => "complaint-1"
+    });
+
+    const res = await call(handler, {
+      body: { zoneId: "zone-1", kind: "dirty", text: "Spill", photo }
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(fileDriver.upload).toHaveBeenCalledWith(
+      "cleaning/complaints/complaint-1/photo.jpg",
+      expect.any(Buffer),
+      "image/jpeg",
+      expect.objectContaining({ role: "anonymous" })
+    );
+    expect(metadataDriver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      ownerType: "cleaning_complaint",
+      ownerId: "complaint-1",
+      kind: "cleaning_complaint_photo",
+      path: "cleaning/complaints/complaint-1/photo.jpg",
+      contentType: "image/jpeg",
+      createdByRole: "anonymous"
+    }));
+    const complaint = JSON.parse(driver.set.mock.calls.find(([key]) => key === "ccomplaint:complaint-1")[1]);
+    expect(complaint).toMatchObject({
+      id: "complaint-1",
+      photo: null,
+      photoPath: "cleaning/complaints/complaint-1/photo.jpg",
+      hasPhoto: true
+    });
+    expect(JSON.stringify(complaint)).not.toContain("data:image");
+  });
+
+  it("does not accept public photo reports in file-storage mode without a file driver", async () => {
+    const driver = { get: vi.fn(), set: vi.fn() };
+    const handler = createPublicComplaintHandler({
+      driver,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true", CMMS_FILE_DRIVER: "supabase" },
+      now: () => 123456,
+      createId: () => "complaint-1"
+    });
+
+    const res = await call(handler, {
+      body: { zoneId: "zone-1", kind: "dirty", text: "Spill", photo }
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "public_complaint_file_storage_not_configured" });
+    expect(driver.set).not.toHaveBeenCalled();
   });
 
   it("rate-limits before writing the complaint", async () => {

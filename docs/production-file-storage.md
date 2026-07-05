@@ -31,6 +31,8 @@ The release gate only accepts production mode when file storage and file ownersh
 - Existing demo/local flows still read and write the current browser/KV photo records for review compatibility.
 - Production+API ticket before/after photos use `/api/files` and ticket metadata fields (`photoPath`, `afterPhotoPath`).
 - Production+API cleaning complaint and round issue photos use `/api/files` and metadata fields (`photoPath`, `hasPhoto`).
+- Public unauthenticated cleaning quick-report photos are uploaded server-side by `/api/public/complaints` into Supabase Storage. The public caller can submit the required photo but cannot read files back.
+- In production file-storage mode, `/api/public/complaints` writes only `photoPath`/`hasPhoto` into the complaint record and rejects the report if Supabase file storage or file metadata storage is not configured.
 - Backup/restore may still include `photos` for demo/local continuity.
 - Production rollout must keep protected file access behind server APIs before real use.
 - `/api/files` currently uses a conservative path-prefix allowlist before final metadata/RLS-based authorization.
@@ -74,4 +76,4 @@ Finish the production file boundary around backup/export and normalized tables:
 - keep production business records as metadata/path references, not embedded base64;
 - persist file ownership metadata server-side when upload flows are moved fully behind Supabase tables/RLS;
 - keep protected image data fetched through `/api/files`;
-- avoid treating demo/local backup photos as production migration data.
+- avoid treating demo/local backup photos as production migration data, including old public quick-report base64 photos.

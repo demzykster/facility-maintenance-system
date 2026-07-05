@@ -34,7 +34,7 @@ Still in scope for production hardening:
 
 - normalized database schema/RLS for more business tables;
 - continued server-side permission enforcement;
-- production file/photo storage;
+- production file/photo storage beyond the first ticket/cleaning/public-report storage boundary;
 - server-side AI endpoint for provider secrets;
 - adapter/model-first extraction from `src/ClaudeMaintenanceApp.jsx`.
 
