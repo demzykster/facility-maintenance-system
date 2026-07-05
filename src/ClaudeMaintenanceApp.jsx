@@ -10234,19 +10234,19 @@ button.notif-perm:hover{background:#D1FAE5;}
   .modal2-body{padding:14px;}
   .profile-head{margin-bottom:10px;}
   .avatar.big{width:34px;height:34px;font-size:16px;}
-  .worker-top{display:grid;grid-template-columns:1fr;gap:10px;padding:calc(16px + env(safe-area-inset-top)) 12px 10px;}
-  .worker-top-actions{justify-content:center;width:100%;gap:6px;flex-wrap:nowrap;}
-  .worker-top .icon-btn{width:40px;height:40px;flex:0 0 40px;}
-  .worker-action-btn{width:40px;min-height:40px;padding:0;flex:0 0 40px;justify-content:center;}
+  .worker-top{display:grid;grid-template-columns:1fr;gap:8px;padding:calc(14px + env(safe-area-inset-top)) 10px 8px;}
+  .worker-top-actions{justify-content:center;width:100%;gap:4px;flex-wrap:nowrap;}
+  .worker-top .icon-btn{width:34px;height:34px;flex:0 0 34px;}
+  .worker-action-btn{width:34px;min-height:34px;padding:0;flex:0 0 34px;justify-content:center;}
   .worker-action-btn span{display:none;}
-  .language-picker.compact{min-width:0;flex:0 0 96px;}
-  .language-picker.compact select{width:100%;min-height:40px;}
-  .wk-title{font-size:19px;}
+  .language-picker.compact{min-width:0;flex:0 0 82px;}
+  .language-picker.compact select{width:100%;min-height:34px;font-size:12px;padding-inline:6px;}
+  .wk-title{font-size:18px;}
   .worker-preview{padding:0 12px 10px;}
-  .wk-tabs{display:flex;gap:6px;padding:10px 8px 0;align-items:stretch;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;}
+  .wk-tabs{display:flex;gap:4px;padding:8px 6px 0;align-items:stretch;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;}
   .wk-tabs::-webkit-scrollbar{width:0;height:0;display:none;}
-  .wk-tabs button{min-width:82px;flex:0 0 82px;min-height:64px;flex-direction:column;gap:4px;padding:8px 4px;font-size:12px;line-height:1.12;text-align:center;white-space:normal;overflow-wrap:anywhere;}
-  .wk-tabs button svg{width:15px;height:15px;flex-shrink:0;}
+  .wk-tabs button{min-width:70px;flex:0 0 70px;min-height:58px;flex-direction:column;gap:3px;padding:7px 3px;font-size:11px;line-height:1.1;text-align:center;white-space:normal;overflow-wrap:anywhere;}
+  .wk-tabs button svg{width:14px;height:14px;flex-shrink:0;}
   .worker-body{padding:16px 12px 40px;}
   .absence-date-row{display:grid;grid-template-columns:1fr;gap:10px;}
   .absence-date-row .field{min-width:0;}
@@ -10270,10 +10270,12 @@ button.notif-perm:hover{background:#D1FAE5;}
   .manager-fleet-table .ft-doc{grid-area:drivers;justify-content:flex-end;white-space:nowrap;font-size:12px;line-height:1.3;}
 }
 @media(max-width:390px){
-  .wk-tabs{gap:3px;padding-inline:6px;}
-  .wk-tabs button{min-width:78px;flex-basis:78px;min-height:62px;padding:7px 3px;font-size:11.5px;}
-  .worker-top .icon-btn,.worker-action-btn{width:38px;height:38px;flex-basis:38px;}
-  .language-picker.compact{flex-basis:88px;}
+  .worker-top{padding-inline:8px;}
+  .worker-top-actions{gap:3px;}
+  .wk-tabs{gap:3px;padding-inline:5px;}
+  .wk-tabs button{min-width:64px;flex-basis:64px;min-height:56px;padding:6px 2px;font-size:10.5px;}
+  .worker-top .icon-btn,.worker-action-btn{width:32px;height:32px;flex-basis:32px;}
+  .language-picker.compact{flex-basis:76px;}
 }
 `}</style>);
 }
