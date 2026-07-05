@@ -7823,7 +7823,19 @@ function PMList({ items, fleet, onOpen, config, selectedIds = [], onToggleSelect
 function PMCalendar({ items, fleet, onOpen, overdue, config }) {
   const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
   const year = cursor.getFullYear(), month = cursor.getMonth();
-  const byDay = {}; items.forEach((x) => { const k = startOfDay(x.nextDue); (byDay[k] = byDay[k] || []).push(x); });
+  const monthStart = startOfDay(new Date(year, month, 1).getTime());
+  const monthEnd = startOfDay(new Date(year, month + 1, 0).getTime());
+  const byDay = {};
+  (items || []).forEach((x) => {
+    const stepM = pmIntervalMonths(x, config);
+    let occ = startOfDay(x.nextDue);
+    for (let i = 0; i < 60 && occ <= monthEnd; i++) {
+      if (occ >= monthStart) (byDay[occ] = byDay[occ] || []).push({ task: x, projected: occ !== startOfDay(x.nextDue) });
+      const nextOcc = nextMaintenanceDueFrom(occ, stepM, { adjustToWorkday: toWorkday });
+      if (!nextOcc || nextOcc <= occ) break;
+      occ = startOfDay(nextOcc);
+    }
+  });
   // build weeks (rows) with only Sun-Thu columns
   const first = new Date(year, month, 1); const startW = new Date(first); startW.setDate(1 - first.getDay());
   const weeks = []; let cur = new Date(startW);
@@ -7835,7 +7847,7 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
     <div className="cal-grid">{weeks.map((row, wi) => row.map((day, di) => { const inMonth = day.getMonth() === month; const k = startOfDay(day.getTime()); const list = byDay[k] || []; const isToday = k === todayK; return (
       <div key={wi + "-" + di} className={"cal-cell" + (inMonth ? "" : " out") + (isToday ? " today" : "")}>
         <div className="cal-daynum">{day.getDate()}</div>
-        {list.slice(0, 3).map((x) => { const f = pmFleet(x, fleet); const od = k < todayK; return <button key={x.id} className="cal-pill" style={{ background: od ? "#FEE2E2" : "#FFEDD5", color: od ? "#B91C1C" : "#9A3412" }} onClick={() => onOpen(x)}>{f ? f.code : "כלי"}</button>; })}
+        {list.slice(0, 3).map(({ task: x, projected }) => { const f = pmFleet(x, fleet); const od = k < todayK; return <button key={`${x.id}-${k}`} className={"cal-pill" + (projected ? " projected" : "")} style={{ background: od ? "#FEE2E2" : projected ? "#EEF2FF" : "#FFEDD5", color: od ? "#B91C1C" : projected ? "#4338CA" : "#9A3412" }} onClick={() => onOpen(x)}>{f ? f.code : "כלי"}</button>; })}
         {list.length > 3 && <div className="cal-more">+{list.length - 3}</div>}
       </div>); }))}</div>
     {overdue.length > 0 && <><SectionTitle><AlertTriangle size={15} /> באיחור</SectionTitle><div className="cards">{overdue.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); return <div key={x.id} className="pm-card" onClick={() => onOpen(x)}><span className="pm-bar" style={{ background: "#DC2626" }} /><div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span></div><div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)} · באיחור {-d} ימים{fleetDepts(f).length ? <> · {fleetDepts(f).join(", ")}</> : null}</div></div></div>; })}</div></>}
@@ -10208,6 +10220,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .pm-plan-day b{font-weight:800;white-space:nowrap;}
 .pm-plan-day span{font-weight:800;color:var(--primary);white-space:nowrap;}
 .pm-plan-day em{font-style:normal;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-pill.projected{border:1px dashed #818CF8;}
 .checklist{display:flex;flex-direction:column;gap:8px;}
 .chk{display:flex;align-items:center;gap:10px;width:100%;text-align:right;background:var(--surface);border:1.5px solid var(--line);border-radius:11px;padding:12px;font-size:14px;color:var(--ink);}
 .chk.on{border-color:#16A34A;background:#16a34a14;}
