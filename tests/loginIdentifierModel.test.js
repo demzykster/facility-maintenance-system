@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveIdentifier } from "../src/loginIdentifierModel.js";
 
 const users = [
-  { id: "admin-1", role: "admin", email: "Vadim@Chemipal.co.il", password: "1234" },
+  { id: "admin-1", role: "admin", email: "Vadim@example.local", password: "1234" },
   { id: "mgr-1", role: "user", email: "manager@local", password: "1234", active: false },
   { id: "mgr-2", role: "user", email: "old-manager@local", password: "1234", status: "archived" },
   { id: "worker-1", role: "worker", workerNo: "1042", pin: "1234" },
@@ -17,7 +17,7 @@ const builtins = [
 
 describe("resolveIdentifier", () => {
   it("resolves staff email case-insensitively and asks for password", () => {
-    expect(resolveIdentifier(" vadim@chemipal.co.il ", users, builtins)).toMatchObject({
+    expect(resolveIdentifier(" vadim@example.local ", users, builtins)).toMatchObject({
       status: "active",
       identifierType: "email",
       auth: "password",
