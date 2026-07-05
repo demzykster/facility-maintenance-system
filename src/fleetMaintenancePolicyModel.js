@@ -168,7 +168,7 @@ export function nextWorkingDay(tsMs) {
   return day.getTime();
 }
 
-export function distributeNewTasks(assignments = [], { startAt, endAt, dailyCapacity = 4, perTypeDailyLimits = {} } = {}) {
+export function distributeNewTasks(assignments = [], { startAt, endAt, dailyCapacity = 4, perTypeDailyLimits = {}, maxPlanningDays = 370 } = {}) {
   const original = Array.isArray(assignments) ? assignments : [];
   const capacity = Math.max(1, Math.floor(Number(dailyCapacity) || 4));
   const rawStart = Number(startAt) || Date.now();
@@ -192,9 +192,11 @@ export function distributeNewTasks(assignments = [], { startAt, endAt, dailyCapa
   };
   if (lastDay && lastDay >= firstDay) {
     let date = firstDay;
-    while (date <= lastDay) {
+    let guard = Math.max(1, Math.floor(Number(maxPlanningDays) || 370));
+    while (date <= lastDay && guard > 0) {
       days.push({ date, remaining: capacity, hasHeavy: false, typeCounts: {}, used: 0 });
       date = nextDay(date);
+      guard -= 1;
     }
   }
 
@@ -225,7 +227,7 @@ export function distributeNewTasks(assignments = [], { startAt, endAt, dailyCapa
   return original;
 }
 
-export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], existingTasks = [], startAt, endAt, now, dailyCapacity = 4, perTypeDailyLimits = {}, idFactory } = {}) {
+export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], existingTasks = [], startAt, endAt, now, dailyCapacity = 4, perTypeDailyLimits = {}, maxPlanningDays, idFactory } = {}) {
   const cleanRules = normalizeMaintenanceRules(rules);
   const ruleWeights = new Map(cleanRules.map((rule) => [rule.id, rule.weight === 2 ? 2 : 1]));
   const units = (Array.isArray(fleetRefs) ? fleetRefs : [])
@@ -279,7 +281,7 @@ export function buildMaintenanceScheduleFromRules({ rules = [], fleetRefs = [], 
 
   distributeNewTasks(
     toDistribute.map((task) => ({ task, weight: ruleWeights.get(task.maintenanceRuleId) || 1, typeName: task.vehicleTypeName })),
-    { startAt: firstDue, endAt, dailyCapacity, perTypeDailyLimits }
+    { startAt: firstDue, endAt, dailyCapacity, perTypeDailyLimits, maxPlanningDays }
   );
   const tasks = [...preserved, ...toDistribute];
 

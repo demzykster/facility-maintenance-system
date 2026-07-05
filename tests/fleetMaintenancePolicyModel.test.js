@@ -295,6 +295,28 @@ describe("fleetMaintenancePolicyModel", () => {
     expect(localYmd(assignments.find((assignment) => assignment.task.id === "picker-1").task.nextDue)).toBe("2026-01-04");
   });
 
+  it("caps oversized planning windows instead of expanding endless calendar days", () => {
+    const assignments = Array.from({ length: 3 }, (_, index) => ({
+      task: { id: `reach-${index + 1}` },
+      weight: 1,
+      typeName: "מלגזת היגש"
+    }));
+
+    distributeNewTasks(assignments, {
+      startAt: localDate(2026, 0, 4),
+      endAt: localDate(2035, 0, 4),
+      dailyCapacity: 4,
+      perTypeDailyLimits: { "מלגזת היגש": 1 },
+      maxPlanningDays: 2
+    });
+
+    expect(assignments.map((assignment) => localYmd(assignment.task.nextDue))).toEqual([
+      "2026-01-04",
+      "2026-01-05",
+      "2026-01-06"
+    ]);
+  });
+
   it("preserves an existing future nextDue when building schedules from rules", () => {
     const futureDue = localDate(2026, 0, 20);
     const result = buildMaintenanceScheduleFromRules({
