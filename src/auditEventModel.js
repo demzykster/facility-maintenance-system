@@ -7,6 +7,9 @@ export const AUDIT_ENTITY_TYPES = Object.freeze({
   fleet: "fleet",
   cleaning: "cleaning",
   ppe: "ppe",
+  task: "task",
+  meeting: "meeting",
+  controls: "controls",
   system: "system"
 });
 

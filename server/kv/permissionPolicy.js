@@ -23,9 +23,10 @@ const WRITE_RULES = Object.freeze([
   { prefixes: ["cround:"], roles: ["admin", "user"], access: "cleaning:perform", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
   { prefixes: ["ccomplaint:"], roles: ["admin", "user"], access: "cleaning:closeComplaint", entityType: AUDIT_ENTITY_TYPES.cleaning, auditSensitive: false },
   { prefixes: ["presence:"], roles: ["admin", "tech"], entityType: AUDIT_ENTITY_TYPES.user, auditSensitive: false },
-  { prefixes: ["mtask:", "mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
-  { prefixes: ["controlProgram:", "controlAssignment:"], module: "controls", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
-  { prefixes: ["controlRun:", "controlFinding:"], module: "controls", minLevel: "request", entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false },
+  { prefixes: ["mtask:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.task, auditSensitive: false },
+  { prefixes: ["mmeet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.meeting, auditSensitive: false },
+  { prefixes: ["controlProgram:", "controlAssignment:"], module: "controls", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.controls, auditSensitive: false },
+  { prefixes: ["controlRun:", "controlFinding:"], module: "controls", minLevel: "request", entityType: AUDIT_ENTITY_TYPES.controls, auditSensitive: false },
   { prefixes: ["appIssue:"], roles: ACTIVE_ROLES, entityType: AUDIT_ENTITY_TYPES.settings, auditSensitive: false }
 ]);
 

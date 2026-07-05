@@ -25,10 +25,12 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionForKey("ppereq:req-1")).toMatchObject({ module: "ppe", minLevel: "request", auditSensitive: false });
     expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
     expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:closeComplaint", auditSensitive: false });
-    expect(kvWritePermissionForKey("controlProgram:program-1")).toMatchObject({ module: "controls", minLevel: "manage", auditSensitive: false });
-    expect(kvWritePermissionForKey("controlAssignment:assignment-1")).toMatchObject({ module: "controls", minLevel: "manage", auditSensitive: false });
-    expect(kvWritePermissionForKey("controlRun:run-1")).toMatchObject({ module: "controls", minLevel: "request", auditSensitive: false });
-    expect(kvWritePermissionForKey("controlFinding:finding-1")).toMatchObject({ module: "controls", minLevel: "request", auditSensitive: false });
+    expect(kvWritePermissionForKey("mtask:task-1")).toMatchObject({ roles: ["admin", "user"], entityType: "task", auditSensitive: false });
+    expect(kvWritePermissionForKey("mmeet:meeting-1")).toMatchObject({ roles: ["admin", "user"], entityType: "meeting", auditSensitive: false });
+    expect(kvWritePermissionForKey("controlProgram:program-1")).toMatchObject({ module: "controls", minLevel: "manage", entityType: "controls", auditSensitive: false });
+    expect(kvWritePermissionForKey("controlAssignment:assignment-1")).toMatchObject({ module: "controls", minLevel: "manage", entityType: "controls", auditSensitive: false });
+    expect(kvWritePermissionForKey("controlRun:run-1")).toMatchObject({ module: "controls", minLevel: "request", entityType: "controls", auditSensitive: false });
+    expect(kvWritePermissionForKey("controlFinding:finding-1")).toMatchObject({ module: "controls", minLevel: "request", entityType: "controls", auditSensitive: false });
     expect(kvWritePermissionForKey("appIssue:issue-1")).toMatchObject({ roles: expect.arrayContaining(["worker", "cleaner"]), auditSensitive: false });
   });
 
