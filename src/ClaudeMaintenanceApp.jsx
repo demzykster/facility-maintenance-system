@@ -2741,6 +2741,7 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
   const [savedRun, setSavedRun] = useState(null);
   const [savedFinding, setSavedFinding] = useState(null);
   const [openRunId, setOpenRunId] = useState(null);
+  const [historyFilter, setHistoryFilter] = useState("all");
   const [programDraft, setProgramDraft] = useState({ domain: "safety", presetId: "safety-walk-basic", name: "סיור בטיחות ידני", target: "", responsibleId: "", participantId: "" });
   const [assignmentDrafts, setAssignmentDrafts] = useState({});
   const [activeAssignmentRun, setActiveAssignmentRun] = useState(null);
@@ -2802,6 +2803,22 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
     return map;
   }, {}), [controlFindings]);
   const recentRuns = useMemo(() => (controlRuns || []).slice(0, 6), [controlRuns]);
+  const findingRows = useMemo(() => (controlFindings || [])
+    .filter((finding) => finding?.id)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 24), [controlFindings]);
+  const filteredFindingRows = useMemo(() => findingRows.filter((finding) => {
+    if (historyFilter === "task") return !!finding.route?.taskId;
+    if (historyFilter === "pending") return finding.route?.type === "task" && !finding.route?.taskId;
+    if (historyFilter === "report") return finding.route?.type !== "task";
+    return true;
+  }), [findingRows, historyFilter]);
+  const findingFilterStats = useMemo(() => ({
+    all: findingRows.length,
+    task: findingRows.filter((finding) => !!finding.route?.taskId).length,
+    pending: findingRows.filter((finding) => finding.route?.type === "task" && !finding.route?.taskId).length,
+    report: findingRows.filter((finding) => finding.route?.type !== "task").length
+  }), [findingRows]);
   const programOptions = useMemo(() => (controlPrograms || []).filter((program) => program?.id && program?.active !== false), [controlPrograms]);
   const assignmentOptions = useMemo(() => (controlAssignments || []).filter((assignment) => assignment?.id), [controlAssignments]);
   const visibleAssignments = useMemo(() => {
@@ -3214,6 +3231,38 @@ function ControlsHub({ session, config = DEFAULT_CONFIG, fleet = [], users = [],
       {msg && <div className={msg === SAVE_FAILED_MESSAGE ? "err" : "note"} style={{ marginTop: 12 }}>{msg}</div>}
       <div className="control-panel" style={{ marginTop: 12 }}>
         <SectionTitle><History size={15} /> היסטוריית בקרות אחרונות</SectionTitle>
+        <div className="control-findings-overview">
+          <div className="row-between" style={{ alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div>
+              <div className="task-row-t">ממצאים אחרונים</div>
+              <div className="hint">סינון מהיר לפי טיפול: נפתחה מטלה, מיועד למטלה, או לדוח בלבד.</div>
+            </div>
+            <span className="badge sm" style={{ background: "#F8FAFC", color: "#475569", border: "1px solid var(--line)" }}>{filteredFindingRows.length}/{findingRows.length}</span>
+          </div>
+          <div className="qchips compact" style={{ marginBottom: 10 }}>
+            {[
+              ["all", `הכל (${findingFilterStats.all})`],
+              ["task", `עם מטלה (${findingFilterStats.task})`],
+              ["pending", `ללא מטלה (${findingFilterStats.pending})`],
+              ["report", `לדוח בלבד (${findingFilterStats.report})`]
+            ].map(([id, label]) => <button key={id} className={"qchip" + (historyFilter === id ? " on" : "")} onClick={() => setHistoryFilter(id)}>{label}</button>)}
+          </div>
+          {filteredFindingRows.length ? <div className="control-finding-list">{filteredFindingRows.slice(0, 8).map((finding) => {
+            const sev = findingSeverityMeta(finding.severity);
+            const run = (controlRuns || []).find((item) => item.id === finding.runId);
+            return <div key={finding.id} className="control-finding-item">
+              <div className="task-row-main">
+                <div className="task-row-t">{finding.title || "ממצא ללא כותרת"}</div>
+                {finding.description && <div className="task-row-desc">{finding.description}</div>}
+                <div className="task-row-sub">{findingRouteLabel(finding)} · {run?.target?.label || run?.target?.id || finding.target?.label || finding.target?.id || "ללא יעד"} · {fmtDate(finding.createdAt || run?.finishedAt || run?.startedAt)}</div>
+              </div>
+              <div className="task-row-side">
+                <span className="badge sm" style={{ background: sev.bg, color: sev.color }}>{sev.label}</span>
+                {finding.route?.taskId && onOpenTask && <button className="btn-ghost sm" onClick={() => onOpenTask(finding.route.taskId)}><ClipboardList size={13} /> פתח מטלה</button>}
+              </div>
+            </div>;
+          })}</div> : <div className="hint">{findingRows.length ? "אין ממצאים במסנן הזה." : "עדיין אין ממצאים שמורים. ממצא שייווצר מבדיקה יופיע כאן עם מצב הטיפול שלו."}</div>}
+        </div>
         {recentRuns.length ? <div className="task-list">
           {recentRuns.map((run) => {
             const findings = runFindingsByRun[run.id] || [];
