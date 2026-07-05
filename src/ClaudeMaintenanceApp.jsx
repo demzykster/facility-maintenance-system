@@ -6352,10 +6352,11 @@ function FleetModule(p) {
     </label>
   );
   const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const missing = ts == null; const col = missing ? "#DC2626" : docWarnColor(dl, config); return <span key={d.id} className="doc-chip"><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{d.label}</span><span className="doc-chip-days" style={{ color: col }}>{missing ? "חסר" : docDaysLabel(dl)}</span></span>; };
-  const renderRow = (f) => { const blk = unitBlock(f, tickets, config); const selected = selectedFleetIds.includes(f.id); return <div key={f.id} role="button" tabIndex={0} className={"ftable-row" + (blk ? " blocked" : "") + (selected ? " selected" : "")} onClick={() => setOpenId(f.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(f.id); } }} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
+  const renderRow = (f) => { const blk = unitBlock(f, tickets, config); const selected = selectedFleetIds.includes(f.id); return <div key={f.id} role="button" tabIndex={0} className={"ftable-row fleet-unit-row" + (blk ? " blocked" : "") + (selected ? " selected" : "")} onClick={() => setOpenId(f.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(f.id); } }} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
     <label className="ft-select" aria-label={`בחר ${f.code}`} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleFleetSelection(f.id)} /></label>
     <span className="ft-code">{f.code}</span>
-    <span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span>
+    <span className="ft-type"><b>{unitTypeName(f, config) || "—"}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span>
+    <span className="ft-model">{unitModelCode(f) || "—"}</span>
     <span className="ft-sup">{f.supplier || "—"}</span>
     <span className="ft-doc"><span className="doc-chip-stack">{machineDocs(f, config).map((d) => docChip(f, d))}</span></span>
   </div>; };
@@ -6366,8 +6367,8 @@ function FleetModule(p) {
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
     {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} users={p.users} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
-    <div className="row-between"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportFleet} disabled={!rows.length} title={!rows.length ? "אין נתונים לייצוא" : ""}><FileSpreadsheet size={15} /> ייצוא Excel</button>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
-    <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="fleet-topbar"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="fleet-actions"><button className="btn-ghost sm" onClick={exportFleet} disabled={!rows.length} title={!rows.length ? "אין נתונים לייצוא" : ""}><FileSpreadsheet size={15} /> ייצוא Excel</button>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
+    <div className="search-wrap fleet-search"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="סוג" value={type} onChange={setType}>{types.map((t) => <option key={t}>{t}</option>)}</Sel>
       <Sel label="מחלקה" value={dept} onChange={setDept}>{depts.map((d) => <option key={d}>{d}</option>)}</Sel>
@@ -6407,10 +6408,10 @@ function FleetModule(p) {
     {rows.length === 0 ? <Empty text={fleet.length ? "אין תוצאות לפילטר הנוכחי" : "הפארק ריק"} sub={fleet.length ? "נסו לנקות את הפילטרים" : "הוסיפו כלי שינוע ראשון"} />
       : groups ? <div className="fleet-groups">{groups.map((g) => { const open = !collapsed[g.k]; return <div key={g.k} className="fgroup">
           <button className="fgroup-head" onClick={() => setCollapsed((c) => ({ ...c, [g.k]: open }))}><ChevronLeft size={15} className="fgroup-chev" style={{ transform: open ? "rotate(-90deg)" : "none" }} /><span className="fgroup-name">{g.k}</span><span className="fgroup-count">{g.items.length}</span>{g.blocked > 0 && <span className="fgroup-blk"><ShieldAlert size={11} /> {g.blocked} מושבתים</span>}</button>
-          {open && <div className="ftable"><div className="ftable-head"><span></span><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>{g.items.map(renderRow)}</div>}
+          {open && <div className="ftable fleet-unit-table"><div className="ftable-head fleet-unit-row"><span></span><span>מספר</span><span>סוג</span><span>דגם</span><span>ספק</span><span>מסמכים</span></div>{g.items.map(renderRow)}</div>}
         </div>; })}</div>
-      : <div className="ftable">
-          <div className="ftable-head"><span></span><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>מסמכים</span></div>
+      : <div className="ftable fleet-unit-table">
+          <div className="ftable-head fleet-unit-row"><span></span><span>מספר</span><span>סוג</span><span>דגם</span><span>ספק</span><span>מסמכים</span></div>
           {rows.map(renderRow)}
         </div>}
     </>}
@@ -9285,11 +9286,15 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .pm-mini-t{font-size:13px;font-weight:500;flex:1;}.pm-mini-d{font-size:12.5px;font-weight:600;}
 
 .ftable{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
-.fleet-filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+.fleet-topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:10px 0 14px;}
+.fleet-topbar .section-title{margin:0;}
+.fleet-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;}
+.fleet-search{margin:0 0 14px;}
+.fleet-filters{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
 .flt-field{display:flex;flex-direction:column;gap:3px;min-width:110px;flex:1;}
 .flt-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
 .flt-field select{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;}
-.fleet-results-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;}
+.fleet-results-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;}
 .fleet-count{color:var(--muted);font-weight:600;}
 .fleet-bulk-panel{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin:0 0 10px;display:flex;flex-direction:column;gap:9px;}
 .fleet-bulk-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
@@ -9442,6 +9447,12 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .more-menu button:hover{background:var(--surface-2);}
 .ftable-head{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:11px 14px;background:var(--surface-2);font-size:11.5px;font-weight:700;color:var(--muted);}
 .ftable-row{display:grid;grid-template-columns:34px 0.8fr 1.4fr 1fr 1.1fr;gap:6px;padding:12px 14px;width:100%;text-align:right;border-top:1px solid var(--line);align-items:center;color:var(--ink);font-size:12.5px;cursor:pointer;}
+.fleet-unit-table .fleet-unit-row{direction:ltr;grid-template-columns:34px minmax(82px,.65fr) minmax(170px,1.25fr) minmax(110px,.8fr) minmax(110px,.8fr) minmax(210px,1.35fr);gap:12px;text-align:left;}
+.fleet-unit-table .fleet-unit-row>span,.fleet-unit-table .fleet-unit-row>label{direction:rtl;text-align:right;min-width:0;}
+.fleet-unit-table .ft-code{direction:ltr;text-align:left;unicode-bidi:isolate;font-variant-numeric:tabular-nums;font-weight:800;}
+.fleet-unit-table .ft-type b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fleet-unit-table .ft-model{direction:ltr;text-align:left;unicode-bidi:isolate;font-weight:800;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fleet-unit-table .ft-sup{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:700;}
 .manager-fleet-row{grid-template-columns:minmax(118px,0.95fr) minmax(240px,1.75fr) minmax(96px,0.85fr) minmax(96px,0.8fr);}
 .manager-fleet-table .ft-code{min-width:0;direction:ltr;unicode-bidi:isolate;text-align:start;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .manager-fleet-table .ft-model{min-width:0;line-height:1.3;}
