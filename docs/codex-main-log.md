@@ -112,3 +112,16 @@ Risks / follow-up: Keep this file updated whenever STOP happens.
 Next target: Continue only with small main/v1 stability or documentation tasks.
 Status: Ready for PR.
 ```
+
+```text
+Session: 2026-07-05 Impeccable bridge
+Branch: codex/impeccable-bridge
+Goal: Make the repo-local Impeccable script path work from CMMS without touching app code or v2.
+Done: Added thin .Codex/skills/impeccable script wrappers that execute the installed local Impeccable skill scripts.
+Files changed: .Codex/skills/impeccable/scripts/*; docs/codex-main-log.md
+Tests: node .Codex/skills/impeccable/scripts/context.mjs; node .Codex/skills/impeccable/scripts/context-signals.mjs; node .Codex/skills/impeccable/scripts/detect.mjs --json src/ClaudeMaintenanceApp.jsx; git diff --check; npm test -- --run; npm run build; npm run release:check.
+Not checked: Application UI, because this is tooling/docs only.
+Risks / follow-up: Bridge points to the local installed skill path under /Users/Vadim/.agents; if the skill moves, update the wrapper target.
+Next target: Use Impeccable plus browser smoke for a sober UI audit of בקרות before more controls feature work.
+Status: Ready for PR.
+```
