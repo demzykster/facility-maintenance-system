@@ -258,6 +258,43 @@ describe("fleetMaintenancePolicyModel", () => {
     expect(byId["light-2"]).toBe("2026-01-05");
   });
 
+  it("spreads maintenance tasks across the selected planning window", () => {
+    const assignments = Array.from({ length: 4 }, (_, index) => ({ task: { id: `task-${index + 1}` }, weight: 1 }));
+
+    distributeNewTasks(assignments, {
+      startAt: localDate(2026, 0, 4),
+      endAt: localDate(2026, 0, 7),
+      dailyCapacity: 4
+    });
+
+    expect(assignments.map((assignment) => localYmd(assignment.task.nextDue))).toEqual([
+      "2026-01-04",
+      "2026-01-05",
+      "2026-01-06",
+      "2026-01-07"
+    ]);
+  });
+
+  it("honors per-type daily maintenance limits while planning", () => {
+    const assignments = [
+      { task: { id: "reach-1" }, weight: 1, typeName: "מלגזת היגש" },
+      { task: { id: "reach-2" }, weight: 1, typeName: "מלגזת היגש" },
+      { task: { id: "reach-3" }, weight: 1, typeName: "מלגזת היגש" },
+      { task: { id: "picker-1" }, weight: 1, typeName: "מלקטת כפולה" }
+    ];
+
+    distributeNewTasks(assignments, {
+      startAt: localDate(2026, 0, 4),
+      endAt: localDate(2026, 0, 5),
+      dailyCapacity: 4,
+      perTypeDailyLimits: { "מלגזת היגש": 1 }
+    });
+
+    const reachDates = assignments.filter((assignment) => assignment.typeName === "מלגזת היגש").map((assignment) => localYmd(assignment.task.nextDue));
+    expect(new Set(reachDates).size).toBe(3);
+    expect(localYmd(assignments.find((assignment) => assignment.task.id === "picker-1").task.nextDue)).toBe("2026-01-04");
+  });
+
   it("preserves an existing future nextDue when building schedules from rules", () => {
     const futureDue = localDate(2026, 0, 20);
     const result = buildMaintenanceScheduleFromRules({
