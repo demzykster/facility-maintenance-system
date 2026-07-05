@@ -45,7 +45,7 @@ import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
-import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
+import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
@@ -3850,13 +3850,13 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_L
   const [manualCode, setManualCode] = useState("");
   const [showManual, setShowManual] = useState(false), [showScanner, setShowScanner] = useState(false);
   const finishScan = (raw) => {
-    const scanned = extractCzoneFromRaw(raw);
-    if (scanned && scanned === zone?.id) {
+    const text = String(raw || "").trim();
+    if (cleaningQrMatchesZone(text, zone)) {
       setScanErr("");
       onScanSuccess?.();
       return true;
     }
-    setScanErr(scanned ? t("cleaningQr.scanWrong") : t("cleaningQr.scanMissing"));
+    setScanErr(text ? t("cleaningQr.scanWrong") : t("cleaningQr.scanMissing"));
     return false;
   };
   const submitManual = () => finishScan(manualCode);

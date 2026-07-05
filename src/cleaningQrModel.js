@@ -7,6 +7,10 @@ export function normalizeScannedCleaningZoneId(value) {
   return text.startsWith(CLEANING_QR_PREFIX) ? text.slice(CLEANING_QR_PREFIX.length).trim() : text;
 }
 
+export function normalizeCleaningQrManualCode(value) {
+  return String(value || "").trim().replace(/\s+/g, "").toUpperCase();
+}
+
 export function cleaningQrToken(zoneId) {
   const cleanZoneId = normalizeScannedCleaningZoneId(zoneId);
   return cleanZoneId ? `${CLEANING_QR_PREFIX}${cleanZoneId}` : "";
@@ -87,4 +91,11 @@ export function findScannedCleaningZone(zones = [], scannedZoneId = "") {
   const scanned = normalizeScannedCleaningZoneId(scannedZoneId);
   if (!scanned) return null;
   return (zones || []).find((zone) => zone?.id === scanned && zone.active !== false) || null;
+}
+
+export function cleaningQrMatchesZone(raw = "", zone = {}) {
+  const scanned = normalizeScannedCleaningZoneId(extractCzoneFromRaw(raw) || raw);
+  if (!scanned || zone?.active === false) return false;
+  if (scanned === zone?.id) return true;
+  return normalizeCleaningQrManualCode(scanned) === normalizeCleaningQrManualCode(zone?.code);
 }
