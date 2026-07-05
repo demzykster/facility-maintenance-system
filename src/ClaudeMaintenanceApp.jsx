@@ -45,7 +45,7 @@ import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
-import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
+import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, normalizeCleaningQrManualCode, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
@@ -2339,7 +2339,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
   const t = (key, vars) => uiText(language, key, vars);
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
-  const [zone, setZone] = useState(scannedZone || null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false), [showScanner, setShowScanner] = useState(false);
+  const [zone, setZone] = useState(scannedZone || null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false), [showScanner, setShowScanner] = useState(false), [showManual, setShowManual] = useState(false), [manualCode, setManualCode] = useState("");
   const fileRef = useRef(null);
   useEffect(() => { if (scannedZone && (!zone || zone.id !== scannedZone.id)) setZone(scannedZone); }, [scannedZone?.id]);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); setErr(""); }; img.src = e.target.result; }; r.readAsDataURL(file); };
@@ -2347,6 +2347,16 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
     setShowScanner(false);
     const scanned = extractCzoneFromRaw(raw);
     const found = findScannedCleaningZone(active, scanned);
+    if (!found) {
+      setErr(t("public.wrongQr"));
+      return;
+    }
+    setZone(found);
+    setErr("");
+  };
+  const submitManualQr = () => {
+    const code = normalizeCleaningQrManualCode(manualCode);
+    const found = active.find((z) => cleaningQrMatchesZone(code, z));
     if (!found) {
       setErr(t("public.wrongQr"));
       return;
@@ -2385,7 +2395,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
         <div className="pub-title">{t("public.title")}</div>
         <div className="pub-sub">{t("public.scanRequired")}</div>
         {active.length === 0 ? <div className="note">{t("public.noZones")}</div>
-          : <><button className="btn-primary full pub-scan-btn" onClick={() => { setErr(""); setShowScanner(true); }}><Camera size={16} /> {t("cleaningQr.scanButton")}</button>{allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div> : <div className="note">{scannedZoneId ? t("public.wrongQr") : t("public.qrOnly")}</div>}</>}
+          : <><button className="btn-primary full pub-scan-btn" onClick={() => { setErr(""); setShowScanner(true); }}><Camera size={16} /> {t("cleaningQr.scanButton")}</button><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setErr(""); setShowManual((v) => !v); }}>{t("cleaningQr.manualToggle")}</button>{showManual && <div className="field" style={{ marginTop: 8 }}><span>{t("cleaningQr.manualLabel")}</span><input value={manualCode} onChange={(e) => { setManualCode(e.target.value); setErr(""); }} placeholder={t("cleaningQr.manualPlaceholder")} /><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={submitManualQr}>{t("cleaningQr.manualSubmit")}</button></div>}{allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div> : <div className="note">{scannedZoneId ? t("public.wrongQr") : t("public.qrOnly")}</div>}</>}
         {err && <div className="err">{err}</div>}
       </> : <>
         <div className="pub-title">{zone.name}</div>
@@ -2398,7 +2408,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
         <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setZone(null); setProb(null); setPhoto(null); setText(""); }}>{t("common.back")}</button>
         <div className="pub-foot">{t("public.approvalFoot")}</div>
       </>}
-    {showScanner && <QRScannerOverlay onScan={acceptQrScan} onManual={() => { setShowScanner(false); setErr(t("cleaningQr.scanUnsupported")); }} onCancel={() => setShowScanner(false)} />}
+    {showScanner && <QRScannerOverlay onScan={acceptQrScan} onManual={() => { setShowScanner(false); setShowManual(true); setErr(t("cleaningQr.scanUnsupported")); }} onCancel={() => setShowScanner(false)} />}
   </div></div>);
 }
 
