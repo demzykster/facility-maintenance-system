@@ -7855,6 +7855,7 @@ function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "—
   </>);
 }
 function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
+  const MAX_PM_PLAN_WINDOW_DAYS = 370;
   const [date, setDate] = useState(tsToDate(toWorkday(Date.now())));
   const [endDate, setEndDate] = useState(tsToDate(toWorkday(Date.now() + 30 * 86400000)));
   const [typeLimits, setTypeLimits] = useState({});
@@ -7864,6 +7865,8 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
   const startAt = rawStartAt ? toWorkday(rawStartAt) : null;
   const rawEndAt = dateToTs(endDate);
   const endAt = rawEndAt ? toWorkday(rawEndAt) : null;
+  const windowDays = startAt && endAt ? Math.ceil((endAt - startAt) / 86400000) + 1 : 0;
+  const validPlanningWindow = !!startAt && !!endAt && endAt >= startAt && windowDays <= MAX_PM_PLAN_WINDOW_DAYS;
   const dailyCapacity = clampPmDailyCapacity(config?.pmDailyCapacity ?? 4);
   const fleetRefs = useMemo(() => (fleet || []).map((unit) => normalizeFleetUnitRef(unit, { modelType: config?.modelType || {} })), [fleet, config]);
   const affectedTypeNames = useMemo(() => {
@@ -7878,7 +7881,7 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
   }, [affectedTypeNames.join("|")]);
   const cleanTypeLimits = useMemo(() => Object.fromEntries(Object.entries(typeLimits)
     .map(([name, value]) => [name, Math.max(1, Math.min(20, Number(value) || 1))])), [typeLimits]);
-  const plan = useMemo(() => buildMaintenanceScheduleFromRules({
+  const plan = useMemo(() => validPlanningWindow ? buildMaintenanceScheduleFromRules({
     rules,
     fleetRefs,
     existingTasks: pm,
@@ -7886,8 +7889,9 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
     endAt,
     now: Date.now(),
     dailyCapacity,
-    perTypeDailyLimits: cleanTypeLimits
-  }), [rules, fleetRefs, pm, startAt, endAt, dailyCapacity, cleanTypeLimits]);
+    perTypeDailyLimits: cleanTypeLimits,
+    maxPlanningDays: MAX_PM_PLAN_WINDOW_DAYS
+  }) : { tasks: [], created: 0, updated: 0, total: 0 }, [rules, fleetRefs, pm, startAt, endAt, dailyCapacity, cleanTypeLimits, validPlanningWindow]);
   const affectedUnits = new Set(plan.tasks.map((task) => task.forkliftId)).size;
   const spreadDays = new Set(plan.tasks.map((task) => tsToDate(task.nextDue)).filter(Boolean)).size;
   const dayLoad = useMemo(() => {
@@ -7908,6 +7912,7 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
     setErr("");
     if (!startAt) return setErr("נא לבחור תאריך ראשון תקין");
     if (!endAt || endAt < startAt) return setErr("נא לבחור תאריך אחרון תקין שאינו לפני תאריך ההתחלה");
+    if (windowDays > MAX_PM_PLAN_WINDOW_DAYS) return setErr("חלון התכנון ארוך מדי. בחרו טווח של עד שנה אחת.");
     if (!rules.length) return setErr("אין רגולציות טיפול תקופתי פעילות בהגדרות כלי השינוע");
     if (!plan.tasks.length) return setErr("לא נמצאו כלים שמתאימים לרגולציות שהוגדרו");
     const ok = await onSave(plan.tasks);
@@ -7925,6 +7930,7 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
           <label className="field"><span>לפרוס עד תאריך</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
         </div>
         <div className="hint">שיבוצים קיימים עם תאריך עתידי ישמרו את מועד הטיפול הבא שכבר נקבע להם. שיבוצים באיחור או חדשים ייפרסו בתוך חלון התכנון.</div>
+        {!validPlanningWindow && <div className="note" style={{ color: "#B45309", background: "#FEF3C7", marginTop: 10 }}>בחרו טווח תכנון תקין של עד שנה אחת כדי לראות תצוגה מקדימה.</div>}
         {affectedTypeNames.length > 0 && <div className="pm-type-limits">
           <div className="task-row-t">עומס יומי לפי סוג כלי</div>
           <div className="hint">כמה טיפולים מותר לשים ביום מאותו סוג. ברירת המחדל: 1 לכל סוג.</div>
