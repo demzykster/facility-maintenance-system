@@ -3282,8 +3282,52 @@ function ManagerFleet(p) {
   </>);
 }
 /* ============================================================ CLEANING TRACK (ניקיון / סבבים) — Phase 1 */
-const zoneLoc = (z) => [z.building, z.floor].filter(Boolean).join(" · ");
-const zoneSort = (a, b) => (a.building || "").localeCompare(b.building || "", "he") || (a.floor || "").localeCompare(b.floor || "", "he") || (a.name || "").localeCompare(b.name || "", "he");
+const CLEANING_UNASSIGNED_AREA = "ללא אזור מערכת";
+const cleaningAreaName = (z) => (z?.areaName || z?.area || z?.building || "").trim() || CLEANING_UNASSIGNED_AREA;
+const zoneLoc = (z) => [cleaningAreaName(z), z.floor].filter((x) => x && x !== CLEANING_UNASSIGNED_AREA).join(" · ");
+const zoneSort = (a, b) => cleaningAreaName(a).localeCompare(cleaningAreaName(b), "he") || (a.floor || "").localeCompare(b.floor || "", "he") || (a.name || "").localeCompare(b.name || "", "he");
+const cleaningAreaOptions = (config, zones = []) => {
+  const seen = new Set();
+  const add = (value) => {
+    const name = String(value || "").trim();
+    if (!name || seen.has(name)) return null;
+    seen.add(name);
+    return name;
+  };
+  return [
+    ...(config?.zones || []).map(add).filter(Boolean),
+    ...(zones || []).map((z) => add(cleaningAreaName(z))).filter(Boolean).filter((x) => x !== CLEANING_UNASSIGNED_AREA),
+  ];
+};
+const groupCleaningByArea = (items, getZone = (x) => x) => {
+  const map = new Map();
+  (items || []).forEach((item) => {
+    const zone = getZone(item) || {};
+    const area = cleaningAreaName(zone);
+    if (!map.has(area)) map.set(area, { area, items: [] });
+    map.get(area).items.push(item);
+  });
+  return [...map.values()].sort((a, b) => {
+    if (a.area === CLEANING_UNASSIGNED_AREA && b.area !== CLEANING_UNASSIGNED_AREA) return 1;
+    if (b.area === CLEANING_UNASSIGNED_AREA && a.area !== CLEANING_UNASSIGNED_AREA) return -1;
+    return a.area.localeCompare(b.area, "he");
+  });
+};
+const groupCleaningByFloor = (items, getZone = (x) => x) => {
+  const map = new Map();
+  (items || []).forEach((item) => {
+    const zone = getZone(item) || {};
+    const floor = (zone.floor || "").trim();
+    const key = floor || "";
+    if (!map.has(key)) map.set(key, { floor: key, items: [] });
+    map.get(key).items.push(item);
+  });
+  return [...map.values()].sort((a, b) => {
+    if (!a.floor && b.floor) return 1;
+    if (!b.floor && a.floor) return -1;
+    return a.floor.localeCompare(b.floor, "he");
+  });
+};
 const DEFAULT_CLEAN_CHECKLIST = [
   { id: "floor", label: "שטיפת רצפה", translations: { en: "Floor washing", ru: "Мытье пола", ar: "غسل الأرضية", hi: "फर्श धोना", ti: "መሬት ምሕጻብ" } },
   { id: "soap", label: "מילוי סבון", translations: { en: "Refill soap", ru: "Пополнить мыло", ar: "تعبئة الصابون", hi: "साबुन भरना", ti: "ሳሙና ምምላእ" } },
@@ -3429,10 +3473,11 @@ function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve,
     </div></div>);
 }
 
-function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDelete, deleteBlockers = null, onOpenBlocker = () => {} }) {
+function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSave, onDelete, canDelete, deleteBlockers = null, onOpenBlocker = () => {} }) {
   const [zoneId] = useState(zone.id || uid());
   const [zoneCode] = useState(zone.code || ("Z" + Math.random().toString(36).slice(2, 6).toUpperCase()));
-  const [name, setName] = useState(zone.name || ""), [building, setBuilding] = useState(zone.building || ""), [floor, setFloor] = useState(zone.floor || ""), [code, setCode] = useState(zone.code || "");
+  const areaOptions = useMemo(() => cleaningAreaOptions(config, zones), [config, zones]);
+  const [name, setName] = useState(zone.name || ""), [areaName, setAreaName] = useState((zone.areaName || zone.area || zone.building || "").trim()), [floor, setFloor] = useState(zone.floor || ""), [code, setCode] = useState(zone.code || "");
   const [checklist, setChecklist] = useState(zone.checklist?.length ? zone.checklist : DEFAULT_CLEAN_CHECKLIST);
   const [windows, setWindows] = useState(zone.windows?.length ? zone.windows : [{ id: uid(), time: "06:00", tol: 60 }]);
   const [cleanerId, setCleanerId] = useState(zone.cleanerId || ""), [active, setActive] = useState(zone.active !== false), [err, setErr] = useState("");
@@ -3449,6 +3494,7 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
   const draftClTranslations = (i) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, translations: draftCleaningChecklistTranslations(x.label, x.translations) } : x)));
   const setWin = (i, k, v) => setWindows((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const save = async () => {
+    if (!areaName.trim()) return setErr("נא לבחור אזור מערכת");
     if (!name.trim()) return setErr("נא להזין שם אזור");
     const cl = checklist.filter((c) => (c.label || "").trim()).map((c) => normalizeCleaningChecklistItem({ ...c, id: c.id || uid() }));
     if (!cl.length) return setErr("נא להוסיף לפחות פריט אחד בצ׳קליסט");
@@ -3458,7 +3504,8 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
     setErr("");
     setBusy(true);
     try {
-      const ok = await onSave({ id: zoneId, code: code.trim() || zoneCode, name: name.trim(), building: building.trim(), floor: floor.trim(), checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
+      const area = areaName.trim();
+      const ok = await onSave({ id: zoneId, code: code.trim() || zoneCode, name: name.trim(), areaName: area, building: area, floor: floor.trim(), checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
       if (ok === false) setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
     } catch {
       setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
@@ -3468,8 +3515,8 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{zone.id ? "עריכת אזור ניקיון" : "אזור ניקיון חדש"}</div></div>
     <div className="body">
-      <label className="field"><span>שם האזור *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: שירותים קומה 2 — אגף מזרח" /></label>
-      <div className="field-row"><label className="field"><span>בניין</span><input value={building} onChange={(e) => setBuilding(e.target.value)} placeholder="בניין A" /></label><label className="field"><span>קומה</span><input value={floor} onChange={(e) => setFloor(e.target.value)} placeholder="קומה 2" /></label></div>
+      <label className="field"><span>אזור מערכת *</span><select value={areaName} onChange={(e) => setAreaName(e.target.value)}><option value="">— בחרו מתוך אזורי האחזקה —</option>{areaOptions.length > 0 && <optgroup label="אזורי אחזקה">{areaOptions.map((area) => <option key={area} value={area}>{area}</option>)}</optgroup>}</select><div className="hint">הרשימה נמשכת מהגדרות אחזקה › אזורים. כך ניקיון, קריאות ודוחות משתמשים באותה מפת אתר.</div></label>
+      <div className="field-row"><label className="field"><span>קומה / מיקום משנה</span><input value={floor} onChange={(e) => setFloor(e.target.value)} placeholder="קומה 2 / אגף מזרח / כניסה" /></label><label className="field"><span>שם אזור ניקיון *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: שירותים / מטבחון / משרדים" /></label></div>
       <div className="field"><span>צ׳קליסט האזור *</span>
         {checklist.map((c, i) => {
           const rowKey = c.id || String(i);
@@ -3586,21 +3633,35 @@ function CleaningAdmin(p) {
     return { rows, tot, done, action, actionN };
   }, [list, rounds]);
   const winChips = (sts) => <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div>;
+  const zoneSelectOptions = groupCleaningByArea(list).map((g) => <optgroup key={g.area} label={g.area}>{g.items.map((z) => <option key={z.id} value={z.id}>{z.floor ? `${z.floor} · ` : ""}{z.name}</option>)}</optgroup>);
+  const renderAreaSections = (items, renderItem, getZone = (x) => x) => groupCleaningByArea(items, getZone).map((areaGroup) => {
+    const actionCount = areaGroup.items.reduce((n, item) => {
+      const sts = item.sts || [];
+      return n + sts.filter((s) => s.status === "missed" || s.status === "due" || s.status === "overdue").length;
+    }, 0);
+    return <section key={areaGroup.area} className="clean-area-group">
+      <div className="clean-area-head"><div><div className="clean-area-title"><Building2 size={15} /> {areaGroup.area}</div><div className="clean-area-meta">{countLabel(areaGroup.items.length, "אזור ניקיון", "אזורי ניקיון")}{actionCount ? ` · ${actionCount} דורשים פעולה` : ""}</div></div></div>
+      {groupCleaningByFloor(areaGroup.items, getZone).map((floorGroup) => <div key={floorGroup.floor || "_none"} className="clean-floor-group">
+        {floorGroup.floor && <div className="clean-floor-title">{floorGroup.floor}</div>}
+        <div className="cards">{floorGroup.items.map(renderItem)}</div>
+      </div>)}
+    </section>;
+  });
   return (<>
     <div className="seg-tabs s4" style={{ maxWidth: 560, marginBottom: 14 }}><button className={tab === "today" ? "on" : ""} onClick={() => setTab("today")}>היום</button><button className={tab === "zones" ? "on" : ""} onClick={() => setTab("zones")}>אזורים</button><button className={tab === "complaints" ? "on" : ""} onClick={() => setTab("complaints")}>דיווחים{needAttn ? ` (${needAttn})` : ""}</button><button className={tab === "rounds" ? "on" : ""} onClick={() => setTab("rounds")}>סבבים</button></div>
     {tab === "today" ? (list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלשונית «אזורים»" /> : <>
       <div className="comp-card"><div className="comp-big">{today.done}/{today.tot}</div><div className="comp-lbl">סבבים בוצעו היום</div><div className="comp-bar"><span style={{ width: (today.tot ? Math.round(today.done / today.tot * 100) : 0) + "%" }} /></div></div>
       {(() => { const tk = todayKey(); const away = (absences || []).filter((a) => a.from <= tk && (a.to || a.from) >= tk); if (!away.length) return null; const zonesOf = (uid) => (zones || []).filter((z) => z.cleanerId === uid && z.active !== false).map((z) => z.name); return <div className="note" style={{ borderColor: "#FDE68A", marginBottom: 8 }}><CalendarClock size={13} /> בחופשה היום — נדרש כיסוי: {away.map((a) => `${a.name}${zonesOf(a.userId).length ? " (" + zonesOf(a.userId).join(", ") + ")" : ""}`).join(" · ")}</div>; })()}
-      {today.action.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש פעולה ({today.actionN})</SectionTitle><div className="cards">{today.action.map(({ z, sts }) => { const missed = sts.filter((s) => s.status === "missed").length; const due = sts.filter((s) => s.status === "due" || s.status === "overdue").length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: missed ? "#DC2626" : "#B45309" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: missed ? "#FEE2E2" : "#FEF3C7", color: missed ? "#DC2626" : "#B45309" }}>{missed ? `${missed} פוספסו` : `${due} לביצוע`}</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>; })}</div></>}
+      {today.action.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש פעולה ({today.actionN})</SectionTitle>{renderAreaSections(today.action, ({ z, sts }) => { const missed = sts.filter((s) => s.status === "missed").length; const due = sts.filter((s) => s.status === "due" || s.status === "overdue").length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: missed ? "#DC2626" : "#B45309" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: missed ? "#FEE2E2" : "#FEF3C7", color: missed ? "#DC2626" : "#B45309" }}>{missed ? `${missed} פוספסו` : `${due} לביצוע`}</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>; }, (x) => x.z)}</>}
       <SectionTitle><Sparkles size={15} /> כל האזורים היום</SectionTitle>
-      <div className="cards">{today.rows.map(({ z, sts }) => <div key={z.id} className="tcard"><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>)}</div>
+      {renderAreaSections(today.rows, ({ z, sts }) => <div key={z.id} className="tcard"><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>, (x) => x.z)}
     </>)
       : tab === "rounds" ? (<>
-        <div className="u-filters" style={{ marginBottom: 12 }}><select value={rZone} onChange={(e) => setRZone(e.target.value)}><option value="all">כל האזורים</option>{list.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}</select><button className={"wtoggle" + (rProblems ? " on" : "")} onClick={() => setRProblems((v) => !v)}><AlertTriangle size={14} /> רק עם הערות</button></div>
+        <div className="u-filters" style={{ marginBottom: 12 }}><select value={rZone} onChange={(e) => setRZone(e.target.value)}><option value="all">כל האזורים</option>{zoneSelectOptions}</select><button className={"wtoggle" + (rProblems ? " on" : "")} onClick={() => setRProblems((v) => !v)}><AlertTriangle size={14} /> רק עם הערות</button></div>
         {roundsByDay.length === 0 ? <Empty text="אין סבבים להצגה" Icon={Sparkles} sub="שנו את הסינון או המתינו לסבבים" /> : roundsByDay.map(([day, rs]) => <div key={day} style={{ marginBottom: 16 }}><div className="day-h">{dayLabel(+day)}</div><div className="cards">{rs.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.zoneLoc ? " · " + r.zoneLoc : ""}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{r.byName} · {r.doneCount}/{countLabel(r.total, "פריט", "פריטים")}{r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}{prob ? ` · ${countLabel(r.issues.length, "הערה", "הערות")}` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div></div>)}
       </>)
       : tab === "complaints" ? (<>
-        <div className="u-filters" style={{ marginBottom: 12 }}><select value={cZone} onChange={(e) => setCZone(e.target.value)}><option value="all">כל האזורים</option>{list.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}</select>{cZone !== "all" && <button className="btn-ghost sm" onClick={() => setCZone("all")}>ניקוי סינון</button>}</div>
+        <div className="u-filters" style={{ marginBottom: 12 }}><select value={cZone} onChange={(e) => setCZone(e.target.value)}><option value="all">כל האזורים</option>{zoneSelectOptions}</select>{cZone !== "all" && <button className="btn-ghost sm" onClick={() => setCZone("all")}>ניקוי סינון</button>}</div>
         {(pending.length + openC.length + closedC.length) === 0 ? <Empty text="אין דיווחים" Icon={Sparkles} sub="דיווחי לכלוך ותקלות יופיעו כאן" /> : <>
         {pending.length > 0 && <><SectionTitle><Clock size={15} /> ממתין לאישורך ({pending.length})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>דיווחים מעובדים, מאחראי סבבים ומדיווח אנונימי. הקישו לפתיחה — אישור או דחייה עם סיבה.</div><div className="cards">{pending.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
         {escC.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הועבר אליך לטיפול ({escC.length})</SectionTitle><div className="cards">{escC.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
@@ -3612,9 +3673,9 @@ function CleaningAdmin(p) {
       : (<>
         <div className="row-between"><SectionTitle><Sparkles size={15} /> אזורי ניקיון ({list.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> אזור חדש</button></div>
         {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדים עם גישה לניקיון. הוסיפו עובד למחלקת ניקיון תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור.</div>}
-        {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : <div className="cards">{list.map((z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}</div>}
+        {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : renderAreaSections(list, (z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}
       </>)}
-    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} cleaners={cleaners} managers={managers} canDelete={!!edit.id} deleteBlockers={editDeleteBlockers} onOpenBlocker={openZoneBlocker} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
+    {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} config={p.config} zones={zones} cleaners={cleaners} managers={managers} canDelete={!!edit.id} deleteBlockers={editDeleteBlockers} onOpenBlocker={openZoneBlocker} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
       if (!await saveZone(z)) return false;
       const managerResults = await Promise.all((managers || []).map((m) => {
         const has = (m.mgrZones || []).includes(z.id);
@@ -3981,6 +4042,13 @@ function CleanerApp(p) {
     setTimeout(() => setSent(false), 2600);
     return true;
   };
+  const areaSections = (items, renderItem, getZone = (x) => x) => groupCleaningByArea(items, getZone).map((areaGroup) => <section key={areaGroup.area} className="clean-area-group compact">
+    <div className="clean-area-head"><div><div className="clean-area-title"><Building2 size={14} /> {areaGroup.area}</div><div className="clean-area-meta">{countLabel(areaGroup.items.length, "אזור", "אזורים")}</div></div></div>
+    {groupCleaningByFloor(areaGroup.items, getZone).map((floorGroup) => <div key={floorGroup.floor || "_none"} className="clean-floor-group">
+      {floorGroup.floor && <div className="clean-floor-title">{floorGroup.floor}</div>}
+      <div className="cards">{floorGroup.items.map(renderItem)}</div>
+    </div>)}
+  </section>);
   const card = (z, cover) => {
     const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds);
     const oc = (complaints || []).filter((c) => c.zoneId === z.id && c.status === "open" && c.ownerRole !== "admin").length;
@@ -4015,12 +4083,12 @@ function CleanerApp(p) {
     <main className="content">
       {qrArrivalZone && <div className="toast-ok"><MapPin size={16} /> {t("cleaner.qrArrived", { zone: qrArrivalZone.name })}</div>}
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
-      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{todo.map(({ z, win, status }, i) => <button key={i} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win, scanToken: qr.reason === "scan_matched" }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>)}</div>}
+      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{areaSections(todo, ({ z, win, status }, i) => <button key={`${z.id}-${win.id || i}`} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win, scanToken: qr.reason === "scan_matched" }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>, (x) => x.z)}</div>}
       {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> {t("cleaner.openReports", { count: myComplaints.length })}</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
       {active.length === 0 ? <Empty text={t("cleaner.noZones")} Icon={Sparkles} sub={t("cleaner.managerDefinesZones")} /> : <>
         <SectionTitle><Sparkles size={15} /> {t("cleaner.myZones", { count: mine.length })}</SectionTitle>
-        {mine.length === 0 ? <Empty text={t("cleaner.noAssignedZones")} Icon={Sparkles} /> : <div className="cards">{mine.map(card)}</div>}
-        {others.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowCover((v) => !v)}>{showCover ? "▾" : "▸"} {t("cleaner.peerCover", { count: others.length })}</button>{showCover ? <div className="cards">{others.map((z) => card(z, true))}</div> : <div className="hint" style={{ marginInlineStart: 4 }}>{t("cleaner.peerCoverHint")}</div>}</div>}
+        {mine.length === 0 ? <Empty text={t("cleaner.noAssignedZones")} Icon={Sparkles} /> : areaSections(mine, (z) => card(z))}
+        {others.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowCover((v) => !v)}>{showCover ? "▾" : "▸"} {t("cleaner.peerCover", { count: others.length })}</button>{showCover ? areaSections(others, (z) => card(z, true)) : <div className="hint" style={{ marginInlineStart: 4 }}>{t("cleaner.peerCoverHint")}</div>}</div>}
         {doneToday.length > 0 && <div style={{ marginTop: 6 }}><button className="day-toggle" onClick={() => setShowDone((v) => !v)}>{showDone ? "▾" : "▸"} {t("cleaner.doneToday", { count: doneToday.length })}</button>{showDone && <div className="cards">{doneToday.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.winTime ? " · " + r.winTime : ""}{r.manualEntry ? " · ידני" : ""}</div><div className="audit-meta">{t("cleaner.itemsProgress", { done: r.doneCount, total: r.total })}{r.isCover ? " · " + t("cleaner.coverBadge") + (r.coverFor ? " " + t("cleaner.coverFor", { name: r.coverFor }) : "") : ""}{prob ? ` · ${t("cleaner.issuesCount", { count: r.issues.length })}` : ""}{r.manualEntryReason ? " · " + r.manualEntryReason : ""}</div></div><ChevronLeft size={16} /></button>; })}</div>}</div>}
       </>}
       {myReports.length > 0 && <div style={{ marginTop: 6 }}><SectionTitle><AlertTriangle size={15} /> {t("cleaner.myReports", { count: myReports.length })}</SectionTitle><div className="cards">{myReports.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></div>}
@@ -4059,12 +4127,19 @@ function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, re
   const open = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && c.status === "open").sort((a, b) => b.at - a.at), [complaints, mz]);
   const closed = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && (c.status === "resolved" || c.status === "rejected")).sort((a, b) => (b.resolvedAt || b.at) - (a.resolvedAt || a.at)), [complaints, mz]);
   const now = Date.now();
+  const renderAreaSections = (items, renderItem, getZone = (x) => x) => groupCleaningByArea(items, getZone).map((areaGroup) => <section key={areaGroup.area} className="clean-area-group">
+    <div className="clean-area-head"><div><div className="clean-area-title"><Building2 size={15} /> {areaGroup.area}</div><div className="clean-area-meta">{countLabel(areaGroup.items.length, "אזור ניקיון", "אזורי ניקיון")}</div></div></div>
+    {groupCleaningByFloor(areaGroup.items, getZone).map((floorGroup) => <div key={floorGroup.floor || "_none"} className="clean-floor-group">
+      {floorGroup.floor && <div className="clean-floor-title">{floorGroup.floor}</div>}
+      <div className="cards">{floorGroup.items.map(renderItem)}</div>
+    </div>)}
+  </section>);
   if (!mz.length) return <Empty text="לא שויכו אזורי ניקיון למחלקתך" Icon={Sparkles} sub="מנהל המערכת משייך אזורים בפרופיל שלך" />;
   return (<>
     <div className="note" style={{ marginBottom: 12 }}>מצב הניקיון באזורים של מחלקתך. ניתן לדווח על בעיה — הדיווח מגיע אליך, לעובד הניקיון של האזור ולמנהל המערכת.</div>
     <button className="btn-primary full" style={{ marginBottom: 14 }} onClick={() => setReport(true)}><AlertTriangle size={15} /> דיווח על בעיה (סריקת QR)</button>
     <SectionTitle><Sparkles size={15} /> אזורי מחלקתי ({myZones.length})</SectionTitle>
-    {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : <div className="cards">{myZones.map((z) => { const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}</div>}
+    {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : renderAreaSections(myZones, (z) => { const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}
     {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(open.length, "דיווח", "דיווחים")})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>הקישו לצפייה בפרטים המלאים. דיווחי לכלוך נסגרים ע״י עובד הניקיון; דיווחים מעובד הניקיון בטיפול ההנהלה.</div><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
     {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
     {rep && <Overlay onClose={() => setRep(null)}>{cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: rep.id }).allowed ? <ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /> : <CleaningQrRequired zone={rep} scannedZoneId={scannedZoneId} language={language} onClose={() => setRep(null)} />}</Overlay>}
@@ -4097,13 +4172,13 @@ function CleaningAnalytics({ zones, rounds, complaints }) {
     const totSched = rows.reduce((n, r) => n + r.sched, 0), totDone = rows.reduce((n, r) => n + r.done, 0);
     const totRounds = (rounds || []).filter((r) => r.at >= since).length;
     const totComps = (complaints || []).filter((c) => c.at >= since && c.status !== "rejected").length;
-    const byBuilding = {}; (complaints || []).filter((c) => c.at >= since && c.status !== "rejected").forEach((c) => { const z = active.find((x) => x.id === c.zoneId); const b = (z && z.building) || "ללא בניין"; byBuilding[b] = (byBuilding[b] || 0) + 1; });
-    return { rows, totRounds, totComps, byBuilding, pct: totSched ? Math.round(totDone / totSched * 100) : null };
+    const byArea = {}; (complaints || []).filter((c) => c.at >= since && c.status !== "rejected").forEach((c) => { const z = active.find((x) => x.id === c.zoneId); const area = z ? cleaningAreaName(z) : CLEANING_UNASSIGNED_AREA; byArea[area] = (byArea[area] || 0) + 1; });
+    return { rows, totRounds, totComps, byArea, pct: totSched ? Math.round(totDone / totSched * 100) : null };
   }, [zones, rounds, complaints]);
   if ((zones || []).filter((z) => z.active !== false).length === 0) return <Empty text="אין נתוני ניקיון" Icon={Sparkles} sub="הגדירו אזורים והתחילו לבצע סבבים" />;
   const worst = data.rows.filter((r) => r.pct != null).sort((a, b) => a.pct - b.pct);
   const dirty = data.rows.filter((r) => r.comps > 0).sort((a, b) => b.comps - a.comps);
-  const maxB = Math.max(1, ...Object.values(data.byBuilding));
+  const maxB = Math.max(1, ...Object.values(data.byArea));
   const pctColor = (p) => p >= 80 ? "#16A34A" : p >= 50 ? "#B45309" : "#DC2626";
   return (<>
     <div className="hint" style={{ marginBottom: 12 }}>נתוני 7 הימים האחרונים.</div>
@@ -4115,7 +4190,7 @@ function CleaningAnalytics({ zones, rounds, complaints }) {
     <SectionTitle><BarChart3 size={15} /> עמידה בחלונות לפי אזור</SectionTitle>
     {worst.length === 0 ? <div className="note">אין עדיין חלונות שהסתיימו למדידה.</div> : <div className="cards" style={{ marginBottom: 6 }}>{worst.map((r) => <div key={r.z.id} className="ca-row"><div className="ca-row1"><span className="ca-name">{r.z.name}</span><span className="ca-pct" style={{ color: pctColor(r.pct) }}>{r.pct}%</span></div><div className="ca-bar"><span style={{ width: r.pct + "%", background: pctColor(r.pct) }} /></div><div className="ca-sub">{r.done}/{r.sched} חלונות · {r.onTime} בזמן{zoneLoc(r.z) ? " · " + zoneLoc(r.z) : ""}</div></div>)}</div>}
     {dirty.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הכי הרבה דיווחים</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{dirty.map((r) => <div key={r.z.id} className="tcard"><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{r.z.name}</span><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{r.comps} דיווחים</span></div><div className="tcard-sub">{zoneLoc(r.z) || "—"}</div></div></div>)}</div></>}
-    {Object.keys(data.byBuilding).length > 0 && <><SectionTitle><Building2 size={15} /> דיווחים לפי בניין</SectionTitle><div className="cards">{Object.entries(data.byBuilding).sort((a, b) => b[1] - a[1]).map(([b, n]) => <div key={b} className="ca-row"><div className="ca-row1"><span className="ca-name">{b}</span><span className="ca-pct">{n}</span></div><div className="ca-bar"><span style={{ width: Math.round(n / maxB * 100) + "%", background: "#0EA5E9" }} /></div></div>)}</div></>}
+    {Object.keys(data.byArea).length > 0 && <><SectionTitle><Building2 size={15} /> דיווחים לפי אזור מערכת</SectionTitle><div className="cards">{Object.entries(data.byArea).sort((a, b) => b[1] - a[1]).map(([b, n]) => <div key={b} className="ca-row"><div className="ca-row1"><span className="ca-name">{b}</span><span className="ca-pct">{n}</span></div><div className="ca-bar"><span style={{ width: Math.round(n / maxB * 100) + "%", background: "#0EA5E9" }} /></div></div>)}</div></>}
   </>);
 }
 
@@ -7794,7 +7869,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
 }
 
 function SettingsPanel(p) {
-  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, fleet, tickets, appIssues, saveAppIssue, getBackup, importBackup } = p;
+  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, fleet, tickets, zones: cleaningZones = [], appIssues, saveAppIssue, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("workers"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
@@ -7852,7 +7927,7 @@ function SettingsPanel(p) {
   const runImport = async () => { if (!pendImport) return; setImpBusy(true); try { await importBackup(pendImport.data); setPendImport(null); setImpMsg("השחזור הושלם ✓"); } catch (er) { setImpMsg("השחזור נכשל"); } finally { setImpBusy(false); } };
   // целостность данных: сколько записей ссылается на элемент справочника
   const deptUse = (d) => users.filter((u) => u.dept === d).length + (fleet || []).filter((f) => (f.depts || []).includes(d) || f.dept === d).length + (tickets || []).filter((t) => t.reportedBy?.dept === d).length;
-  const zoneUse = (z) => (fleet || []).filter((f) => f.zone === z).length + (tickets || []).filter((t) => t.zone === z).length;
+  const zoneUse = (z) => (fleet || []).filter((f) => f.zone === z).length + (tickets || []).filter((t) => t.zone === z).length + (cleaningZones || []).filter((cz) => cleaningAreaName(cz) === z).length;
   const registryRenames = (rows) => rows.filter((r) => r._orig && r.name.trim() && r._orig !== r.name.trim());
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
@@ -7902,7 +7977,29 @@ function SettingsPanel(p) {
       flash();
     } catch (e) { setUserCfgMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); }
   };
-  const saveMaint = async () => { setMaintMsg(""); if (registryEmptied(zones, zoneUse)) { setMaintMsg("לא ניתן לרוקן שם של אזור שנמצא בשימוש — שנו שם או שחררו את הרשומות"); return false; } try { const list = cats.filter((c) => c.label.trim()); for (const r of registryRenames(zones)) { const o = r._orig, n = r.name.trim(); for (const f of (fleet || [])) if (f.zone === o && await saveFleet({ ...f, zone: n }) === false) throw new Error("save_failed"); for (const t of (tickets || [])) if (t.zone === o && await saveTicket({ ...t, zone: n }) === false) throw new Error("save_failed"); } if (await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }) === false) throw new Error("save_failed"); setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() }))); flash(); return true; } catch (e) { setMaintMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב."); return false; } };
+  const saveMaint = async () => {
+    setMaintMsg("");
+    if (registryEmptied(zones, zoneUse)) {
+      setMaintMsg("לא ניתן לרוקן שם של אזור שנמצא בשימוש — שנו שם או שחררו את הרשומות");
+      return false;
+    }
+    try {
+      const list = cats.filter((c) => c.label.trim());
+      for (const r of registryRenames(zones)) {
+        const o = r._orig, n = r.name.trim();
+        for (const f of (fleet || [])) if (f.zone === o && await saveFleet({ ...f, zone: n }) === false) throw new Error("save_failed");
+        for (const t of (tickets || [])) if (t.zone === o && await saveTicket({ ...t, zone: n }) === false) throw new Error("save_failed");
+        for (const z of (cleaningZones || [])) if (cleaningAreaName(z) === o && await saveZone({ ...z, areaName: n, building: n }) === false) throw new Error("save_failed");
+      }
+      if (await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }) === false) throw new Error("save_failed");
+      setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() })));
+      flash();
+      return true;
+    } catch (e) {
+      setMaintMsg("השמירה נכשלה — ייתכן שחלק מהשינויים לא נשמרו. נסו שוב.");
+      return false;
+    }
+  };
   const adminCount = users.filter((u) => u.role === "admin" && u.active).length;
   const mayViewUsers = p.only === "users" ? canViewUsers(session) : true;
   const mayManageUsers = p.canManageUsers ?? canManageUsers(session);
@@ -9832,6 +9929,19 @@ button.notif-perm:hover{background:#D1FAE5;}
 .todo-row:last-child{margin-bottom:0;}
 .todo-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
 .todo-main{flex:1;}.todo-zone{font-weight:700;font-size:14px;}.todo-sub{font-size:12px;color:var(--muted);}
+.clean-area-group{margin:0 0 16px;}
+.clean-area-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px;padding:0 2px;}
+.clean-area-title{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:800;color:var(--ink);}
+.clean-area-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.clean-floor-group{margin:0 0 10px;}
+.clean-floor-title{font-size:12px;font-weight:800;color:var(--muted);margin:0 0 6px;padding-inline-start:2px;}
+.clean-area-group.compact{margin:8px 0 10px;}
+.clean-area-group.compact .clean-area-head{margin-bottom:6px;}
+.todo-card .clean-area-title{font-size:13px;color:#92400E;}
+.app-dark .todo-card .clean-area-title{color:#FCD34D;}
+.todo-card .clean-area-meta{display:none;}
+.todo-card .clean-floor-title{font-size:11px;color:#92400E99;}
+.app-dark .todo-card .clean-floor-title{color:#FCD34D99;}
 .comp-card{border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:8px;text-align:center;background:var(--surface);}
 .comp-big{font-size:30px;font-weight:800;color:#0EA5E9;line-height:1;}
 .comp-lbl{font-size:13px;color:var(--muted);margin:4px 0 10px;}
