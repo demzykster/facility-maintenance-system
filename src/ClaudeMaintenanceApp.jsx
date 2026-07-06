@@ -45,7 +45,7 @@ import { reportClientError } from "./clientErrorAdapter.js";
 import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSupported } from "./pushNotificationAdapter.js";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
-import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, normalizeCleaningQrManualCode, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
+import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesTarget, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findCleaningQrTarget, findScannedCleaningZone, normalizeCleaningQrManualCode, normalizeCleaningSubzones, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
 import { cleaningMissedRoundRecordsForStatuses, cleaningWindowBounds, cleaningWindowMinutes, isCleaningRoundActionableStatus, isCompletedCleaningRound } from "./cleaningRoundScheduleModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
@@ -2358,20 +2358,21 @@ const ANON_PROBLEMS = [{ label: "רצפה מלוכלכת / שלולית", kind: 
 function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false, language = DEFAULT_LANGUAGE }) {
   const t = (key, vars) => uiText(language, key, vars);
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
-  const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
-  const [zone, setZone] = useState(scannedZone || null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false), [showScanner, setShowScanner] = useState(false), [showManual, setShowManual] = useState(false), [manualCode, setManualCode] = useState("");
+  const scannedTarget = useMemo(() => findCleaningQrTarget(active, scannedZoneId), [active, scannedZoneId]);
+  const [zone, setZone] = useState(scannedTarget?.zone || null), [subzone, setSubzone] = useState(scannedTarget?.subzone || null), [prob, setProb] = useState(null), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""), [done, setDone] = useState(false), [showScanner, setShowScanner] = useState(false), [showManual, setShowManual] = useState(false), [manualCode, setManualCode] = useState("");
   const fileRef = useRef(null);
-  useEffect(() => { if (scannedZone && (!zone || zone.id !== scannedZone.id)) setZone(scannedZone); }, [scannedZone?.id]);
+  useEffect(() => { if (scannedTarget && (!zone || zone.id !== scannedTarget.zone.id || subzone?.id !== scannedTarget.subzone?.id)) { setZone(scannedTarget.zone); setSubzone(scannedTarget.subzone || null); } }, [scannedTarget?.zone?.id, scannedTarget?.subzone?.id]);
   const grab = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); setErr(""); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const acceptQrScan = (raw) => {
     setShowScanner(false);
     const scanned = extractCzoneFromRaw(raw);
-    const found = findScannedCleaningZone(active, scanned);
+    const found = findCleaningQrTarget(active, scanned);
     if (!found) {
       setErr(t("public.wrongQr"));
       return;
     }
-    setZone(found);
+    setZone(found.zone);
+    setSubzone(found.subzone || null);
     setErr("");
   };
   const submitManualQr = () => {
@@ -2382,6 +2383,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
       return;
     }
     setZone(found);
+    setSubzone(cleaningSubzones(found).find((s) => s.code === code) || null);
     setErr("");
   };
   const submit = async () => {
@@ -2390,7 +2392,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
     if (!photo) return setErr("חובה לצרף תמונה — הדיווח לא יישלח בלעדיה");
     setBusy(true);
     try {
-      const key = `anonrl_${zone.id}`;
+      const key = `anonrl_${zone.id}_${subzone?.id || "zone"}`;
       const last = Number(await store.get(key, false) || 0);
       const waitMs = 5 * 60 * 1000 - (Date.now() - last);
       if (waitMs > 0) {
@@ -2400,7 +2402,7 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
       await store.set(key, String(Date.now()), false);
     } catch (e) {}
     try {
-      await onSubmit({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind: prob.kind, photo, text: text.trim() || prob.label, reportedById: "", reportedByName: "דיווח אנונימי", reportedByRole: "anonymous" });
+      await onSubmit({ zoneId: zone.id, zoneName: zone.name, zoneLoc: cleaningTargetLoc(zone, subzone), subzoneId: subzone?.id || "", subzoneName: subzone?.name || "", kind: prob.kind, photo, text: text.trim() || prob.label, reportedById: "", reportedByName: "דיווח אנונימי", reportedByRole: "anonymous" });
     } catch (e) {
       setBusy(false);
       return setErr("שליחת הדיווח נכשלה. נסו שוב בעוד רגע.");
@@ -2418,8 +2420,8 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
           : <><button className="btn-primary full pub-scan-btn" onClick={() => { setErr(""); setShowScanner(true); }}><Camera size={16} /> {t("cleaningQr.scanButton")}</button><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setErr(""); setShowManual((v) => !v); }}>{t("cleaningQr.manualToggle")}</button>{showManual && <div className="field" style={{ marginTop: 8 }}><span>{t("cleaningQr.manualLabel")}</span><input value={manualCode} onChange={(e) => { setManualCode(e.target.value); setErr(""); }} placeholder={t("cleaningQr.manualPlaceholder")} /><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={submitManualQr}>{t("cleaningQr.manualSubmit")}</button></div>}{allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div> : <div className="note">{scannedZoneId ? t("public.wrongQr") : t("public.qrOnly")}</div>}</>}
         {err && <div className="err">{err}</div>}
       </> : <>
-        <div className="pub-title">{zone.name}</div>
-        <div className="pub-sub">{zoneLoc(zone) || ""}</div>
+        <div className="pub-title">{subzone?.name || zone.name}</div>
+        <div className="pub-sub">{cleaningTargetLoc(zone, subzone) || ""}</div>
         <div className="field"><span>{t("public.problem")}</span><div className="pub-chips">{ANON_PROBLEMS.map((p) => <button key={p.label} className={"pub-chip" + (prob === p ? " on" : "")} onClick={() => { setProb(p); setErr(""); }}>{p.label}</button>)}</div></div>
         <div className="field"><span>{t("public.photoRequired")}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> {t("public.addPhoto")}</button>}</div>
         <label className="field"><span>{t("public.detailsOptional")}</span><input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("public.detailsPlaceholder")} /></label>
@@ -3350,6 +3352,10 @@ const WORK_WEEK = [0, 1, 2, 3, 4]; // ראשון–חמישי
 const zoneActiveDays = (z) => (Array.isArray(z.activeDays) ? z.activeDays : [0, 1, 2, 3, 4, 5, 6]);
 const isCleaningDay = (z, ts) => zoneActiveDays(z).includes(new Date(ts).getDay());
 const activeDaysLabel = (z) => { const d = zoneActiveDays(z); if (d.length === 7) return "כל יום"; if (d.length === 5 && WORK_WEEK.every((x) => d.includes(x))) return "א׳–ה׳"; if (!d.length) return "ללא ימים"; return WEEKDAYS.filter((w) => d.includes(w.d)).map((w) => w.short).join(" · "); };
+const cleaningSubzones = (zone) => normalizeCleaningSubzones(zone?.subzones || []);
+const cleaningSubzoneLabel = (subzone) => subzone?.name || "";
+const cleaningTargetLoc = (zone, subzone = null) => [zoneLoc(zone), cleaningSubzoneLabel(subzone)].filter(Boolean).join(" · ");
+const newCleaningQrCode = (prefix = "Z") => `${prefix}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 // פריטי הצ׳קליסט שרלוונטיים לחלון מסוים. win.items === undefined/null ⇒ כל הפריטים (תאימות לאחור + כולל פריטים עתידיים).
 const windowItems = (zone, win) => { const cl = zone.checklist || []; if (!win || !Array.isArray(win.items)) return cl; const set = new Set(win.items); return cl.filter((c) => set.has(c.id)); };
 const parseHM = (hm) => cleaningWindowMinutes({ time: hm });
@@ -3495,6 +3501,7 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
   const [zoneCode] = useState(zone.code || ("Z" + Math.random().toString(36).slice(2, 6).toUpperCase()));
   const areaOptions = useMemo(() => cleaningAreaOptions(config, zones), [config, zones]);
   const [name, setName] = useState(zone.name || ""), [areaName, setAreaName] = useState((zone.areaName || zone.area || zone.building || "").trim()), [floor, setFloor] = useState(zone.floor || ""), [code, setCode] = useState(zone.code || "");
+  const [subzones, setSubzones] = useState(cleaningSubzones(zone));
   const [checklist, setChecklist] = useState(zone.checklist?.length ? zone.checklist : DEFAULT_CLEAN_CHECKLIST);
   const [windows, setWindows] = useState(zone.windows?.length ? zone.windows : [{ id: uid(), time: "06:00", tol: 60 }]);
   const [cleanerId, setCleanerId] = useState(zone.cleanerId || ""), [active, setActive] = useState(zone.active !== false), [err, setErr] = useState("");
@@ -3510,6 +3517,7 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
   const setClTranslation = (i, code, value) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, translations: { ...(x.translations || {}), [code]: value } } : x)));
   const draftClTranslations = (i) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, translations: draftCleaningChecklistTranslations(x.label, x.translations) } : x)));
   const setWin = (i, k, v) => setWindows((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const setSubzone = (i, k, v) => setSubzones((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const save = async () => {
     if (!areaName.trim()) return setErr("נא לבחור אזור מערכת");
     if (!name.trim()) return setErr("נא להזין שם אזור");
@@ -3522,7 +3530,8 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
     setBusy(true);
     try {
       const area = areaName.trim();
-      const ok = await onSave({ id: zoneId, code: code.trim() || zoneCode, name: name.trim(), areaName: area, building: area, floor: floor.trim(), checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
+      const cleanSubzones = subzones.map((s) => ({ id: s.id || uid(), name: (s.name || "").trim(), code: normalizeCleaningQrManualCode(s.code || "") || newCleaningQrCode("P"), active: s.active !== false })).filter((s) => s.name);
+      const ok = await onSave({ id: zoneId, code: code.trim() || zoneCode, name: name.trim(), areaName: area, building: area, floor: floor.trim(), subzones: cleanSubzones, checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
       if (ok === false) setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
     } catch {
       setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
@@ -3534,6 +3543,16 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
     <div className="body">
       <label className="field"><span>אזור מערכת *</span><select value={areaName} onChange={(e) => setAreaName(e.target.value)}><option value="">— בחרו מתוך אזורי האחזקה —</option>{areaOptions.length > 0 && <optgroup label="אזורי אחזקה">{areaOptions.map((area) => <option key={area} value={area}>{area}</option>)}</optgroup>}</select><div className="hint">הרשימה נמשכת מהגדרות אחזקה › אזורים. כך ניקיון, קריאות ודוחות משתמשים באותה מפת אתר.</div></label>
       <div className="field-row"><label className="field"><span>קומה / מיקום משנה</span><input value={floor} onChange={(e) => setFloor(e.target.value)} placeholder="קומה 2 / אגף מזרח / כניסה" /></label><label className="field"><span>שם אזור ניקיון *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: שירותים / מטבחון / משרדים" /></label></div>
+      <div className="field"><span>מקומות בתוך האזור</span>
+        <div className="hint">אופציונלי. השתמשו בזה כשאזור אחד כולל כמה נקודות סריקה, למשל שירותים, מטבחון ומשרדים באותו קומה. כל מקום מקבל QR וקוד ידני משלו, אבל משתמש באותו צ׳קליסט של האזור.</div>
+        {subzones.map((s, i) => <div key={s.id || i} className="cl-row" style={{ alignItems: "center" }}>
+          <input value={s.name || ""} onChange={(e) => setSubzone(i, "name", e.target.value)} placeholder="לדוגמה: שירותים נשים / מטבחון" />
+          <input value={s.code || ""} onChange={(e) => setSubzone(i, "code", normalizeCleaningQrManualCode(e.target.value))} placeholder="קוד ידני" style={{ maxWidth: 120 }} />
+          <label className="chk-line" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={s.active !== false} onChange={(e) => setSubzone(i, "active", e.target.checked)} /> פעיל</label>
+          <button className="icon-btn sm" aria-label={`מחק מקום: ${s.name || "ללא שם"}`} onClick={() => setSubzones((list) => list.filter((_, j) => j !== i))}><Trash2 size={16} /></button>
+        </div>)}
+        <button className="btn-ghost sm" onClick={() => setSubzones((s) => [...s, { id: uid(), name: "", code: newCleaningQrCode("P"), active: true }])}><Plus size={14} /> הוספת מקום פנימי</button>
+      </div>
       <div className="field"><span>צ׳קליסט האזור *</span>
         {checklist.map((c, i) => {
           const rowKey = c.id || String(i);
@@ -3580,27 +3599,32 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
 }
 
 function ZoneTag({ zone, onClose }) {
-  const qrUrl = cleaningQrUrlFromWindow(zone.id);
-  const [qrDataUrl, setQrDataUrl] = useState("");
+  const targets = useMemo(() => [{ id: "_zone", name: zone.name, code: zone.code, subzoneId: "", loc: zoneLoc(zone) }, ...cleaningSubzones(zone).map((s) => ({ id: s.id, name: s.name, code: s.code, subzoneId: s.id, loc: cleaningTargetLoc(zone, s) }))], [zone]);
+  const [qrDataUrls, setQrDataUrls] = useState({});
   useEffect(() => {
     let alive = true;
-    setQrDataUrl("");
-    QRCode.toDataURL(qrUrl || ("czone:" + zone.id), { errorCorrectionLevel: "M", margin: 0, width: 220 })
-      .then((url) => { if (alive) setQrDataUrl(url); })
-      .catch(() => { if (alive) setQrDataUrl(""); });
+    setQrDataUrls({});
+    Promise.all(targets.map((target) => {
+      const qrUrl = cleaningQrUrlFromWindow(zone.id, globalThis.window, target.subzoneId);
+      return QRCode.toDataURL(qrUrl || ("czone:" + zone.id), { errorCorrectionLevel: "M", margin: 0, width: 220 })
+        .then((url) => [target.id, url])
+        .catch(() => [target.id, ""]);
+    })).then((entries) => { if (alive) setQrDataUrls(Object.fromEntries(entries)); });
     return () => { alive = false; };
-  }, [qrUrl, zone.id]);
+  }, [zone.id, targets]);
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">תווית להדפסה</div></div>
     <div className="body">
-      <div className="zone-tag">
-        <div className="zt-name">{zone.name}</div>
-        {zoneLoc(zone) && <div className="zt-loc">{zoneLoc(zone)}</div>}
-        {qrDataUrl ? <img className="zt-qr" alt="QR" src={qrDataUrl} /> : <div className="zt-qr-fallback"><ClipboardCheck size={40} /></div>}
-        <div className="zt-code">{zone.code}</div>
-        <div className="zt-hint">סריקה לדיווח או לסבב ניקיון</div>
-      </div>
-      <div className="field" style={{ marginTop: 12 }}><span>קישור QR</span><input readOnly value={qrUrl} onFocus={(e) => e.target.select()} /></div>
-      <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו בכניסה לאזור. הסריקה פותחת את CMMS ישירות על האזור הזה, לדיווח בעיה או לביצוע סבב ניקיון.</div>
+      {targets.map((target) => { const qrUrl = cleaningQrUrlFromWindow(zone.id, globalThis.window, target.subzoneId); return <div key={target.id} style={{ marginBottom: 14 }}>
+        <div className="zone-tag">
+          <div className="zt-name">{target.name}</div>
+          {target.loc && <div className="zt-loc">{target.loc}</div>}
+          {qrDataUrls[target.id] ? <img className="zt-qr" alt="QR" src={qrDataUrls[target.id]} /> : <div className="zt-qr-fallback"><ClipboardCheck size={40} /></div>}
+          <div className="zt-code">{target.code}</div>
+          <div className="zt-hint">{target.subzoneId ? "QR מקום פנימי" : "QR אזור ראשי"} · סריקה לדיווח או לסבב ניקיון</div>
+        </div>
+        <div className="field" style={{ marginTop: 8 }}><span>קישור QR</span><input readOnly value={qrUrl} onFocus={(e) => e.target.select()} /></div>
+      </div>; })}
+      <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו במקום עצמו. אם מוגדרים מקומות פנימיים, עדיף להדביק את ה-QR הספציפי של המקום.</div>
       <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={() => { try { window.print(); } catch (e) {} }}><Printer size={15} /> הדפסה</button>
       <div style={{ height: 16 }} />
     </div></div>);
@@ -3713,7 +3737,7 @@ function CleaningAdmin(p) {
       : (<>
         <div className="row-between"><SectionTitle><Sparkles size={15} /> אזורי ניקיון ({list.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> אזור חדש</button></div>
         {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדים עם גישה לניקיון. הוסיפו עובד למחלקת ניקיון תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור.</div>}
-        {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : renderAreaSections(list, (z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}
+        {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : renderAreaSections(list, (z) => { const lr = lastRoundOf(z.id, rounds); const subCount = cleaningSubzones(z).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span>{subCount > 0 && <span className="badge sm" style={{ background: "#E0F2FE", color: "#0369A1" }}>{countLabel(subCount, "מקום פנימי", "מקומות פנימיים")}</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}
       </>)}
     {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} config={p.config} zones={zones} cleaners={cleaners} managers={managers} canDelete={!!edit.id} deleteBlockers={editDeleteBlockers} onOpenBlocker={openZoneBlocker} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
       if (!await saveZone(z)) return false;
@@ -3734,7 +3758,7 @@ function CleaningAdmin(p) {
   </>);
 }
 
-function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, config, language = DEFAULT_LANGUAGE }) {
+function RoundForm({ zone, subzone = null, win, session, onCancel, onSave, scanToken = false, config, language = DEFAULT_LANGUAGE }) {
   const t = (key, vars) => uiText(language, key, vars);
   const [done, setDone] = useState({}), [issues, setIssues] = useState({}), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [scanOk, setScanOk] = useState(!appModeRequiresCleaningQr(APP_MODE) || !!scanToken), [showScanner, setShowScanner] = useState(false), [showManual, setShowManual] = useState(false), [manualReason, setManualReason] = useState(""), [manualEntry, setManualEntry] = useState(null);
@@ -3748,8 +3772,8 @@ function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, co
   const setIssueKind = (id, k) => setIssues((s) => ({ ...s, [id]: { ...s[id], kind: k } }));
   const grabIssuePhoto = (file) => { const id = photoTarget.current; if (!id) return; resize(file, (d) => setIssues((s) => ({ ...s, [id]: { ...s[id], photo: d } }))); };
   const acceptScan = (raw) => {
-    const scanned = extractCzoneFromRaw(raw);
-    if (scanned !== zone.id) return setErr(scanned ? t("cleaningRound.qrWrong") : t("cleaningRound.qrMissing"));
+    const scanned = extractCzoneFromRaw(raw) || raw;
+    if (!cleaningQrMatchesTarget(scanned, zone, subzone)) return setErr(scanned ? t("cleaningRound.qrWrong") : t("cleaningRound.qrMissing"));
     setErr("");
     setShowScanner(false);
     setScanOk(true);
@@ -3771,7 +3795,7 @@ function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, co
     setErr("");
     setBusy(true);
     try {
-      const ok = await onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr, manualEntry: !!manualEntry, manualEntryReason: manualEntry?.reason || "" });
+      const ok = await onSave({ id: uid(), zoneId: zone.id, zoneName: zone.name, zoneLoc: cleaningTargetLoc(zone, subzone), subzoneId: subzone?.id || "", subzoneName: subzone?.name || "", winId: win?.id || null, winTime: win?.time || null, at: Date.now(), byUid: session.id, byName: session.name, byRole: session.role, isCover: !!isCover, coverFor: isCover ? (zone.cleanerName || "") : "", items: done, doneCount, total: cl.length, issues: issArr, manualEntry: !!manualEntry, manualEntryReason: manualEntry?.reason || "" });
       if (ok === false) {
         setErr(t("cleaningRound.saveFailed"));
         setBusy(false);
@@ -3790,7 +3814,7 @@ function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, co
     </div></div>;
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label={t("common.close")} onClick={onCancel}><X size={22} /></button><div className="form-title">{t("cleaningRound.title")}{win?.time ? " · " + win.time : ""}</div></div>
     <div className="body">
-      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{win?.time ? " · " + t("cleaningRound.roundAt", { time: win.time }) : ""}</div>{isCover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{zone.cleanerName ? " · " + t("cleaner.coverFor", { name: zone.cleanerName }) : " — " + t("cleaningRound.notYourZone")}</span>}</div>
+      <div className="round-zone"><div className="rz-name">{subzone?.name || zone.name}</div><div className="rz-loc">{cleaningTargetLoc(zone, subzone) || "—"}{win?.time ? " · " + t("cleaningRound.roundAt", { time: win.time }) : ""}</div>{subzone && <span className="badge sm" style={{ background: "#E0F2FE", color: "#0369A1" }}>מקום פנימי</span>}{isCover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{zone.cleanerName ? " · " + t("cleaner.coverFor", { name: zone.cleanerName }) : " — " + t("cleaningRound.notYourZone")}</span>}</div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabIssuePhoto(e.target.files?.[0])} />
       <div className="field"><span>{t("cleaningRound.checklist")} · {doneCount}/{t("cleaningRound.itemsCount", { count: cl.length })}{Object.keys(issues).length ? ` · ${t("cleaningRound.issuesCount", { count: Object.keys(issues).length })}` : ""}</span>
         <div className="round-cl">{cl.map((c) => { const iss = issues[c.id]; return <div key={c.id} style={{ border: iss ? "1.5px solid #FCA5A5" : "1px solid var(--line)", borderRadius: 10, marginBottom: 6, overflow: "hidden", background: iss ? "#FEF2F2" : "transparent" }}>
@@ -3852,7 +3876,7 @@ function RoundDoneScreen({ round, zones, rounds, session, config, onClose }) {
     </div></div>;
 }
 
-function ComplaintForm({ zone, session, onCancel, onSave }) {
+function ComplaintForm({ zone, subzone = null, session, onCancel, onSave }) {
   const [kind, setKind] = useState("dirty"), [photo, setPhoto] = useState(null), [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [noPhoto, setNoPhoto] = useState(false), [noPhotoReason, setNoPhotoReason] = useState("");
   const fileRef = useRef(null);
@@ -3864,7 +3888,7 @@ function ComplaintForm({ zone, session, onCancel, onSave }) {
     setErr("");
     setBusy(true);
     try {
-      const ok = await onSave({ zoneId: zone.id, zoneName: zone.name, zoneLoc: zoneLoc(zone), kind, photo: photo || null, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", text: text.trim(), reportedById: session.id, reportedByName: session.name, reportedByRole: session.role });
+      const ok = await onSave({ zoneId: zone.id, zoneName: zone.name, zoneLoc: cleaningTargetLoc(zone, subzone), subzoneId: subzone?.id || "", subzoneName: subzone?.name || "", kind, photo: photo || null, noPhotoReason: (!photo && noPhoto) ? noPhotoReason.trim() : "", text: text.trim(), reportedById: session.id, reportedByName: session.name, reportedByRole: session.role });
       if (ok === false) {
         setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
         setBusy(false);
@@ -3876,7 +3900,7 @@ function ComplaintForm({ zone, session, onCancel, onSave }) {
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">דיווח על בעיה באזור</div></div>
     <div className="body">
-      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}</div></div>
+      <div className="round-zone"><div className="rz-name">{subzone?.name || zone.name}</div><div className="rz-loc">{cleaningTargetLoc(zone, subzone) || "—"}</div>{subzone && <span className="badge sm" style={{ background: "#E0F2FE", color: "#0369A1" }}>מקום פנימי</span>}</div>
       <div className="field"><span>סוג הבעיה</span><div className="pr-row"><button className={"pr-pick" + (kind === "dirty" ? " on" : "")} onClick={() => setKind("dirty")} style={kind === "dirty" ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9" } : {}}><Sparkles size={15} /> לכלוך — נדרש ניקיון</button><button className={"pr-pick" + (kind === "broken" ? " on" : "")} onClick={() => setKind("broken")} style={kind === "broken" ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}><Wrench size={15} /> תקלה / שבר</button></div>{kind === "broken" && <div className="hint">ייפתח כקריאת אחזקה רגילה ויעבור לטיפול הצוות הטכני.</div>}</div>
       <div className="field"><span>תמונה {noPhoto ? "" : "* (חובה)"}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{!noPhoto && (photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>)}
         <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={noPhoto} onChange={(e) => { setNoPhoto(e.target.checked); if (e.target.checked) setPhoto(null); setErr(""); }} /> אין אפשרות לצרף תמונה</label>
@@ -3899,6 +3923,7 @@ function ZoneSpec({ zone, onClose }) {
       <div className="field"><span><CalendarClock size={14} /> ימי פעילות · {activeDaysLabel(zone)}</span>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>{WEEKDAYS.map((w) => { const on = days.includes(w.d); return <span key={w.d} className="badge sm" style={on ? { background: "#0EA5E9", color: "#fff", minWidth: 34, justifyContent: "center" } : { background: "var(--surface-2)", color: "var(--muted)", minWidth: 34, justifyContent: "center" }}>{w.short}</span>; })}</div>
       </div>
+      {cleaningSubzones(zone).length > 0 && <div className="field"><span><MapPin size={14} /> מקומות פנימיים ({cleaningSubzones(zone).length})</span><div className="round-cl">{cleaningSubzones(zone).map((s) => <div key={s.id} className="round-item" style={{ cursor: "default" }}><span className="ri-box"><MapPin size={13} /></span>{s.name}<span style={{ color: "var(--muted)", fontSize: 12, marginInlineStart: 6 }}>· {s.code}</span></div>)}</div></div>}
       <div className="field"><span><Clock size={14} /> סבבים וצ׳קליסט לכל סבב ({ws.length})</span>
         {ws.length === 0
           ? (cl.length === 0 ? <div className="hint">לא הוגדרו חלונות וצ׳קליסט.</div> : <div className="round-cl">{cl.map((c) => <div key={c.id} className="round-item" style={{ cursor: "default" }}><span className="ri-box"><Check size={14} /></span>{c.label}</div>)}</div>)
@@ -3913,15 +3938,16 @@ function ZoneSpec({ zone, onClose }) {
 
 function ReportFlow({ zones, session, onSubmit, onClose, scannedZoneId = "", allowManualZonePick = false }) {
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
-  const scannedZone = useMemo(() => findScannedCleaningZone(active, scannedZoneId), [active, scannedZoneId]);
-  const [stage, setStage] = useState(scannedZone ? "form" : "scan"), [zone, setZone] = useState(scannedZone);
+  const scannedTarget = useMemo(() => findCleaningQrTarget(active, scannedZoneId), [active, scannedZoneId]);
+  const [stage, setStage] = useState(scannedTarget ? "form" : "scan"), [zone, setZone] = useState(scannedTarget?.zone || null), [subzone, setSubzone] = useState(scannedTarget?.subzone || null);
   useEffect(() => {
-    if (scannedZone && (!zone || zone.id !== scannedZone.id)) {
-      setZone(scannedZone);
+    if (scannedTarget && (!zone || zone.id !== scannedTarget.zone.id || subzone?.id !== scannedTarget.subzone?.id)) {
+      setZone(scannedTarget.zone);
+      setSubzone(scannedTarget.subzone || null);
       setStage("form");
     }
-  }, [scannedZone?.id]);
-  if (stage === "form" && zone) return <ComplaintForm zone={zone} session={session} onCancel={onClose} onSave={onSubmit} />;
+  }, [scannedTarget?.zone?.id, scannedTarget?.subzone?.id]);
+  if (stage === "form" && zone) return <ComplaintForm zone={zone} subzone={subzone} session={session} onCancel={onClose} onSave={onSubmit} />;
   return (<div className="pub-wrap"><div className="pub-card">
     <button className="icon-btn pub-x" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
     {stage === "scan" ? <>
@@ -3934,7 +3960,7 @@ function ReportFlow({ zones, session, onSubmit, onClose, scannedZoneId = "", all
       <div className="pub-logo"><Sparkles size={24} /></div>
       <div className="pub-title">בחירת אזור</div>
       <div className="pub-sub">תוצאת הסריקה — בחרו את האזור שדווח.</div>
-      {active.length === 0 ? <div className="note">אין אזורים פעילים במחלקתך.</div> : <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => { setZone(z); setStage("form"); }}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>}
+      {active.length === 0 ? <div className="note">אין אזורים פעילים במחלקתך.</div> : <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => { setZone(z); setSubzone(null); setStage("form"); }}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div>}
       <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => setStage("scan")}>חזרה לסריקה</button>
     </>}
   </div></div>);
@@ -4014,7 +4040,7 @@ function CleaningQrRequired({ zone, scannedZoneId, onClose, language = DEFAULT_L
     const text = String(raw || "").trim();
     if (cleaningQrMatchesZone(text, zone)) {
       setScanErr("");
-      onScanSuccess?.();
+      onScanSuccess?.(text);
       return true;
     }
     setScanErr(text ? t("cleaningQr.scanWrong") : t("cleaningQr.scanMissing"));
@@ -4059,7 +4085,8 @@ function CleanerApp(p) {
   }, [mine, rounds, config, saveRound]);
   useEffect(() => {
     if (autoQrOpened.current || !scannedZoneId) return;
-    const z = mine.find((zone) => zone.id === scannedZoneId);
+    const qrTarget = findCleaningQrTarget(mine, scannedZoneId);
+    const z = qrTarget?.zone;
     if (!z || !cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }).allowed) return;
     const target = actionableRoundForZone(z);
     autoQrOpened.current = true;
@@ -4067,7 +4094,7 @@ function CleanerApp(p) {
       setQrArrivalZone(z);
       return;
     }
-    setRun({ zone: z, win: target.win, scanToken: true });
+    setRun({ zone: z, subzone: qrTarget.subzone, win: target.win, scanToken: true });
   }, [mine, scannedZoneId, rounds, config]);
   const myComplaints = useMemo(() => { const ids = new Set(mine.map((z) => z.id)); return (complaints || []).filter((c) => c.status === "open" && c.ownerRole !== "admin" && ids.has(c.zoneId)).sort((a, b) => b.at - a.at); }, [complaints, mine]);
   const myReports = useMemo(() => (complaints || []).filter((c) => c.reportedById === session.id).sort((a, b) => b.at - a.at).slice(0, 30), [complaints, session.id]);
@@ -4075,7 +4102,7 @@ function CleanerApp(p) {
     const roundRecord = { ...r, issues: (r.issues || []).map((issue) => issue.photo ? { ...issue, photo: null, hasPhoto: true } : issue) };
     if (await saveRound(roundRecord) === false) return false;
     const iss = r.issues || [];
-    const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${countLabel(list.length, kind === "broken" ? "תקלה" : "הערה", kind === "broken" ? "תקלות" : "הערות")} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role });
+    const mk = (kind, list) => ({ zoneId: r.zoneId, zoneName: r.zoneName, zoneLoc: r.zoneLoc, subzoneId: r.subzoneId || "", subzoneName: r.subzoneName || "", kind, photo: (list.find((x) => x.photo) || {}).photo || null, text: list.length === 1 ? (list[0].label ? list[0].label + ": " : "") + list[0].reason : `${countLabel(list.length, kind === "broken" ? "תקלה" : "הערה", kind === "broken" ? "תקלות" : "הערות")} בסבב${r.winTime ? " " + r.winTime : ""}`, issues: list, fromRoundId: r.id, reportedById: session.id, reportedByName: session.name, reportedByRole: session.role });
     const broken = iss.filter((x) => x.kind === "broken");
     const dirty = iss.filter((x) => x.kind !== "broken");
     const complaintResults = [];
@@ -4092,7 +4119,7 @@ function CleanerApp(p) {
     <div className="clean-area-head"><div><div className="clean-area-title"><Building2 size={14} /> {areaGroup.area}</div><div className="clean-area-meta">{countLabel(areaGroup.items.length, "אזור", "אזורים")}</div></div></div>
     {groupCleaningByFloor(areaGroup.items, getZone).map((floorGroup) => <div key={floorGroup.floor || "_none"} className="clean-floor-group">
       {floorGroup.floor && <div className="clean-floor-title">{floorGroup.floor}</div>}
-      <div className="cards">{floorGroup.items.map(renderItem)}</div>
+        <div className="cards">{floorGroup.items.map(renderItem)}</div>
     </div>)}
   </section>);
   const card = (z, cover) => {
@@ -4118,9 +4145,10 @@ function CleanerApp(p) {
     const subMissed = !notDay && !dueNow && nextP && missed.length ? " · " + t("cleaner.missedShort", { times: missed.map((m) => m.win.time).join(",") }) : "";
     const openRound = () => {
       if (!target) return;
+      const qrTarget = findCleaningQrTarget([z], scannedZoneId);
       const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id });
       if (!qr.allowed) return setQrBlockedZone(z);
-      setRun({ zone: z, win: target, scanToken: qr.reason === "scan_matched" });
+      setRun({ zone: z, subzone: qrTarget?.subzone || null, win: target, scanToken: qr.reason === "scan_matched" });
     };
     return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{z.cleanerName ? " · " + t("cleaner.coverFor", { name: z.cleanerName }) : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{t("cleaner.reportsBadge", { count: oc })}</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? t("cleaner.cleanedAgo", { time: timeAgo(lr) }) : t("cleaner.neverCleaned")}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
   };
@@ -4133,7 +4161,7 @@ function CleanerApp(p) {
     <main className="content">
       {qrArrivalZone && <div className="toast-ok"><MapPin size={16} /> {t("cleaner.qrArrived", { zone: qrArrivalZone.name })}</div>}
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
-      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{areaSections(todo, ({ z, win, status }, i) => { const sts = zoneTodayStatuses(z, rounds, now, config); const idx = sts.findIndex((s) => s.win === win || s.win?.id === win?.id); return <button key={`${z.id}-${win.id || i}`} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win, scanToken: qr.reason === "scan_matched" }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{idx >= 0 ? t("cleaner.roundOrdinal", { index: idx + 1, total: sts.length, time: win.time }) : t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>; }, (x) => x.z)}</div>}
+      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{areaSections(todo, ({ z, win, status }, i) => { const sts = zoneTodayStatuses(z, rounds, now, config); const idx = sts.findIndex((s) => s.win === win || s.win?.id === win?.id); return <button key={`${z.id}-${win.id || i}`} className="todo-row" onClick={() => { const qrTarget = findCleaningQrTarget([z], scannedZoneId); const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, subzone: qrTarget?.subzone || null, win, scanToken: qr.reason === "scan_matched" }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{idx >= 0 ? t("cleaner.roundOrdinal", { index: idx + 1, total: sts.length, time: win.time }) : t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>; }, (x) => x.z)}</div>}
       {missedToday.length > 0 && <div className="clean-missed-note"><AlertTriangle size={15} /> {t("cleaner.missedNotice", { count: missedToday.length, windows: missedToday.map((m) => `${m.z.name} ${m.win.time}`).join(" · ") })}</div>}
       {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> {t("cleaner.openReports", { count: myComplaints.length })}</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
       {active.length === 0 ? <Empty text={t("cleaner.noZones")} Icon={Sparkles} sub={t("cleaner.managerDefinesZones")} /> : <>
@@ -4153,8 +4181,8 @@ function CleanerApp(p) {
         </div>}
       </div>; })()}
     </main>
-    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} win={run.win} session={session} scanToken={run.scanToken} config={config} language={language} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
-    {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setQrBlockedZone(null)} onScanSuccess={() => { const target = actionableRoundForZone(qrBlockedZone); setQrBlockedZone(null); if (target) setRun({ zone: qrBlockedZone, win: target.win, scanToken: true }); }} /></Overlay>}
+    {run && <Overlay onClose={() => setRun(null)}><RoundForm zone={run.zone} subzone={run.subzone || null} win={run.win} session={session} scanToken={run.scanToken} config={config} language={language} onCancel={() => setRun(null)} onSave={doSave} /></Overlay>}
+    {qrBlockedZone && <Overlay onClose={() => setQrBlockedZone(null)}><CleaningQrRequired zone={qrBlockedZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setQrBlockedZone(null)} onScanSuccess={(raw) => { const qrTarget = findCleaningQrTarget([qrBlockedZone], extractCzoneFromRaw(raw) || raw || scannedZoneId); const target = actionableRoundForZone(qrBlockedZone); setQrBlockedZone(null); if (target) setRun({ zone: qrBlockedZone, subzone: qrTarget?.subzone || null, win: target.win, scanToken: true }); }} /></Overlay>}
     {doneRound && <Overlay onClose={() => setDoneRound(null)}><RoundDoneScreen round={doneRound} zones={zones} rounds={rounds} session={session} config={config} onClose={() => setDoneRound(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId), escalate: cDetail.ownerRole !== "admin" && mine.some((z) => z.id === cDetail.zoneId) }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onEscalate={(c) => { escalateComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
@@ -4170,10 +4198,11 @@ function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, re
   const myZones = useMemo(() => (zones || []).filter((z) => mz.includes(z.id)).sort(zoneSort), [zones, mz]);
   useEffect(() => {
     if (autoQrOpened.current || !scannedZoneId) return;
-    const z = myZones.find((zone) => zone.id === scannedZoneId);
+    const target = findCleaningQrTarget(myZones, scannedZoneId);
+    const z = target?.zone;
     if (!z) return;
     autoQrOpened.current = true;
-    setRep(z);
+    setRep({ zone: z, subzone: target.subzone || null });
   }, [myZones, scannedZoneId]);
   const open = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && c.status === "open").sort((a, b) => b.at - a.at), [complaints, mz]);
   const closed = useMemo(() => (complaints || []).filter((c) => mz.includes(c.zoneId) && (c.status === "resolved" || c.status === "rejected")).sort((a, b) => (b.resolvedAt || b.at) - (a.resolvedAt || a.at)), [complaints, mz]);
@@ -4193,7 +4222,7 @@ function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, re
     {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : renderAreaSections(myZones, (z) => { const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}
     {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(open.length, "דיווח", "דיווחים")})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>הקישו לצפייה בפרטים המלאים. דיווחי לכלוך נסגרים ע״י עובד הניקיון; דיווחים מעובד הניקיון בטיפול ההנהלה.</div><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
     {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
-    {rep && <Overlay onClose={() => setRep(null)}>{cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: rep.id }).allowed ? <ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /> : <CleaningQrRequired zone={rep} scannedZoneId={scannedZoneId} language={language} onClose={() => setRep(null)} />}</Overlay>}
+    {rep && <Overlay onClose={() => setRep(null)}>{(() => { const repZone = rep.zone || rep; const repSubzone = rep.subzone || null; return cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: repZone.id }).allowed ? <ComplaintForm zone={repZone} subzone={repSubzone} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /> : <CleaningQrRequired zone={repZone} scannedZoneId={scannedZoneId} language={language} onClose={() => setRep(null)} />; })()}</Overlay>}
     {report && <Overlay onClose={() => setReport(false)}><ReportFlow zones={myZones} session={session} scannedZoneId={scannedZoneId} allowManualZonePick={SEED_POLICY.allowDemoData} onSubmit={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setReport(false); return ok; }} onClose={() => setReport(false)} /></Overlay>}
     {spec && <Overlay onClose={() => setSpec(null)}><ZoneSpec zone={spec} onClose={() => setSpec(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ resolve: cDetail.ownerRole !== "admin" && cDetail.status === "open" }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
