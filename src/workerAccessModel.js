@@ -28,6 +28,8 @@ export function workerLoginStateText(user) {
 export function loginSetupPrompt(user) {
   return isPasswordActivationRole(user?.role)
     ? "המשתמש יגדיר סיסמה אישית בכניסה הראשונה עם הדוא״ל."
+    : user?.role === "tech"
+    ? "הטכנאי יגדיר קוד אישי בכניסה הראשונה עם מספר הטלפון."
     : "המשתמש יגדיר קוד אישי בכניסה הראשונה עם מספר העובד.";
 }
 

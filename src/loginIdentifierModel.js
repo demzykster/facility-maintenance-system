@@ -1,10 +1,11 @@
 const norm = (value) => String(value || "").trim();
 const normEmail = (value) => norm(value).toLowerCase();
+export const normPhone = (value) => String(value || "").replace(/\D/g, "");
 
 const activeState = (user) => (user?.active === false || user?.status === "archived") ? "archived" : "active";
 
-const authForRole = (role) => {
-  if (role === "tech") return "none";
+const authForRole = (role, identifierType = "") => {
+  if (role === "tech") return identifierType === "techCode" ? "none" : "pin";
   if (role === "worker" || role === "cleaner") return "pin";
   return "password";
 };
@@ -12,7 +13,7 @@ const authForRole = (role) => {
 const candidate = (user, identifierType, source = "users") => ({
   status: activeState(user),
   identifierType,
-  auth: authForRole(user?.role),
+  auth: authForRole(user?.role, identifierType),
   user,
   source
 });
@@ -33,6 +34,15 @@ export function resolveIdentifier(input, users = [], builtins = []) {
 
   const builtinWorker = builtins.find((u) => (u.role === "worker" || u.role === "cleaner") && norm(u.workerNo) === value);
   if (builtinWorker) return candidate(builtinWorker, "workerNo", "builtin");
+
+  const phone = normPhone(value);
+  if (phone) {
+    const storedPhone = users.find((u) => normPhone(u.phone) === phone);
+    if (storedPhone) return candidate(storedPhone, "phone");
+
+    const builtinPhone = builtins.find((u) => normPhone(u.phone) === phone);
+    if (builtinPhone) return candidate(builtinPhone, "phone", "builtin");
+  }
 
   const storedTech = users.find((u) => u.role === "tech" && norm(u.pin) === value);
   if (storedTech) return candidate(storedTech, "techCode");

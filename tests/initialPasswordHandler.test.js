@@ -29,10 +29,22 @@ const newWorker = {
   name: "Worker One",
   role: "worker",
   workerNo: "1042",
+  phone: "050-111-2222",
   active: true,
   pin: "",
   password: "",
   dept: "נפחי"
+};
+
+const newTech = {
+  id: "tech-1",
+  name: "Tech One",
+  role: "tech",
+  phone: "050-333-4444",
+  active: true,
+  pin: "",
+  password: "",
+  techScope: "transport"
 };
 
 const newManager = {
@@ -40,6 +52,7 @@ const newManager = {
   name: "Manager One",
   role: "user",
   email: "manager@example.com",
+  phone: "050-555-6666",
   active: true,
   password: "",
   dept: "נפחי",
@@ -62,7 +75,73 @@ describe("initial password handler", () => {
       needsSetup: true,
       auth: "pin",
       identifierType: "workerNo",
-      user: { name: "Worker One", role: "worker", workerNo: "1042", email: "" }
+      user: { name: "Worker One", role: "worker", workerNo: "1042", email: "", phone: "050-111-2222" }
+    });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("validates a phone number as a first PIN setup identifier for a technician", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([{ key: "user:tech-1", value: JSON.stringify(newTech) }]),
+      set: vi.fn()
+    };
+    const handler = createInitialPasswordHandler({ driver });
+
+    const res = await call(handler, { body: { action: "validate", identifier: "0503334444" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      needsSetup: true,
+      auth: "pin",
+      identifierType: "phone",
+      user: { name: "Tech One", role: "tech", workerNo: "", email: "", phone: "050-333-4444" }
+    });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
+  it("completes technician first PIN setup by phone", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([{ key: "user:tech-1", value: JSON.stringify(newTech) }]),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createInitialPasswordHandler({ driver, env: { CMMS_SESSION_SECRET: "session-secret" }, now: () => 123456 });
+
+    const res = await call(handler, { body: { action: "complete", identifier: "0503334444", pin: "2468" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      user: { id: "tech-1", name: "Tech One", role: "tech", phone: "050-333-4444" },
+      auth: { accessToken: "", cookieSession: true, expiresAt: 86523000 },
+      pinSessionExpiresAt: 86523000
+    });
+    expect(driver.set).toHaveBeenCalledWith("user:tech-1", JSON.stringify({
+      ...newTech,
+      pin: "2468",
+      authUserId: "",
+      activationToken: "",
+      activationStatus: "activated",
+      activatedAt: 123456
+    }), true);
+  });
+
+  it("validates a phone number as a first password setup identifier for a manager", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([{ key: "user:manager-1", value: JSON.stringify(newManager) }]),
+      set: vi.fn()
+    };
+    const handler = createInitialPasswordHandler({ driver });
+
+    const res = await call(handler, { body: { action: "validate", identifier: "0505556666" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      needsSetup: true,
+      auth: "password",
+      identifierType: "phone",
+      user: { name: "Manager One", role: "user", email: "manager@example.com", phone: "050-555-6666" }
     });
     expect(driver.set).not.toHaveBeenCalled();
   });

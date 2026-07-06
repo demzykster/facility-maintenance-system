@@ -3,7 +3,7 @@ import { createUpstashKvDriverFromEnv } from "../kv/upstashDriver.js";
 import { signCmmsSessionToken } from "./cmmsSessionToken.js";
 import { cookieAuthPayload, setAuthCookies } from "./authCookie.js";
 
-const PIN_ROLES = new Set(["worker", "cleaner"]);
+const PIN_ROLES = new Set(["worker", "cleaner", "tech"]);
 const PASSWORD_ROLES = new Set(["admin", "user"]);
 
 const json = (res, status, body) => {
@@ -22,6 +22,7 @@ const readBody = async (req) => {
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeIdentifier = (value) => String(value || "").trim();
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
 const trimSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 
@@ -50,6 +51,7 @@ function publicInitialUser(user = {}) {
     name: user.name || "",
     role: user.role || "user",
     email: user.email || "",
+    phone: user.phone || "",
     workerNo: user.workerNo || ""
   };
 }
@@ -80,16 +82,26 @@ const publicSession = (user = {}) => ({
 async function findInitialPasswordRecord(driver, identifier) {
   const clean = normalizeIdentifier(identifier);
   const email = normalizeEmail(clean);
+  const phone = normalizePhone(clean);
   const records = await driver.listValues("user:", true);
   return (records || [])
     .map(parseStoredUser)
     .filter(Boolean)
     .find(({ user }) => {
       if (user?.active === false || user?.status === "archived") return false;
+      if (phone && normalizePhone(user.phone) === phone) return true;
       if (PASSWORD_ROLES.has(String(user?.role || ""))) return normalizeEmail(user.email) === email;
       if (PIN_ROLES.has(String(user?.role || ""))) return normalizeIdentifier(user.workerNo) === clean;
       return false;
     });
+}
+
+function initialIdentifierType(user = {}, identifier = "", kind = "") {
+  const clean = normalizeIdentifier(identifier);
+  const phone = normalizePhone(clean);
+  if (phone && normalizePhone(user.phone) === phone) return "phone";
+  if (kind === "password") return "email";
+  return "workerNo";
 }
 
 async function responseJson(response) {
@@ -263,11 +275,11 @@ export function createInitialPasswordHandler({
         pinSessionExpiresAt: tokenResult?.expiresAt || null
       });
     }
-    if (hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_already_configured", user: publicInitialUser(record.user), auth: kind });
+    if (hasLoginSecret(record.user)) return json(res, 409, { error: "initial_secret_already_configured", user: publicInitialUser(record.user), auth: kind, identifierType: initialIdentifierType(record.user, identifier, kind) });
     if (kind === "password" && !isValidEmail(record.user.email)) return json(res, 400, { error: "valid_email_required", user: publicInitialUser(record.user), auth: kind });
 
     if (body?.action !== "complete") {
-      return json(res, 200, { ok: true, needsSetup: true, auth: kind, identifierType: kind === "password" ? "email" : "workerNo", user: publicInitialUser(record.user) });
+      return json(res, 200, { ok: true, needsSetup: true, auth: kind, identifierType: initialIdentifierType(record.user, identifier, kind), user: publicInitialUser(record.user) });
     }
 
     const password = String(body?.password || "").trim();

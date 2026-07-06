@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { resolveIdentifier } from "../src/loginIdentifierModel.js";
 
 const users = [
-  { id: "admin-1", role: "admin", email: "Vadim@example.local", password: "1234" },
-  { id: "mgr-1", role: "user", email: "manager@local", password: "1234", active: false },
+  { id: "admin-1", role: "admin", email: "Vadim@example.local", phone: "050-111-1111", password: "1234" },
+  { id: "mgr-1", role: "user", email: "manager@local", phone: "050-222-2222", password: "1234", active: false },
   { id: "mgr-2", role: "user", email: "old-manager@local", password: "1234", status: "archived" },
-  { id: "worker-1", role: "worker", workerNo: "1042", pin: "1234" },
+  { id: "worker-1", role: "worker", workerNo: "1042", phone: "050-333-3333", pin: "1234" },
   { id: "cleaner-1", role: "cleaner", workerNo: "1050", pin: "1234" },
-  { id: "tech-1", role: "tech", pin: "7788" }
+  { id: "tech-1", role: "tech", phone: "050-444-4444", pin: "7788" }
 ];
 
 const builtins = [
@@ -60,6 +60,27 @@ describe("resolveIdentifier", () => {
       status: "active",
       identifierType: "techCode",
       auth: "none",
+      user: { id: "tech-1" }
+    });
+  });
+
+  it("resolves phone as a secondary identifier for login-capable users", () => {
+    expect(resolveIdentifier("0501111111", users, builtins)).toMatchObject({
+      status: "active",
+      identifierType: "phone",
+      auth: "password",
+      user: { id: "admin-1" }
+    });
+    expect(resolveIdentifier("050-333-3333", users, builtins)).toMatchObject({
+      status: "active",
+      identifierType: "phone",
+      auth: "pin",
+      user: { id: "worker-1" }
+    });
+    expect(resolveIdentifier("050 444 4444", users, builtins)).toMatchObject({
+      status: "active",
+      identifierType: "phone",
+      auth: "pin",
       user: { id: "tech-1" }
     });
   });
