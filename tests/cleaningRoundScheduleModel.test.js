@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCleaningMissedRoundRecord,
+  cleaningChecklistForTarget,
   cleaningMissedRoundExists,
   cleaningMissedRoundRecordsForStatuses,
   cleaningWindowBounds,
@@ -76,5 +77,36 @@ describe("cleaning round schedule model", () => {
       slotStart: 5 * hour,
       slotEnd: 7 * hour
     });
+  });
+
+  it("uses parent window item filters when no subzone checklist exists", () => {
+    const zone = {
+      checklist: [
+        { id: "sink", label: "כיור" },
+        { id: "floor", label: "רצפה" }
+      ]
+    };
+
+    expect(cleaningChecklistForTarget(zone, { items: ["floor"] }, { id: "wc", checklist: [] })).toEqual([
+      { id: "floor", label: "רצפה" }
+    ]);
+  });
+
+  it("uses a subzone checklist when the scanned place has one", () => {
+    const zone = {
+      checklist: [
+        { id: "sink", label: "כיור" },
+        { id: "floor", label: "רצפה" }
+      ]
+    };
+    const subzone = {
+      id: "wc",
+      checklist: [
+        { id: "mirror", label: "מראה" },
+        { id: "paper", label: "נייר" }
+      ]
+    };
+
+    expect(cleaningChecklistForTarget(zone, { items: ["floor"] }, subzone)).toEqual(subzone.checklist);
   });
 });

@@ -99,7 +99,7 @@ describe("cleaningQrModel", () => {
       subzones: [{ id: "wc-women", name: "שירותים נשים", code: "WC1" }]
     };
 
-    expect(findCleaningQrTarget([zone], "zone-1~wc-women")).toEqual({ zone, subzone: { ...zone.subzones[0], active: true } });
+    expect(findCleaningQrTarget([zone], "zone-1~wc-women")).toEqual({ zone, subzone: { ...zone.subzones[0], active: true, checklist: [] } });
     expect(cleaningQrMatchesZone("WC1", zone)).toBe(true);
     expect(cleaningQrMatchesZone("https://cmms.example/?z=czone:zone-1~wc-women", zone)).toBe(true);
     expect(findCleaningQrTarget([zone], "zone-1~missing")).toBeNull();
