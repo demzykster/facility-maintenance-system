@@ -26,21 +26,6 @@ export function cleaningWindowBounds(win = {}, dayStart = 0) {
   };
 }
 
-export function cleaningChecklistForTarget(zone = {}, win = null, subzone = null) {
-  const subzoneChecklist = Array.isArray(subzone?.checklist)
-    ? subzone.checklist.filter((item) => String(item?.label || "").trim())
-    : [];
-  if (subzoneChecklist.length > 0) return subzoneChecklist;
-
-  const checklist = Array.isArray(zone?.checklist)
-    ? zone.checklist.filter((item) => String(item?.label || "").trim())
-    : [];
-  if (!win || !Array.isArray(win.items)) return checklist;
-
-  const selected = new Set(win.items);
-  return checklist.filter((item) => selected.has(item.id));
-}
-
 export function isMissedCleaningRound(round = {}) {
   return round.type === "missed" || round.status === "missed";
 }

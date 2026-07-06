@@ -68,7 +68,6 @@ describe("location model", () => {
       name: "מטבחון",
       checklist: [{ id: "floor", label: "רצפה" }],
       windows: [{ id: "morning", time: "08:00", tol: 30 }],
-      subzones: [{ id: "sink", name: "כיור", code: "SINK1", active: true, checklist: [] }],
       activeDays: [0, 1, 2, 3, 4],
       cleanerId: "u1",
       cleanerName: "Cleaner",
@@ -85,7 +84,6 @@ describe("location model", () => {
       cleanerName: "Cleaner",
       managerIds: ["m1", "m2"],
       qrCode: "Z123",
-      subzones: [{ id: "sink", name: "כיור", code: "SINK1", active: true, checklist: [] }],
       compliancePolicy: { requirePhotoOnIssue: true }
     });
   });
