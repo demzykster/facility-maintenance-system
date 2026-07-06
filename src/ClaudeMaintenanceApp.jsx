@@ -10589,6 +10589,19 @@ body *{visibility:hidden!important;}
   .manager-fleet-table .ft-model b{display:block;font-size:13px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;}
   .manager-fleet-table .ft-sup{grid-area:supplier;max-width:96px;text-align:end;white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.3;}
   .manager-fleet-table .ft-doc{grid-area:drivers;justify-content:flex-end;white-space:nowrap;font-size:12px;line-height:1.3;}
+  .fleet-unit-table{display:flex;flex-direction:column;gap:10px;background:transparent;border:0;overflow:visible;}
+  .fleet-unit-table .ftable-head{display:none;}
+  .fleet-unit-table .fleet-unit-row{grid-template-columns:minmax(0,1fr) 34px;grid-template-areas:"code select" "type select" "model select" "supplier select" "docs docs";gap:5px 10px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 1px 2px rgba(15,23,42,.03);text-align:start;}
+  .fleet-unit-table .fleet-unit-row+.fleet-unit-row{border-top:1px solid var(--line);}
+  .fleet-unit-table .ft-select{grid-area:select;align-self:start;justify-self:end;}
+  .fleet-unit-table .ft-code{grid-area:code;font-size:16px;line-height:1.2;text-align:start;}
+  .fleet-unit-table .ft-type{grid-area:type;min-width:0;}
+  .fleet-unit-table .ft-type b{font-size:14px;line-height:1.25;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  .fleet-unit-table .ft-model{grid-area:model;text-align:start;font-size:13px;line-height:1.25;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  .fleet-unit-table .ft-sup{grid-area:supplier;text-align:start;font-size:12.5px;line-height:1.3;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  .fleet-unit-table .ft-doc{grid-area:docs;margin-top:5px;}
+  .fleet-unit-table .doc-chip-stack{grid-template-columns:1fr;gap:5px;}
+  .fleet-unit-table .doc-chip{max-width:100%;}
 }
 @media(max-width:390px){
   .worker-top{padding-inline:8px;}
