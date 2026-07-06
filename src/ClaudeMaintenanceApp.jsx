@@ -3651,21 +3651,20 @@ function ZoneTag({ zone, onClose }) {
     })).then((entries) => { if (alive) setQrDataUrls(Object.fromEntries(entries)); });
     return () => { alive = false; };
   }, [zone.id, targets]);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">תווית להדפסה</div></div>
-    <div className="body">
-      {targets.map((target) => { const qrUrl = cleaningQrUrlFromWindow(zone.id, globalThis.window, target.subzoneId); return <div key={target.id} style={{ marginBottom: 14 }}>
+  return (<div className="ovl-inner qr-label-sheet"><div className="form-head qr-label-controls"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">מדבקת QR להדפסה</div></div>
+    <div className="body qr-label-body">
+      <div className="qr-label-actions qr-label-controls">
+        <button className="btn-primary full sm" onClick={() => { try { window.print(); } catch (e) {} }}><Printer size={15} /> הדפסת מדבקה</button>
+      </div>
+      {targets.map((target) => <div key={target.id} className="zone-tag-page">
         <div className="zone-tag">
           <div className="zt-name">{target.name}</div>
-          {target.loc && <div className="zt-loc">{target.loc}</div>}
+          <div className="zt-loc">{target.loc || target.name}</div>
           {qrDataUrls[target.id] ? <img className="zt-qr" alt="QR" src={qrDataUrls[target.id]} /> : <div className="zt-qr-fallback"><ClipboardCheck size={40} /></div>}
           <div className="zt-code">{target.code}</div>
           <div className="zt-hint">{target.subzoneId ? "QR מקום פנימי" : "QR אזור ראשי"} · סריקה לדיווח או לסבב ניקיון</div>
         </div>
-        <div className="field" style={{ marginTop: 8 }}><span>קישור QR</span><input readOnly value={qrUrl} onFocus={(e) => e.target.select()} /></div>
-      </div>; })}
-      <div className="hint" style={{ marginTop: 12 }}>הדפיסו והצמידו במקום עצמו. אם מוגדרים מקומות פנימיים, עדיף להדביק את ה-QR הספציפי של המקום.</div>
-      <button className="btn-ghost full sm" style={{ marginTop: 10 }} onClick={() => { try { window.print(); } catch (e) {} }}><Printer size={15} /> הדפסה</button>
-      <div style={{ height: 16 }} />
+      </div>)}
     </div></div>);
 }
 
@@ -10026,13 +10025,40 @@ button.notif-perm:hover{background:#D1FAE5;}
 .tcard-actions{display:flex;gap:4px;align-items:center;margin-inline-start:auto;}
 .tcard.clk{cursor:pointer;text-align:start;}
 .toast-ok{display:flex;align-items:center;justify-content:center;gap:7px;background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;border-radius:10px;padding:10px;font-size:13.5px;font-weight:600;margin-bottom:12px;}
-.zone-tag{border:2px solid var(--ink);border-radius:16px;padding:22px;text-align:center;background:#fff;color:#0b0b0b;max-width:300px;margin:0 auto;}
-.zt-name{font-size:18px;font-weight:800;}
-.zt-loc{font-size:13px;color:#555;margin-top:3px;}
-.zt-qr{width:200px;height:200px;margin:16px auto 8px;display:block;}
-.zt-qr-fallback{width:200px;height:200px;margin:16px auto 8px;display:flex;align-items:center;justify-content:center;border:2px dashed #bbb;border-radius:12px;color:#bbb;}
-.zt-code{font-family:ui-monospace,monospace;font-size:22px;font-weight:800;letter-spacing:2px;}
-.zt-hint{font-size:11px;color:#777;margin-top:6px;}
+.qr-label-sheet{max-width:520px;}
+.qr-label-body{display:flex;flex-direction:column;align-items:center;gap:14px;}
+.qr-label-actions{width:min(100%,340px);}
+.zone-tag-page{break-after:page;page-break-after:always;width:100%;display:flex;justify-content:center;}
+.zone-tag-page:last-child{break-after:auto;page-break-after:auto;}
+.zone-tag{width:340px;min-height:416px;border:3px solid #16202E;border-radius:28px;padding:30px 22px 24px;text-align:center;background:#fff;color:#0b0b0b;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(15,23,42,.10);}
+.zt-name{font-size:28px;font-weight:900;line-height:1.05;text-wrap:balance;max-width:100%;}
+.zt-loc{font-size:17px;color:#555;margin-top:8px;line-height:1.2;text-wrap:balance;max-width:100%;}
+.zt-qr{width:230px;height:230px;margin:20px auto 10px;display:block;image-rendering:pixelated;}
+.zt-qr-fallback{width:230px;height:230px;margin:20px auto 10px;display:flex;align-items:center;justify-content:center;border:2px dashed #bbb;border-radius:12px;color:#bbb;}
+.zt-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:31px;font-weight:900;letter-spacing:4px;line-height:1.05;}
+.zt-hint{font-size:13px;color:#777;margin-top:14px;line-height:1.25;text-wrap:balance;}
+@media print{
+@page{size:62mm 90mm;margin:0;}
+html,body,#root{width:62mm!important;min-height:90mm!important;background:#fff!important;margin:0!important;padding:0!important;overflow:visible!important;}
+body>*:not(#root),.app-root>:not(.main-col),.main-col>:not(.content),.content.with-nav>:not(.ovl-backdrop){display:none!important;}
+.ovl-backdrop{position:absolute!important;inset:0!important;display:block!important;width:62mm!important;min-height:90mm!important;margin:0!important;padding:0!important;background:#fff!important;z-index:9999!important;}
+.ovl-panel{display:block!important;width:62mm!important;height:auto!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;background:#fff!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;}
+.ovl-backdrop>*:not(.ovl-panel),.ovl-panel>*:not(.qr-label-sheet){display:none!important;}
+body *{visibility:hidden!important;}
+.qr-label-sheet,.qr-label-sheet *{visibility:visible!important;}
+.qr-label-sheet{position:absolute!important;inset:0!important;width:62mm!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;color:#000!important;box-shadow:none!important;}
+.qr-label-controls{display:none!important;}
+.qr-label-body{display:block!important;width:62mm!important;margin:0!important;padding:0!important;background:#fff!important;}
+.zone-tag-page{width:62mm!important;height:90mm!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;background:#fff!important;break-after:page;page-break-after:always;}
+.zone-tag-page:last-child{break-after:auto;page-break-after:auto;}
+.zone-tag{width:56mm!important;height:84mm!important;min-height:0!important;box-sizing:border-box!important;border:1.2mm solid #16202E!important;border-radius:5mm!important;padding:7mm 4mm 5mm!important;margin:0!important;box-shadow:none!important;color:#000!important;background:#fff!important;}
+.zt-name{font-size:18pt!important;line-height:1.05!important;font-weight:900!important;}
+.zt-loc{font-size:11pt!important;line-height:1.15!important;margin-top:2.5mm!important;color:#555!important;}
+.zt-qr{width:40mm!important;height:40mm!important;margin:6mm auto 3mm!important;}
+.zt-qr-fallback{width:40mm!important;height:40mm!important;margin:6mm auto 3mm!important;}
+.zt-code{font-size:20pt!important;line-height:1!important;letter-spacing:2.2mm!important;}
+.zt-hint{font-size:8.5pt!important;line-height:1.18!important;margin-top:4mm!important;color:#777!important;}
+}
 .round-zone{background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
 .rz-name{font-weight:800;font-size:16px;}.rz-loc{font-size:13px;color:var(--muted);margin:2px 0 4px;}
 .round-cl{display:flex;flex-direction:column;gap:7px;}
