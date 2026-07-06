@@ -1844,14 +1844,14 @@ export default function App() {
     const plan = cleaningZoneDeletePlan(id, { rounds, complaints, users });
     if (!plan.zoneId) return false;
     const linked = cleaningZoneDeleteBlockers(plan.zoneId, { rounds, complaints, users });
-    for (const record of [...(linked.rounds || []), ...(linked.complaints || [])]) {
-      await CLEANING_PHOTOS.removeRecord(record);
+    for (const manager of plan.updatedManagers) {
+      if (!await saveUser(manager)) return false;
     }
     for (const key of plan.deleteKeys) {
       if (!await deleteShared(key)) return false;
     }
-    for (const manager of plan.updatedManagers) {
-      if (!await saveUser(manager)) return false;
+    for (const record of [...(linked.rounds || []), ...(linked.complaints || [])]) {
+      await CLEANING_PHOTOS.removeRecord(record);
     }
     const zoneId = String(plan.zoneId).trim();
     const belongsToZone = (record) => String(record?.zoneId || "").trim() === zoneId;
