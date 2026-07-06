@@ -23,6 +23,15 @@ const asDataUrl = (file = {}) => {
 
 const safeSegment = (value) => String(value || "item").replace(/[^a-zA-Z0-9._-]/g, "-");
 
+const recordPhotoPaths = (record = {}) => {
+  const paths = [];
+  if (record.photoPath) paths.push(record.photoPath);
+  for (const issue of record.issues || []) {
+    if (issue?.photoPath) paths.push(issue.photoPath);
+  }
+  return [...new Set(paths)];
+};
+
 export const cleaningComplaintPhotoPath = (complaintId, dataUrl = "") => (
   `cleaning/complaints/${safeSegment(complaintId)}/photo.${dataUrlMeta(dataUrl).ext}`
 );
@@ -98,6 +107,12 @@ export function createCleaningPhotoStorage({ appMode = "demo", provider = STORAG
         return asDataUrl(await files.download(record.photoPath));
       } catch {
         return null;
+      }
+    },
+    async removeRecord(record) {
+      if (!this.usesApi) return;
+      for (const path of recordPhotoPaths(record)) {
+        try { await files.delete(path); } catch {}
       }
     }
   };

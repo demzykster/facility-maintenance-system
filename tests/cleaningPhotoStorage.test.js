@@ -88,6 +88,29 @@ describe("cleaningPhotoStorage", () => {
     });
   });
 
+  it("removes production cleaning photos referenced by a complaint or round record", async () => {
+    const apiProvider = { delete: vi.fn().mockResolvedValue(true) };
+    const storage = createCleaningPhotoStorage({
+      appMode: "production",
+      provider: "api",
+      apiBaseUrl: "https://cmms.example/api",
+      apiProvider
+    });
+
+    await storage.removeRecord({
+      id: "C-1",
+      photoPath: "cleaning/complaints/C-1/photo.jpg",
+      issues: [
+        { photoPath: "cleaning/complaints/C-1/issues/sink.jpg" },
+        { photoPath: "cleaning/complaints/C-1/issues/sink.jpg" }
+      ]
+    });
+
+    expect(apiProvider.delete).toHaveBeenCalledTimes(2);
+    expect(apiProvider.delete).toHaveBeenCalledWith("cleaning/complaints/C-1/photo.jpg");
+    expect(apiProvider.delete).toHaveBeenCalledWith("cleaning/complaints/C-1/issues/sink.jpg");
+  });
+
   it("keeps demo/local cleaning photos inline for current review data compatibility", async () => {
     const storage = createCleaningPhotoStorage({ appMode: "demo", provider: "local" });
     const complaint = { id: "C-1", photo: "data:image/jpeg;base64,abc", issues: [{ itemId: "sink", photo: "data:image/jpeg;base64,def" }] };

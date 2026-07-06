@@ -54,7 +54,7 @@ import { DEFAULT_LANGUAGE, languageCookieString, languageDirection, languageFrom
 import { uiText } from "./uiI18nModel.js";
 import { isStandaloneDisplay, pwaInstallPromptMode } from "./pwaInstallModel.js";
 import { supplierActivityCounts } from "./supplierActivityModel.js";
-import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers } from "./cleaningZoneBlockersModel.js";
+import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers, cleaningZoneDeletePlan } from "./cleaningZoneBlockersModel.js";
 import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 import { defaultWorkerView } from "./workerProfileModel.js";
@@ -1840,7 +1840,26 @@ export default function App() {
     return true;
   };
   const saveZone = async (z) => { if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false; setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); return true; };
-  const delZone = async (id) => { if (!await deleteShared(`czone:${id}`)) return false; setZones((s) => s.filter((x) => x.id !== id)); return true; };
+  const delZone = async (id) => {
+    const plan = cleaningZoneDeletePlan(id, { rounds, complaints, users });
+    if (!plan.zoneId) return false;
+    const linked = cleaningZoneDeleteBlockers(plan.zoneId, { rounds, complaints, users });
+    for (const record of [...(linked.rounds || []), ...(linked.complaints || [])]) {
+      await CLEANING_PHOTOS.removeRecord(record);
+    }
+    for (const key of plan.deleteKeys) {
+      if (!await deleteShared(key)) return false;
+    }
+    for (const manager of plan.updatedManagers) {
+      if (!await saveUser(manager)) return false;
+    }
+    const zoneId = String(plan.zoneId).trim();
+    const belongsToZone = (record) => String(record?.zoneId || "").trim() === zoneId;
+    setZones((s) => s.filter((x) => x.id !== plan.zoneId));
+    setRounds((s) => s.filter((x) => !belongsToZone(x)));
+    setComplaints((s) => s.filter((x) => !belongsToZone(x)));
+    return true;
+  };
   const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); if (!await persistShared(`cround:${rec.id}`, JSON.stringify(rec))) return false; setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); return true; };
   const saveAbsence = async (a) => { if (!await persistShared(`cabsence:${a.id}`, JSON.stringify(a))) return false; setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1))); return true; };
   const delAbsence = async (id) => { if (!await deleteShared(`cabsence:${id}`)) return false; setAbsences((s) => s.filter((x) => x.id !== id)); return true; };
@@ -3452,16 +3471,16 @@ function ZoneForm({ zone, cleaners, managers, onCancel, onSave, onDelete, canDel
       <label className="field"><span>אחראי סבבים</span><select value={cleanerId} onChange={(e) => setCleanerId(e.target.value)}><option value="">— ללא שיוך —</option>{cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="hint">כל עובד עם גישה לניקיון יכול לבצע סבב ככיסוי. האחראי הוא ברירת המחדל של האזור.</div></label>
       {managers && <div className="field"><span>מנהלי מחלקה שרואים את האזור</span>{managers.length === 0 ? <div className="hint">אין מנהלי מחלקה. הוסיפו תחת «צוות ומשתמשים».</div> : <div className="chk-grid">{managers.map((m) => <label key={m.id} className={"chk-pill" + (mgrIds.includes(m.id) ? " on" : "")}><input type="checkbox" checked={mgrIds.includes(m.id)} onChange={() => setMgrIds((s) => s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id])} /> {m.name}</label>)}</div>}<div className="hint">אותה הגדרה כמו ב«צוות ומשתמשים» של המנהל — נשמרת לשני הכיוונים.</div></div>}
       <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> אזור פעיל</label>
-      {canDelete && blockerCount > 0 && <div className="note" style={{ marginTop: 8, borderColor: "#FDE68A" }}><AlertTriangle size={14} /> אי אפשר למחוק אזור שיש לו פעילות מקושרת. פתחו את הרשומות ונקו אותן קודם.
+      {canDelete && blockerCount > 0 && <div className="note" style={{ marginTop: 8, borderColor: "#FDE68A" }}><AlertTriangle size={14} /> מחיקת האזור תמחק גם את ההיסטוריה המקושרת אליו.
         <div className="u-filters" style={{ marginTop: 8 }}>
           {(deleteBlockers?.rounds || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("rounds")}>סבבים: {deleteBlockers.rounds.length}</button>}
           {(deleteBlockers?.complaints || []).length > 0 && <button type="button" className="btn-ghost sm" onClick={() => onOpenBlocker("complaints")}>דיווחים: {deleteBlockers.complaints.length}</button>}
-          {(deleteBlockers?.managers || []).length > 0 && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>מנהלים משויכים: {deleteBlockers.managers.map((m) => m.name || "—").join(", ")}</span>}
+          {(deleteBlockers?.managers || []).length > 0 && <span className="badge sm" style={{ background: "#FEF3C7", color: "#92400E" }}>יוסר ממנהלים: {deleteBlockers.managers.map((m) => m.name || "—").join(", ")}</span>}
         </div>
       </div>}
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save} disabled={busy}>{busy ? "שומר…" : "שמירה"}</button>
-      {canDelete && blockerCount === 0 && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label="מחיקת אזור" onConfirm={onDelete} />}
+      {canDelete && <ConfirmBtn className="btn-danger full" style={{ marginTop: 10 }} label={blockerCount > 0 ? "מחיקת אזור והיסטוריה" : "מחיקת אזור"} onConfirm={onDelete} />}
       <div style={{ height: 24 }} />
     </div></div>);
 }
