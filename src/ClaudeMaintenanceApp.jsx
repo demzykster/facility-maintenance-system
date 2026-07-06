@@ -47,7 +47,7 @@ import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSup
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, normalizeCleaningQrManualCode, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
-import { cleaningMissedRoundRecordsForStatuses, isCleaningRoundActionableStatus, isCompletedCleaningRound } from "./cleaningRoundScheduleModel.js";
+import { cleaningMissedRoundRecordsForStatuses, cleaningWindowBounds, cleaningWindowMinutes, isCleaningRoundActionableStatus, isCompletedCleaningRound } from "./cleaningRoundScheduleModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
@@ -3352,16 +3352,15 @@ const isCleaningDay = (z, ts) => zoneActiveDays(z).includes(new Date(ts).getDay(
 const activeDaysLabel = (z) => { const d = zoneActiveDays(z); if (d.length === 7) return "כל יום"; if (d.length === 5 && WORK_WEEK.every((x) => d.includes(x))) return "א׳–ה׳"; if (!d.length) return "ללא ימים"; return WEEKDAYS.filter((w) => d.includes(w.d)).map((w) => w.short).join(" · "); };
 // פריטי הצ׳קליסט שרלוונטיים לחלון מסוים. win.items === undefined/null ⇒ כל הפריטים (תאימות לאחור + כולל פריטים עתידיים).
 const windowItems = (zone, win) => { const cl = zone.checklist || []; if (!win || !Array.isArray(win.items)) return cl; const set = new Set(win.items); return cl.filter((c) => set.has(c.id)); };
-const parseHM = (hm) => { const [h, m] = String(hm || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
-const windowAbs = (win, ts) => dayStart(ts) + parseHM(win.time) * 60000;
+const parseHM = (hm) => cleaningWindowMinutes({ time: hm });
+const windowAbs = (win, ts) => dayStart(ts) + cleaningWindowMinutes(win) * 60000;
 const zoneTodayStatuses = (zone, rounds, now, cfg = {}) => {
   if (!isCleaningDay(zone, now)) return []; // לא יום ניקיון של האזור — אין חלונות / אין "פוספס"
   const reminderMs = clampCleaningReminderMins(cfg?.cleaningReminderMins ?? 30) * 60000;
   const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
   const ds = dayStart(now), eod = ds + 86400000;
-  return ws.map((win, i) => {
-    const target = ds + parseHM(win.time) * 60000, tol = (+win.tol || 0) * 60000, slotStart = target - tol;
-    const nx = ws[i + 1]; const slotEnd = nx ? (ds + parseHM(nx.time) * 60000 - (+nx.tol || 0) * 60000) : eod;
+  return ws.map((win) => {
+    const { target, tol, slotStart, slotEnd } = cleaningWindowBounds(win, ds);
     const round = (rounds || []).find((r) => isCompletedCleaningRound(r) && r.zoneId === zone.id && r.at >= ds && r.at < eod && (r.winId ? r.winId === win.id : (r.at >= slotStart && r.at < slotEnd)));
     let status;
     if (round) status = "done";
@@ -3395,9 +3394,8 @@ const dayCompliance = (zone, rounds, dayTs, now) => {
   if (!isCleaningDay(zone, dayTs)) return []; // יום ללא ניקיון מתוכנן — לא נספר בעמידה ביעדים
   const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
   const ds = dayStart(dayTs), eod = ds + 86400000;
-  return ws.map((win, i) => {
-    const target = ds + parseHM(win.time) * 60000, tol = (+win.tol || 0) * 60000, slotStart = target - tol;
-    const nx = ws[i + 1]; const slotEnd = nx ? (ds + parseHM(nx.time) * 60000 - (+nx.tol || 0) * 60000) : eod;
+  return ws.map((win) => {
+    const { target, tol, slotStart, slotEnd } = cleaningWindowBounds(win, ds);
     const resolved = slotEnd <= now; const r = (rounds || []).find((x) => isCompletedCleaningRound(x) && x.zoneId === zone.id && x.at >= ds && x.at < eod && (x.winId ? x.winId === win.id : (x.at >= slotStart && x.at < slotEnd)));
     return { resolved, done: !!r, onTime: r ? r.at <= target + tol : false };
   });

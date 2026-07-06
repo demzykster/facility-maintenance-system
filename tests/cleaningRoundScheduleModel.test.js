@@ -3,6 +3,7 @@ import {
   buildCleaningMissedRoundRecord,
   cleaningMissedRoundExists,
   cleaningMissedRoundRecordsForStatuses,
+  cleaningWindowBounds,
   isCleaningRoundActionableStatus,
   isCompletedCleaningRound,
   isMissedCleaningRound
@@ -63,5 +64,17 @@ describe("cleaning round schedule model", () => {
 
     expect(cleaningMissedRoundExists([existing], zone, statuses[0].win, 0, 86400000)).toBe(true);
     expect(cleaningMissedRoundRecordsForStatuses({ zone, statuses, rounds: [existing], dayStart: 0, dayEnd: 86400000 })).toEqual([]);
+  });
+
+  it("closes a cleaning window at the configured late tolerance", () => {
+    const hour = 60 * 60000;
+    const bounds = cleaningWindowBounds({ time: "06:00", tol: 60 }, 0);
+
+    expect(bounds).toMatchObject({
+      target: 6 * hour,
+      tol: hour,
+      slotStart: 5 * hour,
+      slotEnd: 7 * hour
+    });
   });
 });

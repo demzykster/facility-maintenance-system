@@ -10,6 +10,22 @@ export function cleaningMissedWindowKey(zone = {}, win = {}, dayStart = 0) {
     .join("_");
 }
 
+export function cleaningWindowMinutes(win = {}) {
+  const [h, m] = String(win.time || "0:0").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+export function cleaningWindowBounds(win = {}, dayStart = 0) {
+  const target = dayStart + cleaningWindowMinutes(win) * 60000;
+  const tol = Math.max(0, Number(win.tol) || 0) * 60000;
+  return {
+    target,
+    tol,
+    slotStart: target - tol,
+    slotEnd: target + tol
+  };
+}
+
 export function isMissedCleaningRound(round = {}) {
   return round.type === "missed" || round.status === "missed";
 }
