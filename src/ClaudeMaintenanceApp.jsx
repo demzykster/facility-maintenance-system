@@ -2510,7 +2510,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   const productionConfigured = productionLoginReady(productionLoginConfig);
   useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || d.phone || ""); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
-  const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", phone: u.phone || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u), cleaningAccess: u.cleaningAccess || u.cleaning || false });
+  const finish = (u) => onLogin({ id: u.id, name: u.name, position: u.position || u.jobTitle || "", role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", phone: u.phone || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u), cleaningAccess: u.cleaningAccess || u.cleaning || false });
   const dfltDept = config?.departments?.[0] || "";
   const withDefaultDept = (u) => ({ ...u, dept: u.dept || ((u.role === "user" || u.role === "worker") ? dfltDept : "") });
   const rememberLogin = (u, idType) => {
@@ -7622,37 +7622,71 @@ function WorkerReportsAnalytics({ tickets, dept = null, depts = null }) {
 
 /* ============================================================ SETTINGS */
 const SLA3 = (o) => ({ high: o?.high ?? 4, medium: o?.medium ?? 24, low: o?.low ?? 72 });
-function UserTree({ list, departments, onPick, expandAll, shifts }) {
-  const [open, setOpen] = useState({});
-  const isOpen = (k) => expandAll || open[k];
-  const toggle = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
+function UserTree({ list, departments, onPick, shifts, mode = "workers", onCreate, canCreate = false, showEmptyGroups = false }) {
   const pickable = typeof onPick === "function";
-  const mgrDepts = (u) => userDepts(u);
-  const admins = list.filter((u) => u.role === "admin");
-  const techs = list.filter((u) => u.role === "tech");
-  const allDepts = [...new Set([...(departments || []), ...list.filter((u) => u.role !== "admin" && u.role !== "tech").flatMap((u) => u.role === "user" ? mgrDepts(u) : [u.dept]).filter(Boolean)])];
-  const unassigned = list.filter((u) => u.role !== "admin" && u.role !== "tech" && (u.role === "user" ? mgrDepts(u).length === 0 : !(u.dept || "")));
-  const PersonRow = ({ u, lead }) => { const RI = ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User; const RowTag = pickable ? "button" : "div"; return <RowTag className={"tcard" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : (lead ? "#0D9488" : "#16A34A"), marginInlineStart: lead ? 0 : 14, cursor: pickable ? "pointer" : "default" }}><span className="avatar"><RI size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: lead ? "rgba(13,148,136,0.12)" : "var(--surface-2)", color: lead ? "#0D9488" : "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.role === "user" ? ((mgrDepts(u).length > 1 ? `מנהל · ${mgrDepts(u).join(", ")}` : "מנהל מחלקה") + (u.reportsTo ? ` · כפוף ל-${(list.find((x) => x.id === u.reportsTo) || {}).name || "?"}` : "")) : u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : isWorkerLike(u) ? `מס׳ ${u.workerNo || "—"} · ${workerLoginStateText(u)}` : (u.email || "")}{u.active === false ? " · מושבת" : ""}</div></div></RowTag>; };
-  const Group = ({ k, title, count, color, children }) => <div style={{ marginBottom: 10 }}><button type="button" aria-expanded={!!isOpen(k)} onClick={() => toggle(k)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", borderInlineStartWidth: 4, borderInlineStartColor: color || "var(--border)", background: "var(--surface-2)", cursor: "pointer", textAlign: "start" }}><span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>{title}<span className="badge sm" style={{ background: "var(--surface)", color: "var(--muted)" }}>{count}</span></span><ChevronLeft size={16} style={{ transform: isOpen(k) ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></button>{isOpen(k) && <div style={{ marginTop: 6, paddingInlineStart: 6 }}>{children}</div>}</div>;
-  const Col = ({ title, color, people }) => <div style={{ flex: "1 1 220px", minWidth: 200 }}><div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: color || "inherit", marginBottom: 6 }}>{color ? <span style={{ width: 8, height: 8, borderRadius: 4, background: color }} /> : null}{title}<span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{people.length}</span></div><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{people.length === 0 ? <div className="hint" style={{ paddingInlineStart: 6 }}>אין עובדים</div> : people}</div></div>;
-  if (list.length === 0) return <div className="note">לא נמצאו משתמשים</div>;
-  return (<div style={{ marginTop: 4 }}>
-    {admins.length > 0 && <Group k="_admin" title="הנהלה" count={admins.length} color="#7C3AED"><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{admins.map((u) => <PersonRow key={u.id} u={u} lead />)}</div></Group>}
+  const canAdd = canCreate && typeof onCreate === "function";
+  const roleTitle = (u) => u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : (ROLE_LABEL[u.role] || "משתמש");
+  const userTitle = (u) => (u.position || u.jobTitle || "").trim() || roleTitle(u);
+  const shiftName = (u) => (shifts || DRIVER_SHIFTS).find((s) => s.id === u.shift)?.label || "";
+  const activeList = list.filter((u) => u.status !== "archived");
+  const metaParts = (u) => {
+    const out = [];
+    if (isWorkerLike(u) && u.workerNo) out.push(`מס׳ ${u.workerNo}`);
+    if (u.role === "tech") out.push(u.techScope === "facility" ? "מבנה" : "צי");
+    if (u.supplier) out.push(u.supplier);
+    if (u.phone) out.push(u.phone);
+    if (u.email) out.push(u.email);
+    if (shiftName(u)) out.push(shiftName(u));
+    if (isActivationLinkRole(u.role)) out.push(workerLoginStateText(u));
+    if (u.active === false) out.push("מושבת");
+    return out.filter(Boolean).join(" · ");
+  };
+  const iconFor = (u) => ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User;
+  const PersonRow = ({ u }) => {
+    const Icon = iconFor(u);
+    const RowTag = pickable ? "button" : "div";
+    return <RowTag className={"tcard" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : "var(--border)", cursor: pickable ? "pointer" : "default", textAlign: "start" }}>
+      <span className="avatar"><Icon size={18} /></span>
+      <div className="tcard-main">
+        <div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{userTitle(u)}</span></div>
+        <div className="tcard-sub">{metaParts(u) || roleTitle(u)}</div>
+      </div>
+    </RowTag>;
+  };
+  const Section = ({ title, count, actionLabel, actionPatch, children }) => <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+    <div className="row-between" style={{ padding: "10px 12px", gap: 10, borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</b><span className="badge sm" style={{ background: "var(--surface)", color: "var(--muted)" }}>{count}</span></div>
+      {canAdd && actionLabel && <button className="btn-ghost sm" type="button" onClick={() => onCreate(actionPatch)}><Plus size={14} /> {actionLabel}</button>}
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 8, padding: 10 }}>{children}</div>
+  </section>;
+  const Empty = ({ text = "לא נמצאו משתמשים" }) => <div className="note" style={{ marginTop: 10 }}>{text}</div>;
+  if (activeList.length === 0) return <Empty />;
+  if (mode === "managers") {
+    const managers = activeList.filter((u) => u.role === "user");
+    return managers.length ? <Section title="מנהלים" count={managers.length} actionLabel="מנהל" actionPatch={{ role: "user" }}>{managers.map((u) => <PersonRow key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלים" />;
+  }
+  if (mode === "techs") {
+    const techs = activeList.filter((u) => u.role === "tech");
+    const bySupplier = [...new Set(techs.map((u) => u.supplier || "פנימי"))];
+    return techs.length ? <>{bySupplier.map((sp) => { const rows = techs.filter((u) => (u.supplier || "פנימי") === sp); return <Section key={sp} title={sp} count={rows.length} actionLabel="טכנאי" actionPatch={{ role: "tech", supplier: sp === "פנימי" ? "" : sp }}>{rows.map((u) => <PersonRow key={u.id} u={u} />)}</Section>; })}</> : <Empty text="לא נמצאו טכנאים" />;
+  }
+  if (mode === "admins") {
+    const admins = activeList.filter((u) => u.role === "admin");
+    return admins.length ? <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.map((u) => <PersonRow key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלי מערכת" />;
+  }
+  const workers = activeList.filter((u) => isWorkerLike(u));
+  const allDepts = [...new Set([...(departments || []), ...workers.map((u) => u.dept).filter(Boolean)])];
+  const unassigned = workers.filter((u) => !(u.dept || ""));
+  return <div style={{ marginTop: 4 }}>
     {allDepts.map((d) => {
-      const mgrs = list.filter((u) => u.role === "user" && mgrDepts(u).includes(d));
-      const workers = list.filter((u) => isWorkerLike(u) && (u.dept || "") === d);
-      if (mgrs.length + workers.length === 0) return null;
-      const noShiftWk = workers.filter((u) => !u.shift);
-      const noShiftMgrs = mgrs.filter((u) => !u.shift);
-      return <Group key={d} k={"d:" + d} title={d} count={mgrs.length + workers.length} color="#0D9488">
-        {noShiftMgrs.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 10 }}>{noShiftMgrs.map((u) => <PersonRow key={"m" + u.id} u={u} lead />)}</div>}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>{(shifts || DRIVER_SHIFTS).map((sh) => { const cm = mgrs.filter((u) => u.shift === sh.id); const cw = workers.filter((u) => u.shift === sh.id); const people = [...cm.map((u) => <PersonRow key={"m" + u.id} u={u} lead />), ...cw.map((u) => <PersonRow key={u.id} u={u} />)]; return <Col key={sh.id} title={sh.label} color={sh.color} people={people} />; })}</div>
-        {noShiftWk.length > 0 && <div style={{ marginTop: 10 }}><div className="hint" style={{ marginBottom: 4 }}>ללא משמרת ({noShiftWk.length})</div><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{noShiftWk.map((u) => <PersonRow key={u.id} u={u} />)}</div></div>}
-      </Group>;
+      const rows = workers.filter((u) => (u.dept || "") === d);
+      if (!rows.length && !showEmptyGroups) return null;
+      return <Section key={d} title={d} count={rows.length} actionLabel="עובד" actionPatch={{ role: "worker", dept: d }}>{rows.length ? rows.map((u) => <PersonRow key={u.id} u={u} />) : <div className="hint">אין עובדים במחלקה הזו</div>}</Section>;
     })}
-    {techs.length > 0 && (() => { const sups = [...new Set(techs.map((u) => u.supplier || "").filter(Boolean))]; const internal = techs.filter((u) => !u.supplier); return <Group k="_tech" title="טכנאים" count={techs.length} color="#D97706"><div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>{sups.map((sp) => <Col key={sp} title={sp} people={techs.filter((u) => u.supplier === sp).map((u) => <PersonRow key={u.id} u={u} />)} />)}{internal.length > 0 && <Col title="פנימי" people={internal.map((u) => <PersonRow key={u.id} u={u} />)} />}</div></Group>; })()}
-    {unassigned.length > 0 && <Group k="_un" title="לא משויך" count={unassigned.length} color="var(--muted)"><div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{unassigned.map((u) => <PersonRow key={u.id} u={u} />)}</div></Group>}
-  </div>);
+    {unassigned.length > 0 && <Section title="ללא מחלקה" count={unassigned.length} actionLabel="עובד" actionPatch={{ role: "worker" }}>{unassigned.map((u) => <PersonRow key={u.id} u={u} />)}</Section>}
+    {workers.length === 0 && <Empty text="לא נמצאו עובדים" />}
+  </div>;
 }
 function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete, canManage }) {
   const meta = supMeta(config, name);
@@ -7763,7 +7797,7 @@ function SettingsPanel(p) {
   const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, fleet, tickets, appIssues, saveAppIssue, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
-  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("users"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
+  const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("workers"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
   const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
@@ -7823,6 +7857,24 @@ function SettingsPanel(p) {
   const registryEmptied = (rows, usage) => rows.some((r) => r._orig && !r.name.trim() && usage(r._orig) > 0);
   const cleanRegistry = (rows) => [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
   const cleanWorkShifts = () => wshifts.filter((s) => (s.label || "").trim()).map((s) => ({ id: s.id || ("ws" + Math.random().toString(36).slice(2, 7)), label: s.label.trim(), color: s.color || "#64748B" }));
+  const usersForSub = (arr, sub) => {
+    if (sub === "managers") return arr.filter((u) => u.role === "user");
+    if (sub === "techs") return arr.filter((u) => u.role === "tech");
+    if (sub === "admins") return arr.filter((u) => u.role === "admin");
+    return arr.filter((u) => isWorkerLike(u));
+  };
+  const userSubTitle = () => {
+    if (userSub === "managers") return "מנהלים";
+    if (userSub === "techs") return "טכנאים";
+    if (userSub === "admins") return "מנהלי מערכת";
+    return "עובדים";
+  };
+  const userSubCreatePatch = () => {
+    if (userSub === "managers") return { role: "user" };
+    if (userSub === "techs") return { role: "tech" };
+    if (userSub === "admins") return { role: "admin" };
+    return { role: "worker" };
+  };
   const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
   const pickLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -7870,8 +7922,9 @@ function SettingsPanel(p) {
       </div></div>); })}</div>
     <button className="btn-ghost full" onClick={() => setRows((s) => [...s, { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: "" }])}><Plus size={15} /> {addLabel}</button>
   </>);
-  const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim()) || String(u.phone || "").includes(uq.trim())));
-  const duplicateUserGroups = findUserDuplicateGroups(ulist);
+  const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || (u.position || u.jobTitle || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim()) || String(u.phone || "").includes(uq.trim())));
+  const visibleUsers = usersForSub(ulist, userSub);
+  const duplicateUserGroups = findUserDuplicateGroups(visibleUsers);
   const restoreWorker = async (w) => { const ok = await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); if (ok !== false) setArcView(null); return ok; };
   const deleteArchivedWorker = async (w) => {
     if (!mayManageUsers || !w?.id || w.id === session.id) return false;
@@ -7998,7 +8051,13 @@ function SettingsPanel(p) {
 
 
     {tab === "users" && (!mayViewUsers ? <div className="note">אין הרשאה לצפייה בניהול משתמשים.</div> : <>
-      {p.only === "users" && <div className="seg-tabs" style={{ marginBottom: 14 }}><button className={userSub === "users" ? "on" : ""} onClick={() => setUserSub("users")}>משתמשים</button><button className={userSub === "settings" ? "on" : ""} onClick={() => setUserSub("settings")}>הגדרות</button></div>}
+      <div className="seg-tabs" style={{ marginBottom: 14 }}>
+        <button className={userSub === "workers" ? "on" : ""} onClick={() => setUserSub("workers")}>עובדים</button>
+        <button className={userSub === "managers" ? "on" : ""} onClick={() => setUserSub("managers")}>מנהלים</button>
+        <button className={userSub === "techs" ? "on" : ""} onClick={() => setUserSub("techs")}>טכנאים</button>
+        <button className={userSub === "admins" ? "on" : ""} onClick={() => setUserSub("admins")}>מנהלי מערכת</button>
+        <button className={userSub === "settings" ? "on" : ""} onClick={() => setUserSub("settings")}>הגדרות</button>
+      </div>
       {userSub === "settings" ? <>
       <SectionTitle><Clock size={15} /> משמרות עבודה</SectionTitle>
       <div className="hint" style={{ marginBottom: 6 }}>משמרות לשיוך עובדים ולעמודות בעץ המחלקות. בדמו ברירת המחדל היא בוקר / לילה, ואפשר להוסיף משמרות נוספות לפי הצורך.</div>
@@ -8014,11 +8073,11 @@ function SettingsPanel(p) {
       <button className="btn-primary full" style={{ marginTop: 16 }} onClick={saveUsersCfg}>{saved ? "נשמר ✓" : "שמירת הגדרות צוות"}</button>
       {userCfgMsg && <div className="note" style={{ color: "#DC2626" }}>{userCfgMsg}</div>}
       </> : <>
-      <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> הוסף משתמש</button>}</div>
+      <div className="row-between"><SectionTitle><Users size={15} /> {userSubTitle()}</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit(userSubCreatePatch())}><UserPlus size={15} /> הוספה</button>}</div>
       {!mayManageUsers && <div className="hint" style={{ marginTop: 4 }}>יש לך הרשאת צפייה בלבד. יצירה, עריכה ושחזור עובדים דורשים הרשאת ניהול משתמשים.</div>}
-      <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / מס׳ עובד / דוא״ל" /></div>
+      <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / טלפון / מס׳ עובד / דוא״ל" /></div>
       {duplicateUserGroups.length > 0 && <div className="note warn" style={{ marginTop: 10 }}>נמצאו {countLabel(duplicateUserGroups.length, "כפילות אפשרית", "כפילויות אפשריות")} בזהות כניסה. בדקו רשומות עם אותו דוא״ל, טלפון או מספר עובד לפני מחיקה או איחוד.</div>}
-      <UserTree list={ulist} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
+      <UserTree list={visibleUsers} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} shifts={workShiftsOf(config)} mode={userSub} canCreate={mayManageUsers} showEmptyGroups={!uq.trim()} onCreate={(patch) => setUEdit(patch || {})} />
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
       {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} onDelete={mayManageUsers ? deleteArchivedWorker : undefined} /></Overlay>}
@@ -8031,7 +8090,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   const initialPerms = normalizePerms(user);
   const initialRole = user.role === "cleaner" ? "worker" : (user.role || lockRole || "");
   const initialDept = user.role === "cleaner" ? "ניקיון" : (user.dept || lockDept || "");
-  const [name, setName] = useState(user.name || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
+  const [name, setName] = useState(user.name || ""), [position, setPosition] = useState(user.position || user.jobTitle || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
@@ -8090,7 +8149,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     const nextCleaningAccess = (role === "worker" && manualCleaningAccess && !cleaningDeptSelected)
       ? { enabled: true, canPerformRounds: true, canReceiveComplaints: true, canCloseComplaints: true, canManageCleaningZones: false, canViewCleaningReports: false }
       : undefined;
-    const ok = await onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), phone: phone.trim(), role,
+    const ok = await onSave({ id: user.id || uid(), createdAt: user.createdAt || Date.now(), authUserId: user.authUserId || "", name: name.trim(), position: position.trim(), phone: phone.trim(), role,
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
       workerNo: role === "worker" ? workerNo.trim() : "",
@@ -8127,6 +8186,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{user.id ? (lockRole === "worker" ? "עריכת עובד" : "עריכת משתמש") : (lockRole === "worker" ? "עובד חדש" : "משתמש חדש")}</div></div>
     <div className="body">
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <label className="field"><span>תפקיד בארגון</span><input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="לדוגמה: מנהל משמרת / אחראי מחסן" /><div className="hint">כותרת אנושית לזיהוי האדם. הרשאות המערכת נקבעות בשדה התפקיד ובהרשאות האישיות.</div></label>
       {role === "worker" && <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>}
       {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@example.local" /></label>}
       <label className="field"><span>טלפון{role === "tech" ? " (שם משתמש לכניסה) *" : ""}</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">{role === "tech" ? "הטכנאי ייכנס עם מספר הטלפון ויגדיר קוד אישי בכניסה הראשונה." : "יכול לשמש גם כפרטי כניסה אם הוזן, ומוצג לאנשי טיפול כדי שיוכלו להתקשר בלחיצה."}</div></label>
