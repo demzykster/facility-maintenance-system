@@ -47,7 +47,7 @@ import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSup
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesTarget, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findCleaningQrTarget, findScannedCleaningZone, normalizeCleaningQrManualCode, normalizeCleaningSubzones, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
-import { cleaningMissedRoundRecordsForStatuses, cleaningWindowBounds, cleaningWindowMinutes, isCleaningRoundActionableStatus, isCompletedCleaningRound } from "./cleaningRoundScheduleModel.js";
+import { cleaningChecklistForTarget, cleaningMissedRoundRecordsForStatuses, cleaningWindowBounds, cleaningWindowMinutes, isCleaningRoundActionableStatus, isCompletedCleaningRound } from "./cleaningRoundScheduleModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
@@ -3357,7 +3357,7 @@ const cleaningSubzoneLabel = (subzone) => subzone?.name || "";
 const cleaningTargetLoc = (zone, subzone = null) => [zoneLoc(zone), cleaningSubzoneLabel(subzone)].filter(Boolean).join(" · ");
 const newCleaningQrCode = (prefix = "Z") => `${prefix}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 // פריטי הצ׳קליסט שרלוונטיים לחלון מסוים. win.items === undefined/null ⇒ כל הפריטים (תאימות לאחור + כולל פריטים עתידיים).
-const windowItems = (zone, win) => { const cl = zone.checklist || []; if (!win || !Array.isArray(win.items)) return cl; const set = new Set(win.items); return cl.filter((c) => set.has(c.id)); };
+const windowItems = (zone, win, subzone = null) => cleaningChecklistForTarget(zone, win, subzone);
 const parseHM = (hm) => cleaningWindowMinutes({ time: hm });
 const windowAbs = (win, ts) => dayStart(ts) + cleaningWindowMinutes(win) * 60000;
 const zoneTodayStatuses = (zone, rounds, now, cfg = {}) => {
@@ -3509,6 +3509,7 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
   const [activeDays, setActiveDays] = useState(Array.isArray(zone.activeDays) ? zone.activeDays : (zone.id ? [0, 1, 2, 3, 4, 5, 6] : WORK_WEEK));
   const [mgrIds, setMgrIds] = useState((managers || []).filter((m) => (m.mgrZones || []).includes(zone.id)).map((m) => m.id));
   const [openWin, setOpenWin] = useState(null);
+  const [openSubzoneChecklist, setOpenSubzoneChecklist] = useState(null);
   const [openChecklistTranslations, setOpenChecklistTranslations] = useState({});
   const blockerCount = cleaningZoneBlockerCount(deleteBlockers);
   const toggleDay = (d) => setActiveDays((s) => (s.includes(d) ? s.filter((x) => x !== d) : [...s, d]).sort((a, b) => a - b));
@@ -3518,6 +3519,19 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
   const draftClTranslations = (i) => setChecklist((s) => s.map((x, j) => (j === i ? { ...x, translations: draftCleaningChecklistTranslations(x.label, x.translations) } : x)));
   const setWin = (i, k, v) => setWindows((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const setSubzone = (i, k, v) => setSubzones((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const setSubzoneChecklist = (subzoneIndex, itemIndex, value) => setSubzones((s) => s.map((subzone, i) => {
+    if (i !== subzoneIndex) return subzone;
+    const nextChecklist = (subzone.checklist || []).map((item, j) => (j === itemIndex ? { ...item, label: value } : item));
+    return { ...subzone, checklist: nextChecklist };
+  }));
+  const addSubzoneChecklistItem = (subzoneIndex) => setSubzones((s) => s.map((subzone, i) => (i === subzoneIndex ? { ...subzone, checklist: [...(subzone.checklist || []), { id: uid(), label: "" }] } : subzone)));
+  const removeSubzoneChecklistItem = (subzoneIndex, itemIndex) => setSubzones((s) => s.map((subzone, i) => (i === subzoneIndex ? { ...subzone, checklist: (subzone.checklist || []).filter((_, j) => j !== itemIndex) } : subzone)));
+  const copyZoneChecklistToSubzone = (subzoneIndex) => setSubzones((s) => s.map((subzone, i) => {
+    if (i !== subzoneIndex) return subzone;
+    const copied = checklist.filter((item) => (item.label || "").trim()).map((item) => ({ ...normalizeCleaningChecklistItem(item), id: uid() }));
+    return { ...subzone, checklist: copied };
+  }));
+  const clearSubzoneChecklist = (subzoneIndex) => setSubzones((s) => s.map((subzone, i) => (i === subzoneIndex ? { ...subzone, checklist: [] } : subzone)));
   const save = async () => {
     if (!areaName.trim()) return setErr("נא לבחור אזור מערכת");
     if (!name.trim()) return setErr("נא להזין שם אזור");
@@ -3530,7 +3544,13 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
     setBusy(true);
     try {
       const area = areaName.trim();
-      const cleanSubzones = subzones.map((s) => ({ id: s.id || uid(), name: (s.name || "").trim(), code: normalizeCleaningQrManualCode(s.code || "") || newCleaningQrCode("P"), active: s.active !== false })).filter((s) => s.name);
+      const cleanSubzones = subzones.map((s) => ({
+        id: s.id || uid(),
+        name: (s.name || "").trim(),
+        code: normalizeCleaningQrManualCode(s.code || "") || newCleaningQrCode("P"),
+        active: s.active !== false,
+        checklist: (s.checklist || []).filter((c) => (c.label || "").trim()).map((c) => normalizeCleaningChecklistItem({ ...c, id: c.id || uid() }))
+      })).filter((s) => s.name);
       const ok = await onSave({ id: zoneId, code: code.trim() || zoneCode, name: name.trim(), areaName: area, building: area, floor: floor.trim(), subzones: cleanSubzones, checklist: cl, windows: windows.filter((w) => w.time).map((w) => { const items = Array.isArray(w.items) ? w.items.filter((id) => clIds.has(id)) : null; return { id: w.id || uid(), time: w.time, tol: +w.tol || 0, items: (items && items.length < cl.length) ? items : null }; }), activeDays: activeDays.slice().sort((a, b) => a - b), cleanerId, cleanerName: cleaner ? cleaner.name : "", active, demo: zone.demo || false, createdAt: zone.createdAt || Date.now() }, mgrIds);
       if (ok === false) setErr("השמירה נכשלה — בדקו חיבור ונסו שוב.");
     } catch {
@@ -3544,13 +3564,32 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
       <label className="field"><span>אזור מערכת *</span><select value={areaName} onChange={(e) => setAreaName(e.target.value)}><option value="">— בחרו מתוך אזורי האחזקה —</option>{areaOptions.length > 0 && <optgroup label="אזורי אחזקה">{areaOptions.map((area) => <option key={area} value={area}>{area}</option>)}</optgroup>}</select><div className="hint">הרשימה נמשכת מהגדרות אחזקה › אזורים. כך ניקיון, קריאות ודוחות משתמשים באותה מפת אתר.</div></label>
       <div className="field-row"><label className="field"><span>קומה / מיקום משנה</span><input value={floor} onChange={(e) => setFloor(e.target.value)} placeholder="קומה 2 / אגף מזרח / כניסה" /></label><label className="field"><span>שם אזור ניקיון *</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="לדוגמה: שירותים / מטבחון / משרדים" /></label></div>
       <div className="field"><span>מקומות בתוך האזור</span>
-        <div className="hint">אופציונלי. השתמשו בזה כשאזור אחד כולל כמה נקודות סריקה, למשל שירותים, מטבחון ומשרדים באותו קומה. כל מקום מקבל QR וקוד ידני משלו, אבל משתמש באותו צ׳קליסט של האזור.</div>
-        {subzones.map((s, i) => <div key={s.id || i} className="cl-row" style={{ alignItems: "center" }}>
-          <input value={s.name || ""} onChange={(e) => setSubzone(i, "name", e.target.value)} placeholder="לדוגמה: שירותים נשים / מטבחון" />
-          <input value={s.code || ""} onChange={(e) => setSubzone(i, "code", normalizeCleaningQrManualCode(e.target.value))} placeholder="קוד ידני" style={{ maxWidth: 120 }} />
-          <label className="chk-line" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={s.active !== false} onChange={(e) => setSubzone(i, "active", e.target.checked)} /> פעיל</label>
-          <button className="icon-btn sm" aria-label={`מחק מקום: ${s.name || "ללא שם"}`} onClick={() => setSubzones((list) => list.filter((_, j) => j !== i))}><Trash2 size={16} /></button>
-        </div>)}
+        <div className="hint">אופציונלי. כל מקום מקבל QR וקוד ידני משלו. אם מוגדר לו צ׳קליסט, סריקה שלו תפתח את הצ׳קליסט הזה; אם לא, הוא משתמש בצ׳קליסט הבסיסי של האזור.</div>
+        {subzones.map((s, i) => {
+          const subzoneChecklist = (s.checklist || []).filter((item) => (item.label || "").trim());
+          const checklistOpen = openSubzoneChecklist === i;
+          return <div key={s.id || i} className="cl-edit-block">
+            <div className="cl-row" style={{ alignItems: "center" }}>
+              <input value={s.name || ""} onChange={(e) => setSubzone(i, "name", e.target.value)} placeholder="לדוגמה: שירותים נשים / מטבחון" />
+              <input value={s.code || ""} onChange={(e) => setSubzone(i, "code", normalizeCleaningQrManualCode(e.target.value))} placeholder="קוד ידני" style={{ maxWidth: 120 }} />
+              <label className="chk-line" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={s.active !== false} onChange={(e) => setSubzone(i, "active", e.target.checked)} /> פעיל</label>
+              <button className="icon-btn sm" aria-label={`מחק מקום: ${s.name || "ללא שם"}`} onClick={() => setSubzones((list) => list.filter((_, j) => j !== i))}><Trash2 size={16} /></button>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              <button className="btn-ghost sm" type="button" onClick={() => setOpenSubzoneChecklist(checklistOpen ? null : i)}>{checklistOpen ? "▾" : "▸"} צ׳קליסט המקום ({subzoneChecklist.length ? countLabel(subzoneChecklist.length, "פריט", "פריטים") : "משתמש באזור"})</button>
+              <button className="btn-ghost sm" type="button" onClick={() => copyZoneChecklistToSubzone(i)}>העתקת צ׳קליסט האזור</button>
+              {subzoneChecklist.length > 0 && <button className="btn-ghost sm" type="button" onClick={() => clearSubzoneChecklist(i)}>חזרה לצ׳קליסט האזור</button>}
+            </div>
+            {checklistOpen && <div style={{ padding: "6px 8px", background: "var(--surface-2)", borderRadius: 10, marginTop: 6 }}>
+              {(s.checklist || []).map((item, itemIndex) => <div key={item.id || itemIndex} className="cl-row">
+                <input value={item.label || ""} onChange={(e) => setSubzoneChecklist(i, itemIndex, e.target.value)} placeholder="פריט לבדיקה במקום הזה" />
+                <button className="icon-btn sm" aria-label={`מחק פריט מקום: ${item.label || "ללא שם"}`} onClick={() => removeSubzoneChecklistItem(i, itemIndex)}><Trash2 size={16} /></button>
+              </div>)}
+              <button className="btn-ghost sm" type="button" onClick={() => addSubzoneChecklistItem(i)}><Plus size={14} /> הוספת פריט למקום</button>
+              <div className="hint">חלונות הסבב, הימים והאחראי נשארים של האזור הראשי. הצ׳קליסט כאן מחליף רק את רשימת הבדיקה כשסורקים את ה-QR של המקום.</div>
+            </div>}
+          </div>;
+        })}
         <button className="btn-ghost sm" onClick={() => setSubzones((s) => [...s, { id: uid(), name: "", code: newCleaningQrCode("P"), active: true }])}><Plus size={14} /> הוספת מקום פנימי</button>
       </div>
       <div className="field"><span>צ׳קליסט האזור *</span>
@@ -3764,7 +3803,7 @@ function RoundForm({ zone, subzone = null, win, session, onCancel, onSave, scanT
   const [scanOk, setScanOk] = useState(!appModeRequiresCleaningQr(APP_MODE) || !!scanToken), [showScanner, setShowScanner] = useState(false), [showManual, setShowManual] = useState(false), [manualReason, setManualReason] = useState(""), [manualEntry, setManualEntry] = useState(null);
   const fileRef = useRef(null); const photoTarget = useRef(null);
   const resize = (file, cb) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); cb(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
-  const cl = windowItems(zone, win);
+  const cl = windowItems(zone, win, subzone);
   const doneCount = cl.filter((c) => done[c.id]).length;
   const isCover = zone.cleanerId && zone.cleanerId !== session.id;
   const toggleIssue = (id) => { setErr(""); setIssues((s) => { if (s[id]) { const n = { ...s }; delete n[id]; return n; } return { ...s, [id]: { reason: "", photo: null, kind: "dirty" } }; }); setDone((d) => (d[id] ? { ...d, [id]: false } : d)); };
@@ -3838,7 +3877,8 @@ function RoundForm({ zone, subzone = null, win, session, onCancel, onSave, scanT
 
 function RoundDetail({ round, zone, onClose }) {
   const win = zone && round.winId ? (zone.windows || []).find((w) => w.id === round.winId) : null;
-  const items = zone ? windowItems(zone, win) : [];
+  const subzone = zone && round.subzoneId ? cleaningSubzones(zone).find((item) => item.id === round.subzoneId) || null : null;
+  const items = zone ? windowItems(zone, win, subzone) : [];
   const issues = round.issues || [];
   const missed = !isCompletedCleaningRound(round);
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פרטי סבב</div></div>
@@ -3923,7 +3963,7 @@ function ZoneSpec({ zone, onClose }) {
       <div className="field"><span><CalendarClock size={14} /> ימי פעילות · {activeDaysLabel(zone)}</span>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>{WEEKDAYS.map((w) => { const on = days.includes(w.d); return <span key={w.d} className="badge sm" style={on ? { background: "#0EA5E9", color: "#fff", minWidth: 34, justifyContent: "center" } : { background: "var(--surface-2)", color: "var(--muted)", minWidth: 34, justifyContent: "center" }}>{w.short}</span>; })}</div>
       </div>
-      {cleaningSubzones(zone).length > 0 && <div className="field"><span><MapPin size={14} /> מקומות פנימיים ({cleaningSubzones(zone).length})</span><div className="round-cl">{cleaningSubzones(zone).map((s) => <div key={s.id} className="round-item" style={{ cursor: "default" }}><span className="ri-box"><MapPin size={13} /></span>{s.name}<span style={{ color: "var(--muted)", fontSize: 12, marginInlineStart: 6 }}>· {s.code}</span></div>)}</div></div>}
+      {cleaningSubzones(zone).length > 0 && <div className="field"><span><MapPin size={14} /> מקומות פנימיים ({cleaningSubzones(zone).length})</span><div className="round-cl">{cleaningSubzones(zone).map((s) => { const subzoneChecklist = (s.checklist || []).filter((item) => (item.label || "").trim()); return <div key={s.id} className="round-item" style={{ cursor: "default" }}><span className="ri-box"><MapPin size={13} /></span>{s.name}<span style={{ color: "var(--muted)", fontSize: 12, marginInlineStart: 6 }}>· {s.code} · {subzoneChecklist.length ? countLabel(subzoneChecklist.length, "פריט ייעודי", "פריטים ייעודיים") : "צ׳קליסט האזור"}</span></div>; })}</div></div>}
       <div className="field"><span><Clock size={14} /> סבבים וצ׳קליסט לכל סבב ({ws.length})</span>
         {ws.length === 0
           ? (cl.length === 0 ? <div className="hint">לא הוגדרו חלונות וצ׳קליסט.</div> : <div className="round-cl">{cl.map((c) => <div key={c.id} className="round-item" style={{ cursor: "default" }}><span className="ri-box"><Check size={14} /></span>{c.label}</div>)}</div>)

@@ -97,7 +97,8 @@ export const cleaningProfileFromZone = (zone = {}, managerIds = []) => {
       id: cleanString(subzone.id),
       name: cleanString(subzone.name),
       code: cleanString(subzone.code),
-      active: subzone.active !== false
+      active: subzone.active !== false,
+      checklist: Array.isArray(subzone.checklist) ? subzone.checklist : []
     })).filter((subzone) => subzone.id && subzone.name),
     compliancePolicy: zone.compliancePolicy || null
   };

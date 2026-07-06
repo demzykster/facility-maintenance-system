@@ -113,7 +113,8 @@ export function normalizeCleaningSubzones(subzones = []) {
       id: String(subzone?.id || "").trim(),
       name: String(subzone?.name || "").replace(/\s+/g, " ").trim(),
       code: normalizeCleaningQrManualCode(subzone?.code || ""),
-      active: subzone?.active !== false
+      active: subzone?.active !== false,
+      checklist: Array.isArray(subzone?.checklist) ? subzone.checklist : []
     }))
     .filter((subzone) => subzone.id && subzone.name);
 }
