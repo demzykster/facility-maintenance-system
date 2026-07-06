@@ -37,7 +37,7 @@ Status: done in PRs #84 and #85.
 
 Goal:
 - Replace role tabs with one identifier-first flow.
-- Resolve email, worker number, or technician code.
+- Resolve email, phone, worker number, or legacy demo technician code.
 - Block archived users.
 - Keep the lookup as a pure/testable function that can become an API call.
 
@@ -51,7 +51,7 @@ Notes:
 
 Implementation:
 - PR #84 added a pure `resolveIdentifier` helper and unit tests.
-- The helper resolves email, worker number, and technician code, and returns `archived` before any password/PIN check.
+- The helper resolves email, phone, worker number, and legacy demo technician code, and returns `archived` before any password/PIN check.
 - PR #85 replaced the role-tab login UI with one identifier field and a conditional password/PIN step.
 - The activation-link flow was replaced by first-login password/PIN setup.
 

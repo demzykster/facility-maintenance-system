@@ -2508,7 +2508,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   const scannedZoneId = scannedCleaningZoneIdFromWindow();
   const scannedLandingZone = useMemo(() => findScannedCleaningZone(zones || [], scannedZoneId), [zones, scannedZoneId]);
   const productionConfigured = productionLoginReady(productionLoginConfig);
-  useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || ""); } catch {} }); }, []);
+  useEffect(() => { store.get("login:v1", false).then((v) => { if (!v) return; try { const d = JSON.parse(v); setIdentifier(d.email || d.workerNo || d.phone || ""); } catch {} }); }, []);
   const remember_save = (data) => { if (remember) store.set("login:v1", JSON.stringify(data), false); else store.del("login:v1", false); };
   const finish = (u) => onLogin({ id: u.id, name: u.name, role: u.role, dept: u.dept, depts: u.depts || (u.dept ? [u.dept] : []), email: u.email || "", phone: u.phone || "", workerNo: u.workerNo || "", supplier: u.supplier || "", shiftStart: u.shiftStart || "", shiftEnd: u.shiftEnd || "16:30", shiftId: u.role === "tech" ? "" : (u.shiftId || ""), techScope: u.techScope || "transport", techCats: u.techCats || [], mgrZones: u.mgrZones || [], shift: u.shift || "", perms: normalizePerms(u), cleaningAccess: u.cleaningAccess || u.cleaning || false });
   const dfltDept = config?.departments?.[0] || "";
@@ -2516,6 +2516,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
   const rememberLogin = (u, idType) => {
     if (idType === "email") return remember_save({ email: u.email || identifier.trim(), mode: "user" });
     if (idType === "workerNo") return remember_save({ workerNo: u.workerNo || identifier.trim(), mode: "worker" });
+    if (idType === "phone") return remember_save({ phone: u.phone || identifier.trim(), mode: "phone" });
     return remember_save({ mode: "tech" });
   };
   const submitIdentifier = async () => {
@@ -2544,11 +2545,29 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         setCode("");
       } catch (error) {
         if (error?.message === "initial_secret_already_configured") {
+          if (error?.data?.auth === "password") {
+            const serverUser = error?.data?.user || {};
+            setResolved({
+              status: "active",
+              identifierType: error?.data?.identifierType || (looksLikeEmail ? "email" : "phone"),
+              auth: "password",
+              source: "supabase",
+              user: {
+                ...serverUser,
+                email: serverUser.email || email,
+                name: serverUser.name || serverUser.email || cleanIdentifier,
+                role: serverUser.role || "user"
+              }
+            });
+            setPassword("");
+            setCode("");
+            return;
+          }
           if (!looksLikeEmail) {
             const serverUser = error?.data?.user || {};
             setResolved({
               status: "active",
-              identifierType: "workerNo",
+              identifierType: error?.data?.identifierType || "workerNo",
               auth: error?.data?.auth || "pin",
               source: "production-pin",
               identifier: cleanIdentifier,
@@ -2556,7 +2575,8 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
                 ...serverUser,
                 name: serverUser.name || cleanIdentifier,
                 role: serverUser.role || "worker",
-                workerNo: serverUser.workerNo || cleanIdentifier
+                workerNo: serverUser.workerNo || (error?.data?.identifierType === "phone" ? "" : cleanIdentifier),
+                phone: serverUser.phone || (error?.data?.identifierType === "phone" ? cleanIdentifier : "")
               }
             });
             setPassword("");
@@ -2588,7 +2608,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       return;
     }
     const res = resolveIdentifier(identifier, users, builtinLogins);
-    if (res.status === "empty") return setErr("הזינו דוא״ל, מספר עובד או קוד טכנאי");
+    if (res.status === "empty") return setErr("הזינו דוא״ל, טלפון או מספר עובד");
     if (res.status === "archived") return setErr("המשתמש אינו פעיל. פנו למנהל המערכת");
     if (res.status === "not_found") return setErr("לא נמצא משתמש מתאים");
     if (res.auth === "none") { rememberLogin(res.user, res.identifierType); return finish(withDefaultDept(res.user)); }
@@ -2724,6 +2744,16 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
       setBusy(false);
     }
   };
+  const initialSecretIdentifierLabel = () => {
+    if (isPasswordActivationRole(initialSetup?.user?.role)) return "הדוא״ל";
+    if (initialSetup?.identifierType === "phone") return "מספר הטלפון";
+    return "מספר העובד";
+  };
+  const initialSecretIdentifierValue = () => (
+    initialSetup?.identifierType === "phone"
+      ? (initialSetup.user?.phone || initialSetup.identifier || identifier.trim())
+      : (initialSetup.user?.workerNo || initialSetup.user?.email || initialSetup.identifier || identifier.trim())
+  );
   return (
     <div className="login-bg">
       <div className="login-card">
@@ -2742,7 +2772,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setPasswordChange(null); setResolved(null); setPassword(""); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : initialSetup ? (<>
           <div className="login-q">{isPasswordActivationRole(initialSetup.user?.role) ? "הגדרת סיסמה ראשונה" : "הגדרת קוד אישי ראשון"}</div>
-          <div className="hint" style={{ marginBottom: 10 }}>{isPasswordActivationRole(initialSetup.user?.role) ? <>שלום {initialSetup.user?.name || ""}. הגדירו סיסמה אישית לכניסה עם הדוא״ל <bdi dir="ltr">{initialSetup.user?.email || identifier.trim()}</bdi>.</> : <>שלום {initialSetup.user?.name || ""}. הגדירו קוד אישי לכניסה עם מספר עובד <bdi dir="ltr">{initialSetup.user?.workerNo || identifier.trim()}</bdi>.</>}</div>
+          <div className="hint" style={{ marginBottom: 10 }}>שלום {initialSetup.user?.name || ""}. הגדירו {isPasswordActivationRole(initialSetup.user?.role) ? "סיסמה אישית" : "קוד אישי"} לכניסה עם {initialSecretIdentifierLabel()} <bdi dir="ltr">{initialSecretIdentifierValue()}</bdi>.</div>
           <label className="field"><span>{isPasswordActivationRole(initialSetup.user?.role) ? "סיסמה חדשה" : "קוד אישי חדש"}</span><input className="ltr-input" dir="ltr" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" inputMode={isPasswordActivationRole(initialSetup.user?.role) ? undefined : "numeric"} placeholder="" onKeyDown={(e) => e.key === "Enter" && submitInitialSecret()} autoFocus /></label>
           <label className="field"><span>{isPasswordActivationRole(initialSetup.user?.role) ? "אישור סיסמה" : "אישור קוד"}</span><input className="ltr-input" dir="ltr" value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" inputMode={isPasswordActivationRole(initialSetup.user?.role) ? undefined : "numeric"} placeholder="" onKeyDown={(e) => e.key === "Enter" && submitInitialSecret()} /></label>
           {err && <div className="err">{err}</div>}
@@ -7840,7 +7870,7 @@ function SettingsPanel(p) {
       </div></div>); })}</div>
     <button className="btn-ghost full" onClick={() => setRows((s) => [...s, { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: "" }])}><Plus size={15} /> {addLabel}</button>
   </>);
-  const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim())));
+  const ulist = users.filter((u) => u.status !== "archived" && (!uq.trim() || (u.name || "").includes(uq.trim()) || String(u.workerNo || "").includes(uq.trim()) || (u.email || "").includes(uq.trim()) || String(u.phone || "").includes(uq.trim())));
   const duplicateUserGroups = findUserDuplicateGroups(ulist);
   const restoreWorker = async (w) => { const ok = await saveUser({ ...w, active: true, status: "active", ppeResetAt: Date.now(), exitAt: null }); if (ok !== false) setArcView(null); return ok; };
   const deleteArchivedWorker = async (w) => {
@@ -7987,7 +8017,7 @@ function SettingsPanel(p) {
       <div className="row-between"><SectionTitle><Users size={15} /> ניהול משתמשים</SectionTitle>{mayManageUsers && <button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> הוסף משתמש</button>}</div>
       {!mayManageUsers && <div className="hint" style={{ marginTop: 4 }}>יש לך הרשאת צפייה בלבד. יצירה, עריכה ושחזור עובדים דורשים הרשאת ניהול משתמשים.</div>}
       <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / מס׳ עובד / דוא״ל" /></div>
-      {duplicateUserGroups.length > 0 && <div className="note warn" style={{ marginTop: 10 }}>נמצאו {countLabel(duplicateUserGroups.length, "כפילות אפשרית", "כפילויות אפשריות")} בזהות כניסה. בדקו רשומות עם אותו דוא״ל, מספר עובד או קוד טכנאי לפני מחיקה או איחוד.</div>}
+      {duplicateUserGroups.length > 0 && <div className="note warn" style={{ marginTop: 10 }}>נמצאו {countLabel(duplicateUserGroups.length, "כפילות אפשרית", "כפילויות אפשריות")} בזהות כניסה. בדקו רשומות עם אותו דוא״ל, טלפון או מספר עובד לפני מחיקה או איחוד.</div>}
       <UserTree list={ulist} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} expandAll={!!uq.trim()} shifts={workShiftsOf(config)} />
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
@@ -8043,12 +8073,15 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     if (!name.trim()) return setErr("נא להזין שם");
     if (!role) return setErr("בחרו תפקיד");
     if (role === "tech") {
+      if (!phone.trim()) return setErr("נא להזין טלפון (שם משתמש לכניסה)");
       if (techScope === "facility" && techCats.length === 0) return setErr("בחרו לפחות קטגוריה אחת לטכנאי מבנה");
     }
     else if (role === "worker") { if (!workerNo.trim()) return setErr("נא להזין מספר עובד"); }
     else { if (!email.trim()) return setErr("נא להזין דוא״ל (שם משתמש)"); if (roleUsesPassword && !validLoginEmail(email)) return setErr("נא להזין דוא״ל תקין, לדוגמה name@example.local"); if (role === "user" && depts.length === 0) return setErr("בחרו לפחות מחלקה אחת למנהל"); }
     const others = (users || []).filter((x) => x.id !== (user.id || ""));
+    const phoneKey = String(phone || "").replace(/\D/g, "");
     if (roleUsesPassword && email.trim() && others.some((x) => (x.email || "").trim().toLowerCase() === email.trim().toLowerCase())) return setErr("דוא״ל זה כבר קיים במערכת");
+    if (phoneKey && others.some((x) => String(x.phone || "").replace(/\D/g, "") === phoneKey)) return setErr("טלפון זה כבר קיים במערכת");
     if (role === "worker" && workerNo.trim() && others.some((x) => String(x.workerNo || "").trim() === workerNo.trim())) return setErr("מספר עובד זה כבר קיים במערכת");
     const nextPerms = role === "admin" ? {} : cleanPerms(perms);
     const nextNotificationPrefs = normalizeNotificationPrefs(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs);
@@ -8096,7 +8129,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
       <label className="field"><span>שם מלא *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
       {role === "worker" && <label className="field"><span>מספר עובד (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} inputMode="numeric" placeholder="לדוגמה: 1042" /></label>}
       {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@example.local" /></label>}
-      <label className="field"><span>טלפון</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">יוצג לאנשי טיפול כדי שיוכלו להתקשר לפותח הקריאה בלחיצה.</div></label>
+      <label className="field"><span>טלפון{role === "tech" ? " (שם משתמש לכניסה) *" : ""}</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">{role === "tech" ? "הטכנאי ייכנס עם מספר הטלפון ויגדיר קוד אישי בכניסה הראשונה." : "יכול לשמש גם כפרטי כניסה אם הוזן, ומוצג לאנשי טיפול כדי שיוכלו להתקשר בלחיצה."}</div></label>
       {!lockRole && <div className="field"><span>תפקיד</span><ChoiceGrid columns="role" value={role} onChange={changeRole} options={USER_FORM_ROLE_OPTIONS.map(([id, label]) => ({ id, label, Icon: roleIcons[id] || User }))} /></div>}
       {role && role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} tone="#0EA5E9" options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
       {role === "user" && (lockDept

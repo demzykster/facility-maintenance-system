@@ -59,5 +59,6 @@ describe("worker access model", () => {
   it("prompts users to set their own first secret by identifier", () => {
     expect(loginSetupPrompt({ role: "user" })).toContain("דוא״ל");
     expect(loginSetupPrompt({ role: "worker" })).toContain("מספר העובד");
+    expect(loginSetupPrompt({ role: "tech" })).toContain("מספר הטלפון");
   });
 });
