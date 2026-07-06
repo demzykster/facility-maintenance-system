@@ -93,13 +93,6 @@ export const cleaningProfileFromZone = (zone = {}, managerIds = []) => {
     cleanerName: cleanString(zone.cleanerName) || "",
     managerIds: [...new Set((managerIds || zone.managerIds || []).map(cleanString).filter(Boolean))],
     qrCode: cleanString(zone.code) || "",
-    subzones: (zone.subzones || []).map((subzone) => ({
-      id: cleanString(subzone.id),
-      name: cleanString(subzone.name),
-      code: cleanString(subzone.code),
-      active: subzone.active !== false,
-      checklist: Array.isArray(subzone.checklist) ? subzone.checklist : []
-    })).filter((subzone) => subzone.id && subzone.name),
     compliancePolicy: zone.compliancePolicy || null
   };
 };
