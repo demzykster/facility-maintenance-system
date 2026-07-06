@@ -29,6 +29,7 @@ import { DEFAULT_LOCAL_NOTIFICATION_PREFS, notificationReadStateForEvents, parse
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
+import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
 import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
@@ -1026,8 +1027,7 @@ const toWorkday = (ts) => { let d = new Date(ts); while (!isWorkday(d)) d.setDat
 const nextWorkdayFrom = (ts) => { let d = new Date(ts); d.setDate(d.getDate() + 1); return toWorkday(d.getTime()); };
 const startOfDay = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const todayKey = () => new Date().toISOString().slice(0, 10);
-const presenceOf = (presence, userId) => { const r = (presence || []).find((x) => x.id === userId); if (!r) return { onShift: false }; const active = r.onShift && r.day === todayKey(); return { ...r, onShift: active }; };
-const lastSeenText = (ts) => { if (!ts) return ""; const m = Math.floor((Date.now() - ts) / 60000); if (m < 1) return "פעיל כעת"; if (m < 60) return `פעיל לפני ${m} ד׳`; const h = Math.floor(m / 60); return `פעיל לפני ${h} שע׳`; };
+const presenceOf = (presence, userId) => presenceRecordForUser(presence, userId, { todayKey: todayKey() });
 // График смены техника: старт+конец (одно расписание на все дни). Источник — личные поля, затем дефолт.
 const techSched = (u, cfg) => ({ start: u?.shiftStart || cfg?.defaultShiftStart || "07:30", end: u?.shiftEnd || cfg?.defaultShiftEnd || "16:30" });
 const todayAtHM = (hm) => { const [hh, mm] = String(hm || "00:00").split(":").map(Number); const d = new Date(); d.setHours(hh || 0, mm || 0, 0, 0); return d.getTime(); };
@@ -1451,6 +1451,7 @@ export default function App() {
   const [pm, setPm] = useState([]);
   const [fleet, setFleet] = useState([]);
   const [presence, setPresence] = useState([]);
+  const presenceRef = useRef([]);
   const [zones, setZones] = useState([]);
   const [rounds, setRounds] = useState([]);
   const [absences, setAbsences] = useState([]);
@@ -1470,6 +1471,7 @@ export default function App() {
   const [theme, setTheme] = useState("light");
   const [language, setLanguageState] = useState(() => preferredInitialLanguage({ cookie: typeof document !== "undefined" ? document.cookie : "", navigator: typeof navigator !== "undefined" ? navigator : undefined }));
   const snapRef = useRef({});
+  useEffect(() => { presenceRef.current = presence; }, [presence]);
   const persistLanguagePreference = (nextLanguage) => {
     const normalized = normalizeLanguageCode(nextLanguage);
     if (typeof document !== "undefined") document.cookie = languageCookieString(normalized);
@@ -1974,8 +1976,22 @@ export default function App() {
     }
   }, [ready, fleet, config]);
   const setShift = async (on) => { if (!session) return false; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return false; setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); return true; };
-  const beat = async () => { if (!session || session.role !== "tech") return; const cur = presence.find((x) => x.id === session.id); if (!cur || !cur.onShift || cur.day !== todayKey()) return; const rec = { ...cur, lastSeen: Date.now() }; await store.set(`presence:${session.id}`, JSON.stringify(rec), true); };
-  useEffect(() => { if (!session || session.role !== "tech") return; const id = setInterval(beat, 60000); return () => clearInterval(id); }, [session, presence]);
+  const touchPresence = async () => {
+    if (!session?.id) return;
+    const cur = presenceRef.current.find((x) => x.id === session.id);
+    const rec = {
+      ...(cur || {}),
+      id: session.id,
+      name: session.name,
+      onShift: session.role === "tech" ? !!cur?.onShift : false,
+      since: cur?.since || null,
+      endedAt: cur?.endedAt || null,
+      lastSeen: Date.now(),
+      day: cur?.day || todayPresenceKey()
+    };
+    if (await persistShared(`presence:${session.id}`, JSON.stringify(rec))) setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]);
+  };
+  useEffect(() => { if (!session?.id) return; touchPresence(); const id = setInterval(touchPresence, 60000); return () => clearInterval(id); }, [session?.id, session?.name, session?.role]);
   const login = async (s, options = {}) => {
     setSession(s);
     if (s?.productionSession) {
@@ -2858,7 +2874,7 @@ function UserApp(p) {
               <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>{needAct}</div><div className="stat-lbl">דורשות פעולה</div></div>
               <div className="stat-box"><div className="stat-num">{mine.length}</div><div className="stat-lbl">סה״כ</div></div>
             </div>
-            {(() => { const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false); return <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle>{techs.length === 0 ? <div className="note" style={{ marginBottom: 12 }}>אין טכנאים מוגדרים.</div> : <div className="tech-strip">{techs.map((u) => { const pr = presenceOf(presence, u.id); return <span key={u.id} className="tech-chip"><span className={"presence-dot" + (pr.onShift ? " on" : "")} />{u.name}{u.supplier ? <span className="tech-chip-sup"> · {u.supplier}</span> : ""}<span className="tech-chip-stat">{pr.onShift ? (lastSeenText(pr.lastSeen) || "במשמרת") : "לא במשמרת"}{(() => { const z = shiftIdle(pr, u, config); return z.lateMin > 0 ? " · איחר " + z.lateMin + " ד׳" : z.earlyMin > 0 ? " · מוקדם " + z.earlyMin + " ד׳" : ""; })()}</span></span>; })}</div>}</>; })()}
+            {(() => { const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false); return <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle>{techs.length === 0 ? <div className="note" style={{ marginBottom: 12 }}>אין טכנאים מוגדרים.</div> : <div className="tech-strip">{techs.map((u) => { const pr = presenceOf(presence, u.id); return <span key={u.id} className="tech-chip"><span className={"presence-dot" + (isPresenceOnline(pr) ? " on" : "")} />{u.name}{u.supplier ? <span className="tech-chip-sup"> · {u.supplier}</span> : ""}<span className="tech-chip-stat">{shiftPresenceStatusText(pr)}{(() => { const z = shiftIdle(pr, u, config); return z.lateMin > 0 ? " · איחר " + z.lateMin + " ד׳" : z.earlyMin > 0 ? " · מוקדם " + z.earlyMin + " ד׳" : ""; })()}</span></span>; })}</div>}</>; })()}
             {pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים לכלי המחלקה — להוצאה לטכנאי</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{pmSoon.slice(0, 6).map((x) => { const d = daysLeft(x.nextDue); const f = pmFleet(x, fleet); return <button key={x.id} className="attn-row" onClick={() => setPmView(x)}><span className="attn-dot" style={{ background: pmColor(d) }} /><span className="attn-main"><span className="attn-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="attn-meta">{x.title || "טיפול תקופתי"}</span></span><span className="attn-tag" style={{ color: pmColor(d), background: pmColor(d) + "1a" }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></button>; })}</div></>}
             <div className="row-between"><div className="chips">{[["open", "פתוחות"], ["closed", "סגורות"], ["all", "הכל"]].map(([id, lbl]) => <button key={id} className={"chip" + (filter === id ? " on" : "")} onClick={() => setFilter(id)}>{lbl}</button>)}</div></div>
             {(() => {
@@ -2890,7 +2906,7 @@ function UserApp(p) {
               : deptTab === "team" ? <>
                 <div className="row-between"><SectionTitle><Users size={15} /> עובדי המחלקה{session.dept ? ` · ${session.dept}` : ""}</SectionTitle><button className="btn-primary sm" onClick={() => setUEdit({})}><UserPlus size={15} /> הוסף עובד</button></div>
                 <div className="note">העובדים מדווחים תקלות שמגיעות אליך לבדיקה. הם נכנסים עם מספר עובד + קוד שתגדירו כאן.</div>
-                {deptWorkers.length === 0 ? <Empty text="אין עובדים במחלקה" Icon={Users} sub="הוסיפו עובד בלחיצה על «הוסף עובד»" /> : <div className="cards">{deptWorkers.map((u) => <button key={u.id} className="tcard" onClick={() => setUEdit(u)} style={{ borderInlineStartColor: u.active ? "#16A34A" : "var(--muted)" }}><span className="avatar"><User size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>עובד</span></div><div className="tcard-sub">מס׳ עובד {u.workerNo || "—"} · {u.active ? "פעיל" : "מושבת"} · {workerLoginStateText(u)}</div></div></button>)}</div>}
+                {deptWorkers.length === 0 ? <Empty text="אין עובדים במחלקה" Icon={Users} sub="הוסיפו עובד בלחיצה על «הוסף עובד»" /> : <div className="cards">{deptWorkers.map((u) => <button key={u.id} className="tcard" onClick={() => setUEdit(u)} style={{ borderInlineStartColor: u.active ? "#16A34A" : "var(--muted)" }}><span className="avatar"><User size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>עובד</span></div><div className="tcard-sub">מס׳ עובד {u.workerNo || "—"} · {u.active ? "פעיל" : "מושבת"} · {userHasLoginSecret(u) ? userPresenceStatusText(presenceOf(presence, u.id)) : workerLoginStateText(u)}</div></div></button>)}</div>}
               </>
               : <ManagerFleet {...p} deptNav={deptNav} />}
           </>)}
@@ -6092,7 +6108,7 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, config, users, pre
       {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
         : <div className="cards">{expDocs.map(({ f, s }) => <button key={f.id} type="button" className="doc-line doc-line-click" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><span className="doc-line-action" aria-hidden="true"><PenLine size={15} /></span></button>)}</div>}</>}
     {w.pm && dashTrack !== "facility" && pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים קרובים</SectionTitle><div className="pm-mini">{pmSoon.slice(0, 5).map((x) => { const d = daysLeft(x.nextDue); const f = fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId); return <div key={x.id} className="pm-mini-item" style={{ cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span className="dot-lg" style={{ background: pmColor(d) }} /><span className="pm-mini-t">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="pm-mini-d" style={{ color: pmColor(d) }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></div>; })}</div></>}
-    {w.presence && <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle><div className="panel">{(users || []).filter((u) => u.role === "tech" && u.active !== false).length === 0 ? <div className="note" style={{ margin: 0 }}>אין טכנאים מוגדרים.</div> : (users || []).filter((u) => u.role === "tech" && u.active !== false).map((u) => { const pr = presenceOf(presence, u.id); return <div key={u.id} className="presence-row"><span className={"presence-dot" + (pr.onShift ? " on" : "")} /><span className="presence-name">{u.name}{u.supplier ? <span className="presence-sup"> · {u.supplier}</span> : ""}</span><span className="presence-stat">{pr.onShift ? lastSeenText(pr.lastSeen) || "במשמרת" : "לא במשמרת"}</span></div>; })}</div></>}
+    {w.presence && <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle><div className="panel">{(users || []).filter((u) => u.role === "tech" && u.active !== false).length === 0 ? <div className="note" style={{ margin: 0 }}>אין טכנאים מוגדרים.</div> : (users || []).filter((u) => u.role === "tech" && u.active !== false).map((u) => { const pr = presenceOf(presence, u.id); return <div key={u.id} className="presence-row"><span className={"presence-dot" + (isPresenceOnline(pr) ? " on" : "")} /><span className="presence-name">{u.name}{u.supplier ? <span className="presence-sup"> · {u.supplier}</span> : ""}</span><span className="presence-stat">{shiftPresenceStatusText(pr)}</span></div>; })}</div></>}
     {w.costs && <><SectionTitle><DollarSign size={15} /> עלויות 30 ימים אחרונים</SectionTitle><div className="panel"><div className="big-stat">{ils(monthCost)}</div></div></>}
     <div style={{ height: 8 }} />
   </>);
@@ -7749,7 +7765,7 @@ function WorkerReportsAnalytics({ tickets, dept = null, depts = null }) {
 
 /* ============================================================ SETTINGS */
 const SLA3 = (o) => ({ high: o?.high ?? 4, medium: o?.medium ?? 24, low: o?.low ?? 72 });
-function UserTree({ list, departments, onPick, shifts, mode = "workers", onCreate, canCreate = false, showEmptyGroups = false }) {
+function UserTree({ list, departments, presence = [], onPick, shifts, mode = "workers", onCreate, canCreate = false, showEmptyGroups = false }) {
   const pickable = typeof onPick === "function";
   const canAdd = canCreate && typeof onCreate === "function";
   const roleTitle = (u) => u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : (ROLE_LABEL[u.role] || "משתמש");
@@ -7764,7 +7780,7 @@ function UserTree({ list, departments, onPick, shifts, mode = "workers", onCreat
     if (u.phone) out.push(u.phone);
     if (u.email) out.push(u.email);
     if (shiftName(u)) out.push(shiftName(u));
-    if (isActivationLinkRole(u.role)) out.push(workerLoginStateText(u));
+    if (isActivationLinkRole(u.role)) out.push(userHasLoginSecret(u) ? userPresenceStatusText(presenceOf(presence, u.id)) : workerLoginStateText(u));
     if (u.active === false) out.push("מושבת");
     return out.filter(Boolean).join(" · ");
   };
@@ -7921,7 +7937,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
 }
 
 function SettingsPanel(p) {
-  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, fleet, tickets, zones: cleaningZones = [], appIssues, saveAppIssue, getBackup, importBackup } = p;
+  const { config, saveConfig, users, saveUser, delUser, saveFleet, saveTicket, saveZone, session, fleet, tickets, presence = [], zones: cleaningZones = [], appIssues, saveAppIssue, getBackup, importBackup } = p;
   const mayFullSettings = canFullSettings(session);
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("workers"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
@@ -8226,16 +8242,16 @@ function SettingsPanel(p) {
       {!mayManageUsers && <div className="hint" style={{ marginTop: 4 }}>יש לך הרשאת צפייה בלבד. יצירה, עריכה ושחזור עובדים דורשים הרשאת ניהול משתמשים.</div>}
       <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / טלפון / מס׳ עובד / דוא״ל" /></div>
       {duplicateUserGroups.length > 0 && <div className="note warn" style={{ marginTop: 10 }}>נמצאו {countLabel(duplicateUserGroups.length, "כפילות אפשרית", "כפילויות אפשריות")} בזהות כניסה. בדקו רשומות עם אותו דוא״ל, טלפון או מספר עובד לפני מחיקה או איחוד.</div>}
-      <UserTree list={visibleUsers} departments={config.departments} onPick={mayManageUsers ? setUEdit : undefined} shifts={workShiftsOf(config)} mode={userSub} canCreate={mayManageUsers} showEmptyGroups={!uq.trim()} onCreate={(patch) => setUEdit(patch || {})} />
+      <UserTree list={visibleUsers} departments={config.departments} presence={presence} onPick={mayManageUsers ? setUEdit : undefined} shifts={workShiftsOf(config)} mode={userSub} canCreate={mayManageUsers} showEmptyGroups={!uq.trim()} onCreate={(patch) => setUEdit(patch || {})} />
       {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
       {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} onDelete={mayManageUsers ? deleteArchivedWorker : undefined} /></Overlay>}
-      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u) => { if (await saveUser(u) === false) return false; setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return true; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
+      {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} presence={presence} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u) => { if (await saveUser(u) === false) return false; setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return true; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       </>}
     </>)}
   </div>);
 }
-function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, canManageWorkerAccess: canWorkerAccess = false, onCancel, onSave, onDelete, onArchive }) {
+function UserForm({ user, config, users, zones, presence = [], canDelete, lockRole, lockDept, canManageWorkerAccess: canWorkerAccess = false, onCancel, onSave, onDelete, onArchive }) {
   const initialPerms = normalizePerms(user);
   const initialRole = user.role === "cleaner" ? "worker" : (user.role || lockRole || "");
   const initialDept = user.role === "cleaner" ? "ניקיון" : (user.dept || lockDept || "");
@@ -8323,7 +8339,7 @@ function UserForm({ user, config, users, zones, canDelete, lockRole, lockDept, c
     if (!roleUsesLogin) return null;
     if (!user.id) return null;
     const pendingText = loginConfigured
-      ? (roleUsesPassword ? "כניסה מוגדרת: המשתמש הגדיר סיסמה. הסיסמה אינה מוצגת למנהלים." : "כניסה מוגדרת: המשתמש הגדיר קוד אישי. הקוד אינו מוצג למנהלים.")
+      ? userPresenceStatusText(presenceOf(presence, user.id))
       : loginSetupPrompt({ ...user, role });
     return <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pendingText}</div>
       {canWorkerAccess ? <>
