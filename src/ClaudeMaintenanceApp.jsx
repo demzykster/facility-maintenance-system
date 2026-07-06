@@ -47,6 +47,7 @@ import { sendPhoneNotification, sendTestPhonePush, subscribeToPhonePush, pushSup
 import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "./appIssueModel.js";
 import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, normalizeCleaningQrManualCode, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
+import { cleaningMissedRoundRecordsForStatuses, isCleaningRoundActionableStatus, isCompletedCleaningRound } from "./cleaningRoundScheduleModel.js";
 import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
@@ -3010,7 +3011,7 @@ function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket, langu
     const vis = visibleTickets(session, tickets, fleet); const out = [];
     vis.forEach((t) => { const tr = trackOf(t); const ff = tr === "transport" ? (fleet || []).find((x) => x.id === t.forkliftId) : null; const depts = tr === "transport" ? fleetDepts(ff) : [t.reportedBy?.dept || t.createdBy?.dept || ""].filter(Boolean); (t.log || []).forEach((l, i) => out.push({ key: t.id + "-" + i, at: l.at, by: l.by || "—", byRole: l.byRole || "", text: l.text || "", kind: logKindOf(l), ticket: t, no: ticketNo(t), track: tr, depts, asset: t.asset || "" })); });
     const mDepts = userDepts(session); (config.driverEvents || []).forEach((ev) => { if (!(session.role === "admin" || ev.byUid === session.id || (ev.byDept && mDepts.includes(ev.byDept)))) return; out.push({ key: "dv-" + ev.id, at: ev.at, by: ev.byName || "—", byRole: ev.byDept === "הנהלה" ? "admin" : "user", text: driverEvtText(ev), kind: "driver", ticket: null, no: ev.unitCode || "", track: "transport", depts: ev.byDept ? [ev.byDept] : [], asset: ev.unitCode || "" }); });
-    (rounds || []).forEach((r) => { out.push({ key: "cr-" + r.id, at: r.at, by: r.byName || "—", byRole: "cleaner", text: `סבב ניקיון · ${r.zoneName}${r.zoneLoc ? " · " + r.zoneLoc : ""}${r.winTime ? " · " + r.winTime : ""} · ${r.doneCount}/${countLabel(r.total, "פריט", "פריטים")}${r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}${(r.issues && r.issues.length) ? " · " + countLabel(r.issues.length, "הערה", "הערות") : (r.note ? " · " + r.note : "")}`, kind: "cleaning", ticket: null, no: r.zoneName || "", track: "facility", depts: [], asset: r.zoneName || "" }); });
+    (rounds || []).forEach((r) => { const missed = !isCompletedCleaningRound(r); out.push({ key: "cr-" + r.id, at: r.at, by: missed ? "מערכת" : (r.byName || "—"), byRole: missed ? "system" : "cleaner", text: missed ? `סבב ניקיון פוספס · ${r.zoneName}${r.zoneLoc ? " · " + r.zoneLoc : ""}${r.winTime ? " · " + r.winTime : ""}` : `סבב ניקיון · ${r.zoneName}${r.zoneLoc ? " · " + r.zoneLoc : ""}${r.winTime ? " · " + r.winTime : ""} · ${r.doneCount}/${countLabel(r.total, "פריט", "פריטים")}${r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}${(r.issues && r.issues.length) ? " · " + countLabel(r.issues.length, "הערה", "הערות") : (r.note ? " · " + r.note : "")}`, kind: "cleaning", ticket: null, no: r.zoneName || "", track: "facility", depts: [], asset: r.zoneName || "" }); });
     return out.sort((a, b) => b.at - a.at);
   }, [session, tickets, fleet, config, rounds]);
   const whoOpts = useMemo(() => [...new Set(entries.map((e) => e.by).filter((x) => x && x !== "—"))].sort((a, b) => a.localeCompare(b, "he")), [entries]);
@@ -3361,7 +3362,7 @@ const zoneTodayStatuses = (zone, rounds, now, cfg = {}) => {
   return ws.map((win, i) => {
     const target = ds + parseHM(win.time) * 60000, tol = (+win.tol || 0) * 60000, slotStart = target - tol;
     const nx = ws[i + 1]; const slotEnd = nx ? (ds + parseHM(nx.time) * 60000 - (+nx.tol || 0) * 60000) : eod;
-    const round = (rounds || []).find((r) => r.zoneId === zone.id && r.at >= ds && r.at < eod && (r.winId ? r.winId === win.id : (r.at >= slotStart && r.at < slotEnd)));
+    const round = (rounds || []).find((r) => isCompletedCleaningRound(r) && r.zoneId === zone.id && r.at >= ds && r.at < eod && (r.winId ? r.winId === win.id : (r.at >= slotStart && r.at < slotEnd)));
     let status;
     if (round) status = "done";
     else if (now < slotStart) status = slotStart - now <= reminderMs ? "upcoming" : "pending";
@@ -3372,6 +3373,24 @@ const zoneTodayStatuses = (zone, rounds, now, cfg = {}) => {
   });
 };
 const WIN_META = { done: { label: "בוצע", color: "#16A34A", bg: "#DCFCE7" }, due: { label: "כעת", color: "#B45309", bg: "#FEF3C7" }, overdue: { label: "באיחור", color: "#EA580C", bg: "#FFEDD5" }, missed: { label: "פוספס", color: "#DC2626", bg: "#FEE2E2" }, upcoming: { label: "מתקרב", color: "#7C3AED", bg: "#EDE9FE" }, pending: { label: "מתוכנן", color: "#64748B", bg: "var(--surface-2)" } };
+const materializeMissedCleaningRounds = async ({ zones = [], rounds = [], now = Date.now(), config = {}, saveRound, inFlightRef }) => {
+  if (!saveRound) return;
+  const ds = dayStart(now), eod = ds + 86400000;
+  const records = [];
+  (zones || []).filter((z) => z.active !== false).forEach((zone) => {
+    const statuses = zoneTodayStatuses(zone, rounds, now, config);
+    records.push(...cleaningMissedRoundRecordsForStatuses({ zone, statuses, rounds, dayStart: ds, dayEnd: eod, zoneLoc: zoneLoc(zone) }));
+  });
+  for (const record of records) {
+    if (inFlightRef?.current?.has(record.id)) continue;
+    inFlightRef?.current?.add(record.id);
+    try {
+      await saveRound(record);
+    } finally {
+      inFlightRef?.current?.delete(record.id);
+    }
+  }
+};
 const dayCompliance = (zone, rounds, dayTs, now) => {
   if (!isCleaningDay(zone, dayTs)) return []; // יום ללא ניקיון מתוכנן — לא נספר בעמידה ביעדים
   const ws = (zone.windows || []).slice().sort((a, b) => parseHM(a.time) - parseHM(b.time));
@@ -3379,7 +3398,7 @@ const dayCompliance = (zone, rounds, dayTs, now) => {
   return ws.map((win, i) => {
     const target = ds + parseHM(win.time) * 60000, tol = (+win.tol || 0) * 60000, slotStart = target - tol;
     const nx = ws[i + 1]; const slotEnd = nx ? (ds + parseHM(nx.time) * 60000 - (+nx.tol || 0) * 60000) : eod;
-    const resolved = slotEnd <= now; const r = (rounds || []).find((x) => x.zoneId === zone.id && x.at >= ds && x.at < eod && (x.winId ? x.winId === win.id : (x.at >= slotStart && x.at < slotEnd)));
+    const resolved = slotEnd <= now; const r = (rounds || []).find((x) => isCompletedCleaningRound(x) && x.zoneId === zone.id && x.at >= ds && x.at < eod && (x.winId ? x.winId === win.id : (x.at >= slotStart && x.at < slotEnd)));
     return { resolved, done: !!r, onTime: r ? r.at <= target + tol : false };
   });
 };
@@ -3590,12 +3609,13 @@ function ZoneTag({ zone, onClose }) {
 }
 
 function CleaningAdmin(p) {
-  const { zones, rounds, users, absences, saveZone, delZone, saveUser, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, delComplaint } = p;
+  const { zones, rounds, users, absences, saveZone, delZone, saveUser, saveRound, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, delComplaint } = p;
   const cleaners = useMemo(() => (users || []).filter(isActiveCleaningWorker), [users]);
   const managers = useMemo(() => (users || []).filter((u) => u.role === "user" && u.active !== false), [users]);
   const [tab, setTab] = useState("today"), [edit, setEdit] = useState(null), [tag, setTag] = useState(null), [rep, setRep] = useState(null), [showClosed, setShowClosed] = useState(false);
   const [rZone, setRZone] = useState("all"), [rProblems, setRProblems] = useState(false), [rDetail, setRDetail] = useState(null), [cDetail, setCDetail] = useState(null);
   const [cZone, setCZone] = useState("all");
+  const missedInFlight = useRef(new Set());
   const list = useMemo(() => (zones || []).slice().sort(zoneSort), [zones]);
   const roundsByDay = useMemo(() => { const g = {}; (rounds || []).slice().filter((r) => (rZone === "all" || r.zoneId === rZone) && (!rProblems || (r.issues || []).length > 0)).sort((a, b) => b.at - a.at).slice(0, 200).forEach((r) => { const k = dayStart(r.at); (g[k] = g[k] || []).push(r); }); return Object.entries(g).sort((a, b) => b[0] - a[0]); }, [rounds, rZone, rProblems]);
   const complaintScope = useMemo(() => (complaints || []).filter((c) => cZone === "all" || c.zoneId === cZone), [complaints, cZone]);
@@ -3628,16 +3648,37 @@ function CleaningAdmin(p) {
     const rows = list.filter((z) => z.active !== false).map((z) => ({ z, sts: zoneTodayStatuses(z, rounds, now, p.config) }));
     const tot = rows.reduce((n, r) => n + r.sts.length, 0);
     const done = rows.reduce((n, r) => n + r.sts.filter((s) => s.status === "done").length, 0);
-    const action = rows.filter((r) => r.sts.some((s) => s.status === "missed" || s.status === "due" || s.status === "overdue"));
-    const actionN = action.reduce((n, r) => n + r.sts.filter((s) => s.status === "missed" || s.status === "due" || s.status === "overdue").length, 0);
-    return { rows, tot, done, action, actionN };
+    const action = rows.filter((r) => r.sts.some((s) => isCleaningRoundActionableStatus(s.status)));
+    const actionN = action.reduce((n, r) => n + r.sts.filter((s) => isCleaningRoundActionableStatus(s.status)).length, 0);
+    const missed = rows.filter((r) => r.sts.some((s) => s.status === "missed"));
+    const missedN = missed.reduce((n, r) => n + r.sts.filter((s) => s.status === "missed").length, 0);
+    return { rows, tot, done, action, actionN, missed, missedN };
   }, [list, rounds]);
+  useEffect(() => {
+    materializeMissedCleaningRounds({ zones: list, rounds, now: Date.now(), config: p.config, saveRound, inFlightRef: missedInFlight });
+  }, [list, rounds, p.config, saveRound]);
   const winChips = (sts) => <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div>;
+  const roundOrdinal = (sts, win) => {
+    const i = (sts || []).findIndex((s) => s.win === win || s.win?.id === win?.id);
+    return i >= 0 ? `סבב ${i + 1} מתוך ${sts.length}` : "";
+  };
+  const zoneTodayStatButtons = (z, sts) => {
+    const doneN = sts.filter((s) => s.status === "done").length;
+    const missedN = sts.filter((s) => s.status === "missed").length;
+    const dueN = sts.filter((s) => isCleaningRoundActionableStatus(s.status)).length;
+    const issueN = (complaints || []).filter((c) => c.zoneId === z.id && c.status !== "rejected" && c.status !== "resolved").length;
+    return <div className="clean-stat-row">
+      <button type="button" className="clean-stat-chip" onClick={() => { setTab("rounds"); setRZone(z.id); setRProblems(false); }}>בוצעו {doneN}/{sts.length}</button>
+      {dueN > 0 && <button type="button" className="clean-stat-chip warn" onClick={() => { setTab("today"); }}>לביצוע {dueN}</button>}
+      {missedN > 0 && <button type="button" className="clean-stat-chip bad" onClick={() => { setTab("rounds"); setRZone(z.id); setRProblems(false); }}>פוספסו {missedN}</button>}
+      {issueN > 0 && <button type="button" className="clean-stat-chip bad" onClick={() => { setTab("complaints"); setCZone(z.id); }}>בעיות {issueN}</button>}
+    </div>;
+  };
   const zoneSelectOptions = groupCleaningByArea(list).map((g) => <optgroup key={g.area} label={g.area}>{g.items.map((z) => <option key={z.id} value={z.id}>{z.floor ? `${z.floor} · ` : ""}{z.name}</option>)}</optgroup>);
   const renderAreaSections = (items, renderItem, getZone = (x) => x) => groupCleaningByArea(items, getZone).map((areaGroup) => {
     const actionCount = areaGroup.items.reduce((n, item) => {
       const sts = item.sts || [];
-      return n + sts.filter((s) => s.status === "missed" || s.status === "due" || s.status === "overdue").length;
+      return n + sts.filter((s) => isCleaningRoundActionableStatus(s.status)).length;
     }, 0);
     return <section key={areaGroup.area} className="clean-area-group">
       <div className="clean-area-head"><div><div className="clean-area-title"><Building2 size={15} /> {areaGroup.area}</div><div className="clean-area-meta">{countLabel(areaGroup.items.length, "אזור ניקיון", "אזורי ניקיון")}{actionCount ? ` · ${actionCount} דורשים פעולה` : ""}</div></div></div>
@@ -3652,13 +3693,14 @@ function CleaningAdmin(p) {
     {tab === "today" ? (list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלשונית «אזורים»" /> : <>
       <div className="comp-card"><div className="comp-big">{today.done}/{today.tot}</div><div className="comp-lbl">סבבים בוצעו היום</div><div className="comp-bar"><span style={{ width: (today.tot ? Math.round(today.done / today.tot * 100) : 0) + "%" }} /></div></div>
       {(() => { const tk = todayKey(); const away = (absences || []).filter((a) => a.from <= tk && (a.to || a.from) >= tk); if (!away.length) return null; const zonesOf = (uid) => (zones || []).filter((z) => z.cleanerId === uid && z.active !== false).map((z) => z.name); return <div className="note" style={{ borderColor: "#FDE68A", marginBottom: 8 }}><CalendarClock size={13} /> בחופשה היום — נדרש כיסוי: {away.map((a) => `${a.name}${zonesOf(a.userId).length ? " (" + zonesOf(a.userId).join(", ") + ")" : ""}`).join(" · ")}</div>; })()}
-      {today.action.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש פעולה ({today.actionN})</SectionTitle>{renderAreaSections(today.action, ({ z, sts }) => { const missed = sts.filter((s) => s.status === "missed").length; const due = sts.filter((s) => s.status === "due" || s.status === "overdue").length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: missed ? "#DC2626" : "#B45309" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: missed ? "#FEE2E2" : "#FEF3C7", color: missed ? "#DC2626" : "#B45309" }}>{missed ? `${missed} פוספסו` : `${due} לביצוע`}</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>; }, (x) => x.z)}</>}
+      {today.action.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש פעולה ({today.actionN})</SectionTitle>{renderAreaSections(today.action, ({ z, sts }) => { const actionable = sts.filter((s) => isCleaningRoundActionableStatus(s.status)); const activeWin = actionable[0]; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: activeWin?.status === "overdue" ? "#EA580C" : "#B45309" }}><div className="tcard-main"><div className="tcard-row1 clean-tcard-head"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309" }}>{activeWin ? `${roundOrdinal(sts, activeWin.win)} · ${activeWin.win.time}` : `${actionable.length} לביצוע`}</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{z.cleanerName || "ללא אחראי"}</div>{zoneTodayStatButtons(z, sts)}{winChips(sts)}</div></div>; }, (x) => x.z)}</>}
+      {today.missed.length > 0 && <><SectionTitle><Clock size={15} /> פוספסו היום ({today.missedN})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>חלונות שכבר עברו נשמרים להיסטוריה ולניתוח, אבל לא מוצגים לעובד כמשימה לביצוע.</div>{renderAreaSections(today.missed, ({ z, sts }) => <div key={z.id} className="tcard" style={{ borderInlineStartColor: "#DC2626" }}><div className="tcard-main"><div className="tcard-row1 clean-tcard-head"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{sts.filter((s) => s.status === "missed").length} פוספסו</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{z.cleanerName || "ללא אחראי"}</div>{zoneTodayStatButtons(z, sts)}{winChips(sts)}</div></div>, (x) => x.z)}</>}
       <SectionTitle><Sparkles size={15} /> כל האזורים היום</SectionTitle>
-      {renderAreaSections(today.rows, ({ z, sts }) => <div key={z.id} className="tcard"><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"}</div>{winChips(sts)}</div></div>, (x) => x.z)}
+      {renderAreaSections(today.rows, ({ z, sts }) => <div key={z.id} className="tcard"><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1 clean-tcard-head"><span className="tcard-subj">{z.name}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"}</div>{zoneTodayStatButtons(z, sts)}{winChips(sts)}</div></div>, (x) => x.z)}
     </>)
       : tab === "rounds" ? (<>
         <div className="u-filters" style={{ marginBottom: 12 }}><select value={rZone} onChange={(e) => setRZone(e.target.value)}><option value="all">כל האזורים</option>{zoneSelectOptions}</select><button className={"wtoggle" + (rProblems ? " on" : "")} onClick={() => setRProblems((v) => !v)}><AlertTriangle size={14} /> רק עם הערות</button></div>
-        {roundsByDay.length === 0 ? <Empty text="אין סבבים להצגה" Icon={Sparkles} sub="שנו את הסינון או המתינו לסבבים" /> : roundsByDay.map(([day, rs]) => <div key={day} style={{ marginBottom: 16 }}><div className="day-h">{dayLabel(+day)}</div><div className="cards">{rs.map((r) => { const prob = (r.issues || []).length > 0; return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={prob ? { borderInlineStartColor: "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.zoneLoc ? " · " + r.zoneLoc : ""}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{r.byName} · {r.doneCount}/{countLabel(r.total, "פריט", "פריטים")}{r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}{prob ? ` · ${countLabel(r.issues.length, "הערה", "הערות")}` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div></div>)}
+        {roundsByDay.length === 0 ? <Empty text="אין סבבים להצגה" Icon={Sparkles} sub="שנו את הסינון או המתינו לסבבים" /> : roundsByDay.map(([day, rs]) => <div key={day} style={{ marginBottom: 16 }}><div className="day-h">{dayLabel(+day)}</div><div className="cards">{rs.map((r) => { const prob = (r.issues || []).length > 0; const missed = !isCompletedCleaningRound(r); return <button key={r.id} className="audit-row clk" onClick={() => setRDetail(r)} style={(prob || missed) ? { borderInlineStartColor: missed ? "#DC2626" : "#DC2626", borderInlineStartWidth: 3, borderInlineStartStyle: "solid" } : {}}><span className="audit-time">{fmtTime(r.at)}</span><span className="audit-kdot" style={{ background: missed ? "#DC2626" : prob ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{r.zoneName}{r.zoneLoc ? " · " + r.zoneLoc : ""}{r.winTime ? " · " + r.winTime : ""}</div><div className="audit-meta">{missed ? "פוספס · לא בוצע" : `${r.byName} · ${r.doneCount}/${countLabel(r.total, "פריט", "פריטים")}`}{!missed && r.isCover ? " · כיסוי" + (r.coverFor ? " עבור " + r.coverFor : "") : ""}{prob ? ` · ${countLabel(r.issues.length, "הערה", "הערות")}` : ""}</div></div><ChevronLeft size={16} /></button>; })}</div></div>)}
       </>)
       : tab === "complaints" ? (<>
         <div className="u-filters" style={{ marginBottom: 12 }}><select value={cZone} onChange={(e) => setCZone(e.target.value)}><option value="all">כל האזורים</option>{zoneSelectOptions}</select>{cZone !== "all" && <button className="btn-ghost sm" onClick={() => setCZone("all")}>ניקוי סינון</button>}</div>
@@ -3776,11 +3818,12 @@ function RoundDetail({ round, zone, onClose }) {
   const win = zone && round.winId ? (zone.windows || []).find((w) => w.id === round.winId) : null;
   const items = zone ? windowItems(zone, win) : [];
   const issues = round.issues || [];
+  const missed = !isCompletedCleaningRound(round);
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">פרטי סבב</div></div>
     <div className="body">
-      <div className="round-zone"><div className="rz-name">{round.zoneName}</div><div className="rz-loc">{round.zoneLoc || "—"}{round.winTime ? " · סבב " + round.winTime : ""}</div>{issues.length > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{countLabel(issues.length, "הערה", "הערות")}</span>}{round.manualEntry && <span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309", border: "1px solid #FCD34D" }}>ידני · {round.manualEntryReason || "ללא סיבה"}</span>}</div>
+      <div className="round-zone"><div className="rz-name">{round.zoneName}</div><div className="rz-loc">{round.zoneLoc || "—"}{round.winTime ? " · סבב " + round.winTime : ""}</div>{missed && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>פוספס</span>}{issues.length > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{countLabel(issues.length, "הערה", "הערות")}</span>}{round.manualEntry && <span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309", border: "1px solid #FCD34D" }}>ידני · {round.manualEntryReason || "ללא סיבה"}</span>}</div>
       <div className="field"><span>סיכום</span>
-        <div className="audit-row"><span className="audit-kdot" style={{ background: issues.length ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{round.byName}{round.isCover ? " · כיסוי" + (round.coverFor ? " עבור " + round.coverFor : "") : ""}</div><div className="audit-meta">{dayLabel(dayStart(round.at))} · {fmtTime(round.at)} · בוצעו {round.doneCount}/{countLabel(round.total, "פריט", "פריטים")}</div></div></div>
+        <div className="audit-row"><span className="audit-kdot" style={{ background: missed ? "#DC2626" : issues.length ? "#DC2626" : "#16A34A" }} /><div className="audit-main"><div className="audit-text">{missed ? "סבב פוספס" : round.byName}{!missed && round.isCover ? " · כיסוי" + (round.coverFor ? " עבור " + round.coverFor : "") : ""}</div><div className="audit-meta">{dayLabel(dayStart(round.at))} · {fmtTime(round.at)}{missed ? " · לא בוצע" : ` · בוצעו ${round.doneCount}/${countLabel(round.total, "פריט", "פריטים")}`}</div></div></div>
       </div>
       {issues.length > 0 && <div className="field"><span style={{ color: "#DC2626" }}><AlertTriangle size={14} /> הערות / בעיות ({countLabel(issues.length, "הערה", "הערות")})</span>
         <div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}><CleaningPhoto record={iss} /><div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}><AlertTriangle size={12} /> {iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div><div className="cmp-meta">נפתח דיווח אוטומטי</div></div></div>)}</div>
@@ -3794,10 +3837,10 @@ function RoundDoneScreen({ round, zones, rounds, session, config, onClose }) {
   const zone = (zones || []).find((z) => z.id === round.zoneId) || { id: round.zoneId, name: round.zoneName };
   const now = Date.now();
   const withCurrent = [round, ...(rounds || []).filter((r) => r.id !== round.id)];
-  const zoneRemaining = zoneTodayStatuses(zone, withCurrent, now, config).filter(({ status }) => status !== "done");
+  const zoneRemaining = zoneTodayStatuses(zone, withCurrent, now, config).filter(({ status }) => status !== "done" && status !== "missed");
   const activeOther = (zones || [])
     .filter((z) => z.active !== false && z.cleanerId === session.id && z.id !== zone.id)
-    .map((z) => ({ z, next: zoneTodayStatuses(z, withCurrent, now, config).find(({ status }) => status === "due" || status === "overdue") }))
+    .map((z) => ({ z, next: zoneTodayStatuses(z, withCurrent, now, config).find(({ status }) => isCleaningRoundActionableStatus(status)) }))
     .filter((x) => x.next)
     .sort((a, b) => parseHM(a.next.win.time) - parseHM(b.next.win.time));
   return <div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={22} /></button><div className="form-title">הסבב הושלם</div></div>
@@ -4007,10 +4050,15 @@ function CleanerApp(p) {
   const active = useMemo(() => (zones || []).filter((z) => z.active !== false).sort(zoneSort), [zones]);
   const mine = useMemo(() => active.filter((z) => z.cleanerId === session.id), [active, session.id]);
   const others = useMemo(() => active.filter((z) => z.cleanerId !== session.id), [active, session.id]);
+  const missedInFlight = useRef(new Set());
   const todo = useMemo(() => { const out = []; mine.forEach((z) => zoneTodayStatuses(z, rounds, now, config).forEach(({ win, status }) => { if (status === "due" || status === "overdue") out.push({ z, win, status }); })); return out.sort((a, b) => parseHM(a.win.time) - parseHM(b.win.time)); }, [mine, rounds, config]);
-  const doneToday = useMemo(() => (rounds || []).filter((r) => r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
+  const missedToday = useMemo(() => { const out = []; mine.forEach((z) => zoneTodayStatuses(z, rounds, now, config).forEach((s) => { if (s.status === "missed") out.push({ z, ...s }); })); return out.sort((a, b) => parseHM(a.win.time) - parseHM(b.win.time)); }, [mine, rounds, config]);
+  const doneToday = useMemo(() => (rounds || []).filter((r) => isCompletedCleaningRound(r) && r.byUid === session.id && dayStart(r.at) === dayStart(now)).sort((a, b) => b.at - a.at), [rounds]);
   const autoQrOpened = useRef(false);
-  const actionableRoundForZone = (z) => zoneTodayStatuses(z, rounds, Date.now(), config).find(({ status }) => status === "due" || status === "overdue" || status === "missed");
+  const actionableRoundForZone = (z) => zoneTodayStatuses(z, rounds, Date.now(), config).find(({ status }) => isCleaningRoundActionableStatus(status));
+  useEffect(() => {
+    materializeMissedCleaningRounds({ zones: mine, rounds, now: Date.now(), config, saveRound, inFlightRef: missedInFlight });
+  }, [mine, rounds, config, saveRound]);
   useEffect(() => {
     if (autoQrOpened.current || !scannedZoneId) return;
     const z = mine.find((zone) => zone.id === scannedZoneId);
@@ -4053,16 +4101,20 @@ function CleanerApp(p) {
     const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds);
     const oc = (complaints || []).filter((c) => c.zoneId === z.id && c.status === "open" && c.ownerRole !== "admin").length;
     const notDay = sts.length === 0;
-    const dueNow = sts.find((s) => s.status === "due" || s.status === "overdue");
+    const dueNow = sts.find((s) => isCleaningRoundActionableStatus(s.status));
     const nextP = sts.find((s) => s.status === "pending");
     const missed = sts.filter((s) => s.status === "missed");
     const allDone = sts.length > 0 && sts.every((s) => s.status === "done");
+    const roundOrdinal = (win) => {
+      const idx = sts.findIndex((s) => s.win === win || s.win?.id === win?.id);
+      return idx >= 0 ? t("cleaner.roundOrdinal", { index: idx + 1, total: sts.length, time: win.time }) : t("cleaner.window", { time: win.time });
+    };
     let st, target;
     if (notDay) st = { txt: t("cleaner.notCleaningDay"), color: "var(--muted)", bg: "var(--surface-2)" };
-    else if (dueNow) { st = { txt: t("cleaner.nowRound", { time: dueNow.win.time }), color: WIN_META[dueNow.status].color, bg: WIN_META[dueNow.status].bg, go: 1 }; target = dueNow.win; }
+    else if (dueNow) { st = { txt: roundOrdinal(dueNow.win), color: WIN_META[dueNow.status].color, bg: WIN_META[dueNow.status].bg, go: 1 }; target = dueNow.win; }
     else if (allDone) st = { txt: t("cleaner.doneForToday"), color: "#16A34A", bg: "#DCFCE7" };
-    else if (nextP) { st = { txt: t("cleaner.nextRound", { time: nextP.win.time }), color: "#0369A1", bg: "#E0F2FE" }; target = nextP.win; }
-    else if (missed.length) { st = { txt: t("cleaner.missedRound", { time: missed[0].win.time }), color: "#DC2626", bg: "#FEE2E2", go: 1 }; target = missed[0].win; }
+    else if (nextP) st = { txt: t("cleaner.nextRound", { time: nextP.win.time }), color: "#0369A1", bg: "#E0F2FE" };
+    else if (missed.length) st = { txt: t("cleaner.missedRound", { time: missed[0].win.time }), color: "#DC2626", bg: "#FEE2E2" };
     else st = { txt: "—", color: "var(--muted)", bg: "var(--surface-2)" };
     const border = cover ? "#A855F7" : (st.go ? st.color : (allDone ? "#16A34A" : "#0EA5E9"));
     const subMissed = !notDay && !dueNow && nextP && missed.length ? " · " + t("cleaner.missedShort", { times: missed.map((m) => m.win.time).join(",") }) : "";
@@ -4083,7 +4135,8 @@ function CleanerApp(p) {
     <main className="content">
       {qrArrivalZone && <div className="toast-ok"><MapPin size={16} /> {t("cleaner.qrArrived", { zone: qrArrivalZone.name })}</div>}
       {sent && <div className="toast-ok"><CheckCircle2 size={16} /> {t("cleaner.roundSaved")}</div>}
-      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{areaSections(todo, ({ z, win, status }, i) => <button key={`${z.id}-${win.id || i}`} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win, scanToken: qr.reason === "scan_matched" }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>, (x) => x.z)}</div>}
+      {todo.length > 0 && <div className="todo-card"><div className="todo-h"><Clock size={15} /> {t("cleaner.todoNow", { count: todo.length })}</div>{areaSections(todo, ({ z, win, status }, i) => { const sts = zoneTodayStatuses(z, rounds, now, config); const idx = sts.findIndex((s) => s.win === win || s.win?.id === win?.id); return <button key={`${z.id}-${win.id || i}`} className="todo-row" onClick={() => { const qr = cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: z.id }); if (!qr.allowed) return setQrBlockedZone(z); setRun({ zone: z, win, scanToken: qr.reason === "scan_matched" }); }}><span className="todo-dot" style={{ background: WIN_META[status].color }} /><div className="todo-main"><div className="todo-zone">{z.name}</div><div className="todo-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{idx >= 0 ? t("cleaner.roundOrdinal", { index: idx + 1, total: sts.length, time: win.time }) : t("cleaner.window", { time: win.time })} · {t(`cleaner.status.${status}`)}</div></div><ChevronLeft size={16} /></button>; }, (x) => x.z)}</div>}
+      {missedToday.length > 0 && <div className="clean-missed-note"><AlertTriangle size={15} /> {t("cleaner.missedNotice", { count: missedToday.length, windows: missedToday.map((m) => `${m.z.name} ${m.win.time}`).join(" · ") })}</div>}
       {myComplaints.length > 0 && <><SectionTitle><AlertTriangle size={15} /> {t("cleaner.openReports", { count: myComplaints.length })}</SectionTitle><div className="cards">{myComplaints.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
       {active.length === 0 ? <Empty text={t("cleaner.noZones")} Icon={Sparkles} sub={t("cleaner.managerDefinesZones")} /> : <>
         <SectionTitle><Sparkles size={15} /> {t("cleaner.myZones", { count: mine.length })}</SectionTitle>
@@ -9923,6 +9976,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .round-item.on .ri-box{background:#0EA5E9;border-color:#0EA5E9;}
 .todo-card{border:1px solid #FCD34D;background:#FFFBEB;border-radius:14px;padding:12px;margin-bottom:16px;}
 .app-dark .todo-card{background:#3a2e0e;border-color:#a87f1a;}
+.clean-missed-note{display:flex;align-items:flex-start;gap:8px;border:1px solid #FCA5A5;background:#FEF2F2;color:#991B1B;border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:13px;font-weight:700;line-height:1.45;}
+.app-dark .clean-missed-note{background:#3b1111;border-color:#7f1d1d;color:#fecaca;}
 .todo-h{display:flex;align-items:center;gap:7px;font-weight:800;font-size:14px;color:#92400E;margin-bottom:8px;}
 .app-dark .todo-h{color:#FCD34D;}
 .todo-row{display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:9px;border-radius:10px;background:var(--surface);border:1px solid var(--line);margin-bottom:6px;cursor:pointer;color:var(--ink);}
@@ -9937,6 +9992,14 @@ button.notif-perm:hover{background:#D1FAE5;}
 .clean-floor-title{font-size:12px;font-weight:800;color:var(--muted);margin:0 0 6px;padding-inline-start:2px;}
 .clean-area-group.compact{margin:8px 0 10px;}
 .clean-area-group.compact .clean-area-head{margin-bottom:6px;}
+.clean-tcard-head{align-items:flex-start;flex-wrap:wrap;}
+.clean-tcard-head .tcard-subj{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3;min-width:110px;}
+.clean-tcard-head .badge{flex-shrink:0;}
+.clean-stat-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:6px 0 2px;}
+.clean-stat-chip{border:1px solid var(--line);background:var(--surface-2);color:var(--muted);border-radius:999px;padding:3px 8px;font-size:11.5px;font-weight:800;line-height:1.2;cursor:pointer;}
+.clean-stat-chip.warn{background:#FEF3C7;color:#92400E;border-color:#FDE68A;}
+.clean-stat-chip.bad{background:#FEE2E2;color:#B91C1C;border-color:#FCA5A5;}
+.clean-stat-chip:hover{filter:brightness(.98);transform:translateY(-1px);}
 .todo-card .clean-area-title{font-size:13px;color:#92400E;}
 .app-dark .todo-card .clean-area-title{color:#FCD34D;}
 .todo-card .clean-area-meta{display:none;}
