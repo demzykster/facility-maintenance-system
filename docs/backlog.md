@@ -63,9 +63,9 @@ Completed PR #749:
 - Kept the seam backed by the current storage driver for the first slice.
 
 Active PR sequence:
-1. Move login-capable user `app_users` profile synchronization into `/api/users` for records with `authUserId`.
+1. Make `/api/users` read/list login-capable users from Supabase `app_users` as the primary source.
 2. Keep `/api/users` as the server operation boundary and preserve local/demo behavior.
-3. Add tests for profile update payload mapping, permission checks, and KV fallback/mirror behavior while the temporary mirror remains.
+3. Add tests for profile-to-user mapping, permission checks, and KV fallback/enrichment behavior while the temporary mirror remains.
 4. Do not bundle this with cleaning, PPE, broad permission redesign, or monolith extraction.
 
 DoD:
