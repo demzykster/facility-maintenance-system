@@ -17,6 +17,57 @@ Use `docs/active-work.md` and `docs/release-checklist.md` as the active route fo
 
 The backlog below remains useful for historical detail and code-area context, but broad product polish should not stay open under vague labels. New UI/copy fixes should start only from a concrete owner-reported issue.
 
+## Current Backlog Candidates
+
+### R10 safety slice - staging preflight model coverage and build-size truth
+
+Status: active on `codex/r10-safety-preflight-user-gap`.
+
+Goal:
+- Keep the current R10/final-production path safe without bypassing the documented guardrails.
+- Make staging preflight env checks testable at the model seam instead of leaving missing/wrong-value and bootstrap-safety checks only in the executable script.
+- Refresh the documented bundle-size warning from a fresh build when the task scope allows build output.
+
+Suggested PR sequence:
+1. Move the missing-required-env, wrong-value env, and bootstrap-safety checks from `tools/staging-smoke-preflight.mjs` into `src/stagingSmokePreflightModel.js`.
+2. Add focused Vitest coverage for missing required env values, wrong values such as non-production `VITE_CMMS_APP_MODE`, non-api storage provider, non-Supabase KV/file/audit drivers, disabled public complaints, and bootstrap env that remains enabled after first-admin setup.
+3. Keep existing placeholder and Supabase public/server pair tests; do not rewrite them.
+4. Keep local/demo default behavior unchanged. This slice should harden staging/production gates, not flip `seedPolicyForMode`.
+5. If a fresh `npm run build` is run as part of the PR, update `docs/current-status.md` with the observed main chunk raw/gzip size. If build is not run, leave the bundle-size note untouched.
+
+DoD:
+- `npm test -- --run` passes.
+- `npm run release:check` passes.
+- No broad UI refactor, no `src/features/*` adoption, and no change to production data authority.
+- `tools/staging-smoke-preflight.mjs` remains a thin executable wrapper over tested preflight model logic.
+
+Later separate safety slices:
+- Decide whether `staging:preflight` should become a CI/deploy-blocking gate, and if so add a CI-safe dry/model check or a gated job that has the required staging secrets.
+- Add minimal automated browser smoke coverage for the highest-risk role/workflow paths.
+- Add a minimal lint/static-analysis gate once scoped so it does not become a broad formatting churn PR.
+
+### R10 data slice - user-management authority gap
+
+Status: candidate, not active until explicitly selected.
+
+Goal:
+- Keep the distinction between production identity/session and admin user-management clear.
+- Production login/session/profile lookup already uses Supabase `public.app_users`, RLS, and `/api/session/me`.
+- Admin/team user creation, edits, permissions, and worker-access management still use the `user:` KV compatibility path through `/api/kv`, protected by server permission checks and secret redaction.
+- Close this remaining user-management authority gap through an explicit server operation/API/RLS path or another approved normalized authority design.
+
+Suggested PR sequence:
+1. Document the current three-layer user state: Supabase identity/session, admin user-management via `user:` KV bridge, and strengthened KV read/write permission policy.
+2. Design the smallest server-operation boundary for admin user-management without changing local/demo login behavior.
+3. Add tests for manager/admin permission checks, secret redaction, self-read behavior, and denied writes before replacing the bridge path.
+4. Migrate one narrow user-management write/read flow at a time; do not bundle this with cleaning, PPE, or broad permission redesign.
+
+DoD:
+- Production identity/session remains backed by Supabase `app_users`.
+- Admin user-management no longer depends on raw `user:` KV writes for the migrated flow.
+- Permission checks are enforced server-side and covered by tests.
+- Existing first-login password/PIN contract remains unchanged.
+
 ## Verified Planning Facts
 
 ### Worker First-Login Setup UI
