@@ -64,11 +64,13 @@ import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { createApiFleetProvider } from "./apiFleetAdapter.js";
 import { createApiPmProvider } from "./apiPmAdapter.js";
+import { createApiCleaningZonesProvider } from "./apiCleaningZonesAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
+import { cleaningZonesAuthorityFailureIssue, cleaningZonesForAuthority, normalizedCleaningZonesAuthorityEnabled } from "./cleaningZonesAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -135,6 +137,19 @@ const NORMALIZED_PM_SHADOW_WRITE = !NORMALIZED_PM_AUTHORITY
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_PM_PROVIDER;
+const NORMALIZED_CLEANING_ZONES_PROVIDER = createApiCleaningZonesProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_CLEANING_ZONES_AUTHORITY = normalizedCleaningZonesAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_CLEANING_ZONES_PROVIDER
+});
+const NORMALIZED_CLEANING_ZONES_SHADOW_WRITE = !NORMALIZED_CLEANING_ZONES_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_CLEANING_ZONES_PROVIDER;
 const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
@@ -1753,6 +1768,7 @@ export default function App() {
 	    let ticketRows = tk;
 	    let pmRows = pmv;
 	    let fleetRows = fl;
+	    let zoneRows = zn;
 	    let userRows = us;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
@@ -1799,6 +1815,21 @@ export default function App() {
 	        }));
 	      }
 	    }
+	    if (NORMALIZED_CLEANING_ZONES_AUTHORITY) {
+	      try {
+	        const normalizedCleaningZones = await cleaningZonesForAuthority({
+          kvZones: zn,
+          provider: NORMALIZED_CLEANING_ZONES_PROVIDER,
+          normalizedAuthority: true
+        });
+        zoneRows = normalizedCleaningZones.zones;
+      } catch (error) {
+        void recordAutomaticAppIssue(cleaningZonesAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized cleaning zones API load failed"
+        }));
+	      }
+	    }
 	    if (USER_MANAGEMENT_API_AUTHORITY) {
 	      try {
 	        userRows = await loadUsers();
@@ -1814,7 +1845,7 @@ export default function App() {
     apply("ticket", ticketRows, setTickets, (a, b) => b.createdAt - a.createdAt);
     apply("pm", pmRows, setPm, (a, b) => a.nextDue - b.nextDue);
     apply("fleet", fleetRows, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
-    apply("czone", zn, setZones, zoneSort);
+    apply("czone", zoneRows, setZones, zoneSort);
     apply("cround", rd, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
     apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
@@ -2087,6 +2118,50 @@ export default function App() {
       return false;
     }
   };
+  const shadowWriteNormalizedCleaningZone = async (z) => {
+    if (!NORMALIZED_CLEANING_ZONES_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_CLEANING_ZONES_PROVIDER.upsert(z);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "cleaning_zone_normalized_shadow_write_failed",
+        action: "upsert",
+        key: `czone:${z?.id || "unknown"}`,
+        message: error?.message || "Normalized cleaning zones API write failed"
+      });
+    }
+  };
+  const shadowDeleteNormalizedCleaningZone = async (id) => {
+    if (!NORMALIZED_CLEANING_ZONES_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_CLEANING_ZONES_PROVIDER.delete(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "cleaning_zone_normalized_shadow_delete_failed",
+        action: "delete",
+        key: `czone:${id || "unknown"}`,
+        message: error?.message || "Normalized cleaning zones API delete failed"
+      });
+    }
+  };
+  const mirrorCleaningZoneToKv = async (z) => {
+    const ok = await persistShared(`czone:${z.id}`, JSON.stringify(z), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "cleaning_zone_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `czone:${z?.id || "unknown"}`,
+      message: "Compatibility KV cleaning zone mirror save failed"
+    });
+  };
+  const mirrorDeleteCleaningZoneFromKv = async (id) => {
+    const ok = await deleteShared(`czone:${id}`, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "cleaning_zone_kv_mirror_delete_failed",
+      action: "mirror-delete",
+      key: `czone:${id || "unknown"}`,
+      message: "Compatibility KV cleaning zone mirror delete failed"
+    });
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
@@ -2267,7 +2342,27 @@ export default function App() {
     if (catalogAdditions?.length) setConfig(mergedConfig);
     return true;
   };
-  const saveZone = async (z) => { if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false; setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort)); return true; };
+  const saveZone = async (z) => {
+    if (NORMALIZED_CLEANING_ZONES_AUTHORITY) {
+      try {
+        await NORMALIZED_CLEANING_ZONES_PROVIDER.upsert(z);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(cleaningZonesAuthorityFailureIssue({
+          action: "save",
+          id: z.id,
+          message: error?.message || "Normalized cleaning zones API save failed"
+        }));
+        return false;
+      }
+      void mirrorCleaningZoneToKv(z);
+    } else {
+      if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false;
+      void shadowWriteNormalizedCleaningZone(z);
+    }
+    setZones((s) => [...s.filter((x) => x.id !== z.id), z].sort(zoneSort));
+    return true;
+  };
   const delZone = async (id) => {
     const plan = cleaningZoneDeletePlan(id, { rounds, complaints, users });
     if (!plan.zoneId) return false;
@@ -2275,7 +2370,24 @@ export default function App() {
     for (const manager of plan.updatedManagers) {
       if (!await saveUser(manager)) return false;
     }
+    if (NORMALIZED_CLEANING_ZONES_AUTHORITY) {
+      try {
+        await NORMALIZED_CLEANING_ZONES_PROVIDER.delete(plan.zoneId);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(cleaningZonesAuthorityFailureIssue({
+          action: "delete",
+          id: plan.zoneId,
+          message: error?.message || "Normalized cleaning zones API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeleteCleaningZoneFromKv(plan.zoneId);
+    } else {
+      void shadowDeleteNormalizedCleaningZone(plan.zoneId);
+    }
     for (const key of plan.deleteKeys) {
+      if (NORMALIZED_CLEANING_ZONES_AUTHORITY && key === `czone:${plan.zoneId}`) continue;
       if (!await deleteShared(key)) return false;
     }
     for (const record of [...(linked.rounds || []), ...(linked.complaints || [])]) {
