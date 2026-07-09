@@ -2,10 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-cleaning-rounds-api`
-- Current branch: `codex/r10-cleaning-rounds-api`.
-- Last completed work: R10 cleaning zones authority slice moved cleaning zone reads, saves, and deletes to `/api/cleaning/zones` in production/API mode, with `czone:*` kept as a compatibility KV mirror. Cleaning rounds, complaints, and absences remain on the existing KV bridge until later slices.
-- Current work: Add the first `/api/cleaning/rounds` server-operation seam over `public.cleaning_rounds` while leaving UI/runtime authority and `cround:*` migration for later slices.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 cleaning rounds API slice added the first `/api/cleaning/rounds` server-operation seam over `public.cleaning_rounds` while leaving UI/runtime authority and `cround:*` migration for later slices.
 
 ## Current Product Direction
 
