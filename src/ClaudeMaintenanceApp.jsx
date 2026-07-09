@@ -64,6 +64,7 @@ import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { createApiFleetProvider } from "./apiFleetAdapter.js";
 import { createApiPmProvider } from "./apiPmAdapter.js";
+import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
@@ -134,6 +135,13 @@ const NORMALIZED_PM_SHADOW_WRITE = !NORMALIZED_PM_AUTHORITY
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_PM_PROVIDER;
+const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const USER_MANAGEMENT_API_AUTHORITY = APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!USER_MANAGEMENT_PROVIDER;
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 const PUBLIC_ZONES_URL = publicZonesApiUrlFromEnv(import.meta.env);
 
@@ -1573,11 +1581,11 @@ export default function App() {
         .catch(() => {});
       const restored = await restoreProductionSession({ config: PRODUCTION_LOGIN_CONFIG, authStore: PRODUCTION_AUTH_STORE });
       if (restored?.session) {
-        setSession(restored.session);
-        applySavedConfig(await store.get("config:v1", true));
-        setUsers(await loadColl("user:"));
-        await reloadAll();
-      }
+	        setSession(restored.session);
+	        applySavedConfig(await store.get("config:v1", true));
+	        setUsers(await loadUsers());
+	        await reloadAll();
+	      }
       return;
     }
     applySavedConfig(await store.get("config:v1", true));
@@ -1638,10 +1646,17 @@ export default function App() {
     }));
     return arr.filter(Boolean);
   }
-  const parseCollRecords = (records) => (records || []).map((record) => {
-    try { return JSON.parse(record.value); } catch { return null; }
-  }).filter(Boolean);
-  async function loadCollections(prefixes) {
+	  const parseCollRecords = (records) => (records || []).map((record) => {
+	    try { return JSON.parse(record.value); } catch { return null; }
+	  }).filter(Boolean);
+	  async function loadUsers() {
+	    if (USER_MANAGEMENT_API_AUTHORITY) {
+	      const response = await USER_MANAGEMENT_PROVIDER.list();
+	      return Array.isArray(response?.users) ? response.users : [];
+	    }
+	    return loadColl("user:");
+	  }
+	  async function loadCollections(prefixes) {
     if (typeof store.listManyValues === "function") {
       try {
         const grouped = await store.listManyValues(prefixes, true);
@@ -1735,9 +1750,10 @@ export default function App() {
       "presence:", "user:",
       "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
-    let ticketRows = tk;
-    let pmRows = pmv;
-    let fleetRows = fl;
+	    let ticketRows = tk;
+	    let pmRows = pmv;
+	    let fleetRows = fl;
+	    let userRows = us;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
         const normalized = await ticketsForAuthority({
@@ -1768,9 +1784,9 @@ export default function App() {
         }));
       }
     }
-    if (NORMALIZED_PM_AUTHORITY) {
-      try {
-        const normalizedPm = await pmForAuthority({
+	    if (NORMALIZED_PM_AUTHORITY) {
+	      try {
+	        const normalizedPm = await pmForAuthority({
           kvPm: pmv,
           provider: NORMALIZED_PM_PROVIDER,
           normalizedAuthority: true
@@ -1780,9 +1796,16 @@ export default function App() {
         void recordAutomaticAppIssue(pmAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized PM API load failed"
-        }));
-      }
-    }
+	        }));
+	      }
+	    }
+	    if (USER_MANAGEMENT_API_AUTHORITY) {
+	      try {
+	        userRows = await loadUsers();
+	      } catch (error) {
+	        void recordAutomaticAppIssue({ kind: "users_api_load_failed", action: "load", key: "user:*", message: error?.message || "User-management API load failed" });
+	      }
+	    }
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
@@ -1813,8 +1836,8 @@ export default function App() {
       if (snapRef.current.presence !== sig) { snapRef.current.presence = sig; return merged; }
       return cur;
     });
-    apply("user", us, setUsers, null);
-  }
+	    apply("user", userRows, setUsers, null);
+	  }
   const pushTargetIds = (ids) => {
     const unique = [...new Set((ids || []).filter(Boolean).map(String))];
     const withoutActor = unique.filter((id) => id !== session?.id);
@@ -2357,18 +2380,38 @@ export default function App() {
       throw new Error(data?.error || `admin_profile_sync_${response.status}`);
     }
   };
-  const saveUser = async (u) => {
-    try {
-      await syncAdminProfileUser(u);
-    } catch (error) {
-      console.warn("admin profile sync failed", error);
-      return false;
-    }
-    if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false;
-    setUsers((s) => [...s.filter((x) => x.id !== u.id), u]);
-    return true;
-  };
-  const delUser = async (id) => { if (!await deleteShared(`user:${id}`)) return false; setUsers((s) => s.filter((x) => x.id !== id)); return true; };
+	  const saveUser = async (u) => {
+	    try {
+	      await syncAdminProfileUser(u);
+	    } catch (error) {
+	      console.warn("admin profile sync failed", error);
+	      return false;
+	    }
+	    if (USER_MANAGEMENT_API_AUTHORITY) {
+	      try {
+	        await USER_MANAGEMENT_PROVIDER.upsert(u);
+	      } catch (error) {
+	        setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
+	        void recordAutomaticAppIssue({ kind: "users_api_save_failed", action: "upsert", key: `user:${u.id}`, message: error?.message || "User-management API save failed" });
+	        return false;
+	      }
+	    } else if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false;
+	    setUsers((s) => [...s.filter((x) => x.id !== u.id), u]);
+	    return true;
+	  };
+	  const delUser = async (id) => {
+	    if (USER_MANAGEMENT_API_AUTHORITY) {
+	      try {
+	        await USER_MANAGEMENT_PROVIDER.delete(id);
+	      } catch (error) {
+	        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+	        void recordAutomaticAppIssue({ kind: "users_api_delete_failed", action: "delete", key: `user:${id}`, message: error?.message || "User-management API delete failed" });
+	        return false;
+	      }
+	    } else if (!await deleteShared(`user:${id}`)) return false;
+	    setUsers((s) => s.filter((x) => x.id !== id));
+	    return true;
+	  };
   const saveConfig = async (n, options = {}) => { if (!await persistShared("config:v1", JSON.stringify(n), options)) return false; setConfig(n); return true; };
   const saveTask = async (t) => {
     const task = normalizeTaskActionRecord(t);

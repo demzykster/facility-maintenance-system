@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: R10 safety/user-authority pass moved staging preflight missing/wrong env and bootstrap-safety checks into the tested preflight model, refreshed the bundle-size warning from a fresh build, and preserved the user-management authority gap and safety-slice plan in backlog docs.
+- Active branch: `codex/r10-user-management-authority`.
+- Current branch: `codex/r10-user-management-authority`.
+- Current branch work: R10 user-management authority slice. Add an explicit `/api/users` server operation seam for admin/team user-management and route production/API user save/delete/load paths through it instead of raw `/api/kv user:*` calls.
 
 ## Current Product Direction
 
