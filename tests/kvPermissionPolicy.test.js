@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   kvReadValueForSession,
+  kvReadPermissionError,
   kvWritePermissionError,
   kvWritePermissionForKey,
   redactUserSecrets,
   sensitiveKvWriteAuditEvent,
+  sessionHasKvReadPermission,
   sessionHasKvWritePermission,
   sessionCanReadUserSecrets,
   sessionPermissionLevel
@@ -110,6 +112,19 @@ describe("KV write permission policy", () => {
       value: JSON.stringify(record),
       session: { role: "admin" }
     })).toBe(JSON.stringify(record));
+  });
+
+  it("limits sensitive KV reads to the owning user or matching module permission", () => {
+    expect(sessionHasKvReadPermission({ role: "admin" }, "user:worker-1")).toBe(true);
+    expect(sessionHasKvReadPermission({ id: "worker-1", role: "worker" }, "user:worker-1")).toBe(true);
+    expect(sessionHasKvReadPermission({ id: "worker-2", role: "worker" }, "user:worker-1")).toBe(false);
+    expect(sessionHasKvReadPermission({ role: "user", permissions: { users: "view" } }, "user:worker-1")).toBe(true);
+    expect(kvReadPermissionError({ id: "worker-2", role: "worker" }, "user:worker-1")).toBe("permission_required:users:view");
+
+    expect(sessionHasKvReadPermission({ role: "admin" }, "appIssue:issue-1")).toBe(true);
+    expect(sessionHasKvReadPermission({ role: "user", permissions: { settings: "manage" } }, "appIssue:issue-1")).toBe(true);
+    expect(sessionHasKvReadPermission({ role: "worker" }, "appIssue:issue-1")).toBe(false);
+    expect(kvReadPermissionError({ role: "worker" }, "appIssue:issue-1")).toBe("permission_required:settings:manage");
   });
 
   it("builds audit events for sensitive writes without auditing ordinary workflow writes", () => {

@@ -134,6 +134,7 @@ Production requirement:
 - Production audit event contract is documented in `docs/production-audit-events.md`.
 - Supabase `public.audit_events` sink is the first durable audit destination for sensitive server-side writes.
 - `src/productionReadinessModel.js` separates `staging_pilot` readiness from `final_production` readiness so the project does not treat the KV bridge as the final production data core.
+- The KV bridge now enforces server-side read permissions for sensitive `user:` and `appIssue:` records as the first R10 server-authority slice.
 
 ## Monolith Extraction Policy
 

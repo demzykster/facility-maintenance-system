@@ -72,6 +72,29 @@ export function sessionCanReadUserSecrets(session = {}) {
     || permissionLevelRank(sessionPermissionLevel(session, "workerAccess")) >= permissionLevelRank("manage");
 }
 
+export function sessionCanReadUserDirectory(session = {}) {
+  if (session.role === "admin") return true;
+  return permissionLevelRank(sessionPermissionLevel(session, "users")) >= permissionLevelRank("view")
+    || permissionLevelRank(sessionPermissionLevel(session, "workerAccess")) >= permissionLevelRank("view");
+}
+
+export function sessionHasKvReadPermission(session = {}, key = "") {
+  const recordKey = String(key || "");
+  if (!recordKey) return false;
+  if (session.role === "admin") return true;
+
+  if (recordKey.startsWith("user:")) {
+    const userId = recordKey.slice("user:".length);
+    return Boolean(session.id && String(session.id) === userId) || sessionCanReadUserDirectory(session);
+  }
+
+  if (recordKey.startsWith("appIssue:")) {
+    return permissionLevelRank(sessionPermissionLevel(session, "settings")) >= permissionLevelRank("manage");
+  }
+
+  return true;
+}
+
 const USER_SECRET_FIELDS = Object.freeze([
   "password",
   "pin",
@@ -101,6 +124,14 @@ export function kvReadValueForSession({ key = "", value = null, session = {} } =
   } catch {
     return value;
   }
+}
+
+export function kvReadPermissionError(session = {}, key = "") {
+  if (sessionHasKvReadPermission(session, key)) return null;
+  const recordKey = String(key || "");
+  if (recordKey.startsWith("user:")) return "permission_required:users:view";
+  if (recordKey.startsWith("appIssue:")) return "permission_required:settings:manage";
+  return "permission_required:read";
 }
 
 export function kvWritePermissionError(session = {}, key = "") {

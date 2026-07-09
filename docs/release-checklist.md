@@ -50,7 +50,7 @@ Closed notes:
 
 ### R10 — Final Production Data Core
 
-Status: not started.
+Status: started.
 
 Why it matters:
 - The current staging/pilot foundation is usable, but the accepted Supabase KV bridge is still a launch compromise.
@@ -63,6 +63,12 @@ Done means:
 - File ownership metadata links to normalized business records where those records exist.
 - The production readiness model can report `final_production` without `normalized_business_tables_not_complete` or `server_side_business_permissions_not_complete`.
 - The old KV bridge remains only for explicitly unmoved legacy data or is retired.
+
+Current notes:
+- First server-authority slice: the KV bridge now applies server-side read permissions for sensitive `user:` and `appIssue:` records, including direct reads, value-list reads, and key-only lists.
+- Ordinary workers can read their own `user:` record but not the full user directory; managers/admins with user permissions can still read the directory with login secrets redacted where appropriate.
+- `appIssue:` reports remain writable by working roles but readable only by admin/settings-management sessions.
+- This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End
 
