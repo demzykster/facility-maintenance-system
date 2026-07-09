@@ -46,7 +46,7 @@ Closed notes:
 - Supabase KV compatibility is the accepted staging/pilot bridge, not the final CMMS source of truth.
 - Production file metadata, audit events, first-admin bootstrap, backup/restore drill, and staging gates are documented in the production docs.
 - `src/productionReadinessModel.js` names the current state as `staging_pilot` when production config, Supabase schema, staging gate, and backup/restore drill are verified.
-- Live staging/pilot gate passed on 2026-07-09 against the Vercel production alias and linked Supabase staging project: env shape, schema/bucket, live commit, bootstrap-closed state, admin session, KV bridge, settings persistence, fleet UI/API/Supabase parity, AI intake smoke, and desktop/mobile UI smoke.
+- Live staging/pilot gate passed on 2026-07-10 against the Vercel production alias and linked Supabase staging project at commit `cb1f9b4`: env shape, schema/bucket, live commit, bootstrap-closed state, admin session, KV bridge, settings persistence, normalized tickets/fleet/PM API smokes, fleet UI/API/Supabase parity, AI intake smoke, system-error smoke, and desktop/mobile UI smoke.
 - Final production still requires moving beyond the accepted KV bridge into normalized business tables and broader server-side business permissions. That is tracked as R10, not as an unclosed R9 tail.
 
 ### R10 — Final Production Data Core
@@ -80,6 +80,8 @@ Current notes:
 - Ticket cleanup slice: normalized ticket deletion also cleans ticket-owned Supabase Storage objects and marks active `file_metadata` rows deleted by owner, so deleting a ticket does not leave active file attachments behind.
 - Fleet authority slice: `public.fleet_units` and `/api/fleet` are live. In production/API mode, fleet reads, saves, imports, batch saves, and deletes use the normalized API first, while `fleet:*` KV is only a compatibility mirror. The staging gate reconciles `fleet:*` to `public.fleet_units` and runs a controlled `/api/fleet` smoke.
 - Periodic-maintenance authority slice: `public.periodic_maintenance` and `/api/pm` are live. In production/API mode, PM reads, saves, batch saves, and deletes use the normalized API first, while `pm:*` KV is only a compatibility mirror. The staging gate reconciles `pm:*` to `public.periodic_maintenance` and runs a controlled `/api/pm` smoke.
+- User-management server-operation slice: production/API mode routes user list/save/delete through `/api/users` instead of raw `/api/kv user:*` calls.
+- User-management `app_users` authority slices: `/api/users` reads login-capable users from `public.app_users`, syncs profile writes there before writing the temporary `user:` KV mirror, and deactivates matching `app_users` rows before deleting the mirror.
 - This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End
