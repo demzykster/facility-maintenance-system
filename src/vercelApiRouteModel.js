@@ -4,6 +4,7 @@ export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/ai/intake.js",
   "api/bootstrap/admin.js",
   "api/client-errors.js",
+  "api/cleaning/records.js",
   "api/cleaning/rounds.js",
   "api/cleaning/zones.js",
   "api/files/index.js",

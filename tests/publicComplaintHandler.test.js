@@ -135,6 +135,38 @@ describe("public complaint handler", () => {
     expect(complaint.photo).toBe(photo);
   });
 
+  it("also writes public complaints to the normalized complaints driver when configured", async () => {
+    const driver = {
+      get: vi.fn(async (key) => {
+        if (key.startsWith("publicComplaintRate:")) return null;
+        if (key === "czone:zone-1") return JSON.stringify({ id: "zone-1", name: "Lobby" });
+        return null;
+      }),
+      set: vi.fn()
+    };
+    const complaintsDriver = { upsert: vi.fn().mockResolvedValue({ id: "complaint-1" }) };
+    const handler = createPublicComplaintHandler({
+      driver,
+      complaintsDriver,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true" },
+      now: () => 123456,
+      createId: () => "complaint-1"
+    });
+
+    const res = await call(handler, {
+      body: { zoneId: "zone-1", kind: "dirty", text: "Spill", photo }
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(complaintsDriver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "complaint-1",
+      zoneId: "zone-1",
+      status: "pending",
+      source: "public_endpoint"
+    }));
+    expect(driver.set).toHaveBeenCalledWith("ccomplaint:complaint-1", expect.any(String), true);
+  });
+
   it("stores public complaint photos in file storage without embedding base64 when configured", async () => {
     const driver = {
       get: vi.fn(async (key) => {
