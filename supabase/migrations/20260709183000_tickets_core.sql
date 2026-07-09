@@ -30,6 +30,8 @@ create index if not exists tickets_created_at_idx on public.tickets(created_at d
 create index if not exists tickets_updated_at_idx on public.tickets(updated_at desc);
 create index if not exists tickets_legacy_payload_gin_idx on public.tickets using gin (legacy_payload);
 
+grant select, insert, update, delete on public.tickets to service_role;
+
 drop trigger if exists tickets_touch_updated_at on public.tickets;
 create trigger tickets_touch_updated_at
 before update on public.tickets

@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
 import { applyEnvValues, parseEnvFile } from "../src/envFileModel.js";
+import { isExpectedBrowserSmokeResponse, isRelevantBrowserSmokeConsoleMessage } from "../src/stagingBrowserSignalModel.js";
 import { normalizeSupabaseUrl } from "../src/supabaseStagingSchemaCheckModel.js";
 
 const ENV_FILE = ".env.staging.local";
@@ -88,10 +89,10 @@ async function fleetUiCount({ publicUrl, email, password, expectedCount }) {
   const failedResponses = [];
   const consoleErrors = [];
   page.on("response", (response) => {
-    if (response.status() >= 400 && /\/api\/kv/.test(response.url())) failedResponses.push(`${response.status()} ${response.url()}`);
+    if (!isExpectedBrowserSmokeResponse({ url: response.url(), status: response.status() })) failedResponses.push(`${response.status()} ${response.url()}`);
   });
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
+    if (isRelevantBrowserSmokeConsoleMessage({ type: message.type(), text: message.text() })) consoleErrors.push(message.text());
   });
 
   try {

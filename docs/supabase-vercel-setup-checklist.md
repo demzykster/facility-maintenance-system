@@ -54,6 +54,7 @@ Expected objects:
 - private Supabase Storage bucket `cmms-files`
 - explicit `service_role` REST privileges for the server API routes
 - authenticated `SELECT` privilege on `public.app_users`, still constrained by RLS
+- service-role REST privileges for `public.tickets` so `/api/tickets` can shadow-write and shadow-delete normalized pilot rows
 
 ## 3. Fill Local Staging Env
 

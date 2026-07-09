@@ -1,11 +1,9 @@
 import { chromium } from "playwright";
+import { isExpectedBrowserSmokeResponse, isRelevantBrowserSmokeConsoleMessage } from "../src/stagingBrowserSignalModel.js";
 
 const appUrl = process.env.CMMS_BROWSER_SMOKE_URL || process.env.CMMS_PUBLIC_APP_URL || "https://facility-maintenance-system.vercel.app/";
 
-const relevantConsoleMessage = (message) => {
-  const text = String(message.text || "");
-  return message.type === "error" || /init error|supabase_access_token_required|storage_api_/i.test(text);
-};
+const relevantConsoleMessage = (message) => isRelevantBrowserSmokeConsoleMessage(message);
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -29,7 +27,7 @@ async function main() {
 
     const emailVisible = await page.locator('input[placeholder="owner@example.com"]').isVisible().catch(() => false);
     const relevantConsole = consoleMessages.filter(relevantConsoleMessage);
-    const relevantFailures = failed.filter((item) => !/favicon\\.ico$/.test(item.url));
+    const relevantFailures = failed.filter((item) => !isExpectedBrowserSmokeResponse(item));
     const ok = emailVisible && unauthKv.length === 0 && relevantConsole.length === 0 && relevantFailures.length === 0;
 
     const report = {

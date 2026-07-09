@@ -46,6 +46,7 @@ Closed notes:
 - Supabase KV compatibility is the accepted staging/pilot bridge, not the final CMMS source of truth.
 - Production file metadata, audit events, first-admin bootstrap, backup/restore drill, and staging gates are documented in the production docs.
 - `src/productionReadinessModel.js` names the current state as `staging_pilot` when production config, Supabase schema, staging gate, and backup/restore drill are verified.
+- Live staging/pilot gate passed on 2026-07-09 against the Vercel production alias and linked Supabase staging project: env shape, schema/bucket, live commit, bootstrap-closed state, admin session, KV bridge, settings persistence, fleet UI/API/Supabase parity, AI intake smoke, and desktop/mobile UI smoke.
 - Final production still requires moving beyond the accepted KV bridge into normalized business tables and broader server-side business permissions. That is tracked as R10, not as an unclosed R9 tail.
 
 ### R10 — Final Production Data Core
