@@ -4,6 +4,7 @@ dist/
 vite-cache/
 .vite-cache/
 *.tsbuildinfo
+.DS_Store
 .npm-cache/
 .tools/
 .claude/
