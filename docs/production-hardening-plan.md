@@ -136,6 +136,7 @@ Production requirement:
 - `src/productionReadinessModel.js` separates `staging_pilot` readiness from `final_production` readiness so the project does not treat the KV bridge as the final production data core.
 - The KV bridge now enforces server-side read permissions for sensitive `user:` and `appIssue:` records as the first R10 server-authority slice.
 - `public.tickets` is the first normalized business table for moving ticket records out of the KV bridge in a later server-operation slice.
+- `POST /api/tickets` is the first normalized ticket server operation; it validates Supabase/CMMS sessions, reuses ticket write permissions, writes to `public.tickets`, and records an audit event when configured.
 
 ## Monolith Extraction Policy
 

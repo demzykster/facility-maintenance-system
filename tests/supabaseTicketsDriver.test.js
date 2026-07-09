@@ -1,0 +1,42 @@
+import { describe, expect, it, vi } from "vitest";
+import { createSupabaseTicketsDriver, createSupabaseTicketsDriverFromEnv } from "../server/tickets/supabaseTicketsDriver.js";
+
+describe("Supabase tickets driver", () => {
+  it("requires Supabase url and service role key", () => {
+    expect(createSupabaseTicketsDriver()).toBeNull();
+    expect(createSupabaseTicketsDriverFromEnv({})).toBeNull();
+  });
+
+  it("upserts normalized ticket rows through Supabase REST", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([{ id: "T-1", status: "open" }]);
+      }
+    });
+    const driver = createSupabaseTicketsDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service",
+      fetchImpl
+    });
+
+    await expect(driver.upsert({ id: "T-1", num: 7, status: "open", subject: "Broken" })).resolves.toEqual({ id: "T-1", status: "open" });
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/tickets?on_conflict=id", {
+      method: "POST",
+      headers: expect.objectContaining({
+        apikey: "service",
+        authorization: "Bearer service",
+        prefer: "resolution=merge-duplicates,return=representation"
+      }),
+      body: expect.any(String)
+    });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
+      id: "T-1",
+      num: 7,
+      status: "open",
+      subject: "Broken",
+      source_kv_key: "ticket:T-1"
+    });
+  });
+});

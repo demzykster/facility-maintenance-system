@@ -17,7 +17,8 @@ export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/session/logout.js",
   "api/session/profile.js",
   "api/session/me.js",
-  "api/system-errors.js"
+  "api/system-errors.js",
+  "api/tickets/index.js"
 ]);
 
 export function vercelApiRoutePolicy(files = [], { functionLimit = VERCEL_API_ROUTE_FUNCTION_BUDGET } = {}) {
