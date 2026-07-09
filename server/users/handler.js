@@ -151,6 +151,18 @@ const writeAuditEvent = async (auditDriver, event) => {
   if (typeof auditDriver.write === "function") return auditDriver.write(event);
 };
 
+const writeKvMirror = async (driver, key, value) => {
+  if (typeof driver?.set !== "function") return false;
+  await driver.set(key, value, true);
+  return true;
+};
+
+const deleteKvMirror = async (driver, key) => {
+  if (typeof driver?.delete !== "function") return false;
+  await driver.delete(key, true);
+  return true;
+};
+
 const userDeleteAuditEvent = (userId, actor) => normalizeAuditEvent({
   at: Date.now(),
   actorId: actor.id,
@@ -190,7 +202,6 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
   return async function usersApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
-    if (!backendDriver) return json(res, 503, { error: "users_backend_not_configured" });
 
     try {
       const method = String(req.method || "GET").toUpperCase();
@@ -200,7 +211,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       }
 
       if (method === "GET") {
-        if (typeof backendDriver.get !== "function" || typeof backendDriver.listValues !== "function") return json(res, 503, { error: "users_read_not_configured" });
+        if (!backendDriver && !backendProfileClient) return json(res, 503, { error: "users_backend_not_configured" });
         const id = String(req.query?.id || "").trim();
         const canReadProfiles = typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.listAppUserProfiles === "function";
         if (id) {
@@ -215,6 +226,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
               return json(res, 200, { ok: true, user: publicUserForSession(appUserRecordKey(user), user, auth.user), source: "app_users" });
             }
           }
+          if (typeof backendDriver?.get !== "function") return json(res, 404, { error: "user_not_found" });
           const value = await backendDriver.get(key, true);
           if (!value) return json(res, 404, { error: "user_not_found" });
           return json(res, 200, { ok: true, user: publicUserForSession(key, JSON.parse(value), auth.user), source: "kv" });
@@ -227,10 +239,10 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
             const user = userRecordFromAppUserProfile(profile, legacy);
             usersById.set(user.id, publicUserForSession(appUserRecordKey(user), user, auth.user));
           }
-          const legacyRecords = (await backendDriver.listValues("user:", true))
+          const legacyRecords = typeof backendDriver?.listValues === "function" ? (await backendDriver.listValues("user:", true))
             .map(parseStoredUser)
             .filter(Boolean)
-            .filter((record) => !kvReadPermissionError(auth.user, record.key));
+            .filter((record) => !kvReadPermissionError(auth.user, record.key)) : [];
           for (const record of legacyRecords) {
             const user = record.user || {};
             if (user.authUserId || usersById.has(user.id)) continue;
@@ -253,13 +265,17 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
         const key = `user:${id}`;
         const permissionError = kvWritePermissionError(auth.user, key);
         if (permissionError) return json(res, 403, { error: permissionError });
-        if (typeof backendDriver.delete !== "function") return json(res, 503, { error: "users_delete_not_configured" });
+        let deactivatedProfile = false;
         if (typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfile === "function") {
           const profile = await backendProfileClient.getAppUserProfileById(id);
           const appUser = profile ? normalizeSupabaseAppUserProfile(profile) : null;
-          if (appUser?.authUserId) await backendProfileClient.updateAppUserProfile(appUser.authUserId, { active: false });
+          if (appUser?.authUserId) {
+            await backendProfileClient.updateAppUserProfile(appUser.authUserId, { active: false });
+            deactivatedProfile = true;
+          }
         }
-        await backendDriver.delete(key, true);
+        if (!deactivatedProfile && typeof backendDriver?.delete !== "function") return json(res, 503, { error: "users_delete_not_configured" });
+        await deleteKvMirror(backendDriver, key);
         await writeAuditEvent(backendAuditDriver, userDeleteAuditEvent(id, auth.user));
         return json(res, 200, { ok: true, user: { id } });
       }
@@ -270,14 +286,15 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       const key = `user:${id}`;
       const permissionError = kvWritePermissionError(auth.user, key);
       if (permissionError) return json(res, 403, { error: permissionError });
-      if (typeof backendDriver.set !== "function") return json(res, 503, { error: "users_write_not_configured" });
       if (user.authUserId) {
         if (!backendProfileClient) return json(res, 503, { error: "users_profile_backend_not_configured" });
         const patch = appUserPatchFromUserRecord(user);
         if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
         await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
+      } else if (typeof backendDriver?.set !== "function") {
+        return json(res, 503, { error: "users_legacy_backend_not_configured" });
       }
-      await backendDriver.set(key, JSON.stringify(user), true);
+      await writeKvMirror(backendDriver, key, JSON.stringify(user));
       await writeAuditEvent(backendAuditDriver, userUpsertAuditEvent(user, auth.user));
       return json(res, 200, { ok: true, user: redactUserSecrets(user) });
     } catch (error) {

@@ -181,6 +181,34 @@ describe("users API handler", () => {
     expect(profileClient.listAppUserProfiles).toHaveBeenCalled();
   });
 
+  it("lists app_users without requiring the temporary KV mirror", async () => {
+    const profileClient = {
+      listAppUserProfiles: vi.fn().mockResolvedValue([
+        { id: "app-user-1", auth_user_id: "auth-1", role: "tech", name: "Tech One", active: true, email: "tech@example.com" }
+      ]),
+      getAppUserProfileById: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "view" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer manager-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      source: "app_users",
+      users: [
+        expect.objectContaining({ id: "app-user-1", authUserId: "auth-1", name: "Tech One" })
+      ]
+    });
+    expect(profileClient.listAppUserProfiles).toHaveBeenCalled();
+  });
+
   it("reads a single app_users profile before falling back to KV", async () => {
     const driver = {
       get: vi.fn(async (key) => key === "user:app-user-1" ? JSON.stringify({ id: "app-user-1", authUserId: "auth-1", techCats: ["electric"] }) : null),
@@ -318,6 +346,60 @@ describe("users API handler", () => {
     expect(order).toEqual(["auth-email", "app-users", "kv"]);
   });
 
+  it("syncs login-capable users to app_users even when the temporary KV mirror is unavailable", async () => {
+    const profileClient = {
+      updateAuthEmail: vi.fn().mockResolvedValue({ id: "auth-2" }),
+      updateAppUserProfile: vi.fn().mockResolvedValue({ id: "manager-2" })
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      auditDriver,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const user = { id: "manager-2", authUserId: "auth-2", name: "Manager Two", role: "user", email: "MANAGER2@EXAMPLE.COM", perms: { users: "view" } };
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAuthEmail).toHaveBeenCalledWith("auth-2", "manager2@example.com");
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-2", expect.objectContaining({
+      name: "Manager Two",
+      permissions: { users: "view" }
+    }));
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "user",
+      entityId: "manager-2",
+      action: "update"
+    }));
+  });
+
+  it("fails legacy-only user saves when no KV mirror exists to preserve first-login discovery", async () => {
+    const profileClient = {
+      updateAppUserProfile: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user: { id: "worker-1", name: "Worker", role: "worker" } }
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "users_legacy_backend_not_configured" });
+    expect(profileClient.updateAppUserProfile).not.toHaveBeenCalled();
+  });
+
   it("does not write the KV mirror when app_users sync is required but unavailable", async () => {
     const driver = { set: vi.fn() };
     const handler = createUsersApiHandler({
@@ -395,5 +477,34 @@ describe("users API handler", () => {
     expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-1", { active: false });
     expect(driver.delete).toHaveBeenCalledWith("user:app-user-1", true);
     expect(order).toEqual(["app-users", "kv"]);
+  });
+
+  it("deactivates login-capable app_users even when the temporary KV mirror is unavailable", async () => {
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({ id: "app-user-1", auth_user_id: "auth-1", active: true }),
+      updateAppUserProfile: vi.fn().mockResolvedValue({ id: "app-user-1", active: false })
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      auditDriver,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer manager-token" },
+      query: { id: "app-user-1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.getAppUserProfileById).toHaveBeenCalledWith("app-user-1");
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-1", { active: false });
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "user",
+      entityId: "app-user-1",
+      action: "delete"
+    }));
   });
 });
