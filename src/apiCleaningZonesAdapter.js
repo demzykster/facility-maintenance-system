@@ -13,6 +13,7 @@ export function createApiCleaningZonesProvider({ baseUrl, fetchImpl = globalThis
   if (!baseUrl) return null;
   const root = String(baseUrl).replace(/\/+$/, "");
   if (typeof fetchImpl !== "function") throw new Error("cleaning_zones_api_fetch_missing");
+  const resourceQuery = "resource=zones";
 
   const request = async (path, options = {}) => {
     const accessToken = typeof getAccessToken === "function" ? await getAccessToken() : "";
@@ -30,22 +31,22 @@ export function createApiCleaningZonesProvider({ baseUrl, fetchImpl = globalThis
 
   return {
     async list() {
-      const response = await request("/cleaning/zones", { method: "GET" });
+      const response = await request(`/cleaning/records?${resourceQuery}`, { method: "GET" });
       return parseJson(response);
     },
     async get(id) {
-      const response = await request(`/cleaning/zones?id=${encodeURIComponent(id)}`, { method: "GET" });
+      const response = await request(`/cleaning/records?${resourceQuery}&id=${encodeURIComponent(id)}`, { method: "GET" });
       return parseJson(response);
     },
     async upsert(zone) {
-      const response = await request("/cleaning/zones", {
+      const response = await request("/cleaning/records", {
         method: "POST",
-        body: JSON.stringify({ zone })
+        body: JSON.stringify({ resource: "zones", zone })
       });
       return parseJson(response);
     },
     async delete(id) {
-      await request(`/cleaning/zones?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      await request(`/cleaning/records?${resourceQuery}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
       return true;
     }
   };

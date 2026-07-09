@@ -27,8 +27,8 @@ describe("api cleaning rounds adapter", () => {
     await expect(provider.get("round-1")).resolves.toEqual({ ok: true, round: { id: "round-1" } });
 
     expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
-      "https://cmms.example/api/cleaning/rounds",
-      "https://cmms.example/api/cleaning/rounds?id=round-1"
+      "https://cmms.example/api/cleaning/records?resource=rounds",
+      "https://cmms.example/api/cleaning/records?resource=rounds&id=round-1"
     ]);
   });
 
@@ -42,14 +42,14 @@ describe("api cleaning rounds adapter", () => {
 
     await expect(provider.upsert({ id: "round-1", zoneId: "zone-1" })).resolves.toEqual({ ok: true, round: { id: "round-1" } });
 
-    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/rounds", {
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/records", {
       method: "POST",
       credentials: "include",
       headers: {
         "content-type": "application/json",
         authorization: "Bearer access-1"
       },
-      body: JSON.stringify({ round: { id: "round-1", zoneId: "zone-1" } })
+      body: JSON.stringify({ resource: "rounds", round: { id: "round-1", zoneId: "zone-1" } })
     });
   });
 
@@ -72,7 +72,7 @@ describe("api cleaning rounds adapter", () => {
 
     await expect(provider.delete("round-1")).resolves.toBe(true);
 
-    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/rounds?id=round-1", {
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/records?resource=rounds&id=round-1", {
       method: "DELETE",
       credentials: "include",
       headers: {

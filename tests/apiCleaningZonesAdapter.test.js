@@ -27,8 +27,8 @@ describe("api cleaning zones adapter", () => {
     await expect(provider.get("zone-1")).resolves.toEqual({ ok: true, zone: { id: "zone-1" } });
 
     expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
-      "https://cmms.example/api/cleaning/zones",
-      "https://cmms.example/api/cleaning/zones?id=zone-1"
+      "https://cmms.example/api/cleaning/records?resource=zones",
+      "https://cmms.example/api/cleaning/records?resource=zones&id=zone-1"
     ]);
   });
 
@@ -42,14 +42,14 @@ describe("api cleaning zones adapter", () => {
 
     await expect(provider.upsert({ id: "zone-1", name: "Lobby" })).resolves.toEqual({ ok: true, zone: { id: "zone-1" } });
 
-    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/zones", {
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/records", {
       method: "POST",
       credentials: "include",
       headers: {
         "content-type": "application/json",
         authorization: "Bearer access-1"
       },
-      body: JSON.stringify({ zone: { id: "zone-1", name: "Lobby" } })
+      body: JSON.stringify({ resource: "zones", zone: { id: "zone-1", name: "Lobby" } })
     });
   });
 
@@ -72,7 +72,7 @@ describe("api cleaning zones adapter", () => {
 
     await expect(provider.delete("zone-1")).resolves.toBe(true);
 
-    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/zones?id=zone-1", {
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/cleaning/records?resource=zones&id=zone-1", {
       method: "DELETE",
       credentials: "include",
       headers: {

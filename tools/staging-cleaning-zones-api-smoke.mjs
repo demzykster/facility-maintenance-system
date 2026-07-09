@@ -91,13 +91,13 @@ const zone = {
 };
 
 try {
-  const upsertResponse = await fetch(`${publicUrl}/api/cleaning/zones`, {
+  const upsertResponse = await fetch(`${publicUrl}/api/cleaning/records`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${accessToken}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify({ zone })
+    body: JSON.stringify({ resource: "zones", zone })
   });
   const upsertData = await readJson(upsertResponse);
   if (!upsertResponse.ok || !upsertData?.ok) throw new Error(upsertData?.error || `cleaning_zone_upsert_${upsertResponse.status}`);
@@ -106,14 +106,14 @@ try {
   if (afterUpsert.length !== 1) throw new Error(`cleaning_zone_upsert_row_count:${afterUpsert.length}`);
   if (afterUpsert[0].name !== name) throw new Error("cleaning_zone_upsert_name_mismatch");
 
-  const listResponse = await fetch(`${publicUrl}/api/cleaning/zones`, {
+  const listResponse = await fetch(`${publicUrl}/api/cleaning/records?resource=zones`, {
     headers: { authorization: `Bearer ${accessToken}` }
   });
   const listData = await readJson(listResponse);
   if (!listResponse.ok || !listData?.ok) throw new Error(listData?.error || `cleaning_zone_list_${listResponse.status}`);
   if (!listData?.zones?.some((item) => item.id === id && item.name === name)) throw new Error("cleaning_zone_list_missing_smoke_zone");
 
-  const deleteResponse = await fetch(`${publicUrl}/api/cleaning/zones?id=${encodeURIComponent(id)}`, {
+  const deleteResponse = await fetch(`${publicUrl}/api/cleaning/records?resource=zones&id=${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: { authorization: `Bearer ${accessToken}` }
   });
@@ -135,7 +135,7 @@ try {
   }, null, 2));
 } catch (error) {
   try {
-    await fetch(`${publicUrl}/api/cleaning/zones?id=${encodeURIComponent(id)}`, {
+    await fetch(`${publicUrl}/api/cleaning/records?resource=zones&id=${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${accessToken}` }
     });

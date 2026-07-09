@@ -15,8 +15,8 @@ describe("staging cleaning rounds API smoke wiring", () => {
     expect(gate).toContain('["staging:smoke:cleaning-rounds-api", ["npm", ["run", "staging:smoke:cleaning-rounds-api"]]]');
     expect(reconcileScript).toContain("prefix=cround%3A");
     expect(reconcileScript).toContain("rest/v1/cleaning_rounds");
-    expect(reconcileScript).toContain('fetch(`${publicUrl}/api/cleaning/rounds`');
+    expect(reconcileScript).toContain('fetch(`${publicUrl}/api/cleaning/records`');
     expect(smokeScript).toContain('table: "cleaning_rounds"');
-    expect(smokeScript).toContain("/api/cleaning/rounds");
+    expect(smokeScript).toContain("/api/cleaning/records");
   });
 });

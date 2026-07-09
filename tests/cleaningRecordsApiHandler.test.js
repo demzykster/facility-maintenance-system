@@ -53,6 +53,49 @@ describe("cleaning records API handler", () => {
     expect(res.json()).toEqual({ error: "cleaning_records_resource_required" });
   });
 
+  it("lists cleaning zones through the shared records route", async () => {
+    const zones = { list: vi.fn().mockResolvedValue([{ id: "zone-1", name: "Lobby" }]), get: vi.fn() };
+    const handler = createCleaningRecordsApiHandler({
+      drivers: { zones },
+      sessionClient: sessionClientFor({ role: "cleaner" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer cleaner-token" },
+      query: { resource: "zones", limit: "25" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, zones: [{ id: "zone-1", name: "Lobby" }] });
+    expect(zones.list).toHaveBeenCalledWith({ limit: "25" });
+  });
+
+  it("upserts cleaning rounds through the shared records route", async () => {
+    const rounds = { upsert: vi.fn().mockResolvedValue({ id: "round-1" }) };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createCleaningRecordsApiHandler({
+      drivers: { rounds },
+      auditDriver,
+      sessionClient: sessionClientFor({ role: "cleaner" })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer cleaner-token" },
+      body: { resource: "rounds", round: { id: "round-1", zoneId: "zone-1", byName: "Cleaner" } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, round: { id: "round-1", sourceKvKey: "cround:round-1" } });
+    expect(rounds.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "round-1", zoneId: "zone-1" }));
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "app-user-1",
+      entityType: "cleaning",
+      entityId: "round-1",
+      action: "update"
+    }));
+  });
+
   it("lists cleaning complaints for cleaning managers", async () => {
     const complaints = { list: vi.fn().mockResolvedValue([{ id: "complaint-1" }]), get: vi.fn() };
     const handler = createCleaningRecordsApiHandler({
