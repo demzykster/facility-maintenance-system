@@ -1,6 +1,7 @@
 export const STAGING_SUPABASE_TABLES = [
   "app_users",
   "cmms_kv_records",
+  "fleet_units",
   "tickets",
   "file_metadata",
   "audit_events"
