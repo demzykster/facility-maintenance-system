@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createUsersApiHandler } from "../server/users/handler.js";
+import { appUserPatchFromUserRecord, createUsersApiHandler } from "../server/users/handler.js";
 
 function createRes() {
   return {
@@ -41,6 +41,36 @@ function sessionClientFor(profile = {}) {
 }
 
 describe("users API handler", () => {
+  it("maps user records to app_users profile patches without KV-only fields", () => {
+    expect(appUserPatchFromUserRecord({
+      name: " Manager ",
+      role: "user",
+      active: true,
+      email: "MANAGER@EXAMPLE.COM ",
+      phone: " 050-111 ",
+      dept: "Ops",
+      depts: ["Ops", " Logistics "],
+      perms: { users: "manage" },
+      mgrZones: ["North", " South "],
+      techScope: "facility",
+      supplier: "Vendor",
+      techCats: ["kv-only"],
+      pin: "1234"
+    })).toEqual({
+      name: "Manager",
+      role: "user",
+      active: true,
+      email: "manager@example.com",
+      phone: "050-111",
+      department: "Ops",
+      departments: ["Ops", "Logistics"],
+      permissions: { users: "manage" },
+      manager_zones: ["North", "South"],
+      tech_scope: "facility",
+      supplier: "Vendor"
+    });
+  });
+
   it("requires a Supabase or CMMS bearer token", async () => {
     const handler = createUsersApiHandler({ driver: { listValues: vi.fn(), get: vi.fn() } });
 
@@ -137,6 +167,68 @@ describe("users API handler", () => {
       entityId: "worker-1",
       action: "update"
     }));
+  });
+
+  it("syncs login-capable users to app_users before writing the KV mirror", async () => {
+    const order = [];
+    const driver = {
+      set: vi.fn().mockImplementation(() => {
+        order.push("kv");
+        return Promise.resolve();
+      })
+    };
+    const profileClient = {
+      updateAuthEmail: vi.fn().mockImplementation(() => {
+        order.push("auth-email");
+        return Promise.resolve();
+      }),
+      updateAppUserProfile: vi.fn().mockImplementation(() => {
+        order.push("app-users");
+        return Promise.resolve({ id: "app-1" });
+      })
+    };
+    const handler = createUsersApiHandler({
+      driver,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const user = { id: "manager-2", authUserId: "auth-2", name: "Manager Two", role: "user", email: "MANAGER2@EXAMPLE.COM", perms: { users: "view" } };
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAuthEmail).toHaveBeenCalledWith("auth-2", "manager2@example.com");
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-2", expect.objectContaining({
+      name: "Manager Two",
+      role: "user",
+      email: "manager2@example.com",
+      permissions: { users: "view" }
+    }));
+    expect(driver.set).toHaveBeenCalledWith("user:manager-2", JSON.stringify(user), true);
+    expect(order).toEqual(["auth-email", "app-users", "kv"]);
+  });
+
+  it("does not write the KV mirror when app_users sync is required but unavailable", async () => {
+    const driver = { set: vi.fn() };
+    const handler = createUsersApiHandler({
+      driver,
+      env: {},
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user: { id: "manager-2", authUserId: "auth-2", name: "Manager Two", role: "user" } }
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "users_profile_backend_not_configured" });
+    expect(driver.set).not.toHaveBeenCalled();
   });
 
   it("deletes users for sessions with users manage permission", async () => {

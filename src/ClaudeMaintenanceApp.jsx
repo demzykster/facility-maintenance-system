@@ -2375,17 +2375,19 @@ export default function App() {
       },
       body: JSON.stringify({ authUserId: u.authUserId, patch })
     });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data?.error || `admin_profile_sync_${response.status}`);
-    }
-  };
+	    if (!response.ok) {
+	      const data = await response.json().catch(() => ({}));
+	      throw new Error(data?.error || `admin_profile_sync_${response.status}`);
+	    }
+	  };
 	  const saveUser = async (u) => {
-	    try {
-	      await syncAdminProfileUser(u);
-	    } catch (error) {
-	      console.warn("admin profile sync failed", error);
-	      return false;
+	    if (!USER_MANAGEMENT_API_AUTHORITY) {
+	      try {
+	        await syncAdminProfileUser(u);
+	      } catch (error) {
+	        console.warn("admin profile sync failed", error);
+	        return false;
+	      }
 	    }
 	    if (USER_MANAGEMENT_API_AUTHORITY) {
 	      try {

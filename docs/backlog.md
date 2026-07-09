@@ -62,10 +62,10 @@ Completed PR #749:
 - Added tests for manager/admin permission checks, secret redaction, self-read behavior, denied writes, and client wiring.
 - Kept the seam backed by the current storage driver for the first slice.
 
-Next PR sequence:
-1. Pick one narrow admin user-management operation or field group to move from the compatibility storage driver to normalized Supabase `app_users` authority.
+Active PR sequence:
+1. Move login-capable user `app_users` profile synchronization into `/api/users` for records with `authUserId`.
 2. Keep `/api/users` as the server operation boundary and preserve local/demo behavior.
-3. Add tests for RLS/profile update payload mapping, permission checks, first-login compatibility, and KV fallback/mirror behavior if kept temporarily.
+3. Add tests for profile update payload mapping, permission checks, and KV fallback/mirror behavior while the temporary mirror remains.
 4. Do not bundle this with cleaning, PPE, broad permission redesign, or monolith extraction.
 
 DoD:
