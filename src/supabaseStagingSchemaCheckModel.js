@@ -1,7 +1,11 @@
 export const STAGING_SUPABASE_TABLES = [
   "app_users",
   "cmms_kv_records",
+  "cleaning_zones",
+  "cleaning_rounds",
+  "cleaning_complaints",
   "fleet_units",
+  "worker_absences",
   "periodic_maintenance",
   "tickets",
   "file_metadata",

@@ -82,6 +82,7 @@ Current notes:
 - Periodic-maintenance authority slice: `public.periodic_maintenance` and `/api/pm` are live. In production/API mode, PM reads, saves, batch saves, and deletes use the normalized API first, while `pm:*` KV is only a compatibility mirror. The staging gate reconciles `pm:*` to `public.periodic_maintenance` and runs a controlled `/api/pm` smoke.
 - User-management server-operation slice: production/API mode routes user list/save/delete through `/api/users` instead of raw `/api/kv user:*` calls.
 - User-management `app_users` authority slices: `/api/users` reads login-capable users from `public.app_users`, syncs profile writes there before writing the temporary `user:` KV mirror, and deactivates matching `app_users` rows before deleting the mirror.
+- Cleaning schema-foundation slice: `public.cleaning_zones`, `public.cleaning_rounds`, `public.cleaning_complaints`, and `public.worker_absences` are the first normalized cleaning tables/RLS target. Runtime authority still stays on the accepted `czone:`/`cround:`/`ccomplaint:`/`cabsence:` KV bridge until explicit cleaning API/driver slices are added.
 - This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End

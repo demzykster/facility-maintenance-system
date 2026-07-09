@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: R10 users delete-authority slice made `/api/users` deactivate login-capable Supabase `app_users` records before removing their temporary `user:` KV mirror.
+- Active branch: `codex/r10-cleaning-schema-foundation`.
+- Current branch: `codex/r10-cleaning-schema-foundation`.
+- Current branch work: R10 cleaning schema-foundation slice. Add the first normalized Supabase/RLS tables for cleaning zones, rounds, complaints, and worker absences without switching runtime authority away from the accepted KV bridge yet.
 
 ## Current Product Direction
 
