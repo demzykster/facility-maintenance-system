@@ -121,6 +121,13 @@ try {
   if (afterUpsert.length !== 1) throw new Error(`tickets_upsert_row_count:${afterUpsert.length}`);
   if (afterUpsert[0].subject !== subject) throw new Error("tickets_upsert_subject_mismatch");
 
+  const listResponse = await fetch(`${publicUrl}/api/tickets`, {
+    headers: { authorization: `Bearer ${accessToken}` }
+  });
+  const listData = await readJson(listResponse);
+  if (!listResponse.ok || !listData?.ok) throw new Error(listData?.error || `tickets_list_${listResponse.status}`);
+  if (!listData?.tickets?.some((item) => item.id === id && item.subject === subject)) throw new Error("tickets_list_missing_smoke_ticket");
+
   const uploadResponse = await fetch(`${publicUrl}/api/files?path=${encodeURIComponent(filePath)}`, {
     method: "POST",
     headers: {

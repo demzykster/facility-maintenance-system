@@ -19,6 +19,7 @@ describe("staging tickets API smoke wiring", () => {
     expect(smokeScript).toContain('fetch(`${publicUrl}/api/files?path=${encodeURIComponent(filePath)}`');
     expect(smokeScript).toContain('fetch(`${publicUrl}/api/tickets?id=${encodeURIComponent(id)}`');
     expect(smokeScript).toContain("tickets_upsert_row_count");
+    expect(smokeScript).toContain("tickets_list_missing_smoke_ticket");
     expect(smokeScript).toContain("ticket_files_missing");
     expect(smokeScript).toContain("tickets_delete_row_count");
     expect(smokeScript).not.toContain('createdBy: { id: "staging-smoke"');

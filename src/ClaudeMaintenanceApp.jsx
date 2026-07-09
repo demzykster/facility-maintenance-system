@@ -63,6 +63,7 @@ import { defaultWorkerView } from "./workerProfileModel.js";
 import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
+import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -94,10 +95,15 @@ const NORMALIZED_TICKET_PROVIDER = createApiTicketProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
 });
-const NORMALIZED_TICKET_SHADOW_WRITE =
-  APP_MODE === APP_MODES.production &&
-  storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api &&
-  !!NORMALIZED_TICKET_PROVIDER;
+const NORMALIZED_TICKET_AUTHORITY = normalizedTicketAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_TICKET_PROVIDER
+});
+const NORMALIZED_TICKET_SHADOW_WRITE = !NORMALIZED_TICKET_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_TICKET_PROVIDER;
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 const PUBLIC_ZONES_URL = publicZonesApiUrlFromEnv(import.meta.env);
 
@@ -1699,12 +1705,28 @@ export default function App() {
       "presence:", "user:",
       "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
+    let ticketRows = tk;
+    if (NORMALIZED_TICKET_AUTHORITY) {
+      try {
+        const normalized = await ticketsForAuthority({
+          kvTickets: tk,
+          provider: NORMALIZED_TICKET_PROVIDER,
+          normalizedAuthority: true
+        });
+        ticketRows = normalized.tickets;
+      } catch (error) {
+        void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized ticket API load failed"
+        }));
+      }
+    }
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
       if (snapRef.current[key] !== sig) { snapRef.current[key] = sig; setter(data); }
     };
-    apply("ticket", tk, setTickets, (a, b) => b.createdAt - a.createdAt);
+    apply("ticket", ticketRows, setTickets, (a, b) => b.createdAt - a.createdAt);
     apply("pm", pmv, setPm, (a, b) => a.nextDue - b.nextDue);
     apply("fleet", fl, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
     apply("czone", zn, setZones, zoneSort);
@@ -1818,13 +1840,46 @@ export default function App() {
       });
     }
   };
+  const mirrorTicketToKv = async (ticket) => {
+    const ok = await persistShared(`ticket:${ticket.id}`, JSON.stringify(ticket), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "ticket_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `ticket:${ticket?.id || "unknown"}`,
+      message: "Compatibility KV ticket mirror save failed"
+    });
+  };
+  const mirrorDeleteTicketFromKv = async (id) => {
+    const ok = await deleteShared(`ticket:${id}`, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "ticket_kv_mirror_delete_failed",
+      action: "mirror-delete",
+      key: `ticket:${id || "unknown"}`,
+      message: "Compatibility KV ticket mirror delete failed"
+    });
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
     rec = applyTicketStatusTiming(rec, _prev, _now);
     if (!rec.num) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
-    if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
-    void shadowWriteNormalizedTicket(rec);
+    if (NORMALIZED_TICKET_AUTHORITY) {
+      try {
+        await NORMALIZED_TICKET_PROVIDER.upsert(rec);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
+          action: "save",
+          id: rec.id,
+          message: error?.message || "Normalized ticket API save failed"
+        }));
+        return false;
+      }
+      void mirrorTicketToKv(rec);
+    } else {
+      if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
+      void shadowWriteNormalizedTicket(rec);
+    }
     setTickets((p) => [rec, ...p.filter((x) => x.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
     notifyTicketPhone(rec, _prev);
     return true;
@@ -1851,7 +1906,28 @@ export default function App() {
     setPm((s) => s.filter((x) => !cleanIds.includes(x.id)));
     return true;
   };
-  const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; void shadowDeleteNormalizedTicket(id); try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
+  const delTicket = async (id) => {
+    if (NORMALIZED_TICKET_AUTHORITY) {
+      try {
+        await NORMALIZED_TICKET_PROVIDER.delete(id);
+      } catch (error) {
+        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+        void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
+          action: "delete",
+          id,
+          message: error?.message || "Normalized ticket API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeleteTicketFromKv(id);
+    } else {
+      if (!await deleteShared(`ticket:${id}`)) return false;
+      void shadowDeleteNormalizedTicket(id);
+    }
+    try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {}
+    setTickets((s) => s.filter((x) => x.id !== id));
+    return true;
+  };
   const saveFleet = async (f, options = {}) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
   const saveFleetMany = async (items, options = {}) => {
     const units = (items || []).filter((f) => f?.id);
