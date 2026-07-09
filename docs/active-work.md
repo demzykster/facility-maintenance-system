@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: R10 users profile-authority slice moved login-capable user `app_users` profile synchronization into `/api/users` so the server operation owns normalized profile updates before writing the temporary `user:` KV mirror.
+- Active branch: `codex/r10-users-read-authority`.
+- Current branch: `codex/r10-users-read-authority`.
+- Current branch work: R10 users read-authority slice. Make `/api/users` read/list `app_users` as the primary source for login-capable users while keeping `user:` KV as temporary legacy enrichment and fallback.
 
 ## Current Product Direction
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { appUserPatchFromUserRecord, createUsersApiHandler } from "../server/users/handler.js";
+import { appUserPatchFromUserRecord, createUsersApiHandler, userRecordFromAppUserProfile } from "../server/users/handler.js";
 
 function createRes() {
   return {
@@ -41,6 +41,44 @@ function sessionClientFor(profile = {}) {
 }
 
 describe("users API handler", () => {
+  it("maps app_users profiles to user-management records with legacy-only fields preserved", () => {
+    expect(userRecordFromAppUserProfile({
+      id: "app-user-1",
+      auth_user_id: "auth-1",
+      role: "tech",
+      name: "Tech One",
+      email: "tech@example.com",
+      department: "Ops",
+      departments: ["Ops"],
+      manager_zones: ["North"],
+      tech_scope: "facility",
+      supplier: "Vendor",
+      permissions: { users: "view" },
+      active: true,
+      must_change_password: true
+    }, {
+      id: "legacy-id",
+      techCats: ["electric"],
+      shiftStart: "07:30"
+    })).toEqual(expect.objectContaining({
+      id: "app-user-1",
+      authUserId: "auth-1",
+      appUserId: "app-user-1",
+      role: "tech",
+      name: "Tech One",
+      email: "tech@example.com",
+      dept: "Ops",
+      depts: ["Ops"],
+      mgrZones: ["North"],
+      techScope: "facility",
+      supplier: "Vendor",
+      perms: { users: "view" },
+      mustChangePassword: true,
+      techCats: ["electric"],
+      shiftStart: "07:30"
+    }));
+  });
+
   it("maps user records to app_users profile patches without KV-only fields", () => {
     expect(appUserPatchFromUserRecord({
       name: " Manager ",
@@ -102,6 +140,74 @@ describe("users API handler", () => {
       users: [{ id: "worker-1", name: "Worker", activationStatus: "pending" }]
     });
     expect(driver.listValues).toHaveBeenCalledWith("user:", true);
+  });
+
+  it("lists app_users as the read authority and preserves legacy-only KV records", async () => {
+    const driver = {
+      get: vi.fn(async (key) => {
+        if (key === "user:app-user-1") return JSON.stringify({ id: "app-user-1", authUserId: "auth-1", techCats: ["electric"], pin: "1234" });
+        return null;
+      }),
+      listValues: vi.fn().mockResolvedValue([
+        { key: "user:app-user-1", value: JSON.stringify({ id: "app-user-1", authUserId: "auth-1", pin: "1234" }) },
+        { key: "user:legacy-worker", value: JSON.stringify({ id: "legacy-worker", name: "Legacy Worker", pin: "5678" }) }
+      ])
+    };
+    const profileClient = {
+      listAppUserProfiles: vi.fn().mockResolvedValue([
+        { id: "app-user-1", auth_user_id: "auth-1", role: "tech", name: "Tech One", active: true, email: "tech@example.com" }
+      ]),
+      getAppUserProfileById: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "view" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer manager-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      source: "app_users",
+      users: [
+        expect.objectContaining({ id: "app-user-1", authUserId: "auth-1", name: "Tech One", techCats: ["electric"] }),
+        { id: "legacy-worker", name: "Legacy Worker" }
+      ]
+    });
+    expect(profileClient.listAppUserProfiles).toHaveBeenCalled();
+  });
+
+  it("reads a single app_users profile before falling back to KV", async () => {
+    const driver = {
+      get: vi.fn(async (key) => key === "user:app-user-1" ? JSON.stringify({ id: "app-user-1", authUserId: "auth-1", techCats: ["electric"] }) : null),
+      listValues: vi.fn()
+    };
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({ id: "app-user-1", auth_user_id: "auth-1", role: "tech", name: "Tech One", active: true }),
+      listAppUserProfiles: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "view" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer manager-token" },
+      query: { id: "app-user-1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      source: "app_users",
+      user: expect.objectContaining({ id: "app-user-1", authUserId: "auth-1", name: "Tech One", techCats: ["electric"] })
+    });
+    expect(profileClient.getAppUserProfileById).toHaveBeenCalledWith("app-user-1");
   });
 
   it("limits ordinary workers to their own user record", async () => {

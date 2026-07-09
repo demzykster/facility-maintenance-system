@@ -8,6 +8,7 @@ import { bearerToken } from "../session/authCookie.js";
 import { createSupabaseProfileUpdateClient } from "../session/profileHandler.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
+import { normalizeSupabaseAppUserProfile } from "../../src/supabaseProfileModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -60,6 +61,55 @@ const publicUserForSession = (key, user, session) => {
     return user;
   }
 };
+
+export function userRecordFromAppUserProfile(profile = {}, legacy = {}) {
+  const appUser = normalizeSupabaseAppUserProfile(profile);
+  return {
+    ...(legacy || {}),
+    id: appUser.id || legacy.id || "",
+    authUserId: appUser.authUserId || legacy.authUserId || "",
+    appUserId: appUser.id || legacy.appUserId || "",
+    name: appUser.name || legacy.name || "",
+    role: appUser.role || legacy.role || "user",
+    active: appUser.active,
+    email: appUser.email || "",
+    phone: appUser.phone || "",
+    workerNo: appUser.workerNo || legacy.workerNo || "",
+    dept: appUser.department || legacy.dept || "",
+    depts: appUser.departments?.length ? appUser.departments : (Array.isArray(legacy.depts) ? legacy.depts : []),
+    perms: appUser.permissions || legacy.perms || {},
+    mgrZones: appUser.mgrZones || legacy.mgrZones || [],
+    techScope: appUser.techScope || legacy.techScope || "",
+    supplier: appUser.supplier || legacy.supplier || "",
+    mustChangePassword: appUser.mustChangePassword
+  };
+}
+
+const legacyUserKeyCandidates = (profile = {}) => {
+  const appUser = normalizeSupabaseAppUserProfile(profile);
+  return [
+    appUser.id,
+    appUser.authUserId,
+    appUser.workerNo,
+    appUser.email
+  ].filter(Boolean).map((id) => `user:${id}`);
+};
+
+const legacyUserForProfile = async (driver, profile = {}) => {
+  if (typeof driver?.get !== "function") return {};
+  for (const key of legacyUserKeyCandidates(profile)) {
+    const value = await driver.get(key, true);
+    if (!value) continue;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
+const appUserRecordKey = (user = {}) => `user:${user.id}`;
 
 const createDefaultDriver = (env, fetchImpl) => {
   if (env.CMMS_KV_DRIVER === "upstash") return createUpstashKvDriverFromEnv(env, fetchImpl);
@@ -152,13 +202,41 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       if (method === "GET") {
         if (typeof backendDriver.get !== "function" || typeof backendDriver.listValues !== "function") return json(res, 503, { error: "users_read_not_configured" });
         const id = String(req.query?.id || "").trim();
+        const canReadProfiles = typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.listAppUserProfiles === "function";
         if (id) {
           const key = `user:${id}`;
           const permissionError = kvReadPermissionError(auth.user, key);
           if (permissionError) return json(res, 403, { error: permissionError });
+          if (canReadProfiles) {
+            const profile = await backendProfileClient.getAppUserProfileById(id);
+            if (profile) {
+              const legacy = await legacyUserForProfile(backendDriver, profile);
+              const user = userRecordFromAppUserProfile(profile, legacy);
+              return json(res, 200, { ok: true, user: publicUserForSession(appUserRecordKey(user), user, auth.user), source: "app_users" });
+            }
+          }
           const value = await backendDriver.get(key, true);
           if (!value) return json(res, 404, { error: "user_not_found" });
-          return json(res, 200, { ok: true, user: publicUserForSession(key, JSON.parse(value), auth.user) });
+          return json(res, 200, { ok: true, user: publicUserForSession(key, JSON.parse(value), auth.user), source: "kv" });
+        }
+        if (canReadProfiles) {
+          const profiles = await backendProfileClient.listAppUserProfiles();
+          const usersById = new Map();
+          for (const profile of profiles) {
+            const legacy = await legacyUserForProfile(backendDriver, profile);
+            const user = userRecordFromAppUserProfile(profile, legacy);
+            usersById.set(user.id, publicUserForSession(appUserRecordKey(user), user, auth.user));
+          }
+          const legacyRecords = (await backendDriver.listValues("user:", true))
+            .map(parseStoredUser)
+            .filter(Boolean)
+            .filter((record) => !kvReadPermissionError(auth.user, record.key));
+          for (const record of legacyRecords) {
+            const user = record.user || {};
+            if (user.authUserId || usersById.has(user.id)) continue;
+            usersById.set(user.id, publicUserForSession(record.key, user, auth.user));
+          }
+          return json(res, 200, { ok: true, users: [...usersById.values()], source: "app_users" });
         }
         const users = (await backendDriver.listValues("user:", true))
           .map(parseStoredUser)

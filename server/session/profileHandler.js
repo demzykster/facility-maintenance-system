@@ -65,6 +65,24 @@ export function createSupabaseProfileUpdateClient({ url, anonKey, serviceRoleKey
       if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_${response.status}`);
       return Array.isArray(data) ? data[0] : data;
     },
+    async getAppUserProfileById(id) {
+      const response = await fetchImpl(`${root}/rest/v1/app_users?id=eq.${encodeURIComponent(id)}&select=*`, {
+        method: "GET",
+        headers: serviceHeaders
+      });
+      const data = await responseJson(response);
+      if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_get_${response.status}`);
+      return Array.isArray(data) ? data[0] : data;
+    },
+    async listAppUserProfiles() {
+      const response = await fetchImpl(`${root}/rest/v1/app_users?select=*&order=name.asc`, {
+        method: "GET",
+        headers: serviceHeaders
+      });
+      const data = await responseJson(response);
+      if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_list_${response.status}`);
+      return Array.isArray(data) ? data : [];
+    },
     async updateAuthEmail(authUserId, email) {
       const response = await fetchImpl(`${root}/auth/v1/admin/users/${encodeURIComponent(authUserId)}`, {
         method: "PUT",
