@@ -62,8 +62,10 @@ import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, is
 import { defaultWorkerView } from "./workerProfileModel.js";
 import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
+import { createApiFleetProvider } from "./apiFleetAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
+import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -104,6 +106,19 @@ const NORMALIZED_TICKET_SHADOW_WRITE = !NORMALIZED_TICKET_AUTHORITY
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_TICKET_PROVIDER;
+const NORMALIZED_FLEET_PROVIDER = createApiFleetProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_FLEET_AUTHORITY = normalizedFleetAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_FLEET_PROVIDER
+});
+const NORMALIZED_FLEET_SHADOW_WRITE = !NORMALIZED_FLEET_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_FLEET_PROVIDER;
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 const PUBLIC_ZONES_URL = publicZonesApiUrlFromEnv(import.meta.env);
 
@@ -1706,6 +1721,7 @@ export default function App() {
       "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
     let ticketRows = tk;
+    let fleetRows = fl;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
         const normalized = await ticketsForAuthority({
@@ -1721,6 +1737,21 @@ export default function App() {
         }));
       }
     }
+    if (NORMALIZED_FLEET_AUTHORITY) {
+      try {
+        const normalizedFleet = await fleetForAuthority({
+          kvFleet: fl,
+          provider: NORMALIZED_FLEET_PROVIDER,
+          normalizedAuthority: true
+        });
+        fleetRows = normalizedFleet.fleet;
+      } catch (error) {
+        void recordAutomaticAppIssue(fleetAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized fleet API load failed"
+        }));
+      }
+    }
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
@@ -1728,7 +1759,7 @@ export default function App() {
     };
     apply("ticket", ticketRows, setTickets, (a, b) => b.createdAt - a.createdAt);
     apply("pm", pmv, setPm, (a, b) => a.nextDue - b.nextDue);
-    apply("fleet", fl, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
+    apply("fleet", fleetRows, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
     apply("czone", zn, setZones, zoneSort);
     apply("cround", rd, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
@@ -1858,6 +1889,78 @@ export default function App() {
       message: "Compatibility KV ticket mirror delete failed"
     });
   };
+  const shadowWriteNormalizedFleet = async (f) => {
+    if (!NORMALIZED_FLEET_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_FLEET_PROVIDER.upsert(f);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "fleet_normalized_shadow_write_failed",
+        action: "upsert",
+        key: `fleet:${f?.id || "unknown"}`,
+        message: error?.message || "Normalized fleet API write failed"
+      });
+    }
+  };
+  const shadowDeleteNormalizedFleet = async (id) => {
+    if (!NORMALIZED_FLEET_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_FLEET_PROVIDER.delete(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "fleet_normalized_shadow_delete_failed",
+        action: "delete",
+        key: `fleet:${id || "unknown"}`,
+        message: error?.message || "Normalized fleet API delete failed"
+      });
+    }
+  };
+  const mirrorFleetToKv = async (f) => {
+    const ok = await persistShared(`fleet:${f.id}`, JSON.stringify(f), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "fleet_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `fleet:${f?.id || "unknown"}`,
+      message: "Compatibility KV fleet mirror save failed"
+    });
+  };
+  const mirrorFleetManyToKv = async (units = []) => {
+    const rows = (units || []).filter((f) => f?.id);
+    if (!rows.length) return;
+    const ok = await persistSharedMany(rows.map((f) => ({ key: `fleet:${f.id}`, value: JSON.stringify(f) })), {
+      toastOnFail: false,
+      atomic: true,
+      timeoutMs: 60000
+    });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "fleet_kv_mirror_save_failed",
+      action: "mirror-save-many",
+      key: `fleet:${rows.length} records`,
+      message: "Compatibility KV fleet batch mirror save failed"
+    });
+  };
+  const mirrorDeleteFleetFromKv = async (id) => {
+    const ok = await deleteShared(`fleet:${id}`, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "fleet_kv_mirror_delete_failed",
+      action: "mirror-delete",
+      key: `fleet:${id || "unknown"}`,
+      message: "Compatibility KV fleet mirror delete failed"
+    });
+  };
+  const saveNormalizedFleetUnits = async (units = [], action = "save") => {
+    try {
+      for (const unit of units) await NORMALIZED_FLEET_PROVIDER.upsert(unit);
+      return true;
+    } catch (error) {
+      setToast(SAVE_FAILED_MESSAGE);
+      void recordAutomaticAppIssue(fleetAuthorityFailureIssue({
+        action,
+        message: error?.message || "Normalized fleet API save failed"
+      }));
+      return false;
+    }
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
@@ -1928,12 +2031,38 @@ export default function App() {
     setTickets((s) => s.filter((x) => x.id !== id));
     return true;
   };
-  const saveFleet = async (f, options = {}) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
+  const saveFleet = async (f, options = {}) => {
+    if (NORMALIZED_FLEET_AUTHORITY) {
+      try {
+        await NORMALIZED_FLEET_PROVIDER.upsert(f);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(fleetAuthorityFailureIssue({
+          action: "save",
+          id: f.id,
+          message: error?.message || "Normalized fleet API save failed"
+        }));
+        return false;
+      }
+      void mirrorFleetToKv(f);
+    } else {
+      if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false;
+      void shadowWriteNormalizedFleet(f);
+    }
+    setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1)));
+    return true;
+  };
   const saveFleetMany = async (items, options = {}) => {
     const units = (items || []).filter((f) => f?.id);
     if (!units.length) return true;
-    const ok = await persistSharedMany(units.map((f) => ({ key: `fleet:${f.id}`, value: JSON.stringify(f) })), options);
-    if (!ok) return false;
+    if (NORMALIZED_FLEET_AUTHORITY) {
+      if (!await saveNormalizedFleetUnits(units, "save-many")) return false;
+      void mirrorFleetManyToKv(units);
+    } else {
+      const ok = await persistSharedMany(units.map((f) => ({ key: `fleet:${f.id}`, value: JSON.stringify(f) })), options);
+      if (!ok) return false;
+      units.forEach((unit) => void shadowWriteNormalizedFleet(unit));
+    }
     setFleet((s) => {
       const ids = new Set(units.map((f) => f.id));
       return [...s.filter((x) => !ids.has(x.id)), ...units].sort((a, b) => (a.code > b.code ? 1 : -1));
@@ -1944,10 +2073,22 @@ export default function App() {
     const units = (items || []).filter((f) => f?.id);
     if (!units.length) return true;
     const mergedConfig = catalogAdditions?.length ? mergeFleetCatalogAdditions(config, fleet, catalogAdditions) : config;
+    if (NORMALIZED_FLEET_AUTHORITY) {
+      if (catalogAdditions?.length && !await persistShared("config:v1", JSON.stringify(mergedConfig), options)) return false;
+      if (!await saveNormalizedFleetUnits(units, "import")) return false;
+      void mirrorFleetManyToKv(units);
+      setFleet((s) => {
+        const ids = new Set(units.map((f) => f.id));
+        return [...s.filter((x) => !ids.has(x.id)), ...units].sort((a, b) => (a.code > b.code ? 1 : -1));
+      });
+      if (catalogAdditions?.length) setConfig(mergedConfig);
+      return true;
+    }
     const records = units.map((f) => ({ key: `fleet:${f.id}`, value: JSON.stringify(f) }));
     if (catalogAdditions?.length) records.push({ key: "config:v1", value: JSON.stringify(mergedConfig) });
     const ok = await persistSharedMany(records, { ...options, atomic: true, timeoutMs: 60000 });
     if (!ok) return false;
+    units.forEach((unit) => void shadowWriteNormalizedFleet(unit));
     setFleet((s) => {
       const ids = new Set(units.map((f) => f.id));
       return [...s.filter((x) => !ids.has(x.id)), ...units].sort((a, b) => (a.code > b.code ? 1 : -1));
@@ -2017,7 +2158,27 @@ export default function App() {
   const resolveComplaint = async (c) => persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name });
   const progressComplaint = async (c) => persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() });
   const delComplaint = async (id) => { if (!await deleteShared(`ccomplaint:${id}`)) return false; setComplaints((s) => s.filter((x) => x.id !== id)); return true; };
-  const delFleet = async (id, options = {}) => { if (!await deleteShared(`fleet:${id}`, options)) return false; setFleet((s) => s.filter((x) => x.id !== id)); return true; };
+  const delFleet = async (id, options = {}) => {
+    if (NORMALIZED_FLEET_AUTHORITY) {
+      try {
+        await NORMALIZED_FLEET_PROVIDER.delete(id);
+      } catch (error) {
+        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+        void recordAutomaticAppIssue(fleetAuthorityFailureIssue({
+          action: "delete",
+          id,
+          message: error?.message || "Normalized fleet API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeleteFleetFromKv(id);
+    } else {
+      if (!await deleteShared(`fleet:${id}`, options)) return false;
+      void shadowDeleteNormalizedFleet(id);
+    }
+    setFleet((s) => s.filter((x) => x.id !== id));
+    return true;
+  };
   const syncAdminProfileUser = async (u) => {
     if (!u?.authUserId) return;
     const accessToken = PRODUCTION_AUTH_STORE.get()?.accessToken || "";
