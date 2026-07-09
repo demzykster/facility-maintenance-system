@@ -39,4 +39,29 @@ describe("Supabase tickets driver", () => {
       source_kv_key: "ticket:T-1"
     });
   });
+
+  it("deletes normalized ticket rows by id", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return "";
+      }
+    });
+    const driver = createSupabaseTicketsDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service",
+      fetchImpl
+    });
+
+    await expect(driver.delete("T-1")).resolves.toBeUndefined();
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/tickets?id=eq.T-1", {
+      method: "DELETE",
+      headers: expect.objectContaining({
+        apikey: "service",
+        authorization: "Bearer service",
+        prefer: "return=minimal"
+      })
+    });
+  });
 });

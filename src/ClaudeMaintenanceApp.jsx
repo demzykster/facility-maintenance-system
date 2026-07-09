@@ -1805,6 +1805,19 @@ export default function App() {
       });
     }
   };
+  const shadowDeleteNormalizedTicket = async (id) => {
+    if (!NORMALIZED_TICKET_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_TICKET_PROVIDER.delete(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "ticket_normalized_shadow_delete_failed",
+        action: "delete",
+        key: `ticket:${id || "unknown"}`,
+        message: error?.message || "Normalized ticket API delete failed"
+      });
+    }
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
@@ -1838,7 +1851,7 @@ export default function App() {
     setPm((s) => s.filter((x) => !cleanIds.includes(x.id)));
     return true;
   };
-  const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
+  const delTicket = async (id) => { if (!await deleteShared(`ticket:${id}`)) return false; void shadowDeleteNormalizedTicket(id); try { await TICKET_PHOTOS.remove(tickets.find((x) => x.id === id) || id); } catch {} setTickets((s) => s.filter((x) => x.id !== id)); return true; };
   const saveFleet = async (f, options = {}) => { if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false; setFleet((s) => [...s.filter((x) => x.id !== f.id), f].sort((a, b) => (a.code > b.code ? 1 : -1))); return true; };
   const saveFleetMany = async (items, options = {}) => {
     const units = (items || []).filter((f) => f?.id);

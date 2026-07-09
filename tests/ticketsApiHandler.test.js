@@ -124,4 +124,30 @@ describe("tickets API handler", () => {
     expect(res.json()).toEqual({ error: "permission_required:role:admin|user|tech|worker" });
     expect(driver.upsert).not.toHaveBeenCalled();
   });
+
+  it("deletes normalized tickets for sessions allowed to write tickets", async () => {
+    const driver = { delete: vi.fn().mockResolvedValue(undefined) };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { id: "T-4" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, ticket: { id: "T-4" } });
+    expect(driver.delete).toHaveBeenCalledWith("T-4");
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "app-user-1",
+      entityType: "ticket",
+      entityId: "T-4",
+      action: "delete"
+    }));
+  });
 });
