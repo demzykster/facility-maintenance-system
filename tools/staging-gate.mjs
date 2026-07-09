@@ -8,6 +8,8 @@ const steps = [
   ["staging:smoke:live:strict", ["npm", ["run", "staging:smoke:live", "--", "--expect-current-commit"]]],
   ["staging:tickets:reconcile", ["npm", ["run", "staging:tickets:reconcile"]]],
   ["staging:smoke:tickets-api", ["npm", ["run", "staging:smoke:tickets-api"]]],
+  ["staging:fleet:reconcile", ["npm", ["run", "staging:fleet:reconcile"]]],
+  ["staging:smoke:fleet-api", ["npm", ["run", "staging:smoke:fleet-api"]]],
   ["staging:smoke:settings", ["npm", ["run", "staging:smoke:settings"]]],
   ["staging:smoke:fleet-ui", ["npm", ["run", "staging:smoke:fleet-ui"]]],
   ["staging:smoke:ai-intake", ["npm", ["run", "staging:smoke:ai-intake"]]],
