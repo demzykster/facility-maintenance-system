@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-safety-preflight-user-gap`.
-- Current branch: `codex/r10-safety-preflight-user-gap`.
-- Current branch work: R10 safety/user-authority pass. The staging preflight missing/wrong env and bootstrap-safety checks are being moved into the tested preflight model, and current backlog candidates now preserve the user-management authority gap and safety-slice plan.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 safety/user-authority pass moved staging preflight missing/wrong env and bootstrap-safety checks into the tested preflight model, refreshed the bundle-size warning from a fresh build, and preserved the user-management authority gap and safety-slice plan in backlog docs.
 
 ## Current Product Direction
 
