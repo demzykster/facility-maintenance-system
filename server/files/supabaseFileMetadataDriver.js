@@ -103,6 +103,15 @@ export function createSupabaseFileMetadataDriver({ url, serviceRoleKey, table = 
       });
       const data = await readJsonOrText(response);
       if (!response.ok) throw new Error(errorMessage(data, `supabase_file_metadata_delete_${response.status}`));
+    },
+    async markDeletedByOwner(ownerType, ownerId, deletedAt = Date.now()) {
+      const response = await fetchImpl(`${base}?owner_type=eq.${encodeURIComponent(ownerType)}&owner_id=eq.${encodeURIComponent(ownerId)}&deleted_at=is.null`, {
+        method: "PATCH",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "return=minimal" }),
+        body: JSON.stringify({ deleted_at: new Date(Number(deletedAt)).toISOString() })
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_file_metadata_delete_${response.status}`));
     }
   };
 }
