@@ -18,6 +18,8 @@
     "staging:tickets:reconcile": "node tools/staging-tickets-reconcile.mjs",
     "staging:smoke:fleet-api": "node tools/staging-fleet-api-smoke.mjs",
     "staging:fleet:reconcile": "node tools/staging-fleet-reconcile.mjs",
+    "staging:smoke:pm-api": "node tools/staging-pm-api-smoke.mjs",
+    "staging:pm:reconcile": "node tools/staging-pm-reconcile.mjs",
     "staging:smoke:browser": "node tools/staging-browser-smoke.mjs",
     "staging:smoke:ui": "node tools/staging-ui-smoke.mjs",
     "staging:smoke:fleet-ui": "node tools/staging-fleet-ui-smoke.mjs",
