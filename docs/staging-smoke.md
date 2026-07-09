@@ -36,7 +36,7 @@ After `.env.staging.local` is filled or the shell has staging Supabase env loade
 npm run staging:supabase-schema
 ```
 
-This checks `app_users`, `cmms_kv_records`, `cleaning_zones`, `cleaning_rounds`, `cleaning_complaints`, `fleet_units`, `worker_absences`, `periodic_maintenance`, `tickets`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket. The normalized business tables must also grant `select`, `insert`, `update`, and `delete` to `service_role`, otherwise REST checks and normalized API writes fail with 403.
+This checks `app_users`, `cmms_kv_records`, `cleaning_zones`, `cleaning_rounds`, `cleaning_complaints`, `fleet_units`, `ppe_items`, `ppe_norms`, `ppe_movements`, `ppe_requests`, `ppe_orders`, `worker_absences`, `periodic_maintenance`, `tickets`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket. The normalized business tables must also grant `select`, `insert`, `update`, and `delete` to `service_role`, otherwise REST checks and normalized API writes fail with 403.
 
 After the first admin exists and bootstrap has been disabled, run the live read-only smoke:
 
@@ -62,7 +62,7 @@ npm run staging:gate
 
 It runs the local staging env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke. It intentionally does not run `npm run staging:backup:evidence`, because that command creates a local sensitive data snapshot for restore drills.
 
-The gate also runs controlled normalized API smokes for `/api/tickets`, `/api/fleet`, `/api/pm`, and the shared cleaning records route (`zones`, `rounds`, `complaints`, and `absences`). Each smoke creates one temporary record, verifies it in its Supabase table, deletes it through the same API route, and verifies cleanup. Before the business smokes, the gate reconciles legacy KV records for tickets, fleet, periodic maintenance, and cleaning records into their normalized tables. Cleaning records use normalized API authority in production/API mode with compatibility KV mirrors.
+The gate also runs controlled normalized API smokes for `/api/tickets`, `/api/fleet`, `/api/pm`, `/api/ppe`, and the shared cleaning records route (`zones`, `rounds`, `complaints`, and `absences`). Each smoke creates one temporary record, verifies it in its Supabase table, deletes it through the same API route, and verifies cleanup. Before the business smokes, the gate reconciles legacy KV records for tickets, fleet, periodic maintenance, PPE, and cleaning records into their normalized tables. PPE and cleaning records use normalized API authority in production/API mode with compatibility KV mirrors.
 
 ## Required Env Shape
 

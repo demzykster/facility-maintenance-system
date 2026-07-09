@@ -67,6 +67,7 @@ import { createApiPmProvider } from "./apiPmAdapter.js";
 import { createApiCleaningZonesProvider } from "./apiCleaningZonesAdapter.js";
 import { createApiCleaningRoundsProvider } from "./apiCleaningRoundsAdapter.js";
 import { createApiCleaningComplaintsProvider, createApiWorkerAbsencesProvider } from "./apiCleaningRecordsAdapter.js";
+import { createApiPpeProvider } from "./apiPpeAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
@@ -75,6 +76,7 @@ import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority }
 import { cleaningZonesAuthorityFailureIssue, cleaningZonesForAuthority, normalizedCleaningZonesAuthorityEnabled } from "./cleaningZonesAuthorityModel.js";
 import { cleaningRoundsAuthorityFailureIssue, cleaningRoundsForAuthority, normalizedCleaningRoundsAuthorityEnabled } from "./cleaningRoundsAuthorityModel.js";
 import { cleaningComplaintsAuthorityFailureIssue, cleaningComplaintsForAuthority, normalizedCleaningRecordsAuthorityEnabled, workerAbsencesAuthorityFailureIssue, workerAbsencesForAuthority } from "./cleaningRecordsAuthorityModel.js";
+import { normalizedPpeAuthorityEnabled, ppeAuthorityFailureIssue, ppeForAuthority } from "./ppeAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -193,6 +195,19 @@ const NORMALIZED_WORKER_ABSENCES_SHADOW_WRITE = !NORMALIZED_WORKER_ABSENCES_AUTH
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_WORKER_ABSENCES_PROVIDER;
+const NORMALIZED_PPE_PROVIDER = createApiPpeProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_PPE_AUTHORITY = normalizedPpeAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_PPE_PROVIDER
+});
+const NORMALIZED_PPE_SHADOW_WRITE = !NORMALIZED_PPE_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_PPE_PROVIDER;
 const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
@@ -1816,6 +1831,11 @@ export default function App() {
 	    let complaintRows = cp;
 	    let absenceRows = abs;
 	    let userRows = us;
+	    let ppeRows = pp;
+	    let ppeItemRows = ppit;
+	    let ppeNormRows = ppn;
+	    let ppeRequestRows = ppreq;
+	    let ppeOrderRows = pord;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
         const normalized = await ticketsForAuthority({
@@ -1928,6 +1948,30 @@ export default function App() {
 	        void recordAutomaticAppIssue({ kind: "users_api_load_failed", action: "load", key: "user:*", message: error?.message || "User-management API load failed" });
 	      }
 	    }
+	    if (NORMALIZED_PPE_AUTHORITY) {
+	      try {
+	        const normalizedPpe = await ppeForAuthority({
+          kvMovements: pp,
+          kvItems: ppit,
+          kvNorms: ppn,
+          kvRequests: ppreq,
+          kvOrders: pord,
+          provider: NORMALIZED_PPE_PROVIDER,
+          normalizedAuthority: true
+        });
+        ppeRows = normalizedPpe.movements;
+        ppeItemRows = normalizedPpe.items;
+        ppeNormRows = normalizedPpe.norms;
+        ppeRequestRows = normalizedPpe.requests;
+        ppeOrderRows = normalizedPpe.orders;
+      } catch (error) {
+        void recordAutomaticAppIssue(ppeAuthorityFailureIssue({
+          action: "load",
+          resource: "records",
+          message: error?.message || "Normalized PPE API load failed"
+        }));
+	      }
+	    }
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
@@ -1942,11 +1986,11 @@ export default function App() {
     apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
     apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
     apply("mmeet", mmt, setMeetings, (a, b) => b.at - a.at);
-    apply("ppe", pp, setPpe, (a, b) => b.at - a.at);
-    apply("ppeitem", ppit, setPpeItems, (a, b) => (a.name > b.name ? 1 : -1));
-    apply("ppenorm", ppn, setPpeNorms, null);
-    apply("ppereq", ppreq, setPpeReqs, (a, b) => b.at - a.at);
-    apply("ppeorder", pord, setPpeOrders, (a, b) => b.createdAt - a.createdAt);
+    apply("ppe", ppeRows, setPpe, (a, b) => b.at - a.at);
+    apply("ppeitem", ppeItemRows, setPpeItems, (a, b) => (a.name > b.name ? 1 : -1));
+    apply("ppenorm", ppeNormRows, setPpeNorms, null);
+    apply("ppereq", ppeRequestRows, setPpeReqs, (a, b) => b.at - a.at);
+    apply("ppeorder", ppeOrderRows, setPpeOrders, (a, b) => b.createdAt - a.createdAt);
     apply("appIssue", issues, setAppIssues, (a, b) => (b.at || 0) - (a.at || 0));
     apply("cabsence", absenceRows, setAbsences, (a, b) => (a.from > b.from ? 1 : -1));
     // presence: мержим хранилище с текущим стейтом по свежести lastSeen — чтобы поллинг не затирал только что записанный статус при медленном/частичном хранилище
@@ -2362,6 +2406,109 @@ export default function App() {
       key: `cabsence:${id || "unknown"}`,
       message: "Compatibility KV worker absence mirror delete failed"
     });
+  };
+  const ppeResourceProvider = (resource) => NORMALIZED_PPE_PROVIDER?.[resource] || null;
+  const ppeKvPrefix = (resource) => ({
+    movements: "ppe:",
+    items: "ppeitem:",
+    norms: "ppenorm:",
+    requests: "ppereq:",
+    orders: "ppeorder:"
+  })[resource] || "ppe:";
+  const shadowWriteNormalizedPpe = async (resource, record) => {
+    if (!NORMALIZED_PPE_SHADOW_WRITE) return;
+    try {
+      await ppeResourceProvider(resource)?.upsert?.(record);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: `ppe_${resource}_normalized_shadow_write_failed`,
+        action: "upsert",
+        key: `${ppeKvPrefix(resource)}${record?.id || "unknown"}`,
+        message: error?.message || "Normalized PPE API write failed"
+      });
+    }
+  };
+  const shadowDeleteNormalizedPpe = async (resource, id) => {
+    if (!NORMALIZED_PPE_SHADOW_WRITE) return;
+    try {
+      await ppeResourceProvider(resource)?.delete?.(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: `ppe_${resource}_normalized_shadow_delete_failed`,
+        action: "delete",
+        key: `${ppeKvPrefix(resource)}${id || "unknown"}`,
+        message: error?.message || "Normalized PPE API delete failed"
+      });
+    }
+  };
+  const mirrorPpeToKv = async (resource, record) => {
+    const key = `${ppeKvPrefix(resource)}${record.id}`;
+    const ok = await persistShared(key, JSON.stringify(record), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: `ppe_${resource}_kv_mirror_save_failed`,
+      action: "mirror-save",
+      key,
+      message: "Compatibility KV PPE mirror save failed"
+    });
+  };
+  const mirrorDeletePpeFromKv = async (resource, id) => {
+    const key = `${ppeKvPrefix(resource)}${id}`;
+    const ok = await deleteShared(key, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: `ppe_${resource}_kv_mirror_delete_failed`,
+      action: "mirror-delete",
+      key,
+      message: "Compatibility KV PPE mirror delete failed"
+    });
+  };
+  const savePpeResource = async (resource, record, { setState, sortFn } = {}) => {
+    const key = `${ppeKvPrefix(resource)}${record.id}`;
+    if (NORMALIZED_PPE_AUTHORITY) {
+      try {
+        await ppeResourceProvider(resource)?.upsert?.(record);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(ppeAuthorityFailureIssue({
+          action: "save",
+          resource,
+          id: record.id,
+          message: error?.message || "Normalized PPE API save failed"
+        }));
+        return false;
+      }
+      void mirrorPpeToKv(resource, record);
+    } else {
+      if (!await persistShared(key, JSON.stringify(record))) return false;
+      void shadowWriteNormalizedPpe(resource, record);
+    }
+    setState((s) => {
+      const rows = [record, ...s.filter((item) => item.id !== record.id)];
+      return sortFn ? rows.sort(sortFn) : rows;
+    });
+    return true;
+  };
+  const deletePpeResource = async (resource, id, setState) => {
+    const key = `${ppeKvPrefix(resource)}${id}`;
+    if (NORMALIZED_PPE_AUTHORITY) {
+      try {
+        await ppeResourceProvider(resource)?.delete?.(id);
+      } catch (error) {
+        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+        void recordAutomaticAppIssue(ppeAuthorityFailureIssue({
+          action: "delete",
+          resource,
+          id,
+          message: error?.message || "Normalized PPE API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeletePpeFromKv(resource, id);
+    } else {
+      if (!await deleteShared(key)) return false;
+      void shadowDeleteNormalizedPpe(resource, id);
+    }
+    setState((s) => s.filter((item) => item.id !== id));
+    return true;
   };
   const saveTicket = async (t) => {
     let rec = t;
@@ -2838,16 +2985,16 @@ export default function App() {
   const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
   const saveMeeting = async (m) => { if (!await persistShared(`mmeet:${m.id}`, JSON.stringify(m))) return false; setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); return true; };
   const delMeeting = async (id) => { if (!await deleteShared(`mmeet:${id}`)) return false; setMeetings((s) => s.filter((x) => x.id !== id)); return true; };
-  const savePpeItem = async (x) => { if (!await persistShared(`ppeitem:${x.id}`, JSON.stringify(x))) return false; setPpeItems((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (a.name > b.name ? 1 : -1))); return true; };
-  const delPpeItem = async (id) => { if (!await deleteShared(`ppeitem:${id}`)) return false; setPpeItems((s) => s.filter((y) => y.id !== id)); return true; };
-  const savePpe = async (x) => { if (!await persistShared(`ppe:${x.id}`, JSON.stringify(x))) return false; setPpe((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); return true; };
-  const delPpe = async (id) => { if (!await deleteShared(`ppe:${id}`)) return false; setPpe((s) => s.filter((y) => y.id !== id)); return true; };
-  const saveNorm = async (x) => { if (!await persistShared(`ppenorm:${x.id}`, JSON.stringify(x))) return false; setPpeNorms((s) => [x, ...s.filter((y) => y.id !== x.id)]); return true; };
-  const delNorm = async (id) => { if (!await deleteShared(`ppenorm:${id}`)) return false; setPpeNorms((s) => s.filter((y) => y.id !== id)); return true; };
-  const savePpeReq = async (x) => { if (!await persistShared(`ppereq:${x.id}`, JSON.stringify(x))) return false; setPpeReqs((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.at - a.at)); return true; };
-  const delPpeReq = async (id) => { if (!await deleteShared(`ppereq:${id}`)) return false; setPpeReqs((s) => s.filter((y) => y.id !== id)); return true; };
-  const savePpeOrder = async (x) => { if (!await persistShared(`ppeorder:${x.id}`, JSON.stringify(x))) return false; setPpeOrders((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => b.createdAt - a.createdAt)); return true; };
-  const delPpeOrder = async (id) => { if (!await deleteShared(`ppeorder:${id}`)) return false; setPpeOrders((s) => s.filter((y) => y.id !== id)); return true; };
+  const savePpeItem = async (x) => savePpeResource("items", x, { setState: setPpeItems, sortFn: (a, b) => (a.name > b.name ? 1 : -1) });
+  const delPpeItem = async (id) => deletePpeResource("items", id, setPpeItems);
+  const savePpe = async (x) => savePpeResource("movements", x, { setState: setPpe, sortFn: (a, b) => b.at - a.at });
+  const delPpe = async (id) => deletePpeResource("movements", id, setPpe);
+  const saveNorm = async (x) => savePpeResource("norms", x, { setState: setPpeNorms });
+  const delNorm = async (id) => deletePpeResource("norms", id, setPpeNorms);
+  const savePpeReq = async (x) => savePpeResource("requests", x, { setState: setPpeReqs, sortFn: (a, b) => b.at - a.at });
+  const delPpeReq = async (id) => deletePpeResource("requests", id, setPpeReqs);
+  const savePpeOrder = async (x) => savePpeResource("orders", x, { setState: setPpeOrders, sortFn: (a, b) => b.createdAt - a.createdAt });
+  const delPpeOrder = async (id) => deletePpeResource("orders", id, setPpeOrders);
   const saveAppIssue = async (x) => { if (!await persistShared(`appIssue:${x.id}`, JSON.stringify(x))) return false; setAppIssues((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (b.at || 0) - (a.at || 0))); return true; };
   // авто-миграция Тип/Модель: группировка по типу; версия 2 пересобирает старый 1:1
   useEffect(() => {
