@@ -4,12 +4,13 @@
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Product line: v1/main only.
-- Active cleanup branch: none.
+- Active branch: none on `main`, unless a focused PR is in progress.
 - Open PRs at last check: none.
+- Current production-data direction: R10 is started. Tickets, fleet units, and periodic maintenance are normalized-authority in production/API mode; their legacy KV records remain compatibility mirrors.
 
 ## Owner Decision
 
-The owner chose to remove the abandoned separate checks direction from the current v1 release. The project should now focus on finishing the existing working areas with minimal time investment.
+The owner chose to remove the abandoned separate checks direction from the current v1 release. The project should focus on the existing working areas, small low-risk fixes, and explicitly scoped R10 production-data slices.
 
 ## What The Completed Cleanup Did
 
@@ -22,9 +23,11 @@ The owner chose to remove the abandoned separate checks direction from the curre
 ## What Not To Do
 
 - Do not touch v2 or Claude branches.
-- Do not create `src/app`, `src/features`, or `src/shared`.
+- Do not start using `src/app`, `src/features`, or `src/shared` as a new v1 modular architecture. Existing placeholder folders do not change this rule.
 - Do not rebuild the app architecture.
 - Do not recreate the removed direction from old docs or memory.
+- Do not treat R10 as forbidden database expansion. R10 is allowed only as narrow slices with migration/API/adapter/tests/gate evidence.
+- Do not manually edit production/staging database data or overwrite owner-entered staging data unless the owner explicitly asks.
 
 ## Validation Expectations
 
@@ -33,3 +36,4 @@ Before opening a PR:
 - Run the unit test suite.
 - Run a production build unless the owner explicitly says not to.
 - Smoke the main app screens if UI changed.
+- For docs-only guardrail updates, `git diff --check` and `npm run release:check` are the minimum proof.

@@ -60,7 +60,8 @@ If `main`, open PRs, remote branches, or docs disagree, treat that as a synchron
 - One PR should have one clear theme. It may include several closely related low-risk fixes.
 - Do not replace `src/ClaudeMaintenanceApp.jsx` as a whole file.
 - Do not start new Supabase/Auth/RLS/database expansion unless it is explicitly scoped. Existing Supabase/Vercel staging is live; protect owner-entered data.
-- Do not do a broad modular split yet.
+- R10 is the current approved production-data scope, but only as narrow slices: one domain at a time, with migration/API/adapter/tests/gate evidence.
+- Do not do a broad modular split yet. In v1, do not start using `src/app`, `src/features`, or `src/shared` as a new architecture; existing placeholder folders are not permission to fill them.
 - Cross-cutting changes to auth, sessions, storage, files, push, permissions, or security must be done on a named branch with a visible PR, preferably draft until verified. Do not leave that kind of work as hidden uncommitted changes on `main`.
 - Autonomy never overrides the agreed strategy. Even if the owner says "move freely", "do it yourself", or "do not wait for me", Codex must stay inside the current roadmap and documented guardrails.
 - Autonomy also does not authorize broad architectural changes that were not requested or recorded. If a change affects login, data persistence, or production access, name the risk in the PR and keep a rollback path.
@@ -101,6 +102,7 @@ Rules:
 - Use small branches and PRs.
 - Do not replace src/ClaudeMaintenanceApp.jsx as a whole file.
 - No new Supabase/Auth/RLS/database expansion unless explicitly scoped. Existing Supabase/Vercel staging is live; protect owner-entered data.
+- R10 is allowed only as focused production-data slices with migration/API/adapter/tests/gate evidence.
 - No broad modular split.
 - For code changes run npm test -- --run, npm run build, and browser smoke-check UI behavior changes.
 - Keep docs short: active-work is a live ledger, not full history.

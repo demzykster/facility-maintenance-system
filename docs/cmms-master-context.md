@@ -21,7 +21,7 @@ The previous separate checks direction was removed from the v1 product surface a
 
 ## Source Layout
 
-The current v1 app remains in the existing source layout. Do not create `src/app`, `src/features`, or `src/shared` in this workstream.
+The current v1 app remains in the existing source layout. Do not start using `src/app`, `src/features`, or `src/shared` as a new modular architecture in this workstream. Existing placeholder folders do not authorize a broad split.
 
 ## Data Collections
 
@@ -47,3 +47,5 @@ Current collection families:
 - Do not touch v2 or Claude branches.
 - Keep docs honest after merges.
 - Prefer small verified changes over broad redesign.
+- R10 is the approved production-data path, but only as narrow domain slices with migration/API/adapter/tests/gate evidence.
+- Do not manually edit production/staging data or overwrite owner-entered staging data unless the owner explicitly asks.
