@@ -2,9 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/staging-cleaning-rounds-smoke`
+- Current branch: `codex/staging-cleaning-rounds-smoke`.
 - Last completed work: R10 cleaning rounds API slice added the first `/api/cleaning/rounds` server-operation seam over `public.cleaning_rounds` while leaving UI/runtime authority and `cround:*` migration for later slices.
+- Current work: Add staging reconciliation and a controlled API smoke for `cround:*` / `/api/cleaning/rounds` without switching UI/runtime authority.
 
 ## Current Product Direction
 
