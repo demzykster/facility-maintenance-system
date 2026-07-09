@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { chromium, devices } from "@playwright/test";
 import { applyEnvValues, parseEnvFile } from "../src/envFileModel.js";
+import { isExpectedBrowserSmokeResponse, isRelevantBrowserSmokeConsoleMessage } from "../src/stagingBrowserSignalModel.js";
 
 const ENV_FILE = ".env.staging.local";
 const CREDENTIALS_FILE = ".staging-admin-credentials.local";
@@ -47,16 +48,11 @@ function adminCredentials() {
 }
 
 function relevantResponse(response) {
-  const url = response.url();
-  if (response.status() < 400) return false;
-  if (/favicon\.ico$/.test(url)) return false;
-  if (/\/api\/bootstrap\/admin/.test(url)) return false;
-  return true;
+  return !isExpectedBrowserSmokeResponse({ url: response.url(), status: response.status() });
 }
 
 function relevantConsoleMessage(message) {
-  const text = message.text();
-  return message.type() === "error" || /save failed|failed|exception|error/i.test(text);
+  return isRelevantBrowserSmokeConsoleMessage({ type: message.type(), text: message.text() });
 }
 
 async function assertNoSaveFailureToast(page, label) {

@@ -4,7 +4,7 @@
 
 - Active branch: none.
 - Current branch: `main`.
-- Last completed work: closed broad historical backlog/documentation tails so only live handoff and release checklist drive new work.
+- Last completed work: staging/pilot gate was repaired and passed against the live Vercel/Supabase staging environment after the normalized tickets schema/grants were applied.
 
 ## Current Product Direction
 

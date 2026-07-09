@@ -15,6 +15,7 @@ describe("Supabase tickets core migration", () => {
   it("creates the normalized tickets table with the first RLS policies", () => {
     expect(migrationSql).toContain("create table if not exists public.tickets");
     expect(migrationSql).toContain("legacy_payload jsonb");
+    expect(migrationSql).toContain("grant select, insert, update, delete on public.tickets to service_role");
     expect(migrationSql).toContain("alter table public.tickets enable row level security");
     expect(migrationSql).toContain("create policy tickets_admin_all");
     expect(migrationSql).toContain("create policy tickets_manager_read");
