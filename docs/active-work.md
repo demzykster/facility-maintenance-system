@@ -2,10 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-cleaning-zones-reconcile`
-- Current branch: `codex/r10-cleaning-zones-reconcile`.
-- Last completed work: R10 cleaning zones API slice added a staging gate smoke for `/api/cleaning/zones` while leaving UI/runtime authority on the current KV bridge until later slices.
-- Current work: Add staging reconciliation from protected `czone:` KV records into `public.cleaning_zones` through the normalized `/api/cleaning/zones` route.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 cleaning zones reconciliation slice added staging reconciliation from protected `czone:` KV records into `public.cleaning_zones` through the normalized `/api/cleaning/zones` route. Staging now has 11 KV cleaning zones mirrored into 11 normalized rows, while UI/runtime authority remains on the KV bridge until later slices.
 
 ## Current Product Direction
 
