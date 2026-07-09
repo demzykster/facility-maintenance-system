@@ -362,4 +362,38 @@ describe("users API handler", () => {
       action: "delete"
     }));
   });
+
+  it("deactivates login-capable app_users before deleting the temporary KV mirror", async () => {
+    const order = [];
+    const driver = {
+      delete: vi.fn().mockImplementation(() => {
+        order.push("kv");
+        return Promise.resolve();
+      })
+    };
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({ id: "app-user-1", auth_user_id: "auth-1", active: true }),
+      updateAppUserProfile: vi.fn().mockImplementation(() => {
+        order.push("app-users");
+        return Promise.resolve({ id: "app-user-1", active: false });
+      })
+    };
+    const handler = createUsersApiHandler({
+      driver,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer manager-token" },
+      query: { id: "app-user-1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.getAppUserProfileById).toHaveBeenCalledWith("app-user-1");
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-1", { active: false });
+    expect(driver.delete).toHaveBeenCalledWith("user:app-user-1", true);
+    expect(order).toEqual(["app-users", "kv"]);
+  });
 });

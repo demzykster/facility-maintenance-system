@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: R10 users read-authority slice made `/api/users` read/list Supabase `app_users` as the primary source for login-capable users while keeping `user:` KV as temporary legacy enrichment and fallback.
+- Active branch: `codex/r10-users-delete-authority`.
+- Current branch: `codex/r10-users-delete-authority`.
+- Current branch work: R10 users delete-authority slice. Make `/api/users` deactivate login-capable Supabase `app_users` records before removing their temporary `user:` KV mirror.
 
 ## Current Product Direction
 
