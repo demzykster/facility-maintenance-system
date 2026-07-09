@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-user-management-authority`.
-- Current branch: `codex/r10-user-management-authority`.
-- Current branch work: R10 user-management authority slice. Add an explicit `/api/users` server operation seam for admin/team user-management and route production/API user save/delete/load paths through it instead of raw `/api/kv user:*` calls.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 user-management authority slice added an explicit `/api/users` server operation seam for admin/team user-management and routed production/API user save/delete/load paths through it instead of raw `/api/kv user:*` calls.
 
 ## Current Product Direction
 
