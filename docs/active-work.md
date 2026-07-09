@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-normalized-tickets-core`.
-- Current branch: `codex/r10-normalized-tickets-core`.
-- Current work: R10 normalized tickets core pass: add server-side ticket read/detail contract, KV-to-`public.tickets` staging reconciliation, and normalized ticket file metadata visibility.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 normalized tickets core pass added server-side ticket read/detail contract, KV-to-`public.tickets` staging reconciliation, and normalized ticket file metadata visibility.
 
 ## Current Product Direction
 
