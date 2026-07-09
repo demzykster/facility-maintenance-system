@@ -2,9 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/r10-cleaning-rounds-authority`
+- Current branch: `codex/r10-cleaning-rounds-authority`.
 - Last completed work: R10 cleaning rounds staging slice added reconciliation and a controlled API smoke for `cround:*` / `/api/cleaning/rounds`. Staging now has 34 KV cleaning rounds mirrored into 34 normalized rows, while UI/runtime authority remains on `cround:` until a later slice.
+- Current work: Move cleaning rounds UI/runtime reads and saves to `/api/cleaning/rounds` in production/API mode while keeping `cround:*` as a compatibility mirror.
 
 ## Current Product Direction
 
