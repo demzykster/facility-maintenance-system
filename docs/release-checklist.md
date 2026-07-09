@@ -77,6 +77,7 @@ Current notes:
 - Staging reconciliation slice: `staging:tickets:reconcile` compares shared KV `ticket:*` records to `public.tickets`, backfills missing/drifted rows through `/api/tickets`, and fails the staging gate if the normalized table still disagrees with the KV authority.
 - Ticket file ownership slice: the tickets API can expose active file metadata for a normalized ticket, and the staging tickets API smoke creates a temporary ticket, uploads a file with `ownerType=ticket`, verifies it through `/api/tickets?id=...&includeFiles=1`, then deletes the file and ticket.
 - Ticket authority slice: in production/API mode, the app reads tickets from `/api/tickets`, writes/deletes through the normalized tickets API first, and keeps `ticket:*` KV only as a compatibility mirror. Demo/local mode still uses the existing KV path.
+- Ticket cleanup slice: normalized ticket deletion also cleans ticket-owned Supabase Storage objects and marks active `file_metadata` rows deleted by owner, so deleting a ticket does not leave active file attachments behind.
 - This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End
