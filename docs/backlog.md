@@ -21,19 +21,19 @@ The backlog below remains useful for historical detail and code-area context, bu
 
 ### R10 safety slice - staging preflight model coverage and build-size truth
 
-Status: active on `codex/r10-safety-preflight-user-gap`.
+Status: done in PR #746.
 
 Goal:
 - Keep the current R10/final-production path safe without bypassing the documented guardrails.
 - Make staging preflight env checks testable at the model seam instead of leaving missing/wrong-value and bootstrap-safety checks only in the executable script.
 - Refresh the documented bundle-size warning from a fresh build when the task scope allows build output.
 
-Suggested PR sequence:
-1. Move the missing-required-env, wrong-value env, and bootstrap-safety checks from `tools/staging-smoke-preflight.mjs` into `src/stagingSmokePreflightModel.js`.
-2. Add focused Vitest coverage for missing required env values, wrong values such as non-production `VITE_CMMS_APP_MODE`, non-api storage provider, non-Supabase KV/file/audit drivers, disabled public complaints, and bootstrap env that remains enabled after first-admin setup.
-3. Keep existing placeholder and Supabase public/server pair tests; do not rewrite them.
-4. Keep local/demo default behavior unchanged. This slice should harden staging/production gates, not flip `seedPolicyForMode`.
-5. If a fresh `npm run build` is run as part of the PR, update `docs/current-status.md` with the observed main chunk raw/gzip size. If build is not run, leave the bundle-size note untouched.
+Completed PR sequence:
+1. Moved the missing-required-env, wrong-value env, and bootstrap-safety checks from `tools/staging-smoke-preflight.mjs` into `src/stagingSmokePreflightModel.js`.
+2. Added focused Vitest coverage for missing required env values, wrong values such as non-production `VITE_CMMS_APP_MODE`, non-api storage provider, non-Supabase KV/file/audit drivers, disabled public complaints, and bootstrap env that remains enabled after first-admin setup.
+3. Kept existing placeholder and Supabase public/server pair tests.
+4. Kept local/demo default behavior unchanged; `seedPolicyForMode` was not flipped.
+5. Updated `docs/current-status.md` with the observed main chunk raw/gzip size from a fresh `npm run build`.
 
 DoD:
 - `npm test -- --run` passes.
