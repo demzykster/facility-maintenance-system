@@ -156,6 +156,8 @@ Minimum path:
 12. verify audit entries exist.
 13. run `npm run staging:smoke:live`.
 
+The automated `npm run staging:gate` also verifies normalized ticket upsert/delete through `/api/tickets`; if this fails, check `public.tickets` service-role grants first.
+
 ## 9. Backup And Restore Drill
 
 Follow `docs/supabase-backup-restore-drill.md`.
