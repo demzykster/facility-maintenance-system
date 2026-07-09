@@ -14,7 +14,7 @@ import jsQR from "jsqr";
 import packageInfo from "../package.json";
 import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
-import { store } from "./storageAdapter.js";
+import { productionAccessToken, store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
@@ -61,6 +61,8 @@ import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScre
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 import { defaultWorkerView } from "./workerProfileModel.js";
 import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
+import { createApiTicketProvider } from "./apiTicketAdapter.js";
+import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -88,6 +90,14 @@ const PRODUCTION_LOGIN_CONFIG = productionLoginConfigFromEnv(import.meta.env);
 const PRODUCTION_AUTH_STORE = createProductionAuthStore();
 const TICKET_PHOTOS = createTicketPhotoStorageFromEnv(import.meta.env, store, PRODUCTION_AUTH_STORE);
 const CLEANING_PHOTOS = createCleaningPhotoStorageFromEnv(import.meta.env, PRODUCTION_AUTH_STORE);
+const NORMALIZED_TICKET_PROVIDER = createApiTicketProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_TICKET_SHADOW_WRITE =
+  APP_MODE === APP_MODES.production &&
+  storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api &&
+  !!NORMALIZED_TICKET_PROVIDER;
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 const PUBLIC_ZONES_URL = publicZonesApiUrlFromEnv(import.meta.env);
 
@@ -1782,12 +1792,26 @@ export default function App() {
       dedupeKey: `cleaning-${complaint.id}-${complaint.at || Date.now()}`
     });
   };
+  const shadowWriteNormalizedTicket = async (ticket) => {
+    if (!NORMALIZED_TICKET_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_TICKET_PROVIDER.upsert(ticket);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "ticket_normalized_shadow_write_failed",
+        action: "upsert",
+        key: `ticket:${ticket?.id || "unknown"}`,
+        message: error?.message || "Normalized ticket API write failed"
+      });
+    }
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
     rec = applyTicketStatusTiming(rec, _prev, _now);
     if (!rec.num) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
     if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
+    void shadowWriteNormalizedTicket(rec);
     setTickets((p) => [rec, ...p.filter((x) => x.id !== rec.id)].sort((a, b) => b.createdAt - a.createdAt));
     notifyTicketPhone(rec, _prev);
     return true;
