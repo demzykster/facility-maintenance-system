@@ -50,9 +50,11 @@ DoD:
 - Any UI change is small and does not change Supabase/Auth/RLS/backend behavior.
 - Existing behavior remains understandable for admin, manager, technician, worker, and legacy cleaner during transition.
 
-## Later - Audit Dependencies
+## Later - Dependency Audit
 
-`npm audit` still reports `xlsx` high severity advisories with no npm automatic fix. Do not replace `xlsx` casually; this affects business import/export flows. Handle it in a focused dependency phase after the permissions/onboarding direction is clear.
+The old `xlsx` audit item is closed. `xlsx` is no longer a package dependency; Excel export uses the local adapter over `write-excel-file`, Excel import uses `read-excel-file`, and CSV import uses `papaparse`.
+
+Keep dependency review as a normal release hygiene step, but do not treat the old `xlsx` branch/task as open work.
 
 ## Still Not Next Without Explicit Scope
 

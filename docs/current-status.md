@@ -54,7 +54,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 - Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
 - Vitest was added through PR #2.
-- `npm test` is available and currently runs 4 passing test files.
+- `npm test` is available. As of 2026-07-09 on current `main`, it runs 123 test files / 646 tests.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
 - Ticket-card audit passes reduced noise for closed tickets:
   - closed/cancelled tickets no longer show an SLA progress bar;
@@ -72,14 +72,11 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 ## Known Warnings
 
-- Production bundle is about 1.4 MB. This is expected for the current monolith and is not a blocker.
-- `npm audit` currently reports:
-  - `xlsx` high severity advisories; `xlsx@0.18.5` is the latest npm release and npm reports no automatic fix.
-- The previous `esbuild` low severity audit finding was removed by updating the Vite toolchain in branch `codex/audit-dependencies`.
-- Excel/CSV task import is capped at 5 MB in branch `codex/audit-dependencies` as a small mitigation while the `xlsx` replacement/upgrade decision remains open.
-- Branch `codex/replace-task-import-xlsx` moves task file import away from `xlsx` to `read-excel-file` for `.xlsx` and `papaparse` for `.csv`.
-- After that branch, `xlsx` remains only for Excel export/report generation paths.
-- The public Vercel deployment is staging/pilot, not final production. It uses the current Supabase-backed server/session/KV compatibility path for staging data, while local/demo mode can still use browser storage for development review.
+- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-09, `npm run build` produced the main app chunk at about 2.18 MB raw / 575 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
+- `npm audit` is currently clean: 0 vulnerabilities on 2026-07-09.
+- The old `xlsx` package dependency has been removed from `package.json`. Excel export now goes through `src/xlsxExportAdapter.js` on top of `write-excel-file`; Excel import uses `read-excel-file`; CSV import uses `papaparse`.
+- Old dependency-audit branch references are historical only. That work is already merged into `main`; current remote branches should be checked live with `git branch -r`.
+- The public Vercel deployment is staging/pilot, not final production. It uses the current Supabase-backed server/session/API/KV compatibility path for staging data, while local/demo mode can still use browser storage for development review.
 
 ## Current Position
 
@@ -98,3 +95,10 @@ Current permissions work:
 - New user saves write module permissions through `perms`; legacy `fleetDocs/fleetTickets` flags are read only as a migration bridge.
 - Legacy permission migration into `perms` is covered by a Vitest harness.
 - `docs/settings-site-map.md` defines current and intended settings homes.
+
+Current production-data work:
+
+- Tickets are normalized-authority in production/API mode through `/api/tickets`; `ticket:*` KV records remain a compatibility mirror.
+- Fleet units are normalized-authority in production/API mode through `/api/fleet`; `fleet:*` KV records remain a compatibility mirror.
+- Periodic maintenance is normalized-authority in production/API mode through `/api/pm`; `pm:*` KV records remain a compatibility mirror.
+- R10 is not complete yet. Other business domains still need deliberate normalized-table/server-operation slices before final production can stop depending on the accepted KV bridge.
