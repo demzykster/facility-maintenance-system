@@ -48,7 +48,7 @@ Later separate safety slices:
 
 ### R10 data slice - user-management authority gap
 
-Status: active on `codex/r10-user-management-authority`.
+Status: first server-operation slice done in PR #749; normalized/RLS authority work remains.
 
 Goal:
 - Keep the distinction between production identity/session and admin user-management clear.
@@ -56,15 +56,21 @@ Goal:
 - Admin/team user creation, edits, permissions, and worker-access management still use the `user:` KV compatibility path through `/api/kv`, protected by server permission checks and secret redaction.
 - Close this remaining user-management authority gap through an explicit server operation/API/RLS path or another approved normalized authority design.
 
-Suggested PR sequence:
-1. Add the smallest server-operation boundary for admin user-management without changing local/demo login behavior.
-2. Route production/API user list, save, and delete flows through that explicit operation seam instead of raw `/api/kv user:*` calls.
-3. Add tests for manager/admin permission checks, secret redaction, self-read behavior, denied writes, and client wiring.
-4. Keep the seam backed by the current storage driver for this first slice; do not bundle this with cleaning, PPE, full RLS table migration, or broad permission redesign.
+Completed PR #749:
+- Added the smallest server-operation boundary for admin user-management without changing local/demo login behavior.
+- Routed production/API user list, save, and delete flows through that explicit operation seam instead of raw `/api/kv user:*` calls.
+- Added tests for manager/admin permission checks, secret redaction, self-read behavior, denied writes, and client wiring.
+- Kept the seam backed by the current storage driver for the first slice.
+
+Next PR sequence:
+1. Pick one narrow admin user-management operation or field group to move from the compatibility storage driver to normalized Supabase `app_users` authority.
+2. Keep `/api/users` as the server operation boundary and preserve local/demo behavior.
+3. Add tests for RLS/profile update payload mapping, permission checks, first-login compatibility, and KV fallback/mirror behavior if kept temporarily.
+4. Do not bundle this with cleaning, PPE, broad permission redesign, or monolith extraction.
 
 DoD:
 - Production identity/session remains backed by Supabase `app_users`.
-- Admin user-management no longer depends on raw `/api/kv user:*` calls for the migrated production/API flow.
+- Admin user-management no longer depends on raw `/api/kv user:*` calls for the migrated production/API flow, but deeper normalized/RLS authority work remains.
 - Permission checks are enforced server-side and covered by tests.
 - Existing first-login password/PIN contract remains unchanged.
 
