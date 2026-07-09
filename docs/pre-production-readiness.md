@@ -9,6 +9,10 @@ This note names what is currently safe to assume before treating the staging/pil
 - Staging is backed by Supabase Auth/app profiles and the Supabase KV compatibility bridge.
 - Local/demo mode still exists for development review, but it is not the deployed staging data path.
 - Owner-entered staging/pilot data is working data. Do not clear, reseed, or overwrite it unless the owner explicitly asks.
+- Readiness language is explicit now:
+  - `demo`: local/browser review path;
+  - `staging_pilot`: production-like Supabase/Auth/KV/file/audit foundation for controlled use;
+  - `final_production`: normalized business tables plus broader server-side business permissions.
 
 ## Demo-Only Boundaries
 
@@ -30,7 +34,7 @@ This note names what is currently safe to assume before treating the staging/pil
 
 The owner opened the production backend/auth phase after R8. The first staging scope is now implemented around Supabase Auth/app profiles, server sessions, and the Supabase KV compatibility bridge.
 
-Still in scope for production hardening:
+The R9 foundation is closed for the current staging/pilot level. The remaining production hardening is R10-level work:
 
 - normalized database schema/RLS for more business tables;
 - continued server-side permission enforcement;
