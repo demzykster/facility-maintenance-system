@@ -1,4 +1,4 @@
-import { ticketRecordToSupabaseRow } from "../../src/ticketRecordModel.js";
+import { ticketRecordFromSupabaseRow, ticketRecordToSupabaseRow } from "../../src/ticketRecordModel.js";
 
 const readJsonOrText = async (response) => {
   const text = await response.text();
@@ -25,6 +25,27 @@ export function createSupabaseTicketsDriver({ url, serviceRoleKey, table = "tick
   const base = `${root}/rest/v1/${encodeURIComponent(table)}`;
 
   return {
+    async list({ limit = 500 } = {}) {
+      const safeLimit = Math.min(Math.max(Number(limit) || 500, 1), 1000);
+      const response = await fetchImpl(`${base}?select=*&order=created_at.desc&limit=${safeLimit}`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_ticket_${response.status}`));
+      return Array.isArray(data) ? data.map(ticketRecordFromSupabaseRow) : [];
+    },
+    async get(id) {
+      const ticketId = String(id || "").trim();
+      if (!ticketId) throw new Error("ticket_id_required");
+      const response = await fetchImpl(`${base}?id=eq.${encodeURIComponent(ticketId)}&select=*&limit=1`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_ticket_${response.status}`));
+      return Array.isArray(data) && data[0] ? ticketRecordFromSupabaseRow(data[0]) : null;
+    },
     async upsert(ticket) {
       const row = ticketRecordToSupabaseRow(ticket);
       const response = await fetchImpl(`${base}?on_conflict=id`, {

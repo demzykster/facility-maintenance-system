@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: staging/pilot gate was repaired and passed against the live Vercel/Supabase staging environment after the normalized tickets schema/grants were applied.
+- Active branch: `codex/r10-normalized-tickets-core`.
+- Current branch: `codex/r10-normalized-tickets-core`.
+- Current work: R10 normalized tickets core pass: add server-side ticket read/detail contract, KV-to-`public.tickets` staging reconciliation, and normalized ticket file metadata visibility.
 
 ## Current Product Direction
 
@@ -23,3 +23,4 @@
 
 - Treat removed storage prefixes and docs as intentionally retired, not as migration backlog.
 - Do not invent broad product-polish backlog from screenshots or old notes. Wait for a concrete owner-reported issue.
+- For tickets, keep the KV bridge authoritative for the live UI until reconciliation and server reads are verified in staging; do not switch the monolith UI to normalized reads in the same pass.

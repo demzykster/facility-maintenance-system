@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTicketRecord, ticketRecordToSupabaseRow } from "../src/ticketRecordModel.js";
+import { normalizeTicketRecord, ticketRecordFromSupabaseRow, ticketRecordToSupabaseRow } from "../src/ticketRecordModel.js";
 
 describe("ticketRecordModel", () => {
   it("normalizes current UI ticket payloads into a stable production record", () => {
@@ -35,6 +35,43 @@ describe("ticketRecordModel", () => {
       subject: "A",
       source_kv_key: "ticket:T-2",
       legacy_payload: { id: "T-2", status: "new", subject: "A" }
+    });
+  });
+
+  it("does not send legacy non-UUID user ids into UUID foreign-key columns", () => {
+    expect(ticketRecordToSupabaseRow({
+      id: "T-legacy",
+      assigneeId: "u-legacy",
+      reportedBy: { id: "worker-42", name: "Worker" }
+    })).toMatchObject({
+      assignee_id: null,
+      reported_by_id: null,
+      assignee_name: "",
+      reported_by_name: "Worker"
+    });
+  });
+
+  it("hydrates UI-compatible ticket payloads from Supabase rows", () => {
+    expect(ticketRecordFromSupabaseRow({
+      id: "T-3",
+      num: 9,
+      track: "facility",
+      subject: "Fallback subject",
+      status: "open",
+      created_at: "2026-07-09T10:00:00.000Z",
+      updated_at: "2026-07-09T10:05:00.000Z",
+      source_kv_key: "ticket:T-3",
+      legacy_payload: {
+        id: "T-3",
+        subject: "Legacy subject",
+        createdAt: 1_700_000_000_000
+      }
+    })).toMatchObject({
+      id: "T-3",
+      num: 9,
+      subject: "Legacy subject",
+      status: "open",
+      createdAt: 1_700_000_000_000
     });
   });
 });

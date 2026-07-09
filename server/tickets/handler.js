@@ -7,6 +7,7 @@ import { buildSessionPayload, createSupabaseSessionClient } from "../session/ses
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { createSupabaseTicketsDriverFromEnv } from "./supabaseTicketsDriver.js";
+import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -83,9 +84,21 @@ const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
   metadata: { source: "api/tickets", sourceKvKey: `ticket:${ticketId}` }
 });
 
-export function createTicketsApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+const canReadTickets = (user = {}) => {
+  if (!user?.role) return true;
+  return ["admin", "user", "tech", "worker"].includes(user.role);
+};
+
+const withFiles = async (ticket, metadataDriver) => {
+  if (!ticket || typeof metadataDriver?.listActiveByOwner !== "function") return ticket;
+  const files = await metadataDriver.listActiveByOwner("ticket", ticket.id);
+  return { ...ticket, files };
+};
+
+export function createTicketsApiHandler({ driver = null, auditDriver = null, metadataDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
+  const backendMetadataDriver = metadataDriver || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
 
   return async function ticketsApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -94,9 +107,23 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, env
 
     try {
       const method = String(req.method || "GET").toUpperCase();
-      if (!["POST", "DELETE"].includes(method)) {
-        res.setHeader("allow", "POST, DELETE");
+      if (!["GET", "POST", "DELETE"].includes(method)) {
+        res.setHeader("allow", "GET, POST, DELETE");
         return json(res, 405, { error: "method_not_allowed" });
+      }
+
+      if (method === "GET") {
+        if (!canReadTickets(auth.user)) return json(res, 403, { error: "permission_required:tickets:view" });
+        if (typeof backendDriver.get !== "function" || typeof backendDriver.list !== "function") return json(res, 503, { error: "tickets_read_not_configured" });
+        const id = String(req.query?.id || "").trim();
+        const includeFiles = req.query?.includeFiles === "1" || req.query?.includeFiles === "true";
+        if (id) {
+          const ticket = await backendDriver.get(id);
+          if (!ticket) return json(res, 404, { error: "ticket_not_found" });
+          return json(res, 200, { ok: true, ticket: includeFiles ? await withFiles(ticket, backendMetadataDriver) : ticket });
+        }
+        const tickets = await backendDriver.list({ limit: req.query?.limit });
+        return json(res, 200, { ok: true, tickets });
       }
 
       const body = await readBody(req);

@@ -8,13 +8,18 @@ const smokeScript = readFileSync(new URL("../tools/staging-tickets-api-smoke.mjs
 describe("staging tickets API smoke wiring", () => {
   it("exposes the normalized ticket API smoke as a package script and includes it in staging gate", () => {
     expect(packageJson.scripts["staging:smoke:tickets-api"]).toBe("node tools/staging-tickets-api-smoke.mjs");
+    expect(packageJson.scripts["staging:tickets:reconcile"]).toBe("node tools/staging-tickets-reconcile.mjs");
     expect(stagingGate).toContain('"staging:smoke:tickets-api"');
+    expect(stagingGate).toContain('"staging:tickets:reconcile"');
   });
 
   it("creates and deletes a temporary normalized ticket through the public API", () => {
     expect(smokeScript).toContain('fetch(`${publicUrl}/api/tickets`');
+    expect(smokeScript).toContain("&includeFiles=1");
+    expect(smokeScript).toContain('fetch(`${publicUrl}/api/files?path=${encodeURIComponent(filePath)}`');
     expect(smokeScript).toContain('fetch(`${publicUrl}/api/tickets?id=${encodeURIComponent(id)}`');
     expect(smokeScript).toContain("tickets_upsert_row_count");
+    expect(smokeScript).toContain("ticket_files_missing");
     expect(smokeScript).toContain("tickets_delete_row_count");
     expect(smokeScript).not.toContain('createdBy: { id: "staging-smoke"');
   });

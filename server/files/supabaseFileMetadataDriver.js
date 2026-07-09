@@ -59,6 +59,15 @@ export function createSupabaseFileMetadataDriver({ url, serviceRoleKey, table = 
   const base = `${root}/rest/v1/${encodeURIComponent(table)}`;
 
   return {
+    async listActiveByOwner(ownerType, ownerId) {
+      const response = await fetchImpl(`${base}?owner_type=eq.${encodeURIComponent(ownerType)}&owner_id=eq.${encodeURIComponent(ownerId)}&deleted_at=is.null&select=*&order=created_at.desc`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_file_metadata_owner_${response.status}`));
+      return Array.isArray(data) ? data.map(fromRow) : [];
+    },
     async findActiveByPath(path) {
       const response = await fetchImpl(`${base}?path=eq.${encodeURIComponent(path)}&deleted_at=is.null&select=*&limit=1`, {
         method: "GET",

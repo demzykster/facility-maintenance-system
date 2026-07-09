@@ -1,5 +1,10 @@
 const cleanString = (value) => String(value || "").trim();
 const cleanObject = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : {});
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidOrNull = (value) => {
+  const clean = cleanString(value);
+  return UUID_PATTERN.test(clean) ? clean : null;
+};
 
 const isoOrNull = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -49,9 +54,9 @@ export function ticketRecordToSupabaseRow(ticket = {}) {
     category: normalized.category,
     location: normalized.location,
     asset_id: normalized.assetId || null,
-    assignee_id: normalized.assigneeId || null,
+    assignee_id: uuidOrNull(normalized.assigneeId),
     assignee_name: normalized.assigneeName,
-    reported_by_id: normalized.reportedById || null,
+    reported_by_id: uuidOrNull(normalized.reportedById),
     reported_by_name: normalized.reportedByName,
     department: normalized.department,
     due_at: normalized.dueAt,
@@ -61,4 +66,34 @@ export function ticketRecordToSupabaseRow(ticket = {}) {
     source_kv_key: normalized.sourceKvKey,
     legacy_payload: normalized.legacyPayload
   };
+}
+
+export function ticketRecordFromSupabaseRow(row = {}) {
+  const legacy = cleanObject(row.legacy_payload);
+  const fallback = {
+    id: row.id,
+    num: row.num,
+    track: row.track,
+    subject: row.subject,
+    description: row.description,
+    status: row.status,
+    priority: row.priority,
+    category: row.category,
+    zone: row.location,
+    assetId: row.asset_id,
+    assigneeId: row.assignee_id,
+    assignee: row.assignee_name,
+    reportedBy: row.reported_by_id || row.reported_by_name ? {
+      id: row.reported_by_id,
+      name: row.reported_by_name
+    } : undefined,
+    department: row.department,
+    dueAt: row.due_at ? Date.parse(row.due_at) : null,
+    createdAt: row.created_at ? Date.parse(row.created_at) : undefined,
+    updatedAt: row.updated_at ? Date.parse(row.updated_at) : undefined,
+    closedAt: row.closed_at ? Date.parse(row.closed_at) : null,
+    sourceKvKey: row.source_kv_key
+  };
+  const merged = { ...fallback, ...legacy };
+  return normalizeTicketRecord(merged).legacyPayload;
 }
