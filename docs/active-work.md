@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-ticket-normalized-authority`.
-- Current branch: `codex/r10-ticket-normalized-authority`.
-- Current work: R10 ticket authority pass: production/API mode should read, save, and delete tickets through normalized `/api/tickets`, while KV remains only a compatibility mirror.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 ticket authority pass made production/API mode read, save, and delete tickets through normalized `/api/tickets`, while KV remains only a compatibility mirror.
 
 ## Current Product Direction
 
