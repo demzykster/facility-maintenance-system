@@ -12,14 +12,14 @@ describe("user form persistence", () => {
     expect(userFormSource).toContain('authUserId: user.authUserId || ""');
   });
 
-  it("blocks edited Supabase users from being saved when app_users sync fails", () => {
+  it("keeps legacy fallback user saves behind the old app_users sync", () => {
     const start = source.indexOf("const saveUser = async (u) =>");
     const end = source.indexOf("const delUser = async", start);
     const saveUserSource = source.slice(start, end);
 
+    expect(saveUserSource).toContain("if (!USER_MANAGEMENT_API_AUTHORITY)");
     expect(saveUserSource).toContain("await syncAdminProfileUser(u)");
     expect(saveUserSource).toContain('console.warn("admin profile sync failed", error)');
-    expect(saveUserSource.indexOf("await syncAdminProfileUser(u)")).toBeLessThan(saveUserSource.indexOf("USER_MANAGEMENT_PROVIDER.upsert(u)"));
     expect(saveUserSource).not.toContain("syncAdminProfileUser(u).catch");
   });
 

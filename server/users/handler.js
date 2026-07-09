@@ -5,6 +5,7 @@ import { kvReadPermissionError, kvReadValueForSession, kvWritePermissionError, r
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
 import { createUpstashKvDriverFromEnv } from "../kv/upstashDriver.js";
 import { bearerToken } from "../session/authCookie.js";
+import { createSupabaseProfileUpdateClient } from "../session/profileHandler.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 
@@ -31,6 +32,25 @@ const parseStoredUser = (record) => {
     return null;
   }
 };
+
+const cleanString = (value) => String(value || "").trim();
+const cleanEmail = (value) => cleanString(value).toLowerCase();
+
+export function appUserPatchFromUserRecord(user = {}) {
+  return {
+    name: cleanString(user.name) || null,
+    role: cleanString(user.role) || "user",
+    active: user.active !== false,
+    email: cleanEmail(user.email) || null,
+    phone: cleanString(user.phone) || null,
+    department: cleanString(user.dept || user.department) || null,
+    departments: Array.isArray(user.depts) ? user.depts.map(cleanString).filter(Boolean) : (user.dept ? [cleanString(user.dept)] : []),
+    permissions: user.perms || user.permissions || {},
+    manager_zones: Array.isArray(user.mgrZones) ? user.mgrZones.map(cleanString).filter(Boolean) : [],
+    tech_scope: cleanString(user.techScope) || null,
+    supplier: cleanString(user.supplier) || null
+  };
+}
 
 const publicUserForSession = (key, user, session) => {
   const value = kvReadValueForSession({ key, value: JSON.stringify(user), session });
@@ -107,9 +127,15 @@ const userUpsertAuditEvent = (user, actor) => normalizeAuditEvent({
   metadata: { source: "api/users", sourceKvKey: `user:${user.id}` }
 });
 
-export function createUsersApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+export function createUsersApiHandler({ driver = null, auditDriver = null, profileClient = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver || createDefaultDriver(env, fetchImpl);
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
+  const backendProfileClient = profileClient || createSupabaseProfileUpdateClient({
+    url: env.SUPABASE_URL,
+    anonKey: env.SUPABASE_ANON_KEY,
+    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    fetchImpl
+  });
 
   return async function usersApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -162,6 +188,12 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, env =
       const permissionError = kvWritePermissionError(auth.user, key);
       if (permissionError) return json(res, 403, { error: permissionError });
       if (typeof backendDriver.set !== "function") return json(res, 503, { error: "users_write_not_configured" });
+      if (user.authUserId) {
+        if (!backendProfileClient) return json(res, 503, { error: "users_profile_backend_not_configured" });
+        const patch = appUserPatchFromUserRecord(user);
+        if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
+        await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
+      }
       await backendDriver.set(key, JSON.stringify(user), true);
       await writeAuditEvent(backendAuditDriver, userUpsertAuditEvent(user, auth.user));
       return json(res, 200, { ok: true, user: redactUserSecrets(user) });

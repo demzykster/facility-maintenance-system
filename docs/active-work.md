@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: R10 user-management authority slice added an explicit `/api/users` server operation seam for admin/team user-management and routed production/API user save/delete/load paths through it instead of raw `/api/kv user:*` calls.
+- Active branch: `codex/r10-users-profile-authority`.
+- Current branch: `codex/r10-users-profile-authority`.
+- Current branch work: R10 users profile-authority slice. Move login-capable user `app_users` profile synchronization into `/api/users` so the server operation owns normalized profile updates before writing the temporary `user:` KV mirror.
 
 ## Current Product Direction
 
