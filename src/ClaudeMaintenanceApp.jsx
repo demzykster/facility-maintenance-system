@@ -65,12 +65,14 @@ import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { createApiFleetProvider } from "./apiFleetAdapter.js";
 import { createApiPmProvider } from "./apiPmAdapter.js";
 import { createApiCleaningZonesProvider } from "./apiCleaningZonesAdapter.js";
+import { createApiCleaningRoundsProvider } from "./apiCleaningRoundsAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
 import { cleaningZonesAuthorityFailureIssue, cleaningZonesForAuthority, normalizedCleaningZonesAuthorityEnabled } from "./cleaningZonesAuthorityModel.js";
+import { cleaningRoundsAuthorityFailureIssue, cleaningRoundsForAuthority, normalizedCleaningRoundsAuthorityEnabled } from "./cleaningRoundsAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -150,6 +152,19 @@ const NORMALIZED_CLEANING_ZONES_SHADOW_WRITE = !NORMALIZED_CLEANING_ZONES_AUTHOR
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_CLEANING_ZONES_PROVIDER;
+const NORMALIZED_CLEANING_ROUNDS_PROVIDER = createApiCleaningRoundsProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_CLEANING_ROUNDS_AUTHORITY = normalizedCleaningRoundsAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_CLEANING_ROUNDS_PROVIDER
+});
+const NORMALIZED_CLEANING_ROUNDS_SHADOW_WRITE = !NORMALIZED_CLEANING_ROUNDS_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_CLEANING_ROUNDS_PROVIDER;
 const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
@@ -1769,6 +1784,7 @@ export default function App() {
 	    let pmRows = pmv;
 	    let fleetRows = fl;
 	    let zoneRows = zn;
+	    let roundRows = rd;
 	    let userRows = us;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
@@ -1830,6 +1846,21 @@ export default function App() {
         }));
 	      }
 	    }
+	    if (NORMALIZED_CLEANING_ROUNDS_AUTHORITY) {
+	      try {
+	        const normalizedCleaningRounds = await cleaningRoundsForAuthority({
+          kvRounds: rd,
+          provider: NORMALIZED_CLEANING_ROUNDS_PROVIDER,
+          normalizedAuthority: true
+        });
+        roundRows = normalizedCleaningRounds.rounds;
+      } catch (error) {
+        void recordAutomaticAppIssue(cleaningRoundsAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized cleaning rounds API load failed"
+        }));
+	      }
+	    }
 	    if (USER_MANAGEMENT_API_AUTHORITY) {
 	      try {
 	        userRows = await loadUsers();
@@ -1846,7 +1877,7 @@ export default function App() {
     apply("pm", pmRows, setPm, (a, b) => a.nextDue - b.nextDue);
     apply("fleet", fleetRows, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
     apply("czone", zoneRows, setZones, zoneSort);
-    apply("cround", rd, setRounds, (a, b) => b.at - a.at);
+    apply("cround", roundRows, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
     apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
     apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
@@ -2162,6 +2193,28 @@ export default function App() {
       message: "Compatibility KV cleaning zone mirror delete failed"
     });
   };
+  const shadowWriteNormalizedCleaningRound = async (round) => {
+    if (!NORMALIZED_CLEANING_ROUNDS_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_CLEANING_ROUNDS_PROVIDER.upsert(round);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "cleaning_round_normalized_shadow_write_failed",
+        action: "upsert",
+        key: `cround:${round?.id || "unknown"}`,
+        message: error?.message || "Normalized cleaning rounds API write failed"
+      });
+    }
+  };
+  const mirrorCleaningRoundToKv = async (round) => {
+    const ok = await persistShared(`cround:${round.id}`, JSON.stringify(round), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "cleaning_round_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `cround:${round?.id || "unknown"}`,
+      message: "Compatibility KV cleaning round mirror save failed"
+    });
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
@@ -2400,7 +2453,28 @@ export default function App() {
     setComplaints((s) => s.filter((x) => !belongsToZone(x)));
     return true;
   };
-  const saveRound = async (r) => { const rec = await CLEANING_PHOTOS.saveRound(r); if (!await persistShared(`cround:${rec.id}`, JSON.stringify(rec))) return false; setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at)); return true; };
+  const saveRound = async (r) => {
+    const rec = await CLEANING_PHOTOS.saveRound(r);
+    if (NORMALIZED_CLEANING_ROUNDS_AUTHORITY) {
+      try {
+        await NORMALIZED_CLEANING_ROUNDS_PROVIDER.upsert(rec);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(cleaningRoundsAuthorityFailureIssue({
+          action: "save",
+          id: rec.id,
+          message: error?.message || "Normalized cleaning rounds API save failed"
+        }));
+        return false;
+      }
+      void mirrorCleaningRoundToKv(rec);
+    } else {
+      if (!await persistShared(`cround:${rec.id}`, JSON.stringify(rec))) return false;
+      void shadowWriteNormalizedCleaningRound(rec);
+    }
+    setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at));
+    return true;
+  };
   const saveAbsence = async (a) => { if (!await persistShared(`cabsence:${a.id}`, JSON.stringify(a))) return false; setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1))); return true; };
   const delAbsence = async (id) => { if (!await deleteShared(`cabsence:${id}`)) return false; setAbsences((s) => s.filter((x) => x.id !== id)); return true; };
   const spawnFacilityFromComplaint = async (c) => {
