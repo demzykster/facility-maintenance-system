@@ -78,6 +78,8 @@ Current notes:
 - Ticket file ownership slice: the tickets API can expose active file metadata for a normalized ticket, and the staging tickets API smoke creates a temporary ticket, uploads a file with `ownerType=ticket`, verifies it through `/api/tickets?id=...&includeFiles=1`, then deletes the file and ticket.
 - Ticket authority slice: in production/API mode, the app reads tickets from `/api/tickets`, writes/deletes through the normalized tickets API first, and keeps `ticket:*` KV only as a compatibility mirror. Demo/local mode still uses the existing KV path.
 - Ticket cleanup slice: normalized ticket deletion also cleans ticket-owned Supabase Storage objects and marks active `file_metadata` rows deleted by owner, so deleting a ticket does not leave active file attachments behind.
+- Fleet authority slice: `public.fleet_units` and `/api/fleet` are live. In production/API mode, fleet reads, saves, imports, batch saves, and deletes use the normalized API first, while `fleet:*` KV is only a compatibility mirror. The staging gate reconciles `fleet:*` to `public.fleet_units` and runs a controlled `/api/fleet` smoke.
+- Periodic-maintenance authority slice: `public.periodic_maintenance` and `/api/pm` are live. In production/API mode, PM reads, saves, batch saves, and deletes use the normalized API first, while `pm:*` KV is only a compatibility mirror. The staging gate reconciles `pm:*` to `public.periodic_maintenance` and runs a controlled `/api/pm` smoke.
 - This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End

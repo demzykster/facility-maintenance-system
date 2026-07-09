@@ -63,9 +63,11 @@ import { defaultWorkerView } from "./workerProfileModel.js";
 import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { createApiFleetProvider } from "./apiFleetAdapter.js";
+import { createApiPmProvider } from "./apiPmAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
+import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -119,6 +121,19 @@ const NORMALIZED_FLEET_SHADOW_WRITE = !NORMALIZED_FLEET_AUTHORITY
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_FLEET_PROVIDER;
+const NORMALIZED_PM_PROVIDER = createApiPmProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_PM_AUTHORITY = normalizedPmAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_PM_PROVIDER
+});
+const NORMALIZED_PM_SHADOW_WRITE = !NORMALIZED_PM_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_PM_PROVIDER;
 const PUBLIC_COMPLAINTS = createPublicComplaintClient({ url: publicComplaintApiUrlFromEnv(import.meta.env) });
 const PUBLIC_ZONES_URL = publicZonesApiUrlFromEnv(import.meta.env);
 
@@ -1721,6 +1736,7 @@ export default function App() {
       "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
     ]);
     let ticketRows = tk;
+    let pmRows = pmv;
     let fleetRows = fl;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
@@ -1752,13 +1768,28 @@ export default function App() {
         }));
       }
     }
+    if (NORMALIZED_PM_AUTHORITY) {
+      try {
+        const normalizedPm = await pmForAuthority({
+          kvPm: pmv,
+          provider: NORMALIZED_PM_PROVIDER,
+          normalizedAuthority: true
+        });
+        pmRows = normalizedPm.pm;
+      } catch (error) {
+        void recordAutomaticAppIssue(pmAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized PM API load failed"
+        }));
+      }
+    }
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
       if (snapRef.current[key] !== sig) { snapRef.current[key] = sig; setter(data); }
     };
     apply("ticket", ticketRows, setTickets, (a, b) => b.createdAt - a.createdAt);
-    apply("pm", pmv, setPm, (a, b) => a.nextDue - b.nextDue);
+    apply("pm", pmRows, setPm, (a, b) => a.nextDue - b.nextDue);
     apply("fleet", fleetRows, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
     apply("czone", zn, setZones, zoneSort);
     apply("cround", rd, setRounds, (a, b) => b.at - a.at);
@@ -1889,6 +1920,78 @@ export default function App() {
       message: "Compatibility KV ticket mirror delete failed"
     });
   };
+  const shadowWriteNormalizedPm = async (p) => {
+    if (!NORMALIZED_PM_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_PM_PROVIDER.upsert(p);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "pm_normalized_shadow_write_failed",
+        action: "upsert",
+        key: `pm:${p?.id || "unknown"}`,
+        message: error?.message || "Normalized PM API write failed"
+      });
+    }
+  };
+  const shadowDeleteNormalizedPm = async (id) => {
+    if (!NORMALIZED_PM_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_PM_PROVIDER.delete(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "pm_normalized_shadow_delete_failed",
+        action: "delete",
+        key: `pm:${id || "unknown"}`,
+        message: error?.message || "Normalized PM API delete failed"
+      });
+    }
+  };
+  const mirrorPmToKv = async (p) => {
+    const ok = await persistShared(`pm:${p.id}`, JSON.stringify(p), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "pm_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `pm:${p?.id || "unknown"}`,
+      message: "Compatibility KV PM mirror save failed"
+    });
+  };
+  const mirrorPmManyToKv = async (tasks = []) => {
+    const rows = (tasks || []).filter((p) => p?.id);
+    if (!rows.length) return;
+    const ok = await persistSharedMany(rows.map((p) => ({ key: `pm:${p.id}`, value: JSON.stringify(p) })), {
+      toastOnFail: false,
+      atomic: true,
+      timeoutMs: 60000
+    });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "pm_kv_mirror_save_failed",
+      action: "mirror-save-many",
+      key: `pm:${rows.length} records`,
+      message: "Compatibility KV PM batch mirror save failed"
+    });
+  };
+  const mirrorDeletePmFromKv = async (id) => {
+    const ok = await deleteShared(`pm:${id}`, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "pm_kv_mirror_delete_failed",
+      action: "mirror-delete",
+      key: `pm:${id || "unknown"}`,
+      message: "Compatibility KV PM mirror delete failed"
+    });
+  };
+  const saveNormalizedPmTasks = async (tasks = [], action = "save") => {
+    try {
+      for (const task of tasks) await NORMALIZED_PM_PROVIDER.upsert(task);
+      return true;
+    } catch (error) {
+      setToast(SAVE_FAILED_MESSAGE);
+      void recordAutomaticAppIssue(pmAuthorityFailureIssue({
+        action,
+        message: error?.message || "Normalized PM API save failed"
+      }));
+      return false;
+    }
+  };
   const shadowWriteNormalizedFleet = async (f) => {
     if (!NORMALIZED_FLEET_SHADOW_WRITE) return;
     try {
@@ -1987,26 +2090,71 @@ export default function App() {
     notifyTicketPhone(rec, _prev);
     return true;
   };
-  const savePm = async (p) => { if (!await persistShared(`pm:${p.id}`, JSON.stringify(p))) return false; setPm((s) => [...s.filter((x) => x.id !== p.id), p].sort((a, b) => a.nextDue - b.nextDue)); return true; };
+  const savePm = async (p) => {
+    if (NORMALIZED_PM_AUTHORITY) {
+      try {
+        await NORMALIZED_PM_PROVIDER.upsert(p);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(pmAuthorityFailureIssue({
+          action: "save",
+          id: p.id,
+          message: error?.message || "Normalized PM API save failed"
+        }));
+        return false;
+      }
+      void mirrorPmToKv(p);
+    } else {
+      if (!await persistShared(`pm:${p.id}`, JSON.stringify(p))) return false;
+      void shadowWriteNormalizedPm(p);
+    }
+    setPm((s) => [...s.filter((x) => x.id !== p.id), p].sort((a, b) => a.nextDue - b.nextDue));
+    return true;
+  };
   const savePmMany = async (items, options = {}) => {
     const tasks = (items || []).filter((p) => p?.id);
     if (!tasks.length) return true;
-    const ok = await persistSharedMany(tasks.map((p) => ({ key: `pm:${p.id}`, value: JSON.stringify(p) })), { ...options, atomic: true, timeoutMs: 60000 });
-    if (!ok) return false;
+    if (NORMALIZED_PM_AUTHORITY) {
+      if (!await saveNormalizedPmTasks(tasks, "save-many")) return false;
+      void mirrorPmManyToKv(tasks);
+    } else {
+      const ok = await persistSharedMany(tasks.map((p) => ({ key: `pm:${p.id}`, value: JSON.stringify(p) })), { ...options, atomic: true, timeoutMs: 60000 });
+      if (!ok) return false;
+      tasks.forEach((task) => void shadowWriteNormalizedPm(task));
+    }
     setPm((s) => {
       const ids = new Set(tasks.map((p) => p.id));
       return [...s.filter((x) => !ids.has(x.id)), ...tasks].sort((a, b) => a.nextDue - b.nextDue);
     });
     return true;
   };
-  const delPm = async (id) => { if (!await deleteShared(`pm:${id}`)) return false; setPm((s) => s.filter((x) => x.id !== id)); return true; };
+  const delPm = async (id) => {
+    if (NORMALIZED_PM_AUTHORITY) {
+      try {
+        await NORMALIZED_PM_PROVIDER.delete(id);
+      } catch (error) {
+        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+        void recordAutomaticAppIssue(pmAuthorityFailureIssue({
+          action: "delete",
+          id,
+          message: error?.message || "Normalized PM API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeletePmFromKv(id);
+    } else {
+      if (!await deleteShared(`pm:${id}`)) return false;
+      void shadowDeleteNormalizedPm(id);
+    }
+    setPm((s) => s.filter((x) => x.id !== id));
+    return true;
+  };
   const delPmMany = async (ids = []) => {
     const cleanIds = [...new Set((ids || []).filter(Boolean))];
     if (!cleanIds.length) return true;
     for (const id of cleanIds) {
-      if (!await deleteShared(`pm:${id}`)) return false;
+      if (!await delPm(id)) return false;
     }
-    setPm((s) => s.filter((x) => !cleanIds.includes(x.id)));
     return true;
   };
   const delTicket = async (id) => {

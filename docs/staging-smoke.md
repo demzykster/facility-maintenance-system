@@ -36,7 +36,7 @@ After `.env.staging.local` is filled or the shell has staging Supabase env loade
 npm run staging:supabase-schema
 ```
 
-This checks `app_users`, `cmms_kv_records`, `tickets`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket. The `tickets` table must also grant `select`, `insert`, `update`, and `delete` to `service_role`, otherwise REST checks and normalized ticket writes fail with 403.
+This checks `app_users`, `cmms_kv_records`, `fleet_units`, `periodic_maintenance`, `tickets`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket. The normalized business tables must also grant `select`, `insert`, `update`, and `delete` to `service_role`, otherwise REST checks and normalized API writes fail with 403.
 
 After the first admin exists and bootstrap has been disabled, run the live read-only smoke:
 
@@ -62,7 +62,7 @@ npm run staging:gate
 
 It runs the local staging env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke. It intentionally does not run `npm run staging:backup:evidence`, because that command creates a local sensitive data snapshot for restore drills.
 
-The gate also runs a controlled `/api/tickets` smoke that creates one temporary normalized ticket, verifies it in `public.tickets`, deletes it through the same API route, and verifies cleanup.
+The gate also runs controlled normalized API smokes for `/api/tickets`, `/api/fleet`, and `/api/pm`. Each smoke creates one temporary record, verifies it in its Supabase table, deletes it through the same API route, and verifies cleanup. Before those smokes, the gate reconciles legacy KV records for tickets, fleet, and periodic maintenance into their normalized tables.
 
 ## Required Env Shape
 
