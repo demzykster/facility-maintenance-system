@@ -36,7 +36,7 @@ After `.env.staging.local` is filled or the shell has staging Supabase env loade
 npm run staging:supabase-schema
 ```
 
-This checks `app_users`, `cmms_kv_records`, `fleet_units`, `periodic_maintenance`, `tickets`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket. The normalized business tables must also grant `select`, `insert`, `update`, and `delete` to `service_role`, otherwise REST checks and normalized API writes fail with 403.
+This checks `app_users`, `cmms_kv_records`, `cleaning_zones`, `cleaning_rounds`, `cleaning_complaints`, `fleet_units`, `worker_absences`, `periodic_maintenance`, `tickets`, `file_metadata`, `audit_events`, and the private `cmms-files` bucket. The normalized business tables must also grant `select`, `insert`, `update`, and `delete` to `service_role`, otherwise REST checks and normalized API writes fail with 403.
 
 After the first admin exists and bootstrap has been disabled, run the live read-only smoke:
 

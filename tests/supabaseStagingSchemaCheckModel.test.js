@@ -23,6 +23,17 @@ describe("supabase staging schema check model", () => {
     expect(normalizeSupabaseUrl(" https://example.supabase.co/// ")).toBe("https://example.supabase.co");
   });
 
+  it("includes the first normalized cleaning tables in the staging schema gate", async () => {
+    const { STAGING_SUPABASE_TABLES } = await import("../src/supabaseStagingSchemaCheckModel.js");
+
+    expect(STAGING_SUPABASE_TABLES).toEqual(expect.arrayContaining([
+      "cleaning_zones",
+      "cleaning_rounds",
+      "cleaning_complaints",
+      "worker_absences"
+    ]));
+  });
+
   it("summarizes table and private bucket status without secret values", () => {
     const summary = supabaseSchemaCheckSummary({
       tables: [{ name: "app_users", ok: true, status: 200 }, { name: "tickets", ok: true, status: 200 }],
