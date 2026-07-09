@@ -13,25 +13,24 @@ This is the closure checklist for the current stabilization phase. It replaces b
 
 ### R9 — Production Backend Foundation
 
-Status: in progress.
+Status: done for the current staging/pilot foundation.
 
 Why it matters:
 - The project should move from browser-local demo storage to a real production foundation without breaking the working CMMS flows.
 
 Done means:
 - The frontend data-access boundary is extracted from `src/ClaudeMaintenanceApp.jsx`.
-- The current business collections are mapped to a production database schema.
+- The current business collections are mapped to the current production storage boundary.
 - Production mode disables demo seed data and built-in demo identities.
 - Production starts empty of current fake demo/local data; first-admin bootstrap is the only required initial record.
 - Production storage provider mode and API storage contract are defined without replacing the current demo storage path.
 - A release configuration gate blocks production mode when it still points at local/browser storage.
-- Auth, permissions/RLS, files/photos, AI calls, and backup/migration risks are explicitly tracked before implementation.
+- Auth, permissions/RLS, files/photos, AI calls, audit, and backup/restore risks are explicitly tracked before final normalized production work.
 - The monolith extraction path is adapter/model-first, not a whole-file rewrite.
 
-Current notes:
+Closed notes:
 - Owner opened the production backend/auth phase after R8.
 - `docs/production-hardening-plan.md` is the active risk/order document.
-- First implementation step: storage boundary extraction.
 - `src/dataCollections.js` is the first shared map from current backup/storage collections to production tables.
 - `src/seedPolicyModel.js` and `docs/production-seed-policy.md` define the production empty-start and first-admin bootstrap boundary.
 - Current demo/local records are not a migration source; imports are only for real owner-provided data.
@@ -44,7 +43,26 @@ Current notes:
 - `supabase/migrations/20260627173000_app_users_permissions.sql` defines the first `public.app_users` profile/RLS layer linked to Supabase Auth.
 - `docs/supabase-session-adapter.md` and `/api/session/me` define the first server-side Supabase Auth + app profile session lookup.
 - `src/productionLoginAdapter.js` connects production login to Supabase Auth and `/api/session/me` while leaving demo/test login unchanged.
-- Upstash/Vercel Redis may be used as a bridge/cache path, but not as the final CMMS source of truth.
+- Supabase KV compatibility is the accepted staging/pilot bridge, not the final CMMS source of truth.
+- Production file metadata, audit events, first-admin bootstrap, backup/restore drill, and staging gates are documented in the production docs.
+- `src/productionReadinessModel.js` names the current state as `staging_pilot` when production config, Supabase schema, staging gate, and backup/restore drill are verified.
+- Final production still requires moving beyond the accepted KV bridge into normalized business tables and broader server-side business permissions. That is tracked as R10, not as an unclosed R9 tail.
+
+### R10 — Final Production Data Core
+
+Status: not started.
+
+Why it matters:
+- The current staging/pilot foundation is usable, but the accepted Supabase KV bridge is still a launch compromise.
+- Final production should enforce business data shape and permissions at the database/server-operation layer, not only through frontend workflows plus a generic KV compatibility layer.
+
+Done means:
+- Core business records move from the compatibility KV bridge into normalized Supabase tables in a deliberate order.
+- Server-side business operations enforce the same permissions as the UI for the moved flows.
+- RLS/policies and audit coverage are verified for the moved tables.
+- File ownership metadata links to normalized business records where those records exist.
+- The production readiness model can report `final_production` without `normalized_business_tables_not_complete` or `server_side_business_permissions_not_complete`.
+- The old KV bridge remains only for explicitly unmoved legacy data or is retired.
 
 ### R3 — Notifications End-To-End
 

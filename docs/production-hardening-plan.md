@@ -6,7 +6,7 @@ This is the active plan for moving CMMS CDSL from a browser-local demo to a prod
 
 The owner has opened the production backend/auth phase after R8.
 
-The goal is no longer only demo stabilization. The goal is to remove the risks that prevent real production use while keeping the existing working product intact.
+The goal is no longer only demo stabilization. The current R9 foundation supports controlled staging/pilot use while keeping the existing working product intact. Final production readiness now means moving beyond the accepted KV compatibility bridge into normalized business tables and broader server-side business permissions.
 
 The target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage. See `docs/production-platform-decision.md`.
 
@@ -133,6 +133,7 @@ Production requirement:
 - Supabase `public.file_metadata` sink is the first durable file ownership metadata destination.
 - Production audit event contract is documented in `docs/production-audit-events.md`.
 - Supabase `public.audit_events` sink is the first durable audit destination for sensitive server-side writes.
+- `src/productionReadinessModel.js` separates `staging_pilot` readiness from `final_production` readiness so the project does not treat the KV bridge as the final production data core.
 
 ## Monolith Extraction Policy
 
