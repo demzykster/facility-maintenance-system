@@ -1,5 +1,7 @@
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
 import { canPerformCleaning, canViewCleaningReports } from "../../src/cleaningAccessModel.js";
+import { normalizeCleaningZoneRecord } from "../../src/cleaningZoneRecordModel.js";
+import { normalizeCleaningRoundRecord } from "../../src/cleaningRoundRecordModel.js";
 import { normalizeCleaningComplaintRecord } from "../../src/cleaningComplaintRecordModel.js";
 import { normalizeWorkerAbsenceRecord } from "../../src/workerAbsenceRecordModel.js";
 import { sendServerError } from "../httpErrors.js";
@@ -8,9 +10,39 @@ import { kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { bearerToken } from "../session/authCookie.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
+import { createSupabaseCleaningZonesDriverFromEnv } from "./supabaseCleaningZonesDriver.js";
+import { createSupabaseCleaningRoundsDriverFromEnv } from "./supabaseCleaningRoundsDriver.js";
 import { createSupabaseCleaningComplaintsDriverFromEnv, createSupabaseWorkerAbsencesDriverFromEnv } from "./supabaseCleaningRecordsDriver.js";
 
 const RESOURCE_CONFIG = Object.freeze({
+  zones: {
+    singular: "zone",
+    plural: "zones",
+    kvPrefix: "czone:",
+    idError: "cleaning_zone_id_required",
+    notFoundError: "cleaning_zone_not_found",
+    backendError: "cleaning_zones_backend_not_configured",
+    readError: "cleaning_zones_read_not_configured",
+    deleteError: "cleaning_zones_delete_not_configured",
+    source: "api/cleaning/records:zones",
+    normalize: normalizeCleaningZoneRecord,
+    summaryName: "Cleaning zone",
+    after: (record) => ({ name: record.name, building: record.building, floor: record.floor, active: record.active })
+  },
+  rounds: {
+    singular: "round",
+    plural: "rounds",
+    kvPrefix: "cround:",
+    idError: "cleaning_round_id_required",
+    notFoundError: "cleaning_round_not_found",
+    backendError: "cleaning_rounds_backend_not_configured",
+    readError: "cleaning_rounds_read_not_configured",
+    deleteError: "cleaning_rounds_delete_not_configured",
+    source: "api/cleaning/records:rounds",
+    normalize: normalizeCleaningRoundRecord,
+    summaryName: "Cleaning round",
+    after: (record) => ({ zoneId: record.zoneId, cleanerName: record.cleanerName, status: record.status, roundAt: record.roundAt })
+  },
   complaints: {
     singular: "complaint",
     plural: "complaints",
@@ -130,6 +162,8 @@ const resourceFromRequest = (req, body = {}) => {
 };
 
 const createDrivers = (env, fetchImpl) => ({
+  zones: createSupabaseCleaningZonesDriverFromEnv(env, fetchImpl),
+  rounds: createSupabaseCleaningRoundsDriverFromEnv(env, fetchImpl),
   complaints: createSupabaseCleaningComplaintsDriverFromEnv(env, fetchImpl),
   absences: createSupabaseWorkerAbsencesDriverFromEnv(env, fetchImpl)
 });
@@ -187,6 +221,8 @@ export function createCleaningRecordsApiHandler({ drivers = null, auditDriver = 
       return json(res, 200, { ok: true, [config.singular]: { id: record.id, sourceKvKey: record.sourceKvKey } });
     } catch (error) {
       if (error?.message === "cleaning_complaint_id_required") return json(res, 400, { error: "cleaning_complaint_id_required" });
+      if (error?.message === "cleaning_zone_id_required") return json(res, 400, { error: "cleaning_zone_id_required" });
+      if (error?.message === "cleaning_round_id_required") return json(res, 400, { error: "cleaning_round_id_required" });
       if (error?.message === "worker_absence_id_required") return json(res, 400, { error: "worker_absence_id_required" });
       if (error instanceof SyntaxError) return json(res, 400, { error: "invalid_json" });
       return sendServerError(req, res, error, { code: "cleaning_records_api_error", route: "/api/cleaning/records" });

@@ -13,6 +13,7 @@ export function createApiCleaningRoundsProvider({ baseUrl, fetchImpl = globalThi
   if (!baseUrl) return null;
   const root = String(baseUrl).replace(/\/+$/, "");
   if (typeof fetchImpl !== "function") throw new Error("cleaning_rounds_api_fetch_missing");
+  const resourceQuery = "resource=rounds";
 
   const request = async (path, options = {}) => {
     const accessToken = typeof getAccessToken === "function" ? await getAccessToken() : "";
@@ -30,22 +31,22 @@ export function createApiCleaningRoundsProvider({ baseUrl, fetchImpl = globalThi
 
   return {
     async list() {
-      const response = await request("/cleaning/rounds", { method: "GET" });
+      const response = await request(`/cleaning/records?${resourceQuery}`, { method: "GET" });
       return parseJson(response);
     },
     async get(id) {
-      const response = await request(`/cleaning/rounds?id=${encodeURIComponent(id)}`, { method: "GET" });
+      const response = await request(`/cleaning/records?${resourceQuery}&id=${encodeURIComponent(id)}`, { method: "GET" });
       return parseJson(response);
     },
     async upsert(round) {
-      const response = await request("/cleaning/rounds", {
+      const response = await request("/cleaning/records", {
         method: "POST",
-        body: JSON.stringify({ round })
+        body: JSON.stringify({ resource: "rounds", round })
       });
       return parseJson(response);
     },
     async delete(id) {
-      await request(`/cleaning/rounds?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      await request(`/cleaning/records?${resourceQuery}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
       return true;
     }
   };

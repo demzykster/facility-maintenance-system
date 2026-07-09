@@ -121,8 +121,8 @@ try {
   await apiRequest({
     publicUrl,
     accessToken,
-    path: "/api/cleaning/rounds",
-    options: { method: "POST", body: JSON.stringify({ round }) }
+    path: "/api/cleaning/records",
+    options: { method: "POST", body: JSON.stringify({ resource: "rounds", round }) }
   });
 
   const rows = await serviceRows({
@@ -134,10 +134,10 @@ try {
   });
   if (rows[0]?.id !== id || rows[0]?.legacy_payload?.id !== id) throw new Error("cleaning_round_row_missing_after_upsert");
 
-  const listed = await apiRequest({ publicUrl, accessToken, path: "/api/cleaning/rounds?limit=2000", options: { method: "GET" } });
+  const listed = await apiRequest({ publicUrl, accessToken, path: "/api/cleaning/records?resource=rounds&limit=2000", options: { method: "GET" } });
   if (!Array.isArray(listed.rounds) || !listed.rounds.some((item) => item.id === id)) throw new Error("cleaning_round_not_listed_after_upsert");
 
-  await apiRequest({ publicUrl, accessToken, path: `/api/cleaning/rounds?id=${encodeURIComponent(id)}`, options: { method: "DELETE" } });
+  await apiRequest({ publicUrl, accessToken, path: `/api/cleaning/records?resource=rounds&id=${encodeURIComponent(id)}`, options: { method: "DELETE" } });
 
   const afterDelete = await serviceRows({
     root: supabaseUrl,

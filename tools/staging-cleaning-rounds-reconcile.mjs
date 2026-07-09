@@ -89,13 +89,13 @@ async function normalizedCleaningRoundRows({ root, serviceRoleKey }) {
 }
 
 async function upsertCleaningRound({ publicUrl, accessToken, round }) {
-  const response = await fetch(`${publicUrl}/api/cleaning/rounds`, {
+  const response = await fetch(`${publicUrl}/api/cleaning/records`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${accessToken}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify({ round })
+    body: JSON.stringify({ resource: "rounds", round })
   });
   const data = await readJson(response);
   if (!response.ok || !data?.ok) throw new Error(data?.error || `cleaning_round_upsert_${response.status}`);

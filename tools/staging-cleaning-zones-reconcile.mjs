@@ -89,13 +89,13 @@ async function normalizedCleaningZoneRows({ root, serviceRoleKey }) {
 }
 
 async function upsertCleaningZone({ publicUrl, accessToken, zone }) {
-  const response = await fetch(`${publicUrl}/api/cleaning/zones`, {
+  const response = await fetch(`${publicUrl}/api/cleaning/records`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${accessToken}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify({ zone })
+    body: JSON.stringify({ resource: "zones", zone })
   });
   const data = await readJson(response);
   if (!response.ok || !data?.ok) throw new Error(data?.error || `cleaning_zone_upsert_${response.status}`);

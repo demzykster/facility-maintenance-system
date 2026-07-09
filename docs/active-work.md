@@ -2,9 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/consolidate-cleaning-record-routes`.
+- Current branch: `codex/consolidate-cleaning-record-routes`.
 - Last completed work: R10 user-management profile-authority slice removed the temporary `user:*` KV mirror as a hard dependency for login-capable `app_users` reads/writes/deactivation while keeping legacy-only pre-login records on the protected KV bridge.
+- Current work: route-budget cleanup consolidates cleaning zones and rounds onto `/api/cleaning/records` so later R10 domains can add one route without exceeding the Vercel API budget.
 
 ## Current Product Direction
 

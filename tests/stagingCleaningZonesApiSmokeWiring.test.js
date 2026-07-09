@@ -11,8 +11,9 @@ describe("staging cleaning zones API smoke wiring", () => {
     expect(pkg.scripts["staging:smoke:cleaning-zones-api"]).toBe("node tools/staging-cleaning-zones-api-smoke.mjs");
     expect(gate).toContain('["staging:smoke:cleaning-zones-api", ["npm", ["run", "staging:smoke:cleaning-zones-api"]]]');
     expect(smokeScript).toContain("rest/v1/cleaning_zones");
-    expect(smokeScript).toContain('fetch(`${publicUrl}/api/cleaning/zones`');
-    expect(smokeScript).toContain('fetch(`${publicUrl}/api/cleaning/zones?id=${encodeURIComponent(id)}`');
+    expect(smokeScript).toContain('fetch(`${publicUrl}/api/cleaning/records`');
+    expect(smokeScript).toContain('fetch(`${publicUrl}/api/cleaning/records?resource=zones`');
+    expect(smokeScript).toContain('fetch(`${publicUrl}/api/cleaning/records?resource=zones&id=${encodeURIComponent(id)}`');
   });
 
   it("reconciles cleaning zone KV records into cleaning_zones through the public API", () => {
@@ -22,6 +23,6 @@ describe("staging cleaning zones API smoke wiring", () => {
     expect(gate).toContain('["staging:cleaning-zones:reconcile", ["npm", ["run", "staging:cleaning-zones:reconcile"]]]');
     expect(reconcileScript).toContain("prefix=czone%3A");
     expect(reconcileScript).toContain("rest/v1/cleaning_zones");
-    expect(reconcileScript).toContain('fetch(`${publicUrl}/api/cleaning/zones`');
+    expect(reconcileScript).toContain('fetch(`${publicUrl}/api/cleaning/records`');
   });
 });

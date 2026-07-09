@@ -62,7 +62,7 @@ npm run staging:gate
 
 It runs the local staging env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke. It intentionally does not run `npm run staging:backup:evidence`, because that command creates a local sensitive data snapshot for restore drills.
 
-The gate also runs controlled normalized API smokes for `/api/tickets`, `/api/fleet`, `/api/pm`, `/api/cleaning/zones`, and `/api/cleaning/rounds`. Each smoke creates one temporary record, verifies it in its Supabase table, deletes it through the same API route, and verifies cleanup. Before the business smokes, the gate reconciles legacy KV records for tickets, fleet, periodic maintenance, cleaning zones, and cleaning rounds into their normalized tables. Cleaning zones and cleaning rounds use normalized API authority in production/API mode with `czone:`/`cround:` as compatibility mirrors. Cleaning complaints and absences remain on the KV bridge until later slices.
+The gate also runs controlled normalized API smokes for `/api/tickets`, `/api/fleet`, `/api/pm`, and the shared cleaning records route (`zones`, `rounds`, `complaints`, and `absences`). Each smoke creates one temporary record, verifies it in its Supabase table, deletes it through the same API route, and verifies cleanup. Before the business smokes, the gate reconciles legacy KV records for tickets, fleet, periodic maintenance, and cleaning records into their normalized tables. Cleaning records use normalized API authority in production/API mode with compatibility KV mirrors.
 
 ## Required Env Shape
 
