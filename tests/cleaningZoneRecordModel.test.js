@@ -13,7 +13,7 @@ describe("cleaning zone record model", () => {
       building: "A",
       floor: "1",
       areaName: "Main",
-      cleanerId: "app-user-1",
+      cleanerId: "9f6a8a64-5c34-4cb6-b3a9-7f8f5846a444",
       cleanerName: "Cleaner",
       checklist: [{ id: "floor" }],
       windows: [{ id: "morning", time: "08:00" }],
@@ -25,13 +25,26 @@ describe("cleaning zone record model", () => {
       building: "A",
       floor: "1",
       areaName: "Main",
-      cleanerId: "app-user-1",
+      cleanerId: "9f6a8a64-5c34-4cb6-b3a9-7f8f5846a444",
       cleanerName: "Cleaner",
       checklist: [{ id: "floor" }],
       windows: [{ id: "morning", time: "08:00" }],
       active: true,
       createdAt: "1970-01-01T00:00:01.000Z",
       sourceKvKey: "czone:zone-1"
+    }));
+  });
+
+  it("keeps legacy cleaner IDs in the payload without writing them to the UUID column", () => {
+    expect(cleaningZoneRecordToSupabaseRow({
+      id: "zone-1",
+      name: "Lobby",
+      cleanerId: "legacy-worker-1",
+      cleanerName: "Cleaner"
+    })).toEqual(expect.objectContaining({
+      cleaner_id: null,
+      cleaner_name: "Cleaner",
+      legacy_payload: expect.objectContaining({ cleanerId: "legacy-worker-1" })
     }));
   });
 

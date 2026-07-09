@@ -1,6 +1,10 @@
 const cleanString = (value) => String(value || "").trim();
 const cleanObject = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : {});
 const cleanArray = (value) => (Array.isArray(value) ? value : []);
+const uuidOrNull = (value) => {
+  const text = cleanString(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text) ? text : null;
+};
 
 const isoOrNull = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -38,7 +42,7 @@ export function cleaningZoneRecordToSupabaseRow(zone = {}) {
     building: normalized.building,
     floor: normalized.floor,
     area_name: normalized.areaName,
-    cleaner_id: normalized.cleanerId,
+    cleaner_id: uuidOrNull(normalized.cleanerId),
     cleaner_name: normalized.cleanerName,
     active: normalized.active,
     checklist: normalized.checklist,
