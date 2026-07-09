@@ -254,6 +254,11 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
         const permissionError = kvWritePermissionError(auth.user, key);
         if (permissionError) return json(res, 403, { error: permissionError });
         if (typeof backendDriver.delete !== "function") return json(res, 503, { error: "users_delete_not_configured" });
+        if (typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfile === "function") {
+          const profile = await backendProfileClient.getAppUserProfileById(id);
+          const appUser = profile ? normalizeSupabaseAppUserProfile(profile) : null;
+          if (appUser?.authUserId) await backendProfileClient.updateAppUserProfile(appUser.authUserId, { active: false });
+        }
         await backendDriver.delete(key, true);
         await writeAuditEvent(backendAuditDriver, userDeleteAuditEvent(id, auth.user));
         return json(res, 200, { ok: true, user: { id } });
