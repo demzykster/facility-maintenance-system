@@ -4,6 +4,7 @@ import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js"
 import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
 import { sendServerError } from "../httpErrors.js";
 import { cleaningComplaintPhotoMetadata } from "../../src/fileMetadataModel.js";
+import { createSupabaseCleaningComplaintsDriverFromEnv } from "../cleaning/supabaseCleaningRecordsDriver.js";
 
 const MAX_BODY_BYTES = 2_200_000;
 const MAX_PHOTO_CHARS = 2_000_000;
@@ -135,6 +136,7 @@ export function validatePublicComplaintPayload(body = {}) {
 
 export function createPublicComplaintHandler({
   driver = null,
+  complaintsDriver = null,
   fileDriver = null,
   metadataDriver = null,
   env = process.env,
@@ -145,6 +147,10 @@ export function createPublicComplaintHandler({
   const backendDriver = driver
     || (env.CMMS_PUBLIC_COMPLAINTS_DRIVER === "supabase" || env.CMMS_KV_DRIVER === "supabase"
       ? createSupabaseKvDriverFromEnv(env, fetchImpl)
+      : null);
+  const backendComplaintsDriver = complaintsDriver
+    || (env.CMMS_CLEANING_COMPLAINTS_DRIVER === "supabase" || env.CMMS_STORAGE_PROVIDER === "api"
+      ? createSupabaseCleaningComplaintsDriverFromEnv(env, fetchImpl)
       : null);
   const requireFileStorage = env.CMMS_FILE_DRIVER === "supabase";
   const backendFileDriver = fileDriver
@@ -213,6 +219,7 @@ export function createPublicComplaintHandler({
         complaint.hasPhoto = true;
       }
 
+      if (backendComplaintsDriver) await backendComplaintsDriver.upsert(complaint);
       await backendDriver.set(rateKey, String(currentTime), false);
       await backendDriver.set(`ccomplaint:${complaint.id}`, JSON.stringify(complaint), true);
       return json(res, 201, { ok: true, id: complaint.id, status: complaint.status });

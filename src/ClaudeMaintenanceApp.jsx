@@ -66,6 +66,7 @@ import { createApiFleetProvider } from "./apiFleetAdapter.js";
 import { createApiPmProvider } from "./apiPmAdapter.js";
 import { createApiCleaningZonesProvider } from "./apiCleaningZonesAdapter.js";
 import { createApiCleaningRoundsProvider } from "./apiCleaningRoundsAdapter.js";
+import { createApiCleaningComplaintsProvider, createApiWorkerAbsencesProvider } from "./apiCleaningRecordsAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
@@ -73,6 +74,7 @@ import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthority
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
 import { cleaningZonesAuthorityFailureIssue, cleaningZonesForAuthority, normalizedCleaningZonesAuthorityEnabled } from "./cleaningZonesAuthorityModel.js";
 import { cleaningRoundsAuthorityFailureIssue, cleaningRoundsForAuthority, normalizedCleaningRoundsAuthorityEnabled } from "./cleaningRoundsAuthorityModel.js";
+import { cleaningComplaintsAuthorityFailureIssue, cleaningComplaintsForAuthority, normalizedCleaningRecordsAuthorityEnabled, workerAbsencesAuthorityFailureIssue, workerAbsencesForAuthority } from "./cleaningRecordsAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -165,6 +167,32 @@ const NORMALIZED_CLEANING_ROUNDS_SHADOW_WRITE = !NORMALIZED_CLEANING_ROUNDS_AUTH
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_CLEANING_ROUNDS_PROVIDER;
+const NORMALIZED_CLEANING_COMPLAINTS_PROVIDER = createApiCleaningComplaintsProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_CLEANING_COMPLAINTS_AUTHORITY = normalizedCleaningRecordsAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_CLEANING_COMPLAINTS_PROVIDER
+});
+const NORMALIZED_CLEANING_COMPLAINTS_SHADOW_WRITE = !NORMALIZED_CLEANING_COMPLAINTS_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_CLEANING_COMPLAINTS_PROVIDER;
+const NORMALIZED_WORKER_ABSENCES_PROVIDER = createApiWorkerAbsencesProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_WORKER_ABSENCES_AUTHORITY = normalizedCleaningRecordsAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_WORKER_ABSENCES_PROVIDER
+});
+const NORMALIZED_WORKER_ABSENCES_SHADOW_WRITE = !NORMALIZED_WORKER_ABSENCES_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_WORKER_ABSENCES_PROVIDER;
 const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
@@ -1785,6 +1813,8 @@ export default function App() {
 	    let fleetRows = fl;
 	    let zoneRows = zn;
 	    let roundRows = rd;
+	    let complaintRows = cp;
+	    let absenceRows = abs;
 	    let userRows = us;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
@@ -1861,6 +1891,36 @@ export default function App() {
         }));
 	      }
 	    }
+	    if (NORMALIZED_CLEANING_COMPLAINTS_AUTHORITY) {
+	      try {
+	        const normalizedCleaningComplaints = await cleaningComplaintsForAuthority({
+          kvComplaints: cp,
+          provider: NORMALIZED_CLEANING_COMPLAINTS_PROVIDER,
+          normalizedAuthority: true
+        });
+        complaintRows = normalizedCleaningComplaints.complaints;
+      } catch (error) {
+        void recordAutomaticAppIssue(cleaningComplaintsAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized cleaning complaints API load failed"
+        }));
+	      }
+	    }
+	    if (NORMALIZED_WORKER_ABSENCES_AUTHORITY) {
+	      try {
+	        const normalizedWorkerAbsences = await workerAbsencesForAuthority({
+          kvAbsences: abs,
+          provider: NORMALIZED_WORKER_ABSENCES_PROVIDER,
+          normalizedAuthority: true
+        });
+        absenceRows = normalizedWorkerAbsences.absences;
+      } catch (error) {
+        void recordAutomaticAppIssue(workerAbsencesAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized worker absences API load failed"
+        }));
+	      }
+	    }
 	    if (USER_MANAGEMENT_API_AUTHORITY) {
 	      try {
 	        userRows = await loadUsers();
@@ -1878,7 +1938,7 @@ export default function App() {
     apply("fleet", fleetRows, setFleet, (a, b) => (a.code > b.code ? 1 : -1));
     apply("czone", zoneRows, setZones, zoneSort);
     apply("cround", roundRows, setRounds, (a, b) => b.at - a.at);
-    apply("ccomplaint", cp, setComplaints, (a, b) => b.at - a.at);
+    apply("ccomplaint", complaintRows, setComplaints, (a, b) => b.at - a.at);
     apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
     apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
     apply("mmeet", mmt, setMeetings, (a, b) => b.at - a.at);
@@ -1888,7 +1948,7 @@ export default function App() {
     apply("ppereq", ppreq, setPpeReqs, (a, b) => b.at - a.at);
     apply("ppeorder", pord, setPpeOrders, (a, b) => b.createdAt - a.createdAt);
     apply("appIssue", issues, setAppIssues, (a, b) => (b.at || 0) - (a.at || 0));
-    apply("cabsence", abs, setAbsences, (a, b) => (a.from > b.from ? 1 : -1));
+    apply("cabsence", absenceRows, setAbsences, (a, b) => (a.from > b.from ? 1 : -1));
     // presence: мержим хранилище с текущим стейтом по свежести lastSeen — чтобы поллинг не затирал только что записанный статус при медленном/частичном хранилище
     setPresence((cur) => {
       const map = {};
@@ -2215,6 +2275,94 @@ export default function App() {
       message: "Compatibility KV cleaning round mirror save failed"
     });
   };
+  const shadowWriteNormalizedCleaningComplaint = async (complaint) => {
+    if (!NORMALIZED_CLEANING_COMPLAINTS_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_CLEANING_COMPLAINTS_PROVIDER.upsert(complaint);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "cleaning_complaint_normalized_shadow_write_failed",
+        action: "upsert",
+        key: `ccomplaint:${complaint?.id || "unknown"}`,
+        message: error?.message || "Normalized cleaning complaints API write failed"
+      });
+    }
+  };
+  const shadowDeleteNormalizedCleaningComplaint = async (id) => {
+    if (!NORMALIZED_CLEANING_COMPLAINTS_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_CLEANING_COMPLAINTS_PROVIDER.delete(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "cleaning_complaint_normalized_shadow_delete_failed",
+        action: "delete",
+        key: `ccomplaint:${id || "unknown"}`,
+        message: error?.message || "Normalized cleaning complaints API delete failed"
+      });
+    }
+  };
+  const mirrorCleaningComplaintToKv = async (complaint) => {
+    const ok = await persistShared(`ccomplaint:${complaint.id}`, JSON.stringify(complaint), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "cleaning_complaint_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `ccomplaint:${complaint?.id || "unknown"}`,
+      message: "Compatibility KV cleaning complaint mirror save failed"
+    });
+  };
+  const mirrorDeleteCleaningComplaintFromKv = async (id) => {
+    const ok = await deleteShared(`ccomplaint:${id}`, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "cleaning_complaint_kv_mirror_delete_failed",
+      action: "mirror-delete",
+      key: `ccomplaint:${id || "unknown"}`,
+      message: "Compatibility KV cleaning complaint mirror delete failed"
+    });
+  };
+  const shadowWriteNormalizedWorkerAbsence = async (absence) => {
+    if (!NORMALIZED_WORKER_ABSENCES_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_WORKER_ABSENCES_PROVIDER.upsert(absence);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "worker_absence_normalized_shadow_write_failed",
+        action: "upsert",
+        key: `cabsence:${absence?.id || "unknown"}`,
+        message: error?.message || "Normalized worker absences API write failed"
+      });
+    }
+  };
+  const shadowDeleteNormalizedWorkerAbsence = async (id) => {
+    if (!NORMALIZED_WORKER_ABSENCES_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_WORKER_ABSENCES_PROVIDER.delete(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: "worker_absence_normalized_shadow_delete_failed",
+        action: "delete",
+        key: `cabsence:${id || "unknown"}`,
+        message: error?.message || "Normalized worker absences API delete failed"
+      });
+    }
+  };
+  const mirrorWorkerAbsenceToKv = async (absence) => {
+    const ok = await persistShared(`cabsence:${absence.id}`, JSON.stringify(absence), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "worker_absence_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `cabsence:${absence?.id || "unknown"}`,
+      message: "Compatibility KV worker absence mirror save failed"
+    });
+  };
+  const mirrorDeleteWorkerAbsenceFromKv = async (id) => {
+    const ok = await deleteShared(`cabsence:${id}`, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "worker_absence_kv_mirror_delete_failed",
+      action: "mirror-delete",
+      key: `cabsence:${id || "unknown"}`,
+      message: "Compatibility KV worker absence mirror delete failed"
+    });
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
@@ -2475,8 +2623,48 @@ export default function App() {
     setRounds((s) => [...s.filter((x) => x.id !== rec.id), rec].sort((a, b) => b.at - a.at));
     return true;
   };
-  const saveAbsence = async (a) => { if (!await persistShared(`cabsence:${a.id}`, JSON.stringify(a))) return false; setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1))); return true; };
-  const delAbsence = async (id) => { if (!await deleteShared(`cabsence:${id}`)) return false; setAbsences((s) => s.filter((x) => x.id !== id)); return true; };
+  const saveAbsence = async (a) => {
+    if (NORMALIZED_WORKER_ABSENCES_AUTHORITY) {
+      try {
+        await NORMALIZED_WORKER_ABSENCES_PROVIDER.upsert(a);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(workerAbsencesAuthorityFailureIssue({
+          action: "save",
+          id: a.id,
+          message: error?.message || "Normalized worker absences API save failed"
+        }));
+        return false;
+      }
+      void mirrorWorkerAbsenceToKv(a);
+    } else {
+      if (!await persistShared(`cabsence:${a.id}`, JSON.stringify(a))) return false;
+      void shadowWriteNormalizedWorkerAbsence(a);
+    }
+    setAbsences((s) => [...s.filter((x) => x.id !== a.id), a].sort((x, y) => (x.from > y.from ? 1 : -1)));
+    return true;
+  };
+  const delAbsence = async (id) => {
+    if (NORMALIZED_WORKER_ABSENCES_AUTHORITY) {
+      try {
+        await NORMALIZED_WORKER_ABSENCES_PROVIDER.delete(id);
+      } catch (error) {
+        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+        void recordAutomaticAppIssue(workerAbsencesAuthorityFailureIssue({
+          action: "delete",
+          id,
+          message: error?.message || "Normalized worker absences API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeleteWorkerAbsenceFromKv(id);
+    } else {
+      if (!await deleteShared(`cabsence:${id}`)) return false;
+      void shadowDeleteNormalizedWorkerAbsence(id);
+    }
+    setAbsences((s) => s.filter((x) => x.id !== id));
+    return true;
+  };
   const spawnFacilityFromComplaint = async (c) => {
     const tid = uid(), now = Date.now(); const cat = (config.categories || [])[0];
     const complaintPhoto = c.photo || await CLEANING_PHOTOS.load(c);
@@ -2485,7 +2673,27 @@ export default function App() {
     const ok = await saveTicket(rec);
     return ok ? tid : null;
   };
-  const persistComplaint = async (comp) => { if (!await persistShared(`ccomplaint:${comp.id}`, JSON.stringify(comp))) return false; setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at)); return true; };
+  const persistComplaint = async (comp) => {
+    if (NORMALIZED_CLEANING_COMPLAINTS_AUTHORITY) {
+      try {
+        await NORMALIZED_CLEANING_COMPLAINTS_PROVIDER.upsert(comp);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(cleaningComplaintsAuthorityFailureIssue({
+          action: "save",
+          id: comp.id,
+          message: error?.message || "Normalized cleaning complaints API save failed"
+        }));
+        return false;
+      }
+      void mirrorCleaningComplaintToKv(comp);
+    } else {
+      if (!await persistShared(`ccomplaint:${comp.id}`, JSON.stringify(comp))) return false;
+      void shadowWriteNormalizedCleaningComplaint(comp);
+    }
+    setComplaints((s) => [...s.filter((x) => x.id !== comp.id), comp].sort((a, b) => b.at - a.at));
+    return true;
+  };
   const fileComplaint = async (c) => {
     const trusted = c.reportedByRole === "admin" || c.reportedByRole === "user";
     const ownerRole = c.reportedByRole === "cleaner" ? "admin" : "cleaner"; // מי אחראי לסגור: דיווח מעובד ניקיון ⇒ אצל המנהל/מערכת, לא חוזר אליו
@@ -2514,7 +2722,27 @@ export default function App() {
   const escalateComplaint = async (c) => persistComplaint({ ...c, status: "open", escalatedTo: "admin", escalatedAt: Date.now(), escalatedBy: effSession.name });
   const resolveComplaint = async (c) => persistComplaint({ ...c, status: "resolved", resolvedAt: Date.now(), resolvedBy: effSession.name });
   const progressComplaint = async (c) => persistComplaint({ ...c, status: "open", progress: "in_progress", progressNote: (c.progressNote || "").trim(), progressBy: effSession.name, progressAt: Date.now() });
-  const delComplaint = async (id) => { if (!await deleteShared(`ccomplaint:${id}`)) return false; setComplaints((s) => s.filter((x) => x.id !== id)); return true; };
+  const delComplaint = async (id) => {
+    if (NORMALIZED_CLEANING_COMPLAINTS_AUTHORITY) {
+      try {
+        await NORMALIZED_CLEANING_COMPLAINTS_PROVIDER.delete(id);
+      } catch (error) {
+        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+        void recordAutomaticAppIssue(cleaningComplaintsAuthorityFailureIssue({
+          action: "delete",
+          id,
+          message: error?.message || "Normalized cleaning complaints API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeleteCleaningComplaintFromKv(id);
+    } else {
+      if (!await deleteShared(`ccomplaint:${id}`)) return false;
+      void shadowDeleteNormalizedCleaningComplaint(id);
+    }
+    setComplaints((s) => s.filter((x) => x.id !== id));
+    return true;
+  };
   const delFleet = async (id, options = {}) => {
     if (NORMALIZED_FLEET_AUTHORITY) {
       try {

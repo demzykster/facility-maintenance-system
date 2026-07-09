@@ -24,6 +24,8 @@
     "staging:smoke:cleaning-zones-api": "node tools/staging-cleaning-zones-api-smoke.mjs",
     "staging:cleaning-rounds:reconcile": "node tools/staging-cleaning-rounds-reconcile.mjs",
     "staging:smoke:cleaning-rounds-api": "node tools/staging-cleaning-rounds-api-smoke.mjs",
+    "staging:cleaning-records:reconcile": "node tools/staging-cleaning-records-reconcile.mjs",
+    "staging:smoke:cleaning-records-api": "node tools/staging-cleaning-records-api-smoke.mjs",
     "staging:smoke:browser": "node tools/staging-browser-smoke.mjs",
     "staging:smoke:ui": "node tools/staging-ui-smoke.mjs",
     "staging:smoke:fleet-ui": "node tools/staging-fleet-ui-smoke.mjs",
