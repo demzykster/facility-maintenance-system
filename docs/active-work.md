@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-users-profile-authority`.
-- Current branch: `codex/r10-users-profile-authority`.
-- Current branch work: R10 users profile-authority slice. Move login-capable user `app_users` profile synchronization into `/api/users` so the server operation owns normalized profile updates before writing the temporary `user:` KV mirror.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 users profile-authority slice moved login-capable user `app_users` profile synchronization into `/api/users` so the server operation owns normalized profile updates before writing the temporary `user:` KV mirror.
 
 ## Current Product Direction
 
