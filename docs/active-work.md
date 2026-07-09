@@ -4,7 +4,7 @@
 
 - Active branch: none.
 - Current branch: `main`.
-- Last completed work: R10 normalized tickets core pass added server-side ticket read/detail contract, KV-to-`public.tickets` staging reconciliation, and normalized ticket file metadata visibility.
+- Last completed work: R10 ticket authority pass made production/API mode read, save, and delete tickets through normalized `/api/tickets`, while KV remains only a compatibility mirror.
 
 ## Current Product Direction
 
