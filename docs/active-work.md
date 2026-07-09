@@ -2,9 +2,9 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: R10 cleaning schema-foundation slice added the first normalized Supabase/RLS tables for cleaning zones, rounds, complaints, and worker absences without switching runtime authority away from the accepted KV bridge yet.
+- Active branch: `codex/r10-cleaning-zones-api`.
+- Current branch: `codex/r10-cleaning-zones-api`.
+- Current branch work: R10 cleaning zones API slice. Add the first `/api/cleaning/zones` server operation over `public.cleaning_zones` while leaving UI/runtime authority on the current KV bridge until later slices.
 
 ## Current Product Direction
 
