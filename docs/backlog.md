@@ -48,12 +48,12 @@ Later separate safety slices:
 
 ### R10 data slice - user-management authority gap
 
-Status: first server-operation slice done in PR #749; normalized/RLS authority work remains.
+Status: server-operation and first `app_users` authority slices done in PRs #749, #754, and #756; deeper normalized/RLS authority work remains.
 
 Goal:
 - Keep the distinction between production identity/session and admin user-management clear.
 - Production login/session/profile lookup already uses Supabase `public.app_users`, RLS, and `/api/session/me`.
-- Admin/team user creation, edits, permissions, and worker-access management still use the `user:` KV compatibility path through `/api/kv`, protected by server permission checks and secret redaction.
+- Admin/team user creation, edits, permissions, and worker-access management now go through `/api/users` in production/API mode. Login-capable users are read from Supabase `app_users`, profile writes sync there before the temporary `user:` KV mirror, and deletes deactivate matching `app_users` records before mirror removal.
 - Close this remaining user-management authority gap through an explicit server operation/API/RLS path or another approved normalized authority design.
 
 Completed PR #749:
@@ -62,11 +62,17 @@ Completed PR #749:
 - Added tests for manager/admin permission checks, secret redaction, self-read behavior, denied writes, and client wiring.
 - Kept the seam backed by the current storage driver for the first slice.
 
-Active PR sequence:
-1. Make `/api/users` read/list login-capable users from Supabase `app_users` as the primary source.
+Completed PRs #754 and #756:
+- Made `/api/users` read/list login-capable users from Supabase `app_users` as the primary source.
+- Preserved protected `user:` KV as temporary legacy enrichment/fallback for fields not yet modeled in `app_users`.
+- Moved login-capable profile updates into the server operation so `app_users` updates happen before the KV mirror write.
+- Made `/api/users` DELETE deactivate matching `app_users` records before removing the temporary KV mirror.
+- Added tests for profile-to-user mapping, permission checks, KV fallback/enrichment behavior, profile-write ordering, and delete ordering.
+
+Remaining next sequence:
+1. Decide the next explicit normalized/RLS design for user-management fields still living only in `user:` KV, such as worker access details, technician categories, local-only workflow fields, and any fields intentionally out of `app_users`.
 2. Keep `/api/users` as the server operation boundary and preserve local/demo behavior.
-3. Add tests for profile-to-user mapping, permission checks, and KV fallback/enrichment behavior while the temporary mirror remains.
-4. Do not bundle this with cleaning, PPE, broad permission redesign, or monolith extraction.
+3. Do not bundle this with cleaning, PPE, broad permission redesign, or monolith extraction.
 
 DoD:
 - Production identity/session remains backed by Supabase `app_users`.
