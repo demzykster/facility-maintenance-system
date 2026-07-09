@@ -71,7 +71,7 @@ Current notes:
 - First normalized business-table slice: `public.tickets` exists as the target table for moving tickets off the KV bridge, with RLS for admins, ticket managers, assignees, and reporters.
 - The staging schema gate now expects `public.tickets` for new Supabase staging/pilot projects.
 - First normalized server-operation slice: `POST /api/tickets` can upsert tickets into `public.tickets` after Supabase/CMMS session validation and existing ticket write-permission checks.
-- Pilot bridge slice: production/API-mode ticket saves keep the existing `ticket:*` KV record authoritative, then shadow-write the same ticket into `/api/tickets` so the normalized table fills without risking the live workflow.
+- Pilot bridge slice: production/API-mode ticket saves keep the existing `ticket:*` KV record authoritative, then shadow-write the same ticket into `/api/tickets` so the normalized table fills without risking the live workflow. Ticket deletes also shadow-delete the normalized row to avoid stale pilot data.
 - This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End

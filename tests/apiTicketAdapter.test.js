@@ -43,6 +43,26 @@ describe("api ticket adapter", () => {
     await expect(provider.upsert({ id: "T-1" })).rejects.toThrow("permission_denied");
   });
 
+  it("deletes normalized tickets through the same API route", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true }));
+    const provider = createApiTicketProvider({
+      baseUrl: "https://cmms.example/api",
+      fetchImpl,
+      getAccessToken: () => "access-1"
+    });
+
+    await expect(provider.delete("T-1")).resolves.toBe(true);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://cmms.example/api/tickets?id=T-1", {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer access-1"
+      }
+    });
+  });
+
   it("stays disabled when no API base URL is configured", () => {
     expect(createApiTicketProvider({ baseUrl: "" })).toBeNull();
   });

@@ -16,6 +16,7 @@ const json = (res, status, body) => {
 
 const readBody = async (req) => {
   if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req?.[Symbol.asyncIterator] !== "function") return {};
   const chunks = [];
   for await (const chunk of req) chunks.push(Buffer.from(chunk));
   const text = Buffer.concat(chunks).toString("utf8");
@@ -69,6 +70,19 @@ const ticketUpsertAuditEvent = (ticket, actor) => normalizeAuditEvent({
   metadata: { source: "api/tickets", sourceKvKey: ticket.sourceKvKey }
 });
 
+const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
+  at: Date.now(),
+  actorId: actor.id,
+  actorName: actor.name,
+  actorRole: actor.role,
+  entityType: AUDIT_ENTITY_TYPES.ticket,
+  entityId: ticketId,
+  action: AUDIT_ACTIONS.delete,
+  summary: `Ticket deleted through normalized API: ${ticketId}`,
+  before: { id: ticketId },
+  metadata: { source: "api/tickets", sourceKvKey: `ticket:${ticketId}` }
+});
+
 export function createTicketsApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
@@ -80,12 +94,23 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, env
 
     try {
       const method = String(req.method || "GET").toUpperCase();
-      if (method !== "POST") {
-        res.setHeader("allow", "POST");
+      if (!["POST", "DELETE"].includes(method)) {
+        res.setHeader("allow", "POST, DELETE");
         return json(res, 405, { error: "method_not_allowed" });
       }
 
       const body = await readBody(req);
+      if (method === "DELETE") {
+        const id = String(req.query?.id || body?.id || body?.ticket?.id || "").trim();
+        if (!id) return json(res, 400, { error: "ticket_id_required" });
+        const permissionError = kvWritePermissionError(auth.user, `ticket:${id}`);
+        if (permissionError) return json(res, 403, { error: permissionError });
+        if (typeof backendDriver.delete !== "function") return json(res, 503, { error: "tickets_delete_not_configured" });
+        await backendDriver.delete(id);
+        await writeAuditEvent(backendAuditDriver, ticketDeleteAuditEvent(id, auth.user));
+        return json(res, 200, { ok: true, ticket: { id } });
+      }
+
       const ticket = normalizeTicketRecord(body?.ticket || body);
       const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
       if (permissionError) return json(res, 403, { error: permissionError });

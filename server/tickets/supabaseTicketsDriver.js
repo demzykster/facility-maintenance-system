@@ -35,6 +35,16 @@ export function createSupabaseTicketsDriver({ url, serviceRoleKey, table = "tick
       const data = await readJsonOrText(response);
       if (!response.ok) throw new Error(errorMessage(data, `supabase_ticket_${response.status}`));
       return Array.isArray(data) ? data[0] : data;
+    },
+    async delete(id) {
+      const ticketId = String(id || "").trim();
+      if (!ticketId) throw new Error("ticket_id_required");
+      const response = await fetchImpl(`${base}?id=eq.${encodeURIComponent(ticketId)}`, {
+        method: "DELETE",
+        headers: serviceHeaders(serviceRoleKey, { prefer: "return=minimal" })
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_ticket_${response.status}`));
     }
   };
 }

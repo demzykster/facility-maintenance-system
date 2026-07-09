@@ -35,6 +35,10 @@ export function createApiTicketProvider({ baseUrl, fetchImpl = globalThis.fetch,
         body: JSON.stringify({ ticket })
       });
       return parseJson(response);
+    },
+    async delete(id) {
+      await request(`/tickets?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      return true;
     }
   };
 }
