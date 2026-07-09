@@ -62,6 +62,8 @@ npm run staging:gate
 
 It runs the local staging env preflight, Supabase schema/bucket check, Vercel env-name check, and strict live smoke. It intentionally does not run `npm run staging:backup:evidence`, because that command creates a local sensitive data snapshot for restore drills.
 
+The gate also runs a controlled `/api/tickets` smoke that creates one temporary normalized ticket, verifies it in `public.tickets`, deletes it through the same API route, and verifies cleanup.
+
 ## Required Env Shape
 
 Use `.env.staging.example` as the non-secret template for Vercel environment variables.
