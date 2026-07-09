@@ -2,10 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-cleaning-zones-authority`
-- Current branch: `codex/r10-cleaning-zones-authority`.
-- Last completed work: R10 cleaning zones reconciliation slice added staging reconciliation from protected `czone:` KV records into `public.cleaning_zones` through the normalized `/api/cleaning/zones` route. Staging now has 11 KV cleaning zones mirrored into 11 normalized rows, while UI/runtime authority remains on the KV bridge until later slices.
-- Current work: Move cleaning zones UI/runtime authority to `/api/cleaning/zones` in production/API mode while keeping compatibility KV mirrors and leaving rounds, complaints, and absences on the existing KV bridge.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 cleaning zones authority slice moved cleaning zone reads, saves, and deletes to `/api/cleaning/zones` in production/API mode, with `czone:*` kept as a compatibility KV mirror. Cleaning rounds, complaints, and absences remain on the existing KV bridge until later slices.
 
 ## Current Product Direction
 
