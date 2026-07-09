@@ -27,6 +27,7 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionForKey("ppereq:req-1")).toMatchObject({ module: "ppe", minLevel: "request", auditSensitive: false });
     expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
     expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
+    expect(kvWritePermissionForKey("presence:worker-1")).toMatchObject({ roles: ["admin", "tech"], auditSensitive: false });
     expect(kvWritePermissionForKey("mtask:task-1")).toMatchObject({ roles: ["admin", "user"], entityType: "task", auditSensitive: false });
     expect(kvWritePermissionForKey("mmeet:meeting-1")).toMatchObject({ roles: ["admin", "user"], entityType: "meeting", auditSensitive: false });
     expect(kvWritePermissionForKey("appIssue:issue-1")).toMatchObject({ roles: expect.arrayContaining(["worker", "cleaner"]), auditSensitive: false });
@@ -68,8 +69,11 @@ describe("KV write permission policy", () => {
     expect(sessionHasKvWritePermission({ role: "worker", cleaningAccess: { enabled: true, canPerformRounds: false, canCloseComplaints: true } }, "ccomplaint:issue-1")).toBe(false);
     expect(sessionHasKvWritePermission({ role: "tech" }, "ccomplaint:issue-1")).toBe(false);
     expect(kvWritePermissionError({ role: "tech" }, "ccomplaint:issue-1")).toBe("permission_required:cleaning:perform");
-    expect(sessionHasKvWritePermission({ role: "tech" }, "presence:tech-1")).toBe(true);
-    expect(sessionHasKvWritePermission({ role: "worker" }, "presence:worker-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ id: "tech-1", role: "tech" }, "presence:tech-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ id: "worker-1", role: "worker" }, "presence:worker-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ id: "manager-1", role: "user" }, "presence:manager-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ id: "worker-2", role: "worker" }, "presence:worker-1")).toBe(false);
+    expect(kvWritePermissionError({ id: "worker-2", role: "worker" }, "presence:worker-1")).toBe("permission_required:presence:self");
     expect(sessionHasKvWritePermission({ role: "user" }, "mtask:task-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "worker" }, "mtask:task-1")).toBe(false);
     expect(sessionHasKvWritePermission({ role: "cleaner" }, "appIssue:issue-1")).toBe(true);

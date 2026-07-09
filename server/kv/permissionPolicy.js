@@ -54,6 +54,11 @@ export function sessionHasKvWritePermission(session = {}, key = "") {
   const rule = kvWritePermissionForKey(key);
   if (!rule) return true;
   if (session.role === "admin") return true;
+  const recordKey = String(key || "");
+  if (recordKey.startsWith("presence:")) {
+    const presenceUserId = recordKey.slice("presence:".length);
+    return Boolean(session.id && String(session.id) === presenceUserId && ACTIVE_ROLES.includes(session.role));
+  }
   const hasModulePermission = rule.module
     ? permissionLevelRank(sessionPermissionLevel(session, rule.module)) >= permissionLevelRank(rule.minLevel)
     : false;
@@ -137,6 +142,7 @@ export function kvReadPermissionError(session = {}, key = "") {
 export function kvWritePermissionError(session = {}, key = "") {
   const rule = kvWritePermissionForKey(key);
   if (!rule || sessionHasKvWritePermission(session, key)) return null;
+  if (String(key || "").startsWith("presence:")) return "permission_required:presence:self";
   if (rule.module) return `permission_required:${rule.module}:${rule.minLevel}`;
   if (rule.access) return `permission_required:${rule.access}`;
   return `permission_required:role:${(rule.roles || []).join("|")}`;
