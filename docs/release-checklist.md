@@ -68,6 +68,8 @@ Current notes:
 - First server-authority slice: the KV bridge now applies server-side read permissions for sensitive `user:` and `appIssue:` records, including direct reads, value-list reads, and key-only lists.
 - Ordinary workers can read their own `user:` record but not the full user directory; managers/admins with user permissions can still read the directory with login secrets redacted where appropriate.
 - `appIssue:` reports remain writable by working roles but readable only by admin/settings-management sessions.
+- First normalized business-table slice: `public.tickets` exists as the target table for moving tickets off the KV bridge, with RLS for admins, ticket managers, assignees, and reporters.
+- The staging schema gate now expects `public.tickets` for new Supabase staging/pilot projects.
 - This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End
