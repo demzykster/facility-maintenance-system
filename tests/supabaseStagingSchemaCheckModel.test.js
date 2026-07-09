@@ -25,14 +25,14 @@ describe("supabase staging schema check model", () => {
 
   it("summarizes table and private bucket status without secret values", () => {
     const summary = supabaseSchemaCheckSummary({
-      tables: [{ name: "app_users", ok: true, status: 200 }],
+      tables: [{ name: "app_users", ok: true, status: 200 }, { name: "tickets", ok: true, status: 200 }],
       bucket: { name: "cmms-files", ok: true, private: true, status: 200 },
       errors: []
     });
 
     expect(summary).toEqual({
       ok: true,
-      tables: [{ name: "app_users", ok: true, status: 200 }],
+      tables: [{ name: "app_users", ok: true, status: 200 }, { name: "tickets", ok: true, status: 200 }],
       bucket: { name: "cmms-files", ok: true, private: true, status: 200 },
       errors: []
     });

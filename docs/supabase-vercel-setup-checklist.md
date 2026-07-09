@@ -42,11 +42,13 @@ Apply the current migrations in order:
 5. `supabase/migrations/20260628134000_cmms_files_bucket.sql`
 6. `supabase/migrations/20260628152000_service_role_api_grants.sql`
 7. `supabase/migrations/20260628161000_authenticated_app_user_select_grant.sql`
+8. `supabase/migrations/20260709183000_tickets_core.sql`
 
 Expected objects:
 
 - `public.app_users`
 - `public.cmms_kv_records`
+- `public.tickets`
 - `public.audit_events`
 - `public.file_metadata`
 - private Supabase Storage bucket `cmms-files`

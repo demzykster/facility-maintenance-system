@@ -135,6 +135,7 @@ Production requirement:
 - Supabase `public.audit_events` sink is the first durable audit destination for sensitive server-side writes.
 - `src/productionReadinessModel.js` separates `staging_pilot` readiness from `final_production` readiness so the project does not treat the KV bridge as the final production data core.
 - The KV bridge now enforces server-side read permissions for sensitive `user:` and `appIssue:` records as the first R10 server-authority slice.
+- `public.tickets` is the first normalized business table for moving ticket records out of the KV bridge in a later server-operation slice.
 
 ## Monolith Extraction Policy
 
