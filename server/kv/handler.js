@@ -1,6 +1,6 @@
 import { createUpstashKvDriverFromEnv } from "./upstashDriver.js";
 import { createSupabaseKvDriverFromEnv } from "./supabaseDriver.js";
-import { kvReadValueForSession, kvWritePermissionError, kvWritePermissionForKey, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
+import { kvReadPermissionError, kvReadValueForSession, kvWritePermissionError, kvWritePermissionForKey, sessionHasKvReadPermission, sensitiveKvWriteAuditEvent } from "./permissionPolicy.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
@@ -184,6 +184,18 @@ const ticketStatusEventFromKv = (key, beforeValue, afterValue, actor) => {
   return ticketStatusAuditEvent({ ...after, id: after.id || String(key).slice("ticket:".length) }, previousStatus, nextStatus, actor);
 };
 
+const readableKvRecordForSession = (record, session) => {
+  if (!record?.key || !sessionHasKvReadPermission(session, record.key)) return null;
+  return {
+    key: record.key,
+    value: kvReadValueForSession({
+      key: record.key,
+      value: record.value,
+      session
+    })
+  };
+};
+
 const restoreBatchWrites = async ({ driver, written = [], shared = false }) => {
   for (const entry of [...written].reverse()) {
     try {
@@ -317,15 +329,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
             const collections = {};
             for (const item of prefixes) {
               collections[item] = (grouped[item] || [])
-                .map((record) => ({
-                  key: record.key,
-                  value: kvReadValueForSession({
-                    key: record.key,
-                    value: record.value,
-                    session: auth.user
-                  })
-                }))
-                .filter((record) => record.key && record.value !== null && record.value !== undefined);
+                .map((record) => readableKvRecordForSession(record, auth.user))
+                .filter((record) => record?.key && record.value !== null && record.value !== undefined);
             }
             return json(res, 200, { collections });
           }
@@ -338,20 +343,14 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
               value: await backendDriver.get(recordKey, shared)
             })));
           const readable = records
-            .map((record) => ({
-              key: record.key,
-              value: kvReadValueForSession({
-                key: record.key,
-                value: record.value,
-                session: auth.user
-              })
-            }))
-            .filter((record) => record.key && record.value !== null && record.value !== undefined);
+            .map((record) => readableKvRecordForSession(record, auth.user))
+            .filter((record) => record?.key && record.value !== null && record.value !== undefined);
           return json(res, 200, { records: readable });
         }
         const prefixError = kvPrefixValidationError(prefix);
         if (prefixError) return json(res, 400, { error: "prefix_invalid", reason: prefixError });
-        const keys = await backendDriver.list(prefix, shared);
+        const keys = (await backendDriver.list(prefix, shared))
+          .filter((recordKey) => sessionHasKvReadPermission(auth.user, recordKey));
         return json(res, 200, { keys });
       }
       if (!key) return json(res, 400, { error: "key_required" });
@@ -360,6 +359,10 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
 
       if ((method === "PUT" || method === "DELETE") && auth.user) {
         const permissionError = kvWritePermissionError(auth.user, key);
+        if (permissionError) return json(res, 403, { error: permissionError });
+      }
+      if (method === "GET" && auth.user) {
+        const permissionError = kvReadPermissionError(auth.user, key);
         if (permissionError) return json(res, 403, { error: permissionError });
       }
 

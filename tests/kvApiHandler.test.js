@@ -385,6 +385,141 @@ describe("kv API handler", () => {
     });
   });
 
+  it("filters user collection reads to the current worker when the session cannot view users", async () => {
+    const driver = {
+      listValues: vi.fn().mockResolvedValue([
+        { key: "user:worker-1", value: JSON.stringify({ id: "worker-1", name: "Worker One", pin: "1234" }) },
+        { key: "user:worker-2", value: JSON.stringify({ id: "worker-2", name: "Worker Two", pin: "5678" }) }
+      ])
+    };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-worker-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "worker-1",
+        auth_user_id: "auth-worker-1",
+        role: "worker",
+        name: "Worker One",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer worker-token" },
+      query: { prefix: "user:", shared: "1", includeValues: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().records).toHaveLength(1);
+    expect(JSON.parse(res.json().records[0].value)).toEqual({ id: "worker-1", name: "Worker One" });
+  });
+
+  it("blocks direct user record reads outside the current user or users permission", async () => {
+    const driver = { get: vi.fn() };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-worker-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "worker-1",
+        auth_user_id: "auth-worker-1",
+        role: "worker",
+        name: "Worker One",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer worker-token" },
+      query: { key: "user:worker-2", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:users:view" });
+    expect(driver.get).not.toHaveBeenCalled();
+  });
+
+  it("filters sensitive key-only lists for sessions without read permission", async () => {
+    const driver = {
+      list: vi.fn().mockResolvedValue(["user:worker-1", "user:worker-2", "appIssue:issue-1"])
+    };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-worker-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "worker-1",
+        auth_user_id: "auth-worker-1",
+        role: "worker",
+        name: "Worker One",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer worker-token" },
+      query: { prefix: "user:", shared: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ keys: ["user:worker-1"] });
+  });
+
+  it("hides app issue collections from ordinary workers", async () => {
+    const driver = {
+      listValuesMany: vi.fn().mockResolvedValue({
+        "appIssue:": [{ key: "appIssue:issue-1", value: "{\"id\":\"issue-1\"}" }],
+        "ticket:": [{ key: "ticket:T-1", value: "{\"id\":\"T-1\"}" }]
+      })
+    };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-worker-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "worker-1",
+        auth_user_id: "auth-worker-1",
+        role: "worker",
+        name: "Worker One",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: { CMMS_KV_AUTH: "supabase" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer worker-token" },
+      query: { prefixes: "appIssue:,ticket:", shared: "1", includeValues: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      collections: {
+        "appIssue:": [],
+        "ticket:": [{ key: "ticket:T-1", value: "{\"id\":\"T-1\"}" }]
+      }
+    });
+  });
+
   it("hides unexpected backend failures behind a request id", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const driver = {
