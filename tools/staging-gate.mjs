@@ -12,6 +12,7 @@ const steps = [
   ["staging:smoke:fleet-api", ["npm", ["run", "staging:smoke:fleet-api"]]],
   ["staging:pm:reconcile", ["npm", ["run", "staging:pm:reconcile"]]],
   ["staging:smoke:pm-api", ["npm", ["run", "staging:smoke:pm-api"]]],
+  ["staging:smoke:cleaning-zones-api", ["npm", ["run", "staging:smoke:cleaning-zones-api"]]],
   ["staging:smoke:settings", ["npm", ["run", "staging:smoke:settings"]]],
   ["staging:smoke:fleet-ui", ["npm", ["run", "staging:smoke:fleet-ui"]]],
   ["staging:smoke:ai-intake", ["npm", ["run", "staging:smoke:ai-intake"]]],

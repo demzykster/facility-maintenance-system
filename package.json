@@ -20,6 +20,7 @@
     "staging:fleet:reconcile": "node tools/staging-fleet-reconcile.mjs",
     "staging:smoke:pm-api": "node tools/staging-pm-api-smoke.mjs",
     "staging:pm:reconcile": "node tools/staging-pm-reconcile.mjs",
+    "staging:smoke:cleaning-zones-api": "node tools/staging-cleaning-zones-api-smoke.mjs",
     "staging:smoke:browser": "node tools/staging-browser-smoke.mjs",
     "staging:smoke:ui": "node tools/staging-ui-smoke.mjs",
     "staging:smoke:fleet-ui": "node tools/staging-fleet-ui-smoke.mjs",
