@@ -2,10 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/staging-cleaning-rounds-smoke`
-- Current branch: `codex/staging-cleaning-rounds-smoke`.
-- Last completed work: R10 cleaning rounds API slice added the first `/api/cleaning/rounds` server-operation seam over `public.cleaning_rounds` while leaving UI/runtime authority and `cround:*` migration for later slices.
-- Current work: Add staging reconciliation and a controlled API smoke for `cround:*` / `/api/cleaning/rounds` without switching UI/runtime authority.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 cleaning rounds staging slice added reconciliation and a controlled API smoke for `cround:*` / `/api/cleaning/rounds`. Staging now has 34 KV cleaning rounds mirrored into 34 normalized rows, while UI/runtime authority remains on `cround:` until a later slice.
 
 ## Current Product Direction
 
