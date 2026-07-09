@@ -4,6 +4,7 @@ import { VERCEL_API_ROUTE_FILES, vercelApiRoutePolicy } from "../src/vercelApiRo
 describe("Vercel API route policy", () => {
   it("accepts only the intentional endpoint files under api", () => {
     expect(vercelApiRoutePolicy(VERCEL_API_ROUTE_FILES).ok).toBe(true);
+    expect(VERCEL_API_ROUTE_FILES).toContain("api/cleaning/rounds.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/cleaning/zones.js");
   });
 
@@ -40,6 +41,6 @@ describe("Vercel API route policy", () => {
     ]);
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toContain("api_route_count_exceeds_limit:34/24");
+    expect(result.errors).toContain("api_route_count_exceeds_limit:35/24");
   });
 });

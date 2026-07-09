@@ -1,0 +1,151 @@
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
+import { canPerformCleaning, canViewCleaningReports } from "../../src/cleaningAccessModel.js";
+import { normalizeCleaningRoundRecord } from "../../src/cleaningRoundRecordModel.js";
+import { sendServerError } from "../httpErrors.js";
+import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
+import { kvWritePermissionError } from "../kv/permissionPolicy.js";
+import { bearerToken } from "../session/authCookie.js";
+import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
+import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
+import { createSupabaseCleaningRoundsDriverFromEnv } from "./supabaseCleaningRoundsDriver.js";
+
+const json = (res, status, body) => {
+  res.statusCode = status;
+  res.setHeader("content-type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(body));
+};
+
+const readBody = async (req) => {
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req?.[Symbol.asyncIterator] !== "function") return {};
+  const chunks = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  const text = Buffer.concat(chunks).toString("utf8");
+  return text ? JSON.parse(text) : {};
+};
+
+async function authorize(req, env, fetchImpl, sessionClient) {
+  const token = bearerToken(req);
+  if (!token) return { ok: false, status: 401, error: "supabase_access_token_required" };
+
+  const cmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
+  if (cmmsSecret) {
+    const cmmsUser = verifyCmmsSessionToken(token, cmmsSecret);
+    if (cmmsUser) return { ok: true, user: cmmsUser };
+  }
+
+  const client = sessionClient || createSupabaseSessionClient({
+    url: env.SUPABASE_URL,
+    anonKey: env.SUPABASE_ANON_KEY,
+    fetchImpl
+  });
+  if (!client) return { ok: false, status: 503, error: "supabase_session_not_configured" };
+
+  try {
+    const authUser = await client.getAuthUser(token);
+    const profile = await client.getAppUserProfile(token, authUser?.id);
+    const session = buildSessionPayload(authUser, profile);
+    if (!session.ok) return { ok: false, status: session.error === "app_user_disabled" ? 403 : 401, error: session.error };
+    if (session.user.mustChangePassword) return { ok: false, status: 403, error: "password_change_required" };
+    return { ok: true, user: session.user };
+  } catch {
+    return { ok: false, status: 401, error: "supabase_session_failed" };
+  }
+}
+
+const writeAuditEvent = async (auditDriver, event) => {
+  if (!auditDriver || !event) return;
+  if (typeof auditDriver.write === "function") return auditDriver.write(event);
+};
+
+const roundUpsertAuditEvent = (round, actor) => normalizeAuditEvent({
+  at: Date.now(),
+  actorId: actor.id,
+  actorName: actor.name,
+  actorRole: actor.role,
+  entityType: AUDIT_ENTITY_TYPES.cleaning,
+  entityId: round.id,
+  action: AUDIT_ACTIONS.update,
+  summary: `Cleaning round upserted through normalized API: ${round.id}`,
+  after: { zoneId: round.zoneId, cleanerName: round.cleanerName, status: round.status, roundAt: round.roundAt },
+  metadata: { source: "api/cleaning/rounds", sourceKvKey: round.sourceKvKey }
+});
+
+const roundDeleteAuditEvent = (roundId, actor) => normalizeAuditEvent({
+  at: Date.now(),
+  actorId: actor.id,
+  actorName: actor.name,
+  actorRole: actor.role,
+  entityType: AUDIT_ENTITY_TYPES.cleaning,
+  entityId: roundId,
+  action: AUDIT_ACTIONS.delete,
+  summary: `Cleaning round deleted through normalized API: ${roundId}`,
+  before: { id: roundId },
+  metadata: { source: "api/cleaning/rounds", sourceKvKey: `cround:${roundId}` }
+});
+
+const canReadCleaningRounds = (user = {}) => (
+  user.role === "admin"
+  || canPerformCleaning(user)
+  || canViewCleaningReports(user)
+  || user.permissions?.settings === "manage"
+  || user.permissions?.settings === "full"
+);
+
+export function createCleaningRoundsApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+  const backendDriver = driver || createSupabaseCleaningRoundsDriverFromEnv(env, fetchImpl);
+  const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
+
+  return async function cleaningRoundsApiHandler(req, res) {
+    const auth = await authorize(req, env, fetchImpl, sessionClient);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!backendDriver) return json(res, 503, { error: "cleaning_rounds_backend_not_configured" });
+
+    try {
+      const method = String(req.method || "GET").toUpperCase();
+      if (!["GET", "POST", "DELETE"].includes(method)) {
+        res.setHeader("allow", "GET, POST, DELETE");
+        return json(res, 405, { error: "method_not_allowed" });
+      }
+
+      if (method === "GET") {
+        if (!canReadCleaningRounds(auth.user)) return json(res, 403, { error: "permission_required:cleaning:view" });
+        if (typeof backendDriver.get !== "function" || typeof backendDriver.list !== "function") return json(res, 503, { error: "cleaning_rounds_read_not_configured" });
+        const id = String(req.query?.id || "").trim();
+        if (id) {
+          const round = await backendDriver.get(id);
+          if (!round) return json(res, 404, { error: "cleaning_round_not_found" });
+          return json(res, 200, { ok: true, round });
+        }
+        const rounds = await backendDriver.list({ limit: req.query?.limit });
+        return json(res, 200, { ok: true, rounds });
+      }
+
+      const body = await readBody(req);
+      if (method === "DELETE") {
+        const id = String(req.query?.id || body?.id || body?.round?.id || "").trim();
+        if (!id) return json(res, 400, { error: "cleaning_round_id_required" });
+        const permissionError = kvWritePermissionError(auth.user, `cround:${id}`);
+        if (permissionError) return json(res, 403, { error: permissionError });
+        if (typeof backendDriver.delete !== "function") return json(res, 503, { error: "cleaning_rounds_delete_not_configured" });
+        await backendDriver.delete(id);
+        await writeAuditEvent(backendAuditDriver, roundDeleteAuditEvent(id, auth.user));
+        return json(res, 200, { ok: true, round: { id } });
+      }
+
+      const round = normalizeCleaningRoundRecord(body?.round || body);
+      const permissionError = kvWritePermissionError(auth.user, `cround:${round.id}`);
+      if (permissionError) return json(res, 403, { error: permissionError });
+
+      await backendDriver.upsert(round.legacyPayload);
+      await writeAuditEvent(backendAuditDriver, roundUpsertAuditEvent(round, auth.user));
+      return json(res, 200, { ok: true, round: { id: round.id, zoneId: round.zoneId, sourceKvKey: round.sourceKvKey } });
+    } catch (error) {
+      if (error?.message === "cleaning_round_id_required") return json(res, 400, { error: "cleaning_round_id_required" });
+      if (error instanceof SyntaxError) return json(res, 400, { error: "invalid_json" });
+      return sendServerError(req, res, error, { code: "cleaning_rounds_api_error", route: "/api/cleaning/rounds" });
+    }
+  };
+}
+
+export default createCleaningRoundsApiHandler();
