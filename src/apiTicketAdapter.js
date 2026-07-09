@@ -29,6 +29,15 @@ export function createApiTicketProvider({ baseUrl, fetchImpl = globalThis.fetch,
   };
 
   return {
+    async list() {
+      const response = await request("/tickets", { method: "GET" });
+      return parseJson(response);
+    },
+    async get(id, { includeFiles = false } = {}) {
+      const suffix = includeFiles ? "&includeFiles=1" : "";
+      const response = await request(`/tickets?id=${encodeURIComponent(id)}${suffix}`, { method: "GET" });
+      return parseJson(response);
+    },
     async upsert(ticket) {
       const response = await request("/tickets", {
         method: "POST",

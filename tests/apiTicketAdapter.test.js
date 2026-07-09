@@ -13,6 +13,23 @@ const errorResponse = (status, body = {}) => ({
 });
 
 describe("api ticket adapter", () => {
+  it("reads normalized tickets through the production bearer token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, tickets: [{ id: "T-1" }] }));
+    const provider = createApiTicketProvider({
+      baseUrl: "https://cmms.example/api",
+      fetchImpl,
+      getAccessToken: () => "access-1"
+    });
+
+    await expect(provider.list()).resolves.toEqual({ ok: true, tickets: [{ id: "T-1" }] });
+    await expect(provider.get("T-1", { includeFiles: true })).resolves.toEqual({ ok: true, tickets: [{ id: "T-1" }] });
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual([
+      "https://cmms.example/api/tickets",
+      "https://cmms.example/api/tickets?id=T-1&includeFiles=1"
+    ]);
+  });
+
   it("posts tickets to the normalized tickets API with the production bearer token", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(okResponse({ ok: true, ticket: { id: "T-1" } }));
     const provider = createApiTicketProvider({

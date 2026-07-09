@@ -2,6 +2,42 @@ import { describe, expect, it, vi } from "vitest";
 import { createSupabaseFileMetadataDriver, createSupabaseFileMetadataDriverFromEnv } from "../server/files/supabaseFileMetadataDriver.js";
 
 describe("Supabase file metadata driver", () => {
+  it("lists active metadata by owner", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([{
+          id: "file:1",
+          owner_type: "ticket",
+          owner_id: "T-1",
+          owner_sub_id: "",
+          kind: "ticket_before_photo",
+          path: "tickets/T-1/before.jpg",
+          content_type: "image/jpeg",
+          storage_provider: "supabase",
+          bucket: "cmms-files",
+          size_bytes: 12,
+          created_at: "2026-07-09T10:00:00.000Z"
+        }]);
+      }
+    });
+    const driver = createSupabaseFileMetadataDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service",
+      fetchImpl
+    });
+
+    await expect(driver.listActiveByOwner("ticket", "T-1")).resolves.toEqual([expect.objectContaining({
+      ownerType: "ticket",
+      ownerId: "T-1",
+      path: "tickets/T-1/before.jpg"
+    })]);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/file_metadata?owner_type=eq.ticket&owner_id=eq.T-1&deleted_at=is.null&select=*&order=created_at.desc", expect.objectContaining({
+      method: "GET"
+    }));
+  });
+
   it("stays disabled until required server env is configured", () => {
     expect(createSupabaseFileMetadataDriver()).toBeNull();
     expect(createSupabaseFileMetadataDriverFromEnv({})).toBeNull();

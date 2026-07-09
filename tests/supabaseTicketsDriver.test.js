@@ -40,6 +40,47 @@ describe("Supabase tickets driver", () => {
     });
   });
 
+  it("lists normalized tickets as current UI payloads", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([{ id: "T-1", status: "open", subject: "Broken", legacy_payload: { id: "T-1", subject: "Legacy" } }]);
+      }
+    });
+    const driver = createSupabaseTicketsDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service",
+      fetchImpl
+    });
+
+    await expect(driver.list({ limit: 25 })).resolves.toEqual([expect.objectContaining({ id: "T-1", subject: "Legacy" })]);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/tickets?select=*&order=created_at.desc&limit=25", expect.objectContaining({
+      method: "GET",
+      headers: expect.objectContaining({ authorization: "Bearer service" })
+    }));
+  });
+
+  it("gets one normalized ticket by id", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([{ id: "T-2", status: "new", subject: "One", legacy_payload: { id: "T-2", subject: "One" } }]);
+      }
+    });
+    const driver = createSupabaseTicketsDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service",
+      fetchImpl
+    });
+
+    await expect(driver.get("T-2")).resolves.toMatchObject({ id: "T-2", subject: "One" });
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/tickets?id=eq.T-2&select=*&limit=1", expect.objectContaining({
+      method: "GET"
+    }));
+  });
+
   it("deletes normalized ticket rows by id", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,

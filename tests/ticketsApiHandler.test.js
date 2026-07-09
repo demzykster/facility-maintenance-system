@@ -88,6 +88,73 @@ describe("tickets API handler", () => {
     }));
   });
 
+  it("lists normalized tickets for active ticket roles", async () => {
+    const driver = { list: vi.fn().mockResolvedValue([{ id: "T-1", status: "open" }]), get: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "tech" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer tech-token" },
+      query: { limit: "25" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets: [{ id: "T-1", status: "open" }] });
+    expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
+  });
+
+  it("gets one normalized ticket with active file metadata", async () => {
+    const driver = {
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({ id: "T-1", status: "open" })
+    };
+    const metadataDriver = {
+      listActiveByOwner: vi.fn().mockResolvedValue([{ ownerType: "ticket", ownerId: "T-1", path: "tickets/T-1/before.jpg" }])
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "view" } })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer user-token" },
+      query: { id: "T-1", includeFiles: "1" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      ticket: {
+        id: "T-1",
+        status: "open",
+        files: [{ ownerType: "ticket", ownerId: "T-1", path: "tickets/T-1/before.jpg" }]
+      }
+    });
+    expect(metadataDriver.listActiveByOwner).toHaveBeenCalledWith("ticket", "T-1");
+  });
+
+  it("blocks cleaner sessions from reading normalized tickets", async () => {
+    const driver = { list: vi.fn(), get: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "cleaner" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer cleaner-token" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:view" });
+    expect(driver.list).not.toHaveBeenCalled();
+  });
+
   it("accepts CMMS PIN worker sessions for ticket reporting", async () => {
     const driver = { upsert: vi.fn().mockResolvedValue({ id: "T-2" }) };
     const sessionClient = { getAuthUser: vi.fn(), getAppUserProfile: vi.fn() };

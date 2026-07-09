@@ -56,6 +56,18 @@ async function ticketRows({ root, serviceRoleKey, id }) {
   return Array.isArray(data) ? data : [];
 }
 
+async function fileRows({ root, serviceRoleKey, path }) {
+  const response = await fetch(`${root}/rest/v1/file_metadata?path=eq.${encodeURIComponent(path)}&deleted_at=is.null&select=path,owner_type,owner_id,kind`, {
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`
+    }
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(data?.message || data?.error || `file_metadata_${response.status}`);
+  return Array.isArray(data) ? data : [];
+}
+
 loadEnvFile(ENV_FILE);
 loadEnvFile(CREDENTIALS_FILE);
 
@@ -91,6 +103,7 @@ const ticket = {
   createdAt: Date.now(),
   updatedAt: Date.now()
 };
+const filePath = `tickets/${id}/before.jpg`;
 
 try {
   const upsertResponse = await fetch(`${publicUrl}/api/tickets`, {
@@ -108,6 +121,42 @@ try {
   if (afterUpsert.length !== 1) throw new Error(`tickets_upsert_row_count:${afterUpsert.length}`);
   if (afterUpsert[0].subject !== subject) throw new Error("tickets_upsert_subject_mismatch");
 
+  const uploadResponse = await fetch(`${publicUrl}/api/files?path=${encodeURIComponent(filePath)}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      contentType: "image/jpeg",
+      data: Buffer.from("staging-ticket-photo").toString("base64"),
+      metadata: {
+        ownerType: "ticket",
+        ownerId: id,
+        kind: "ticket_before_photo"
+      }
+    })
+  });
+  const uploadData = await readJson(uploadResponse);
+  if (!uploadResponse.ok || !uploadData?.ok) throw new Error(uploadData?.error || `file_upload_${uploadResponse.status}`);
+
+  const afterUpload = await fileRows({ root: supabaseUrl, serviceRoleKey, path: filePath });
+  if (afterUpload.length !== 1) throw new Error(`file_metadata_row_count:${afterUpload.length}`);
+
+  const readResponse = await fetch(`${publicUrl}/api/tickets?id=${encodeURIComponent(id)}&includeFiles=1`, {
+    headers: { authorization: `Bearer ${accessToken}` }
+  });
+  const readData = await readJson(readResponse);
+  if (!readResponse.ok || !readData?.ok) throw new Error(readData?.error || `tickets_read_${readResponse.status}`);
+  if (!readData?.ticket?.files?.some((file) => file.path === filePath && file.ownerId === id)) throw new Error("ticket_files_missing");
+
+  const fileDeleteResponse = await fetch(`${publicUrl}/api/files?path=${encodeURIComponent(filePath)}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${accessToken}` }
+  });
+  const fileDeleteData = await readJson(fileDeleteResponse);
+  if (!fileDeleteResponse.ok || !fileDeleteData?.ok) throw new Error(fileDeleteData?.error || `file_delete_${fileDeleteResponse.status}`);
+
   const deleteResponse = await fetch(`${publicUrl}/api/tickets?id=${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: { authorization: `Bearer ${accessToken}` }
@@ -124,10 +173,17 @@ try {
     ticket: {
       id,
       upserted: true,
+      fileLinked: true,
       deleted: true
     }
   }, null, 2));
 } catch (error) {
+  try {
+    await fetch(`${publicUrl}/api/files?path=${encodeURIComponent(filePath)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+  } catch {}
   try {
     await fetch(`${publicUrl}/api/tickets?id=${encodeURIComponent(id)}`, {
       method: "DELETE",

@@ -73,6 +73,9 @@ Current notes:
 - The staging schema gate now expects `public.tickets` for new Supabase staging/pilot projects.
 - First normalized server-operation slice: `POST /api/tickets` can upsert tickets into `public.tickets` after Supabase/CMMS session validation and existing ticket write-permission checks.
 - Pilot bridge slice: production/API-mode ticket saves keep the existing `ticket:*` KV record authoritative, then shadow-write the same ticket into `/api/tickets` so the normalized table fills without risking the live workflow. Ticket deletes also shadow-delete the normalized row to avoid stale pilot data.
+- Normalized read slice: `/api/tickets` supports list and detail reads from `public.tickets`, and detail reads can include active `file_metadata` rows linked to the ticket.
+- Staging reconciliation slice: `staging:tickets:reconcile` compares shared KV `ticket:*` records to `public.tickets`, backfills missing/drifted rows through `/api/tickets`, and fails the staging gate if the normalized table still disagrees with the KV authority.
+- Ticket file ownership slice: the tickets API can expose active file metadata for a normalized ticket, and the staging tickets API smoke creates a temporary ticket, uploads a file with `ownerType=ticket`, verifies it through `/api/tickets?id=...&includeFiles=1`, then deletes the file and ticket.
 - This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
 
 ### R3 — Notifications End-To-End
