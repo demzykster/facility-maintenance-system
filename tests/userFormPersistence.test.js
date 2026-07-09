@@ -19,8 +19,19 @@ describe("user form persistence", () => {
 
     expect(saveUserSource).toContain("await syncAdminProfileUser(u)");
     expect(saveUserSource).toContain('console.warn("admin profile sync failed", error)');
-    expect(saveUserSource.indexOf("await syncAdminProfileUser(u)")).toBeLessThan(saveUserSource.indexOf("persistShared(`user:${u.id}`"));
+    expect(saveUserSource.indexOf("await syncAdminProfileUser(u)")).toBeLessThan(saveUserSource.indexOf("USER_MANAGEMENT_PROVIDER.upsert(u)"));
     expect(saveUserSource).not.toContain("syncAdminProfileUser(u).catch");
+  });
+
+  it("routes production API user saves through the explicit user-management provider", () => {
+    const start = source.indexOf("const saveUser = async (u) =>");
+    const end = source.indexOf("const delUser = async", start);
+    const saveUserSource = source.slice(start, end);
+
+    expect(source).toContain("const USER_MANAGEMENT_API_AUTHORITY = APP_MODE === APP_MODES.production");
+    expect(saveUserSource).toContain("if (USER_MANAGEMENT_API_AUTHORITY)");
+    expect(saveUserSource).toContain("await USER_MANAGEMENT_PROVIDER.upsert(u)");
+    expect(saveUserSource).toContain("persistShared(`user:${u.id}`");
   });
 
   it("shows the user form save error when the parent save returns false", () => {

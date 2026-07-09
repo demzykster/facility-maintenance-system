@@ -48,7 +48,7 @@ Later separate safety slices:
 
 ### R10 data slice - user-management authority gap
 
-Status: candidate, not active until explicitly selected.
+Status: active on `codex/r10-user-management-authority`.
 
 Goal:
 - Keep the distinction between production identity/session and admin user-management clear.
@@ -57,14 +57,14 @@ Goal:
 - Close this remaining user-management authority gap through an explicit server operation/API/RLS path or another approved normalized authority design.
 
 Suggested PR sequence:
-1. Document the current three-layer user state: Supabase identity/session, admin user-management via `user:` KV bridge, and strengthened KV read/write permission policy.
-2. Design the smallest server-operation boundary for admin user-management without changing local/demo login behavior.
-3. Add tests for manager/admin permission checks, secret redaction, self-read behavior, and denied writes before replacing the bridge path.
-4. Migrate one narrow user-management write/read flow at a time; do not bundle this with cleaning, PPE, or broad permission redesign.
+1. Add the smallest server-operation boundary for admin user-management without changing local/demo login behavior.
+2. Route production/API user list, save, and delete flows through that explicit operation seam instead of raw `/api/kv user:*` calls.
+3. Add tests for manager/admin permission checks, secret redaction, self-read behavior, denied writes, and client wiring.
+4. Keep the seam backed by the current storage driver for this first slice; do not bundle this with cleaning, PPE, full RLS table migration, or broad permission redesign.
 
 DoD:
 - Production identity/session remains backed by Supabase `app_users`.
-- Admin user-management no longer depends on raw `user:` KV writes for the migrated flow.
+- Admin user-management no longer depends on raw `/api/kv user:*` calls for the migrated production/API flow.
 - Permission checks are enforced server-side and covered by tests.
 - Existing first-login password/PIN contract remains unchanged.
 

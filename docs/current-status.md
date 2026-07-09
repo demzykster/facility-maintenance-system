@@ -72,7 +72,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 ## Known Warnings
 
-- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,178.20 kB raw / 575.50 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
+- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,180.11 kB raw / 575.73 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
 - `npm audit` is currently clean: 0 vulnerabilities on 2026-07-09.
 - The old `xlsx` package dependency has been removed from `package.json`. Excel export now goes through `src/xlsxExportAdapter.js` on top of `write-excel-file`; Excel import uses `read-excel-file`; CSV import uses `papaparse`.
 - Old dependency-audit branch references are historical only. That work is already merged into `main`; current remote branches should be checked live with `git branch -r`.
