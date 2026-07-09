@@ -186,6 +186,27 @@ describe("Supabase file metadata driver", () => {
     }));
   });
 
+  it("marks active metadata rows deleted by owner", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return "";
+      }
+    });
+    const driver = createSupabaseFileMetadataDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    await driver.markDeletedByOwner("ticket", "T-1", 2000);
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/file_metadata?owner_type=eq.ticket&owner_id=eq.T-1&deleted_at=is.null", expect.objectContaining({
+      method: "PATCH",
+      body: JSON.stringify({ deleted_at: "1970-01-01T00:00:02.000Z" })
+    }));
+  });
+
   it("surfaces Supabase write failures", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: false,

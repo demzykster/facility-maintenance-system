@@ -8,6 +8,7 @@ import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { createSupabaseTicketsDriverFromEnv } from "./supabaseTicketsDriver.js";
 import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
+import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -95,10 +96,46 @@ const withFiles = async (ticket, metadataDriver) => {
   return { ...ticket, files };
 };
 
-export function createTicketsApiHandler({ driver = null, auditDriver = null, metadataDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
+const deleteTicketOwnedFiles = async ({ ticketId, fileDriver, metadataDriver }) => {
+  const cleanup = { files: 0, metadata: false, errors: 0 };
+  if (!ticketId || typeof metadataDriver?.listActiveByOwner !== "function") return cleanup;
+
+  let files = [];
+  try {
+    files = await metadataDriver.listActiveByOwner("ticket", ticketId);
+  } catch {
+    cleanup.errors += 1;
+  }
+
+  if (typeof fileDriver?.delete === "function") {
+    for (const file of files) {
+      if (!file?.path) continue;
+      try {
+        await fileDriver.delete(file.path);
+        cleanup.files += 1;
+      } catch {
+        cleanup.errors += 1;
+      }
+    }
+  }
+
+  if (typeof metadataDriver.markDeletedByOwner === "function") {
+    try {
+      await metadataDriver.markDeletedByOwner("ticket", ticketId);
+      cleanup.metadata = true;
+    } catch {
+      cleanup.errors += 1;
+    }
+  }
+
+  return cleanup;
+};
+
+export function createTicketsApiHandler({ driver = null, auditDriver = null, metadataDriver = null, fileDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
   const backendMetadataDriver = metadataDriver || (env.CMMS_FILE_METADATA_DRIVER === "supabase" ? createSupabaseFileMetadataDriverFromEnv(env, fetchImpl) : null);
+  const backendFileDriver = fileDriver || (env.CMMS_FILE_DRIVER === "supabase" ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
 
   return async function ticketsApiHandler(req, res) {
     const auth = await authorize(req, env, fetchImpl, sessionClient);
@@ -134,8 +171,9 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         if (permissionError) return json(res, 403, { error: permissionError });
         if (typeof backendDriver.delete !== "function") return json(res, 503, { error: "tickets_delete_not_configured" });
         await backendDriver.delete(id);
+        const cleanup = await deleteTicketOwnedFiles({ ticketId: id, fileDriver: backendFileDriver, metadataDriver: backendMetadataDriver });
         await writeAuditEvent(backendAuditDriver, ticketDeleteAuditEvent(id, auth.user));
-        return json(res, 200, { ok: true, ticket: { id } });
+        return json(res, 200, { ok: true, ticket: { id }, cleanup });
       }
 
       const ticket = normalizeTicketRecord(body?.ticket || body);

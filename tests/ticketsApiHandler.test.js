@@ -208,7 +208,7 @@ describe("tickets API handler", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true, ticket: { id: "T-4" } });
+    expect(res.json()).toEqual({ ok: true, ticket: { id: "T-4" }, cleanup: { files: 0, metadata: false, errors: 0 } });
     expect(driver.delete).toHaveBeenCalledWith("T-4");
     expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
       actorId: "app-user-1",
@@ -216,5 +216,36 @@ describe("tickets API handler", () => {
       entityId: "T-4",
       action: "delete"
     }));
+  });
+
+  it("cleans ticket-owned files when deleting a normalized ticket", async () => {
+    const driver = { delete: vi.fn().mockResolvedValue(undefined) };
+    const metadataDriver = {
+      listActiveByOwner: vi.fn().mockResolvedValue([
+        { ownerType: "ticket", ownerId: "T-5", path: "tickets/T-5/before.jpg" },
+        { ownerType: "ticket", ownerId: "T-5", path: "tickets/T-5/after.jpg" }
+      ]),
+      markDeletedByOwner: vi.fn().mockResolvedValue(undefined)
+    };
+    const fileDriver = { delete: vi.fn().mockResolvedValue(undefined) };
+    const handler = createTicketsApiHandler({
+      driver,
+      metadataDriver,
+      fileDriver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { id: "T-5" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, ticket: { id: "T-5" }, cleanup: { files: 2, metadata: true, errors: 0 } });
+    expect(metadataDriver.listActiveByOwner).toHaveBeenCalledWith("ticket", "T-5");
+    expect(fileDriver.delete).toHaveBeenCalledWith("tickets/T-5/before.jpg");
+    expect(fileDriver.delete).toHaveBeenCalledWith("tickets/T-5/after.jpg");
+    expect(metadataDriver.markDeletedByOwner).toHaveBeenCalledWith("ticket", "T-5");
   });
 });
