@@ -5,7 +5,7 @@ This file is an archive/reference snapshot for Codex sessions. It must not compe
 ## Source Of Truth
 
 - GitHub repository: https://github.com/demzykster/facility-maintenance-system
-- Visibility: private
+- Visibility: public
 - Owner: `demzykster`
 - Branch: `main`
 - Baseline tag: `pre-production-model`
@@ -45,7 +45,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 ### Phase 1 - Git Baseline
 
 - Local Git repository created.
-- GitHub private repository created.
+- GitHub repository created. It is currently public.
 - Code pushed to GitHub over SSH.
 - Tag `pre-production-model` pushed.
 - README contains local run and build commands.
@@ -54,7 +54,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 - Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
 - Vitest was added through PR #2.
-- `npm test` is available. As of 2026-07-09 on current `main`, it runs 123 test files / 646 tests.
+- `npm test` is available. As of 2026-07-10 on current `main`, it runs 125 test files / 665 tests.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
 - Ticket-card audit passes reduced noise for closed tickets:
   - closed/cancelled tickets no longer show an SLA progress bar;
@@ -101,4 +101,5 @@ Current production-data work:
 - Tickets are normalized-authority in production/API mode through `/api/tickets`; `ticket:*` KV records remain a compatibility mirror.
 - Fleet units are normalized-authority in production/API mode through `/api/fleet`; `fleet:*` KV records remain a compatibility mirror.
 - Periodic maintenance is normalized-authority in production/API mode through `/api/pm`; `pm:*` KV records remain a compatibility mirror.
+- User identity/session is backed by Supabase `app_users` and `/api/session/me`; production/API-mode admin user-management goes through `/api/users`, reads login-capable users from `app_users`, syncs profile writes before the temporary `user:` KV mirror, and deactivates matching `app_users` rows on delete.
 - R10 is not complete yet. Other business domains still need deliberate normalized-table/server-operation slices before final production can stop depending on the accepted KV bridge.
