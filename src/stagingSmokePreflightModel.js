@@ -28,6 +28,35 @@ export const STAGING_SMOKE_OPTIONAL_ENV = [
 
 const clean = (value) => String(value || "").trim();
 const cleanUrl = (value) => clean(value).replace(/\/+$/, "");
+const present = (env = {}, name) => clean(env[name]) !== "";
+
+const EXPECTED_STAGING_ENV = Object.freeze([
+  ["VITE_CMMS_APP_MODE", "production", "staging_smoke_requires_production_app_mode"],
+  ["VITE_CMMS_STORAGE_PROVIDER", "api", "staging_smoke_requires_api_storage_provider"],
+  ["CMMS_KV_AUTH", "supabase", "staging_smoke_requires_supabase_kv_auth"],
+  ["CMMS_KV_DRIVER", "supabase", "staging_smoke_requires_supabase_kv_driver"],
+  ["CMMS_FILE_DRIVER", "supabase", "staging_smoke_requires_supabase_file_driver"],
+  ["CMMS_FILE_METADATA_DRIVER", "supabase", "staging_smoke_requires_supabase_file_metadata_driver"],
+  ["CMMS_AUDIT_DRIVER", "supabase", "staging_smoke_requires_supabase_audit_driver"],
+  ["CMMS_PUBLIC_COMPLAINTS_ENABLED", "true", "staging_smoke_requires_public_complaints_enabled"],
+  ["CMMS_PUBLIC_COMPLAINTS_DRIVER", "supabase", "staging_smoke_requires_public_complaints_supabase_driver"]
+]);
+
+export function stagingMissingRequiredEnvErrors(env = {}, names = STAGING_SMOKE_REQUIRED_ENV) {
+  const errors = [];
+  for (const name of names) {
+    if (!present(env, name)) errors.push(`missing_env:${name}`);
+  }
+  return errors;
+}
+
+export function stagingWrongValueEnvErrors(env = {}) {
+  const errors = [];
+  for (const [name, expected, error] of EXPECTED_STAGING_ENV) {
+    if (present(env, name) && clean(env[name]) !== expected) errors.push(error);
+  }
+  return errors;
+}
 
 export function stagingPlaceholderEnvErrors(env = {}, names = STAGING_SMOKE_REQUIRED_ENV) {
   const errors = [];
@@ -63,4 +92,28 @@ export function stagingSupabaseEnvPairErrors(env = {}) {
   }
 
   return errors;
+}
+
+export function stagingBootstrapEnvErrors(env = {}) {
+  const errors = [];
+  if (present(env, "CMMS_BOOTSTRAP_ENABLED") && clean(env.CMMS_BOOTSTRAP_ENABLED) !== "false") {
+    errors.push("bootstrap_must_be_disabled_after_first_admin");
+  }
+  if (present(env, "CMMS_BOOTSTRAP_TOKEN")) {
+    errors.push("bootstrap_token_must_be_removed_after_first_admin");
+  }
+  return errors;
+}
+
+export function stagingSmokePreflightEnvErrors(env = {}, {
+  requiredNames = STAGING_SMOKE_REQUIRED_ENV,
+  placeholderNames = STAGING_SMOKE_REQUIRED_ENV
+} = {}) {
+  return [
+    ...stagingMissingRequiredEnvErrors(env, requiredNames),
+    ...stagingWrongValueEnvErrors(env),
+    ...stagingSupabaseEnvPairErrors(env),
+    ...stagingPlaceholderEnvErrors(env, placeholderNames),
+    ...stagingBootstrapEnvErrors(env)
+  ];
 }
