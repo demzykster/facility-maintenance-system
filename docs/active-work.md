@@ -2,10 +2,9 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-users-profile-authority`.
-- Current branch: `codex/r10-users-profile-authority`.
-- Last completed work: R10 cleaning records slice moved cleaning complaints and worker absences through one shared `/api/cleaning/records` route in production/API mode, with `ccomplaint:*` and `cabsence:*` kept as compatibility KV mirrors and the Vercel API budget still at `24/24`.
-- Current work: R10 user-management profile-authority slice removes the temporary `user:*` KV mirror as a hard dependency for login-capable `app_users` reads/writes/deactivation while keeping legacy-only pre-login records on the protected KV bridge.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 user-management profile-authority slice removed the temporary `user:*` KV mirror as a hard dependency for login-capable `app_users` reads/writes/deactivation while keeping legacy-only pre-login records on the protected KV bridge.
 
 ## Current Product Direction
 
