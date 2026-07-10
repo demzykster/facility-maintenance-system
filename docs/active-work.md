@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-users-app-users-backfill-tool`.
-- Current branch: `codex/r10-users-app-users-backfill-tool`.
-- Last completed work: R10 users API legacy fallback dedupes records that match `app_users` by id, auth user id, email, worker number, or phone before live `app_users` backfill.
-- Current work: R10 app_users legacy user backfill tool adds a guarded dry-run/apply path without deleting legacy KV records.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 app_users legacy user backfill tool adds a guarded dry-run/apply path without deleting legacy KV records.
+- Current work: none.
 
 ## Current Product Direction
 
