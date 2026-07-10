@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/consolidate-session-api-routes`.
+- Current branch: `codex/consolidate-session-api-routes`.
 - Last completed work: R10 settings-records authority slice moved `location:` and `appIssue:` records onto one grouped `/api/settings/records` route with normalized Supabase tables while keeping compatibility KV mirrors.
-- Current work: none.
+- Current work: route-budget safety slice consolidating thin `/api/session/*` proxies into one dynamic route while preserving the existing session URLs.
 
 ## Current Product Direction
 
@@ -30,4 +30,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. The Vercel API route budget is back at 24/24, so future R10 work should reuse grouped routes or consolidate before adding API surface.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. The Vercel API route budget is back at 24/24, so this route-budget slice must free capacity without changing session handler behavior.

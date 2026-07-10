@@ -7,12 +7,15 @@ describe("Vercel API route policy", () => {
     expect(VERCEL_API_ROUTE_FILES).toContain("api/cleaning/records.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/ppe/index.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/public/[resource].js");
+    expect(VERCEL_API_ROUTE_FILES).toContain("api/session/[action].js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/settings/records.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/work/index.js");
     expect(VERCEL_API_ROUTE_FILES).not.toContain("api/cleaning/rounds.js");
     expect(VERCEL_API_ROUTE_FILES).not.toContain("api/cleaning/zones.js");
     expect(VERCEL_API_ROUTE_FILES).not.toContain("api/public/complaints.js");
     expect(VERCEL_API_ROUTE_FILES).not.toContain("api/public/zones.js");
+    expect(VERCEL_API_ROUTE_FILES).not.toContain("api/session/login.js");
+    expect(VERCEL_API_ROUTE_FILES).not.toContain("api/session/me.js");
   });
 
   it("rejects helper files under api because Vercel deploys them as functions", () => {
@@ -48,6 +51,6 @@ describe("Vercel API route policy", () => {
     ]);
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toContain("api_route_count_exceeds_limit:36/24");
+    expect(result.errors).toContain("api_route_count_exceeds_limit:30/24");
   });
 });
