@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-pm-kv-mirrors`.
-- Current branch: `codex/r10-retire-pm-kv-mirrors`.
-- Last completed work: production/API user saves/deletes no longer recreate `user:*` KV mirrors, and staging retired all 12 matched user mirrors after guarded dry-run proof.
-- Current work: retire production/API PM KV mirror writes.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: production/API PM saves/batch saves/deletes no longer recreate `pm:*` KV mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
