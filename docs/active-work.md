@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-config-kv-mirror`.
-- Current branch: `codex/r10-retire-config-kv-mirror`.
+- Active branch: `none`.
+- Current branch: `main`.
 - Last completed work: production/API PPE saves no longer recreate PPE KV mirrors and staging retired all matched PPE mirrors after guarded dry-run proof.
-- Current work: retire the `config:v1` compatibility KV mirror after normalized app config is authoritative.
+- Current work: none.
 
 ## Current Product Direction
 
