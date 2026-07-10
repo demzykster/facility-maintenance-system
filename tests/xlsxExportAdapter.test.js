@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { XLSX, workbookToBlob } from "../src/xlsxExportAdapter.js";
+import { workbookToBlob } from "../src/xlsxExportAdapter.js";
+import { XLSX } from "../src/xlsxWorkbookModel.js";
 
 describe("xlsx export adapter", () => {
   it("keeps the small SheetJS-like surface used by CMMS exports", () => {
