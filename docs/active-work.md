@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-public-complaints-stop-kv-mirror`.
-- Current branch: `codex/r10-public-complaints-stop-kv-mirror`.
-- Last completed work: public QR zones and public complaint zone lookup now read normalized cleaning zones before falling back to `czone:` KV mirrors.
-- Current work: public complaints stop creating new `ccomplaint:*` KV mirrors when the normalized complaints driver is configured.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: public complaints stop creating new `ccomplaint:*` KV mirrors when the normalized complaints driver is configured.
+- Current work: none.
 
 ## Current Product Direction
 
