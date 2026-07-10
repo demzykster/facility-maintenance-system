@@ -42,3 +42,20 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run demo UI smoke
+        run: |
+          npm run preview -- --port 4173 > /tmp/cmms-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4173/ >/dev/null || { cat /tmp/cmms-preview.log; exit 1; }
+          CMMS_DEMO_UI_SMOKE_URL=http://127.0.0.1:4173/ npm run smoke:demo-ui
