@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-kv-residuals-report`.
-- Current branch: `codex/r10-kv-residuals-report`.
-- Last completed work: R10 users backfill status docs recorded that staging now has all legacy `user:` KV rows matched to `app_users`.
-- Current work: R10 residual KV report classifies compatibility mirrors, transient operational keys, and deferred legacy/orphan candidates without writing data.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 residual KV report classifies compatibility mirrors, transient operational keys, and deferred legacy/orphan candidates without writing data.
+- Current work: none.
 
 ## Current Product Direction
 
