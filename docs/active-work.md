@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-ppe-normalized-authority`.
-- Current branch: `codex/r10-ppe-normalized-authority`.
-- Last completed work: route-budget cleanup consolidated cleaning zones and rounds onto `/api/cleaning/records`, reducing the Vercel API route budget from 24/24 to 22/24 so later R10 domains can add narrow routes without exceeding the cap.
-- Current work: R10 PPE normalized-authority slice moves PPE movements, catalog items, norms, requests, and orders onto one `/api/ppe` route with Supabase-backed tables while keeping compatibility KV mirrors.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 PPE normalized-authority slice moved PPE movements, catalog items, norms, requests, and orders onto one `/api/ppe` route with Supabase-backed tables while keeping compatibility KV mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
@@ -27,4 +27,4 @@
 - Tickets, fleet, and periodic maintenance are now normalized authority slices in production/API mode. Continue R10 with the next narrow business-data slice instead of reopening completed migrations unless a live bug is reported.
 - User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users` and deactivates them on delete while preserving protected `user:` KV as temporary legacy enrichment/fallback. Continue user-management R10 in narrow authority slices until writes no longer depend on the bridge.
 - Cleaning zones, rounds, complaints, and worker absences now use normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed cleaning slices unless a live bug is reported.
-- PPE is the active R10 slice. Keep it on one API route with resource dispatch so the Vercel API route budget remains below the cap; do not combine it with tasks, meetings, settings, suppliers, lint, Playwright smoke, or monolith extraction.
+- PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
