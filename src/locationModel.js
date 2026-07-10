@@ -29,6 +29,72 @@ export const normalizeLocationType = (type) => {
   return LOCATION_TYPES.includes(value) ? value : "general";
 };
 
+const cleanStringArray = (values = []) =>
+  [...new Set((Array.isArray(values) ? values : []).map(cleanString).filter(Boolean))];
+
+const cleanObject = (value) =>
+  value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+export function normalizeLocationRecord(location = {}) {
+  const id = cleanString(location.id);
+  const name = cleanString(location.name);
+  if (!id) throw new Error("location_id_required");
+  if (!name) throw new Error("location_name_required");
+  return {
+    ...location,
+    id,
+    name,
+    type: normalizeLocationType(location.type),
+    building: cleanString(location.building),
+    floor: cleanString(location.floor),
+    area: cleanString(location.area),
+    parentId: cleanString(location.parentId) || null,
+    active: location.active !== false,
+    tags: cleanStringArray(location.tags),
+    source: cleanObject(location.source),
+    sourceKvKey: cleanString(location.sourceKvKey) || `location:${id}`,
+    legacyPayload: location.legacyPayload && typeof location.legacyPayload === "object" ? location.legacyPayload : { ...location }
+  };
+}
+
+export function locationRecordToSupabaseRow(location = {}) {
+  const record = normalizeLocationRecord(location);
+  return {
+    id: record.id,
+    name: record.name,
+    type: record.type,
+    building: record.building,
+    floor: record.floor,
+    area: record.area,
+    parent_id: record.parentId,
+    active: record.active,
+    tags: record.tags,
+    source: record.source,
+    source_kv_key: record.sourceKvKey,
+    legacy_payload: record.legacyPayload
+  };
+}
+
+export function locationRecordFromSupabaseRow(row = {}) {
+  const legacy = cleanObject(row.legacy_payload);
+  if (legacy.id) return legacy;
+  return normalizeLocationRecord({
+    ...legacy,
+    id: row.id || legacy.id,
+    name: row.name || legacy.name,
+    type: row.type || legacy.type,
+    building: row.building || legacy.building,
+    floor: row.floor || legacy.floor,
+    area: row.area || legacy.area,
+    parentId: row.parent_id || legacy.parentId,
+    active: row.active !== false,
+    tags: Array.isArray(row.tags) ? row.tags : legacy.tags,
+    source: cleanObject(row.source || legacy.source),
+    sourceKvKey: row.source_kv_key || legacy.sourceKvKey,
+    legacyPayload: legacy
+  });
+}
+
 export const locationDisplayText = (location = {}) => {
   const parts = [
     cleanString(location.name),

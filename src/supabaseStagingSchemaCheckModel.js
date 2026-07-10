@@ -5,6 +5,8 @@ export const STAGING_SUPABASE_TABLES = [
   "cleaning_rounds",
   "cleaning_complaints",
   "fleet_units",
+  "locations",
+  "app_issue_reports",
   "ppe_items",
   "ppe_norms",
   "ppe_movements",

@@ -69,6 +69,7 @@ import { createApiCleaningRoundsProvider } from "./apiCleaningRoundsAdapter.js";
 import { createApiCleaningComplaintsProvider, createApiWorkerAbsencesProvider } from "./apiCleaningRecordsAdapter.js";
 import { createApiPpeProvider } from "./apiPpeAdapter.js";
 import { createApiWorkProvider } from "./apiWorkAdapter.js";
+import { createApiSettingsRecordsProvider } from "./apiSettingsRecordsAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
@@ -79,6 +80,7 @@ import { cleaningRoundsAuthorityFailureIssue, cleaningRoundsForAuthority, normal
 import { cleaningComplaintsAuthorityFailureIssue, cleaningComplaintsForAuthority, normalizedCleaningRecordsAuthorityEnabled, workerAbsencesAuthorityFailureIssue, workerAbsencesForAuthority } from "./cleaningRecordsAuthorityModel.js";
 import { normalizedPpeAuthorityEnabled, ppeAuthorityFailureIssue, ppeForAuthority } from "./ppeAuthorityModel.js";
 import { normalizedWorkAuthorityEnabled, workAuthorityFailureIssue, workForAuthority } from "./workAuthorityModel.js";
+import { normalizedSettingsRecordsAuthorityEnabled, settingsRecordsAuthorityFailureIssue, settingsRecordsForAuthority } from "./settingsRecordsAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -223,6 +225,19 @@ const NORMALIZED_WORK_SHADOW_WRITE = !NORMALIZED_WORK_AUTHORITY
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_WORK_PROVIDER;
+const NORMALIZED_SETTINGS_RECORDS_PROVIDER = createApiSettingsRecordsProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_SETTINGS_RECORDS_AUTHORITY = normalizedSettingsRecordsAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_SETTINGS_RECORDS_PROVIDER
+});
+const NORMALIZED_SETTINGS_RECORDS_SHADOW_WRITE = !NORMALIZED_SETTINGS_RECORDS_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_SETTINGS_RECORDS_PROVIDER;
 const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
@@ -1853,6 +1868,8 @@ export default function App() {
 	    let ppeOrderRows = pord;
 	    let taskRows = mtk;
 	    let meetingRows = mmt;
+	    let locationRows = locs;
+	    let appIssueRows = issues;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
         const normalized = await ticketsForAuthority({
@@ -2007,6 +2024,24 @@ export default function App() {
         }));
 	      }
 	    }
+	    if (NORMALIZED_SETTINGS_RECORDS_AUTHORITY) {
+	      try {
+	        const normalizedSettingsRecords = await settingsRecordsForAuthority({
+          kvLocations: locs,
+          kvAppIssues: issues,
+          provider: NORMALIZED_SETTINGS_RECORDS_PROVIDER,
+          normalizedAuthority: true
+        });
+        locationRows = normalizedSettingsRecords.locations;
+        appIssueRows = normalizedSettingsRecords.appIssues;
+      } catch (error) {
+        void recordAutomaticAppIssue(settingsRecordsAuthorityFailureIssue({
+          action: "load",
+          resource: "records",
+          message: error?.message || "Normalized settings records API load failed"
+        }));
+	      }
+	    }
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
@@ -2018,7 +2053,7 @@ export default function App() {
     apply("czone", zoneRows, setZones, zoneSort);
     apply("cround", roundRows, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", complaintRows, setComplaints, (a, b) => b.at - a.at);
-    apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
+    apply("location", locationRows, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
     apply("mtask", taskRows, setTasks, (a, b) => b.createdAt - a.createdAt);
     apply("mmeet", meetingRows, setMeetings, (a, b) => b.at - a.at);
     apply("ppe", ppeRows, setPpe, (a, b) => b.at - a.at);
@@ -2026,7 +2061,7 @@ export default function App() {
     apply("ppenorm", ppeNormRows, setPpeNorms, null);
     apply("ppereq", ppeRequestRows, setPpeReqs, (a, b) => b.at - a.at);
     apply("ppeorder", ppeOrderRows, setPpeOrders, (a, b) => b.createdAt - a.createdAt);
-    apply("appIssue", issues, setAppIssues, (a, b) => (b.at || 0) - (a.at || 0));
+    apply("appIssue", appIssueRows, setAppIssues, (a, b) => (b.at || 0) - (a.at || 0));
     apply("cabsence", absenceRows, setAbsences, (a, b) => (a.from > b.from ? 1 : -1));
     // presence: мержим хранилище с текущим стейтом по свежести lastSeen — чтобы поллинг не затирал только что записанный статус при медленном/частичном хранилище
     setPresence((cur) => {
@@ -3125,7 +3160,50 @@ export default function App() {
   const delPpeReq = async (id) => deletePpeResource("requests", id, setPpeReqs);
   const savePpeOrder = async (x) => savePpeResource("orders", x, { setState: setPpeOrders, sortFn: (a, b) => b.createdAt - a.createdAt });
   const delPpeOrder = async (id) => deletePpeResource("orders", id, setPpeOrders);
-  const saveAppIssue = async (x) => { if (!await persistShared(`appIssue:${x.id}`, JSON.stringify(x))) return false; setAppIssues((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (b.at || 0) - (a.at || 0))); return true; };
+  const mirrorAppIssueToKv = async (issue) => {
+    const ok = await persistShared(`appIssue:${issue.id}`, JSON.stringify(issue), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: "settings_appIssues_kv_mirror_save_failed",
+      action: "mirror-save",
+      key: `appIssue:${issue.id}`,
+      message: "Compatibility KV app issue mirror save failed"
+    });
+  };
+  const shadowWriteNormalizedAppIssue = async (issue) => {
+    if (!NORMALIZED_SETTINGS_RECORDS_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_SETTINGS_RECORDS_PROVIDER.appIssues?.upsert?.(issue);
+    } catch (error) {
+      void recordAutomaticAppIssue(settingsRecordsAuthorityFailureIssue({
+        action: "shadow-save",
+        resource: "appIssues",
+        id: issue.id,
+        message: error?.message || "Normalized app issue API shadow save failed"
+      }));
+    }
+  };
+  const saveAppIssue = async (x) => {
+    if (NORMALIZED_SETTINGS_RECORDS_AUTHORITY) {
+      try {
+        await NORMALIZED_SETTINGS_RECORDS_PROVIDER.appIssues?.upsert?.(x);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(settingsRecordsAuthorityFailureIssue({
+          action: "save",
+          resource: "appIssues",
+          id: x.id,
+          message: error?.message || "Normalized app issue API save failed"
+        }));
+        return false;
+      }
+      void mirrorAppIssueToKv(x);
+    } else {
+      if (!await persistShared(`appIssue:${x.id}`, JSON.stringify(x))) return false;
+      void shadowWriteNormalizedAppIssue(x);
+    }
+    setAppIssues((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (b.at || 0) - (a.at || 0)));
+    return true;
+  };
   // авто-миграция Тип/Модель: группировка по типу; версия 2 пересобирает старый 1:1
   useEffect(() => {
     if (ready && fleet.length && config.vtMigV !== 2) {

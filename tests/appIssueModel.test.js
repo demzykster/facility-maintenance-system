@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueResponse } from "../src/appIssueModel.js";
+import {
+  APP_ISSUE_STATUS,
+  appIssueRecordFromSupabaseRow,
+  appIssueRecordToSupabaseRow,
+  appIssueStatusLabel,
+  createAppIssue,
+  normalizeAppIssueRecord,
+  updateAppIssueResponse
+} from "../src/appIssueModel.js";
 
 describe("app issue model", () => {
   it("creates a compact app issue report with reporter and runtime context", () => {
@@ -56,5 +64,29 @@ describe("app issue model", () => {
     expect(appIssueStatusLabel(APP_ISSUE_STATUS.open)).toBe("פתוח");
     expect(appIssueStatusLabel(APP_ISSUE_STATUS.reviewing)).toBe("בבדיקה");
     expect(appIssueStatusLabel(APP_ISSUE_STATUS.resolved)).toBe("טופל");
+  });
+
+  it("maps app issues to and from normalized Supabase rows", () => {
+    const issue = createAppIssue({
+      id: "issue-1",
+      at: 1000,
+      description: "בעיה",
+      session: { id: "u1", name: "User", role: "worker" },
+      location: "/tickets"
+    });
+    const row = appIssueRecordToSupabaseRow(issue);
+
+    expect(row).toMatchObject({
+      id: "issue-1",
+      status: "open",
+      reporter_id: "u1",
+      reporter_role: "worker",
+      source_kv_key: "appIssue:issue-1"
+    });
+    expect(appIssueRecordFromSupabaseRow({ ...row, legacy_payload: issue })).toEqual(issue);
+    expect(normalizeAppIssueRecord(issue)).toMatchObject({
+      id: "issue-1",
+      sourceKvKey: "appIssue:issue-1"
+    });
   });
 });

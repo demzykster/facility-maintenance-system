@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/settings-records-authority`.
+- Current branch: `codex/settings-records-authority`.
 - Last completed work: public route-budget safety slice consolidated `/api/public/complaints` and `/api/public/zones` onto one dynamic route while preserving the existing public URLs.
-- Current work: none.
+- Current work: R10 settings-records authority slice for `location:` and `appIssue:` records through one grouped `/api/settings/records` route.
 
 ## Current Product Direction
 
@@ -30,4 +30,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. The public route-budget slice freed one Vercel API route slot; the route budget is now 23/24, so the next narrow R10 domain can add one route if it cannot reuse an existing grouped route.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. The public route-budget slice freed one Vercel API route slot; this settings-records slice may use that slot only as a grouped route, not as one route per small settings domain.
