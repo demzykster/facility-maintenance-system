@@ -68,7 +68,15 @@ To inspect legacy `user:` records before any user migration or deletion decision
 npm run staging:users:reconcile-report
 ```
 
-This is read-only. It compares shared KV `user:` records with `public.app_users` by id, auth user id, email, worker number, and normalized phone, then reports matched, ambiguous, legacy-only, and malformed records.
+By default this is read-only. It compares shared KV `user:` records with `public.app_users` by id, auth user id, email, worker number, and normalized phone, then reports matched, ambiguous, legacy-only, malformed, proposed backfill, and skipped backfill records.
+
+To backfill safe legacy-only users into `public.app_users` without deleting legacy KV records:
+
+```bash
+npm run staging:users:reconcile-report -- --apply
+```
+
+Apply mode aborts if the report has ambiguous matches, malformed records, or skipped backfill rows.
 
 Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
 
