@@ -3191,15 +3191,6 @@ export default function App() {
   const delPpeReq = async (id) => deletePpeResource("requests", id, setPpeReqs);
   const savePpeOrder = async (x) => savePpeResource("orders", x, { setState: setPpeOrders, sortFn: (a, b) => b.createdAt - a.createdAt });
   const delPpeOrder = async (id) => deletePpeResource("orders", id, setPpeOrders);
-  const mirrorAppIssueToKv = async (issue) => {
-    const ok = await persistShared(`appIssue:${issue.id}`, JSON.stringify(issue), { toastOnFail: false });
-    if (!ok) void recordAutomaticAppIssue({
-      kind: "settings_appIssues_kv_mirror_save_failed",
-      action: "mirror-save",
-      key: `appIssue:${issue.id}`,
-      message: "Compatibility KV app issue mirror save failed"
-    });
-  };
   const shadowWriteNormalizedAppIssue = async (issue) => {
     if (!NORMALIZED_SETTINGS_RECORDS_SHADOW_WRITE) return;
     try {
@@ -3227,7 +3218,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorAppIssueToKv(x);
     } else {
       if (!await persistShared(`appIssue:${x.id}`, JSON.stringify(x))) return false;
       void shadowWriteNormalizedAppIssue(x);
