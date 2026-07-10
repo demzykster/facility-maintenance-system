@@ -7,6 +7,7 @@ describe("retired KV write model", () => {
       "presence:",
       "pushSubscriptions:v1",
       "config:v1",
+      "ticket:",
       "ppe:",
       "ppeitem:",
       "ppenorm:",
@@ -17,9 +18,10 @@ describe("retired KV write model", () => {
     expect(retiredKvWriteKey("presence:user-1", { appMode: "production", storageProvider: "api" })).toBe("presence:");
     expect(retiredKvWriteKey("pushSubscriptions:v1", { appMode: "production", storageProvider: "api" })).toBe("pushSubscriptions:v1");
     expect(retiredKvWriteKey("config:v1", { appMode: "production", storageProvider: "api" })).toBe("config:v1");
+    expect(retiredKvWriteKey("ticket:T-1", { appMode: "production", storageProvider: "api" })).toBe("ticket:");
     expect(retiredKvWriteKey("ppeitem:item-1", { appMode: "production", storageProvider: "api" })).toBe("ppeitem:");
     expect(retiredKvWriteKey("ppereq:req-1", { appMode: "production", storageProvider: "api" })).toBe("ppereq:");
-    expect(retiredKvWriteKey("ticket:T-1", { appMode: "production", storageProvider: "api" })).toBe("");
+    expect(retiredKvWriteKey("fleet:F-1", { appMode: "production", storageProvider: "api" })).toBe("");
   });
 
   it("separates active and retired batch writes", () => {
@@ -27,14 +29,16 @@ describe("retired KV write model", () => {
       { key: "presence:user-1", value: "{}" },
       { key: "pushSubscriptions:v1", value: "[]" },
       { key: "config:v1", value: "{}" },
+      { key: "ticket:T-1", value: "{}" },
       { key: "ppeitem:item-1", value: "{}" },
-      { key: "ticket:T-1", value: "{}" }
+      { key: "fleet:F-1", value: "{}" }
     ], { appMode: "production", storageProvider: "api" })).toEqual({
-      active: [{ key: "ticket:T-1", value: "{}" }],
+      active: [{ key: "fleet:F-1", value: "{}" }],
       retired: [
         { key: "presence:user-1", value: "{}", retiredPrefix: "presence:" },
         { key: "pushSubscriptions:v1", value: "[]", retiredPrefix: "pushSubscriptions:v1" },
         { key: "config:v1", value: "{}", retiredPrefix: "config:v1" },
+        { key: "ticket:T-1", value: "{}", retiredPrefix: "ticket:" },
         { key: "ppeitem:item-1", value: "{}", retiredPrefix: "ppeitem:" }
       ]
     });

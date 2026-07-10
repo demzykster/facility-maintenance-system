@@ -16,15 +16,15 @@ describe("normalized ticket authority wiring", () => {
     expect(source).toContain('action: "load"');
   });
 
-  it("writes normalized tickets first and mirrors to KV in production authority mode", () => {
-    expect(source).toMatch(/if \(NORMALIZED_TICKET_AUTHORITY\) \{[\s\S]*await NORMALIZED_TICKET_PROVIDER\.upsert\(rec\);[\s\S]*void mirrorTicketToKv\(rec\);/);
-    expect(source).toContain('kind: "ticket_kv_mirror_save_failed"');
+  it("writes normalized tickets without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/if \(NORMALIZED_TICKET_AUTHORITY\) \{[\s\S]*await NORMALIZED_TICKET_PROVIDER\.upsert\(rec\);[\s\S]*\} else \{[\s\S]*persistShared\(`ticket:\$\{rec\.id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_TICKET_PROVIDER\.upsert\(rec\);[\s\S]*void mirrorTicketToKv\(rec\);/);
     expect(source).toMatch(/if \(!await persistShared\(`ticket:\$\{rec\.id\}`, JSON\.stringify\(rec\)\)\) return false;[\s\S]*void shadowWriteNormalizedTicket\(rec\);/);
   });
 
-  it("deletes normalized tickets first and mirrors the delete to KV in production authority mode", () => {
-    expect(source).toMatch(/if \(NORMALIZED_TICKET_AUTHORITY\) \{[\s\S]*await NORMALIZED_TICKET_PROVIDER\.delete\(id\);[\s\S]*void mirrorDeleteTicketFromKv\(id\);/);
-    expect(source).toContain('kind: "ticket_kv_mirror_delete_failed"');
+  it("deletes normalized tickets without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/if \(NORMALIZED_TICKET_AUTHORITY\) \{[\s\S]*await NORMALIZED_TICKET_PROVIDER\.delete\(id\);[\s\S]*\} else \{[\s\S]*deleteShared\(`ticket:\$\{id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_TICKET_PROVIDER\.delete\(id\);[\s\S]*void mirrorDeleteTicketFromKv\(id\);/);
     expect(source).toMatch(/if \(!await deleteShared\(`ticket:\$\{id\}`\)\) return false;[\s\S]*void shadowDeleteNormalizedTicket\(id\);/);
   });
 });
