@@ -21,7 +21,7 @@ The backlog below remains useful for historical detail and code-area context, bu
 
 ### UI polish slice - touch targets and visual-audit follow-ups
 
-Status: first touch-target/overflow-cue pass done in PR #833; deeper visual polish remains separate.
+Status: first touch-target/overflow-cue pass done in PR #833; local demo UI smoke gate done in PR #834; semantic status-token slice is in PR #835; deeper visual polish remains separate.
 
 Goal:
 - Preserve the current operational CMMS layout while removing concrete usability friction from the owner-reported visual audit.
@@ -33,10 +33,18 @@ Completed PR #833:
 2. Softened only the top dashboard `דורש טיפול` action tiles by removing the heavy colored side stripe and preserving the current information hierarchy.
 3. Restored subtle scrollbar cues for horizontal chips, worker tabs, and the desktop sidebar navigation.
 
+Completed PR #834:
+1. Added `npm run smoke:demo-ui` as a secret-free browser smoke over the production build preview.
+2. Wired the smoke into GitHub Actions after build so desktop/mobile login, shell rendering, horizontal overflow, console errors, failed responses, and small touch targets are checked on each PR/main push.
+3. Fixed flex shrink on mobile topbar icon buttons that the Linux browser smoke caught as sub-44px controls.
+
+In review PR #835:
+1. Added a shared semantic status-token model for priority, task status, and ticket status color metadata.
+2. Covered the model with focused unit tests so future visual cleanup can reuse a stable danger/warning/success/info vocabulary instead of ad hoc color literals.
+
 Remaining separate PR sequence:
-1. Add a semantic status-token slice for danger/warning/success/info/severity colors instead of broad manual color churn.
-2. Continue card/dashboard noise reduction only from concrete owner-reported screens.
-3. Keep code-splitting/virtualization as a separate performance slice; do not bundle it with visual polish.
+1. Continue card/dashboard noise reduction only from concrete owner-reported screens.
+2. Keep code-splitting/virtualization as a separate performance slice; do not bundle it with visual polish.
 
 DoD:
 - `npm run lint`, `npm test -- --run`, `npm run release:check`, and `npm run build` pass.
