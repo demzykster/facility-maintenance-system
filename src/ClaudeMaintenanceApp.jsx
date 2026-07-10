@@ -2577,7 +2577,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorPpeToKv(resource, record);
     } else {
       if (!await persistShared(key, JSON.stringify(record))) return false;
       void shadowWriteNormalizedPpe(resource, record);
@@ -2603,7 +2602,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeletePpeFromKv(resource, id);
     } else {
       if (!await deleteShared(key)) return false;
       void shadowDeleteNormalizedPpe(resource, id);
