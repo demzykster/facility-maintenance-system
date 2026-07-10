@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/static-syntax-gate`.
+- Current branch: `codex/static-syntax-gate`.
 - Last completed work: safety slice added a CI-safe staging preflight gate so production-env shape checks stay wired into normal PR/main checks without exposing staging secrets.
-- Current work: none.
+- Current work: safety slice adds a minimal static syntax-analysis gate for JS/MJS files in CI without broad formatting churn.
 
 ## Current Product Direction
 
@@ -29,3 +29,4 @@
 - Cleaning zones, rounds, complaints, and worker absences now use normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed cleaning slices unless a live bug is reported.
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
+- Minimal static-analysis work should stay limited to syntax checking and CI wiring; do not reformat the monolith or introduce broad ESLint churn in this slice.

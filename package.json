@@ -40,6 +40,7 @@
     "staging:data:summary": "node tools/staging-data-summary.mjs",
     "staging:gate": "node tools/staging-gate.mjs",
     "fleet:import:preview": "node tools/fleet-license-import-preview.mjs",
+    "lint": "node tools/static-syntax-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview --host 127.0.0.1",
