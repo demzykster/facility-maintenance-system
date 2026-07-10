@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-ppe-kv-mirrors`.
-- Current branch: `codex/r10-retire-ppe-kv-mirrors`.
+- Active branch: `none`.
+- Current branch: `main`.
 - Last completed work: production/API push subscription saves no longer recreate the `pushSubscriptions:v1` KV mirror and staging retired the aggregate legacy key after guarded dry-run proof.
-- Current work: retire PPE compatibility KV mirror writes before deleting matched staging PPE mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
