@@ -93,7 +93,17 @@ export function buildSessionPayload(authUser, profile) {
       departments: appUser.departments,
       mgrZones: appUser.mgrZones,
       techScope: appUser.techScope,
+      techCats: appUser.techCats,
       supplier: appUser.supplier,
+      shift: appUser.shift,
+      shiftStart: appUser.shiftStart,
+      shiftEnd: appUser.shiftEnd,
+      lateTolerance: appUser.lateTolerance,
+      earlyTolerance: appUser.earlyTolerance,
+      cleaningAccess: appUser.cleaningAccess,
+      notificationPrefs: appUser.notificationPrefs,
+      employmentType: appUser.employmentType,
+      contractorName: appUser.contractorName,
       permissions: appUser.permissions,
       mustChangePassword: appUser.mustChangePassword
     }

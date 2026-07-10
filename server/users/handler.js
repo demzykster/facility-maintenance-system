@@ -36,20 +36,51 @@ const parseStoredUser = (record) => {
 
 const cleanString = (value) => String(value || "").trim();
 const cleanEmail = (value) => cleanString(value).toLowerCase();
+const cleanStringArray = (values = []) =>
+  [...new Set((Array.isArray(values) ? values : []).map(cleanString).filter(Boolean))];
+const cleanObject = (value) =>
+  value && typeof value === "object" && !Array.isArray(value) ? value : {};
+const numberOrNull = (value) => value === null || value === undefined || value === "" ? null : Math.max(0, Number(value) || 0);
+const timestampOrNull = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const ts = Number(value);
+  return Number.isFinite(ts) && ts > 0 ? new Date(ts).toISOString() : null;
+};
 
 export function appUserPatchFromUserRecord(user = {}) {
   return {
     name: cleanString(user.name) || null,
+    position: cleanString(user.position || user.jobTitle) || null,
     role: cleanString(user.role) || "user",
     active: user.active !== false,
     email: cleanEmail(user.email) || null,
     phone: cleanString(user.phone) || null,
     department: cleanString(user.dept || user.department) || null,
-    departments: Array.isArray(user.depts) ? user.depts.map(cleanString).filter(Boolean) : (user.dept ? [cleanString(user.dept)] : []),
+    departments: Array.isArray(user.depts) ? cleanStringArray(user.depts) : (user.dept ? [cleanString(user.dept)] : []),
     permissions: user.perms || user.permissions || {},
-    manager_zones: Array.isArray(user.mgrZones) ? user.mgrZones.map(cleanString).filter(Boolean) : [],
+    manager_zones: cleanStringArray(user.mgrZones),
     tech_scope: cleanString(user.techScope) || null,
+    tech_cats: cleanStringArray(user.techCats),
     supplier: cleanString(user.supplier) || null
+  };
+}
+
+export function extendedAppUserPatchFromUserRecord(user = {}) {
+  return {
+    ...appUserPatchFromUserRecord(user),
+    shift: cleanString(user.shift) || null,
+    shift_start: cleanString(user.shiftStart) || null,
+    shift_end: cleanString(user.shiftEnd) || null,
+    late_tolerance: numberOrNull(user.lateTolerance),
+    early_tolerance: numberOrNull(user.earlyTolerance),
+    cleaning_access: user.cleaningAccess === undefined ? false : user.cleaningAccess,
+    notification_prefs: cleanObject(user.notificationPrefs || user.notificationPreferences || user.notifyPrefs),
+    employment_type: cleanString(user.employmentType) || null,
+    contractor_name: cleanString(user.contractorName) || null,
+    reports_to: cleanString(user.reportsTo) || null,
+    status: cleanString(user.status) || null,
+    exit_at: timestampOrNull(user.exitAt),
+    ppe_reset_at: timestampOrNull(user.ppeResetAt)
   };
 }
 
@@ -70,6 +101,7 @@ export function userRecordFromAppUserProfile(profile = {}, legacy = {}) {
     authUserId: appUser.authUserId || legacy.authUserId || "",
     appUserId: appUser.id || legacy.appUserId || "",
     name: appUser.name || legacy.name || "",
+    position: appUser.position || legacy.position || legacy.jobTitle || "",
     role: appUser.role || legacy.role || "user",
     active: appUser.active,
     email: appUser.email || "",
@@ -80,7 +112,21 @@ export function userRecordFromAppUserProfile(profile = {}, legacy = {}) {
     perms: appUser.permissions || legacy.perms || {},
     mgrZones: appUser.mgrZones || legacy.mgrZones || [],
     techScope: appUser.techScope || legacy.techScope || "",
+    techCats: appUser.techCats?.length ? appUser.techCats : (Array.isArray(legacy.techCats) ? legacy.techCats : []),
     supplier: appUser.supplier || legacy.supplier || "",
+    shift: appUser.shift || legacy.shift || "",
+    shiftStart: appUser.shiftStart || legacy.shiftStart || "",
+    shiftEnd: appUser.shiftEnd || legacy.shiftEnd || "",
+    lateTolerance: appUser.lateTolerance ?? legacy.lateTolerance,
+    earlyTolerance: appUser.earlyTolerance ?? legacy.earlyTolerance,
+    cleaningAccess: appUser.cleaningAccess ?? legacy.cleaningAccess ?? legacy.cleaning ?? false,
+    notificationPrefs: Object.keys(appUser.notificationPrefs || {}).length ? appUser.notificationPrefs : (legacy.notificationPrefs || legacy.notificationPreferences || legacy.notifyPrefs || {}),
+    employmentType: appUser.employmentType || legacy.employmentType || "",
+    contractorName: appUser.contractorName || legacy.contractorName || "",
+    reportsTo: appUser.reportsTo || legacy.reportsTo || "",
+    status: appUser.status || legacy.status || "",
+    exitAt: appUser.exitAt ?? legacy.exitAt ?? null,
+    ppeResetAt: appUser.ppeResetAt ?? legacy.ppeResetAt ?? null,
     mustChangePassword: appUser.mustChangePassword
   };
 }
@@ -288,7 +334,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       if (permissionError) return json(res, 403, { error: permissionError });
       if (user.authUserId) {
         if (!backendProfileClient) return json(res, 503, { error: "users_profile_backend_not_configured" });
-        const patch = appUserPatchFromUserRecord(user);
+        const patch = extendedAppUserPatchFromUserRecord(user);
         if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
         await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
       } else if (typeof backendDriver?.set !== "function") {

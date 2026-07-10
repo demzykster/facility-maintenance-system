@@ -157,11 +157,21 @@ try {
     id: appUserId,
     authUserId,
     name: "Smoke User Updated",
-    role: "user",
+    role: "tech",
     email: updatedEmail,
     phone: "050-000-0000",
     dept: "Smoke",
     depts: ["Smoke"],
+    techScope: "facility",
+    techCats: ["electric"],
+    shiftStart: "07:30",
+    shiftEnd: "16:00",
+    lateTolerance: 12,
+    earlyTolerance: 4,
+    cleaningAccess: { enabled: true, canPerformRounds: true },
+    notificationPrefs: { enabled: { cleaning: false } },
+    employmentType: "contractor",
+    contractorName: "Smoke Contractor",
     perms: { users: "view", analytics: "view" },
     active: true,
     smoke: true
@@ -180,10 +190,26 @@ try {
     root: supabaseUrl,
     serviceRoleKey,
     table: "app_users",
-    select: "id,auth_user_id,email,name,permissions,active",
+    select: "id,auth_user_id,email,name,role,permissions,active,tech_scope,tech_cats,shift_start,shift_end,late_tolerance,early_tolerance,cleaning_access,notification_prefs,employment_type,contractor_name",
     query: `&id=eq.${encodeURIComponent(appUserId)}&limit=1`
   });
-  if (rows[0]?.email !== updatedEmail || rows[0]?.name !== "Smoke User Updated" || rows[0]?.permissions?.analytics !== "view") {
+  if (
+    rows[0]?.email !== updatedEmail
+    || rows[0]?.name !== "Smoke User Updated"
+    || rows[0]?.role !== "tech"
+    || rows[0]?.permissions?.analytics !== "view"
+    || rows[0]?.tech_scope !== "facility"
+    || !Array.isArray(rows[0]?.tech_cats)
+    || !rows[0].tech_cats.includes("electric")
+    || rows[0]?.shift_start !== "07:30"
+    || rows[0]?.shift_end !== "16:00"
+    || Number(rows[0]?.late_tolerance) !== 12
+    || Number(rows[0]?.early_tolerance) !== 4
+    || rows[0]?.cleaning_access?.canPerformRounds !== true
+    || rows[0]?.notification_prefs?.enabled?.cleaning !== false
+    || rows[0]?.employment_type !== "contractor"
+    || rows[0]?.contractor_name !== "Smoke Contractor"
+  ) {
     throw new Error("users_api_smoke_profile_not_updated");
   }
 
