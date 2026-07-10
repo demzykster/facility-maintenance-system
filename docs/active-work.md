@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-work-records-authority`.
-- Current branch: `codex/r10-work-records-authority`.
-- Last completed work: safety slice added a minimal static syntax-analysis gate for JS/MJS files in CI without broad formatting churn.
-- Current work: R10 work-records authority slice moves maintenance tasks (`mtask:`) and meetings (`mmeet:`) onto one `/api/work` route with Supabase-backed tables while keeping compatibility KV mirrors.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 work-records authority slice moved maintenance tasks (`mtask:`) and meetings (`mmeet:`) onto one `/api/work` route with Supabase-backed tables while keeping compatibility KV mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
@@ -30,4 +30,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work-records are the active R10 slice. Keep tasks and meetings on one route with resource dispatch so the Vercel API route budget remains at or below the cap; do not combine it with monolith extraction or broad settings redesign.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. The Vercel API route budget is now 24/24, so any additional API surface should reuse existing grouped routes or first consolidate route files.
