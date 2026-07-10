@@ -9585,13 +9585,14 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
   const [name, setName] = useState(user.name || ""), [position, setPosition] = useState(user.position || user.jobTitle || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
+  const [loginResetRequested, setLoginResetRequested] = useState(false);
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
   const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
   const roleUsesLogin = isActivationLinkRole(role);
   const roleUsesPin = isPinActivationRole(role);
   const roleUsesPassword = isPasswordActivationRole(role);
   const validLoginEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim().toLowerCase());
-  const loginConfigured = roleUsesLogin && userHasLoginSecret({ ...user, role, pin, password });
+  const loginConfigured = roleUsesLogin && !loginResetRequested && userHasLoginSecret({ ...user, role, pin, password });
   const canResetStoredLogin = loginConfigured && !user.authUserId;
   const activePermCount = USER_PERMISSION_MODULES.filter((m) => permRank(perms[m.mod] || "none") > 0).length;
   const permSummary = activePermCount ? `${countLabel(activePermCount, "תחום פעיל", "תחומים פעילים")}` : "אין הרשאות נוספות";
@@ -9656,7 +9657,8 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       reportsTo: role === "user" ? reportsTo : "",
       active,
       activationToken: "",
-      activationStatus: roleUsesLogin && (nextPin || nextPassword || user.authUserId) ? "activated" : "",
+      activationStatus: roleUsesLogin && !loginResetRequested && (nextPin || nextPassword || user.authUserId || user.loginConfigured || user.loginState === "active") ? "activated" : "",
+      loginResetRequested: canWorkerAccess && roleUsesLogin && loginResetRequested,
       cleaningAccess: nextCleaningAccess,
       employmentType: role === "worker" ? employmentType : (role === "tech" ? "contractor" : ""),
       contractorName: (role === "worker" && employmentType === "contractor") ? contractorName.trim() : "" });
@@ -9670,7 +9672,8 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       : loginSetupPrompt({ ...user, role });
     return <div className="field"><span>סטטוס כניסה</span><div className="hint" style={{ marginTop: 0 }}>{pendingText}</div>
       {canWorkerAccess ? <>
-        {canResetStoredLogin && <button className="btn-ghost full" type="button" onClick={() => { setPassword(""); setPin(""); }}>איפוס כניסה בכניסה הבאה</button>}
+        {canResetStoredLogin && <button className="btn-ghost full" type="button" onClick={() => { setPassword(""); setPin(""); setLoginResetRequested(true); }}>איפוס כניסה בכניסה הבאה</button>}
+        {loginResetRequested && <div className="note warn">האיפוס יישמר רק לאחר לחיצה על שמירת משתמש.</div>}
         {canResetStoredLogin && <div className="hint">האיפוס לא יוצר קישור. אחרי שמירה, המשתמש יזין דוא״ל או מספר עובד ויגדיר סיסמה/קוד חדש בעצמו.</div>}
       </> : <div className="hint">ניהול כניסה דורש הרשאת הפעלת כניסה. שמירת פרטי המשתמש לא תשנה את הגדרת הכניסה הקיימת.</div>}
     </div>;

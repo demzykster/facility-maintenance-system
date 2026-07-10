@@ -492,6 +492,80 @@ describe("users API handler", () => {
     }));
   });
 
+  it("resets app_users PIN login by clearing the hash and requiring first-login setup again", async () => {
+    const appUserId = "550e8400-e29b-41d4-a716-446655440000";
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({
+        id: appUserId,
+        role: "worker",
+        name: "Worker",
+        active: true,
+        pin_hash: "scrypt$hash",
+        login_state: "active"
+      }),
+      updateAppUserProfileById: vi.fn().mockResolvedValue({ id: appUserId })
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const user = {
+      id: appUserId,
+      name: "Worker",
+      role: "worker",
+      workerNo: "2042",
+      active: true,
+      loginResetRequested: true
+    };
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfileById).toHaveBeenCalledWith(appUserId, expect.objectContaining({
+      pin_hash: null,
+      pin_updated_at: null,
+      login_state: "reset_required",
+      must_change_password: false
+    }));
+  });
+
+  it("marks Supabase Auth users for password change when login reset is requested", async () => {
+    const profileClient = {
+      updateAuthEmail: vi.fn(),
+      updateAppUserProfile: vi.fn().mockResolvedValue({ id: "manager-2" })
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const user = {
+      id: "manager-2",
+      authUserId: "auth-2",
+      name: "Manager Two",
+      role: "user",
+      email: "manager2@example.com",
+      loginResetRequested: true
+    };
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-2", expect.objectContaining({
+      login_state: "reset_required",
+      must_change_password: true
+    }));
+  });
+
   it("fails legacy-only user saves when no KV mirror exists to preserve first-login discovery", async () => {
     const profileClient = {
       updateAppUserProfile: vi.fn()

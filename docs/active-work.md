@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/r10-app-users-login-reset`.
+- Current branch: `codex/r10-app-users-login-reset`.
 - Last completed work: R10 PIN-login authority slice added `public.app_users.pin_hash`, `pin_updated_at`, and `login_state`; new `app_users` first-login/PIN setup stores only salted server-side `scrypt` hashes, PIN login verifies those hashes, and `/api/session/me` restores CMMS PIN sessions from `app_users` before falling back to legacy `user:` records.
-- Current work: none.
+- Current work: R10 app_users login reset slice makes manager-triggered first-login reset clear `app_users` PIN/password authority state instead of relying on legacy `user:` secret fields, with the PIN staging smoke covering setup, login, reset, and setup-required validation.
 
 ## Current Product Direction
 
