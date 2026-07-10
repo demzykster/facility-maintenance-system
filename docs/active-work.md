@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/r10-pin-login-authority`.
+- Current branch: `codex/r10-pin-login-authority`.
 - Last completed work: R10 users profile-fields authority slice added expanded `public.app_users` fields for technician assignment, shift/tolerance, cleaning access, notification prefs, employment, and archive/profile metadata while preserving protected `user:` KV as temporary legacy enrichment/fallback.
-- Current work: none.
+- Current work: R10 PIN-login authority slice moves first-login/PIN setup for `app_users` workers/technicians to server-side salted `scrypt` hashes (`pin_hash`) while preserving the legacy `user:` PIN fallback until old records are retired.
 
 ## Current Product Direction
 
@@ -25,7 +25,7 @@
 - Treat removed storage prefixes and docs as intentionally retired, not as migration backlog.
 - Do not invent broad product-polish backlog from screenshots or old notes. Wait for a concrete owner-reported issue.
 - Tickets, fleet, and periodic maintenance are now normalized authority slices in production/API mode. Continue R10 with the next narrow business-data slice instead of reopening completed migrations unless a live bug is reported.
-- User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users`, writes expanded profile fields there, and deactivates them on delete while preserving protected `user:` KV as temporary legacy enrichment/fallback. Continue user-management R10 in narrow authority slices until first-login/PIN legacy discovery no longer depends on the bridge.
+- User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users`, writes expanded profile fields there, and deactivates them on delete while preserving protected `user:` KV as temporary legacy enrichment/fallback. This branch adds `app_users.pin_hash`, `pin_updated_at`, and `login_state` so first-login/PIN setup and PIN session restore can use `app_users` before falling back to the legacy `user:` bridge.
 - Cleaning zones, rounds, complaints, and worker absences now use normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed cleaning slices unless a live bug is reported.
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.

@@ -24,6 +24,8 @@ describe("worker access model", () => {
     expect(userHasLoginSecret({ role: "user", password: "123456" })).toBe(true);
     expect(userHasLoginSecret({ role: "user", authUserId: "auth-1" })).toBe(true);
     expect(userHasLoginSecret({ role: "worker", pin: "1234" })).toBe(true);
+    expect(userHasLoginSecret({ role: "worker", loginConfigured: true })).toBe(true);
+    expect(userHasLoginSecret({ role: "worker", loginState: "active" })).toBe(true);
     expect(userHasLoginSecret({ role: "worker" })).toBe(false);
     expect(userHasLoginSecret({ role: "supplier" })).toBe(false);
   });

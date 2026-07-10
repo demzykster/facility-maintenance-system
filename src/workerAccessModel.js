@@ -11,6 +11,8 @@ export function loginSecretKindForRole(role) {
 
 export function userHasLoginSecret(user) {
   if (!user || !isActivationLinkRole(user.role)) return false;
+  if (user.loginConfigured === true) return true;
+  if (["active"].includes(String(user.loginState || ""))) return true;
   if (isPasswordActivationRole(user.role)) return !!String(user.password || user.authUserId || "").trim();
   return !!String(user.pin || "").trim();
 }

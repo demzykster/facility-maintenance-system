@@ -13,6 +13,7 @@ const steps = [
   ["staging:pm:reconcile", ["npm", ["run", "staging:pm:reconcile"]]],
   ["staging:smoke:pm-api", ["npm", ["run", "staging:smoke:pm-api"]]],
   ["staging:smoke:users-api", ["npm", ["run", "staging:smoke:users-api"]]],
+  ["staging:smoke:pin-login", ["npm", ["run", "staging:smoke:pin-login"]]],
   ["staging:ppe:reconcile", ["npm", ["run", "staging:ppe:reconcile"]]],
   ["staging:smoke:ppe-api", ["npm", ["run", "staging:smoke:ppe-api"]]],
   ["staging:work-records:reconcile", ["npm", ["run", "staging:work-records:reconcile"]]],
