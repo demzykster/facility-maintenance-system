@@ -901,6 +901,55 @@ describe("kv API handler", () => {
     expect(driver.delete).toHaveBeenCalledWith("config:v1", true);
   });
 
+  it("no-ops retired production API KV mirror writes without touching storage", async () => {
+    const driver = { set: vi.fn(), setMany: vi.fn() };
+    const sessionClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "user-1",
+        auth_user_id: "auth-user-1",
+        role: "user",
+        name: "User",
+        active: true,
+        permissions: {},
+        must_change_password: false
+      })
+    };
+    const handler = createKvApiHandler({
+      driver,
+      sessionClient,
+      env: {
+        CMMS_KV_AUTH: "supabase",
+        VITE_CMMS_APP_MODE: "production",
+        VITE_CMMS_STORAGE_PROVIDER: "api"
+      }
+    });
+
+    const putRes = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "presence:user-1", shared: "1" },
+      body: { value: "{\"id\":\"user-1\"}", shared: true }
+    });
+    const postRes = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        shared: true,
+        records: [
+          { key: "presence:user-1", value: "{\"id\":\"user-1\"}" }
+        ]
+      }
+    });
+
+    expect(putRes.statusCode).toBe(200);
+    expect(putRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "presence:" });
+    expect(postRes.statusCode).toBe(200);
+    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 1 });
+    expect(driver.set).not.toHaveBeenCalled();
+    expect(driver.setMany).not.toHaveBeenCalled();
+  });
+
   it("writes audit events for successful sensitive Supabase-authenticated writes when an audit sink is configured", async () => {
     const driver = {
       get: vi.fn().mockResolvedValue("{\"before\":true}"),

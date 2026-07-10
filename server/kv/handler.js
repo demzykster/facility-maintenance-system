@@ -7,6 +7,7 @@ import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { bearerToken, getHeader } from "../session/authCookie.js";
 import { sendServerError } from "../httpErrors.js";
 import { ticketStatusAuditEvent } from "../../src/auditEventModel.js";
+import { activeKvWriteRecords, retiredKvWriteKey } from "../../src/retiredKvWriteModel.js";
 
 const KV_KEY_PATTERN = /^[A-Za-z0-9:_@./=+-]+$/;
 const KV_RATE_BUCKETS = new Map();
@@ -62,6 +63,10 @@ const parsePositiveInt = (value, fallback) => {
 };
 
 const isKnownKvPrefix = (key = "") => ALLOWED_KV_PREFIXES.some((prefix) => String(key || "").startsWith(prefix));
+const retiredWriteOptions = (env = {}) => ({
+  appMode: env.VITE_CMMS_APP_MODE,
+  storageProvider: env.VITE_CMMS_STORAGE_PROVIDER
+});
 
 const kvKeyValidationError = (key = "") => {
   const recordKey = String(key || "");
@@ -242,14 +247,18 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         }));
         const badRecord = normalizedRecords.find((record) => kvKeyValidationError(record.key));
         if (badRecord) return json(res, 400, { error: "record_key_invalid", reason: kvKeyValidationError(badRecord.key) });
+        const partitionedRecords = activeKvWriteRecords(normalizedRecords, retiredWriteOptions(env));
+        if (!partitionedRecords.active.length) {
+          return json(res, 200, { ok: true, count: 0, retired: partitionedRecords.retired.length, ...(parseBool(body?.atomic) ? { atomic: true } : {}) });
+        }
         if (auth.user) {
-          const permissionError = normalizedRecords.map((record) => kvWritePermissionError(auth.user, record.key)).find(Boolean);
+          const permissionError = partitionedRecords.active.map((record) => kvWritePermissionError(auth.user, record.key)).find(Boolean);
           if (permissionError) return json(res, 403, { error: permissionError });
         }
         const atomic = parseBool(body?.atomic);
         const written = [];
         try {
-          const recordsWithFlags = normalizedRecords.map((record) => {
+          const recordsWithFlags = partitionedRecords.active.map((record) => {
             const permissionRule = kvWritePermissionForKey(record.key);
             const shouldAudit = backendAuditDriver && permissionRule && permissionRule.auditSensitive !== false;
             const shouldAuditTicketStatus = backendAuditDriver && String(record.key).startsWith("ticket:");
@@ -277,7 +286,7 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
             before: keysNeedingBefore.has(record.key) ? beforeByKey.get(record.key) ?? null : null
           }));
           if (canUseBulkSet) {
-            await backendDriver.setMany(normalizedRecords, writeShared);
+            await backendDriver.setMany(partitionedRecords.active, writeShared);
             if (atomic) written.push(...recordsWithBefore.map((record) => ({ key: record.key, before: record.before })));
           } else {
             for (const record of recordsWithBefore) {
@@ -305,7 +314,7 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
           }
           throw error;
         }
-        return json(res, 200, { ok: true, count: normalizedRecords.length, ...(atomic ? { atomic: true } : {}) });
+        return json(res, 200, { ok: true, count: partitionedRecords.active.length, ...(partitionedRecords.retired.length ? { retired: partitionedRecords.retired.length } : {}), ...(atomic ? { atomic: true } : {}) });
       }
 
       if (!key && method === "GET") {
@@ -378,6 +387,8 @@ export function createKvApiHandler({ driver = null, auditDriver = null, env = pr
         const body = await readBody(req);
         const value = body?.value ?? "";
         const writeShared = parseBool(body?.shared ?? shared);
+        const retiredPrefix = retiredKvWriteKey(key, retiredWriteOptions(env));
+        if (retiredPrefix) return json(res, 200, { ok: true, retired: true, retiredPrefix });
         const permissionRule = kvWritePermissionForKey(key);
         const shouldAudit = backendAuditDriver && permissionRule && permissionRule.auditSensitive !== false;
         const shouldAuditTicketStatus = backendAuditDriver && String(key).startsWith("ticket:");
