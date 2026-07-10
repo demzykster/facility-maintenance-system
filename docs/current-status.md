@@ -54,7 +54,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 - Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
 - Vitest was added through PR #2.
-- `npm test` is available. As of 2026-07-10 on the R10 app-config authority branch, it runs 181 test files / 868 tests.
+- `npm test` is available. As of 2026-07-10 on the R10 users profile-fields authority branch, it runs 181 test files / 869 tests.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
 - Ticket-card audit passes reduced noise for closed tickets:
   - closed/cancelled tickets no longer show an SLA progress bar;
@@ -102,7 +102,7 @@ Current production-data work:
 - Tickets are normalized-authority in production/API mode through `/api/tickets`; `ticket:*` KV records remain a compatibility mirror.
 - Fleet units are normalized-authority in production/API mode through `/api/fleet`; `fleet:*` KV records remain a compatibility mirror.
 - Periodic maintenance is normalized-authority in production/API mode through `/api/pm`; `pm:*` KV records remain a compatibility mirror.
-- User identity/session is backed by Supabase `app_users` and `/api/session/me`; production/API-mode admin user-management goes through `/api/users`, reads login-capable users from `app_users`, syncs profile writes before the temporary `user:` KV mirror, and deactivates matching `app_users` rows on delete.
+- User identity/session is backed by Supabase `app_users` and `/api/session/me`; production/API-mode admin user-management goes through `/api/users`, reads login-capable users from `app_users`, syncs profile writes before the temporary `user:` KV mirror, deactivates matching `app_users` rows on delete, and now stores technician assignment, shift/tolerance, cleaning access, notification prefs, employment, and archive/profile metadata in `app_users`.
 - Cleaning zones, rounds, complaints, and worker absences are normalized-authority in production/API mode through `/api/cleaning/records`; their legacy KV prefixes remain compatibility mirrors.
 - PPE movements, catalog items, norms, requests, and orders are normalized-authority in production/API mode through `/api/ppe`; `ppe:*`, `ppeitem:*`, `ppenorm:*`, `ppereq:*`, and `ppeorder:*` KV records remain compatibility mirrors.
 - Maintenance tasks and meetings are normalized-authority in production/API mode through `/api/work`; `mtask:*` and `mmeet:*` KV records remain compatibility mirrors.

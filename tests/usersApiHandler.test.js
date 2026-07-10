@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { appUserPatchFromUserRecord, createUsersApiHandler, userRecordFromAppUserProfile } from "../server/users/handler.js";
+import { appUserPatchFromUserRecord, createUsersApiHandler, extendedAppUserPatchFromUserRecord, userRecordFromAppUserProfile } from "../server/users/handler.js";
 
 function createRes() {
   return {
@@ -52,14 +52,22 @@ describe("users API handler", () => {
       departments: ["Ops"],
       manager_zones: ["North"],
       tech_scope: "facility",
+      tech_cats: ["electric"],
       supplier: "Vendor",
+      shift_start: "07:30",
+      shift_end: "16:00",
+      late_tolerance: 12,
+      early_tolerance: 4,
+      cleaning_access: { enabled: true, canPerformRounds: true },
+      notification_prefs: { enabled: { cleaning: false } },
+      employment_type: "contractor",
+      contractor_name: "CleanCo",
+      reports_to: "ops-lead",
       permissions: { users: "view" },
       active: true,
       must_change_password: true
     }, {
-      id: "legacy-id",
-      techCats: ["electric"],
-      shiftStart: "07:30"
+      id: "legacy-id"
     })).toEqual(expect.objectContaining({
       id: "app-user-1",
       authUserId: "auth-1",
@@ -75,7 +83,15 @@ describe("users API handler", () => {
       perms: { users: "view" },
       mustChangePassword: true,
       techCats: ["electric"],
-      shiftStart: "07:30"
+      shiftStart: "07:30",
+      shiftEnd: "16:00",
+      lateTolerance: 12,
+      earlyTolerance: 4,
+      cleaningAccess: { enabled: true, canPerformRounds: true },
+      notificationPrefs: { enabled: { cleaning: false } },
+      employmentType: "contractor",
+      contractorName: "CleanCo",
+      reportsTo: "ops-lead"
     }));
   });
 
@@ -86,6 +102,7 @@ describe("users API handler", () => {
       active: true,
       email: "MANAGER@EXAMPLE.COM ",
       phone: " 050-111 ",
+      position: " Shift Lead ",
       dept: "Ops",
       depts: ["Ops", " Logistics "],
       perms: { users: "manage" },
@@ -96,6 +113,7 @@ describe("users API handler", () => {
       pin: "1234"
     })).toEqual({
       name: "Manager",
+      position: "Shift Lead",
       role: "user",
       active: true,
       email: "manager@example.com",
@@ -105,7 +123,43 @@ describe("users API handler", () => {
       permissions: { users: "manage" },
       manager_zones: ["North", "South"],
       tech_scope: "facility",
+      tech_cats: ["kv-only"],
       supplier: "Vendor"
+    });
+  });
+
+  it("maps extended user-management fields into app_users profile patches", () => {
+    expect(extendedAppUserPatchFromUserRecord({
+      id: "tech-1",
+      role: "tech",
+      name: "Tech",
+      shift: "morning",
+      shiftStart: "07:30",
+      shiftEnd: "16:00",
+      lateTolerance: 12,
+      earlyTolerance: 4,
+      cleaningAccess: { enabled: true, canPerformRounds: true },
+      notificationPrefs: { enabled: { cleaning: false } },
+      employmentType: "contractor",
+      contractorName: "CleanCo",
+      reportsTo: "ops-lead",
+      status: "active",
+      exitAt: 1783660000000,
+      ppeResetAt: 1783660100000
+    })).toMatchObject({
+      shift: "morning",
+      shift_start: "07:30",
+      shift_end: "16:00",
+      late_tolerance: 12,
+      early_tolerance: 4,
+      cleaning_access: { enabled: true, canPerformRounds: true },
+      notification_prefs: { enabled: { cleaning: false } },
+      employment_type: "contractor",
+      contractor_name: "CleanCo",
+      reports_to: "ops-lead",
+      status: "active",
+      exit_at: "2026-07-10T05:06:40.000Z",
+      ppe_reset_at: "2026-07-10T05:08:20.000Z"
     });
   });
 
@@ -327,7 +381,16 @@ describe("users API handler", () => {
       sessionClient: sessionClientFor({ permissions: { users: "manage" } })
     });
 
-    const user = { id: "manager-2", authUserId: "auth-2", name: "Manager Two", role: "user", email: "MANAGER2@EXAMPLE.COM", perms: { users: "view" } };
+    const user = {
+      id: "manager-2",
+      authUserId: "auth-2",
+      name: "Manager Two",
+      role: "user",
+      email: "MANAGER2@EXAMPLE.COM",
+      perms: { users: "view" },
+      notificationPrefs: { enabled: { cleaning: false } },
+      cleaningAccess: { enabled: true, canPerformRounds: true }
+    };
     const res = await call(handler, {
       method: "POST",
       headers: { authorization: "Bearer manager-token" },
@@ -340,7 +403,9 @@ describe("users API handler", () => {
       name: "Manager Two",
       role: "user",
       email: "manager2@example.com",
-      permissions: { users: "view" }
+      permissions: { users: "view" },
+      notification_prefs: { enabled: { cleaning: false } },
+      cleaning_access: { enabled: true, canPerformRounds: true }
     }));
     expect(driver.set).toHaveBeenCalledWith("user:manager-2", JSON.stringify(user), true);
     expect(order).toEqual(["auth-email", "app-users", "kv"]);
