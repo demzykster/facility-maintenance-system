@@ -80,6 +80,7 @@ import { normalizedWorkAuthorityEnabled, workAuthorityFailureIssue, workForAutho
 import { normalizedSettingsRecordsAuthorityEnabled, settingsRecordsAuthorityFailureIssue, settingsRecordsForAuthority } from "./settingsRecordsAuthorityModel.js";
 import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, presenceForAuthority } from "./presenceAuthorityModel.js";
 import { priorityToken, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
+import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -1836,6 +1837,7 @@ export default function App() {
 	    return loadColl("user:");
 	  }
 	  async function loadCollections(prefixes) {
+    if (!prefixes.length) return [];
     if (typeof store.listManyValues === "function") {
       try {
         const grouped = await store.listManyValues(prefixes, true);
@@ -1934,149 +1936,194 @@ export default function App() {
     return ok;
   };
   async function reloadAll() {
-    const [tk, pmv, fl, pres, us, zn, rd, cp, abs, locs, mtk, mmt, pp, ppit, ppn, ppreq, pord, issues] = await loadCollections([
-      "ticket:", "pm:", "fleet:",
-      "presence:", "user:",
-      "czone:", "cround:", "ccomplaint:", "cabsence:", "location:", "mtask:", "mmeet:", "ppe:", "ppeitem:", "ppenorm:", "ppereq:", "ppeorder:", "appIssue:",
-    ]);
-	    let ticketRows = tk;
-	    let pmRows = pmv;
-	    let fleetRows = fl;
-	    let zoneRows = zn;
-	    let roundRows = rd;
-	    let complaintRows = cp;
-	    let absenceRows = abs;
-	    let userRows = us;
-	    let ppeRows = pp;
-	    let ppeItemRows = ppit;
-	    let ppeNormRows = ppn;
-	    let ppeRequestRows = ppreq;
-	    let ppeOrderRows = pord;
-	    let taskRows = mtk;
-	    let meetingRows = mmt;
-	    let locationRows = locs;
-	    let appIssueRows = issues;
-	    let presenceRows = pres;
+    const startupPrefixes = startupKvPrefixesForAuthorities({
+      tickets: NORMALIZED_TICKET_AUTHORITY,
+      pm: NORMALIZED_PM_AUTHORITY,
+      fleet: NORMALIZED_FLEET_AUTHORITY,
+      presence: NORMALIZED_PRESENCE_AUTHORITY,
+      users: USER_MANAGEMENT_API_AUTHORITY,
+      cleaningZones: NORMALIZED_CLEANING_ZONES_AUTHORITY,
+      cleaningRounds: NORMALIZED_CLEANING_ROUNDS_AUTHORITY,
+      cleaningComplaints: NORMALIZED_CLEANING_COMPLAINTS_AUTHORITY,
+      workerAbsences: NORMALIZED_WORKER_ABSENCES_AUTHORITY,
+      settingsRecords: NORMALIZED_SETTINGS_RECORDS_AUTHORITY,
+      work: NORMALIZED_WORK_AUTHORITY,
+      ppe: NORMALIZED_PPE_AUTHORITY
+    });
+    const loadedStartupCollections = await loadCollections(startupPrefixes);
+    const kvCollections = Object.fromEntries(startupPrefixes.map((prefix, index) => [prefix, loadedStartupCollections[index] || []]));
+    const kvRows = (prefix) => kvCollections[prefix] || [];
+    const fallbackRows = async (prefix) => {
+      if (Object.prototype.hasOwnProperty.call(kvCollections, prefix)) return kvRows(prefix);
+      const rows = await loadColl(prefix);
+      kvCollections[prefix] = rows;
+      return rows;
+    };
+    const fallbackMany = async (prefixes) => Promise.all(prefixes.map((prefix) => fallbackRows(prefix)));
+	    let ticketRows = kvRows(STARTUP_KV_PREFIXES.tickets);
+	    let pmRows = kvRows(STARTUP_KV_PREFIXES.pm);
+	    let fleetRows = kvRows(STARTUP_KV_PREFIXES.fleet);
+	    let zoneRows = kvRows(STARTUP_KV_PREFIXES.cleaningZones);
+	    let roundRows = kvRows(STARTUP_KV_PREFIXES.cleaningRounds);
+	    let complaintRows = kvRows(STARTUP_KV_PREFIXES.cleaningComplaints);
+	    let absenceRows = kvRows(STARTUP_KV_PREFIXES.workerAbsences);
+	    let userRows = kvRows(STARTUP_KV_PREFIXES.users);
+	    let ppeRows = kvRows(STARTUP_KV_PREFIXES.ppeMovements);
+	    let ppeItemRows = kvRows(STARTUP_KV_PREFIXES.ppeItems);
+	    let ppeNormRows = kvRows(STARTUP_KV_PREFIXES.ppeNorms);
+	    let ppeRequestRows = kvRows(STARTUP_KV_PREFIXES.ppeRequests);
+	    let ppeOrderRows = kvRows(STARTUP_KV_PREFIXES.ppeOrders);
+	    let taskRows = kvRows(STARTUP_KV_PREFIXES.workTasks);
+	    let meetingRows = kvRows(STARTUP_KV_PREFIXES.workMeetings);
+	    let locationRows = kvRows(STARTUP_KV_PREFIXES.locations);
+	    let appIssueRows = kvRows(STARTUP_KV_PREFIXES.appIssues);
+	    let presenceRows = kvRows(STARTUP_KV_PREFIXES.presence);
+    const normalizedLoads = [];
     if (NORMALIZED_TICKET_AUTHORITY) {
+      normalizedLoads.push((async () => {
       try {
         const normalized = await ticketsForAuthority({
-          kvTickets: tk,
+          kvTickets: [],
           provider: NORMALIZED_TICKET_PROVIDER,
           normalizedAuthority: true
         });
         ticketRows = normalized.tickets;
       } catch (error) {
+        ticketRows = await fallbackRows(STARTUP_KV_PREFIXES.tickets);
         void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized ticket API load failed"
         }));
       }
+      })());
     }
     if (NORMALIZED_FLEET_AUTHORITY) {
+      normalizedLoads.push((async () => {
       try {
         const normalizedFleet = await fleetForAuthority({
-          kvFleet: fl,
+          kvFleet: [],
           provider: NORMALIZED_FLEET_PROVIDER,
           normalizedAuthority: true
         });
         fleetRows = normalizedFleet.fleet;
       } catch (error) {
+        fleetRows = await fallbackRows(STARTUP_KV_PREFIXES.fleet);
         void recordAutomaticAppIssue(fleetAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized fleet API load failed"
         }));
       }
+      })());
     }
 	    if (NORMALIZED_PM_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedPm = await pmForAuthority({
-          kvPm: pmv,
+          kvPm: [],
           provider: NORMALIZED_PM_PROVIDER,
           normalizedAuthority: true
         });
         pmRows = normalizedPm.pm;
       } catch (error) {
+        pmRows = await fallbackRows(STARTUP_KV_PREFIXES.pm);
         void recordAutomaticAppIssue(pmAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized PM API load failed"
 	        }));
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_CLEANING_ZONES_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedCleaningZones = await cleaningZonesForAuthority({
-          kvZones: zn,
+          kvZones: [],
           provider: NORMALIZED_CLEANING_ZONES_PROVIDER,
           normalizedAuthority: true
         });
         zoneRows = normalizedCleaningZones.zones;
       } catch (error) {
+        zoneRows = await fallbackRows(STARTUP_KV_PREFIXES.cleaningZones);
         void recordAutomaticAppIssue(cleaningZonesAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized cleaning zones API load failed"
         }));
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_CLEANING_ROUNDS_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedCleaningRounds = await cleaningRoundsForAuthority({
-          kvRounds: rd,
+          kvRounds: [],
           provider: NORMALIZED_CLEANING_ROUNDS_PROVIDER,
           normalizedAuthority: true
         });
         roundRows = normalizedCleaningRounds.rounds;
       } catch (error) {
+        roundRows = await fallbackRows(STARTUP_KV_PREFIXES.cleaningRounds);
         void recordAutomaticAppIssue(cleaningRoundsAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized cleaning rounds API load failed"
         }));
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_CLEANING_COMPLAINTS_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedCleaningComplaints = await cleaningComplaintsForAuthority({
-          kvComplaints: cp,
+          kvComplaints: [],
           provider: NORMALIZED_CLEANING_COMPLAINTS_PROVIDER,
           normalizedAuthority: true
         });
         complaintRows = normalizedCleaningComplaints.complaints;
       } catch (error) {
+        complaintRows = await fallbackRows(STARTUP_KV_PREFIXES.cleaningComplaints);
         void recordAutomaticAppIssue(cleaningComplaintsAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized cleaning complaints API load failed"
         }));
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_WORKER_ABSENCES_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedWorkerAbsences = await workerAbsencesForAuthority({
-          kvAbsences: abs,
+          kvAbsences: [],
           provider: NORMALIZED_WORKER_ABSENCES_PROVIDER,
           normalizedAuthority: true
         });
         absenceRows = normalizedWorkerAbsences.absences;
       } catch (error) {
+        absenceRows = await fallbackRows(STARTUP_KV_PREFIXES.workerAbsences);
         void recordAutomaticAppIssue(workerAbsencesAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized worker absences API load failed"
         }));
 	      }
+	      })());
 	    }
 	    if (USER_MANAGEMENT_API_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        userRows = await loadUsers();
 	      } catch (error) {
+	        userRows = await fallbackRows(STARTUP_KV_PREFIXES.users);
 	        void recordAutomaticAppIssue({ kind: "users_api_load_failed", action: "load", key: "user:*", message: error?.message || "User-management API load failed" });
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_PPE_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedPpe = await ppeForAuthority({
-          kvMovements: pp,
-          kvItems: ppit,
-          kvNorms: ppn,
-          kvRequests: ppreq,
-          kvOrders: pord,
+          kvMovements: [],
+          kvItems: [],
+          kvNorms: [],
+          kvRequests: [],
+          kvOrders: [],
           provider: NORMALIZED_PPE_PROVIDER,
           normalizedAuthority: true
         });
@@ -2086,64 +2133,88 @@ export default function App() {
         ppeRequestRows = normalizedPpe.requests;
         ppeOrderRows = normalizedPpe.orders;
       } catch (error) {
+        [ppeRows, ppeItemRows, ppeNormRows, ppeRequestRows, ppeOrderRows] = await fallbackMany([
+          STARTUP_KV_PREFIXES.ppeMovements,
+          STARTUP_KV_PREFIXES.ppeItems,
+          STARTUP_KV_PREFIXES.ppeNorms,
+          STARTUP_KV_PREFIXES.ppeRequests,
+          STARTUP_KV_PREFIXES.ppeOrders
+        ]);
 	        void recordAutomaticAppIssue(ppeAuthorityFailureIssue({
           action: "load",
           resource: "records",
           message: error?.message || "Normalized PPE API load failed"
         }));
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_WORK_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedWork = await workForAuthority({
-          kvTasks: mtk,
-          kvMeetings: mmt,
+          kvTasks: [],
+          kvMeetings: [],
           provider: NORMALIZED_WORK_PROVIDER,
           normalizedAuthority: true
         });
         taskRows = normalizedWork.tasks;
         meetingRows = normalizedWork.meetings;
       } catch (error) {
+        [taskRows, meetingRows] = await fallbackMany([
+          STARTUP_KV_PREFIXES.workTasks,
+          STARTUP_KV_PREFIXES.workMeetings
+        ]);
         void recordAutomaticAppIssue(workAuthorityFailureIssue({
           action: "load",
           resource: "records",
           message: error?.message || "Normalized work API load failed"
         }));
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_SETTINGS_RECORDS_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedSettingsRecords = await settingsRecordsForAuthority({
-          kvLocations: locs,
-          kvAppIssues: issues,
+          kvLocations: [],
+          kvAppIssues: [],
           provider: NORMALIZED_SETTINGS_RECORDS_PROVIDER,
           normalizedAuthority: true
         });
         locationRows = normalizedSettingsRecords.locations;
         appIssueRows = normalizedSettingsRecords.appIssues;
       } catch (error) {
+        [locationRows, appIssueRows] = await fallbackMany([
+          STARTUP_KV_PREFIXES.locations,
+          STARTUP_KV_PREFIXES.appIssues
+        ]);
         void recordAutomaticAppIssue(settingsRecordsAuthorityFailureIssue({
           action: "load",
           resource: "records",
           message: error?.message || "Normalized settings records API load failed"
         }));
 	      }
+	      })());
 	    }
 	    if (NORMALIZED_PRESENCE_AUTHORITY) {
+	      normalizedLoads.push((async () => {
 	      try {
 	        const normalizedPresence = await presenceForAuthority({
-          kvPresence: pres,
+          kvPresence: [],
           provider: NORMALIZED_PRESENCE_PROVIDER,
           normalizedAuthority: true
         });
         presenceRows = normalizedPresence.presence;
       } catch (error) {
+        presenceRows = await fallbackRows(STARTUP_KV_PREFIXES.presence);
         void recordAutomaticAppIssue(presenceAuthorityFailureIssue({
           action: "load",
           message: error?.message || "Normalized presence API load failed"
         }));
 	      }
+	      })());
 	    }
+    await Promise.all(normalizedLoads);
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
