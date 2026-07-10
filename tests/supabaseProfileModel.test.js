@@ -81,7 +81,10 @@ describe("supabase profile foundation", () => {
       ppeResetAt: null,
       permissions: { users: "manage" },
       active: true,
-      mustChangePassword: true
+      mustChangePassword: true,
+      loginState: "pending_setup",
+      pinHash: "",
+      pinUpdatedAt: null
     });
   });
 

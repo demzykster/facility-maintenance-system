@@ -60,6 +60,126 @@ const newManager = {
 };
 
 describe("initial password handler", () => {
+  it("validates an app_users worker that still needs first PIN setup without KV", async () => {
+    const passwordClient = {
+      findInitialUser: vi.fn().mockResolvedValue({
+        id: "app-worker-1",
+        name: "App Worker",
+        role: "worker",
+        workerNo: "2042",
+        phone: "050-777-8888",
+        active: true,
+        loginState: "pending_setup",
+        pinHash: ""
+      })
+    };
+    const handler = createInitialPasswordHandler({ passwordClient });
+
+    const res = await call(handler, { body: { action: "validate", identifier: "2042" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      needsSetup: true,
+      auth: "pin",
+      identifierType: "workerNo",
+      user: { name: "App Worker", role: "worker", workerNo: "2042", email: "", phone: "050-777-8888" }
+    });
+  });
+
+  it("completes app_users first PIN setup with a hash instead of a stored PIN", async () => {
+    const appWorker = {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      name: "App Worker",
+      role: "worker",
+      workerNo: "2042",
+      active: true,
+      loginState: "pending_setup",
+      pinHash: ""
+    };
+    const passwordClient = {
+      findInitialUser: vi.fn().mockResolvedValue(appWorker),
+      setPinHash: vi.fn().mockImplementation(async (_id, pinHash) => ({
+        ...appWorker,
+        pinHash,
+        loginState: "active"
+      }))
+    };
+    const pinHasher = vi.fn().mockResolvedValue("scrypt$hash");
+    const handler = createInitialPasswordHandler({
+      passwordClient,
+      pinHasher,
+      env: { CMMS_SESSION_SECRET: "session-secret" },
+      now: () => 123456
+    });
+
+    const res = await call(handler, { body: { action: "complete", identifier: "2042", pin: "6789" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(pinHasher).toHaveBeenCalledWith("6789");
+    expect(passwordClient.setPinHash).toHaveBeenCalledWith("550e8400-e29b-41d4-a716-446655440000", "scrypt$hash", "1970-01-01T00:02:03.456Z");
+    expect(res.json()).toMatchObject({
+      ok: true,
+      user: {
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        name: "App Worker",
+        role: "worker",
+        workerNo: "2042"
+      }
+    });
+  });
+
+  it("logs in an app_users worker by verifying the stored PIN hash", async () => {
+    const passwordClient = {
+      findInitialUser: vi.fn().mockResolvedValue({
+        id: "app-worker-1",
+        name: "App Worker",
+        role: "worker",
+        workerNo: "2042",
+        active: true,
+        loginState: "active",
+        pinHash: "scrypt$hash"
+      })
+    };
+    const pinVerifier = vi.fn().mockResolvedValue(true);
+    const handler = createInitialPasswordHandler({
+      passwordClient,
+      pinVerifier,
+      env: { CMMS_SESSION_SECRET: "session-secret" },
+      now: () => 123456
+    });
+
+    const res = await call(handler, { body: { action: "login", identifier: "2042", pin: "6789" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(pinVerifier).toHaveBeenCalledWith("6789", "scrypt$hash");
+    expect(res.json()).toMatchObject({
+      ok: true,
+      user: { id: "app-worker-1", name: "App Worker", role: "worker", workerNo: "2042" }
+    });
+  });
+
+  it("rejects an app_users worker when PIN hash verification fails", async () => {
+    const passwordClient = {
+      findInitialUser: vi.fn().mockResolvedValue({
+        id: "app-worker-1",
+        name: "App Worker",
+        role: "worker",
+        workerNo: "2042",
+        active: true,
+        loginState: "active",
+        pinHash: "scrypt$hash"
+      })
+    };
+    const pinVerifier = vi.fn().mockResolvedValue(false);
+    const handler = createInitialPasswordHandler({ passwordClient, pinVerifier });
+
+    const res = await call(handler, { body: { action: "login", identifier: "2042", pin: "9999" } });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({ error: "pin_login_failed" });
+  });
+
   it("validates a worker number that still needs first PIN setup", async () => {
     const driver = {
       listValues: vi.fn().mockResolvedValue([{ key: "user:worker-1", value: JSON.stringify(newWorker) }]),

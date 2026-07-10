@@ -50,6 +50,9 @@ export function normalizeSupabaseAppUserProfile(profile = {}) {
     ppeResetAt: profile.ppeResetAt || (profile.ppe_reset_at ? Date.parse(profile.ppe_reset_at) : null),
     permissions: profile.permissions || profile.perms || {},
     active: profile.active !== false,
-    mustChangePassword: profile.mustChangePassword === true || profile.must_change_password === true
+    mustChangePassword: profile.mustChangePassword === true || profile.must_change_password === true,
+    loginState: profile.loginState || profile.login_state || "pending_setup",
+    pinHash: profile.pinHash || profile.pin_hash || "",
+    pinUpdatedAt: profile.pinUpdatedAt || (profile.pin_updated_at ? Date.parse(profile.pin_updated_at) : null)
   };
 }

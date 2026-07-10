@@ -54,6 +54,14 @@ npm run staging:smoke:live
 
 This checks the public app URL, closed bootstrap endpoint, admin Supabase login, `/api/session/me`, KV read access, file route auth/metadata boundary, required Supabase table counts, and the private file bucket. It uses `.env.staging.local` plus `.staging-admin-credentials.local` when present, and must not print secret values.
 
+To verify the worker PIN first-login authority path against the live deploy:
+
+```bash
+npm run staging:smoke:pin-login
+```
+
+This creates a temporary `app_users` worker, completes first PIN setup through `/api/session/initial-password`, verifies that `app_users.pin_hash` is a salted `scrypt` hash rather than the plain PIN, logs in with the PIN, restores `/api/session/me`, and removes the temporary worker.
+
 Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
 
 ```bash

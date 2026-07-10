@@ -3,6 +3,7 @@ import {
   buildCmmsPinSessionPayload,
   buildSessionPayload,
   createSessionMeHandler,
+  createSupabaseCmmsPinSessionClient,
   createSupabaseSessionClient
 } from "../server/session/sessionHandler.js";
 import { signCmmsSessionToken } from "../server/session/cmmsSessionToken.js";
@@ -127,7 +128,7 @@ describe("session handler", () => {
       active: true,
       dept: "נפחי",
       perms: { cleaning: "request" }
-    })).toEqual({
+    })).toMatchObject({
       ok: true,
       user: {
         id: "worker-1",
@@ -244,6 +245,43 @@ describe("session handler", () => {
     expect(sessionClient.getAuthUser).not.toHaveBeenCalled();
   });
 
+  it("serves a CMMS PIN token through app_users before falling back to KV", async () => {
+    const pinSessionClient = {
+      findPinSessionUser: vi.fn().mockResolvedValue({
+        id: "app-worker-1",
+        role: "worker",
+        name: "App Worker",
+        workerNo: "2042",
+        active: true,
+        department: "Warehouse",
+        permissions: { cleaning: "request" }
+      })
+    };
+    const driver = { listValues: vi.fn() };
+    const token = signCmmsSessionToken("app-worker-1", "worker", "2042", "session-secret", Date.now()).token;
+    const handler = createSessionMeHandler({
+      pinSessionClient,
+      driver,
+      env: { CMMS_SESSION_SECRET: "session-secret" }
+    });
+
+    const res = await call(handler, { headers: { authorization: `Bearer ${token}` } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      user: {
+        id: "app-worker-1",
+        role: "worker",
+        name: "App Worker",
+        workerNo: "2042",
+        department: "Warehouse"
+      }
+    });
+    expect(pinSessionClient.findPinSessionUser).toHaveBeenCalledWith(expect.objectContaining({ id: "app-worker-1", workerNo: "2042" }));
+    expect(driver.listValues).not.toHaveBeenCalled();
+  });
+
   it("calls Supabase Auth and app_users REST with anon key plus user bearer token", async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce({
@@ -281,6 +319,39 @@ describe("session handler", () => {
       headers: expect.objectContaining({
         apikey: "anon-key",
         authorization: "Bearer user-token"
+      })
+    }));
+  });
+
+  it("looks up CMMS PIN sessions in app_users with the service role key", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      async text() {
+        return JSON.stringify([{
+          id: "app-worker-1",
+          role: "worker",
+          name: "App Worker",
+          worker_no: "2042",
+          active: true,
+          department: "Warehouse",
+          permissions: { cleaning: "request" }
+        }]);
+      }
+    });
+    const client = createSupabaseCmmsPinSessionClient({
+      url: "https://supabase.example/",
+      serviceRoleKey: "service-role-key",
+      fetchImpl
+    });
+
+    const user = await client.findPinSessionUser({ id: "app-worker-1", role: "worker", workerNo: "2042" });
+
+    expect(user).toMatchObject({ id: "app-worker-1", role: "worker", workerNo: "2042" });
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/app_users?select=*&limit=2000", expect.objectContaining({
+      method: "GET",
+      headers: expect.objectContaining({
+        apikey: "service-role-key",
+        authorization: "Bearer service-role-key"
       })
     }));
   });

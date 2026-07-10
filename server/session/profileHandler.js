@@ -102,6 +102,16 @@ export function createSupabaseProfileUpdateClient({ url, anonKey, serviceRoleKey
       const data = await responseJson(response);
       if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_update_${response.status}`);
       return Array.isArray(data) ? data[0] : data;
+    },
+    async updateAppUserProfileById(id, patch) {
+      const response = await fetchImpl(`${root}/rest/v1/app_users?id=eq.${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { ...serviceHeaders, prefer: "return=representation" },
+        body: JSON.stringify(patch)
+      });
+      const data = await responseJson(response);
+      if (!response.ok) throw new Error(data?.message || data?.error || `supabase_profile_update_${response.status}`);
+      return Array.isArray(data) ? data[0] : data;
     }
   };
 }

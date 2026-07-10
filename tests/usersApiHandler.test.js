@@ -48,6 +48,8 @@ describe("users API handler", () => {
       role: "tech",
       name: "Tech One",
       email: "tech@example.com",
+      pin_hash: "scrypt$hash",
+      login_state: "active",
       department: "Ops",
       departments: ["Ops"],
       manager_zones: ["North"],
@@ -82,6 +84,8 @@ describe("users API handler", () => {
       supplier: "Vendor",
       perms: { users: "view" },
       mustChangePassword: true,
+      loginConfigured: true,
+      loginState: "active",
       techCats: ["electric"],
       shiftStart: "07:30",
       shiftEnd: "16:00",
@@ -118,6 +122,7 @@ describe("users API handler", () => {
       active: true,
       email: "manager@example.com",
       phone: "050-111",
+      worker_no: null,
       department: "Ops",
       departments: ["Ops", "Logistics"],
       permissions: { users: "manage" },
@@ -440,6 +445,49 @@ describe("users API handler", () => {
     expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
       entityType: "user",
       entityId: "manager-2",
+      action: "update"
+    }));
+  });
+
+  it("syncs app_users workers by profile id when they do not have Supabase Auth users", async () => {
+    const appUserId = "550e8400-e29b-41d4-a716-446655440000";
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({ id: appUserId, role: "worker", name: "Worker", active: true }),
+      updateAppUserProfileById: vi.fn().mockResolvedValue({ id: appUserId })
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      auditDriver,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const user = {
+      id: appUserId,
+      name: "Worker Updated",
+      role: "worker",
+      workerNo: "2042",
+      dept: "Warehouse",
+      active: true,
+      loginConfigured: true
+    };
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfileById).toHaveBeenCalledWith(appUserId, expect.objectContaining({
+      name: "Worker Updated",
+      role: "worker",
+      worker_no: "2042",
+      department: "Warehouse"
+    }));
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "user",
+      entityId: appUserId,
       action: "update"
     }));
   });

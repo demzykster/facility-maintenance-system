@@ -46,6 +46,7 @@ const timestampOrNull = (value) => {
   const ts = Number(value);
   return Number.isFinite(ts) && ts > 0 ? new Date(ts).toISOString() : null;
 };
+const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
 
 export function appUserPatchFromUserRecord(user = {}) {
   return {
@@ -55,6 +56,7 @@ export function appUserPatchFromUserRecord(user = {}) {
     active: user.active !== false,
     email: cleanEmail(user.email) || null,
     phone: cleanString(user.phone) || null,
+    worker_no: (user.role === "worker" || user.role === "cleaner") ? (cleanString(user.workerNo) || null) : null,
     department: cleanString(user.dept || user.department) || null,
     departments: Array.isArray(user.depts) ? cleanStringArray(user.depts) : (user.dept ? [cleanString(user.dept)] : []),
     permissions: user.perms || user.permissions || {},
@@ -127,7 +129,9 @@ export function userRecordFromAppUserProfile(profile = {}, legacy = {}) {
     status: appUser.status || legacy.status || "",
     exitAt: appUser.exitAt ?? legacy.exitAt ?? null,
     ppeResetAt: appUser.ppeResetAt ?? legacy.ppeResetAt ?? null,
-    mustChangePassword: appUser.mustChangePassword
+    mustChangePassword: appUser.mustChangePassword,
+    loginState: appUser.loginState || legacy.loginState || "",
+    loginConfigured: appUser.loginState === "active" || !!appUser.pinHash || legacy.loginConfigured === true
   };
 }
 
@@ -337,6 +341,13 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
         const patch = extendedAppUserPatchFromUserRecord(user);
         if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
         await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
+      } else if (isUuid(id) && typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfileById === "function") {
+        const existingProfile = await backendProfileClient.getAppUserProfileById(id);
+        if (existingProfile) {
+          await backendProfileClient.updateAppUserProfileById(id, extendedAppUserPatchFromUserRecord(user));
+        } else if (typeof backendDriver?.set !== "function") {
+          return json(res, 503, { error: "users_legacy_backend_not_configured" });
+        }
       } else if (typeof backendDriver?.set !== "function") {
         return json(res, 503, { error: "users_legacy_backend_not_configured" });
       }

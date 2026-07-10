@@ -35,6 +35,65 @@ const parseStoredUser = (record) => {
   }
 };
 
+const trimSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
+
+function userRecordFromAppUserProfile(profile = {}) {
+  const appUser = normalizeSupabaseAppUserProfile(profile);
+  return {
+    id: appUser.id || "",
+    authUserId: appUser.authUserId || "",
+    email: appUser.email || "",
+    phone: appUser.phone || "",
+    role: appUser.role || "worker",
+    name: appUser.name || appUser.workerNo || "",
+    workerNo: appUser.workerNo || "",
+    department: appUser.department || "",
+    departments: appUser.departments || [],
+    mgrZones: appUser.mgrZones || [],
+    techScope: appUser.techScope || "",
+    techCats: appUser.techCats || [],
+    supplier: appUser.supplier || "",
+    shift: appUser.shift || "",
+    shiftStart: appUser.shiftStart || "",
+    shiftEnd: appUser.shiftEnd || "",
+    lateTolerance: appUser.lateTolerance,
+    earlyTolerance: appUser.earlyTolerance,
+    cleaningAccess: appUser.cleaningAccess,
+    notificationPrefs: appUser.notificationPrefs || {},
+    employmentType: appUser.employmentType || "",
+    contractorName: appUser.contractorName || "",
+    permissions: appUser.permissions || {},
+    active: appUser.active,
+    mustChangePassword: appUser.mustChangePassword,
+    status: appUser.status || "",
+    loginState: appUser.loginState || "pending_setup"
+  };
+}
+
+export function createSupabaseCmmsPinSessionClient({ url, serviceRoleKey, fetchImpl = globalThis.fetch } = {}) {
+  const root = trimSlash(url);
+  const key = String(serviceRoleKey || "").trim();
+  if (!root || !key || !fetchImpl) return null;
+  const headers = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
+
+  return {
+    async findPinSessionUser(tokenSession) {
+      const response = await fetchImpl(`${root}/rest/v1/app_users?select=*&limit=2000`, {
+        method: "GET",
+        headers
+      });
+      const data = await responseJson(response);
+      if (!response.ok) throw new Error(data?.message || data?.error || `supabase_pin_session_${response.status}`);
+      return (Array.isArray(data) ? data : [])
+        .map(userRecordFromAppUserProfile)
+        .find((user) => (
+          String(user.id || user.workerNo || "") === tokenSession.id
+          || (tokenSession.workerNo && String(user.workerNo || "") === tokenSession.workerNo)
+        )) || null;
+    }
+  };
+}
+
 export function createSupabaseSessionClient({ url, anonKey, fetchImpl = globalThis.fetch } = {}) {
   if (!url || !anonKey || !fetchImpl) return null;
   const root = String(url).replace(/\/+$/, "");
@@ -135,6 +194,9 @@ export function buildCmmsPinSessionPayload(tokenSession, storedUser) {
       supplier: storedUser.supplier || "",
       permissions: storedUser.perms || storedUser.permissions || {},
       cleaningAccess: storedUser.cleaningAccess || storedUser.cleaning || false,
+      notificationPrefs: storedUser.notificationPrefs || {},
+      employmentType: storedUser.employmentType || "",
+      contractorName: storedUser.contractorName || "",
       mustChangePassword: storedUser.mustChangePassword === true
     }
   };
@@ -143,6 +205,7 @@ export function buildCmmsPinSessionPayload(tokenSession, storedUser) {
 export function createSessionMeHandler({
   env = process.env,
   sessionClient = null,
+  pinSessionClient = null,
   driver = null,
   fetchImpl = globalThis.fetch
 } = {}) {
@@ -159,6 +222,23 @@ export function createSessionMeHandler({
     const cmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
     const cmmsTokenSession = cmmsSecret ? verifyCmmsSessionToken(token, cmmsSecret) : null;
     if (cmmsTokenSession) {
+      const appUsersClient = pinSessionClient || createSupabaseCmmsPinSessionClient({
+        url: env.SUPABASE_URL,
+        serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+        fetchImpl
+      });
+      if (appUsersClient) {
+        try {
+          const appUser = await appUsersClient.findPinSessionUser(cmmsTokenSession);
+          if (appUser) {
+            const session = buildCmmsPinSessionPayload(cmmsTokenSession, appUser);
+            if (!session.ok) return json(res, session.error === "app_user_disabled" ? 403 : 401, { error: session.error });
+            return json(res, 200, session);
+          }
+        } catch {
+          return json(res, 401, { error: "cmms_session_lookup_failed" });
+        }
+      }
       const backendDriver = driver || createDefaultDriver(env, fetchImpl);
       if (!backendDriver) return json(res, 503, { error: "cmms_session_backend_not_configured" });
       try {

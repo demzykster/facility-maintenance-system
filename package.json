@@ -22,6 +22,7 @@
     "staging:smoke:pm-api": "node tools/staging-pm-api-smoke.mjs",
     "staging:pm:reconcile": "node tools/staging-pm-reconcile.mjs",
     "staging:smoke:users-api": "node tools/staging-users-api-smoke.mjs",
+    "staging:smoke:pin-login": "node tools/staging-pin-login-smoke.mjs",
     "staging:ppe:reconcile": "node tools/staging-ppe-reconcile.mjs",
     "staging:smoke:ppe-api": "node tools/staging-ppe-api-smoke.mjs",
     "staging:work-records:reconcile": "node tools/staging-work-records-reconcile.mjs",
