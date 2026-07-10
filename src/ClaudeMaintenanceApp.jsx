@@ -25,7 +25,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
-import { DEFAULT_LOCAL_NOTIFICATION_PREFS, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
+import { DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, nextBrowserNotificationEvent, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
@@ -1489,7 +1489,11 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
   const [readState, setReadState] = useState(null), [toast, setToast] = useState(null);
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
-  const maxRef = useRef(0), initRef = useRef(false);
+  const browserNotificationRef = useRef({ maxAt: 0, notifiedKeys: [] }), initRef = useRef(false);
+  useEffect(() => {
+    initRef.current = false;
+    browserNotificationRef.current = { maxAt: 0, notifiedKeys: [] };
+  }, [skey]);
   useEffect(() => {
     let cancelled = false;
     setReadState(null);
@@ -1514,9 +1518,23 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   const unreadEvents = useMemo(() => events.filter((event) => unreadKeys.has(event.key)), [events, unreadKeys]);
   const unread = unreadKeys.size;
   useEffect(() => {
-    if (!visible.length) return; const max = visible[0].at;
-    if (!initRef.current) { initRef.current = true; maxRef.current = max; return; }
-    if (max > maxRef.current) { const top = visible.find((e) => e.at > maxRef.current); maxRef.current = max; if (top) { setToast(top); try { if ("Notification" in window && Notification.permission === "granted") new Notification(top.title, { body: top.body }); } catch (e) {} setTimeout(() => setToast(null), 5200); } }
+    if (!visible.length) return;
+    if (!initRef.current) {
+      initRef.current = true;
+      browserNotificationRef.current = initialBrowserNotificationState(visible);
+      return;
+    }
+    const nextBrowserNotification = nextBrowserNotificationEvent(visible, browserNotificationRef.current);
+    browserNotificationRef.current = {
+      maxAt: nextBrowserNotification.maxAt,
+      notifiedKeys: nextBrowserNotification.notifiedKeys
+    };
+    const top = nextBrowserNotification.event;
+    if (top) {
+      setToast(top);
+      try { if ("Notification" in window && Notification.permission === "granted") new Notification(top.title, { body: top.body }); } catch (e) {}
+      setTimeout(() => setToast(null), 5200);
+    }
   }, [visible]);
   const markRead = async () => {
     const next = notificationReadStateForEvents(visible);

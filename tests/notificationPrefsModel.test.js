@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  initialBrowserNotificationState,
+  nextBrowserNotificationEvent,
   notificationReadStateForEvents,
   parseLocalNotificationPrefs,
   parseNotificationReadState,
@@ -45,5 +47,23 @@ describe("notification prefs model", () => {
     const read = { seenAt: 1000, seenKeys: ["dynamic"] };
 
     expect(unreadNotificationKeySet([{ key: "dynamic", at: 2000 }, { key: "new", at: 2000 }], read)).toEqual(new Set(["new"]));
+  });
+
+  it("does not fire a browser notification again for the same event key", () => {
+    const state = initialBrowserNotificationState([{ key: "doc-194336", at: 1000 }]);
+
+    expect(nextBrowserNotificationEvent([{ key: "doc-194336", at: 2000 }], state)).toEqual({
+      event: null,
+      maxAt: 2000,
+      notifiedKeys: ["doc-194336"]
+    });
+  });
+
+  it("fires a browser notification once for a new event key", () => {
+    const state = initialBrowserNotificationState([{ key: "doc-194336", at: 1000 }]);
+    const first = nextBrowserNotificationEvent([{ key: "doc-194336", at: 2000 }, { key: "doc-194337", at: 2000 }], state);
+
+    expect(first.event).toEqual({ key: "doc-194337", at: 2000 });
+    expect(nextBrowserNotificationEvent([{ key: "doc-194337", at: 3000 }], first).event).toBeNull();
   });
 });
