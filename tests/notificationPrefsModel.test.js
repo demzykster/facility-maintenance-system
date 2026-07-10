@@ -70,6 +70,39 @@ describe("notification prefs model", () => {
     expect(nextBrowserNotificationEvent([{ key: "doc-194337", at: 3000 }], first).event).toBeNull();
   });
 
+  it("throttles browser notifications while still remembering skipped event keys", () => {
+    const first = nextBrowserNotificationEvent(
+      [{ key: "ticket-1", at: 1000 }],
+      { maxAt: 0, notifiedKeys: [] },
+      { now: 10_000, minIntervalMs: 30_000 }
+    );
+    const second = nextBrowserNotificationEvent(
+      [{ key: "ticket-2", at: 2000 }],
+      first,
+      { now: 20_000, minIntervalMs: 30_000 }
+    );
+
+    expect(first.event).toEqual({ key: "ticket-1", at: 1000 });
+    expect(first.lastNotifiedAt).toBe(10_000);
+    expect(second).toMatchObject({
+      event: null,
+      maxAt: 2000,
+      notifiedKeys: ["ticket-1", "ticket-2"],
+      lastNotifiedAt: 10_000
+    });
+  });
+
+  it("allows the next browser notification after the throttle window", () => {
+    const result = nextBrowserNotificationEvent(
+      [{ key: "ticket-2", at: 2000 }],
+      { maxAt: 1000, notifiedKeys: ["ticket-1"], lastNotifiedAt: 10_000 },
+      { now: 50_000, minIntervalMs: 30_000 }
+    );
+
+    expect(result.event).toEqual({ key: "ticket-2", at: 2000 });
+    expect(result.lastNotifiedAt).toBe(50_000);
+  });
+
   it("keeps browser notification state stable across reloads", () => {
     const first = nextBrowserNotificationEvent([{ key: "ticket-1", at: 1000 }], { maxAt: 0, notifiedKeys: [] });
     const restored = parseBrowserNotificationState(JSON.stringify(first));

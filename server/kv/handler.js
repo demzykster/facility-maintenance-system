@@ -64,6 +64,7 @@ const parsePositiveInt = (value, fallback) => {
 
 const isKnownKvPrefix = (key = "") => ALLOWED_KV_PREFIXES.some((prefix) => String(key || "").startsWith(prefix));
 const retiredWriteOptions = (env = {}) => ({
+  dataAuthority: env.CMMS_DATA_AUTHORITY,
   appMode: env.VITE_CMMS_APP_MODE,
   storageProvider: env.VITE_CMMS_STORAGE_PROVIDER
 });

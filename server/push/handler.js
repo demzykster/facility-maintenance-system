@@ -138,6 +138,7 @@ export function createPushHandler({
   const backendKvDriver = driver
     || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
   const retiredPushMirror = retiredKvWriteKey(PUSH_SUBSCRIPTIONS_KEY, {
+    dataAuthority: env.CMMS_DATA_AUTHORITY,
     appMode: env.VITE_CMMS_APP_MODE,
     storageProvider: env.VITE_CMMS_STORAGE_PROVIDER
   });

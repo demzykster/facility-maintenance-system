@@ -2,6 +2,7 @@ export function kvServerConfigFromEnv(env = {}) {
   return {
     auth: String(env.CMMS_KV_AUTH || "").trim().toLowerCase(),
     driver: String(env.CMMS_KV_DRIVER || "").trim().toLowerCase(),
+    dataAuthority: String(env.CMMS_DATA_AUTHORITY || "").trim().toLowerCase(),
     allowKvBridgeProduction: env.CMMS_ALLOW_PRODUCTION_KV_BRIDGE === "true",
     supabaseUrl: String(env.SUPABASE_URL || "").trim(),
     supabaseAnonKey: String(env.SUPABASE_ANON_KEY || "").trim(),
@@ -20,6 +21,7 @@ export function productionKvServerPolicy({
   if (requiresProductionKv) {
     if (kvServer.auth !== "supabase") errors.push("production_requires_supabase_kv_auth");
     if (kvServer.driver !== "supabase") errors.push("production_requires_supabase_kv_driver");
+    if (kvServer.dataAuthority !== "normalized") errors.push("production_requires_normalized_data_authority");
     if (!kvServer.allowKvBridgeProduction) errors.push("production_requires_explicit_kv_bridge_acceptance");
     if (!kvServer.supabaseUrl) errors.push("production_requires_supabase_url");
     if (!kvServer.supabaseAnonKey) errors.push("production_requires_supabase_anon_key");

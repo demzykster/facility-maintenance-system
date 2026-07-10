@@ -1,0 +1,49 @@
+name: Staging Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  staging-gate:
+    runs-on: ubuntu-latest
+    env:
+      VITE_CMMS_APP_MODE: production
+      VITE_CMMS_STORAGE_PROVIDER: api
+      VITE_CMMS_STORAGE_API_URL: /api
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      CMMS_KV_AUTH: supabase
+      CMMS_KV_DRIVER: supabase
+      CMMS_DATA_AUTHORITY: normalized
+      CMMS_ALLOW_PRODUCTION_KV_BRIDGE: "true"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CMMS_FILE_DRIVER: supabase
+      CMMS_FILE_BUCKET: ${{ secrets.CMMS_FILE_BUCKET }}
+      CMMS_FILE_METADATA_DRIVER: supabase
+      CMMS_AUDIT_DRIVER: supabase
+      CMMS_PUBLIC_COMPLAINTS_ENABLED: "true"
+      CMMS_PUBLIC_COMPLAINTS_DRIVER: supabase
+      STAGING_ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+      STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+      CMMS_STAGING_APP_URL: ${{ secrets.CMMS_STAGING_APP_URL }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run staging gate
+        run: npm run staging:gate

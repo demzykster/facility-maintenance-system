@@ -45,6 +45,11 @@ describe("retired KV write model", () => {
     expect(retiredKvWriteKey("appIssue:issue-1", { appMode: "production", storageProvider: "api" })).toBe("appIssue:");
   });
 
+  it("can retire compatibility writes from an explicit server data authority flag", () => {
+    expect(retiredKvWriteKey("ticket:T-1", { dataAuthority: "normalized" })).toBe("ticket:");
+    expect(retiredKvWriteKey("ticket:T-1", { dataAuthority: "legacy" })).toBe("");
+  });
+
   it("separates active and retired batch writes", () => {
     expect(activeKvWriteRecords([
       { key: "presence:user-1", value: "{}" },

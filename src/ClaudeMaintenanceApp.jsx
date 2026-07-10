@@ -1240,6 +1240,19 @@ function docStatus(fleet, cfg) {
   else if (min <= w.yellow) { color = "#CA8A04"; label = `${min} ימים`; }
   return { d: min, color, label, which };
 }
+function docNotificationAt(fleet, cfg, status = {}) {
+  const docs = machineDocs(fleet, cfg);
+  const matchedDoc = docs.find((doc) => doc.label === status.which) || null;
+  const matchedTs = matchedDoc ? dateToTs(fleet?.docs?.[matchedDoc.id]?.date) : null;
+  if (matchedTs != null) return matchedTs;
+  const stableFallback = Number(fleet?.updatedAt || fleet?.createdAt || fleet?.importedAt || 0);
+  return Number.isFinite(stableFallback) && stableFallback > 0 ? stableFallback : 0;
+}
+const aggregateNotificationAt = (items = [], candidates = ["updatedAt", "createdAt", "at"]) => (
+  Math.max(0, ...(items || []).map((item) => (
+    Math.max(0, ...candidates.map((field) => Number(item?.[field] || 0)).filter(Number.isFinite))
+  )))
+);
 function docWarnColor(days, cfg) {
   const w = cfg?.docWarn || DEFAULT_CONFIG.docWarn;
   if (days == null) return "var(--muted)";
@@ -1446,7 +1459,7 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
       if (ticketMissedSla(t, cfg)) ev.push({ key: t.id + "-sla", at: t.dueAt, ticketId: t.id, kind: "sla", title: `חריגת SLA · #${ticketNo(t)}`, body: t.subject });
       if (isCriticalEscalated(t, cfg)) ev.push({ key: t.id + "-esc", at: t.createdAt + (cfg?.escalateCriticalHours ?? 2) * 3600000, ticketId: t.id, kind: "escalate", title: `השבתה קריטית ללא טכנאי · #${ticketNo(t)}`, body: `${t.asset || ""} · ${t.subject} — אף טכנאי לא קיבל את הקריאה מעל ${cfg?.escalateCriticalHours ?? 2} שע׳` });
     });
-    (fleet || []).forEach((f) => { const s = docStatus(f, cfg); if (s.d != null && s.d <= (cfg?.docWarn?.yellow || 30)) ev.push({ key: "doc-" + f.id, at: Date.now() - (30 - Math.max(0, s.d)) * 3600000, kind: "doc", go: "fleet", fleetId: f.id, title: `מסמך פג-תוקף · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${s.label}` }); });
+    (fleet || []).forEach((f) => { const s = docStatus(f, cfg); if (s.d != null && s.d <= (cfg?.docWarn?.yellow || 30)) ev.push({ key: "doc-" + f.id, at: docNotificationAt(f, cfg, s), kind: "doc", go: "fleet", fleetId: f.id, title: `מסמך פג-תוקף · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${s.label}` }); });
     (fleet || []).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "fleet", fleetId: f.id, title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
     tickets.filter((t) => needsHandler(t, users, fleet)).forEach((t) => ev.push({ key: "orphan-" + t.id, at: t.createdAt, ticketId: t.id, kind: "escalate", go: "tickets", title: `קריאה ללא מטפל · #${ticketNo(t)}`, body: `${t.subject} — ${t.assignee ? "המטפל אינו פעיל עוד" : "אין טכנאי פעיל לקבל"}. נדרש שיבוץ.` }));
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי קרוב", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
@@ -1454,7 +1467,7 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
     { const pend = (ppeReqs || []).filter(ppeRequestNeedsAction);
       if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", ppeSub: "dash", title: "בקשות ביגוד ממתינות", body: `${countLabel(pend.length, "בקשה", "בקשות")} לאישור או חתימת עובד` }); }
     { const low = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
-      if (low.length) ev.push({ key: "ppe-low-admin", at: Date.now(), kind: "ppe", go: "ppe", ppeSub: "dash", title: "חוסרי ביגוד לפי מידה", body: `${countLabel(low.length, "פריט", "פריטים")} מתחת למינימום` }); }
+      if (low.length) ev.push({ key: "ppe-low-admin", at: aggregateNotificationAt(low), kind: "ppe", go: "ppe", ppeSub: "dash", title: "חוסרי ביגוד לפי מידה", body: `${countLabel(low.length, "פריט", "פריטים")} מתחת למינימום` }); }
     { const openOrders = (ppeOrders || []).filter((o) => o.status === "sent");
       if (openOrders.length) ev.push({ key: "ppe-orders-admin", at: Math.max(...openOrders.map((o) => o.sentAt || o.createdAt || 0)), kind: "ppe", go: "ppe", ppeSub: "log", title: "הזמנות ביגוד ממתינות לקליטה", body: `${countLabel(openOrders.length, "הזמנת רכש פתוחה", "הזמנות רכש פתוחות")}` }); }
     ev.push(...buildPpeApprovedEvents(ppeReqs));
@@ -1490,10 +1503,10 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   const bkey = `browsernotif:${session.id || session.role + ":" + session.name}`;
   const [readState, setReadState] = useState(null), [toast, setToast] = useState(null);
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
-  const browserNotificationRef = useRef({ maxAt: 0, notifiedKeys: [] }), initRef = useRef(false), browserStateLoadedRef = useRef(false);
+  const browserNotificationRef = useRef({ maxAt: 0, notifiedKeys: [], lastNotifiedAt: 0 }), initRef = useRef(false), browserStateLoadedRef = useRef(false);
   useEffect(() => {
     initRef.current = false;
-    browserNotificationRef.current = { maxAt: 0, notifiedKeys: [] };
+    browserNotificationRef.current = { maxAt: 0, notifiedKeys: [], lastNotifiedAt: 0 };
     browserStateLoadedRef.current = false;
   }, [bkey]);
   useEffect(() => {
@@ -1541,7 +1554,8 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
       const baseline = initialBrowserNotificationState(browserVisible);
       browserNotificationRef.current = {
         maxAt: Math.max(stored.maxAt || 0, baseline.maxAt || 0),
-        notifiedKeys: [...new Set([...(stored.notifiedKeys || []), ...(baseline.notifiedKeys || [])])]
+        notifiedKeys: [...new Set([...(stored.notifiedKeys || []), ...(baseline.notifiedKeys || [])])],
+        lastNotifiedAt: stored.lastNotifiedAt || 0
       };
       store.set(bkey, JSON.stringify(browserNotificationRef.current), false);
       return;
@@ -1549,7 +1563,8 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
     const nextBrowserNotification = nextBrowserNotificationEvent(browserVisible, browserNotificationRef.current);
     browserNotificationRef.current = {
       maxAt: nextBrowserNotification.maxAt,
-      notifiedKeys: nextBrowserNotification.notifiedKeys
+      notifiedKeys: nextBrowserNotification.notifiedKeys,
+      lastNotifiedAt: nextBrowserNotification.lastNotifiedAt || 0
     };
     store.set(bkey, JSON.stringify(browserNotificationRef.current), false);
     const top = nextBrowserNotification.event;

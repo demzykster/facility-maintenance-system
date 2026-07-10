@@ -35,6 +35,7 @@ describe("productionConfigGateModel", () => {
       errors: [
         "production_requires_supabase_kv_auth",
         "production_requires_supabase_kv_driver",
+        "production_requires_normalized_data_authority",
         "production_requires_explicit_kv_bridge_acceptance",
         "production_requires_supabase_url",
         "production_requires_supabase_anon_key",
@@ -55,6 +56,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        dataAuthority: "normalized",
         allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
@@ -79,6 +81,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        dataAuthority: "normalized",
         allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
@@ -109,6 +112,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        dataAuthority: "normalized",
         allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
@@ -135,6 +139,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        dataAuthority: "normalized",
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
         supabaseServiceRoleKey: "service"
@@ -165,6 +170,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        dataAuthority: "normalized",
         allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",
@@ -197,6 +203,7 @@ describe("productionConfigGateModel", () => {
       kvServer: {
         auth: "supabase",
         driver: "supabase",
+        dataAuthority: "normalized",
         allowKvBridgeProduction: true,
         supabaseUrl: "https://supabase.example",
         supabaseAnonKey: "anon",

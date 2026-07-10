@@ -14,6 +14,7 @@ const ciEnv = Object.freeze({
   VITE_SUPABASE_ANON_KEY: "ci-anon-key",
   CMMS_KV_AUTH: "supabase",
   CMMS_KV_DRIVER: "supabase",
+  CMMS_DATA_AUTHORITY: "normalized",
   CMMS_ALLOW_PRODUCTION_KV_BRIDGE: "true",
   SUPABASE_URL: "https://ci-preflight.supabase.co",
   SUPABASE_ANON_KEY: "ci-anon-key",
