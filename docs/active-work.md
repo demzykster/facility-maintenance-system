@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-app-config-authority`.
-- Current branch: `codex/r10-app-config-authority`.
-- Last completed work: R10 push-subscriptions authority slice added `public.push_subscriptions` behind `/api/push`, routes phone push subscribe/unsubscribe through normalized server storage first, and preserves `pushSubscriptions:v1` as a compatibility KV mirror.
-- Current work: R10 app-config authority slice for `config:v1` behind an explicit settings config API, with `config:v1` preserved as a compatibility KV mirror.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 app-config authority slice added `public.app_config` behind `/api/settings/config`, routes `config:v1` reads/writes through normalized server storage first, and preserves `config:v1` as a compatibility KV mirror.
+- Current work: none.
 
 ## Current Product Direction
 

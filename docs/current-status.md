@@ -106,7 +106,7 @@ Current production-data work:
 - Cleaning zones, rounds, complaints, and worker absences are normalized-authority in production/API mode through `/api/cleaning/records`; their legacy KV prefixes remain compatibility mirrors.
 - PPE movements, catalog items, norms, requests, and orders are normalized-authority in production/API mode through `/api/ppe`; `ppe:*`, `ppeitem:*`, `ppenorm:*`, `ppereq:*`, and `ppeorder:*` KV records remain compatibility mirrors.
 - Maintenance tasks and meetings are normalized-authority in production/API mode through `/api/work`; `mtask:*` and `mmeet:*` KV records remain compatibility mirrors.
-- App config is moving onto normalized authority in production/API mode through `/api/settings/config`; `config:v1` remains a compatibility mirror.
+- App config is normalized-authority in production/API mode through `/api/settings/config`; `config:v1` remains a compatibility mirror.
 - Locations and app issue reports are normalized-authority in production/API mode through `/api/settings/records`; `location:*` and `appIssue:*` KV records remain compatibility mirrors.
 - Technician/user presence is normalized-authority in production/API mode through `/api/presence`; `presence:*` KV records remain compatibility mirrors.
 - Phone push subscriptions are normalized-authority through `/api/push` backed by `public.push_subscriptions`; `pushSubscriptions:v1` remains a compatibility mirror.
