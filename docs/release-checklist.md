@@ -47,11 +47,11 @@ Closed notes:
 - Production file metadata, audit events, first-admin bootstrap, backup/restore drill, and staging gates are documented in the production docs.
 - `src/productionReadinessModel.js` names the current state as `staging_pilot` when production config, Supabase schema, staging gate, and backup/restore drill are verified.
 - Live staging/pilot gate passed on 2026-07-10 against the Vercel production alias and linked Supabase staging project at commit `cb1f9b4`: env shape, schema/bucket, live commit, bootstrap-closed state, admin session, KV bridge, settings persistence, normalized tickets/fleet/PM API smokes, fleet UI/API/Supabase parity, AI intake smoke, system-error smoke, and desktop/mobile UI smoke.
-- Final production still requires moving beyond the accepted KV bridge into normalized business tables and broader server-side business permissions. That is tracked as R10, not as an unclosed R9 tail.
+- Final production data-core cleanup moved beyond the accepted KV bridge into normalized business tables and server-side operations during R10. Remaining final-production approval work should be tracked as audit/acceptance/load-test work, not as an unclosed R9 tail.
 
 ### R10 — Final Production Data Core
 
-Status: started.
+Status: done for the currently mapped v1 production data core; pending independent review before final production labeling.
 
 Why it matters:
 - The current staging/pilot foundation is usable, but the accepted Supabase KV bridge is still a launch compromise.
@@ -66,6 +66,7 @@ Done means:
 - The old KV bridge remains only for explicitly unmoved legacy data or is retired.
 
 Current notes:
+- R10 closure note: all current `DATA_COLLECTIONS` have normalized Supabase table targets, server routes, staging smoke/reconcile coverage, and production/API write paths that no longer recreate KV mirrors. The generic `/api/kv` write bridge now no-ops for every allowed shared prefix in production/API mode, and the live residual report shows `cmms_kv_records=0`.
 - First server-authority slice: the KV bridge now applies server-side read permissions for sensitive `user:` and `appIssue:` records, including direct reads, value-list reads, and key-only lists.
 - Ordinary workers can read their own `user:` record but not the full user directory; managers/admins with user permissions can still read the directory with login secrets redacted where appropriate.
 - `appIssue:` reports remain writable by working roles but readable only by admin/settings-management sessions.
@@ -102,7 +103,7 @@ Current notes:
 - User backfill/retirement slice: staging backfilled the remaining legacy-only `user:` KV rows into `public.app_users`, then retired all 12 matched `user:*` mirrors after guarded dry-run proof once the production/API user mirror guard was live. The follow-up residual report showed `cmms_kv_records=0`, and first-login password completion updates existing backfilled rows by id instead of creating duplicate profiles.
 - Cleaning schema-foundation slice: `public.cleaning_zones`, `public.cleaning_rounds`, `public.cleaning_complaints`, and `public.worker_absences` are the first normalized cleaning tables/RLS target. Runtime authority still stays on the accepted `czone:`/`cround:`/`ccomplaint:`/`cabsence:` KV bridge until explicit cleaning API/driver slices are added.
 - First cleaning server-operation slice: `/api/cleaning/records?resource=zones` can list/upsert/delete normalized `public.cleaning_zones` rows with the same settings-management write boundary as `czone:`.
-- This reduces KV bridge exposure but does not complete R10; normalized business tables and broader server-side business permissions are still required.
+- Historical note: the early cleaning slices reduced KV bridge exposure before the later cleaning/PPE/work/settings/user/photo retirement slices closed the current R10 data-core scope.
 
 ### R3 — Notifications End-To-End
 

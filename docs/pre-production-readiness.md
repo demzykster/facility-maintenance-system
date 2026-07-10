@@ -34,11 +34,11 @@ This note names what is currently safe to assume before treating the staging/pil
 
 The owner opened the production backend/auth phase after R8. The first staging scope is now implemented around Supabase Auth/app profiles, server sessions, and the Supabase KV compatibility bridge.
 
-The R9 foundation is closed for the current staging/pilot level. The remaining production hardening is R10-level work:
+The R9 foundation is closed for the current staging/pilot level. The R10 production data-core cleanup is closed for the currently mapped v1 business domains. Remaining production hardening is now audit/acceptance/load-test work plus future explicit domain work, not an open-ended R10 migration queue:
 
-- normalized database schema/RLS for more business tables;
-- continued server-side permission enforcement;
-- production file/photo storage beyond the first ticket/cleaning/public-report storage boundary;
+- independent architecture/security review of the now-normalized backend paths;
+- owner acceptance of the staging/pilot workflows as production workflows;
+- load/performance testing on realistic ticket/work/fleet/cleaning volumes;
 - server-side AI endpoint for provider secrets;
 - adapter/model-first extraction from `src/ClaudeMaintenanceApp.jsx`.
 
