@@ -5,6 +5,7 @@ import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMe
 import { sendServerError } from "../httpErrors.js";
 import { cleaningComplaintPhotoMetadata } from "../../src/fileMetadataModel.js";
 import { createSupabaseCleaningComplaintsDriverFromEnv } from "../cleaning/supabaseCleaningRecordsDriver.js";
+import { createSupabaseCleaningZonesDriverFromEnv } from "../cleaning/supabaseCleaningZonesDriver.js";
 
 const MAX_BODY_BYTES = 2_200_000;
 const MAX_PHOTO_CHARS = 2_000_000;
@@ -137,6 +138,7 @@ export function validatePublicComplaintPayload(body = {}) {
 export function createPublicComplaintHandler({
   driver = null,
   complaintsDriver = null,
+  zonesDriver = null,
   fileDriver = null,
   metadataDriver = null,
   env = process.env,
@@ -151,6 +153,10 @@ export function createPublicComplaintHandler({
   const backendComplaintsDriver = complaintsDriver
     || (env.CMMS_CLEANING_COMPLAINTS_DRIVER === "supabase" || env.CMMS_STORAGE_PROVIDER === "api"
       ? createSupabaseCleaningComplaintsDriverFromEnv(env, fetchImpl)
+      : null);
+  const backendZonesDriver = zonesDriver
+    || (env.CMMS_CLEANING_ZONES_DRIVER === "supabase" || env.CMMS_STORAGE_PROVIDER === "api"
+      ? createSupabaseCleaningZonesDriverFromEnv(env, fetchImpl)
       : null);
   const requireFileStorage = env.CMMS_FILE_DRIVER === "supabase";
   const backendFileDriver = fileDriver
@@ -185,7 +191,9 @@ export function createPublicComplaintHandler({
         return json(res, 429, { error: "public_complaint_rate_limited" });
       }
 
-      const zone = parseStoredJson(await backendDriver.get(`czone:${validated.zoneId}`, true));
+      const zone = backendZonesDriver?.get
+        ? await backendZonesDriver.get(validated.zoneId)
+        : parseStoredJson(await backendDriver.get(`czone:${validated.zoneId}`, true));
       if (!zone || zone.active === false) return json(res, 404, { error: "zone_not_found" });
       const complaint = buildPublicComplaintRecord({
         body,

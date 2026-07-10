@@ -167,6 +167,48 @@ describe("public complaint handler", () => {
     expect(driver.set).toHaveBeenCalledWith("ccomplaint:complaint-1", expect.any(String), true);
   });
 
+  it("loads the reported zone from normalized cleaning zones before legacy KV mirrors", async () => {
+    const driver = {
+      get: vi.fn(async (key) => key.startsWith("publicComplaintRate:") ? null : JSON.stringify({
+        id: "zone-1",
+        name: "Legacy Lobby",
+        building: "Legacy",
+        floor: "0"
+      })),
+      set: vi.fn()
+    };
+    const zonesDriver = {
+      get: vi.fn(async () => ({
+        id: "zone-1",
+        name: "Normalized Lobby",
+        building: "A",
+        floor: "1",
+        active: true
+      }))
+    };
+    const handler = createPublicComplaintHandler({
+      driver,
+      zonesDriver,
+      env: { CMMS_PUBLIC_COMPLAINTS_ENABLED: "true" },
+      now: () => 123456,
+      createId: () => "complaint-1"
+    });
+
+    const res = await call(handler, {
+      body: { zoneId: "zone-1", kind: "dirty", text: "Spill", photo }
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(zonesDriver.get).toHaveBeenCalledWith("zone-1");
+    expect(driver.get).not.toHaveBeenCalledWith("czone:zone-1", true);
+    const complaint = JSON.parse(driver.set.mock.calls.find(([key]) => key === "ccomplaint:complaint-1")[1]);
+    expect(complaint).toMatchObject({
+      zoneId: "zone-1",
+      zoneName: "Normalized Lobby",
+      zoneLoc: "A · 1"
+    });
+  });
+
   it("stores public complaint photos in file storage without embedding base64 when configured", async () => {
     const driver = {
       get: vi.fn(async (key) => {
