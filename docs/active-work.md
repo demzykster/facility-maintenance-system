@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `none`.
-- Current branch: `main`.
+- Active branch: `codex/r10-retire-user-kv-mirrors`.
+- Current branch: `codex/r10-retire-user-kv-mirrors`.
 - Last completed work: production/API fleet saves/imports/deletes no longer recreate fleet KV mirrors, and staging retired all 126 matched fleet mirrors after guarded dry-run proof.
-- Current work: none.
+- Current work: retire production/API user KV mirror writes and prepare guarded deletion of matched staging `user:*` mirrors.
 
 ## Current Product Direction
 
@@ -26,7 +26,7 @@
 - Use `npm run staging:kv:retire-mirrors -- --prefix <prefix>` as a dry-run before deleting old compatibility mirrors; `-- --prefix <prefix> --apply` deletes only shared KV records whose key matches a normalized table row's `source_kv_key`.
 - Do not invent broad product-polish backlog from screenshots or old notes. Wait for a concrete owner-reported issue.
 - Tickets, fleet, and periodic maintenance are now normalized authority slices in production/API mode. Continue R10 with the next narrow business-data slice instead of reopening completed migrations unless a live bug is reported.
-- User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users`, writes expanded profile fields there, deactivates matching rows on delete, and resets login authority state on manager-triggered reset while preserving protected `user:` KV as temporary legacy enrichment/fallback. `app_users` also carries PIN authority fields (`pin_hash`, `pin_updated_at`, `login_state`) so first-login/PIN setup, reset, and PIN session restore can use `app_users` before falling back to the legacy `user:` bridge. On 2026-07-10 staging backfilled the remaining legacy-only `user:` rows into `app_users`; `npm run staging:users:reconcile-report` showed `legacyUsers=12`, `appUsers=19`, `matched=12`, `legacyOnly=0`, `ambiguous=0`, `parseErrors=0`.
+- User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users`, creates new users in `app_users`, writes expanded profile fields there, deactivates matching rows on delete, and resets login authority state on manager-triggered reset without creating new production/API `user:*` KV mirrors. `app_users` also carries PIN authority fields (`pin_hash`, `pin_updated_at`, `login_state`) so first-login/PIN setup, reset, and PIN session restore use `app_users` when configured. On 2026-07-10 staging backfilled the remaining legacy-only `user:` rows into `app_users`; `npm run staging:users:reconcile-report` showed `legacyUsers=12`, `appUsers=19`, `matched=12`, `legacyOnly=0`, `ambiguous=0`, `parseErrors=0`. Staging `user:*` mirror deletion should run only after the merged build is live and `npm run staging:users:retire-kv-mirrors` proves every legacy row is matched.
 - Cleaning zones, rounds, complaints, and worker absences now use normalized API authority in production/API mode. Production/API saves no longer write cleaning compatibility KV mirrors, and staging retired all matched cleaning zone/round mirrors after guarded dry-run proof. Public QR zone listing and public complaint zone lookup read normalized cleaning zones before falling back to legacy `czone:` KV mirrors when present. Public complaints write normalized complaints without creating new `ccomplaint:*` KV mirrors when the normalized complaints driver is configured. Next R10 slices should continue with another narrow business-data domain instead of reopening completed cleaning slices unless a live bug is reported.
 - PPE now uses normalized API authority in production/API mode. Production/API saves no longer write PPE compatibility KV mirrors, and staging retired all matched PPE mirrors after guarded dry-run proof. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.

@@ -235,6 +235,7 @@ export function createSessionMeHandler({
             if (!session.ok) return json(res, session.error === "app_user_disabled" ? 403 : 401, { error: session.error });
             return json(res, 200, session);
           }
+          return json(res, 401, { error: "cmms_user_missing" });
         } catch {
           return json(res, 401, { error: "cmms_session_lookup_failed" });
         }

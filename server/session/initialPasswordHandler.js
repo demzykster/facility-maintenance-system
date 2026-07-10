@@ -139,6 +139,7 @@ async function findInitialPasswordRecord({ driver, supabaseClient, identifier })
   if (typeof supabaseClient?.findInitialUser === "function") {
     const appUser = await supabaseClient.findInitialUser(clean);
     if (appUser) return { key: `app_user:${appUser.id}`, source: "app_users", user: appUser };
+    return null;
   }
   if (typeof driver?.listValues !== "function") return null;
   const records = await driver.listValues("user:", true);

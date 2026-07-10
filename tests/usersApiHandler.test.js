@@ -201,7 +201,7 @@ describe("users API handler", () => {
     expect(driver.listValues).toHaveBeenCalledWith("user:", true);
   });
 
-  it("lists app_users as the read authority and preserves legacy-only KV records", async () => {
+  it("lists app_users as the read authority without requiring legacy KV mirrors", async () => {
     const driver = {
       get: vi.fn(async (key) => {
         if (key === "user:app-user-1") return JSON.stringify({ id: "app-user-1", authUserId: "auth-1", techCats: ["electric"], pin: "1234" });
@@ -233,14 +233,13 @@ describe("users API handler", () => {
       ok: true,
       source: "app_users",
       users: [
-        expect.objectContaining({ id: "app-user-1", authUserId: "auth-1", name: "Tech One", techCats: ["electric"] }),
-        { id: "legacy-worker", name: "Legacy Worker" }
+        expect.objectContaining({ id: "app-user-1", authUserId: "auth-1", name: "Tech One" })
       ]
     });
     expect(profileClient.listAppUserProfiles).toHaveBeenCalled();
   });
 
-  it("does not list legacy fallback users again when they match app_users by email phone or worker number", async () => {
+  it("does not list legacy fallback users when app_users authority is available", async () => {
     const driver = {
       get: vi.fn(),
       listValues: vi.fn().mockResolvedValue([
@@ -267,7 +266,7 @@ describe("users API handler", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json().users.map((user) => user.id)).toEqual(["app-email", "app-worker", "legacy-only"]);
+    expect(res.json().users.map((user) => user.id)).toEqual(["app-email", "app-worker"]);
     expect(res.json().users[0]).toMatchObject({ id: "app-email", email: "same@example.com", phone: "0501112222" });
     expect(res.json().users[1]).toMatchObject({ id: "app-worker", workerNo: "2042" });
   });
@@ -300,7 +299,7 @@ describe("users API handler", () => {
     expect(profileClient.listAppUserProfiles).toHaveBeenCalled();
   });
 
-  it("reads a single app_users profile before falling back to KV", async () => {
+  it("reads a single app_users profile without requiring a KV mirror", async () => {
     const driver = {
       get: vi.fn(async (key) => key === "user:app-user-1" ? JSON.stringify({ id: "app-user-1", authUserId: "auth-1", techCats: ["electric"] }) : null),
       listValues: vi.fn()
@@ -324,7 +323,7 @@ describe("users API handler", () => {
     expect(res.json()).toEqual({
       ok: true,
       source: "app_users",
-      user: expect.objectContaining({ id: "app-user-1", authUserId: "auth-1", name: "Tech One", techCats: ["electric"] })
+      user: expect.objectContaining({ id: "app-user-1", authUserId: "auth-1", name: "Tech One" })
     });
     expect(profileClient.getAppUserProfileById).toHaveBeenCalledWith("app-user-1");
   });
@@ -425,7 +424,7 @@ describe("users API handler", () => {
     }), true);
   });
 
-  it("syncs login-capable users to app_users before writing the KV mirror", async () => {
+  it("syncs login-capable users to app_users without writing a KV mirror", async () => {
     const order = [];
     const driver = {
       set: vi.fn().mockImplementation(() => {
@@ -475,8 +474,8 @@ describe("users API handler", () => {
       notification_prefs: { enabled: { cleaning: false } },
       cleaning_access: { enabled: true, canPerformRounds: true }
     }));
-    expect(driver.set).toHaveBeenCalledWith("user:manager-2", JSON.stringify(user), true);
-    expect(order).toEqual(["auth-email", "app-users", "kv"]);
+    expect(driver.set).not.toHaveBeenCalled();
+    expect(order).toEqual(["auth-email", "app-users"]);
   });
 
   it("syncs login-capable users to app_users even when the temporary KV mirror is unavailable", async () => {
@@ -553,6 +552,50 @@ describe("users API handler", () => {
       entityId: appUserId,
       action: "update"
     }));
+  });
+
+  it("creates new login-capable users directly in app_users and returns the created profile id", async () => {
+    const profileClient = {
+      createAppUserProfile: vi.fn().mockResolvedValue({
+        id: "550e8400-e29b-41d4-a716-446655440010",
+        role: "worker",
+        name: "Worker New",
+        worker_no: "2088",
+        active: true,
+        login_state: "pending_setup"
+      })
+    };
+    const driver = { set: vi.fn() };
+    const handler = createUsersApiHandler({
+      driver,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user: { id: "tmp-user-1", name: "Worker New", role: "worker", workerNo: "2088", active: true } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.createAppUserProfile).toHaveBeenCalledWith(expect.objectContaining({
+      name: "Worker New",
+      role: "worker",
+      worker_no: "2088",
+      login_state: "pending_setup",
+      login_metadata: { source: "api/users", client_user_id: "tmp-user-1" }
+    }));
+    expect(driver.set).not.toHaveBeenCalled();
+    expect(res.json()).toEqual({
+      ok: true,
+      user: expect.objectContaining({
+        id: "550e8400-e29b-41d4-a716-446655440010",
+        name: "Worker New",
+        workerNo: "2088",
+        loginState: "pending_setup"
+      })
+    });
   });
 
   it("resets app_users PIN login by clearing the hash and requiring first-login setup again", async () => {
@@ -695,7 +738,7 @@ describe("users API handler", () => {
     }));
   });
 
-  it("deactivates login-capable app_users before deleting the temporary KV mirror", async () => {
+  it("deactivates login-capable app_users without deleting a temporary KV mirror", async () => {
     const order = [];
     const driver = {
       delete: vi.fn().mockImplementation(() => {
@@ -725,8 +768,8 @@ describe("users API handler", () => {
     expect(res.statusCode).toBe(200);
     expect(profileClient.getAppUserProfileById).toHaveBeenCalledWith("app-user-1");
     expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-1", { active: false });
-    expect(driver.delete).toHaveBeenCalledWith("user:app-user-1", true);
-    expect(order).toEqual(["app-users", "kv"]);
+    expect(driver.delete).not.toHaveBeenCalled();
+    expect(order).toEqual(["app-users"]);
   });
 
   it("deactivates login-capable app_users even when the temporary KV mirror is unavailable", async () => {
