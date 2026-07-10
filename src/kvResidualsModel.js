@@ -40,7 +40,15 @@ export function countKvPrefixes(recordKeys = []) {
   }, {});
 }
 
-export function classifyKvResiduals({ kvPrefixes = {}, userReconciliation = null } = {}) {
+export function countKvScopes(rows = []) {
+  return rows.reduce((counts, row) => {
+    const scope = String(row?.scope || "unknown").trim() || "unknown";
+    counts[scope] = (counts[scope] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+export function classifyKvResiduals({ kvPrefixes = {}, kvScopes = {}, userReconciliation = null } = {}) {
   const compatibilityMirrors = [];
   const transientOperational = [];
   const deferredOrphanCandidates = [];
@@ -68,11 +76,15 @@ export function classifyKvResiduals({ kvPrefixes = {}, userReconciliation = null
     ok: true,
     counts: {
       prefixes: Object.keys(kvPrefixes).length,
+      scopes: Object.keys(kvScopes).length,
       compatibilityMirrors: compatibilityMirrors.reduce((sum, item) => sum + item.count, 0),
       transientOperational: transientOperational.reduce((sum, item) => sum + item.count, 0),
       deferredOrphanCandidates: deferredOrphanCandidates.reduce((sum, item) => sum + item.count, 0),
       unknown: unknown.reduce((sum, item) => sum + item.count, 0)
     },
+    scopes: Object.entries(kvScopes)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([scope, count]) => ({ scope, count })),
     compatibilityMirrors,
     transientOperational,
     deferredOrphanCandidates,

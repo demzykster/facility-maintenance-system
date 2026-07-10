@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
-- Last completed work: R10 residual KV docs updated after owner-approved deletion of inactive controls/template KV records.
-- Current work: none.
+- Active branch: `codex/r10-kv-residuals-all-scopes`.
+- Current branch: `codex/r10-kv-residuals-all-scopes`.
+- Last completed work: Owner-approved cleanup removed inactive controls/template KV records and stale public complaint rate-limit keys from staging.
+- Current work: R10 residual KV report now covers all KV scopes and records scope breakdowns.
 
 ## Current Product Direction
 

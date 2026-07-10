@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { applyEnvValues, parseEnvFile } from "../src/envFileModel.js";
-import { classifyKvResiduals, countKvPrefixes } from "../src/kvResidualsModel.js";
+import { classifyKvResiduals, countKvPrefixes, countKvScopes } from "../src/kvResidualsModel.js";
 import { normalizeSupabaseUrl } from "../src/supabaseStagingSchemaCheckModel.js";
 import { proposeLegacyUserBackfillRows } from "../src/userReconciliationModel.js";
 
@@ -53,8 +53,8 @@ const [kvRows, appUsers] = await Promise.all([
     root,
     serviceRoleKey,
     table: "cmms_kv_records",
-    select: "record_key,value",
-    query: "&scope=eq.shared&order=record_key.asc"
+    select: "scope,record_key,value",
+    query: "&order=scope.asc,record_key.asc"
   }),
   serviceRows({
     root,
@@ -69,6 +69,7 @@ const userRows = kvRows.filter((row) => String(row.record_key || "").startsWith(
 const userReconciliation = proposeLegacyUserBackfillRows({ legacyRows: userRows, appUsers });
 const report = classifyKvResiduals({
   kvPrefixes: countKvPrefixes(kvRows.map((row) => row.record_key)),
+  kvScopes: countKvScopes(kvRows),
   userReconciliation
 });
 
