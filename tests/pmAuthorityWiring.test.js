@@ -16,15 +16,15 @@ describe("normalized PM authority wiring", () => {
     expect(source).toContain('action: "load"');
   });
 
-  it("writes normalized PM tasks first and mirrors to KV in production authority mode", () => {
-    expect(source).toMatch(/if \(NORMALIZED_PM_AUTHORITY\) \{[\s\S]*await NORMALIZED_PM_PROVIDER\.upsert\(p\);[\s\S]*void mirrorPmToKv\(p\);/);
-    expect(source).toContain('kind: "pm_kv_mirror_save_failed"');
+  it("writes normalized PM tasks without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/if \(NORMALIZED_PM_AUTHORITY\) \{[\s\S]*await NORMALIZED_PM_PROVIDER\.upsert\(p\);[\s\S]*\} else \{[\s\S]*persistShared\(`pm:\$\{p\.id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_PM_PROVIDER\.upsert\(p\);[\s\S]*void mirrorPmToKv\(p\);/);
     expect(source).toMatch(/if \(!await persistShared\(`pm:\$\{p\.id\}`, JSON\.stringify\(p\)\)\) return false;[\s\S]*void shadowWriteNormalizedPm\(p\);/);
   });
 
-  it("deletes normalized PM tasks first and mirrors the delete to KV in production authority mode", () => {
-    expect(source).toMatch(/if \(NORMALIZED_PM_AUTHORITY\) \{[\s\S]*await NORMALIZED_PM_PROVIDER\.delete\(id\);[\s\S]*void mirrorDeletePmFromKv\(id\);/);
-    expect(source).toContain('kind: "pm_kv_mirror_delete_failed"');
+  it("deletes normalized PM tasks without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/if \(NORMALIZED_PM_AUTHORITY\) \{[\s\S]*await NORMALIZED_PM_PROVIDER\.delete\(id\);[\s\S]*\} else \{[\s\S]*deleteShared\(`pm:\$\{id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_PM_PROVIDER\.delete\(id\);[\s\S]*void mirrorDeletePmFromKv\(id\);/);
     expect(source).toMatch(/if \(!await deleteShared\(`pm:\$\{id\}`\)\) return false;[\s\S]*void shadowDeleteNormalizedPm\(id\);/);
   });
 });
