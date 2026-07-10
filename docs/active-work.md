@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-push-subscription-kv-mirror`.
-- Current branch: `codex/r10-retire-push-subscription-kv-mirror`.
-- Last completed work: server-side retired-prefix guard prevents old production/API clients from recreating `presence:*` KV mirrors.
-- Current work: retire the `pushSubscriptions:v1` compatibility mirror after normalized push subscriptions are authoritative.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: production/API push subscription saves no longer recreate the `pushSubscriptions:v1` KV mirror and staging has a guarded aggregate-key retire script.
+- Current work: none.
 
 ## Current Product Direction
 
