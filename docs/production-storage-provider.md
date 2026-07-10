@@ -35,5 +35,5 @@ The shared KV API only accepts known v1 prefixes. Keep `server/kv/handler.js`, `
 - Task and meeting writes are workflow writes for admin and manager roles.
 - PPE catalog/order writes require `ppe:manage`; PPE requests require `ppe:request` or worker/cleaner request flow.
 - App issue reports are accepted from active product roles.
-- Phone push subscriptions are managed through `/api/push`; `pushSubscriptions:v1` remains a compatibility mirror while normalized `push_subscriptions` is the production/API-mode authority.
+- Phone push subscriptions are managed through `/api/push`; normalized `push_subscriptions` is the production/API-mode authority, and `pushSubscriptions:v1` is a retired aggregate compatibility key once the guarded staging retire check passes.
 - App config is managed through `/api/settings/config`; `config:v1` remains a compatibility mirror while normalized `app_config` is the production/API-mode authority.

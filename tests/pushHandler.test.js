@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPushHandler } from "../server/push/handler.js";
+import { createNormalizedPushSubscriptionStore, createPushHandler } from "../server/push/handler.js";
 
 function createRes() {
   return {
@@ -137,6 +137,30 @@ describe("push API handler", () => {
     }));
     expect(unsubscribe.statusCode).toBe(200);
     expect(subscriptionStore.deleteMany).toHaveBeenCalledWith([subscribe.json().id]);
+  });
+
+  it("can run normalized subscription storage without a KV mirror", async () => {
+    let list = [];
+    const driver = {
+      list: vi.fn().mockImplementation(async () => list),
+      upsert: vi.fn().mockImplementation(async (record) => {
+        list = [record, ...list.filter((item) => item.id !== record.id)];
+      }),
+      delete: vi.fn().mockImplementation(async (id) => {
+        list = list.filter((item) => item.id !== id);
+      })
+    };
+    const mirrorDriver = {
+      get: vi.fn(),
+      set: vi.fn()
+    };
+    const store = createNormalizedPushSubscriptionStore({ driver, mirrorDriver: null });
+    await store.upsert({ id: "push-1", userId: "user-1", subscription });
+    await store.deleteMany(["push-1"]);
+
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "push-1" }));
+    expect(driver.delete).toHaveBeenCalledWith("push-1");
+    expect(mirrorDriver.set).not.toHaveBeenCalled();
   });
 
   it("sends a business notification only to explicit subscribed targets", async () => {

@@ -908,8 +908,8 @@ describe("kv API handler", () => {
       getAppUserProfile: vi.fn().mockResolvedValue({
         id: "user-1",
         auth_user_id: "auth-user-1",
-        role: "user",
-        name: "User",
+        role: "admin",
+        name: "Admin",
         active: true,
         permissions: {},
         must_change_password: false
@@ -931,21 +931,30 @@ describe("kv API handler", () => {
       query: { key: "presence:user-1", shared: "1" },
       body: { value: "{\"id\":\"user-1\"}", shared: true }
     });
+    const pushPutRes = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "pushSubscriptions:v1", shared: "1" },
+      body: { value: "[]", shared: true }
+    });
     const postRes = await call(handler, {
       method: "POST",
       headers: { authorization: "Bearer user-token" },
       body: {
         shared: true,
         records: [
-          { key: "presence:user-1", value: "{\"id\":\"user-1\"}" }
+          { key: "presence:user-1", value: "{\"id\":\"user-1\"}" },
+          { key: "pushSubscriptions:v1", value: "[]" }
         ]
       }
     });
 
     expect(putRes.statusCode).toBe(200);
     expect(putRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "presence:" });
+    expect(pushPutRes.statusCode).toBe(200);
+    expect(pushPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "pushSubscriptions:v1" });
     expect(postRes.statusCode).toBe(200);
-    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 1 });
+    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 2 });
     expect(driver.set).not.toHaveBeenCalled();
     expect(driver.setMany).not.toHaveBeenCalled();
   });

@@ -1,4 +1,7 @@
-const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze(["presence:"]);
+const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
+  "presence:",
+  "pushSubscriptions:v1"
+]);
 
 export function retiredKvWritePrefixes({ appMode = "", storageProvider = "" } = {}) {
   const productionApi = String(appMode || "").trim().toLowerCase() === "production"

@@ -14,6 +14,7 @@ import {
   selectPushNotificationTargets,
   upsertPushSubscription
 } from "../../src/pushNotificationModel.js";
+import { retiredKvWriteKey } from "../../src/retiredKvWriteModel.js";
 
 const readBody = async (req) => {
   if (req.body && typeof req.body === "object") return req.body;
@@ -78,7 +79,7 @@ function createKvPushSubscriptionStore(driver) {
   };
 }
 
-function createNormalizedPushSubscriptionStore({ driver, mirrorDriver = null } = {}) {
+export function createNormalizedPushSubscriptionStore({ driver, mirrorDriver = null } = {}) {
   if (!driver?.list || !driver?.upsert || !driver?.delete) return null;
   const mirrorStore = createKvPushSubscriptionStore(mirrorDriver);
   return {
@@ -136,11 +137,15 @@ export function createPushHandler({
 } = {}) {
   const backendKvDriver = driver
     || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
+  const retiredPushMirror = retiredKvWriteKey(PUSH_SUBSCRIPTIONS_KEY, {
+    appMode: env.VITE_CMMS_APP_MODE,
+    storageProvider: env.VITE_CMMS_STORAGE_PROVIDER
+  });
   const backendSubscriptionStore = subscriptionStore
     || (driver ? createKvPushSubscriptionStore(driver) : null)
     || createNormalizedPushSubscriptionStore({
       driver: createSupabasePushSubscriptionDriverFromEnv(env, fetchImpl),
-      mirrorDriver: backendKvDriver
+      mirrorDriver: retiredPushMirror ? null : backendKvDriver
     })
     || createKvPushSubscriptionStore(backendKvDriver);
   const enabled = pushRuntimeReady(env);
