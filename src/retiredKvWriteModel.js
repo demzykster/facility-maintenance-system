@@ -1,6 +1,7 @@
 const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
   "presence:",
   "pushSubscriptions:v1",
+  "config:v1",
   "ppe:",
   "ppeitem:",
   "ppenorm:",
