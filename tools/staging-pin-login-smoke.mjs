@@ -4,6 +4,7 @@ import { applyEnvValues, parseEnvFile } from "../src/envFileModel.js";
 import { normalizeSupabaseUrl } from "../src/supabaseStagingSchemaCheckModel.js";
 
 const ENV_FILE = ".env.staging.local";
+const CREDENTIALS_FILE = ".staging-admin-credentials.local";
 const DEFAULT_APP_URL = "https://facility-maintenance-system.vercel.app";
 
 function loadEnvFile(file) {
@@ -52,6 +53,18 @@ async function apiRequest({ publicUrl, path, body, token }) {
   return data;
 }
 
+async function supabasePasswordToken({ url, anonKey, email, password }) {
+  const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: anonKey, "content-type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(data?.error_description || data?.msg || data?.message || `auth_${response.status}`);
+  if (!data?.access_token) throw new Error("auth_access_token_missing");
+  return data.access_token;
+}
+
 async function apiGet({ publicUrl, path, token }) {
   const response = await fetch(`${publicUrl}${path}`, {
     method: "GET",
@@ -79,16 +92,29 @@ async function serviceDelete({ root, serviceRoleKey, table, query }) {
 }
 
 loadEnvFile(ENV_FILE);
+loadEnvFile(CREDENTIALS_FILE);
 
 const publicUrl = appUrl();
 const supabaseUrl = normalizeSupabaseUrl(requireEnv("SUPABASE_URL"));
+const anonKey = requireEnv("SUPABASE_ANON_KEY");
 const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+const adminEmail = String(process.env.STAGING_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "").trim();
+const adminPassword = String(process.env.STAGING_ADMIN_PASSWORD || process.env.ADMIN_NEW_PASSWORD || "").trim();
 const suffix = `${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
 const workerNo = `88${suffix.slice(-8)}`;
 const pin = "6842";
 let appUserId = "";
 
+if (!adminEmail || !adminPassword) throw new Error("missing_admin_credentials");
+
 try {
+  const adminAccessToken = await supabasePasswordToken({
+    url: supabaseUrl,
+    anonKey,
+    email: adminEmail,
+    password: adminPassword
+  });
+
   const insertResponse = await fetch(`${supabaseUrl}/rest/v1/app_users`, {
     method: "POST",
     headers: serviceHeaders(serviceRoleKey, { prefer: "return=representation" }),
@@ -151,10 +177,47 @@ try {
   });
   if (session?.user?.id !== appUserId || session?.user?.workerNo !== workerNo) throw new Error("pin_smoke_session_mismatch");
 
+  await apiRequest({
+    publicUrl,
+    path: "/api/users",
+    token: adminAccessToken,
+    body: {
+      user: {
+        id: appUserId,
+        name: "Smoke PIN Worker",
+        role: "worker",
+        workerNo,
+        dept: "Smoke",
+        depts: ["Smoke"],
+        active: true,
+        loginResetRequested: true
+      }
+    }
+  });
+
+  const resetRows = await serviceRows({
+    root: supabaseUrl,
+    serviceRoleKey,
+    table: "app_users",
+    select: "id,worker_no,pin_hash,pin_updated_at,login_state",
+    query: `&id=eq.${encodeURIComponent(appUserId)}&limit=1`
+  });
+  const resetRow = resetRows[0] || {};
+  if (resetRow.pin_hash !== null) throw new Error("pin_smoke_reset_hash_not_cleared");
+  if (resetRow.pin_updated_at !== null) throw new Error("pin_smoke_reset_updated_at_not_cleared");
+  if (resetRow.login_state !== "reset_required") throw new Error("pin_smoke_reset_login_state_unexpected");
+
+  const resetValidate = await apiRequest({
+    publicUrl,
+    path: "/api/session/initial-password",
+    body: { action: "validate", identifier: workerNo }
+  });
+  if (resetValidate.auth !== "pin" || resetValidate.needsSetup !== true) throw new Error("pin_smoke_reset_validate_unexpected");
+
   console.log(JSON.stringify({
     ok: true,
     appUrl: publicUrl,
-    user: { id: appUserId, workerNo, pinHash: "scrypt", loginState: row.login_state }
+    user: { id: appUserId, workerNo, pinHash: "scrypt", loginState: row.login_state, resetState: resetRow.login_state }
   }, null, 2));
 } finally {
   if (appUserId) {

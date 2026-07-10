@@ -160,6 +160,24 @@ const legacyUserForProfile = async (driver, profile = {}) => {
 };
 
 const appUserRecordKey = (user = {}) => `user:${user.id}`;
+const userLoginResetPatch = (user = {}) => {
+  const role = cleanString(user.role);
+  if (role === "worker" || role === "cleaner" || role === "tech") {
+    return {
+      pin_hash: null,
+      pin_updated_at: null,
+      login_state: "reset_required",
+      must_change_password: false
+    };
+  }
+  if (role === "admin" || role === "user") {
+    return {
+      login_state: "reset_required",
+      must_change_password: true
+    };
+  }
+  return {};
+};
 
 const createDefaultDriver = (env, fetchImpl) => {
   if (env.CMMS_KV_DRIVER === "upstash") return createUpstashKvDriverFromEnv(env, fetchImpl);
@@ -336,15 +354,22 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       const key = `user:${id}`;
       const permissionError = kvWritePermissionError(auth.user, key);
       if (permissionError) return json(res, 403, { error: permissionError });
+      const loginResetRequested = user.loginResetRequested === true;
       if (user.authUserId) {
         if (!backendProfileClient) return json(res, 503, { error: "users_profile_backend_not_configured" });
-        const patch = extendedAppUserPatchFromUserRecord(user);
+        const patch = {
+          ...extendedAppUserPatchFromUserRecord(user),
+          ...(loginResetRequested ? userLoginResetPatch(user) : {})
+        };
         if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
         await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
       } else if (isUuid(id) && typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfileById === "function") {
         const existingProfile = await backendProfileClient.getAppUserProfileById(id);
         if (existingProfile) {
-          await backendProfileClient.updateAppUserProfileById(id, extendedAppUserPatchFromUserRecord(user));
+          await backendProfileClient.updateAppUserProfileById(id, {
+            ...extendedAppUserPatchFromUserRecord(user),
+            ...(loginResetRequested ? userLoginResetPatch(user) : {})
+          });
         } else if (typeof backendDriver?.set !== "function") {
           return json(res, 503, { error: "users_legacy_backend_not_configured" });
         }
