@@ -98,6 +98,31 @@ describe("settings config API handler", () => {
     }));
   });
 
+  it("writes normalized config without recreating the retired production API mirror", async () => {
+    const configDriver = { upsert: vi.fn().mockResolvedValue({ config: { departments: ["Ops"] } }) };
+    const mirrorDriver = { set: vi.fn().mockResolvedValue(undefined) };
+    const handler = createSettingsConfigApiHandler({
+      configDriver,
+      mirrorDriver,
+      env: {
+        VITE_CMMS_APP_MODE: "production",
+        VITE_CMMS_STORAGE_PROVIDER: "api"
+      },
+      sessionClient: sessionClientFor({ role: "user", permissions: { settings: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer token" },
+      body: { config: { departments: ["Ops"] } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, config: { departments: ["Ops"] }, source: "normalized" });
+    expect(configDriver.upsert).toHaveBeenCalledWith({ departments: ["Ops"] }, "main");
+    expect(mirrorDriver.set).not.toHaveBeenCalled();
+  });
+
   it("requires settings management to write config", async () => {
     const configDriver = { upsert: vi.fn() };
     const handler = createSettingsConfigApiHandler({

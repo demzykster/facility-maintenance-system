@@ -8,6 +8,7 @@ import { bearerToken } from "../session/authCookie.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { createSupabaseAppConfigDriverFromEnv } from "./supabaseAppConfigDriver.js";
+import { retiredKvWriteKey } from "../../src/retiredKvWriteModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -86,7 +87,11 @@ async function readConfig(configDriver, mirrorDriver) {
 
 export function createSettingsConfigApiHandler({ configDriver = null, mirrorDriver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendConfigDriver = configDriver || createSupabaseAppConfigDriverFromEnv(env, fetchImpl);
-  const backendMirrorDriver = mirrorDriver || createSupabaseKvDriverFromEnv(env, fetchImpl);
+  const retiredConfigMirror = retiredKvWriteKey(APP_CONFIG_KEY, {
+    appMode: env.VITE_CMMS_APP_MODE,
+    storageProvider: env.VITE_CMMS_STORAGE_PROVIDER
+  });
+  const backendMirrorDriver = retiredConfigMirror ? null : (mirrorDriver || createSupabaseKvDriverFromEnv(env, fetchImpl));
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
 
   return async function settingsConfigApiHandler(req, res) {

@@ -104,6 +104,15 @@ npm run staging:push-subscriptions:retire-mirror -- --apply
 
 The apply mode deletes `pushSubscriptions:v1` only when every legacy subscription id in the JSON mirror already exists in `public.push_subscriptions`.
 
+The app config mirror is also an aggregate key rather than a collection prefix:
+
+```bash
+npm run staging:app-config:retire-mirror
+npm run staging:app-config:retire-mirror -- --apply
+```
+
+The apply mode deletes `config:v1` only when the shared KV value matches `public.app_config.config`.
+
 Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
 
 ```bash
