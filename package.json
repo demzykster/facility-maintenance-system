@@ -26,6 +26,8 @@
     "staging:smoke:ppe-api": "node tools/staging-ppe-api-smoke.mjs",
     "staging:work-records:reconcile": "node tools/staging-work-records-reconcile.mjs",
     "staging:smoke:work-records-api": "node tools/staging-work-records-api-smoke.mjs",
+    "staging:settings-records:reconcile": "node tools/staging-settings-records-reconcile.mjs",
+    "staging:smoke:settings-records-api": "node tools/staging-settings-records-api-smoke.mjs",
     "staging:cleaning-zones:reconcile": "node tools/staging-cleaning-zones-reconcile.mjs",
     "staging:smoke:cleaning-zones-api": "node tools/staging-cleaning-zones-api-smoke.mjs",
     "staging:cleaning-rounds:reconcile": "node tools/staging-cleaning-rounds-reconcile.mjs",

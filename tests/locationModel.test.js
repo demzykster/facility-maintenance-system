@@ -5,7 +5,10 @@ import {
   legacyZoneLocationId,
   locationDisplayText,
   locationFromLegacyZoneName,
+  locationRecordFromSupabaseRow,
+  locationRecordToSupabaseRow,
   locationsFromLegacyZoneNames,
+  normalizeLocationRecord,
   normalizeLocationType
 } from "../src/locationModel.js";
 
@@ -100,5 +103,24 @@ describe("location model", () => {
   it("falls back unknown types to general", () => {
     expect(normalizeLocationType("warehouse")).toBe("warehouse");
     expect(normalizeLocationType("cleaning-only")).toBe("general");
+  });
+
+  it("maps locations to and from normalized Supabase rows", () => {
+    const row = locationRecordToSupabaseRow({ id: "loc-1", name: "מחסן", type: "warehouse", tags: ["main"] });
+
+    expect(row).toMatchObject({
+      id: "loc-1",
+      name: "מחסן",
+      type: "warehouse",
+      source_kv_key: "location:loc-1"
+    });
+    expect(locationRecordFromSupabaseRow({ ...row, legacy_payload: { id: "loc-1", name: "Legacy" } })).toEqual({
+      id: "loc-1",
+      name: "Legacy"
+    });
+    expect(normalizeLocationRecord({ id: "loc-2", name: "חצר" })).toMatchObject({
+      id: "loc-2",
+      sourceKvKey: "location:loc-2"
+    });
   });
 });

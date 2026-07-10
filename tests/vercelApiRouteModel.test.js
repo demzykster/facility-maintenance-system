@@ -7,6 +7,7 @@ describe("Vercel API route policy", () => {
     expect(VERCEL_API_ROUTE_FILES).toContain("api/cleaning/records.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/ppe/index.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/public/[resource].js");
+    expect(VERCEL_API_ROUTE_FILES).toContain("api/settings/records.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/work/index.js");
     expect(VERCEL_API_ROUTE_FILES).not.toContain("api/cleaning/rounds.js");
     expect(VERCEL_API_ROUTE_FILES).not.toContain("api/cleaning/zones.js");
@@ -47,6 +48,6 @@ describe("Vercel API route policy", () => {
     ]);
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toContain("api_route_count_exceeds_limit:35/24");
+    expect(result.errors).toContain("api_route_count_exceeds_limit:36/24");
   });
 });
