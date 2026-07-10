@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/startup-data-load-performance`.
-- Current branch: `codex/startup-data-load-performance`.
-- Last completed work: generic production/API KV writes no longer create `photo:*` legacy ticket-photo records.
-- Current work: owner-reported iPhone authenticated startup performance slice.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: owner-reported iPhone authenticated startup performance slice.
+- Current work: none.
 
 ## Current Product Direction
 
