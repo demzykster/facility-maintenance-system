@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `none`.
-- Current branch: `main`.
+- Active branch: `codex/r10-retire-fleet-kv-mirrors`.
+- Current branch: `codex/r10-retire-fleet-kv-mirrors`.
 - Last completed work: production/API cleaning saves no longer recreate cleaning KV mirrors and staging retired all matched cleaning zone/round mirrors after guarded dry-run proof.
-- Current work: none.
+- Current work: retire fleet compatibility KV mirror writes before deleting matched staging fleet mirrors.
 
 ## Current Product Direction
 

@@ -16,15 +16,15 @@ describe("normalized fleet authority wiring", () => {
     expect(source).toContain('action: "load"');
   });
 
-  it("writes normalized fleet units first and mirrors to KV in production authority mode", () => {
-    expect(source).toMatch(/if \(NORMALIZED_FLEET_AUTHORITY\) \{[\s\S]*await NORMALIZED_FLEET_PROVIDER\.upsert\(f\);[\s\S]*void mirrorFleetToKv\(f\);/);
-    expect(source).toContain('kind: "fleet_kv_mirror_save_failed"');
+  it("writes normalized fleet units without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/if \(NORMALIZED_FLEET_AUTHORITY\) \{[\s\S]*await NORMALIZED_FLEET_PROVIDER\.upsert\(f\);[\s\S]*\} else \{[\s\S]*persistShared\(`fleet:\$\{f\.id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_FLEET_PROVIDER\.upsert\(f\);[\s\S]*void mirrorFleetToKv\(f\);/);
     expect(source).toMatch(/if \(!await persistShared\(`fleet:\$\{f\.id\}`, JSON\.stringify\(f\), options\)\) return false;[\s\S]*void shadowWriteNormalizedFleet\(f\);/);
   });
 
-  it("deletes normalized fleet units first and mirrors the delete to KV in production authority mode", () => {
-    expect(source).toMatch(/if \(NORMALIZED_FLEET_AUTHORITY\) \{[\s\S]*await NORMALIZED_FLEET_PROVIDER\.delete\(id\);[\s\S]*void mirrorDeleteFleetFromKv\(id\);/);
-    expect(source).toContain('kind: "fleet_kv_mirror_delete_failed"');
+  it("deletes normalized fleet units without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/if \(NORMALIZED_FLEET_AUTHORITY\) \{[\s\S]*await NORMALIZED_FLEET_PROVIDER\.delete\(id\);[\s\S]*\} else \{[\s\S]*deleteShared\(`fleet:\$\{id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_FLEET_PROVIDER\.delete\(id\);[\s\S]*void mirrorDeleteFleetFromKv\(id\);/);
     expect(source).toMatch(/if \(!await deleteShared\(`fleet:\$\{id\}`, options\)\) return false;[\s\S]*void shadowDeleteNormalizedFleet\(id\);/);
   });
 });

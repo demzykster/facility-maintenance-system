@@ -3,6 +3,7 @@ const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
   "pushSubscriptions:v1",
   "config:v1",
   "ticket:",
+  "fleet:",
   "czone:",
   "cround:",
   "ccomplaint:",
