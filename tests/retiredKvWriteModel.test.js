@@ -8,6 +8,10 @@ describe("retired KV write model", () => {
       "pushSubscriptions:v1",
       "config:v1",
       "ticket:",
+      "czone:",
+      "cround:",
+      "ccomplaint:",
+      "cabsence:",
       "ppe:",
       "ppeitem:",
       "ppenorm:",
@@ -19,6 +23,8 @@ describe("retired KV write model", () => {
     expect(retiredKvWriteKey("pushSubscriptions:v1", { appMode: "production", storageProvider: "api" })).toBe("pushSubscriptions:v1");
     expect(retiredKvWriteKey("config:v1", { appMode: "production", storageProvider: "api" })).toBe("config:v1");
     expect(retiredKvWriteKey("ticket:T-1", { appMode: "production", storageProvider: "api" })).toBe("ticket:");
+    expect(retiredKvWriteKey("czone:zone-1", { appMode: "production", storageProvider: "api" })).toBe("czone:");
+    expect(retiredKvWriteKey("cround:round-1", { appMode: "production", storageProvider: "api" })).toBe("cround:");
     expect(retiredKvWriteKey("ppeitem:item-1", { appMode: "production", storageProvider: "api" })).toBe("ppeitem:");
     expect(retiredKvWriteKey("ppereq:req-1", { appMode: "production", storageProvider: "api" })).toBe("ppereq:");
     expect(retiredKvWriteKey("fleet:F-1", { appMode: "production", storageProvider: "api" })).toBe("");
@@ -30,6 +36,7 @@ describe("retired KV write model", () => {
       { key: "pushSubscriptions:v1", value: "[]" },
       { key: "config:v1", value: "{}" },
       { key: "ticket:T-1", value: "{}" },
+      { key: "czone:zone-1", value: "{}" },
       { key: "ppeitem:item-1", value: "{}" },
       { key: "fleet:F-1", value: "{}" }
     ], { appMode: "production", storageProvider: "api" })).toEqual({
@@ -39,6 +46,7 @@ describe("retired KV write model", () => {
         { key: "pushSubscriptions:v1", value: "[]", retiredPrefix: "pushSubscriptions:v1" },
         { key: "config:v1", value: "{}", retiredPrefix: "config:v1" },
         { key: "ticket:T-1", value: "{}", retiredPrefix: "ticket:" },
+        { key: "czone:zone-1", value: "{}", retiredPrefix: "czone:" },
         { key: "ppeitem:item-1", value: "{}", retiredPrefix: "ppeitem:" }
       ]
     });

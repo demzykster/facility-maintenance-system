@@ -16,15 +16,15 @@ describe("normalized cleaning zones authority wiring", () => {
     expect(source).toContain('action: "load"');
   });
 
-  it("writes normalized cleaning zones first and mirrors to KV in production authority mode", () => {
-    expect(source).toMatch(/if \(NORMALIZED_CLEANING_ZONES_AUTHORITY\) \{[\s\S]*await NORMALIZED_CLEANING_ZONES_PROVIDER\.upsert\(z\);[\s\S]*void mirrorCleaningZoneToKv\(z\);/);
-    expect(source).toContain('kind: "cleaning_zone_kv_mirror_save_failed"');
+  it("writes normalized cleaning zones without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/if \(NORMALIZED_CLEANING_ZONES_AUTHORITY\) \{[\s\S]*await NORMALIZED_CLEANING_ZONES_PROVIDER\.upsert\(z\);[\s\S]*\} else \{[\s\S]*persistShared\(`czone:\$\{z\.id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_CLEANING_ZONES_PROVIDER\.upsert\(z\);[\s\S]*void mirrorCleaningZoneToKv\(z\);/);
     expect(source).toMatch(/if \(!await persistShared\(`czone:\$\{z\.id\}`, JSON\.stringify\(z\)\)\) return false;[\s\S]*void shadowWriteNormalizedCleaningZone\(z\);/);
   });
 
-  it("deletes normalized cleaning zones first while keeping dependent KV cleanup intact", () => {
-    expect(source).toMatch(/if \(NORMALIZED_CLEANING_ZONES_AUTHORITY\) \{[\s\S]*await NORMALIZED_CLEANING_ZONES_PROVIDER\.delete\(plan\.zoneId\);[\s\S]*void mirrorDeleteCleaningZoneFromKv\(plan\.zoneId\);/);
-    expect(source).toContain('kind: "cleaning_zone_kv_mirror_delete_failed"');
+  it("deletes normalized cleaning zones without recreating the zone KV mirror", () => {
+    expect(source).toMatch(/if \(NORMALIZED_CLEANING_ZONES_AUTHORITY\) \{[\s\S]*await NORMALIZED_CLEANING_ZONES_PROVIDER\.delete\(plan\.zoneId\);[\s\S]*\} else \{[\s\S]*shadowDeleteNormalizedCleaningZone\(plan\.zoneId\);/);
+    expect(source).not.toMatch(/await NORMALIZED_CLEANING_ZONES_PROVIDER\.delete\(plan\.zoneId\);[\s\S]*void mirrorDeleteCleaningZoneFromKv\(plan\.zoneId\);/);
     expect(source).toContain("if (NORMALIZED_CLEANING_ZONES_AUTHORITY && key === `czone:${plan.zoneId}`) continue;");
     expect(source).toContain("if (!await deleteShared(key)) return false;");
     expect(source).toContain("void shadowDeleteNormalizedCleaningZone(plan.zoneId);");

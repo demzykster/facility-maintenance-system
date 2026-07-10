@@ -2897,7 +2897,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorCleaningZoneToKv(z);
     } else {
       if (!await persistShared(`czone:${z.id}`, JSON.stringify(z))) return false;
       void shadowWriteNormalizedCleaningZone(z);
@@ -2924,7 +2923,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeleteCleaningZoneFromKv(plan.zoneId);
     } else {
       void shadowDeleteNormalizedCleaningZone(plan.zoneId);
     }
@@ -2956,7 +2954,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorCleaningRoundToKv(rec);
     } else {
       if (!await persistShared(`cround:${rec.id}`, JSON.stringify(rec))) return false;
       void shadowWriteNormalizedCleaningRound(rec);
@@ -2977,7 +2974,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorWorkerAbsenceToKv(a);
     } else {
       if (!await persistShared(`cabsence:${a.id}`, JSON.stringify(a))) return false;
       void shadowWriteNormalizedWorkerAbsence(a);
@@ -2998,7 +2994,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeleteWorkerAbsenceFromKv(id);
     } else {
       if (!await deleteShared(`cabsence:${id}`)) return false;
       void shadowDeleteNormalizedWorkerAbsence(id);
@@ -3027,7 +3022,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorCleaningComplaintToKv(comp);
     } else {
       if (!await persistShared(`ccomplaint:${comp.id}`, JSON.stringify(comp))) return false;
       void shadowWriteNormalizedCleaningComplaint(comp);
@@ -3076,7 +3070,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeleteCleaningComplaintFromKv(id);
     } else {
       if (!await deleteShared(`ccomplaint:${id}`)) return false;
       void shadowDeleteNormalizedCleaningComplaint(id);
