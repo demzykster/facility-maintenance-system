@@ -135,7 +135,7 @@ describe("public complaint handler", () => {
     expect(complaint.photo).toBe(photo);
   });
 
-  it("also writes public complaints to the normalized complaints driver when configured", async () => {
+  it("writes public complaints to the normalized complaints driver without creating a KV mirror when configured", async () => {
     const driver = {
       get: vi.fn(async (key) => {
         if (key.startsWith("publicComplaintRate:")) return null;
@@ -164,7 +164,7 @@ describe("public complaint handler", () => {
       status: "pending",
       source: "public_endpoint"
     }));
-    expect(driver.set).toHaveBeenCalledWith("ccomplaint:complaint-1", expect.any(String), true);
+    expect(driver.set).not.toHaveBeenCalledWith("ccomplaint:complaint-1", expect.any(String), true);
   });
 
   it("loads the reported zone from normalized cleaning zones before legacy KV mirrors", async () => {
