@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-work-kv-mirrors`.
-- Current branch: `codex/r10-retire-work-kv-mirrors`.
-- Last completed work: production/API PM saves/batch saves/deletes no longer recreate `pm:*` KV mirrors.
-- Current work: stop production/API work-record saves/deletes from recreating `mtask:*` and `mmeet:*` KV mirrors.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: production/API work-record saves/deletes no longer recreate `mtask:*` or `mmeet:*` KV mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
