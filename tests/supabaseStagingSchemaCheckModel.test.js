@@ -28,6 +28,7 @@ describe("supabase staging schema check model", () => {
 
     expect(STAGING_SUPABASE_TABLES).toEqual(expect.arrayContaining([
       "cleaning_zones",
+      "app_config",
       "cleaning_rounds",
       "cleaning_complaints",
       "technician_presence",

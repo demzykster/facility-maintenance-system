@@ -64,6 +64,37 @@ describe("apiStorageAdapter", () => {
     });
   });
 
+  it("routes shared config:v1 operations through the settings config API", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(ok({ ok: true, value: "{\"companyName\":\"CDSL\"}" }))
+      .mockResolvedValueOnce(ok({ ok: true }))
+      .mockResolvedValueOnce(ok({ ok: true }))
+      .mockResolvedValueOnce(ok({ ok: true }))
+      .mockResolvedValueOnce(ok({ ok: true }));
+    const provider = createApiStorageProvider({ baseUrl: "https://cmms.example/api", fetchImpl });
+
+    await expect(provider.get("config:v1", true)).resolves.toEqual({ ok: true, value: "{\"companyName\":\"CDSL\"}" });
+    await expect(provider.set("config:v1", "{\"companyName\":\"CDSL\"}", true)).resolves.toBe(true);
+    await expect(provider.setMany([
+      { key: "config:v1", value: "{\"companyName\":\"CDSL\"}" },
+      { key: "ticket:1", value: "{}" }
+    ], true)).resolves.toBe(true);
+    await expect(provider.delete("config:v1", true)).resolves.toBe(true);
+
+    expect(fetchImpl.mock.calls.map(([url, options]) => [url, options.method || "GET"])).toEqual([
+      ["https://cmms.example/api/settings/config", "GET"],
+      ["https://cmms.example/api/settings/config", "PUT"],
+      ["https://cmms.example/api/settings/config", "PUT"],
+      ["https://cmms.example/api/kv", "POST"],
+      ["https://cmms.example/api/settings/config", "DELETE"]
+    ]);
+    expect(JSON.parse(fetchImpl.mock.calls[3][1].body)).toEqual({
+      records: [{ key: "ticket:1", value: "{}" }],
+      shared: true,
+      atomic: false
+    });
+  });
+
   it("adds the production access token when available", async () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce(ok({ value: "ticket-json" }));
     const provider = createApiStorageProvider({

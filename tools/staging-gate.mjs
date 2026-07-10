@@ -20,6 +20,8 @@ const steps = [
   ["staging:smoke:presence-api", ["npm", ["run", "staging:smoke:presence-api"]]],
   ["staging:push-subscriptions:reconcile", ["npm", ["run", "staging:push-subscriptions:reconcile"]]],
   ["staging:smoke:push-api", ["npm", ["run", "staging:smoke:push-api"]]],
+  ["staging:app-config:reconcile", ["npm", ["run", "staging:app-config:reconcile"]]],
+  ["staging:smoke:app-config-api", ["npm", ["run", "staging:smoke:app-config-api"]]],
   ["staging:settings-records:reconcile", ["npm", ["run", "staging:settings-records:reconcile"]]],
   ["staging:smoke:settings-records-api", ["npm", ["run", "staging:smoke:settings-records-api"]]],
   ["staging:cleaning-zones:reconcile", ["npm", ["run", "staging:cleaning-zones:reconcile"]]],

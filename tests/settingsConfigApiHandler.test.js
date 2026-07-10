@@ -1,0 +1,118 @@
+import { describe, expect, it, vi } from "vitest";
+import { createSettingsConfigApiHandler } from "../server/settings/configHandler.js";
+
+function createRes() {
+  return {
+    headers: {},
+    statusCode: 0,
+    body: "",
+    setHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    },
+    end(body) {
+      this.body = body;
+    },
+    json() {
+      return this.body ? JSON.parse(this.body) : null;
+    }
+  };
+}
+
+async function call(handler, req) {
+  const res = createRes();
+  await handler({ headers: {}, query: {}, method: "GET", ...req }, res);
+  return res;
+}
+
+function sessionClientFor(profile = {}) {
+  return {
+    getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1", email: "manager@example.com" }),
+    getAppUserProfile: vi.fn().mockResolvedValue({
+      id: "app-user-1",
+      auth_user_id: "auth-user-1",
+      role: "user",
+      name: "Manager",
+      active: true,
+      permissions: {},
+      must_change_password: false,
+      ...profile
+    })
+  };
+}
+
+describe("settings config API handler", () => {
+  it("reads normalized config for settings viewers", async () => {
+    const configDriver = { get: vi.fn().mockResolvedValue({ config: { companyName: "CDSL" } }) };
+    const handler = createSettingsConfigApiHandler({
+      configDriver,
+      mirrorDriver: null,
+      sessionClient: sessionClientFor({ role: "user", permissions: { settings: "view" } })
+    });
+
+    const res = await call(handler, { headers: { authorization: "Bearer token" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, value: "{\"companyName\":\"CDSL\"}", config: { companyName: "CDSL" }, source: "normalized" });
+  });
+
+  it("falls back to config:v1 mirror when normalized row is missing", async () => {
+    const configDriver = { get: vi.fn().mockResolvedValue(null) };
+    const mirrorDriver = { get: vi.fn().mockResolvedValue("{\"companyName\":\"Legacy\"}") };
+    const handler = createSettingsConfigApiHandler({
+      configDriver,
+      mirrorDriver,
+      sessionClient: sessionClientFor({ role: "admin" })
+    });
+
+    const res = await call(handler, { headers: { authorization: "Bearer token" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, value: "{\"companyName\":\"Legacy\"}", config: { companyName: "Legacy" }, source: "kv" });
+    expect(mirrorDriver.get).toHaveBeenCalledWith("config:v1", true);
+  });
+
+  it("writes normalized config and mirrors config:v1", async () => {
+    const configDriver = { upsert: vi.fn().mockResolvedValue({ config: { departments: ["Ops"] } }) };
+    const mirrorDriver = { set: vi.fn().mockResolvedValue(undefined) };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createSettingsConfigApiHandler({
+      configDriver,
+      mirrorDriver,
+      auditDriver,
+      sessionClient: sessionClientFor({ role: "user", permissions: { settings: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer token" },
+      body: { value: "{\"departments\":[\"Ops\"]}" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, config: { departments: ["Ops"] }, source: "normalized" });
+    expect(configDriver.upsert).toHaveBeenCalledWith({ departments: ["Ops"] }, "main");
+    expect(mirrorDriver.set).toHaveBeenCalledWith("config:v1", "{\"departments\":[\"Ops\"]}", true);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "settings",
+      entityId: "config:v1"
+    }));
+  });
+
+  it("requires settings management to write config", async () => {
+    const configDriver = { upsert: vi.fn() };
+    const handler = createSettingsConfigApiHandler({
+      configDriver,
+      sessionClient: sessionClientFor({ role: "user", permissions: { settings: "view" } })
+    });
+
+    const res = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer token" },
+      body: { config: { companyName: "Nope" } }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:settings:manage" });
+    expect(configDriver.upsert).not.toHaveBeenCalled();
+  });
+});
