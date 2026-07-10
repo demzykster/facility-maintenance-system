@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-users-profile-fields-authority`.
-- Current branch: `codex/r10-users-profile-fields-authority`.
-- Last completed work: R10 app-config authority slice added `public.app_config` behind `/api/settings/config`, routes `config:v1` reads/writes through normalized server storage first, and preserves `config:v1` as a compatibility KV mirror.
-- Current work: R10 users profile-fields authority slice for user-management fields still living only in `user:` KV, starting with technician assignment, shift/tolerance, cleaning access, notification prefs, employment, and archive/profile metadata.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 users profile-fields authority slice added expanded `public.app_users` fields for technician assignment, shift/tolerance, cleaning access, notification prefs, employment, and archive/profile metadata while preserving protected `user:` KV as temporary legacy enrichment/fallback.
+- Current work: none.
 
 ## Current Product Direction
 
