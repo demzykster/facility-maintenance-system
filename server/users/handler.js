@@ -36,6 +36,7 @@ const parseStoredUser = (record) => {
 
 const cleanString = (value) => String(value || "").trim();
 const cleanEmail = (value) => cleanString(value).toLowerCase();
+const cleanDigits = (value) => cleanString(value).replace(/\D/g, "");
 const cleanStringArray = (values = []) =>
   [...new Set((Array.isArray(values) ? values : []).map(cleanString).filter(Boolean))];
 const cleanObject = (value) =>
@@ -143,6 +144,16 @@ const legacyUserKeyCandidates = (profile = {}) => {
     appUser.workerNo,
     appUser.email
   ].filter(Boolean).map((id) => `user:${id}`);
+};
+
+const legacyUserMatchesProfile = (profile = {}, legacy = {}) => {
+  const appUser = normalizeSupabaseAppUserProfile(profile);
+  if (appUser.id && appUser.id === legacy.id) return true;
+  if (appUser.authUserId && appUser.authUserId === legacy.authUserId) return true;
+  if (appUser.workerNo && cleanString(appUser.workerNo) === cleanString(legacy.workerNo)) return true;
+  if (appUser.email && cleanEmail(appUser.email) === cleanEmail(legacy.email)) return true;
+  if (appUser.phone && cleanDigits(appUser.phone) && cleanDigits(appUser.phone) === cleanDigits(legacy.phone)) return true;
+  return false;
 };
 
 const legacyUserForProfile = async (driver, profile = {}) => {
@@ -308,19 +319,21 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
         }
         if (canReadProfiles) {
           const profiles = await backendProfileClient.listAppUserProfiles();
-          const usersById = new Map();
-          for (const profile of profiles) {
-            const legacy = await legacyUserForProfile(backendDriver, profile);
-            const user = userRecordFromAppUserProfile(profile, legacy);
-            usersById.set(user.id, publicUserForSession(appUserRecordKey(user), user, auth.user));
-          }
           const legacyRecords = typeof backendDriver?.listValues === "function" ? (await backendDriver.listValues("user:", true))
             .map(parseStoredUser)
             .filter(Boolean)
             .filter((record) => !kvReadPermissionError(auth.user, record.key)) : [];
+          const usersById = new Map();
+          for (const profile of profiles) {
+            const keyedLegacy = await legacyUserForProfile(backendDriver, profile);
+            const matchedLegacy = legacyRecords.find((record) => legacyUserMatchesProfile(profile, record.user));
+            const legacy = Object.keys(keyedLegacy || {}).length ? keyedLegacy : (matchedLegacy?.user || {});
+            const user = userRecordFromAppUserProfile(profile, legacy);
+            usersById.set(user.id, publicUserForSession(appUserRecordKey(user), user, auth.user));
+          }
           for (const record of legacyRecords) {
             const user = record.user || {};
-            if (user.authUserId || usersById.has(user.id)) continue;
+            if (user.authUserId || usersById.has(user.id) || profiles.some((profile) => legacyUserMatchesProfile(profile, user))) continue;
             usersById.set(user.id, publicUserForSession(record.key, user, auth.user));
           }
           return json(res, 200, { ok: true, users: [...usersById.values()], source: "app_users" });

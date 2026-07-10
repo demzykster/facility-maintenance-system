@@ -240,6 +240,38 @@ describe("users API handler", () => {
     expect(profileClient.listAppUserProfiles).toHaveBeenCalled();
   });
 
+  it("does not list legacy fallback users again when they match app_users by email phone or worker number", async () => {
+    const driver = {
+      get: vi.fn(),
+      listValues: vi.fn().mockResolvedValue([
+        { key: "user:legacy-email", value: JSON.stringify({ id: "legacy-email", name: "Email Legacy", role: "user", email: "same@example.com", phone: "050-111-2222" }) },
+        { key: "user:legacy-worker", value: JSON.stringify({ id: "legacy-worker", name: "Worker Legacy", role: "worker", workerNo: "2042", phone: "050-222-3333" }) },
+        { key: "user:legacy-only", value: JSON.stringify({ id: "legacy-only", name: "Legacy Only", role: "user", email: "only@example.com" }) }
+      ])
+    };
+    const profileClient = {
+      listAppUserProfiles: vi.fn().mockResolvedValue([
+        { id: "app-email", role: "user", name: "Email App", active: true, email: "same@example.com", phone: "0501112222" },
+        { id: "app-worker", role: "worker", name: "Worker App", active: true, worker_no: "2042" }
+      ]),
+      getAppUserProfileById: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "view" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer manager-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().users.map((user) => user.id)).toEqual(["app-email", "app-worker", "legacy-only"]);
+    expect(res.json().users[0]).toMatchObject({ id: "app-email", email: "same@example.com", phone: "0501112222" });
+    expect(res.json().users[1]).toMatchObject({ id: "app-worker", workerNo: "2042" });
+  });
+
   it("lists app_users without requiring the temporary KV mirror", async () => {
     const profileClient = {
       listAppUserProfiles: vi.fn().mockResolvedValue([
