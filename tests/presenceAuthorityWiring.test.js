@@ -10,9 +10,9 @@ describe("presence authority wiring", () => {
     expect(source).toMatch(/NORMALIZED_PRESENCE_AUTHORITY = normalizedPresenceAuthorityEnabled\(\{[\s\S]*appMode: APP_MODE,[\s\S]*storageProvider: storageProviderFromEnv\(import\.meta\.env\),[\s\S]*provider: NORMALIZED_PRESENCE_PROVIDER/);
   });
 
-  it("loads and writes presence through the normalized provider before the KV mirror", () => {
+  it("loads and writes presence through the normalized provider without creating a KV mirror in authority mode", () => {
     expect(source).toContain("const normalizedPresence = await presenceForAuthority({");
     expect(source).toContain("await NORMALIZED_PRESENCE_PROVIDER.upsert(record);");
-    expect(source).toContain("void mirrorPresenceToKv(record);");
+    expect(source).not.toContain("void mirrorPresenceToKv(record);");
   });
 });
