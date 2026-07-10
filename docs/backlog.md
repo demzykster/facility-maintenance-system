@@ -21,7 +21,7 @@ The backlog below remains useful for historical detail and code-area context, bu
 
 ### UI polish slice - touch targets and visual-audit follow-ups
 
-Status: first touch-target/overflow-cue pass done in PR #833; local demo UI smoke gate done in PR #834; semantic status-token slice done in PR #835; lazy Excel export performance slice done in PR #836; lazy QR performance slice done in PR #837; lazy import-parser performance slice done in PR #838; startup data-load performance slice is active; deeper visual polish remains separate.
+Status: first touch-target/overflow-cue pass done in PR #833; local demo UI smoke gate done in PR #834; semantic status-token slice done in PR #835; lazy Excel export performance slice done in PR #836; lazy QR performance slice done in PR #837; lazy import-parser performance slice done in PR #838; startup data-load performance slice done in PR #839; authenticated background refresh throttle is active; deeper visual polish remains separate.
 
 Goal:
 - Preserve the current operational CMMS layout while removing concrete usability friction from the owner-reported visual audit.
@@ -55,10 +55,15 @@ Completed PR #838:
 2. Lazy-load `read-excel-file` only when importing task or fleet-license Excel files.
 3. Keep broader monolith code-splitting as a separate future slice.
 
-Active startup data-load performance slice:
+Completed PR #839:
 1. Skip the old shared KV startup sweep for domains that already have production/API normalized authority.
 2. Keep legacy KV fallback available only when a normalized API load actually fails.
 3. Load independent normalized API domains in parallel instead of one-by-one during authenticated startup.
+
+Active authenticated background refresh throttle:
+1. Replace aggressive 15-second full data polling with a calmer refresh interval.
+2. Prevent overlapping `reloadAll()` runs when a slow mobile/network refresh is still in flight.
+3. Keep immediate refresh when the user returns to a visible app.
 
 Remaining separate PR sequence:
 1. Continue card/dashboard noise reduction only from concrete owner-reported screens.
