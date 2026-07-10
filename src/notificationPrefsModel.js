@@ -76,11 +76,32 @@ export function browserNotificationEvents(events = []) {
   });
 }
 
-export function initialBrowserNotificationState(events = []) {
+const BROWSER_NOTIFICATION_STATE_KEY_LIMIT = 500;
+
+export function pruneBrowserNotificationState(state = {}) {
+  const notifiedKeys = Array.isArray(state.notifiedKeys)
+    ? [...new Set(state.notifiedKeys.filter((key) => typeof key === "string" && key))]
+    : [];
   return {
+    maxAt: parseNotificationSeenAt(state.maxAt),
+    notifiedKeys: notifiedKeys.slice(-BROWSER_NOTIFICATION_STATE_KEY_LIMIT)
+  };
+}
+
+export function parseBrowserNotificationState(raw) {
+  if (!raw) return { maxAt: 0, notifiedKeys: [] };
+  try {
+    const value = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (value && typeof value === "object") return pruneBrowserNotificationState(value);
+  } catch {}
+  return { maxAt: 0, notifiedKeys: [] };
+}
+
+export function initialBrowserNotificationState(events = []) {
+  return pruneBrowserNotificationState({
     maxAt: events.reduce((max, event) => Math.max(max, Number(event?.at) || 0), 0),
     notifiedKeys: [...new Set(events.map((event) => event?.key).filter((key) => typeof key === "string" && key))]
-  };
+  });
 }
 
 export function nextBrowserNotificationEvent(events = [], state = {}) {
@@ -94,5 +115,5 @@ export function nextBrowserNotificationEvent(events = [], state = {}) {
   }) || null;
   const maxAt = sorted.reduce((max, item) => Math.max(max, Number(item?.at) || 0), previousMaxAt);
   if (event?.key) notifiedKeys.add(event.key);
-  return { event, maxAt, notifiedKeys: [...notifiedKeys] };
+  return { event, ...pruneBrowserNotificationState({ maxAt, notifiedKeys: [...notifiedKeys] }) };
 }

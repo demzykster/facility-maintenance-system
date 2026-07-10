@@ -4,9 +4,11 @@ import {
   initialBrowserNotificationState,
   nextBrowserNotificationEvent,
   notificationReadStateForEvents,
+  parseBrowserNotificationState,
   parseLocalNotificationPrefs,
   parseNotificationReadState,
   parseNotificationSeenAt,
+  pruneBrowserNotificationState,
   unreadNotificationKeySet
 } from "../src/notificationPrefsModel.js";
 
@@ -66,6 +68,24 @@ describe("notification prefs model", () => {
 
     expect(first.event).toEqual({ key: "doc-194337", at: 2000 });
     expect(nextBrowserNotificationEvent([{ key: "doc-194337", at: 3000 }], first).event).toBeNull();
+  });
+
+  it("keeps browser notification state stable across reloads", () => {
+    const first = nextBrowserNotificationEvent([{ key: "ticket-1", at: 1000 }], { maxAt: 0, notifiedKeys: [] });
+    const restored = parseBrowserNotificationState(JSON.stringify(first));
+
+    expect(nextBrowserNotificationEvent([{ key: "ticket-1", at: 2000 }], restored)).toMatchObject({
+      event: null,
+      maxAt: 2000,
+      notifiedKeys: ["ticket-1"]
+    });
+  });
+
+  it("bounds persisted browser notification keys", () => {
+    const keys = Array.from({ length: 620 }, (_, index) => `event-${index}`);
+
+    expect(pruneBrowserNotificationState({ maxAt: 10, notifiedKeys: keys }).notifiedKeys).toHaveLength(500);
+    expect(parseBrowserNotificationState("{bad")).toEqual({ maxAt: 0, notifiedKeys: [] });
   });
 
   it("keeps backlog-style events out of browser notifications", () => {

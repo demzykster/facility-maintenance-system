@@ -25,7 +25,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
-import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, nextBrowserNotificationEvent, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
+import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, nextBrowserNotificationEvent, notificationReadStateForEvents, parseBrowserNotificationState, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
@@ -1487,13 +1487,27 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
 function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
   const skey = `seen:${session.role}:${session.name}`;
   const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
+  const bkey = `browsernotif:${session.id || session.role + ":" + session.name}`;
   const [readState, setReadState] = useState(null), [toast, setToast] = useState(null);
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
-  const browserNotificationRef = useRef({ maxAt: 0, notifiedKeys: [] }), initRef = useRef(false);
+  const browserNotificationRef = useRef({ maxAt: 0, notifiedKeys: [] }), initRef = useRef(false), browserStateLoadedRef = useRef(false);
   useEffect(() => {
     initRef.current = false;
     browserNotificationRef.current = { maxAt: 0, notifiedKeys: [] };
-  }, [skey]);
+    browserStateLoadedRef.current = false;
+  }, [bkey]);
+  useEffect(() => {
+    let cancelled = false;
+    browserStateLoadedRef.current = false;
+    store.get(bkey, false).then((v) => {
+      if (cancelled) return;
+      browserNotificationRef.current = parseBrowserNotificationState(v);
+      browserStateLoadedRef.current = true;
+    }).catch(() => {
+      if (!cancelled) browserStateLoadedRef.current = true;
+    });
+    return () => { cancelled = true; };
+  }, [bkey]);
   useEffect(() => {
     let cancelled = false;
     setReadState(null);
@@ -1519,10 +1533,17 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   const unreadEvents = useMemo(() => events.filter((event) => unreadKeys.has(event.key)), [events, unreadKeys]);
   const unread = unreadKeys.size;
   useEffect(() => {
+    if (!browserStateLoadedRef.current) return;
     if (!browserVisible.length) return;
     if (!initRef.current) {
       initRef.current = true;
-      browserNotificationRef.current = initialBrowserNotificationState(browserVisible);
+      const stored = parseBrowserNotificationState(browserNotificationRef.current);
+      const baseline = initialBrowserNotificationState(browserVisible);
+      browserNotificationRef.current = {
+        maxAt: Math.max(stored.maxAt || 0, baseline.maxAt || 0),
+        notifiedKeys: [...new Set([...(stored.notifiedKeys || []), ...(baseline.notifiedKeys || [])])]
+      };
+      store.set(bkey, JSON.stringify(browserNotificationRef.current), false);
       return;
     }
     const nextBrowserNotification = nextBrowserNotificationEvent(browserVisible, browserNotificationRef.current);
@@ -1530,6 +1551,7 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
       maxAt: nextBrowserNotification.maxAt,
       notifiedKeys: nextBrowserNotification.notifiedKeys
     };
+    store.set(bkey, JSON.stringify(browserNotificationRef.current), false);
     const top = nextBrowserNotification.event;
     if (top) {
       setToast(top);
