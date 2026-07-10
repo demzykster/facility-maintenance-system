@@ -12,6 +12,8 @@ const steps = [
   ["staging:smoke:fleet-api", ["npm", ["run", "staging:smoke:fleet-api"]]],
   ["staging:pm:reconcile", ["npm", ["run", "staging:pm:reconcile"]]],
   ["staging:smoke:pm-api", ["npm", ["run", "staging:smoke:pm-api"]]],
+  ["staging:ppe:reconcile", ["npm", ["run", "staging:ppe:reconcile"]]],
+  ["staging:smoke:ppe-api", ["npm", ["run", "staging:smoke:ppe-api"]]],
   ["staging:cleaning-zones:reconcile", ["npm", ["run", "staging:cleaning-zones:reconcile"]]],
   ["staging:smoke:cleaning-zones-api", ["npm", ["run", "staging:smoke:cleaning-zones-api"]]],
   ["staging:cleaning-rounds:reconcile", ["npm", ["run", "staging:cleaning-rounds:reconcile"]]],
