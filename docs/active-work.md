@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/r10-initial-password-app-user-id-complete`.
+- Current branch: `codex/r10-initial-password-app-user-id-complete`.
 - Last completed work: R10 user reconciliation report slice added a read-only dry-run tool for classifying legacy `user:` KV records against `public.app_users` before any migration/deletion decisions.
-- Current work: none.
+- Current work: R10 first-password completion hardening prevents existing `app_users` email/password rows without `auth_user_id` from being duplicated during first password setup.
 
 ## Current Product Direction
 

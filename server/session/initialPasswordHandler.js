@@ -172,7 +172,7 @@ async function responseJson(response) {
   }
 }
 
-function createSupabaseInitialPasswordClient(env, fetchImpl) {
+export function createSupabaseInitialPasswordClient(env, fetchImpl) {
   const supabaseUrl = trimSlash(env.SUPABASE_URL || env.VITE_SUPABASE_URL);
   const serviceRoleKey = String(env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   const anonKey = String(env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || "").trim();
@@ -259,10 +259,22 @@ function createSupabaseInitialPasswordClient(env, fetchImpl) {
   }
 
   async function upsertAppUser(user, authUserId) {
+    const profile = appUserProfile(user, authUserId);
+    if (isUuid(user.id)) {
+      const response = await fetchImpl(`${supabaseUrl}/rest/v1/app_users?id=eq.${encodeURIComponent(user.id)}`, {
+        method: "PATCH",
+        headers: { ...serviceHeaders, prefer: "return=representation" },
+        body: JSON.stringify(profile)
+      });
+      const data = await responseJson(response);
+      if (!response.ok) throw new Error(data?.message || data?.error || "app_user_update_failed");
+      const updated = Array.isArray(data) ? data[0] : data;
+      if (updated) return updated;
+    }
     const response = await fetchImpl(`${supabaseUrl}/rest/v1/app_users?on_conflict=auth_user_id`, {
       method: "POST",
       headers: { ...serviceHeaders, prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(appUserProfile(user, authUserId))
+      body: JSON.stringify(profile)
     });
     const data = await responseJson(response);
     if (!response.ok) throw new Error(data?.message || data?.error || "app_user_upsert_failed");
