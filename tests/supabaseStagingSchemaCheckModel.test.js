@@ -31,6 +31,7 @@ describe("supabase staging schema check model", () => {
       "cleaning_rounds",
       "cleaning_complaints",
       "technician_presence",
+      "push_subscriptions",
       "worker_absences"
     ]));
   });
