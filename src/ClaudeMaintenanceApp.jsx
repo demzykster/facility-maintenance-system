@@ -83,6 +83,7 @@ import { normalizedPpeAuthorityEnabled, ppeAuthorityFailureIssue, ppeForAuthorit
 import { normalizedWorkAuthorityEnabled, workAuthorityFailureIssue, workForAuthority } from "./workAuthorityModel.js";
 import { normalizedSettingsRecordsAuthorityEnabled, settingsRecordsAuthorityFailureIssue, settingsRecordsForAuthority } from "./settingsRecordsAuthorityModel.js";
 import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, presenceForAuthority } from "./presenceAuthorityModel.js";
+import { priorityToken, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -352,21 +353,21 @@ const catOf = (t) => {
 };
 
 const PRIORITIES = [
-  { id: "high", label: "גבוהה", hours: 4, color: "#DC2626", bg: "#FEE2E2" },
-  { id: "medium", label: "בינונית", hours: 24, color: "#CA8A04", bg: "#FEF9C3" },
-  { id: "low", label: "נמוכה", hours: 72, color: "#16A34A", bg: "#DCFCE7" },
+  { id: "high", label: "גבוהה", hours: 4, ...priorityToken("high") },
+  { id: "medium", label: "בינונית", hours: 24, ...priorityToken("medium") },
+  { id: "low", label: "נמוכה", hours: 72, ...priorityToken("low") },
 ];
 const PRIO_ALIAS = { urgent: "high" };
 const prOf = (id) => PRIORITIES.find((p) => p.id === (PRIO_ALIAS[id] || id)) || PRIORITIES[1];
 // ---- מטלות ניהול (Management tasks) ----
 const TASK_STATUS = [
-  { id: "todo", label: "לביצוע", color: "#64748B" },
-  { id: "in_progress", label: "בתהליך", color: "#2563EB" },
-  { id: "waiting", label: "ממתין לגורם", color: "#CA8A04" },
-  { id: "done", label: "הושלם", color: "#16A34A" },
-  { id: "cancelled", label: "בוטל", color: "#9CA3AF" },
+  { id: "todo", label: "לביצוע", ...taskStatusToken("todo") },
+  { id: "in_progress", label: "בתהליך", ...taskStatusToken("in_progress") },
+  { id: "waiting", label: "ממתין לגורם", ...taskStatusToken("waiting") },
+  { id: "done", label: "הושלם", ...taskStatusToken("done") },
+  { id: "cancelled", label: "בוטל", ...taskStatusToken("cancelled") },
 ];
-const tstOf = (id) => { const base = TASK_STATUS.find((s) => s.id === id) || TASK_STATUS[0]; const o = TASK_STATUS_META[base.id]; return o ? { ...base, label: o.label || base.label, color: o.color || base.color } : base; };
+const tstOf = (id) => { const base = TASK_STATUS.find((s) => s.id === id) || TASK_STATUS[0]; const o = TASK_STATUS_META[base.id]; return o ? { ...base, label: o.label || base.label, color: o.color || base.color, bg: o.bg || base.bg } : base; };
 let TASK_STATUS_META = {};
 const taskStatuses = () => TASK_STATUS.map((s) => tstOf(s.id));
 const PRANK = { high: 0, medium: 1, low: 2 };
@@ -423,15 +424,15 @@ const slaForTicket = (t, cfg, fleet) => {
 };
 
 const STATUSES = [
-  { id: "pending_manager", label: "ממתינה לאישור מנהל", color: "#EA580C", bg: "#FFEDD5" },
-  { id: "rework", label: "הוחזר לעובד", color: "#0891B2", bg: "#CFFAFE" },
-  { id: "new", label: "חדשה", color: "#2563EB", bg: "#DBEAFE" },
-  { id: "in_progress", label: "בטיפול", color: "#D97706", bg: "#FEF3C7" },
-  { id: "waiting", label: "בהמתנה", color: "#7C3AED", bg: "#EDE9FE" },
-  { id: "pending_user", label: "ממתינה לאישור הפותח", color: "#0D9488", bg: "#CCFBF1" },
-  { id: "pending_admin", label: "ממתינה לסגירה", color: "#4F46E5", bg: "#E0E7FF" },
-  { id: "done", label: "נסגרה", color: "#16A34A", bg: "#DCFCE7" },
-  { id: "cancelled", label: "בוטלה", color: "#6B7280", bg: "#F3F4F6" },
+  { id: "pending_manager", label: "ממתינה לאישור מנהל", ...ticketStatusToken("pending_manager") },
+  { id: "rework", label: "הוחזר לעובד", ...ticketStatusToken("rework") },
+  { id: "new", label: "חדשה", ...ticketStatusToken("new") },
+  { id: "in_progress", label: "בטיפול", ...ticketStatusToken("in_progress") },
+  { id: "waiting", label: "בהמתנה", ...ticketStatusToken("waiting") },
+  { id: "pending_user", label: "ממתינה לאישור הפותח", ...ticketStatusToken("pending_user") },
+  { id: "pending_admin", label: "ממתינה לסגירה", ...ticketStatusToken("pending_admin") },
+  { id: "done", label: "נסגרה", ...ticketStatusToken("done") },
+  { id: "cancelled", label: "בוטלה", ...ticketStatusToken("cancelled") },
 ];
 const stOf = (id) => STATUSES.find((s) => s.id === id) || STATUSES[0];
 const trackOf = (t) => t.track || (t.forkliftId ? "transport" : "facility");
