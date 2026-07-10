@@ -1,0 +1,365 @@
+#!/usr/bin/env node
+import { existsSync, readFileSync } from "node:fs";
+import { applyEnvValues, parseEnvFile } from "../src/envFileModel.js";
+import {
+  DEFAULT_LOAD_TEST_THRESHOLDS,
+  createLoadTestRunId,
+  loadTestBatch,
+  loadTestRecordId,
+  normalizeLoadTestProfile,
+  summarizeLoadTimings
+} from "../src/stagingLoadTestModel.js";
+import { normalizeSupabaseUrl } from "../src/supabaseStagingSchemaCheckModel.js";
+import { ticketRecordToSupabaseRow } from "../src/ticketRecordModel.js";
+import { fleetRecordToSupabaseRow } from "../src/fleetRecordModel.js";
+import {
+  maintenanceMeetingRecordToSupabaseRow,
+  maintenanceTaskRecordToSupabaseRow
+} from "../src/workRecordModel.js";
+import { cleaningComplaintRecordToSupabaseRow } from "../src/cleaningComplaintRecordModel.js";
+
+const ENV_FILE = ".env.staging.local";
+const CREDENTIALS_FILE = ".staging-admin-credentials.local";
+const DEFAULT_APP_URL = "https://facility-maintenance-system.vercel.app";
+const SERVICE_BATCH_SIZE = 500;
+
+function loadEnvFile(file) {
+  if (!existsSync(file)) return;
+  applyEnvValues(process.env, parseEnvFile(readFileSync(file, "utf8")));
+}
+
+function argValue(name, fallback = "") {
+  const prefix = `--${name}=`;
+  const inline = process.argv.find((arg) => arg.startsWith(prefix));
+  if (inline) return inline.slice(prefix.length);
+  const index = process.argv.indexOf(`--${name}`);
+  if (index >= 0 && process.argv[index + 1]) return process.argv[index + 1];
+  return fallback;
+}
+
+function hasFlag(name) {
+  return process.argv.includes(`--${name}`);
+}
+
+function requireEnv(name) {
+  const value = String(process.env[name] || "").trim();
+  if (!value) throw new Error(`missing_env:${name}`);
+  return value;
+}
+
+function appUrl() {
+  return String(process.env.CMMS_STAGING_APP_URL || process.env.STAGING_APP_URL || DEFAULT_APP_URL).replace(/\/+$/, "");
+}
+
+async function readJson(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { text };
+  }
+}
+
+async function supabasePasswordToken({ url, anonKey, email, password }) {
+  const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: anonKey, "content-type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(data?.error_description || data?.msg || data?.message || `auth_${response.status}`);
+  if (!data?.access_token) throw new Error("auth_access_token_missing");
+  return data.access_token;
+}
+
+const serviceHeaders = (serviceRoleKey, extra = {}) => ({
+  apikey: serviceRoleKey,
+  authorization: `Bearer ${serviceRoleKey}`,
+  "content-type": "application/json",
+  ...extra
+});
+
+async function serviceUpsertRows({ root, serviceRoleKey, table, rows }) {
+  const started = performance.now();
+  for (const batch of loadTestBatch(rows, SERVICE_BATCH_SIZE)) {
+    if (!batch.length) continue;
+    const response = await fetch(`${root}/rest/v1/${table}?on_conflict=id`, {
+      method: "POST",
+      headers: serviceHeaders(serviceRoleKey, { prefer: "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify(batch)
+    });
+    const data = await readJson(response);
+    if (!response.ok) throw new Error(data?.message || data?.error || `${table}_seed_${response.status}`);
+  }
+  return Math.round(performance.now() - started);
+}
+
+async function serviceDeleteRunRows({ root, serviceRoleKey, table, runId }) {
+  if (!String(runId || "").startsWith("loadtest-")) throw new Error("unsafe_loadtest_cleanup_run_id");
+  const started = performance.now();
+  const response = await fetch(`${root}/rest/v1/${table}?id=like.${encodeURIComponent(`${runId}%`)}`, {
+    method: "DELETE",
+    headers: serviceHeaders(serviceRoleKey, { prefer: "return=minimal" })
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(data?.message || data?.error || `${table}_cleanup_${response.status}`);
+  return Math.round(performance.now() - started);
+}
+
+async function serviceCountRunRows({ root, serviceRoleKey, table, runId }) {
+  const response = await fetch(`${root}/rest/v1/${table}?id=like.${encodeURIComponent(`${runId}%`)}&select=id`, {
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      prefer: "count=exact"
+    }
+  });
+  await readJson(response);
+  if (!response.ok) throw new Error(`${table}_count_${response.status}`);
+  return Number(String(response.headers.get("content-range") || "0-0/0").split("/")[1] || 0);
+}
+
+const nowIso = () => new Date().toISOString();
+
+function buildTickets(runId, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const id = loadTestRecordId(runId, "ticket", index + 1);
+    return ticketRecordToSupabaseRow({
+      id,
+      track: index % 3 === 0 ? "transport" : "facility",
+      subject: `Load test ticket ${index + 1}`,
+      description: `Generated by ${runId}`,
+      status: index % 5 === 0 ? "in_progress" : "new",
+      priority: index % 7 === 0 ? "high" : "low",
+      category: "loadtest",
+      zone: `Load zone ${index % 20}`,
+      asset: `Asset ${index % 50}`,
+      createdBy: { name: "Load Test", role: "admin" },
+      createdAt: Date.now() - index * 1000,
+      updatedAt: Date.now(),
+      loadTestRunId: runId
+    });
+  });
+}
+
+function buildFleet(runId, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const id = loadTestRecordId(runId, "fleet", index + 1);
+    return fleetRecordToSupabaseRow({
+      id,
+      code: `LT-${String(index + 1).padStart(5, "0")}`,
+      vehicleType: index % 2 ? "forklift" : "cart",
+      model: `Model-${index % 12}`,
+      supplier: `Supplier-${index % 8}`,
+      status: "active",
+      createdAt: Date.now() - index * 2000,
+      updatedAt: Date.now(),
+      loadTestRunId: runId
+    });
+  });
+}
+
+function buildTasks(runId, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const id = loadTestRecordId(runId, "task", index + 1);
+    return maintenanceTaskRecordToSupabaseRow({
+      id,
+      title: `Load task ${index + 1}`,
+      status: index % 4 === 0 ? "waiting" : "open",
+      sourceModule: "loadtest",
+      responsibleIds: [],
+      participantIds: [],
+      createdAt: Date.now() - index * 1500,
+      updatedAt: Date.now(),
+      loadTestRunId: runId
+    });
+  });
+}
+
+function buildMeetings(runId, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const id = loadTestRecordId(runId, "meeting", index + 1);
+    return maintenanceMeetingRecordToSupabaseRow({
+      id,
+      title: `Load meeting ${index + 1}`,
+      status: "planned",
+      agenda: `Generated by ${runId}`,
+      at: Date.now() - index * 3000,
+      createdAt: Date.now() - index * 3000,
+      updatedAt: Date.now(),
+      loadTestRunId: runId
+    });
+  });
+}
+
+function buildCleaningComplaints(runId, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const id = loadTestRecordId(runId, "cleaning", index + 1);
+    return cleaningComplaintRecordToSupabaseRow({
+      id,
+      zoneId: null,
+      zoneName: `Load cleaning zone ${index % 25}`,
+      kind: index % 3 === 0 ? "broken" : "dirty",
+      text: `Load cleaning complaint ${index + 1}`,
+      status: index % 5 === 0 ? "open" : "pending",
+      ownerRole: "cleaner",
+      at: Date.now() - index * 2500,
+      verified: false,
+      loadTestRunId: runId
+    });
+  });
+}
+
+async function timedApi({ publicUrl, accessToken, label, path, options = {} }) {
+  const started = performance.now();
+  let status = 0;
+  let ok = false;
+  let error = "";
+  try {
+    const response = await fetch(`${publicUrl}${path}`, {
+      ...options,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+        ...(options.headers || {})
+      }
+    });
+    status = response.status;
+    const data = await readJson(response);
+    ok = response.ok && data?.ok !== false;
+    if (!ok) error = data?.error || data?.message || `http_${response.status}`;
+  } catch (err) {
+    error = err?.message || String(err);
+  }
+  return { label, path, status, ok, error, durationMs: Math.round(performance.now() - started) };
+}
+
+async function runApiSamples({ publicUrl, accessToken, runId }) {
+  const mutationId = loadTestRecordId(runId, "api-ticket", 1);
+  const mutationTicket = {
+    id: mutationId,
+    track: "facility",
+    subject: `Load API mutation ${mutationId}`,
+    description: "Created and deleted by staging load test",
+    status: "new",
+    priority: "low",
+    category: "loadtest",
+    zone: "loadtest",
+    createdBy: { name: "Load Test", role: "admin" },
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  const samples = [];
+  const push = async (sample) => samples.push(await sample);
+  await push(timedApi({ publicUrl, accessToken, label: "tickets:list", path: "/api/tickets" }));
+  await push(timedApi({ publicUrl, accessToken, label: "fleet:list", path: "/api/fleet" }));
+  await push(timedApi({ publicUrl, accessToken, label: "tasks:list", path: "/api/work?resource=tasks" }));
+  await push(timedApi({ publicUrl, accessToken, label: "meetings:list", path: "/api/work?resource=meetings" }));
+  await push(timedApi({ publicUrl, accessToken, label: "cleaning:complaints:list", path: "/api/cleaning/records?resource=complaints&limit=2000" }));
+  await push(timedApi({
+    publicUrl,
+    accessToken,
+    label: "tickets:write",
+    path: "/api/tickets",
+    options: { method: "POST", body: JSON.stringify({ ticket: mutationTicket }) }
+  }));
+  await push(timedApi({ publicUrl, accessToken, label: "tickets:read", path: `/api/tickets?id=${encodeURIComponent(mutationId)}` }));
+  await push(timedApi({
+    publicUrl,
+    accessToken,
+    label: "tickets:delete",
+    path: `/api/tickets?id=${encodeURIComponent(mutationId)}`,
+    options: { method: "DELETE" }
+  }));
+  return samples;
+}
+
+loadEnvFile(ENV_FILE);
+loadEnvFile(CREDENTIALS_FILE);
+
+const profileName = argValue("profile", "smoke");
+const runId = argValue("run-id", createLoadTestRunId());
+const keep = hasFlag("keep");
+const profile = normalizeLoadTestProfile(profileName, {
+  tickets: argValue("tickets"),
+  tasks: argValue("tasks"),
+  meetings: argValue("meetings"),
+  fleet: argValue("fleet"),
+  cleaningComplaints: argValue("cleaning-complaints")
+});
+const thresholds = {
+  apiP95Ms: Number(argValue("api-p95-ms", DEFAULT_LOAD_TEST_THRESHOLDS.apiP95Ms)),
+  apiMaxMs: Number(argValue("api-max-ms", DEFAULT_LOAD_TEST_THRESHOLDS.apiMaxMs)),
+  seedMs: Number(argValue("seed-ms", DEFAULT_LOAD_TEST_THRESHOLDS.seedMs)),
+  cleanupMs: Number(argValue("cleanup-ms", DEFAULT_LOAD_TEST_THRESHOLDS.cleanupMs))
+};
+
+if (!runId.startsWith("loadtest-")) throw new Error("run_id_must_start_with_loadtest");
+
+const publicUrl = appUrl();
+const supabaseUrl = normalizeSupabaseUrl(requireEnv("SUPABASE_URL"));
+const anonKey = requireEnv("SUPABASE_ANON_KEY");
+const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+const adminEmail = String(process.env.STAGING_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "").trim();
+const adminPassword = String(process.env.STAGING_ADMIN_PASSWORD || process.env.ADMIN_NEW_PASSWORD || "").trim();
+if (!adminEmail || !adminPassword) throw new Error("missing_admin_credentials");
+
+const accessToken = await supabasePasswordToken({ url: supabaseUrl, anonKey, email: adminEmail, password: adminPassword });
+
+const seedPlan = [
+  ["tickets", buildTickets(runId, profile.tickets)],
+  ["fleet_units", buildFleet(runId, profile.fleet)],
+  ["maintenance_tasks", buildTasks(runId, profile.tasks)],
+  ["maintenance_meetings", buildMeetings(runId, profile.meetings)],
+  ["cleaning_complaints", buildCleaningComplaints(runId, profile.cleaningComplaints)]
+];
+const cleanupTables = [...seedPlan.map(([table]) => table), "file_metadata"];
+const seedTimings = {};
+const cleanupTimings = {};
+let samples = [];
+let cleanupOk = false;
+
+try {
+  for (const [table, rows] of seedPlan) {
+    seedTimings[table] = await serviceUpsertRows({ root: supabaseUrl, serviceRoleKey, table, rows });
+  }
+  samples = await runApiSamples({ publicUrl, accessToken, runId });
+} finally {
+  if (!keep) {
+    for (const table of cleanupTables) {
+      cleanupTimings[table] = await serviceDeleteRunRows({ root: supabaseUrl, serviceRoleKey, table, runId });
+    }
+    cleanupOk = true;
+  }
+}
+
+const remaining = {};
+if (!keep) {
+  for (const [table] of seedPlan) {
+    remaining[table] = await serviceCountRunRows({ root: supabaseUrl, serviceRoleKey, table, runId });
+  }
+}
+
+const summary = summarizeLoadTimings(samples, thresholds);
+const seedTooSlow = Object.entries(seedTimings).filter(([, duration]) => duration > thresholds.seedMs);
+const cleanupTooSlow = Object.entries(cleanupTimings).filter(([, duration]) => duration > thresholds.cleanupMs);
+const remainingRows = Object.values(remaining).reduce((sum, value) => sum + value, 0);
+const ok = summary.ok && seedTooSlow.length === 0 && cleanupTooSlow.length === 0 && (!keep ? cleanupOk && remainingRows === 0 : true);
+
+const result = {
+  ok,
+  appUrl: publicUrl,
+  runId,
+  profileName,
+  profile,
+  thresholds,
+  seedTimings,
+  apiSummary: summary,
+  apiSamples: samples,
+  cleanup: keep ? { kept: true } : { ok: cleanupOk, timings: cleanupTimings, remaining },
+  checkedAt: nowIso()
+};
+
+console.log(JSON.stringify(result, null, 2));
+if (!ok) process.exit(1);
