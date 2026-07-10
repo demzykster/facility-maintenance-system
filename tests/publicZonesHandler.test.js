@@ -82,6 +82,46 @@ describe("public zones handler", () => {
     });
   });
 
+  it("uses normalized cleaning zones before legacy KV mirrors", async () => {
+    const driver = { listValues: vi.fn() };
+    const zonesDriver = {
+      list: vi.fn(async () => [
+        {
+          id: "z1",
+          name: "Lobby",
+          building: "A",
+          floor: "1",
+          code: "L-1",
+          active: true,
+          cleanerId: "worker-1"
+        },
+        {
+          id: "z2",
+          name: "Closed",
+          active: false
+        }
+      ])
+    };
+    const handler = createPublicZonesHandler({ driver, zonesDriver });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(200);
+    expect(zonesDriver.list).toHaveBeenCalledWith();
+    expect(driver.listValues).not.toHaveBeenCalled();
+    expect(res.json()).toEqual({
+      ok: true,
+      zones: [{
+        id: "z1",
+        name: "Lobby",
+        building: "A",
+        floor: "1",
+        code: "L-1",
+        active: true
+      }]
+    });
+  });
+
   it("does not expose zones when the backend is unavailable", async () => {
     const handler = createPublicZonesHandler({ driver: {} });
 
