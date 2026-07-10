@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createInitialPasswordHandler } from "../server/session/initialPasswordHandler.js";
+import { createInitialPasswordHandler, createSupabaseInitialPasswordClient } from "../server/session/initialPasswordHandler.js";
 
 function createRes() {
   return {
@@ -326,6 +326,49 @@ describe("initial password handler", () => {
       activationStatus: "activated",
       activatedAt: 123456
     }), true);
+  });
+
+  it("completes first password setup by updating an existing app_users row without creating a duplicate", async () => {
+    const appUserId = "550e8400-e29b-41d4-a716-446655440001";
+    const authUserId = "660e8400-e29b-41d4-a716-446655440002";
+    const calls = [];
+    const fetchImpl = vi.fn(async (url, options = {}) => {
+      calls.push({ url, options });
+      if (String(url).includes("/auth/v1/admin/users")) {
+        return { ok: true, text: async () => JSON.stringify({ id: authUserId }) };
+      }
+      if (String(url).includes(`/rest/v1/app_users?id=eq.${encodeURIComponent(appUserId)}`)) {
+        expect(options.method).toBe("PATCH");
+        const body = JSON.parse(options.body);
+        expect(body.auth_user_id).toBe(authUserId);
+        expect(body.login_metadata).toMatchObject({ source: "initial-password", cmms_user_id: appUserId });
+        return { ok: true, text: async () => JSON.stringify([{ id: appUserId, ...body, must_change_password: false }]) };
+      }
+      if (String(url).includes("/auth/v1/token?grant_type=password")) {
+        return { ok: true, text: async () => JSON.stringify({ access_token: "access", refresh_token: "refresh", expires_in: 3600 }) };
+      }
+      throw new Error(`unexpected_fetch:${url}`);
+    });
+    const client = createSupabaseInitialPasswordClient({
+      SUPABASE_URL: "https://supabase.example",
+      SUPABASE_SERVICE_ROLE_KEY: "service",
+      SUPABASE_ANON_KEY: "anon"
+    }, fetchImpl);
+
+    const result = await client.completePasswordUser({
+      id: appUserId,
+      name: "Manager One",
+      role: "user",
+      email: "manager@example.com",
+      active: true,
+      loginState: "pending_setup"
+    }, "secret1");
+
+    expect(result).toMatchObject({
+      auth: { access_token: "access" },
+      user: { authUserId, appUserId, mustChangePassword: false }
+    });
+    expect(calls.some((call) => String(call.url).includes("/rest/v1/app_users?on_conflict=auth_user_id"))).toBe(false);
   });
 
   it("rejects first password setup when the stored email is not valid for Supabase Auth", async () => {
