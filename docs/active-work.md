@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-photo-kv-writes`.
-- Current branch: `codex/r10-retire-photo-kv-writes`.
-- Last completed work: production/API settings-record paths no longer recreate `location:*` or `appIssue:*` KV mirrors.
-- Current work: stop generic production/API KV writes from creating new `photo:*` legacy ticket-photo records.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: generic production/API KV writes no longer create `photo:*` legacy ticket-photo records.
+- Current work: none.
 
 ## Current Product Direction
 
