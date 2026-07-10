@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-document-first-mirror-retirement`.
-- Current branch: `codex/r10-document-first-mirror-retirement`.
-- Last completed work: guarded staging KV mirror retirement tool for deleting only shared mirrors with matching normalized `source_kv_key`.
-- Current work: document guarded retirement of matched `presence:*` and `appIssue:*` staging KV mirrors.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: guarded retirement of matched `presence:*` and `appIssue:*` staging KV mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
