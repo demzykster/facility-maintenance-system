@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-remove-controls-residual-docs`.
-- Current branch: `codex/r10-remove-controls-residual-docs`.
-- Last completed work: R10 residual KV report classifies compatibility mirrors, transient operational keys, and deferred legacy/orphan candidates without writing data.
-- Current work: R10 residual KV docs update after owner-approved deletion of inactive controls/template KV records.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 residual KV docs updated after owner-approved deletion of inactive controls/template KV records.
+- Current work: none.
 
 ## Current Product Direction
 
