@@ -96,6 +96,16 @@ const PUSH_EVENT_KINDS = new Set([
   "system"
 ]);
 
+const NON_INTERRUPTING_PUSH_KINDS = new Set(["doc", "pm", "ppe"]);
+const NON_INTERRUPTING_PUSH_KEY_PREFIXES = ["sh-on-", "sh-off-"];
+
+export function pushEventInterruptsUser(input = {}) {
+  const kind = PUSH_EVENT_KINDS.has(input.kind) ? input.kind : "system";
+  if (NON_INTERRUPTING_PUSH_KINDS.has(kind)) return false;
+  const key = String(input.dedupeKey || input.tag || input.key || "").trim();
+  return !NON_INTERRUPTING_PUSH_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
 export function normalizePushNotificationRequest(input = {}) {
   const targetUserIds = [...new Set((Array.isArray(input.targetUserIds) ? input.targetUserIds : [])
     .map((id) => String(id || "").trim())
@@ -108,7 +118,7 @@ export function normalizePushNotificationRequest(input = {}) {
   const tag = String(input.tag || input.dedupeKey || `cmms-${kind}`).trim().slice(0, 80);
   if (!targetUserIds.length) return { ok: false, error: "push_targets_required" };
   if (!title || !body) return { ok: false, error: "push_payload_required" };
-  return { ok: true, targetUserIds, title, body, url, kind, tag };
+  return { ok: true, targetUserIds, title, body, url, kind, tag, interrupting: pushEventInterruptsUser({ ...input, kind, tag }) };
 }
 
 export function selectPushNotificationTargets(subscriptions = [], targetUserIds = [], kind = "system") {
@@ -134,6 +144,7 @@ export function pushPayload(input = {}) {
     title: String(input.title || "CMMS CDSL").slice(0, 80),
     body: String(input.body || "יש עדכון חדש במערכת").slice(0, 180),
     url: String(input.url || "/").slice(0, 220),
-    tag: String(input.tag || "cmms-update").slice(0, 80)
+    tag: String(input.tag || "cmms-update").slice(0, 80),
+    kind: PUSH_EVENT_KINDS.has(input.kind) ? input.kind : "system"
   });
 }
