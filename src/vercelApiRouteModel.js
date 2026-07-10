@@ -3,7 +3,7 @@ export const VERCEL_API_ROUTE_FUNCTION_BUDGET = 24;
 export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/ai/intake.js",
   "api/bootstrap/admin.js",
-  "api/client-errors.js",
+  "api/[diagnostic].js",
   "api/cleaning/records.js",
   "api/files/index.js",
   "api/fleet/index.js",
@@ -15,7 +15,6 @@ export const VERCEL_API_ROUTE_FILES = Object.freeze([
   "api/push.js",
   "api/session/[action].js",
   "api/settings/records.js",
-  "api/system-errors.js",
   "api/tickets/index.js",
   "api/users/index.js",
   "api/work/index.js"
