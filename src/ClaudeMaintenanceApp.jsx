@@ -2832,7 +2832,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorFleetToKv(f);
     } else {
       if (!await persistShared(`fleet:${f.id}`, JSON.stringify(f), options)) return false;
       void shadowWriteNormalizedFleet(f);
@@ -2845,7 +2844,6 @@ export default function App() {
     if (!units.length) return true;
     if (NORMALIZED_FLEET_AUTHORITY) {
       if (!await saveNormalizedFleetUnits(units, "save-many")) return false;
-      void mirrorFleetManyToKv(units);
     } else {
       const ok = await persistSharedMany(units.map((f) => ({ key: `fleet:${f.id}`, value: JSON.stringify(f) })), options);
       if (!ok) return false;
@@ -2864,7 +2862,6 @@ export default function App() {
     if (NORMALIZED_FLEET_AUTHORITY) {
       if (catalogAdditions?.length && !await persistShared("config:v1", JSON.stringify(mergedConfig), options)) return false;
       if (!await saveNormalizedFleetUnits(units, "import")) return false;
-      void mirrorFleetManyToKv(units);
       setFleet((s) => {
         const ids = new Set(units.map((f) => f.id));
         return [...s.filter((x) => !ids.has(x.id)), ...units].sort((a, b) => (a.code > b.code ? 1 : -1));
@@ -3090,7 +3087,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeleteFleetFromKv(id);
     } else {
       if (!await deleteShared(`fleet:${id}`, options)) return false;
       void shadowDeleteNormalizedFleet(id);
