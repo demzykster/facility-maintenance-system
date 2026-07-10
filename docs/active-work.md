@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retired-presence-kv-write-guard`.
-- Current branch: `codex/r10-retired-presence-kv-write-guard`.
-- Last completed work: guarded retirement of matched `presence:*` and `appIssue:*` staging KV mirrors.
-- Current work: server-side retired-prefix guard prevents old production/API clients from recreating `presence:*` KV mirrors.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: server-side retired-prefix guard prevents old production/API clients from recreating `presence:*` KV mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
