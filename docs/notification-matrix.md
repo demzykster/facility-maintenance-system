@@ -20,7 +20,7 @@ Source of truth in code:
 
 ## Browser Notification Policy
 
-The in-app notification panel remains the complete operational list. Browser / OS notifications are intentionally narrower: they should interrupt the user only for events that usually require action now.
+The in-app notification panel remains the complete operational list. Browser / OS notifications are intentionally narrower: they should interrupt the user only for events that usually require action now. This rule is enforced both in the local browser notification filter and in the server push path.
 
 Panel-only events:
 

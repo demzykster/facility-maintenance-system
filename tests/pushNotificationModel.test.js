@@ -4,6 +4,7 @@ import {
   pushPayload,
   pushRuntimeReady,
   normalizePushNotificationRequest,
+  pushEventInterruptsUser,
   removePushSubscription,
   selectPushNotificationTargets,
   upsertPushSubscription
@@ -60,11 +61,12 @@ describe("push notification model", () => {
   });
 
   it("builds a compact notification payload", () => {
-    expect(JSON.parse(pushPayload({ title: "A", body: "B", url: "/tickets", tag: "t" }))).toEqual({
+    expect(JSON.parse(pushPayload({ title: "A", body: "B", url: "/tickets", tag: "t", kind: "new" }))).toEqual({
       title: "A",
       body: "B",
       url: "/tickets",
-      tag: "t"
+      tag: "t",
+      kind: "new"
     });
   });
 
@@ -78,6 +80,22 @@ describe("push notification model", () => {
       ok: false,
       error: "push_targets_required"
     });
+  });
+
+  it("marks backlog-style events as non-interrupting for server push", () => {
+    expect(pushEventInterruptsUser({ kind: "doc", dedupeKey: "doc-194336" })).toBe(false);
+    expect(pushEventInterruptsUser({ kind: "pm", dedupeKey: "pm-1" })).toBe(false);
+    expect(pushEventInterruptsUser({ kind: "ppe", dedupeKey: "ppe-low-admin" })).toBe(false);
+    expect(pushEventInterruptsUser({ kind: "confirm", dedupeKey: "sh-on-tech-1" })).toBe(false);
+    expect(pushEventInterruptsUser({ kind: "back", tag: "sh-off-tech-1" })).toBe(false);
+    expect(pushEventInterruptsUser({ kind: "new", dedupeKey: "ticket-1" })).toBe(true);
+    expect(normalizePushNotificationRequest({
+      title: "A",
+      body: "B",
+      targetUserIds: ["u1"],
+      kind: "doc",
+      dedupeKey: "doc-194336"
+    })).toMatchObject({ ok: true, interrupting: false });
   });
 
   it("selects only subscribed target users and de-dupes endpoints", () => {

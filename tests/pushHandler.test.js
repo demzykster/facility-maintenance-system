@@ -201,6 +201,43 @@ describe("push API handler", () => {
     expect(push.sendNotification).toHaveBeenLastCalledWith(subscription, expect.stringContaining("קריאה חדשה"));
   });
 
+  it("does not send non-interrupting business events through server push", async () => {
+    let stored = "";
+    const driver = {
+      get: vi.fn().mockImplementation(async () => stored),
+      set: vi.fn().mockImplementation(async (_key, value) => { stored = value; })
+    };
+    const push = {
+      setVapidDetails: vi.fn(),
+      sendNotification: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createPushHandler({ driver, push, env, sessionClient: activeSessionClient });
+
+    await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { action: "subscribe", subscription }
+    });
+    const notify = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        action: "notify",
+        event: {
+          targetUserIds: ["app-user-1"],
+          title: "מסמך פג-תוקף",
+          body: "30 ימים",
+          kind: "doc",
+          dedupeKey: "doc-194336"
+        }
+      }
+    });
+
+    expect(notify.statusCode).toBe(200);
+    expect(notify.json()).toEqual({ ok: true, sent: 0, targets: 0, skipped: "non_interrupting" });
+    expect(push.sendNotification).not.toHaveBeenCalled();
+  });
+
   it("uses fresh user notification preferences before sending business push", async () => {
     let stored = "";
     const driver = {

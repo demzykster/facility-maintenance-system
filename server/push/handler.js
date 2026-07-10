@@ -218,6 +218,9 @@ export function createPushHandler({
       if (action === "notify") {
         const normalized = normalizePushNotificationRequest(body.event || body);
         if (!normalized.ok) return sendJson(res, 400, { error: normalized.error });
+        if (!normalized.interrupting) {
+          return sendJson(res, 200, { ok: true, sent: 0, targets: 0, skipped: "non_interrupting" });
+        }
         const subscriptions = await enrichSubscriptionsWithUsers(backendKvDriver, current);
         const targets = selectPushNotificationTargets(subscriptions, normalized.targetUserIds, normalized.kind);
         let sent = 0;
@@ -226,7 +229,8 @@ export function createPushHandler({
             title: normalized.title,
             body: normalized.body,
             url: normalized.url,
-            tag: normalized.tag
+            tag: normalized.tag,
+            kind: normalized.kind
           }));
           sent += 1;
         }
