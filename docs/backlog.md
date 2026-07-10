@@ -21,7 +21,7 @@ The backlog below remains useful for historical detail and code-area context, bu
 
 ### UI polish slice - touch targets and visual-audit follow-ups
 
-Status: first touch-target/overflow-cue pass done in PR #833; local demo UI smoke gate done in PR #834; semantic status-token slice done in PR #835; lazy Excel export performance slice is in review; deeper visual polish remains separate.
+Status: first touch-target/overflow-cue pass done in PR #833; local demo UI smoke gate done in PR #834; semantic status-token slice done in PR #835; lazy Excel export performance slice done in PR #836; lazy QR performance slice is in review; deeper visual polish remains separate.
 
 Goal:
 - Preserve the current operational CMMS layout while removing concrete usability friction from the owner-reported visual audit.
@@ -42,10 +42,14 @@ Completed PR #835:
 1. Added a shared semantic status-token model for priority, task status, and ticket status color metadata.
 2. Covered the model with focused unit tests so future visual cleanup can reuse a stable danger/warning/success/info vocabulary instead of ad hoc color literals.
 
-In review performance slice:
+Completed PR #836:
 1. Split lightweight workbook helpers from the heavier Excel export adapter.
 2. Lazy-load `write-excel-file` only when a user actually downloads an Excel file.
-3. Keep Excel import, CSV import, QR scanning, and broader monolith code-splitting as separate future slices.
+
+In review QR performance slice:
+1. Lazy-load `qrcode` only when rendering a cleaning-zone QR label.
+2. Lazy-load `jsqr` only when opening the QR scanner overlay.
+3. Keep Excel import, CSV import, and broader monolith code-splitting as separate future slices.
 
 Remaining separate PR sequence:
 1. Continue card/dashboard noise reduction only from concrete owner-reported screens.

@@ -9,8 +9,6 @@ import {
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History, Play} from "lucide-react";
 import readExcelFile from "read-excel-file/browser";
 import Papa from "papaparse";
-import QRCode from "qrcode";
-import jsQR from "jsqr";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -574,6 +572,8 @@ const cellSafe = (v) => (typeof v === "string" && /^[=+\-@\t\r\n]/.test(v)) ? "'
 const rowsSafe = (rows) => (Array.isArray(rows) ? rows : []).map((r) => (r && typeof r === "object" && !Array.isArray(r)) ? Object.fromEntries(Object.entries(r).map(([k, val]) => [k, cellSafe(val)])) : r);
 const clampPmDailyCapacity = (value) => Math.max(1, Math.min(20, Number(value) || 4));
 const clampCleaningReminderMins = (value) => Math.max(5, Math.min(120, Number(value) || 30));
+const loadQrCode = () => import("qrcode").then((module) => module.default || module);
+const loadJsQr = () => import("jsqr").then((module) => module.default || module);
 const notifyUser = (message) => {
   try {
     if (typeof window === "undefined" || !window.dispatchEvent) return;
@@ -4947,7 +4947,8 @@ function ZoneTag({ zone, onClose }) {
   useEffect(() => {
     let alive = true;
     setQrDataUrl("");
-    QRCode.toDataURL(qrUrl || ("czone:" + zone.id), { errorCorrectionLevel: "M", margin: 0, width: 220 })
+    loadQrCode()
+      .then((QRCode) => QRCode.toDataURL(qrUrl || ("czone:" + zone.id), { errorCorrectionLevel: "M", margin: 0, width: 220 }))
       .then((url) => { if (alive) setQrDataUrl(url); })
       .catch(() => { if (alive) setQrDataUrl(""); });
     return () => { alive = false; };
@@ -5308,6 +5309,10 @@ function QRScannerOverlay({ onScan, onCancel, onManual }) {
   const [err, setErr] = useState(""), [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
     let alive = true;
+    let scanQr = null;
+    const scannerReady = loadJsQr()
+      .then((scanner) => { scanQr = scanner; })
+      .catch(() => { if (alive) setErr("לא ניתן לטעון את סורק ה-QR."); throw new Error("qr_scanner_load_failed"); });
     const stop = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
@@ -5323,7 +5328,7 @@ function QRScannerOverlay({ onScan, onCancel, onManual }) {
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         ctx.drawImage(video, 0, 0, w, h);
         const imageData = ctx.getImageData(0, 0, w, h);
-        const result = jsQR(imageData.data, w, h);
+        const result = scanQr?.(imageData.data, w, h);
         const scanned = extractCzoneFromRaw(result?.data || "");
         if (scanned) {
           stop();
@@ -5341,9 +5346,14 @@ function QRScannerOverlay({ onScan, onCancel, onManual }) {
           videoRef.current.srcObject = stream;
           videoRef.current.play?.().catch(() => {});
         }
+        return scannerReady;
+      })
+      .then(() => {
+        if (!alive) return;
         rafRef.current = requestAnimationFrame(tick);
       })
       .catch((error) => {
+        if (error?.message === "qr_scanner_load_failed") return;
         const name = error?.name || "";
         setErr(name === "NotAllowedError" || name === "SecurityError" ? "לא ניתנה גישה למצלמה" : "מצלמה לא זמינה");
       });
