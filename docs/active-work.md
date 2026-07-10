@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-users-backfill-status-docs`.
-- Current branch: `codex/r10-users-backfill-status-docs`.
-- Last completed work: R10 app_users legacy user backfill tool adds a guarded dry-run/apply path without deleting legacy KV records.
-- Current work: R10 users backfill status docs after staging apply.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 users backfill status docs recorded that staging now has all legacy `user:` KV rows matched to `app_users`.
+- Current work: none.
 
 ## Current Product Direction
 
