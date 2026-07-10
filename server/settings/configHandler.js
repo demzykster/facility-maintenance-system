@@ -88,6 +88,7 @@ async function readConfig(configDriver, mirrorDriver) {
 export function createSettingsConfigApiHandler({ configDriver = null, mirrorDriver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendConfigDriver = configDriver || createSupabaseAppConfigDriverFromEnv(env, fetchImpl);
   const retiredConfigMirror = retiredKvWriteKey(APP_CONFIG_KEY, {
+    dataAuthority: env.CMMS_DATA_AUTHORITY,
     appMode: env.VITE_CMMS_APP_MODE,
     storageProvider: env.VITE_CMMS_STORAGE_PROVIDER
   });

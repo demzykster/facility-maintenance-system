@@ -149,6 +149,7 @@ Use `.env.staging.example` as the non-secret template for Vercel environment var
 - `VITE_SUPABASE_ANON_KEY`
 - `CMMS_KV_AUTH=supabase`
 - `CMMS_KV_DRIVER=supabase`
+- `CMMS_DATA_AUTHORITY=normalized`
 - `CMMS_ALLOW_PRODUCTION_KV_BRIDGE=true`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`

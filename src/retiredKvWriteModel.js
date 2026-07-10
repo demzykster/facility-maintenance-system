@@ -22,10 +22,11 @@ const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
   "appIssue:"
 ]);
 
-export function retiredKvWritePrefixes({ appMode = "", storageProvider = "" } = {}) {
+export function retiredKvWritePrefixes({ appMode = "", storageProvider = "", dataAuthority = "" } = {}) {
+  const normalizedAuthority = String(dataAuthority || "").trim().toLowerCase() === "normalized";
   const productionApi = String(appMode || "").trim().toLowerCase() === "production"
     && String(storageProvider || "").trim().toLowerCase() === "api";
-  return productionApi ? RETIRED_PRODUCTION_API_WRITE_PREFIXES : [];
+  return normalizedAuthority || productionApi ? RETIRED_PRODUCTION_API_WRITE_PREFIXES : [];
 }
 
 export function retiredKvWriteKey(key = "", options = {}) {

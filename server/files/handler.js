@@ -5,7 +5,9 @@ import { createSupabaseFileMetadataDriverFromEnv } from "./supabaseFileMetadataD
 import { sendServerError } from "../httpErrors.js";
 import { bearerToken } from "../session/authCookie.js";
 import { AUDIT_ACTIONS, fileAuditEvent } from "../../src/auditEventModel.js";
-import { fileMetadataPathMatchesOwner, normalizeFileMetadata } from "../../src/fileMetadataModel.js";
+import { FILE_OWNER_TYPES, fileMetadataPathMatchesOwner, normalizeFileMetadata } from "../../src/fileMetadataModel.js";
+import { canPerformCleaning, canViewCleaningReports } from "../../src/cleaningAccessModel.js";
+import { kvWritePermissionError, permissionLevelRank, sessionPermissionLevel } from "../kv/permissionPolicy.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -104,6 +106,55 @@ const requireActiveMetadata = async (metadataDriver, path) => {
   return { ok: true, metadata };
 };
 
+const hasModuleLevel = (user = {}, module, minLevel = "view") => (
+  permissionLevelRank(sessionPermissionLevel(user, module)) >= permissionLevelRank(minLevel)
+);
+
+const canReadTicketFile = (user = {}) => ["admin", "user", "tech", "worker"].includes(user.role);
+
+const canReadCleaningFile = (user = {}) => (
+  user.role === "admin"
+  || user.role === "user"
+  || canPerformCleaning(user)
+  || canViewCleaningReports(user)
+);
+
+const ownerWriteKey = (metadata = {}) => {
+  if (metadata.ownerType === FILE_OWNER_TYPES.ticket) return `ticket:${metadata.ownerId}`;
+  if (metadata.ownerType === FILE_OWNER_TYPES.cleaningComplaint) return `ccomplaint:${metadata.ownerId}`;
+  if (metadata.ownerType === FILE_OWNER_TYPES.cleaningRound) return `cround:${metadata.ownerId}`;
+  return "";
+};
+
+const fileOwnerPermissionError = ({ metadata = null, user = {}, action = "read" } = {}) => {
+  if (!metadata) return null;
+  if (user.role === "admin") return null;
+
+  if (action !== "read") {
+    const key = ownerWriteKey(metadata);
+    if (key && kvWritePermissionError(user, key)) {
+      return metadata.ownerType === FILE_OWNER_TYPES.ticket
+        ? "permission_required:files:ticket"
+        : "permission_required:files:cleaning";
+    }
+  }
+
+  if (metadata.ownerType === FILE_OWNER_TYPES.ticket) {
+    return canReadTicketFile(user) ? null : "permission_required:files:ticket";
+  }
+  if (metadata.ownerType === FILE_OWNER_TYPES.cleaningComplaint || metadata.ownerType === FILE_OWNER_TYPES.cleaningRound) {
+    return canReadCleaningFile(user) ? null : "permission_required:files:cleaning";
+  }
+  if (metadata.ownerType === FILE_OWNER_TYPES.user) {
+    const ownUserFile = user.id && String(user.id) === String(metadata.ownerId);
+    return ownUserFile || hasModuleLevel(user, "users", "view") ? null : "permission_required:files:user";
+  }
+
+  return hasModuleLevel(user, "settings", action === "read" ? "view" : "manage")
+    ? null
+    : "permission_required:files:manage";
+};
+
 export function createFileApiHandler({ driver = null, auditDriver = null, metadataDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver
     || (env.CMMS_FILE_DRIVER === "supabase" ? createSupabaseFileDriverFromEnv(env, fetchImpl) : null);
@@ -128,6 +179,8 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
       if (method === "GET") {
         const metadata = await requireActiveMetadata(backendMetadataDriver, path);
         if (!metadata.ok) return json(res, metadata.status, { error: metadata.error });
+        const permissionError = fileOwnerPermissionError({ metadata: metadata.metadata, user: auth.user, action: "read" });
+        if (permissionError) return json(res, 403, { error: permissionError });
         const file = await backendDriver.download(path, auth.user);
         return json(res, 200, {
           path,
@@ -149,6 +202,8 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
           if (error?.message === "file_metadata_path_owner_mismatch") return json(res, 400, { error: error.message });
           throw error;
         }
+        const permissionError = fileOwnerPermissionError({ metadata, user: auth.user, action: "write" });
+        if (permissionError) return json(res, 403, { error: permissionError });
         await backendDriver.upload(path, file.buffer, file.contentType, auth.user);
         if (metadata) await backendMetadataDriver?.upsert?.(metadata);
         await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path, contentType: file.contentType }, AUDIT_ACTIONS.upload, auth.user));
@@ -157,6 +212,8 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
       if (method === "DELETE") {
         const metadata = await requireActiveMetadata(backendMetadataDriver, path);
         if (!metadata.ok) return json(res, metadata.status, { error: metadata.error });
+        const permissionError = fileOwnerPermissionError({ metadata: metadata.metadata, user: auth.user, action: "delete" });
+        if (permissionError) return json(res, 403, { error: permissionError });
         await backendDriver.delete(path, auth.user);
         await backendMetadataDriver?.markDeletedByPath?.(path);
         await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path }, AUDIT_ACTIONS.delete, auth.user));

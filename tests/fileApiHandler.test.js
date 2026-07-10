@@ -267,6 +267,99 @@ describe("file API handler", () => {
     expect(driver.delete).not.toHaveBeenCalled();
   });
 
+  it("requires business owner permission before downloading or deleting active ticket files", async () => {
+    const driver = {
+      download: vi.fn(),
+      delete: vi.fn()
+    };
+    const metadataDriver = {
+      findActiveByPath: vi.fn().mockResolvedValue({
+        ownerType: "ticket",
+        ownerId: "T-1",
+        kind: "ticket_before_photo",
+        path: "tickets/T-1/before.jpg"
+      })
+    };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient({ role: "cleaner" })
+    });
+
+    const download = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" }
+    });
+    const del = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" }
+    });
+
+    expect(download.statusCode).toBe(403);
+    expect(download.json()).toEqual({ error: "permission_required:files:ticket" });
+    expect(del.statusCode).toBe(403);
+    expect(del.json()).toEqual({ error: "permission_required:files:ticket" });
+    expect(driver.download).not.toHaveBeenCalled();
+    expect(driver.delete).not.toHaveBeenCalled();
+  });
+
+  it("requires business owner write permission before uploading ticket metadata files", async () => {
+    const driver = { upload: vi.fn() };
+    const metadataDriver = { upsert: vi.fn() };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient({ role: "cleaner" })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" },
+      body: {
+        contentType: "image/jpeg",
+        data: Buffer.from("photo-bytes").toString("base64"),
+        metadata: {
+          ownerType: "ticket",
+          ownerId: "T-1",
+          kind: "ticket_before_photo"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:files:ticket" });
+    expect(driver.upload).not.toHaveBeenCalled();
+    expect(metadataDriver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("requires cleaning access before downloading cleaning-owned files", async () => {
+    const driver = { download: vi.fn() };
+    const metadataDriver = {
+      findActiveByPath: vi.fn().mockResolvedValue({
+        ownerType: "cleaning_complaint",
+        ownerId: "complaint-1",
+        kind: "cleaning_complaint_photo",
+        path: "cleaning/complaints/complaint-1/photo.jpg"
+      })
+    };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient({ role: "tech" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "cleaning/complaints/complaint-1/photo.jpg" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:files:cleaning" });
+    expect(driver.download).not.toHaveBeenCalled();
+  });
+
   it("rejects active file metadata that does not match the storage path owner", async () => {
     const driver = {
       download: vi.fn(),

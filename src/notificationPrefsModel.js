@@ -77,15 +77,19 @@ export function browserNotificationEvents(events = []) {
 }
 
 const BROWSER_NOTIFICATION_STATE_KEY_LIMIT = 500;
+export const DEFAULT_BROWSER_NOTIFICATION_MIN_INTERVAL_MS = 30 * 60 * 1000;
 
 export function pruneBrowserNotificationState(state = {}) {
   const notifiedKeys = Array.isArray(state.notifiedKeys)
     ? [...new Set(state.notifiedKeys.filter((key) => typeof key === "string" && key))]
     : [];
-  return {
+  const pruned = {
     maxAt: parseNotificationSeenAt(state.maxAt),
     notifiedKeys: notifiedKeys.slice(-BROWSER_NOTIFICATION_STATE_KEY_LIMIT)
   };
+  const lastNotifiedAt = parseNotificationSeenAt(state.lastNotifiedAt);
+  if (lastNotifiedAt) pruned.lastNotifiedAt = lastNotifiedAt;
+  return pruned;
 }
 
 export function parseBrowserNotificationState(raw) {
@@ -104,16 +108,30 @@ export function initialBrowserNotificationState(events = []) {
   });
 }
 
-export function nextBrowserNotificationEvent(events = [], state = {}) {
+export function nextBrowserNotificationEvent(events = [], state = {}, options = {}) {
   const notifiedKeys = new Set(Array.isArray(state.notifiedKeys) ? state.notifiedKeys : []);
   const sorted = [...events].sort((a, b) => (Number(b?.at) || 0) - (Number(a?.at) || 0));
   const previousMaxAt = parseNotificationSeenAt(state.maxAt);
+  const lastNotifiedAt = parseNotificationSeenAt(state.lastNotifiedAt);
+  const minIntervalMs = Number.isFinite(Number(options.minIntervalMs))
+    ? Math.max(0, Number(options.minIntervalMs))
+    : DEFAULT_BROWSER_NOTIFICATION_MIN_INTERVAL_MS;
+  const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
   const event = sorted.find((item) => {
     const key = typeof item?.key === "string" ? item.key : "";
     if (key && notifiedKeys.has(key)) return false;
     return (Number(item?.at) || 0) > previousMaxAt;
   }) || null;
   const maxAt = sorted.reduce((max, item) => Math.max(max, Number(item?.at) || 0), previousMaxAt);
-  if (event?.key) notifiedKeys.add(event.key);
-  return { event, ...pruneBrowserNotificationState({ maxAt, notifiedKeys: [...notifiedKeys] }) };
+  if (!event) return { event, ...pruneBrowserNotificationState({ maxAt, notifiedKeys: [...notifiedKeys], lastNotifiedAt }) };
+  if (event.key) notifiedKeys.add(event.key);
+  const throttled = lastNotifiedAt && now - lastNotifiedAt < minIntervalMs;
+  return {
+    event: throttled ? null : event,
+    ...pruneBrowserNotificationState({
+      maxAt,
+      notifiedKeys: [...notifiedKeys],
+      lastNotifiedAt: throttled ? lastNotifiedAt : now
+    })
+  };
 }
