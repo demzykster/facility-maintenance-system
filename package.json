@@ -57,6 +57,7 @@
     "staging:kv:retire-mirrors": "node tools/staging-kv-retire-mirrors.mjs",
     "staging:load:test": "node tools/staging-load-test.mjs",
     "staging:gate": "node tools/staging-gate.mjs",
+    "smoke:demo-ui": "node tools/demo-ui-smoke.mjs",
     "fleet:import:preview": "node tools/fleet-license-import-preview.mjs",
     "lint": "node tools/static-syntax-check.mjs",
     "test": "vitest run",

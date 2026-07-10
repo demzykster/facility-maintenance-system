@@ -21,19 +21,22 @@ The backlog below remains useful for historical detail and code-area context, bu
 
 ### UI polish slice - touch targets and visual-audit follow-ups
 
-Status: candidate; first touch-target pass is scoped as a small UI-only slice.
+Status: first touch-target/overflow-cue pass done in PR #833; deeper visual polish remains separate.
 
 Goal:
 - Preserve the current operational CMMS layout while removing concrete usability friction from the owner-reported visual audit.
 - Keep changes surgical: no redesign, no business-logic changes, no whole-file replacement, no modular split.
 - Treat dashboard/card noise, semantic status colors, hidden overflow cues, and frontend performance as separate follow-up slices.
 
-Suggested PR sequence:
-1. Normalize high-use interactive controls to mobile-safe touch targets: topbar, bottom nav, sidebar actions, segmented controls, role preview, worker/mobile controls, install prompt, login controls, and compact action buttons.
-2. Soften only the top dashboard `דורש טיפול` action tiles by removing the heavy colored side stripe and preserving the current information hierarchy.
-3. Add a later semantic status-token slice for danger/warning/success/info/severity colors instead of broad manual color churn.
-4. Add a later discoverability slice for hidden horizontal/vertical scroll areas where users may not know more controls exist.
-5. Keep code-splitting/virtualization as a separate performance slice; do not bundle it with visual polish.
+Completed PR #833:
+1. Normalized high-use interactive controls to mobile-safe touch targets: topbar, bottom nav, sidebar actions, segmented controls, role preview, worker/mobile controls, install prompt, login controls, and compact action buttons.
+2. Softened only the top dashboard `דורש טיפול` action tiles by removing the heavy colored side stripe and preserving the current information hierarchy.
+3. Restored subtle scrollbar cues for horizontal chips, worker tabs, and the desktop sidebar navigation.
+
+Remaining separate PR sequence:
+1. Add a semantic status-token slice for danger/warning/success/info/severity colors instead of broad manual color churn.
+2. Continue card/dashboard noise reduction only from concrete owner-reported screens.
+3. Keep code-splitting/virtualization as a separate performance slice; do not bundle it with visual polish.
 
 DoD:
 - `npm run lint`, `npm test -- --run`, `npm run release:check`, and `npm run build` pass.
@@ -64,7 +67,7 @@ DoD:
 
 Later separate safety slices:
 - CI-safe staging preflight dry/model check is now wired into GitHub Actions through `staging:preflight:ci`; a future deploy-blocking live secret-backed job can still be considered separately.
-- Add minimal automated browser smoke coverage for the highest-risk role/workflow paths.
+- Local demo browser smoke is now wired through `npm run smoke:demo-ui`; a future authenticated staging smoke should cover highest-risk role/workflow paths with real staging credentials.
 - Minimal static syntax-analysis gate is now wired into GitHub Actions through `npm run lint`; a future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
 
 ### R10 data slice - user-management authority gap
