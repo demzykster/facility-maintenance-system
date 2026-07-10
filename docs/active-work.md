@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-app-issues-stop-kv-mirror`.
-- Current branch: `codex/r10-app-issues-stop-kv-mirror`.
-- Last completed work: presence saves stop creating new `presence:*` KV mirrors in production/API authority mode.
-- Current work: app issue saves stop creating new `appIssue:*` KV mirrors in production/API authority mode.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: app issue saves stop creating new `appIssue:*` KV mirrors in production/API authority mode.
+- Current work: none.
 
 ## Current Product Direction
 
