@@ -949,6 +949,12 @@ describe("kv API handler", () => {
       query: { key: "ticket:T-1", shared: "1" },
       body: { value: "{\"id\":\"T-1\"}", shared: true }
     });
+    const photoPutRes = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "photo:T-1", shared: "1" },
+      body: { value: "data:image/png;base64,abc", shared: true }
+    });
     const userPutRes = await call(handler, {
       method: "PUT",
       headers: { authorization: "Bearer user-token" },
@@ -1014,6 +1020,7 @@ describe("kv API handler", () => {
           { key: "config:v1", value: "{\"companyName\":\"CDSL\"}" },
           { key: "user:worker-1", value: "{\"id\":\"worker-1\"}" },
           { key: "ticket:T-1", value: "{\"id\":\"T-1\"}" },
+          { key: "photo:T-1", value: "data:image/png;base64,abc" },
           { key: "fleet:F-1", value: "{\"id\":\"F-1\"}" },
           { key: "pm:PM-1", value: "{\"id\":\"PM-1\"}" },
           { key: "mtask:task-1", value: "{\"id\":\"task-1\"}" },
@@ -1035,6 +1042,8 @@ describe("kv API handler", () => {
     expect(configPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "config:v1" });
     expect(ticketPutRes.statusCode).toBe(200);
     expect(ticketPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "ticket:" });
+    expect(photoPutRes.statusCode).toBe(200);
+    expect(photoPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "photo:" });
     expect(userPutRes.statusCode).toBe(200);
     expect(userPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "user:" });
     expect(zonePutRes.statusCode).toBe(200);
@@ -1054,7 +1063,7 @@ describe("kv API handler", () => {
     expect(ppePutRes.statusCode).toBe(200);
     expect(ppePutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "ppeitem:" });
     expect(postRes.statusCode).toBe(200);
-    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 14 });
+    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 15 });
     expect(driver.set).not.toHaveBeenCalled();
     expect(driver.setMany).not.toHaveBeenCalled();
   });

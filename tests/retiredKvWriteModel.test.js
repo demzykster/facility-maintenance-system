@@ -9,6 +9,7 @@ describe("retired KV write model", () => {
       "config:v1",
       "user:",
       "ticket:",
+      "photo:",
       "fleet:",
       "pm:",
       "mtask:",
@@ -31,6 +32,7 @@ describe("retired KV write model", () => {
     expect(retiredKvWriteKey("config:v1", { appMode: "production", storageProvider: "api" })).toBe("config:v1");
     expect(retiredKvWriteKey("user:worker-1", { appMode: "production", storageProvider: "api" })).toBe("user:");
     expect(retiredKvWriteKey("ticket:T-1", { appMode: "production", storageProvider: "api" })).toBe("ticket:");
+    expect(retiredKvWriteKey("photo:T-1", { appMode: "production", storageProvider: "api" })).toBe("photo:");
     expect(retiredKvWriteKey("fleet:F-1", { appMode: "production", storageProvider: "api" })).toBe("fleet:");
     expect(retiredKvWriteKey("pm:PM-1", { appMode: "production", storageProvider: "api" })).toBe("pm:");
     expect(retiredKvWriteKey("mtask:task-1", { appMode: "production", storageProvider: "api" })).toBe("mtask:");
@@ -50,6 +52,7 @@ describe("retired KV write model", () => {
       { key: "config:v1", value: "{}" },
       { key: "user:worker-1", value: "{}" },
       { key: "ticket:T-1", value: "{}" },
+      { key: "photo:T-1", value: "data:image/png;base64,abc" },
       { key: "fleet:F-1", value: "{}" },
       { key: "pm:PM-1", value: "{}" },
       { key: "mtask:task-1", value: "{}" },
@@ -58,15 +61,16 @@ describe("retired KV write model", () => {
       { key: "czone:zone-1", value: "{}" },
       { key: "ppeitem:item-1", value: "{}" },
       { key: "appIssue:issue-1", value: "{}" },
-      { key: "photo:T-1", value: "data:image/png;base64,abc" }
+      { key: "theme:v1", value: "dark" }
     ], { appMode: "production", storageProvider: "api" })).toEqual({
-      active: [{ key: "photo:T-1", value: "data:image/png;base64,abc" }],
+      active: [{ key: "theme:v1", value: "dark" }],
       retired: [
         { key: "presence:user-1", value: "{}", retiredPrefix: "presence:" },
         { key: "pushSubscriptions:v1", value: "[]", retiredPrefix: "pushSubscriptions:v1" },
         { key: "config:v1", value: "{}", retiredPrefix: "config:v1" },
         { key: "user:worker-1", value: "{}", retiredPrefix: "user:" },
         { key: "ticket:T-1", value: "{}", retiredPrefix: "ticket:" },
+        { key: "photo:T-1", value: "data:image/png;base64,abc", retiredPrefix: "photo:" },
         { key: "fleet:F-1", value: "{}", retiredPrefix: "fleet:" },
         { key: "pm:PM-1", value: "{}", retiredPrefix: "pm:" },
         { key: "mtask:task-1", value: "{}", retiredPrefix: "mtask:" },

@@ -4,6 +4,7 @@ const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
   "config:v1",
   "user:",
   "ticket:",
+  "photo:",
   "fleet:",
   "pm:",
   "mtask:",
