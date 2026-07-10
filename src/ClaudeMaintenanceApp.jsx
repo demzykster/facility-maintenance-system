@@ -3289,7 +3289,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorPresenceToKv(record);
       return true;
     }
     const ok = await persistShared(`presence:${record.id}`, JSON.stringify(record));
