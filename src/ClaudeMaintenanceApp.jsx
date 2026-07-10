@@ -2637,26 +2637,6 @@ export default function App() {
       });
     }
   };
-  const mirrorWorkToKv = async (resource, record) => {
-    const key = `${workKvPrefix(resource)}${record.id}`;
-    const ok = await persistShared(key, JSON.stringify(record), { toastOnFail: false });
-    if (!ok) void recordAutomaticAppIssue({
-      kind: `work_${resource}_kv_mirror_save_failed`,
-      action: "mirror-save",
-      key,
-      message: "Compatibility KV work mirror save failed"
-    });
-  };
-  const mirrorDeleteWorkFromKv = async (resource, id) => {
-    const key = `${workKvPrefix(resource)}${id}`;
-    const ok = await deleteShared(key, { toastOnFail: false });
-    if (!ok) void recordAutomaticAppIssue({
-      kind: `work_${resource}_kv_mirror_delete_failed`,
-      action: "mirror-delete",
-      key,
-      message: "Compatibility KV work mirror delete failed"
-    });
-  };
   const saveWorkResource = async (resource, record, { setState, sortFn } = {}) => {
     const key = `${workKvPrefix(resource)}${record.id}`;
     if (NORMALIZED_WORK_AUTHORITY) {
@@ -2672,7 +2652,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorWorkToKv(resource, record);
     } else {
       if (!await persistShared(key, JSON.stringify(record))) return false;
       void shadowWriteNormalizedWork(resource, record);
@@ -2698,7 +2677,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeleteWorkFromKv(resource, id);
     } else {
       if (!await deleteShared(key)) return false;
       void shadowDeleteNormalizedWork(resource, id);

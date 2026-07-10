@@ -11,6 +11,8 @@ describe("retired KV write model", () => {
       "ticket:",
       "fleet:",
       "pm:",
+      "mtask:",
+      "mmeet:",
       "czone:",
       "cround:",
       "ccomplaint:",
@@ -29,6 +31,8 @@ describe("retired KV write model", () => {
     expect(retiredKvWriteKey("ticket:T-1", { appMode: "production", storageProvider: "api" })).toBe("ticket:");
     expect(retiredKvWriteKey("fleet:F-1", { appMode: "production", storageProvider: "api" })).toBe("fleet:");
     expect(retiredKvWriteKey("pm:PM-1", { appMode: "production", storageProvider: "api" })).toBe("pm:");
+    expect(retiredKvWriteKey("mtask:task-1", { appMode: "production", storageProvider: "api" })).toBe("mtask:");
+    expect(retiredKvWriteKey("mmeet:meet-1", { appMode: "production", storageProvider: "api" })).toBe("mmeet:");
     expect(retiredKvWriteKey("czone:zone-1", { appMode: "production", storageProvider: "api" })).toBe("czone:");
     expect(retiredKvWriteKey("cround:round-1", { appMode: "production", storageProvider: "api" })).toBe("cround:");
     expect(retiredKvWriteKey("ppeitem:item-1", { appMode: "production", storageProvider: "api" })).toBe("ppeitem:");
@@ -44,11 +48,13 @@ describe("retired KV write model", () => {
       { key: "ticket:T-1", value: "{}" },
       { key: "fleet:F-1", value: "{}" },
       { key: "pm:PM-1", value: "{}" },
+      { key: "mtask:task-1", value: "{}" },
+      { key: "mmeet:meet-1", value: "{}" },
       { key: "czone:zone-1", value: "{}" },
       { key: "ppeitem:item-1", value: "{}" },
-      { key: "mtask:task-1", value: "{}" }
+      { key: "location:loc-1", value: "{}" }
     ], { appMode: "production", storageProvider: "api" })).toEqual({
-      active: [{ key: "mtask:task-1", value: "{}" }],
+      active: [{ key: "location:loc-1", value: "{}" }],
       retired: [
         { key: "presence:user-1", value: "{}", retiredPrefix: "presence:" },
         { key: "pushSubscriptions:v1", value: "[]", retiredPrefix: "pushSubscriptions:v1" },
@@ -57,6 +63,8 @@ describe("retired KV write model", () => {
         { key: "ticket:T-1", value: "{}", retiredPrefix: "ticket:" },
         { key: "fleet:F-1", value: "{}", retiredPrefix: "fleet:" },
         { key: "pm:PM-1", value: "{}", retiredPrefix: "pm:" },
+        { key: "mtask:task-1", value: "{}", retiredPrefix: "mtask:" },
+        { key: "mmeet:meet-1", value: "{}", retiredPrefix: "mmeet:" },
         { key: "czone:zone-1", value: "{}", retiredPrefix: "czone:" },
         { key: "ppeitem:item-1", value: "{}", retiredPrefix: "ppeitem:" }
       ]
