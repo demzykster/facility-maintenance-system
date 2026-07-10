@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyKvResiduals, countKvPrefixes, prefixFromRecordKey } from "../src/kvResidualsModel.js";
+import { classifyKvResiduals, countKvPrefixes, countKvScopes, prefixFromRecordKey } from "../src/kvResidualsModel.js";
 
 describe("kv residuals model", () => {
   it("extracts and counts KV prefixes", () => {
@@ -8,6 +8,11 @@ describe("kv residuals model", () => {
     expect(countKvPrefixes(["user:1", "user:2", "ticket:t1", ""])).toEqual({
       ticket: 1,
       user: 2
+    });
+    expect(countKvScopes([{ scope: "shared" }, { scope: "local" }, { scope: "shared" }, {}])).toEqual({
+      local: 1,
+      shared: 2,
+      unknown: 1
     });
   });
 
@@ -21,6 +26,7 @@ describe("kv residuals model", () => {
         itpl: 1,
         mystery: 3
       },
+      kvScopes: { shared: 16, local: 5 },
       userReconciliation: {
         counts: { legacyUsers: 12, matched: 12 }
       }
@@ -28,11 +34,13 @@ describe("kv residuals model", () => {
 
     expect(report.counts).toEqual({
       prefixes: 6,
+      scopes: 2,
       compatibilityMirrors: 13,
       transientOperational: 2,
       deferredOrphanCandidates: 2,
       unknown: 3
     });
+    expect(report.scopes).toEqual([{ scope: "local", count: 5 }, { scope: "shared", count: 16 }]);
     expect(report.compatibilityMirrors).toEqual([
       { prefix: "ticket", count: 1, status: "compatibility_mirror" },
       { prefix: "user", count: 12, status: "matched:12/12" }
