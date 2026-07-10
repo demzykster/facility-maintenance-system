@@ -37,4 +37,4 @@ The shared KV API only accepts known v1 prefixes. Keep `server/kv/handler.js`, `
 - App issue reports are accepted from active product roles.
 - Phone push subscriptions are managed through `/api/push`; normalized `push_subscriptions` is the production/API-mode authority, and staging has retired the aggregate `pushSubscriptions:v1` compatibility key after the guarded retire check passed.
 - PPE is managed through `/api/ppe`; normalized PPE tables are the production/API-mode authority, production/API saves no longer create new PPE KV mirrors for the listed PPE prefixes, and staging has retired all matched PPE mirrors.
-- App config is managed through `/api/settings/config`; normalized `app_config` is the production/API-mode authority, and production/API saves no longer create new `config:v1` KV mirrors.
+- App config is managed through `/api/settings/config`; normalized `app_config` is the production/API-mode authority, production/API saves no longer create new `config:v1` KV mirrors, and staging has retired the app-config mirror.
