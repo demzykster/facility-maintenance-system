@@ -13,6 +13,7 @@ describe("retired KV write model", () => {
       "pm:",
       "mtask:",
       "mmeet:",
+      "location:",
       "czone:",
       "cround:",
       "ccomplaint:",
@@ -21,7 +22,8 @@ describe("retired KV write model", () => {
       "ppeitem:",
       "ppenorm:",
       "ppereq:",
-      "ppeorder:"
+      "ppeorder:",
+      "appIssue:"
     ]);
     expect(retiredKvWritePrefixes({ appMode: "demo", storageProvider: "api" })).toEqual([]);
     expect(retiredKvWriteKey("presence:user-1", { appMode: "production", storageProvider: "api" })).toBe("presence:");
@@ -33,10 +35,12 @@ describe("retired KV write model", () => {
     expect(retiredKvWriteKey("pm:PM-1", { appMode: "production", storageProvider: "api" })).toBe("pm:");
     expect(retiredKvWriteKey("mtask:task-1", { appMode: "production", storageProvider: "api" })).toBe("mtask:");
     expect(retiredKvWriteKey("mmeet:meet-1", { appMode: "production", storageProvider: "api" })).toBe("mmeet:");
+    expect(retiredKvWriteKey("location:loc-1", { appMode: "production", storageProvider: "api" })).toBe("location:");
     expect(retiredKvWriteKey("czone:zone-1", { appMode: "production", storageProvider: "api" })).toBe("czone:");
     expect(retiredKvWriteKey("cround:round-1", { appMode: "production", storageProvider: "api" })).toBe("cround:");
     expect(retiredKvWriteKey("ppeitem:item-1", { appMode: "production", storageProvider: "api" })).toBe("ppeitem:");
     expect(retiredKvWriteKey("ppereq:req-1", { appMode: "production", storageProvider: "api" })).toBe("ppereq:");
+    expect(retiredKvWriteKey("appIssue:issue-1", { appMode: "production", storageProvider: "api" })).toBe("appIssue:");
   });
 
   it("separates active and retired batch writes", () => {
@@ -50,11 +54,13 @@ describe("retired KV write model", () => {
       { key: "pm:PM-1", value: "{}" },
       { key: "mtask:task-1", value: "{}" },
       { key: "mmeet:meet-1", value: "{}" },
+      { key: "location:loc-1", value: "{}" },
       { key: "czone:zone-1", value: "{}" },
       { key: "ppeitem:item-1", value: "{}" },
-      { key: "location:loc-1", value: "{}" }
+      { key: "appIssue:issue-1", value: "{}" },
+      { key: "photo:T-1", value: "data:image/png;base64,abc" }
     ], { appMode: "production", storageProvider: "api" })).toEqual({
-      active: [{ key: "location:loc-1", value: "{}" }],
+      active: [{ key: "photo:T-1", value: "data:image/png;base64,abc" }],
       retired: [
         { key: "presence:user-1", value: "{}", retiredPrefix: "presence:" },
         { key: "pushSubscriptions:v1", value: "[]", retiredPrefix: "pushSubscriptions:v1" },
@@ -65,8 +71,10 @@ describe("retired KV write model", () => {
         { key: "pm:PM-1", value: "{}", retiredPrefix: "pm:" },
         { key: "mtask:task-1", value: "{}", retiredPrefix: "mtask:" },
         { key: "mmeet:meet-1", value: "{}", retiredPrefix: "mmeet:" },
+        { key: "location:loc-1", value: "{}", retiredPrefix: "location:" },
         { key: "czone:zone-1", value: "{}", retiredPrefix: "czone:" },
-        { key: "ppeitem:item-1", value: "{}", retiredPrefix: "ppeitem:" }
+        { key: "ppeitem:item-1", value: "{}", retiredPrefix: "ppeitem:" },
+        { key: "appIssue:issue-1", value: "{}", retiredPrefix: "appIssue:" }
       ]
     });
   });

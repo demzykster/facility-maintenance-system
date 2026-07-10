@@ -8,6 +8,7 @@ const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
   "pm:",
   "mtask:",
   "mmeet:",
+  "location:",
   "czone:",
   "cround:",
   "ccomplaint:",
@@ -16,7 +17,8 @@ const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
   "ppeitem:",
   "ppenorm:",
   "ppereq:",
-  "ppeorder:"
+  "ppeorder:",
+  "appIssue:"
 ]);
 
 export function retiredKvWritePrefixes({ appMode = "", storageProvider = "" } = {}) {
