@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/data-refresh-throttle`.
-- Current branch: `codex/data-refresh-throttle`.
-- Last completed work: owner-reported iPhone authenticated startup performance slice.
-- Current work: authenticated background data refresh throttle.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: authenticated background data refresh throttle.
+- Current work: none.
 
 ## Current Product Direction
 
