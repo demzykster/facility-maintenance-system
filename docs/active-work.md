@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-kv-mirror-retirement-tool`.
-- Current branch: `codex/r10-kv-mirror-retirement-tool`.
-- Last completed work: app issue saves stop creating new `appIssue:*` KV mirrors in production/API authority mode.
-- Current work: guarded staging KV mirror retirement tool for deleting only shared mirrors with matching normalized `source_kv_key`.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: guarded staging KV mirror retirement tool for deleting only shared mirrors with matching normalized `source_kv_key`.
+- Current work: none.
 
 ## Current Product Direction
 
