@@ -3,7 +3,7 @@ export function isExpectedBrowserSmokeResponse({ url = "", status = 0 } = {}) {
   if (Number(status) < 400) return true;
   if (/favicon\.ico$/.test(text)) return true;
   if (/\/api\/bootstrap\/admin/.test(text)) return true;
-  if (Number(status) === 404 && /\/api\/session\/initial-password/.test(text)) return true;
+  if ([404, 409].includes(Number(status)) && /\/api\/session\/initial-password/.test(text)) return true;
   return false;
 }
 

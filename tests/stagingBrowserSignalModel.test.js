@@ -12,6 +12,10 @@ describe("staging browser smoke signal filters", () => {
       url: "https://facility-maintenance-system.vercel.app/api/session/initial-password"
     })).toBe(true);
     expect(isExpectedBrowserSmokeResponse({
+      status: 409,
+      url: "https://facility-maintenance-system.vercel.app/api/session/initial-password"
+    })).toBe(true);
+    expect(isExpectedBrowserSmokeResponse({
       status: 404,
       url: "https://facility-maintenance-system.vercel.app/api/kv?prefix=ticket"
     })).toBe(false);
