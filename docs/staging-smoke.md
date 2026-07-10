@@ -78,6 +78,14 @@ npm run staging:users:reconcile-report -- --apply
 
 Apply mode aborts if the report has ambiguous matches, malformed records, or skipped backfill rows.
 
+To classify remaining shared KV prefixes after normalized-authority slices and backfills:
+
+```bash
+npm run staging:kv:residuals
+```
+
+This is read-only. It groups prefixes into compatibility mirrors, transient operational keys, deferred/orphan candidates, and unknown prefixes. Use it before deleting any KV data or opening a new R10 data-domain slice.
+
 Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
 
 ```bash
