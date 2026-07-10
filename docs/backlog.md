@@ -19,6 +19,27 @@ The backlog below remains useful for historical detail and code-area context, bu
 
 ## Current Backlog Candidates
 
+### UI polish slice - touch targets and visual-audit follow-ups
+
+Status: candidate; first touch-target pass is scoped as a small UI-only slice.
+
+Goal:
+- Preserve the current operational CMMS layout while removing concrete usability friction from the owner-reported visual audit.
+- Keep changes surgical: no redesign, no business-logic changes, no whole-file replacement, no modular split.
+- Treat dashboard/card noise, semantic status colors, hidden overflow cues, and frontend performance as separate follow-up slices.
+
+Suggested PR sequence:
+1. Normalize high-use interactive controls to mobile-safe touch targets: topbar, bottom nav, sidebar actions, segmented controls, role preview, worker/mobile controls, install prompt, login controls, and compact action buttons.
+2. Soften only the top dashboard `דורש טיפול` action tiles by removing the heavy colored side stripe and preserving the current information hierarchy.
+3. Add a later semantic status-token slice for danger/warning/success/info/severity colors instead of broad manual color churn.
+4. Add a later discoverability slice for hidden horizontal/vertical scroll areas where users may not know more controls exist.
+5. Keep code-splitting/virtualization as a separate performance slice; do not bundle it with visual polish.
+
+DoD:
+- `npm run lint`, `npm test -- --run`, `npm run release:check`, and `npm run build` pass.
+- Browser smoke covers desktop and mobile after demo login with no horizontal overflow.
+- Existing notification dedupe fixes remain intact; do not copy older `ClaudeMaintenanceApp.jsx` versions over current `main`.
+
 ### R10 safety slice - staging preflight model coverage and build-size truth
 
 Status: done in PR #746.
