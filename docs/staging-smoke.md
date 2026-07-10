@@ -86,6 +86,15 @@ npm run staging:kv:residuals
 
 This is read-only. It groups prefixes into compatibility mirrors, transient operational keys, deferred/orphan candidates, and unknown prefixes. Use it before deleting any KV data or opening a new R10 data-domain slice.
 
+To retire compatibility mirrors after a domain has stopped writing new KV mirrors:
+
+```bash
+npm run staging:kv:retire-mirrors -- --prefix presence:
+npm run staging:kv:retire-mirrors -- --prefix presence: --apply
+```
+
+The dry-run reports how many shared KV records have a matching normalized `source_kv_key`. The apply mode deletes only those matched shared records; unmatched records remain for a separate investigation.
+
 Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
 
 ```bash

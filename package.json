@@ -51,6 +51,7 @@
     "staging:backup:evidence": "node tools/staging-backup-evidence.mjs",
     "staging:data:summary": "node tools/staging-data-summary.mjs",
     "staging:kv:residuals": "node tools/staging-kv-residuals-report.mjs",
+    "staging:kv:retire-mirrors": "node tools/staging-kv-retire-mirrors.mjs",
     "staging:gate": "node tools/staging-gate.mjs",
     "fleet:import:preview": "node tools/fleet-license-import-preview.mjs",
     "lint": "node tools/static-syntax-check.mjs",
