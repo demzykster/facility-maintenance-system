@@ -64,3 +64,24 @@ export function unreadNotificationKeySet(events = [], readState = {}) {
       .filter(Boolean)
   );
 }
+
+export function initialBrowserNotificationState(events = []) {
+  return {
+    maxAt: events.reduce((max, event) => Math.max(max, Number(event?.at) || 0), 0),
+    notifiedKeys: [...new Set(events.map((event) => event?.key).filter((key) => typeof key === "string" && key))]
+  };
+}
+
+export function nextBrowserNotificationEvent(events = [], state = {}) {
+  const notifiedKeys = new Set(Array.isArray(state.notifiedKeys) ? state.notifiedKeys : []);
+  const sorted = [...events].sort((a, b) => (Number(b?.at) || 0) - (Number(a?.at) || 0));
+  const previousMaxAt = parseNotificationSeenAt(state.maxAt);
+  const event = sorted.find((item) => {
+    const key = typeof item?.key === "string" ? item.key : "";
+    if (key && notifiedKeys.has(key)) return false;
+    return (Number(item?.at) || 0) > previousMaxAt;
+  }) || null;
+  const maxAt = sorted.reduce((max, item) => Math.max(max, Number(item?.at) || 0), previousMaxAt);
+  if (event?.key) notifiedKeys.add(event.key);
+  return { event, maxAt, notifiedKeys: [...notifiedKeys] };
+}
