@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-user-reconciliation-report`.
-- Current branch: `codex/r10-user-reconciliation-report`.
-- Last completed work: R10 user mirror hygiene slice keeps UI-only login reset/configuration flags out of the temporary `user:` KV compatibility mirror.
-- Current work: R10 user reconciliation report slice adds a dry-run tool for classifying legacy `user:` KV records against `public.app_users` before any migration/deletion decisions.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 user reconciliation report slice added a read-only dry-run tool for classifying legacy `user:` KV records against `public.app_users` before any migration/deletion decisions.
+- Current work: none.
 
 ## Current Product Direction
 
