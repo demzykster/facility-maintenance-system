@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-user-kv-mirrors`.
-- Current branch: `codex/r10-retire-user-kv-mirrors`.
-- Last completed work: production/API fleet saves/imports/deletes no longer recreate fleet KV mirrors, and staging retired all 126 matched fleet mirrors after guarded dry-run proof.
-- Current work: retire production/API user KV mirror writes and prepare guarded deletion of matched staging `user:*` mirrors.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: production/API user saves/deletes no longer recreate `user:*` KV mirrors; staging `user:*` mirror deletion is the next guarded cleanup step.
+- Current work: none.
 
 ## Current Product Direction
 
