@@ -28,6 +28,8 @@
     "staging:smoke:work-records-api": "node tools/staging-work-records-api-smoke.mjs",
     "staging:presence:reconcile": "node tools/staging-presence-reconcile.mjs",
     "staging:smoke:presence-api": "node tools/staging-presence-api-smoke.mjs",
+    "staging:push-subscriptions:reconcile": "node tools/staging-push-subscriptions-reconcile.mjs",
+    "staging:smoke:push-api": "node tools/staging-push-api-smoke.mjs",
     "staging:settings-records:reconcile": "node tools/staging-settings-records-reconcile.mjs",
     "staging:smoke:settings-records-api": "node tools/staging-settings-records-api-smoke.mjs",
     "staging:cleaning-zones:reconcile": "node tools/staging-cleaning-zones-reconcile.mjs",

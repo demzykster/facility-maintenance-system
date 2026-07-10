@@ -100,6 +100,45 @@ describe("push API handler", () => {
     expect(push.sendNotification).toHaveBeenCalledWith(subscription, expect.stringContaining("התראות לטלפון הופעלו"));
   });
 
+  it("can store subscriptions through the normalized subscription store", async () => {
+    let list = [];
+    const subscriptionStore = {
+      list: vi.fn().mockImplementation(async () => list),
+      upsert: vi.fn().mockImplementation(async (record) => {
+        list = [record, ...list.filter((item) => item.id !== record.id)];
+      }),
+      deleteMany: vi.fn().mockImplementation(async (ids) => {
+        const removeIds = new Set(ids);
+        list = list.filter((item) => !removeIds.has(item.id));
+      })
+    };
+    const handler = createPushHandler({
+      subscriptionStore,
+      push: { setVapidDetails: vi.fn(), sendNotification: vi.fn() },
+      env,
+      sessionClient: activeSessionClient
+    });
+
+    const subscribe = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { action: "subscribe", subscription }
+    });
+    const unsubscribe = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { action: "unsubscribe", subscription }
+    });
+
+    expect(subscribe.statusCode).toBe(200);
+    expect(subscriptionStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "app-user-1",
+      subscription
+    }));
+    expect(unsubscribe.statusCode).toBe(200);
+    expect(subscriptionStore.deleteMany).toHaveBeenCalledWith([subscribe.json().id]);
+  });
+
   it("sends a business notification only to explicit subscribed targets", async () => {
     let stored = "";
     const driver = {
