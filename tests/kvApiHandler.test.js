@@ -949,6 +949,12 @@ describe("kv API handler", () => {
       query: { key: "ticket:T-1", shared: "1" },
       body: { value: "{\"id\":\"T-1\"}", shared: true }
     });
+    const zonePutRes = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "czone:zone-1", shared: "1" },
+      body: { value: "{\"id\":\"zone-1\"}", shared: true }
+    });
     const ppePutRes = await call(handler, {
       method: "PUT",
       headers: { authorization: "Bearer user-token" },
@@ -965,6 +971,8 @@ describe("kv API handler", () => {
           { key: "pushSubscriptions:v1", value: "[]" },
           { key: "config:v1", value: "{\"companyName\":\"CDSL\"}" },
           { key: "ticket:T-1", value: "{\"id\":\"T-1\"}" },
+          { key: "czone:zone-1", value: "{\"id\":\"zone-1\"}" },
+          { key: "cround:round-1", value: "{\"id\":\"round-1\"}" },
           { key: "ppeitem:item-1", value: "{\"id\":\"item-1\"}" }
         ]
       }
@@ -978,10 +986,12 @@ describe("kv API handler", () => {
     expect(configPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "config:v1" });
     expect(ticketPutRes.statusCode).toBe(200);
     expect(ticketPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "ticket:" });
+    expect(zonePutRes.statusCode).toBe(200);
+    expect(zonePutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "czone:" });
     expect(ppePutRes.statusCode).toBe(200);
     expect(ppePutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "ppeitem:" });
     expect(postRes.statusCode).toBe(200);
-    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 5 });
+    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 7 });
     expect(driver.set).not.toHaveBeenCalled();
     expect(driver.setMany).not.toHaveBeenCalled();
   });

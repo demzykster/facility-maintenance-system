@@ -16,9 +16,9 @@ describe("normalized cleaning rounds authority wiring", () => {
     expect(source).toContain('action: "load"');
   });
 
-  it("writes normalized cleaning rounds first and mirrors to KV in production authority mode", () => {
-    expect(source).toMatch(/const saveRound = async \(r\) => \{[\s\S]*const rec = await CLEANING_PHOTOS\.saveRound\(r\);[\s\S]*if \(NORMALIZED_CLEANING_ROUNDS_AUTHORITY\) \{[\s\S]*await NORMALIZED_CLEANING_ROUNDS_PROVIDER\.upsert\(rec\);[\s\S]*void mirrorCleaningRoundToKv\(rec\);/);
-    expect(source).toContain('kind: "cleaning_round_kv_mirror_save_failed"');
+  it("writes normalized cleaning rounds without recreating KV mirrors in production authority mode", () => {
+    expect(source).toMatch(/const saveRound = async \(r\) => \{[\s\S]*const rec = await CLEANING_PHOTOS\.saveRound\(r\);[\s\S]*if \(NORMALIZED_CLEANING_ROUNDS_AUTHORITY\) \{[\s\S]*await NORMALIZED_CLEANING_ROUNDS_PROVIDER\.upsert\(rec\);[\s\S]*\} else \{[\s\S]*persistShared\(`cround:\$\{rec\.id\}`/);
+    expect(source).not.toMatch(/await NORMALIZED_CLEANING_ROUNDS_PROVIDER\.upsert\(rec\);[\s\S]*void mirrorCleaningRoundToKv\(rec\);/);
     expect(source).toMatch(/if \(!await persistShared\(`cround:\$\{rec\.id\}`, JSON\.stringify\(rec\)\)\) return false;[\s\S]*void shadowWriteNormalizedCleaningRound\(rec\);/);
   });
 });
