@@ -2744,7 +2744,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorPmToKv(p);
     } else {
       if (!await persistShared(`pm:${p.id}`, JSON.stringify(p))) return false;
       void shadowWriteNormalizedPm(p);
@@ -2757,7 +2756,6 @@ export default function App() {
     if (!tasks.length) return true;
     if (NORMALIZED_PM_AUTHORITY) {
       if (!await saveNormalizedPmTasks(tasks, "save-many")) return false;
-      void mirrorPmManyToKv(tasks);
     } else {
       const ok = await persistSharedMany(tasks.map((p) => ({ key: `pm:${p.id}`, value: JSON.stringify(p) })), { ...options, atomic: true, timeoutMs: 60000 });
       if (!ok) return false;
@@ -2782,7 +2780,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeletePmFromKv(id);
     } else {
       if (!await deleteShared(`pm:${id}`)) return false;
       void shadowDeleteNormalizedPm(id);

@@ -5,6 +5,7 @@ const RETIRED_PRODUCTION_API_WRITE_PREFIXES = Object.freeze([
   "user:",
   "ticket:",
   "fleet:",
+  "pm:",
   "czone:",
   "cround:",
   "ccomplaint:",
