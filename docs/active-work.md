@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/consolidate-error-api-routes`.
-- Current branch: `codex/consolidate-error-api-routes`.
-- Last completed work: route-budget safety slice consolidated thin `/api/session/*` proxies into one dynamic route while preserving the existing session URLs and handlers.
-- Current work: route-budget safety slice consolidating `/api/client-errors` and `/api/system-errors` into one dynamic diagnostics route while preserving the existing URLs and permissions.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: route-budget safety slice consolidated `/api/client-errors` and `/api/system-errors` into one dynamic diagnostics route while preserving the existing URLs and permission boundaries.
+- Current work: none.
 
 ## Current Product Direction
 
@@ -30,4 +30,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. The session route-budget slice freed six Vercel API route slots; this diagnostics route-budget slice must preserve the existing client/system error URLs and permission boundaries.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. The diagnostics route-budget slice freed one more Vercel API route slot; the route budget is now 17/24.
