@@ -6,7 +6,7 @@ This is the active plan for moving CMMS CDSL from a browser-local demo to a prod
 
 The owner has opened the production backend/auth phase after R8.
 
-The goal is no longer only demo stabilization. The current R9 foundation supports controlled staging/pilot use while keeping the existing working product intact. Final production readiness now means moving beyond the accepted KV compatibility bridge into normalized business tables and broader server-side business permissions.
+The goal is no longer only demo stabilization. The R9 foundation supports controlled staging/pilot use while keeping the existing working product intact, and the R10 data-core cleanup moved the current v1 business domains beyond the accepted KV compatibility bridge into normalized business tables and server-side operations. Final production approval now depends on independent review, owner acceptance, and any requested load testing.
 
 The target production platform is Vercel frontend + Supabase Postgres/Auth/RLS/Storage. See `docs/production-platform-decision.md`.
 
@@ -137,7 +137,7 @@ Production requirement:
 - The KV bridge now enforces server-side read permissions for sensitive `user:` and `appIssue:` records as the first R10 server-authority slice.
 - `public.tickets` is the first normalized business table for moving ticket records out of the KV bridge in a later server-operation slice.
 - `POST /api/tickets` is the first normalized ticket server operation; it validates Supabase/CMMS sessions, reuses ticket write permissions, writes to `public.tickets`, and records an audit event when configured.
-- Production/API-mode ticket saves now shadow-write to `/api/tickets` after the current KV save succeeds. Ticket deletes shadow-delete the normalized row. During pilot, `ticket:*` remains the source of truth; `public.tickets` is populated for validation, audit, and future cutover work.
+- Production/API-mode ticket saves/deletes now use `/api/tickets` as normalized authority and no longer recreate `ticket:*` KV mirrors; `public.tickets` is the production/API ticket source for validation, audit, and current runtime reads.
 
 ## Monolith Extraction Policy
 

@@ -25,7 +25,7 @@ describe("productionReadinessModel", () => {
     });
   });
 
-  it("marks the current Supabase/KV bridge foundation as staging pilot ready but not final production", () => {
+  it("stays at staging pilot when final-production data-core flags are not supplied", () => {
     expect(productionReadinessSummary(passedStagingInputs)).toMatchObject({
       level: PRODUCTION_READINESS_LEVELS.stagingPilot,
       stagingPilotReady: true,
