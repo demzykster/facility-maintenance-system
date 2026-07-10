@@ -54,7 +54,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 - Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
 - Vitest was added through PR #2.
-- `npm test` is available. As of 2026-07-10 on the work-records authority branch, it runs 162 test files / 806 tests.
+- `npm test` is available. As of 2026-07-10 on the public-route consolidation branch, it runs 163 test files / 809 tests.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
 - Ticket-card audit passes reduced noise for closed tickets:
   - closed/cancelled tickets no longer show an SLA progress bar;
@@ -72,7 +72,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 ## Known Warnings
 
-- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,201.08 kB raw / 578.92 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
+- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,201.08 kB raw / 578.93 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
 - `npm audit` is currently clean: 0 vulnerabilities on 2026-07-09.
 - The old `xlsx` package dependency has been removed from `package.json`. Excel export now goes through `src/xlsxExportAdapter.js` on top of `write-excel-file`; Excel import uses `read-excel-file`; CSV import uses `papaparse`.
 - CI now runs `npm run lint`, a lightweight JS/MJS syntax gate built on `node --check`; on 2026-07-10 it checked 362 files. JSX coverage still comes from `npm run build`.
