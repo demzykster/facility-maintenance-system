@@ -95,6 +95,15 @@ npm run staging:kv:retire-mirrors -- --prefix presence: --apply
 
 The dry-run reports how many shared KV records have a matching normalized `source_kv_key`. The apply mode deletes only those matched shared records; unmatched records remain for a separate investigation.
 
+The aggregate push subscription mirror is not a per-row `source_kv_key` mirror. Use its dedicated dry-run/apply command after `public.push_subscriptions` is authoritative:
+
+```bash
+npm run staging:push-subscriptions:retire-mirror
+npm run staging:push-subscriptions:retire-mirror -- --apply
+```
+
+The apply mode deletes `pushSubscriptions:v1` only when every legacy subscription id in the JSON mirror already exists in `public.push_subscriptions`.
+
 Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
 
 ```bash

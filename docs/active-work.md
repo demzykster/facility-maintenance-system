@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `none`.
-- Current branch: `main`.
+- Active branch: `codex/r10-retire-push-subscription-kv-mirror`.
+- Current branch: `codex/r10-retire-push-subscription-kv-mirror`.
 - Last completed work: server-side retired-prefix guard prevents old production/API clients from recreating `presence:*` KV mirrors.
-- Current work: none.
+- Current work: retire the `pushSubscriptions:v1` compatibility mirror after normalized push subscriptions are authoritative.
 
 ## Current Product Direction
 
@@ -31,4 +31,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. App config now uses normalized API authority in production/API mode with `config:v1` as a compatibility mirror. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode; app issue saves no longer create new `appIssue:*` KV mirrors in production/API authority mode. Technician/user presence now uses normalized API authority in production/API mode and no longer creates new `presence:*` KV mirrors on production/API saves; generic KV writes for `presence:*` are a no-op in production/API mode so older open clients cannot recreate retired mirrors. On 2026-07-10, staging retired all matched `presence:*` and `appIssue:*` KV mirrors after dry-run proof, reducing KV records from 219 to 189. Phone push subscriptions now use normalized server storage in production/API mode with `pushSubscriptions:v1` as a compatibility mirror. The route budget remains 19/24.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. App config now uses normalized API authority in production/API mode with `config:v1` as a compatibility mirror. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode; app issue saves no longer create new `appIssue:*` KV mirrors in production/API authority mode. Technician/user presence now uses normalized API authority in production/API mode and no longer creates new `presence:*` KV mirrors on production/API saves; generic KV writes for `presence:*` are a no-op in production/API mode so older open clients cannot recreate retired mirrors. On 2026-07-10, staging retired all matched `presence:*` and `appIssue:*` KV mirrors after dry-run proof, reducing KV records from 219 to 189. Phone push subscriptions now use normalized server storage in production/API mode; this branch stops new `pushSubscriptions:v1` mirror writes and adds a guarded aggregate-key retire script. The route budget remains 19/24.
