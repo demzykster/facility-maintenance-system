@@ -229,7 +229,7 @@ export function createPublicComplaintHandler({
 
       if (backendComplaintsDriver) await backendComplaintsDriver.upsert(complaint);
       await backendDriver.set(rateKey, String(currentTime), false);
-      await backendDriver.set(`ccomplaint:${complaint.id}`, JSON.stringify(complaint), true);
+      if (!backendComplaintsDriver) await backendDriver.set(`ccomplaint:${complaint.id}`, JSON.stringify(complaint), true);
       return json(res, 201, { ok: true, id: complaint.id, status: complaint.status });
     } catch (error) {
       if (error?.message === "payload_too_large") return json(res, 413, { error: "payload_too_large" });
