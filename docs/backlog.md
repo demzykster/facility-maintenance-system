@@ -44,7 +44,7 @@ DoD:
 Later separate safety slices:
 - CI-safe staging preflight dry/model check is now wired into GitHub Actions through `staging:preflight:ci`; a future deploy-blocking live secret-backed job can still be considered separately.
 - Add minimal automated browser smoke coverage for the highest-risk role/workflow paths.
-- Add a minimal lint/static-analysis gate once scoped so it does not become a broad formatting churn PR.
+- Minimal static syntax-analysis gate is now wired into GitHub Actions through `npm run lint`; a future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
 
 ### R10 data slice - user-management authority gap
 
