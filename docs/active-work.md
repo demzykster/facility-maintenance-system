@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-retire-cleaning-kv-mirrors`.
-- Current branch: `codex/r10-retire-cleaning-kv-mirrors`.
+- Active branch: `none`.
+- Current branch: `main`.
 - Last completed work: production/API ticket saves no longer recreate `ticket:*` mirrors and staging retired the matched ticket mirror after guarded dry-run proof.
-- Current work: retire cleaning compatibility KV mirror writes before deleting matched staging cleaning mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
