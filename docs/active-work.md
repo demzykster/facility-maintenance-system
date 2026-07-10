@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/consolidate-public-api-routes`.
-- Current branch: `codex/consolidate-public-api-routes`.
-- Last completed work: R10 work-records authority slice moved maintenance tasks (`mtask:`) and meetings (`mmeet:`) onto one `/api/work` route with Supabase-backed tables while keeping compatibility KV mirrors.
-- Current work: route-budget safety slice consolidating the public complaints/zones API entrypoints into one dynamic route while preserving the existing public URLs.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: public route-budget safety slice consolidated `/api/public/complaints` and `/api/public/zones` onto one dynamic route while preserving the existing public URLs.
+- Current work: none.
 
 ## Current Product Direction
 
@@ -30,4 +30,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. The Vercel API route budget is currently full, so this route-budget slice must free capacity before any additional API surface is added.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. The public route-budget slice freed one Vercel API route slot; the route budget is now 23/24, so the next narrow R10 domain can add one route if it cannot reuse an existing grouped route.
