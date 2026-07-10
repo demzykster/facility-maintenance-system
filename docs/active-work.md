@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/staging-preflight-ci-gate`.
-- Current branch: `codex/staging-preflight-ci-gate`.
-- Last completed work: R10 PPE normalized-authority slice moved PPE movements, catalog items, norms, requests, and orders onto one `/api/ppe` route with Supabase-backed tables while keeping compatibility KV mirrors.
-- Current work: safety slice adds a CI-safe staging preflight gate so production-env shape checks stay wired into normal PR/main checks without exposing staging secrets.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: safety slice added a CI-safe staging preflight gate so production-env shape checks stay wired into normal PR/main checks without exposing staging secrets.
+- Current work: none.
 
 ## Current Product Direction
 
@@ -28,4 +28,4 @@
 - User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users` and deactivates them on delete while preserving protected `user:` KV as temporary legacy enrichment/fallback. Continue user-management R10 in narrow authority slices until writes no longer depend on the bridge.
 - Cleaning zones, rounds, complaints, and worker absences now use normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed cleaning slices unless a live bug is reported.
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
-- Staging preflight model coverage is done; the active safety slice should only wire a CI-safe dry gate and must not change seed defaults, staging secrets, R10 data authority, or monolith structure.
+- Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
