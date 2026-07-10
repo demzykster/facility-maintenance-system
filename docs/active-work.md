@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-presence-stop-kv-mirror`.
-- Current branch: `codex/r10-presence-stop-kv-mirror`.
-- Last completed work: public complaints stop creating new `ccomplaint:*` KV mirrors when the normalized complaints driver is configured.
-- Current work: presence saves stop creating new `presence:*` KV mirrors in production/API authority mode.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: presence saves stop creating new `presence:*` KV mirrors in production/API authority mode.
+- Current work: none.
 
 ## Current Product Direction
 
