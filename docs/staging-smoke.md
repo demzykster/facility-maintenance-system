@@ -76,6 +76,13 @@ To backfill safe legacy-only users into `public.app_users` without deleting lega
 npm run staging:users:reconcile-report -- --apply
 ```
 
+To retire old `user:*` mirrors after all legacy rows are matched to `public.app_users`:
+
+```bash
+npm run staging:users:retire-kv-mirrors
+npm run staging:users:retire-kv-mirrors -- --apply
+```
+
 Apply mode aborts if the report has ambiguous matches, malformed records, or skipped backfill rows.
 
 To classify remaining shared KV prefixes after normalized-authority slices and backfills:

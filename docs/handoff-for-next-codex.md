@@ -6,7 +6,7 @@
 - Product line: v1/main only.
 - Active branch: none on `main`, unless a focused PR is in progress.
 - Open PRs at last check: none.
-- Current production-data direction: R10 is started. Tickets, fleet units, and periodic maintenance are normalized-authority in production/API mode; their legacy KV records remain compatibility mirrors.
+- Current production-data direction: R10 is active. Tickets, fleet units, users, app config, PPE, cleaning, presence, push subscriptions, and several settings paths are normalized-authority in production/API mode; staging residual KV records are currently 0 after guarded mirror retirement. Periodic maintenance and work records still keep compatibility mirrors.
 
 ## Owner Decision
 
