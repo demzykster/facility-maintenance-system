@@ -25,7 +25,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
-import { DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, nextBrowserNotificationEvent, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
+import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, nextBrowserNotificationEvent, notificationReadStateForEvents, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
@@ -1513,18 +1513,19 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   const setPrefs = (patch) => setPrefsState((p) => { const np = { ...p, ...patch }; store.set(pkey, JSON.stringify(np), false); return np; });
   const rawEvents = useMemo(() => computeEvents(session, tickets, pm, fleet, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders).filter((e) => (cfg.notify || {})[e.kind] !== false), [session, tickets, pm, fleet, cfg, presence, zones, rounds, complaints, users, absences, tasks, meetings, ppeReqs, ppeItems, ppeOrders]);
   const visible = useMemo(() => rawEvents.filter((e) => !prefs.hidden[e.kind]), [rawEvents, prefs.hidden]);
+  const browserVisible = useMemo(() => browserNotificationEvents(visible), [visible]);
   const events = useMemo(() => [...visible].sort((a, b) => prefs.sort === "oldest" ? a.at - b.at : b.at - a.at), [visible, prefs.sort]);
   const unreadKeys = useMemo(() => readState == null ? new Set() : unreadNotificationKeySet(visible, readState), [visible, readState]);
   const unreadEvents = useMemo(() => events.filter((event) => unreadKeys.has(event.key)), [events, unreadKeys]);
   const unread = unreadKeys.size;
   useEffect(() => {
-    if (!visible.length) return;
+    if (!browserVisible.length) return;
     if (!initRef.current) {
       initRef.current = true;
-      browserNotificationRef.current = initialBrowserNotificationState(visible);
+      browserNotificationRef.current = initialBrowserNotificationState(browserVisible);
       return;
     }
-    const nextBrowserNotification = nextBrowserNotificationEvent(visible, browserNotificationRef.current);
+    const nextBrowserNotification = nextBrowserNotificationEvent(browserVisible, browserNotificationRef.current);
     browserNotificationRef.current = {
       maxAt: nextBrowserNotification.maxAt,
       notifiedKeys: nextBrowserNotification.notifiedKeys
@@ -1535,7 +1536,7 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
       try { if ("Notification" in window && Notification.permission === "granted") new Notification(top.title, { body: top.body }); } catch (e) {}
       setTimeout(() => setToast(null), 5200);
     }
-  }, [visible]);
+  }, [browserVisible]);
   const markRead = async () => {
     const next = notificationReadStateForEvents(visible);
     setReadState(next);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  browserNotificationEvents,
   initialBrowserNotificationState,
   nextBrowserNotificationEvent,
   notificationReadStateForEvents,
@@ -65,5 +66,22 @@ describe("notification prefs model", () => {
 
     expect(first.event).toEqual({ key: "doc-194337", at: 2000 });
     expect(nextBrowserNotificationEvent([{ key: "doc-194337", at: 3000 }], first).event).toBeNull();
+  });
+
+  it("keeps backlog-style events out of browser notifications", () => {
+    expect(browserNotificationEvents([
+      { key: "doc-1", kind: "doc" },
+      { key: "pm-1", kind: "pm" },
+      { key: "ppe-low-admin", kind: "ppe" },
+      { key: "sh-on-tech-1", kind: "confirm" },
+      { key: "sh-off-tech-1", kind: "back" },
+      { key: "ticket-1-c", kind: "new" },
+      { key: "ticket-1-sla", kind: "sla" },
+      { key: "cmp-1", kind: "cleaning" }
+    ])).toEqual([
+      { key: "ticket-1-c", kind: "new" },
+      { key: "ticket-1-sla", kind: "sla" },
+      { key: "cmp-1", kind: "cleaning" }
+    ]);
   });
 });
