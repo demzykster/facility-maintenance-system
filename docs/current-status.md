@@ -108,6 +108,6 @@ Current production-data work:
 - Maintenance tasks and meetings are normalized-authority in production/API mode through `/api/work`; `mtask:*` and `mmeet:*` KV records remain compatibility mirrors.
 - Locations and app issue reports are moving onto normalized authority in production/API mode through `/api/settings/records`; `location:*` and `appIssue:*` KV records remain compatibility mirrors.
 - Technician/user presence is normalized-authority in production/API mode through `/api/presence`; `presence:*` KV records remain compatibility mirrors.
-- Phone push subscriptions are moving onto normalized authority through `/api/push` backed by `public.push_subscriptions`; `pushSubscriptions:v1` remains a compatibility mirror.
+- Phone push subscriptions are normalized-authority through `/api/push` backed by `public.push_subscriptions`; `pushSubscriptions:v1` remains a compatibility mirror.
 - Session API entrypoints keep the existing `/api/session/*` URLs but are served by one dynamic route file. Client/system diagnostics keep the existing `/api/client-errors` and `/api/system-errors` URLs but are served by one dynamic diagnostics route. The presence authority route leaves the Vercel API route budget at 18/24.
 - R10 is not complete yet. Other business domains still need deliberate normalized-table/server-operation slices before final production can stop depending on the accepted KV bridge.
