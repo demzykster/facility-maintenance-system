@@ -54,7 +54,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 - Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
 - Vitest was added through PR #2.
-- `npm test` is available. As of 2026-07-10 on the diagnostics-route consolidation branch, it runs 170 test files / 831 tests.
+- `npm test` is available. As of 2026-07-10 on the R10 presence authority branch, it runs 176 test files / 850 tests.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
 - Ticket-card audit passes reduced noise for closed tickets:
   - closed/cancelled tickets no longer show an SLA progress bar;
@@ -107,5 +107,6 @@ Current production-data work:
 - PPE movements, catalog items, norms, requests, and orders are normalized-authority in production/API mode through `/api/ppe`; `ppe:*`, `ppeitem:*`, `ppenorm:*`, `ppereq:*`, and `ppeorder:*` KV records remain compatibility mirrors.
 - Maintenance tasks and meetings are normalized-authority in production/API mode through `/api/work`; `mtask:*` and `mmeet:*` KV records remain compatibility mirrors.
 - Locations and app issue reports are moving onto normalized authority in production/API mode through `/api/settings/records`; `location:*` and `appIssue:*` KV records remain compatibility mirrors.
-- Session API entrypoints keep the existing `/api/session/*` URLs but are served by one dynamic route file. Client/system diagnostics keep the existing `/api/client-errors` and `/api/system-errors` URLs but are served by one dynamic diagnostics route, leaving the Vercel API route budget at 17/24.
+- Technician/user presence is moving onto normalized authority in production/API mode through `/api/presence`; `presence:*` KV records remain compatibility mirrors.
+- Session API entrypoints keep the existing `/api/session/*` URLs but are served by one dynamic route file. Client/system diagnostics keep the existing `/api/client-errors` and `/api/system-errors` URLs but are served by one dynamic diagnostics route. The presence authority route leaves the Vercel API route budget at 18/24.
 - R10 is not complete yet. Other business domains still need deliberate normalized-table/server-operation slices before final production can stop depending on the accepted KV bridge.

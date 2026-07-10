@@ -70,6 +70,7 @@ import { createApiCleaningComplaintsProvider, createApiWorkerAbsencesProvider } 
 import { createApiPpeProvider } from "./apiPpeAdapter.js";
 import { createApiWorkProvider } from "./apiWorkAdapter.js";
 import { createApiSettingsRecordsProvider } from "./apiSettingsRecordsAdapter.js";
+import { createApiPresenceProvider } from "./apiPresenceAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
@@ -81,6 +82,7 @@ import { cleaningComplaintsAuthorityFailureIssue, cleaningComplaintsForAuthority
 import { normalizedPpeAuthorityEnabled, ppeAuthorityFailureIssue, ppeForAuthority } from "./ppeAuthorityModel.js";
 import { normalizedWorkAuthorityEnabled, workAuthorityFailureIssue, workForAuthority } from "./workAuthorityModel.js";
 import { normalizedSettingsRecordsAuthorityEnabled, settingsRecordsAuthorityFailureIssue, settingsRecordsForAuthority } from "./settingsRecordsAuthorityModel.js";
+import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, presenceForAuthority } from "./presenceAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -238,6 +240,19 @@ const NORMALIZED_SETTINGS_RECORDS_SHADOW_WRITE = !NORMALIZED_SETTINGS_RECORDS_AU
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_SETTINGS_RECORDS_PROVIDER;
+const NORMALIZED_PRESENCE_PROVIDER = createApiPresenceProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_PRESENCE_AUTHORITY = normalizedPresenceAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_PRESENCE_PROVIDER
+});
+const NORMALIZED_PRESENCE_SHADOW_WRITE = !NORMALIZED_PRESENCE_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_PRESENCE_PROVIDER;
 const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
@@ -1870,6 +1885,7 @@ export default function App() {
 	    let meetingRows = mmt;
 	    let locationRows = locs;
 	    let appIssueRows = issues;
+	    let presenceRows = pres;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
         const normalized = await ticketsForAuthority({
@@ -2042,6 +2058,21 @@ export default function App() {
         }));
 	      }
 	    }
+	    if (NORMALIZED_PRESENCE_AUTHORITY) {
+	      try {
+	        const normalizedPresence = await presenceForAuthority({
+          kvPresence: pres,
+          provider: NORMALIZED_PRESENCE_PROVIDER,
+          normalizedAuthority: true
+        });
+        presenceRows = normalizedPresence.presence;
+      } catch (error) {
+        void recordAutomaticAppIssue(presenceAuthorityFailureIssue({
+          action: "load",
+          message: error?.message || "Normalized presence API load failed"
+        }));
+	      }
+	    }
     const apply = (key, arr, setter, sortFn) => {
       const data = sortFn ? [...arr].sort(sortFn) : arr;
       const sig = JSON.stringify(data);
@@ -2066,7 +2097,7 @@ export default function App() {
     // presence: мержим хранилище с текущим стейтом по свежести lastSeen — чтобы поллинг не затирал только что записанный статус при медленном/частичном хранилище
     setPresence((cur) => {
       const map = {};
-      [...(cur || []), ...pres].forEach((r) => { if (!r || !r.id) return; const ex = map[r.id]; if (!ex || (r.lastSeen || 0) >= (ex.lastSeen || 0)) map[r.id] = r; });
+      [...(cur || []), ...presenceRows].forEach((r) => { if (!r || !r.id) return; const ex = map[r.id]; if (!ex || (r.lastSeen || 0) >= (ex.lastSeen || 0)) map[r.id] = r; });
       const merged = Object.values(map);
       const sig = JSON.stringify(merged);
       if (snapRef.current.presence !== sig) { snapRef.current.presence = sig; return merged; }
@@ -3204,6 +3235,67 @@ export default function App() {
     setAppIssues((s) => [x, ...s.filter((y) => y.id !== x.id)].sort((a, b) => (b.at || 0) - (a.at || 0)));
     return true;
   };
+  const shadowWriteNormalizedPresence = async (record) => {
+    if (!NORMALIZED_PRESENCE_SHADOW_WRITE) return;
+    try {
+      await NORMALIZED_PRESENCE_PROVIDER.upsert(record);
+    } catch (error) {
+      void recordAutomaticAppIssue(presenceAuthorityFailureIssue({
+        action: "shadow_save",
+        id: record.id,
+        message: error?.message || "Normalized presence API shadow save failed"
+      }));
+    }
+  };
+  const mirrorPresenceToKv = async (record) => {
+    if (!record?.id) return false;
+    return persistShared(`presence:${record.id}`, JSON.stringify(record), { toastOnFail: false });
+  };
+  const loadPresenceRecord = async (id) => {
+    if (!id) return null;
+    if (NORMALIZED_PRESENCE_AUTHORITY) {
+      try {
+        const response = await NORMALIZED_PRESENCE_PROVIDER.get(id);
+        return response?.presence || null;
+      } catch (error) {
+        if (error?.message !== "presence_not_found") {
+          void recordAutomaticAppIssue(presenceAuthorityFailureIssue({
+            action: "get",
+            id,
+            message: error?.message || "Normalized presence API get failed"
+          }));
+        }
+      }
+    }
+    try {
+      const raw = await store.get(`presence:${id}`, true);
+      if (!raw) return null;
+      return JSON.parse(typeof raw === "string" ? raw : raw.value);
+    } catch {
+      return null;
+    }
+  };
+  const savePresenceRecord = async (record) => {
+    if (!record?.id) return false;
+    if (NORMALIZED_PRESENCE_AUTHORITY) {
+      try {
+        await NORMALIZED_PRESENCE_PROVIDER.upsert(record);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(presenceAuthorityFailureIssue({
+          action: "save",
+          id: record.id,
+          message: error?.message || "Normalized presence API save failed"
+        }));
+        return false;
+      }
+      void mirrorPresenceToKv(record);
+      return true;
+    }
+    const ok = await persistShared(`presence:${record.id}`, JSON.stringify(record));
+    if (ok) void shadowWriteNormalizedPresence(record);
+    return ok;
+  };
   // авто-миграция Тип/Модель: группировка по типу; версия 2 пересобирает старый 1:1
   useEffect(() => {
     if (ready && fleet.length && config.vtMigV !== 2) {
@@ -3211,7 +3303,7 @@ export default function App() {
       if (vts.length) saveConfig({ ...config, ...flattenVehicleTypes(vts), vtMigV: 2 }, { toastOnFail: false });
     }
   }, [ready, fleet, config]);
-  const setShift = async (on) => { if (!session) return false; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return false; setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); return true; };
+  const setShift = async (on) => { if (!session) return false; const prev = presence.find((x) => x.id === session.id); const rec = { id: session.id, name: session.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() }; if (!await savePresenceRecord(rec)) return false; setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]); return true; };
   const touchPresence = async () => {
     if (!session?.id) return;
     const cur = presenceRef.current.find((x) => x.id === session.id);
@@ -3225,7 +3317,7 @@ export default function App() {
       lastSeen: Date.now(),
       day: cur?.day || todayPresenceKey()
     };
-    if (await persistShared(`presence:${session.id}`, JSON.stringify(rec))) setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]);
+    if (await savePresenceRecord(rec)) setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]);
   };
   useEffect(() => { if (!session?.id) return; touchPresence(); const id = setInterval(touchPresence, 60000); return () => clearInterval(id); }, [session?.id, session?.name, session?.role]);
   const login = async (s, options = {}) => {
@@ -3293,7 +3385,7 @@ export default function App() {
     const id = effSession.id; if (!id) return;
     const prev = presence.find((x) => x.id === id);
     const rec = { id, name: effSession.name, onShift: on, since: on ? Date.now() : (prev?.since || null), endedAt: on ? null : Date.now(), lastSeen: Date.now(), day: todayKey() };
-    if (!await persistShared(`presence:${id}`, JSON.stringify(rec))) return false;
+    if (!await savePresenceRecord(rec)) return false;
     setPresence((s) => [...s.filter((x) => x.id !== id), rec]);
     return true;
   });
@@ -3411,15 +3503,14 @@ export default function App() {
     if (!session || session.role !== "tech" || impersonating) return;
     let cancelled = false;
     (async () => {
-      let prev = null;
-      try { const raw = await store.get(`presence:${session.id}`, true); if (raw) prev = JSON.parse(typeof raw === "string" ? raw : raw.value); } catch (e) {}
+      const prev = await loadPresenceRecord(session.id);
       const today = todayKey();
       const started = prev && prev.day === today && prev.since;
       const rec = started
         ? { ...prev, onShift: true, lastSeen: Date.now() }
         : { id: session.id, name: session.name, onShift: true, since: Date.now(), endedAt: null, lastSeen: Date.now(), day: today };
       if (cancelled) return;
-      if (!await persistShared(`presence:${session.id}`, JSON.stringify(rec))) return;
+      if (!await savePresenceRecord(rec)) return;
       setPresence((s) => [...s.filter((x) => x.id !== session.id), rec]);
     })();
     return () => { cancelled = true; };
