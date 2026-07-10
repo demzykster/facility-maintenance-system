@@ -225,6 +225,13 @@ const writeKvMirror = async (driver, key, value) => {
   return true;
 };
 
+const userKvMirrorRecord = (user = {}) => {
+  const clean = { ...(user || {}) };
+  delete clean.loginResetRequested;
+  delete clean.loginConfigured;
+  return clean;
+};
+
 const deleteKvMirror = async (driver, key) => {
   if (typeof driver?.delete !== "function") return false;
   await driver.delete(key, true);
@@ -376,7 +383,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       } else if (typeof backendDriver?.set !== "function") {
         return json(res, 503, { error: "users_legacy_backend_not_configured" });
       }
-      await writeKvMirror(backendDriver, key, JSON.stringify(user));
+      await writeKvMirror(backendDriver, key, JSON.stringify(userKvMirrorRecord(user)));
       await writeAuditEvent(backendAuditDriver, userUpsertAuditEvent(user, auth.user));
       return json(res, 200, { ok: true, user: redactUserSecrets(user) });
     } catch (error) {

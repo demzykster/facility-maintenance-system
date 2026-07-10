@@ -362,6 +362,37 @@ describe("users API handler", () => {
     }));
   });
 
+  it("keeps UI-only login flags out of the temporary KV mirror", async () => {
+    const driver = { set: vi.fn().mockResolvedValue(undefined) };
+    const handler = createUsersApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: {
+        user: {
+          id: "worker-1",
+          name: "Worker",
+          role: "worker",
+          workerNo: "2042",
+          loginConfigured: true,
+          loginResetRequested: true
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.set).toHaveBeenCalledWith("user:worker-1", JSON.stringify({
+      id: "worker-1",
+      name: "Worker",
+      role: "worker",
+      workerNo: "2042"
+    }), true);
+  });
+
   it("syncs login-capable users to app_users before writing the KV mirror", async () => {
     const order = [];
     const driver = {
