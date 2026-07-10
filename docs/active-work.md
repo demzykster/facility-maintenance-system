@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-user-mirror-sanitize`.
-- Current branch: `codex/r10-user-mirror-sanitize`.
-- Last completed work: R10 app_users login reset slice makes manager-triggered first-login reset clear `app_users` PIN/password authority state instead of relying on legacy `user:` secret fields, with the PIN staging smoke covering setup, login, reset, and setup-required validation.
-- Current work: R10 user mirror hygiene slice keeps UI-only login reset/configuration flags out of the temporary `user:` KV compatibility mirror.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 user mirror hygiene slice keeps UI-only login reset/configuration flags out of the temporary `user:` KV compatibility mirror.
+- Current work: none.
 
 ## Current Product Direction
 
