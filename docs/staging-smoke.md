@@ -62,6 +62,14 @@ npm run staging:smoke:pin-login
 
 This creates a temporary `app_users` worker, completes first PIN setup through `/api/session/initial-password`, verifies that `app_users.pin_hash` is a salted `scrypt` hash rather than the plain PIN, logs in with the PIN, restores `/api/session/me`, resets the login through `/api/users`, verifies that the hash is cleared with `login_state='reset_required'`, validates that first-login setup is required again, and removes the temporary worker.
 
+To inspect legacy `user:` records before any user migration or deletion decision:
+
+```bash
+npm run staging:users:reconcile-report
+```
+
+This is read-only. It compares shared KV `user:` records with `public.app_users` by id, auth user id, email, worker number, and normalized phone, then reports matched, ambiguous, legacy-only, and malformed records.
+
 Before marking a Vercel deploy ready for owner review, verify the public app is serving the current local commit:
 
 ```bash
