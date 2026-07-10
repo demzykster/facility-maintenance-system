@@ -65,6 +65,17 @@ export function unreadNotificationKeySet(events = [], readState = {}) {
   );
 }
 
+const NON_INTERRUPTING_BROWSER_KINDS = new Set(["doc", "pm", "ppe"]);
+const NON_INTERRUPTING_BROWSER_KEY_PREFIXES = ["sh-on-", "sh-off-"];
+
+export function browserNotificationEvents(events = []) {
+  return events.filter((event) => {
+    if (NON_INTERRUPTING_BROWSER_KINDS.has(event?.kind)) return false;
+    const key = typeof event?.key === "string" ? event.key : "";
+    return !NON_INTERRUPTING_BROWSER_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+  });
+}
+
 export function initialBrowserNotificationState(events = []) {
   return {
     maxAt: events.reduce((max, event) => Math.max(max, Number(event?.at) || 0), 0),
