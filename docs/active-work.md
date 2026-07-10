@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-public-zones-normalized-read`.
-- Current branch: `codex/r10-public-zones-normalized-read`.
-- Last completed work: R10 residual KV report now covers all KV scopes and records scope breakdowns after stale public complaint rate-limit cleanup.
-- Current work: public QR zones and public complaint zone lookup now read normalized cleaning zones before falling back to `czone:` KV mirrors.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: public QR zones and public complaint zone lookup now read normalized cleaning zones before falling back to `czone:` KV mirrors.
+- Current work: none.
 
 ## Current Product Direction
 
