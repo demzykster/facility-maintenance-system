@@ -42,7 +42,7 @@ DoD:
 - `tools/staging-smoke-preflight.mjs` remains a thin executable wrapper over tested preflight model logic.
 
 Later separate safety slices:
-- Decide whether `staging:preflight` should become a CI/deploy-blocking gate, and if so add a CI-safe dry/model check or a gated job that has the required staging secrets.
+- CI-safe staging preflight dry/model check is now wired into GitHub Actions through `staging:preflight:ci`; a future deploy-blocking live secret-backed job can still be considered separately.
 - Add minimal automated browser smoke coverage for the highest-risk role/workflow paths.
 - Add a minimal lint/static-analysis gate once scoped so it does not become a broad formatting churn PR.
 

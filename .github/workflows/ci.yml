@@ -26,6 +26,9 @@ jobs:
       - name: Run unit tests
         run: npm test -- --run
 
+      - name: Run staging preflight contract
+        run: npm run staging:preflight:ci
+
       - name: Run PR release gates
         if: github.event_name == 'pull_request'
         run: npm run release:check

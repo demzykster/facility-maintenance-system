@@ -22,6 +22,14 @@ npm run staging:preflight:local
 
 The preflight rejects placeholder values such as `YOUR_PROJECT`, `YOUR_SUPABASE_ANON_KEY`, `REPLACE_WITH...`, and `CHANGE_ME`.
 
+CI also runs a dry staging preflight contract:
+
+```bash
+npm run staging:preflight:ci
+```
+
+This uses synthetic non-secret production-shaped values. It does not verify live Vercel/Supabase secrets, but it keeps the staging preflight model and production-config gate wired into normal PR/main checks.
+
 To check whether the Vercel project already has the required variable names configured, run:
 
 ```bash
