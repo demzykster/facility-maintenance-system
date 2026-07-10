@@ -12,7 +12,7 @@ import Papa from "papaparse";
 import QRCode from "qrcode";
 import jsQR from "jsqr";
 import packageInfo from "../package.json";
-import { XLSX, workbookToBlob } from "./xlsxExportAdapter.js";
+import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { productionAccessToken, store } from "./storageAdapter.js";
 import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
@@ -599,7 +599,8 @@ const downloadXlsx = (wb, filename) => {
     notifyUser("הסביבה חוסמת הורדת קבצים. נסו בדפדפן/בגרסת הענן.");
   };
   try {
-    workbookToBlob(wb)
+    import("./xlsxExportAdapter.js")
+      .then(({ workbookToBlob }) => workbookToBlob(wb))
       .then((blob) => { if (!downloadBlob(blob, filename)) fallback(); })
       .catch(fallback);
     return true;

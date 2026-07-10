@@ -72,9 +72,9 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 ## Known Warnings
 
-- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,208.37 kB raw / 580.14 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
+- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,149.74 kB raw / 567.33 kB gzip, plus a lazy Excel export chunk at 59.99 kB raw / 14.47 kB gzip. This is improved from the previous 2,208.37 kB raw / 580.14 kB gzip main chunk, but it remains a real size warning.
 - `npm audit` is currently clean: 0 vulnerabilities on 2026-07-09.
-- The old `xlsx` package dependency has been removed from `package.json`. Excel export now goes through `src/xlsxExportAdapter.js` on top of `write-excel-file`; Excel import uses `read-excel-file`; CSV import uses `papaparse`.
+- The old `xlsx` package dependency has been removed from `package.json`. Excel workbook helpers now live in `src/xlsxWorkbookModel.js`; the heavier `write-excel-file` export path is lazy-loaded through `src/xlsxExportAdapter.js`. Excel import still uses `read-excel-file`; CSV import uses `papaparse`.
 - CI now runs `npm run lint`, a lightweight JS/MJS syntax gate built on `node --check`; on 2026-07-10 it checked 369 files. JSX coverage still comes from `npm run build`.
 - Old dependency-audit branch references are historical only. That work is already merged into `main`; current remote branches should be checked live with `git branch -r`.
 - The public Vercel deployment is staging/pilot, not final production. It uses the current Supabase-backed server/session/API/KV compatibility path for staging data, while local/demo mode can still use browser storage for development review.

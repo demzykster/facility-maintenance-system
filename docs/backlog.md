@@ -21,7 +21,7 @@ The backlog below remains useful for historical detail and code-area context, bu
 
 ### UI polish slice - touch targets and visual-audit follow-ups
 
-Status: first touch-target/overflow-cue pass done in PR #833; local demo UI smoke gate done in PR #834; semantic status-token slice is in PR #835; deeper visual polish remains separate.
+Status: first touch-target/overflow-cue pass done in PR #833; local demo UI smoke gate done in PR #834; semantic status-token slice done in PR #835; lazy Excel export performance slice is in review; deeper visual polish remains separate.
 
 Goal:
 - Preserve the current operational CMMS layout while removing concrete usability friction from the owner-reported visual audit.
@@ -38,13 +38,18 @@ Completed PR #834:
 2. Wired the smoke into GitHub Actions after build so desktop/mobile login, shell rendering, horizontal overflow, console errors, failed responses, and small touch targets are checked on each PR/main push.
 3. Fixed flex shrink on mobile topbar icon buttons that the Linux browser smoke caught as sub-44px controls.
 
-In review PR #835:
+Completed PR #835:
 1. Added a shared semantic status-token model for priority, task status, and ticket status color metadata.
 2. Covered the model with focused unit tests so future visual cleanup can reuse a stable danger/warning/success/info vocabulary instead of ad hoc color literals.
 
+In review performance slice:
+1. Split lightweight workbook helpers from the heavier Excel export adapter.
+2. Lazy-load `write-excel-file` only when a user actually downloads an Excel file.
+3. Keep Excel import, CSV import, QR scanning, and broader monolith code-splitting as separate future slices.
+
 Remaining separate PR sequence:
 1. Continue card/dashboard noise reduction only from concrete owner-reported screens.
-2. Keep code-splitting/virtualization as a separate performance slice; do not bundle it with visual polish.
+2. Continue performance work only as small library-level lazy-load slices or an explicit component/code-splitting plan; do not bundle it with visual polish.
 
 DoD:
 - `npm run lint`, `npm test -- --run`, `npm run release:check`, and `npm run build` pass.
