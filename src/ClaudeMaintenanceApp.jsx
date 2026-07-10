@@ -3125,6 +3125,7 @@ export default function App() {
 	    }
 	  };
 	  const saveUser = async (u) => {
+	    const requestedId = u.id;
 	    if (!USER_MANAGEMENT_API_AUTHORITY) {
 	      try {
 	        await syncAdminProfileUser(u);
@@ -3135,15 +3136,16 @@ export default function App() {
 	    }
 	    if (USER_MANAGEMENT_API_AUTHORITY) {
 	      try {
-	        await USER_MANAGEMENT_PROVIDER.upsert(u);
+	        const result = await USER_MANAGEMENT_PROVIDER.upsert(u);
+	        u = result?.user || u;
 	      } catch (error) {
 	        setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
 	        void recordAutomaticAppIssue({ kind: "users_api_save_failed", action: "upsert", key: `user:${u.id}`, message: error?.message || "User-management API save failed" });
 	        return false;
 	      }
 	    } else if (!await persistShared(`user:${u.id}`, JSON.stringify(u))) return false;
-	    setUsers((s) => [...s.filter((x) => x.id !== u.id), u]);
-	    return true;
+	    setUsers((s) => [...s.filter((x) => x.id !== requestedId && x.id !== u.id), u]);
+	    return u;
 	  };
 	  const delUser = async (id) => {
 	    if (USER_MANAGEMENT_API_AUTHORITY) {

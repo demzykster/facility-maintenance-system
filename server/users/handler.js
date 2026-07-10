@@ -190,6 +190,16 @@ const userLoginResetPatch = (user = {}) => {
   return {};
 };
 
+const appUserCreateProfileFromUserRecord = (user = {}) => ({
+  ...extendedAppUserPatchFromUserRecord(user),
+  login_state: user.active === false || user.status === "archived" ? "disabled" : "pending_setup",
+  must_change_password: false,
+  login_metadata: {
+    source: "api/users",
+    client_user_id: cleanString(user.id)
+  }
+});
+
 const createDefaultDriver = (env, fetchImpl) => {
   if (env.CMMS_KV_DRIVER === "upstash") return createUpstashKvDriverFromEnv(env, fetchImpl);
   if (env.CMMS_KV_DRIVER === "supabase") return createSupabaseKvDriverFromEnv(env, fetchImpl);
@@ -307,10 +317,10 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
           if (canReadProfiles) {
             const profile = await backendProfileClient.getAppUserProfileById(id);
             if (profile) {
-              const legacy = await legacyUserForProfile(backendDriver, profile);
-              const user = userRecordFromAppUserProfile(profile, legacy);
+              const user = userRecordFromAppUserProfile(profile, {});
               return json(res, 200, { ok: true, user: publicUserForSession(appUserRecordKey(user), user, auth.user), source: "app_users" });
             }
+            return json(res, 404, { error: "user_not_found" });
           }
           if (typeof backendDriver?.get !== "function") return json(res, 404, { error: "user_not_found" });
           const value = await backendDriver.get(key, true);
@@ -319,22 +329,10 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
         }
         if (canReadProfiles) {
           const profiles = await backendProfileClient.listAppUserProfiles();
-          const legacyRecords = typeof backendDriver?.listValues === "function" ? (await backendDriver.listValues("user:", true))
-            .map(parseStoredUser)
-            .filter(Boolean)
-            .filter((record) => !kvReadPermissionError(auth.user, record.key)) : [];
           const usersById = new Map();
           for (const profile of profiles) {
-            const keyedLegacy = await legacyUserForProfile(backendDriver, profile);
-            const matchedLegacy = legacyRecords.find((record) => legacyUserMatchesProfile(profile, record.user));
-            const legacy = Object.keys(keyedLegacy || {}).length ? keyedLegacy : (matchedLegacy?.user || {});
-            const user = userRecordFromAppUserProfile(profile, legacy);
+            const user = userRecordFromAppUserProfile(profile, {});
             usersById.set(user.id, publicUserForSession(appUserRecordKey(user), user, auth.user));
-          }
-          for (const record of legacyRecords) {
-            const user = record.user || {};
-            if (user.authUserId || usersById.has(user.id) || profiles.some((profile) => legacyUserMatchesProfile(profile, user))) continue;
-            usersById.set(user.id, publicUserForSession(record.key, user, auth.user));
           }
           return json(res, 200, { ok: true, users: [...usersById.values()], source: "app_users" });
         }
@@ -363,7 +361,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
           }
         }
         if (!deactivatedProfile && typeof backendDriver?.delete !== "function") return json(res, 503, { error: "users_delete_not_configured" });
-        await deleteKvMirror(backendDriver, key);
+        if (!deactivatedProfile) await deleteKvMirror(backendDriver, key);
         await writeAuditEvent(backendAuditDriver, userDeleteAuditEvent(id, auth.user));
         return json(res, 200, { ok: true, user: { id } });
       }
@@ -375,6 +373,8 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       const permissionError = kvWritePermissionError(auth.user, key);
       if (permissionError) return json(res, 403, { error: permissionError });
       const loginResetRequested = user.loginResetRequested === true;
+      let savedUser = user;
+      let appUsersHandled = false;
       if (user.authUserId) {
         if (!backendProfileClient) return json(res, 503, { error: "users_profile_backend_not_configured" });
         const patch = {
@@ -382,23 +382,35 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
           ...(loginResetRequested ? userLoginResetPatch(user) : {})
         };
         if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
-        await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
+        const profile = await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
+        savedUser = userRecordFromAppUserProfile(profile || {}, {});
+        appUsersHandled = true;
       } else if (isUuid(id) && typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfileById === "function") {
         const existingProfile = await backendProfileClient.getAppUserProfileById(id);
         if (existingProfile) {
-          await backendProfileClient.updateAppUserProfileById(id, {
+          const profile = await backendProfileClient.updateAppUserProfileById(id, {
             ...extendedAppUserPatchFromUserRecord(user),
             ...(loginResetRequested ? userLoginResetPatch(user) : {})
           });
+          savedUser = userRecordFromAppUserProfile(profile || {}, {});
+          appUsersHandled = true;
+        } else if (typeof backendProfileClient?.createAppUserProfile === "function") {
+          const profile = await backendProfileClient.createAppUserProfile(appUserCreateProfileFromUserRecord(user));
+          savedUser = userRecordFromAppUserProfile(profile || {}, {});
+          appUsersHandled = true;
         } else if (typeof backendDriver?.set !== "function") {
           return json(res, 503, { error: "users_legacy_backend_not_configured" });
         }
+      } else if (typeof backendProfileClient?.createAppUserProfile === "function") {
+        const profile = await backendProfileClient.createAppUserProfile(appUserCreateProfileFromUserRecord(user));
+        savedUser = userRecordFromAppUserProfile(profile || {}, {});
+        appUsersHandled = true;
       } else if (typeof backendDriver?.set !== "function") {
         return json(res, 503, { error: "users_legacy_backend_not_configured" });
       }
-      await writeKvMirror(backendDriver, key, JSON.stringify(userKvMirrorRecord(user)));
-      await writeAuditEvent(backendAuditDriver, userUpsertAuditEvent(user, auth.user));
-      return json(res, 200, { ok: true, user: redactUserSecrets(user) });
+      if (!appUsersHandled) await writeKvMirror(backendDriver, key, JSON.stringify(userKvMirrorRecord(user)));
+      await writeAuditEvent(backendAuditDriver, userUpsertAuditEvent(savedUser, auth.user));
+      return json(res, 200, { ok: true, user: redactUserSecrets(savedUser) });
     } catch (error) {
       if (error instanceof SyntaxError) return json(res, 400, { error: "invalid_json" });
       return sendServerError(req, res, error, { code: "users_api_error", route: "/api/users" });

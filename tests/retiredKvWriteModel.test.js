@@ -7,6 +7,7 @@ describe("retired KV write model", () => {
       "presence:",
       "pushSubscriptions:v1",
       "config:v1",
+      "user:",
       "ticket:",
       "fleet:",
       "czone:",
@@ -23,6 +24,7 @@ describe("retired KV write model", () => {
     expect(retiredKvWriteKey("presence:user-1", { appMode: "production", storageProvider: "api" })).toBe("presence:");
     expect(retiredKvWriteKey("pushSubscriptions:v1", { appMode: "production", storageProvider: "api" })).toBe("pushSubscriptions:v1");
     expect(retiredKvWriteKey("config:v1", { appMode: "production", storageProvider: "api" })).toBe("config:v1");
+    expect(retiredKvWriteKey("user:worker-1", { appMode: "production", storageProvider: "api" })).toBe("user:");
     expect(retiredKvWriteKey("ticket:T-1", { appMode: "production", storageProvider: "api" })).toBe("ticket:");
     expect(retiredKvWriteKey("fleet:F-1", { appMode: "production", storageProvider: "api" })).toBe("fleet:");
     expect(retiredKvWriteKey("czone:zone-1", { appMode: "production", storageProvider: "api" })).toBe("czone:");
@@ -36,6 +38,7 @@ describe("retired KV write model", () => {
       { key: "presence:user-1", value: "{}" },
       { key: "pushSubscriptions:v1", value: "[]" },
       { key: "config:v1", value: "{}" },
+      { key: "user:worker-1", value: "{}" },
       { key: "ticket:T-1", value: "{}" },
       { key: "fleet:F-1", value: "{}" },
       { key: "czone:zone-1", value: "{}" },
@@ -47,6 +50,7 @@ describe("retired KV write model", () => {
         { key: "presence:user-1", value: "{}", retiredPrefix: "presence:" },
         { key: "pushSubscriptions:v1", value: "[]", retiredPrefix: "pushSubscriptions:v1" },
         { key: "config:v1", value: "{}", retiredPrefix: "config:v1" },
+        { key: "user:worker-1", value: "{}", retiredPrefix: "user:" },
         { key: "ticket:T-1", value: "{}", retiredPrefix: "ticket:" },
         { key: "fleet:F-1", value: "{}", retiredPrefix: "fleet:" },
         { key: "czone:zone-1", value: "{}", retiredPrefix: "czone:" },
