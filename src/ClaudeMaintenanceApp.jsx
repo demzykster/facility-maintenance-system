@@ -1818,7 +1818,17 @@ export default function App() {
     } catch {
       return;
     }
-    const ok = await store.set(`appIssue:${issue.id}`, JSON.stringify(issue), true);
+    let ok = false;
+    if (NORMALIZED_SETTINGS_RECORDS_AUTHORITY) {
+      try {
+        if (typeof NORMALIZED_SETTINGS_RECORDS_PROVIDER.appIssues?.upsert === "function") {
+          await NORMALIZED_SETTINGS_RECORDS_PROVIDER.appIssues.upsert(issue);
+          ok = true;
+        }
+      } catch {}
+    } else {
+      ok = await store.set(`appIssue:${issue.id}`, JSON.stringify(issue), true);
+    }
     if (ok) setAppIssues((items) => [issue, ...items.filter((item) => item.id !== issue.id)].sort((a, b) => b.at - a.at));
   };
   const persistShared = async (key, value, options = {}) => {

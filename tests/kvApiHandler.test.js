@@ -985,6 +985,18 @@ describe("kv API handler", () => {
       query: { key: "mmeet:meet-1", shared: "1" },
       body: { value: "{\"id\":\"meet-1\"}", shared: true }
     });
+    const locationPutRes = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "location:loc-1", shared: "1" },
+      body: { value: "{\"id\":\"loc-1\"}", shared: true }
+    });
+    const appIssuePutRes = await call(handler, {
+      method: "PUT",
+      headers: { authorization: "Bearer user-token" },
+      query: { key: "appIssue:issue-1", shared: "1" },
+      body: { value: "{\"id\":\"issue-1\"}", shared: true }
+    });
     const ppePutRes = await call(handler, {
       method: "PUT",
       headers: { authorization: "Bearer user-token" },
@@ -1006,8 +1018,10 @@ describe("kv API handler", () => {
           { key: "pm:PM-1", value: "{\"id\":\"PM-1\"}" },
           { key: "mtask:task-1", value: "{\"id\":\"task-1\"}" },
           { key: "mmeet:meet-1", value: "{\"id\":\"meet-1\"}" },
+          { key: "location:loc-1", value: "{\"id\":\"loc-1\"}" },
           { key: "czone:zone-1", value: "{\"id\":\"zone-1\"}" },
           { key: "cround:round-1", value: "{\"id\":\"round-1\"}" },
+          { key: "appIssue:issue-1", value: "{\"id\":\"issue-1\"}" },
           { key: "ppeitem:item-1", value: "{\"id\":\"item-1\"}" }
         ]
       }
@@ -1033,10 +1047,14 @@ describe("kv API handler", () => {
     expect(taskPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "mtask:" });
     expect(meetingPutRes.statusCode).toBe(200);
     expect(meetingPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "mmeet:" });
+    expect(locationPutRes.statusCode).toBe(200);
+    expect(locationPutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "location:" });
+    expect(appIssuePutRes.statusCode).toBe(200);
+    expect(appIssuePutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "appIssue:" });
     expect(ppePutRes.statusCode).toBe(200);
     expect(ppePutRes.json()).toEqual({ ok: true, retired: true, retiredPrefix: "ppeitem:" });
     expect(postRes.statusCode).toBe(200);
-    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 12 });
+    expect(postRes.json()).toEqual({ ok: true, count: 0, retired: 14 });
     expect(driver.set).not.toHaveBeenCalled();
     expect(driver.setMany).not.toHaveBeenCalled();
   });
