@@ -81,6 +81,7 @@ import { normalizedSettingsRecordsAuthorityEnabled, settingsRecordsAuthorityFail
 import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, presenceForAuthority } from "./presenceAuthorityModel.js";
 import { priorityToken, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
+import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -1597,6 +1598,8 @@ export default function App() {
   const [session, setSession] = useState(null);
   const sessionRef = useRef(null);
   const readyRef = useRef(false);
+  const dataRefreshInFlightRef = useRef(false);
+  const dataRefreshLastStartedAtRef = useRef(0);
   const quietSharedFailureKeysRef = useRef(new Set());
   const automaticAppIssueKeysRef = useRef(new Map());
   useEffect(() => { sessionRef.current = session; }, [session]);
@@ -1803,14 +1806,27 @@ export default function App() {
   })(); }, []);
   useEffect(() => {
     if (!session) return;
-    const refresh = () => {
-      if (!document.hidden) reloadAll().catch(() => {});
+    const refresh = ({ force = false } = {}) => {
+      const now = Date.now();
+      if (!shouldRunDataRefresh({
+        now,
+        lastStartedAt: dataRefreshLastStartedAtRef.current,
+        inFlight: dataRefreshInFlightRef.current,
+        hidden: document.hidden,
+        force
+      })) return;
+      dataRefreshInFlightRef.current = true;
+      dataRefreshLastStartedAtRef.current = now;
+      reloadAll()
+        .catch(() => {})
+        .finally(() => { dataRefreshInFlightRef.current = false; });
     };
-    const id = setInterval(refresh, 15000);
-    document.addEventListener("visibilitychange", refresh);
+    const onVisible = () => { if (!document.hidden) refresh({ force: true }); };
+    const id = setInterval(refresh, DEFAULT_DATA_REFRESH_INTERVAL_MS);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(id);
-      document.removeEventListener("visibilitychange", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [session]);
 
