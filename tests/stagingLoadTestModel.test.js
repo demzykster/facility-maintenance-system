@@ -36,6 +36,15 @@ describe("staging load test model", () => {
 
   it("summarizes timings and threshold failures", () => {
     expect(percentile([10, 20, 30, 40], 95)).toBe(40);
+    expect(DEFAULT_LOAD_TEST_THRESHOLDS.apiP95Ms).toBe(1500);
+    expect(summarizeLoadTimings([
+      { durationMs: 600, status: 200 },
+      { durationMs: 900, status: 200 },
+      { durationMs: 1200, status: 200 }
+    ], DEFAULT_LOAD_TEST_THRESHOLDS)).toMatchObject({
+      ok: true,
+      thresholdFailures: []
+    });
     expect(summarizeLoadTimings([
       { durationMs: 100, status: 200 },
       { durationMs: 200, status: 200 },
