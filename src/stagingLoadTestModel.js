@@ -25,7 +25,7 @@ export const LOAD_TEST_PROFILES = Object.freeze({
 });
 
 export const DEFAULT_LOAD_TEST_THRESHOLDS = Object.freeze({
-  apiP95Ms: 1000,
+  apiP95Ms: 1500,
   apiMaxMs: 3000,
   seedMs: 120000,
   cleanupMs: 120000

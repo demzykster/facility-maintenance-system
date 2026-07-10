@@ -100,6 +100,7 @@ Later separate safety slices:
 - CI-safe staging preflight dry/model check is now wired into GitHub Actions through `staging:preflight:ci`; a future deploy-blocking live secret-backed job can still be considered separately.
 - Local demo browser smoke is now wired through `npm run smoke:demo-ui`; a future authenticated staging smoke should cover highest-risk role/workflow paths with real staging credentials.
 - Minimal static syntax-analysis gate is now wired into GitHub Actions through `npm run lint`; a future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
+- Staging load-test smoke now has calibrated default latency thresholds for the current Vercel/Supabase staging path; pilot/tenk profiles remain separate intentional load-test runs.
 
 ### R10 data slice - user-management authority gap
 

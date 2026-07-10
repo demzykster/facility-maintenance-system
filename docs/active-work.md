@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `none`.
-- Current branch: `main`.
+- Active branch: `codex/load-test-threshold-calibration`.
+- Current branch: `codex/load-test-threshold-calibration`.
 - Last completed work: authenticated background data refresh throttle.
-- Current work: none.
+- Current work: staging load-test threshold calibration.
 
 ## Current Product Direction
 
