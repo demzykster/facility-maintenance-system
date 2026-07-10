@@ -7,8 +7,6 @@ import {
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy,
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History, Play} from "lucide-react";
-import readExcelFile from "read-excel-file/browser";
-import Papa from "papaparse";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -572,6 +570,8 @@ const cellSafe = (v) => (typeof v === "string" && /^[=+\-@\t\r\n]/.test(v)) ? "'
 const rowsSafe = (rows) => (Array.isArray(rows) ? rows : []).map((r) => (r && typeof r === "object" && !Array.isArray(r)) ? Object.fromEntries(Object.entries(r).map(([k, val]) => [k, cellSafe(val)])) : r);
 const clampPmDailyCapacity = (value) => Math.max(1, Math.min(20, Number(value) || 4));
 const clampCleaningReminderMins = (value) => Math.max(5, Math.min(120, Number(value) || 30));
+const loadReadExcelFile = () => import("read-excel-file/browser").then((module) => module.default || module);
+const loadPapa = () => import("papaparse").then((module) => module.default || module);
 const loadQrCode = () => import("qrcode").then((module) => module.default || module);
 const loadJsQr = () => import("jsqr").then((module) => module.default || module);
 const notifyUser = (message) => {
@@ -643,16 +643,19 @@ const HEADER_KEYS = ["נושא", "משימה", "פירוט", "תיאור", "יע
 const detectHeaderRow = (aoa) => { let best = 0, bestScore = -1; for (let i = 0; i < Math.min(aoa.length, 10); i++) { const cells = (aoa[i] || []).map((c) => String(c == null ? "" : c).toLowerCase()); if (cells.filter((c) => c.trim()).length < 2) continue; const score = cells.filter((c) => HEADER_KEYS.some((k) => c.includes(k))).length; if (score > bestScore) { bestScore = score; best = i; } } return best; };
 const aoaToRows = (aoa) => { const hi = detectHeaderRow(aoa); const hdr = (aoa[hi] || []).map((c, idx) => String(c == null ? "" : c).trim() || `עמודה ${idx + 1}`); const rows = aoa.slice(hi + 1).map((r) => { const o = {}; hdr.forEach((h, idx) => { o[h] = r[idx] == null ? "" : r[idx]; }); return o; }).filter((o) => Object.values(o).some((v) => String(v).trim())); return { headers: hdr, rows }; };
 const parseCsvFile = (file) => new Promise((resolve, reject) => {
-  Papa.parse(file, {
-    skipEmptyLines: false,
-    complete: (res) => resolve({ "CSV": res.data || [] }),
-    error: reject
-  });
+  loadPapa()
+    .then((Papa) => Papa.parse(file, {
+      skipEmptyLines: false,
+      complete: (res) => resolve({ "CSV": res.data || [] }),
+      error: reject
+    }))
+    .catch(reject);
 });
 const parseTaskImportFile = async (file) => {
   const name = file.name || "";
   if (/\.csv$/i.test(name)) return parseCsvFile(file);
   if (!/\.xlsx$/i.test(name)) throw new Error("unsupported");
+  const readExcelFile = await loadReadExcelFile();
   const sheets = await readExcelFile(file);
   const all = {};
   (sheets || []).forEach(({ sheet, data }, index) => { all[sheet || `Sheet ${index + 1}`] = data || []; });
@@ -7826,6 +7829,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
     if (file.size > 10 * 1024 * 1024) { setErr("הקובץ גדול מדי. נסו קובץ עד 10MB."); e.target.value = ""; return; }
     setBusy(true); setErr(""); setImportError(""); setImportProgress(null); setDone(false); setConfirmSkipConflicts(false); setConfirmCatalog(false);
     try {
+      const readExcelFile = await loadReadExcelFile();
       const parsed = parseFleetLicenseWorkbook(await readExcelFile(file), { existingFleet: fleet });
       if (!parsed.ok) { setResult(null); setErr(parsed.error === "fleet_license_sheet_not_found" ? "לא נמצא גיליון בשם רישיונות." : "לא נמצאה טבלת רישיונות תקינה בקובץ."); return; }
       setResult(parsed);
