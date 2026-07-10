@@ -99,7 +99,7 @@ Current permissions work:
 
 Current production-data work:
 
-- Tickets are normalized-authority in production/API mode through `/api/tickets`; `ticket:*` KV records remain a compatibility mirror.
+- Tickets are normalized-authority in production/API mode through `/api/tickets`; production/API saves no longer create new `ticket:*` KV mirrors.
 - Fleet units are normalized-authority in production/API mode through `/api/fleet`; `fleet:*` KV records remain a compatibility mirror.
 - Periodic maintenance is normalized-authority in production/API mode through `/api/pm`; `pm:*` KV records remain a compatibility mirror.
 - User identity/session is backed by Supabase `app_users` and `/api/session/me`; production/API-mode admin user-management goes through `/api/users`, reads login-capable users from `app_users`, syncs profile writes before the temporary `user:` KV mirror, deactivates matching `app_users` rows on delete, and now stores technician assignment, shift/tolerance, cleaning access, notification prefs, employment, archive/profile metadata, and PIN-login authority fields (`pin_hash`, `pin_updated_at`, `login_state`) in `app_users`. New `app_users` PIN setup stores only a salted server-side `scrypt` hash; reset clears the hash and marks `login_state='reset_required'`; legacy plain `user:` PINs remain fallback compatibility until those old records are retired. The first-password path updates existing `app_users` rows by id after Auth creation, preventing duplicate profile rows for backfilled email/password users.

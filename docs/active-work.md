@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `none`.
-- Current branch: `main`.
+- Active branch: `codex/r10-retire-ticket-kv-mirror`.
+- Current branch: `codex/r10-retire-ticket-kv-mirror`.
 - Last completed work: production/API app-config saves no longer recreate `config:v1` and staging retired the app-config mirror after guarded dry-run proof.
-- Current work: none.
+- Current work: retire the remaining `ticket:*` compatibility KV mirror after normalized tickets are authoritative.
 
 ## Current Product Direction
 

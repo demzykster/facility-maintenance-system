@@ -2723,7 +2723,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorTicketToKv(rec);
     } else {
       if (!await persistShared(`ticket:${rec.id}`, JSON.stringify(rec))) return false;
       void shadowWriteNormalizedTicket(rec);
@@ -2812,7 +2811,6 @@ export default function App() {
         }));
         return false;
       }
-      void mirrorDeleteTicketFromKv(id);
     } else {
       if (!await deleteShared(`ticket:${id}`)) return false;
       void shadowDeleteNormalizedTicket(id);
