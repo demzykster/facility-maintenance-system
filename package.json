@@ -10,6 +10,7 @@
     "release:check:main": "node tools/vercel-api-route-gate.mjs && node tools/production-config-gate.mjs",
     "pr:preflight": "npm ci && npm run release:check && npm test -- --run && npm run build",
     "staging:preflight": "node tools/staging-smoke-preflight.mjs",
+    "staging:preflight:ci": "node tools/staging-smoke-preflight-ci.mjs",
     "staging:preflight:local": "node tools/staging-smoke-preflight-local.mjs",
     "staging:vercel-env": "node tools/vercel-env-preflight.mjs --scope demzyksters-projects",
     "staging:supabase-schema": "node tools/supabase-staging-schema-check.mjs",
