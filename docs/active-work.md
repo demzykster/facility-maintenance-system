@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/r10-app-config-authority`.
+- Current branch: `codex/r10-app-config-authority`.
 - Last completed work: R10 push-subscriptions authority slice added `public.push_subscriptions` behind `/api/push`, routes phone push subscribe/unsubscribe through normalized server storage first, and preserves `pushSubscriptions:v1` as a compatibility KV mirror.
-- Current work: none.
+- Current work: R10 app-config authority slice for `config:v1` behind an explicit settings config API, with `config:v1` preserved as a compatibility KV mirror.
 
 ## Current Product Direction
 
@@ -30,4 +30,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. Technician/user presence now uses normalized API authority in production/API mode with a compatibility KV mirror. Phone push subscriptions now use normalized server storage in production/API mode with `pushSubscriptions:v1` as a compatibility mirror. The route budget remains 18/24.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. App config now uses normalized API authority in production/API mode with `config:v1` as a compatibility mirror. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. Technician/user presence now uses normalized API authority in production/API mode with a compatibility KV mirror. Phone push subscriptions now use normalized server storage in production/API mode with `pushSubscriptions:v1` as a compatibility mirror. The route budget remains 19/24.

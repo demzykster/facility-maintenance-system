@@ -1,5 +1,6 @@
 export const STAGING_SUPABASE_TABLES = [
   "app_users",
+  "app_config",
   "cmms_kv_records",
   "cleaning_zones",
   "cleaning_rounds",

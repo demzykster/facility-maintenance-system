@@ -50,6 +50,14 @@ async function supabasePasswordToken({ url, anonKey, email, password }) {
 }
 
 async function kvGet({ publicUrl, token, key }) {
+  if (key === CONFIG_KEY) {
+    const response = await fetch(`${publicUrl}/api/settings/config`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const data = await readJson(response);
+    if (!response.ok || !data?.ok) throw new Error(data?.error || `app_config_get_${response.status}`);
+    return data?.value ?? JSON.stringify(data?.config || {});
+  }
   const response = await fetch(`${publicUrl}/api/kv/${encodeURIComponent(key)}?shared=1`, {
     headers: { authorization: `Bearer ${token}` }
   });
@@ -59,6 +67,19 @@ async function kvGet({ publicUrl, token, key }) {
 }
 
 async function kvSet({ publicUrl, token, key, value }) {
+  if (key === CONFIG_KEY) {
+    const response = await fetch(`${publicUrl}/api/settings/config`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ value })
+    });
+    const data = await readJson(response);
+    if (!response.ok || !data?.ok) throw new Error(data?.error || `app_config_set_${response.status}`);
+    return data;
+  }
   const response = await fetch(`${publicUrl}/api/kv/${encodeURIComponent(key)}`, {
     method: "PUT",
     headers: {
@@ -73,6 +94,15 @@ async function kvSet({ publicUrl, token, key, value }) {
 }
 
 async function kvDelete({ publicUrl, token, key }) {
+  if (key === CONFIG_KEY) {
+    const response = await fetch(`${publicUrl}/api/settings/config`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const data = await readJson(response);
+    if (!response.ok) throw new Error(data?.error || `app_config_delete_${response.status}`);
+    return data;
+  }
   const response = await fetch(`${publicUrl}/api/kv/${encodeURIComponent(key)}?shared=1`, {
     method: "DELETE",
     headers: { authorization: `Bearer ${token}` }
