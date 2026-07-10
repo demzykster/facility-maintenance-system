@@ -10,6 +10,8 @@ export const STAGING_SUPABASE_TABLES = [
   "ppe_movements",
   "ppe_requests",
   "ppe_orders",
+  "maintenance_tasks",
+  "maintenance_meetings",
   "worker_absences",
   "periodic_maintenance",
   "tickets",

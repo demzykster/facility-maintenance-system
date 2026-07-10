@@ -68,6 +68,7 @@ import { createApiCleaningZonesProvider } from "./apiCleaningZonesAdapter.js";
 import { createApiCleaningRoundsProvider } from "./apiCleaningRoundsAdapter.js";
 import { createApiCleaningComplaintsProvider, createApiWorkerAbsencesProvider } from "./apiCleaningRecordsAdapter.js";
 import { createApiPpeProvider } from "./apiPpeAdapter.js";
+import { createApiWorkProvider } from "./apiWorkAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
@@ -77,6 +78,7 @@ import { cleaningZonesAuthorityFailureIssue, cleaningZonesForAuthority, normaliz
 import { cleaningRoundsAuthorityFailureIssue, cleaningRoundsForAuthority, normalizedCleaningRoundsAuthorityEnabled } from "./cleaningRoundsAuthorityModel.js";
 import { cleaningComplaintsAuthorityFailureIssue, cleaningComplaintsForAuthority, normalizedCleaningRecordsAuthorityEnabled, workerAbsencesAuthorityFailureIssue, workerAbsencesForAuthority } from "./cleaningRecordsAuthorityModel.js";
 import { normalizedPpeAuthorityEnabled, ppeAuthorityFailureIssue, ppeForAuthority } from "./ppeAuthorityModel.js";
+import { normalizedWorkAuthorityEnabled, workAuthorityFailureIssue, workForAuthority } from "./workAuthorityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -208,6 +210,19 @@ const NORMALIZED_PPE_SHADOW_WRITE = !NORMALIZED_PPE_AUTHORITY
   && APP_MODE === APP_MODES.production
   && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
   && !!NORMALIZED_PPE_PROVIDER;
+const NORMALIZED_WORK_PROVIDER = createApiWorkProvider({
+  baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
+  getAccessToken: productionAccessToken
+});
+const NORMALIZED_WORK_AUTHORITY = normalizedWorkAuthorityEnabled({
+  appMode: APP_MODE,
+  storageProvider: storageProviderFromEnv(import.meta.env),
+  provider: NORMALIZED_WORK_PROVIDER
+});
+const NORMALIZED_WORK_SHADOW_WRITE = !NORMALIZED_WORK_AUTHORITY
+  && APP_MODE === APP_MODES.production
+  && storageProviderFromEnv(import.meta.env) === STORAGE_PROVIDERS.api
+  && !!NORMALIZED_WORK_PROVIDER;
 const USER_MANAGEMENT_PROVIDER = createApiUserProvider({
   baseUrl: storageApiBaseUrlFromEnv(import.meta.env),
   getAccessToken: productionAccessToken
@@ -1836,6 +1851,8 @@ export default function App() {
 	    let ppeNormRows = ppn;
 	    let ppeRequestRows = ppreq;
 	    let ppeOrderRows = pord;
+	    let taskRows = mtk;
+	    let meetingRows = mmt;
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
         const normalized = await ticketsForAuthority({
@@ -1965,10 +1982,28 @@ export default function App() {
         ppeRequestRows = normalizedPpe.requests;
         ppeOrderRows = normalizedPpe.orders;
       } catch (error) {
-        void recordAutomaticAppIssue(ppeAuthorityFailureIssue({
+	        void recordAutomaticAppIssue(ppeAuthorityFailureIssue({
           action: "load",
           resource: "records",
           message: error?.message || "Normalized PPE API load failed"
+        }));
+	      }
+	    }
+	    if (NORMALIZED_WORK_AUTHORITY) {
+	      try {
+	        const normalizedWork = await workForAuthority({
+          kvTasks: mtk,
+          kvMeetings: mmt,
+          provider: NORMALIZED_WORK_PROVIDER,
+          normalizedAuthority: true
+        });
+        taskRows = normalizedWork.tasks;
+        meetingRows = normalizedWork.meetings;
+      } catch (error) {
+        void recordAutomaticAppIssue(workAuthorityFailureIssue({
+          action: "load",
+          resource: "records",
+          message: error?.message || "Normalized work API load failed"
         }));
 	      }
 	    }
@@ -1984,8 +2019,8 @@ export default function App() {
     apply("cround", roundRows, setRounds, (a, b) => b.at - a.at);
     apply("ccomplaint", complaintRows, setComplaints, (a, b) => b.at - a.at);
     apply("location", locs, setLocations, (a, b) => (a.name || "").localeCompare(b.name || "", "he"));
-    apply("mtask", mtk, setTasks, (a, b) => b.createdAt - a.createdAt);
-    apply("mmeet", mmt, setMeetings, (a, b) => b.at - a.at);
+    apply("mtask", taskRows, setTasks, (a, b) => b.createdAt - a.createdAt);
+    apply("mmeet", meetingRows, setMeetings, (a, b) => b.at - a.at);
     apply("ppe", ppeRows, setPpe, (a, b) => b.at - a.at);
     apply("ppeitem", ppeItemRows, setPpeItems, (a, b) => (a.name > b.name ? 1 : -1));
     apply("ppenorm", ppeNormRows, setPpeNorms, null);
@@ -2510,6 +2545,103 @@ export default function App() {
     setState((s) => s.filter((item) => item.id !== id));
     return true;
   };
+  const workResourceProvider = (resource) => NORMALIZED_WORK_PROVIDER?.[resource] || null;
+  const workKvPrefix = (resource) => ({ tasks: "mtask:", meetings: "mmeet:" })[resource] || "mtask:";
+  const shadowWriteNormalizedWork = async (resource, record) => {
+    if (!NORMALIZED_WORK_SHADOW_WRITE) return;
+    try {
+      await workResourceProvider(resource)?.upsert?.(record);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: `work_${resource}_normalized_shadow_write_failed`,
+        action: "upsert",
+        key: `${workKvPrefix(resource)}${record?.id || "unknown"}`,
+        message: error?.message || "Normalized work API write failed"
+      });
+    }
+  };
+  const shadowDeleteNormalizedWork = async (resource, id) => {
+    if (!NORMALIZED_WORK_SHADOW_WRITE) return;
+    try {
+      await workResourceProvider(resource)?.delete?.(id);
+    } catch (error) {
+      void recordAutomaticAppIssue({
+        kind: `work_${resource}_normalized_shadow_delete_failed`,
+        action: "delete",
+        key: `${workKvPrefix(resource)}${id || "unknown"}`,
+        message: error?.message || "Normalized work API delete failed"
+      });
+    }
+  };
+  const mirrorWorkToKv = async (resource, record) => {
+    const key = `${workKvPrefix(resource)}${record.id}`;
+    const ok = await persistShared(key, JSON.stringify(record), { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: `work_${resource}_kv_mirror_save_failed`,
+      action: "mirror-save",
+      key,
+      message: "Compatibility KV work mirror save failed"
+    });
+  };
+  const mirrorDeleteWorkFromKv = async (resource, id) => {
+    const key = `${workKvPrefix(resource)}${id}`;
+    const ok = await deleteShared(key, { toastOnFail: false });
+    if (!ok) void recordAutomaticAppIssue({
+      kind: `work_${resource}_kv_mirror_delete_failed`,
+      action: "mirror-delete",
+      key,
+      message: "Compatibility KV work mirror delete failed"
+    });
+  };
+  const saveWorkResource = async (resource, record, { setState, sortFn } = {}) => {
+    const key = `${workKvPrefix(resource)}${record.id}`;
+    if (NORMALIZED_WORK_AUTHORITY) {
+      try {
+        await workResourceProvider(resource)?.upsert?.(record);
+      } catch (error) {
+        setToast(SAVE_FAILED_MESSAGE);
+        void recordAutomaticAppIssue(workAuthorityFailureIssue({
+          action: "save",
+          resource,
+          id: record.id,
+          message: error?.message || "Normalized work API save failed"
+        }));
+        return false;
+      }
+      void mirrorWorkToKv(resource, record);
+    } else {
+      if (!await persistShared(key, JSON.stringify(record))) return false;
+      void shadowWriteNormalizedWork(resource, record);
+    }
+    setState((s) => {
+      const rows = [record, ...s.filter((item) => item.id !== record.id)];
+      return sortFn ? rows.sort(sortFn) : rows;
+    });
+    return true;
+  };
+  const deleteWorkResource = async (resource, id, setState) => {
+    const key = `${workKvPrefix(resource)}${id}`;
+    if (NORMALIZED_WORK_AUTHORITY) {
+      try {
+        await workResourceProvider(resource)?.delete?.(id);
+      } catch (error) {
+        setToast("המחיקה לא הושלמה — בדקו חיבור ונסו שוב");
+        void recordAutomaticAppIssue(workAuthorityFailureIssue({
+          action: "delete",
+          resource,
+          id,
+          message: error?.message || "Normalized work API delete failed"
+        }));
+        return false;
+      }
+      void mirrorDeleteWorkFromKv(resource, id);
+    } else {
+      if (!await deleteShared(key)) return false;
+      void shadowDeleteNormalizedWork(resource, id);
+    }
+    setState((s) => s.filter((item) => item.id !== id));
+    return true;
+  };
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
@@ -2978,13 +3110,11 @@ export default function App() {
   const saveConfig = async (n, options = {}) => { if (!await persistShared("config:v1", JSON.stringify(n), options)) return false; setConfig(n); return true; };
   const saveTask = async (t) => {
     const task = normalizeTaskActionRecord(t);
-    if (!await persistShared(`mtask:${task.id}`, JSON.stringify(task))) return false;
-    setTasks((s) => [task, ...s.filter((x) => x.id !== task.id)].sort((a, b) => b.createdAt - a.createdAt));
-    return true;
+    return saveWorkResource("tasks", task, { setState: setTasks, sortFn: (a, b) => b.createdAt - a.createdAt });
   };
-  const delTask = async (id) => { if (!await deleteShared(`mtask:${id}`)) return false; setTasks((s) => s.filter((x) => x.id !== id)); return true; };
-  const saveMeeting = async (m) => { if (!await persistShared(`mmeet:${m.id}`, JSON.stringify(m))) return false; setMeetings((s) => [m, ...s.filter((x) => x.id !== m.id)].sort((a, b) => b.at - a.at)); return true; };
-  const delMeeting = async (id) => { if (!await deleteShared(`mmeet:${id}`)) return false; setMeetings((s) => s.filter((x) => x.id !== id)); return true; };
+  const delTask = async (id) => deleteWorkResource("tasks", id, setTasks);
+  const saveMeeting = async (m) => saveWorkResource("meetings", m, { setState: setMeetings, sortFn: (a, b) => b.at - a.at });
+  const delMeeting = async (id) => deleteWorkResource("meetings", id, setMeetings);
   const savePpeItem = async (x) => savePpeResource("items", x, { setState: setPpeItems, sortFn: (a, b) => (a.name > b.name ? 1 : -1) });
   const delPpeItem = async (id) => deletePpeResource("items", id, setPpeItems);
   const savePpe = async (x) => savePpeResource("movements", x, { setState: setPpe, sortFn: (a, b) => b.at - a.at });

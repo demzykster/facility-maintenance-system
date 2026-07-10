@@ -54,7 +54,7 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 - Duplicate `createdAt` object key in `src/ClaudeMaintenanceApp.jsx` was fixed through PR #1.
 - Vitest was added through PR #2.
-- `npm test` is available. As of 2026-07-10 on the static syntax gate branch, it runs 155 test files / 782 tests.
+- `npm test` is available. As of 2026-07-10 on the work-records authority branch, it runs 162 test files / 806 tests.
 - Storage adapter contract is documented in `tests/storageContract.test.js` through PR #3.
 - Ticket-card audit passes reduced noise for closed tickets:
   - closed/cancelled tickets no longer show an SLA progress bar;
@@ -72,10 +72,10 @@ Check remote branches only when the task involves PR/branch sync or `docs/active
 
 ## Known Warnings
 
-- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,197.16 kB raw / 578.41 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
+- Production bundle is still above Vite's default 500 kB chunk warning. On 2026-07-10, `npm run build` produced the main app chunk at 2,201.08 kB raw / 578.92 kB gzip. This is expected for the current monolith and is not a blocker, but it remains a real size warning.
 - `npm audit` is currently clean: 0 vulnerabilities on 2026-07-09.
 - The old `xlsx` package dependency has been removed from `package.json`. Excel export now goes through `src/xlsxExportAdapter.js` on top of `write-excel-file`; Excel import uses `read-excel-file`; CSV import uses `papaparse`.
-- CI now runs `npm run lint`, a lightweight JS/MJS syntax gate built on `node --check`. JSX coverage still comes from `npm run build`.
+- CI now runs `npm run lint`, a lightweight JS/MJS syntax gate built on `node --check`; on 2026-07-10 it checked 362 files. JSX coverage still comes from `npm run build`.
 - Old dependency-audit branch references are historical only. That work is already merged into `main`; current remote branches should be checked live with `git branch -r`.
 - The public Vercel deployment is staging/pilot, not final production. It uses the current Supabase-backed server/session/API/KV compatibility path for staging data, while local/demo mode can still use browser storage for development review.
 
@@ -105,4 +105,5 @@ Current production-data work:
 - User identity/session is backed by Supabase `app_users` and `/api/session/me`; production/API-mode admin user-management goes through `/api/users`, reads login-capable users from `app_users`, syncs profile writes before the temporary `user:` KV mirror, and deactivates matching `app_users` rows on delete.
 - Cleaning zones, rounds, complaints, and worker absences are normalized-authority in production/API mode through `/api/cleaning/records`; their legacy KV prefixes remain compatibility mirrors.
 - PPE movements, catalog items, norms, requests, and orders are normalized-authority in production/API mode through `/api/ppe`; `ppe:*`, `ppeitem:*`, `ppenorm:*`, `ppereq:*`, and `ppeorder:*` KV records remain compatibility mirrors.
+- Maintenance tasks and meetings are normalized-authority in production/API mode through `/api/work`; `mtask:*` and `mmeet:*` KV records remain compatibility mirrors.
 - R10 is not complete yet. Other business domains still need deliberate normalized-table/server-operation slices before final production can stop depending on the accepted KV bridge.
