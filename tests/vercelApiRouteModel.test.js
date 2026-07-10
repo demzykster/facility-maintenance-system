@@ -6,6 +6,7 @@ describe("Vercel API route policy", () => {
     expect(vercelApiRoutePolicy(VERCEL_API_ROUTE_FILES).ok).toBe(true);
     expect(VERCEL_API_ROUTE_FILES).toContain("api/[diagnostic].js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/cleaning/records.js");
+    expect(VERCEL_API_ROUTE_FILES).toContain("api/presence/index.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/ppe/index.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/public/[resource].js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/session/[action].js");
@@ -54,6 +55,6 @@ describe("Vercel API route policy", () => {
     ]);
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toContain("api_route_count_exceeds_limit:29/24");
+    expect(result.errors).toContain("api_route_count_exceeds_limit:30/24");
   });
 });

@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/r10-presence-authority`.
+- Current branch: `codex/r10-presence-authority`.
 - Last completed work: route-budget safety slice consolidated `/api/client-errors` and `/api/system-errors` into one dynamic diagnostics route while preserving the existing URLs and permission boundaries.
-- Current work: none.
+- Current work: R10 presence authority slice moving `presence:` records toward normalized `technician_presence` server operations while preserving the compatibility KV mirror.
 
 ## Current Product Direction
 
@@ -30,4 +30,4 @@
 - PPE now uses normalized API authority in production/API mode with compatibility KV mirrors. Next R10 slices should continue with another narrow business-data domain instead of reopening completed PPE slices unless a live bug is reported.
 - Staging preflight model coverage and CI-safe dry gate are done. A future deploy-blocking live secret-backed staging gate can still be considered separately.
 - Minimal static-analysis gate is done through `npm run lint`. A future ESLint ruleset can still be considered separately once scoped to avoid broad formatting churn.
-- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. The diagnostics route-budget slice freed one more Vercel API route slot; the route budget is now 17/24.
+- Work records now use normalized API authority in production/API mode with compatibility KV mirrors. Settings records (`location:` and `appIssue:`) now use normalized API authority in production/API mode with compatibility KV mirrors. The diagnostics route-budget slice freed one more Vercel API route slot; the route budget is now 17/24 before the active presence slice, and 18/24 with the presence route in this branch.

@@ -16,6 +16,8 @@ const steps = [
   ["staging:smoke:ppe-api", ["npm", ["run", "staging:smoke:ppe-api"]]],
   ["staging:work-records:reconcile", ["npm", ["run", "staging:work-records:reconcile"]]],
   ["staging:smoke:work-records-api", ["npm", ["run", "staging:smoke:work-records-api"]]],
+  ["staging:presence:reconcile", ["npm", ["run", "staging:presence:reconcile"]]],
+  ["staging:smoke:presence-api", ["npm", ["run", "staging:smoke:presence-api"]]],
   ["staging:settings-records:reconcile", ["npm", ["run", "staging:settings-records:reconcile"]]],
   ["staging:smoke:settings-records-api", ["npm", ["run", "staging:smoke:settings-records-api"]]],
   ["staging:cleaning-zones:reconcile", ["npm", ["run", "staging:cleaning-zones:reconcile"]]],
