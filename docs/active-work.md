@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: none.
-- Current branch: `main`.
+- Active branch: `codex/r10-kv-mirror-retirement-tool`.
+- Current branch: `codex/r10-kv-mirror-retirement-tool`.
 - Last completed work: app issue saves stop creating new `appIssue:*` KV mirrors in production/API authority mode.
-- Current work: none.
+- Current work: guarded staging KV mirror retirement tool for deleting only shared mirrors with matching normalized `source_kv_key`.
 
 ## Current Product Direction
 
@@ -23,6 +23,7 @@
 ## Notes For Next Agent
 
 - Treat removed storage prefixes and docs as intentionally retired, not as migration backlog.
+- Use `npm run staging:kv:retire-mirrors -- --prefix <prefix>` as a dry-run before deleting old compatibility mirrors; `-- --prefix <prefix> --apply` deletes only shared KV records whose key matches a normalized table row's `source_kv_key`.
 - Do not invent broad product-polish backlog from screenshots or old notes. Wait for a concrete owner-reported issue.
 - Tickets, fleet, and periodic maintenance are now normalized authority slices in production/API mode. Continue R10 with the next narrow business-data slice instead of reopening completed migrations unless a live bug is reported.
 - User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users`, writes expanded profile fields there, deactivates matching rows on delete, and resets login authority state on manager-triggered reset while preserving protected `user:` KV as temporary legacy enrichment/fallback. `app_users` also carries PIN authority fields (`pin_hash`, `pin_updated_at`, `login_state`) so first-login/PIN setup, reset, and PIN session restore can use `app_users` before falling back to the legacy `user:` bridge. On 2026-07-10 staging backfilled the remaining legacy-only `user:` rows into `app_users`; `npm run staging:users:reconcile-report` showed `legacyUsers=12`, `appUsers=19`, `matched=12`, `legacyOnly=0`, `ambiguous=0`, `parseErrors=0`.
