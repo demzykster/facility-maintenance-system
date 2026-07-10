@@ -224,6 +224,12 @@ try {
     await serviceDelete({
       root: supabaseUrl,
       serviceRoleKey,
+      table: "cmms_kv_records",
+      query: `scope=eq.shared&record_key=eq.${encodeURIComponent(`user:${appUserId}`)}`
+    }).catch(() => {});
+    await serviceDelete({
+      root: supabaseUrl,
+      serviceRoleKey,
       table: "app_users",
       query: `id=eq.${encodeURIComponent(appUserId)}`
     }).catch(() => {});
