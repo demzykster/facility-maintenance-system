@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/r10-users-legacy-dedupe-before-backfill`.
-- Current branch: `codex/r10-users-legacy-dedupe-before-backfill`.
-- Last completed work: R10 first-password completion hardening prevents existing `app_users` email/password rows without `auth_user_id` from being duplicated during first password setup.
-- Current work: R10 users API legacy fallback dedupe before live app_users backfill.
+- Active branch: none.
+- Current branch: `main`.
+- Last completed work: R10 users API legacy fallback dedupes records that match `app_users` by id, auth user id, email, worker number, or phone before live `app_users` backfill.
+- Current work: none.
 
 ## Current Product Direction
 
