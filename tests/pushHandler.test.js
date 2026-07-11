@@ -44,6 +44,19 @@ const activeSessionClient = {
   })
 };
 
+const workerSessionClient = {
+  getAuthUser: vi.fn().mockResolvedValue({ id: "auth-worker-1", email: "worker@example.com" }),
+  getAppUserProfile: vi.fn().mockResolvedValue({
+    id: "worker-1",
+    auth_user_id: "auth-worker-1",
+    role: "worker",
+    name: "Worker",
+    active: true,
+    permissions: {},
+    must_change_password: false
+  })
+};
+
 const subscription = {
   endpoint: "https://push.example/device/1",
   keys: { p256dh: "p256", auth: "auth" }
@@ -199,6 +212,86 @@ describe("push API handler", () => {
     expect(notify.statusCode).toBe(200);
     expect(notify.json()).toEqual({ ok: true, sent: 1, targets: 1 });
     expect(push.sendNotification).toHaveBeenLastCalledWith(subscription, expect.stringContaining("קריאה חדשה"));
+  });
+
+  it("blocks business notification sends from worker sessions", async () => {
+    const push = {
+      setVapidDetails: vi.fn(),
+      sendNotification: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createPushHandler({
+      subscriptionStore: {
+        list: vi.fn().mockResolvedValue([{
+          id: "push-1",
+          userId: "app-user-1",
+          userRole: "admin",
+          subscription
+        }])
+      },
+      push,
+      env,
+      sessionClient: workerSessionClient
+    });
+
+    const notify = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        action: "notify",
+        event: {
+          targetUserIds: ["app-user-1"],
+          title: "Fake urgent alert",
+          body: "Fake alert",
+          kind: "new"
+        }
+      }
+    });
+
+    expect(notify.statusCode).toBe(403);
+    expect(notify.json()).toEqual({ error: "permission_required:push:notify" });
+    expect(push.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("continues sending business notifications when one push target fails", async () => {
+    const subscriptionTwo = {
+      endpoint: "https://push.example/device/2",
+      keys: { p256dh: "p256-2", auth: "auth-2" }
+    };
+    const push = {
+      setVapidDetails: vi.fn(),
+      sendNotification: vi.fn()
+        .mockRejectedValueOnce(new Error("push_failed"))
+        .mockResolvedValueOnce(undefined)
+    };
+    const handler = createPushHandler({
+      subscriptionStore: {
+        list: vi.fn().mockResolvedValue([
+          { id: "push-1", userId: "app-user-1", userRole: "admin", subscription },
+          { id: "push-2", userId: "app-user-2", userRole: "admin", subscription: subscriptionTwo }
+        ])
+      },
+      push,
+      env,
+      sessionClient: activeSessionClient
+    });
+
+    const notify = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: {
+        action: "notify",
+        event: {
+          targetUserIds: ["app-user-1", "app-user-2"],
+          title: "קריאה חדשה",
+          body: "נפתחה קריאה חדשה",
+          kind: "new"
+        }
+      }
+    });
+
+    expect(notify.statusCode).toBe(200);
+    expect(notify.json()).toEqual({ ok: true, sent: 1, failed: 1, targets: 2 });
+    expect(push.sendNotification).toHaveBeenCalledTimes(2);
   });
 
   it("does not send non-interrupting business events through server push", async () => {
