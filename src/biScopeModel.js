@@ -133,7 +133,10 @@ export function biScopeForSession(session, data = {}) {
       ? tickets.filter((ticket) => ticketInDepartments(ticket, departments, fleet))
       : [],
     fleet: scopedFleet,
-    pm: pm.filter((record) => record.fleetId && scopedFleetIds.has(record.fleetId)),
+    pm: pm.filter((record) => {
+      const fleetId = record.fleetId || record.forkliftId || record.unitId;
+      return fleetId && scopedFleetIds.has(fleetId);
+    }),
     zones: scopedZones,
     rounds: rounds.filter((round) => zoneIds.has(round.zoneId)),
     complaints: complaints.filter((complaint) => zoneIds.has(complaint.zoneId)),

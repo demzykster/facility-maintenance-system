@@ -4287,16 +4287,19 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
 /* ============================================================ USER APP */
 function UserApp(p) {
   const { session, config, fleet, tickets, pm, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
-  const [view, setView] = useState("tickets");
-  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null), [taskNav, setTaskNav] = useState(null);
+  const [view, setView] = useState("bi");
+  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [ticketNav, setTicketNav] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null), [taskNav, setTaskNav] = useState(null);
   const goNotif = (go, ev) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); setDeptNav(ev?.fleetId ? { fleetId: ev.fleetId, _t: Date.now() } : null); } };
   const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
+  const ticketRows = useMemo(() => ticketNav ? mine.filter((ticket) => ticketMatchesBIFocus(ticket, ticketNav, { fleet, config })) : mine, [mine, ticketNav, fleet, config]);
   const myPm = useMemo(() => pmVisible(session, pm, fleet), [pm, fleet, session]);
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
   const openTicket = (id) => setOverlay({ type: "detail", id });
-  const needAct = mine.filter((t) => isOpen(t) && (ballIn(t) === "manager" || (isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework")))).length;
+  const needAct = ticketRows.filter((t) => isOpen(t) && (ballIn(t) === "manager" || (isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework")))).length;
+  const goUserTickets = (nav = {}) => { setTicketNav(nav.focus || nav.track ? { ...nav } : null); setFilter(nav.st || "open"); setView("tickets"); };
+  const goUserDept = (tab = "equip", nav = null) => { setDeptTab(tab); setDeptNav(nav ? { ...nav, _t: Date.now() } : null); setView("dept"); };
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
   const mayViewAudit = canViewAudit(session);
@@ -4309,10 +4312,11 @@ function UserApp(p) {
     tickets, fleet, pm, zones, rounds, complaints, tasks: p.tasks, meetings: p.meetings,
     ppe: p.ppe, ppeItems: p.ppeItems, users
   }), [session, tickets, fleet, pm, zones, rounds, complaints, p.tasks, p.meetings, p.ppe, p.ppeItems, users]);
-  const activeView = view === "activity" && !mayViewAudit ? "tickets" : view === "insights" && !mayViewAnalytics ? "tickets" : view === "ppe" && !mayManagePpe ? "tickets" : view === "teamAdmin" && !mayViewUsers ? "tickets" : view === "suppliers" && !mayViewSuppliers ? "tickets" : view === "settings" && !mayManageSettings ? "tickets" : view;
-  const pageTitle = activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
+  const activeView = view === "activity" && !mayViewAudit ? "bi" : view === "insights" && !mayViewAnalytics ? "bi" : view === "ppe" && !mayManagePpe ? "bi" : view === "teamAdmin" && !mayViewUsers ? "bi" : view === "suppliers" && !mayViewSuppliers ? "bi" : view === "settings" && !mayManageSettings ? "bi" : view;
+  const pageTitle = activeView === "bi" ? "BI" : activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   const userNav = [
-    { id: "tickets", Icon: ListChecks, label: "קריאות", active: activeView === "tickets", onClick: () => setView("tickets") },
+    { id: "bi", Icon: Gauge, label: "BI", active: activeView === "bi", onClick: () => setView("bi") },
+    { id: "tickets", Icon: ListChecks, label: "קריאות", active: activeView === "tickets", onClick: () => { setTicketNav(null); setView("tickets"); } },
     { id: "tasks", Icon: ClipboardList, label: "מטלות", active: activeView === "tasks", onClick: () => setView("tasks") },
     { id: "dept", Icon: Users, label: "המחלקה", active: activeView === "dept", onClick: () => setView("dept") },
     mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null,
@@ -4330,19 +4334,21 @@ function UserApp(p) {
       <div className="main-col">
         <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
-          {activeView === "tickets" ? (<>
+          {activeView === "bi" ? <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={goUserTickets} onGoAssets={(nav) => goUserDept("equip", nav || {})} onGoCleaning={() => goUserDept("cleaning")} onGoPpe={() => goUserDept("ppe")} />
+          : activeView === "tickets" ? (<>
             {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {countLabel(needAct, "קריאה דורשת", "קריאות דורשות")} פעולה שלך</div>}
+            {ticketNav?.focus?.label && <div className="note bi-filter-note"><span>{ticketNav.focus.label}</span><button className="btn-ghost sm" onClick={() => setTicketNav(null)}>נקה סינון</button></div>}
             <div className="stat-strip">
-              <div className="stat-box"><div className="stat-num">{mine.filter(isOpen).length}</div><div className="stat-lbl">פתוחות</div></div>
+              <div className="stat-box"><div className="stat-num">{ticketRows.filter(isOpen).length}</div><div className="stat-lbl">פתוחות</div></div>
               <div className="stat-box"><div className="stat-num" style={{ color: "#0D9488" }}>{needAct}</div><div className="stat-lbl">דורשות פעולה</div></div>
-              <div className="stat-box"><div className="stat-num">{mine.length}</div><div className="stat-lbl">סה״כ</div></div>
+              <div className="stat-box"><div className="stat-num">{ticketRows.length}</div><div className="stat-lbl">סה״כ</div></div>
             </div>
             {(() => { const techs = (users || []).filter((u) => u.role === "tech" && u.active !== false); return <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle>{techs.length === 0 ? <div className="note" style={{ marginBottom: 12 }}>אין טכנאים מוגדרים.</div> : <div className="tech-strip">{techs.map((u) => { const pr = presenceOf(presence, u.id); return <span key={u.id} className="tech-chip"><span className={"presence-dot" + (isPresenceOnline(pr) ? " on" : "")} />{u.name}{u.supplier ? <span className="tech-chip-sup"> · {u.supplier}</span> : ""}<span className="tech-chip-stat">{shiftPresenceStatusText(pr)}{(() => { const z = shiftIdle(pr, u, config); return z.lateMin > 0 ? " · איחר " + z.lateMin + " ד׳" : z.earlyMin > 0 ? " · מוקדם " + z.earlyMin + " ד׳" : ""; })()}</span></span>; })}</div>}</>; })()}
             {pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים לכלי המחלקה — להוצאה לטכנאי</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{pmSoon.slice(0, 6).map((x) => { const d = daysLeft(x.nextDue); const f = pmFleet(x, fleet); return <button key={x.id} className="attn-row" onClick={() => setPmView(x)}><span className="attn-dot" style={{ background: pmColor(d) }} /><span className="attn-main"><span className="attn-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="attn-meta">{x.title || "טיפול תקופתי"}</span></span><span className="attn-tag" style={{ color: pmColor(d), background: pmColor(d) + "1a" }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></button>; })}</div></>}
-            <div className="row-between"><div className="chips">{[["open", "פתוחות"], ["closed", "סגורות"], ["all", "הכל"]].map(([id, lbl]) => <button key={id} className={"chip" + (filter === id ? " on" : "")} onClick={() => setFilter(id)}>{lbl}</button>)}</div></div>
+            <div className="row-between"><div className="chips">{[["open", "פתוחות"], ["closed", "סגורות"], ["all", "הכל"]].map(([id, lbl]) => <button key={id} className={"chip" + (filter === id ? " on" : "")} onClick={() => { setFilter(id); setTicketNav(null); }}>{lbl}</button>)}</div></div>
             {(() => {
               if (filter === "open") {
-                const openT = mine.filter(isOpen);
+                const openT = ticketRows.filter(isOpen);
                 const needEquip = openT.filter((t) => t.status === "waiting" && t.waitingReason === "no_equipment");
                 const workerReports = openT.filter((t) => isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework"));
                 const awaiting = openT.filter((t) => ballIn(t) === "manager" && !needEquip.includes(t) && !workerReports.includes(t));
@@ -4358,7 +4364,7 @@ function UserApp(p) {
                   {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#1F4E8C" /> מעקב — אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                 </>;
               }
-              const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
+              const list = filter === "closed" ? ticketRows.filter((t) => !isOpen(t)) : ticketRows;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
           </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
@@ -4376,7 +4382,7 @@ function UserApp(p) {
         </div>
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
-      <MobileBottomNav nav={userNav} primaryIds={["tickets", "tasks", "dept"]} />
+      <MobileBottomNav nav={userNav} primaryIds={["bi", "tickets", "dept"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
@@ -4747,7 +4753,12 @@ function ManagerFleet(p) {
   const myPm = useMemo(() => pmVisible(session, p.pm, fleet), [p.pm, fleet, session]);
   const showDocs = canFleetDocs(session), showTickets = canFleetTickets(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
-  useEffect(() => { if (deptNav?.fleetId && scoped.some((f) => f.id === deptNav.fleetId)) { setTab("units"); setOpenId(deptNav.fleetId); } }, [deptNav?._t, scoped]);
+  useEffect(() => {
+    if (!deptNav) return;
+    if (deptNav.tab === "pm") setTab("pm");
+    if (deptNav.tab === "fleet" || deptNav.tab === "units") setTab("units");
+    if (deptNav.fleetId && scoped.some((f) => f.id === deptNav.fleetId)) { setTab("units"); setOpenId(deptNav.fleetId); }
+  }, [deptNav?._t, scoped]);
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
     {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
@@ -7377,6 +7388,28 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const ppeLowItems = scope.ppeItems.filter((item) => item.active !== false && ppeLow(item));
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
+  const biNow = Date.now();
+  const createdLast7 = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 7 * 86400000);
+  const createdPrev7 = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 14 * 86400000 && (ticket.createdAt || 0) < biNow - 7 * 86400000);
+  const closedLast7 = scope.tickets.filter((ticket) => !isOpen(ticket) && (ticket.closure?.signedAt || ticket.updatedAt || 0) >= biNow - 7 * 86400000);
+  const trendDelta = createdLast7.length - createdPrev7.length;
+  const repeatProblemRows = Object.values(scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 30 * 86400000).reduce((acc, ticket) => {
+    const category = catOf(ticket);
+    const repeatFocus = ticket.forkliftId
+      ? { forkliftId: ticket.forkliftId }
+      : ticket.asset
+        ? { assetKey: ticket.asset }
+        : ticket.zone
+          ? { zoneKey: ticket.zone }
+          : { categoryId: category.id };
+    const key = ticket.forkliftId ? `fleet:${ticket.forkliftId}` : ticket.asset ? `asset:${ticket.asset}` : ticket.zone ? `zone:${ticket.zone}` : `cat:${category.id}`;
+    const label = ticket.forkliftId ? unitLabel(scope.fleet.find((unit) => unit.id === ticket.forkliftId), config) : (ticket.asset || ticket.zone || category.label || "כללי");
+    acc[key] = acc[key] || { key, label, focus: repeatFocus, n: 0, open: 0, track: isTransportTicket(ticket) ? "transport" : "facility" };
+    acc[key].n += 1;
+    if (isOpen(ticket)) acc[key].open += 1;
+    return acc;
+  }, {})).filter((row) => row.n >= 2).sort((a, b) => b.open - a.open || b.n - a.n).slice(0, 4);
+  const maxRepeatN = Math.max(1, ...repeatProblemRows.map((row) => row.n));
   const departmentRiskRows = biDepartmentRiskRows({
     departments: scope.kind === "company" ? (config.departments || []) : scope.departments,
     tickets: scope.tickets,
@@ -7429,14 +7462,14 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     ...waiting.filter((ticket) => !slaBreaches.some((item) => item.id === ticket.id) && !critical.some((item) => item.id === ticket.id)).map((ticket) => ({ ticket, label: "ממתין לגורם", color: "#B45309" }))
   ].slice(0, 6);
   const rawCommandItems = isAdminBI ? [
-    ...unownedTickets.map((ticket) => ({ key: `owner-${ticket.id}`, domain: ticketDomain(ticket), title: ticketTitle(ticket), sub: `${ticketCause(ticket, "אין בעלים פעיל")} · נדרש שיבוץ`, actionLabel: "פתח קריאה", color: "#7F1D1D", action: () => onOpenTicket?.(ticket.id) })),
-    ...slaBreaches.map((ticket) => ({ key: `sla-${ticket.id}`, domain: ticketDomain(ticket), title: ticketTitle(ticket), sub: `חריגת SLA · ${ticketCause(ticket, "בדיקת סטטוס")}`, actionLabel: "פתח קריאה", color: "#B91C1C", action: () => onOpenTicket?.(ticket.id) })),
-    ...critical.map((ticket) => ({ key: `critical-${ticket.id}`, domain: "שינוע", title: ticketTitle(ticket), sub: `השבתה קריטית · ${ticketCause(ticket, "בדיקת טיפול")}`, actionLabel: "פתח קריאה", color: "#C2410C", action: () => onOpenTicket?.(ticket.id) })),
-    ...cleaningOpen.map((complaint) => ({ key: `clean-${complaint.id}`, domain: "ניקיון", title: complaint.zoneName || "אזור ניקיון", sub: `${complaint.status === "pending" ? "דיווח ממתין לאישור" : "דיווח פתוח"} · ${complaint.kind === "broken" ? "תקלה" : "לכלוך"}`, actionLabel: "לניקיון", color: "#B45309", action: onGoCleaning })),
-    ...cleaningMissed.map((row) => ({ key: `clean-missed-${row.zone.id}-${row.win?.id || row.win?.time || "win"}`, domain: "ניקיון", title: row.zone.name || "אזור ניקיון", sub: `סבב ניקיון פוספס · ${row.win?.time || "היום"}`, actionLabel: "לניקיון", color: "#B91C1C", action: onGoCleaning })),
-    ...ppePending.map((request) => ({ key: `ppe-${request.id}`, domain: "ביגוד", title: request.workerName || "בקשת ביגוד", sub: `${ppeRequestStatusLabel(request.status)} · ${(request.lines || []).length || 1} פריטים`, actionLabel: "לביגוד", color: "#0D9488", action: onGoPpe })),
-    ...pmOverdue.map((task) => ({ key: `pm-${task.id}`, domain: "PM", title: task.name || task.title || task.fleetCode || "טיפול תקופתי", sub: "באיחור · לפתוח צי ותחזוקה מונעת", actionLabel: "ל-PM", color: "#B45309", action: () => onGoAssets?.({ tab: "pm" }) })),
-    ...expiringDocs.filter((row) => row.status.d < 0).map(({ unit, status }) => ({ key: `doc-${unit.id}-${status.label}`, domain: "מסמכים", title: unitLabel(unit, config), sub: `${status.label} · פג תוקף`, actionLabel: "לכלי", color: "#B45309", action: () => onGoAssets?.({ tab: "fleet" }) })),
+    ...unownedTickets.map((ticket) => ({ key: `owner-${ticket.id}`, domain: ticketDomain(ticket), title: ticketTitle(ticket), sub: `${ticketCause(ticket, "אין בעלים פעיל")} · נדרש שיבוץ`, nextStep: "להחליט מי בעל הטיפול הבא", actionLabel: "פתח קריאה", color: "#7F1D1D", action: () => onOpenTicket?.(ticket.id) })),
+    ...slaBreaches.map((ticket) => ({ key: `sla-${ticket.id}`, domain: ticketDomain(ticket), title: ticketTitle(ticket), sub: `חריגת SLA · ${ticketCause(ticket, "בדיקת סטטוס")}`, nextStep: "לבדוק חסם ולהחזיר למסלול", actionLabel: "פתח קריאה", color: "#B91C1C", action: () => onOpenTicket?.(ticket.id) })),
+    ...critical.map((ticket) => ({ key: `critical-${ticket.id}`, domain: "שינוע", title: ticketTitle(ticket), sub: `השבתה קריטית · ${ticketCause(ticket, "בדיקת טיפול")}`, nextStep: "לוודא חלופה או החזרה לשירות", actionLabel: "פתח קריאה", color: "#C2410C", action: () => onOpenTicket?.(ticket.id) })),
+    ...cleaningOpen.map((complaint) => ({ key: `clean-${complaint.id}`, domain: "ניקיון", title: complaint.zoneName || "אזור ניקיון", sub: `${complaint.status === "pending" ? "דיווח ממתין לאישור" : "דיווח פתוח"} · ${complaint.kind === "broken" ? "תקלה" : "לכלוך"}`, nextStep: complaint.status === "pending" ? "לאשר או לדחות את הדיווח" : "להשלים טיפול באזור", actionLabel: "לניקיון", color: "#B45309", action: onGoCleaning })),
+    ...cleaningMissed.map((row) => ({ key: `clean-missed-${row.zone.id}-${row.win?.id || row.win?.time || "win"}`, domain: "ניקיון", title: row.zone.name || "אזור ניקיון", sub: `סבב ניקיון פוספס · ${row.win?.time || "היום"}`, nextStep: "לשבץ כיסוי או לבדוק היעדרות", actionLabel: "לניקיון", color: "#B91C1C", action: onGoCleaning })),
+    ...ppePending.map((request) => ({ key: `ppe-${request.id}`, domain: "ביגוד", title: request.workerName || "בקשת ביגוד", sub: `${ppeRequestStatusLabel(request.status)} · ${(request.lines || []).length || 1} פריטים`, nextStep: "לאשר, להכין או להעביר לחתימה", actionLabel: "לביגוד", color: "#0D9488", action: onGoPpe })),
+    ...pmOverdue.map((task) => ({ key: `pm-${task.id}`, domain: "PM", title: task.name || task.title || task.fleetCode || "טיפול תקופתי", sub: "באיחור · לפתוח צי ותחזוקה מונעת", nextStep: "לתאם הוצאת כלי לטיפול", actionLabel: "ל-PM", color: "#B45309", action: () => onGoAssets?.({ tab: "pm" }) })),
+    ...expiringDocs.filter((row) => row.status.d < 0).map(({ unit, status }) => ({ key: `doc-${unit.id}-${status.label}`, domain: "מסמכים", title: unitLabel(unit, config), sub: `${status.label} · פג תוקף`, nextStep: "לעדכן מסמך או להשבית שימוש", actionLabel: "לכלי", color: "#B45309", action: () => onGoAssets?.({ tab: "fleet" }) })),
   ] : [];
   const commandSeen = new Set();
   const commandItems = rawCommandItems.filter((item) => {
@@ -7482,7 +7515,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         {Object.keys(commandDomainCounts).length > 1 && <div className="bi-command-domains">{Object.entries(commandDomainCounts).map(([domain, count]) => <span key={domain}>{domain}<b>{count}</b></span>)}</div>}
         {commandQueue.length ? commandQueue.map((item) => <button key={item.key} className="bi-attn-row" onClick={item.action || undefined} disabled={!item.action}>
           <span className="bi-dot" style={{ background: item.color }} />
-          <span><span className="bi-command-meta"><em>{item.domain}</em>{item.actionLabel && <small>{item.actionLabel}</small>}</span><b>{item.title}</b><small>{item.sub}</small></span>
+          <span><span className="bi-command-meta"><em>{item.domain}</em>{item.actionLabel && <small>{item.actionLabel}</small>}</span><b>{item.title}</b><small>{item.sub}</small>{item.nextStep && <small className="bi-command-next">המשך: {item.nextStep}</small>}</span>
           {item.action && <ChevronLeft size={15} />}
         </button>) : <div className="note">אין כרגע החלטות דחופות. המשיכו לעקוב אחרי המדדים והמודולים.</div>}
       </section>}
@@ -7512,6 +7545,17 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         {waitReasonRows.length > 0 && <div className="bi-subdivider" />}
         {waitReasonRows.length > 0 && <div className="bi-subtitle">סיבות המתנה</div>}
         {waitReasonRows.map((row) => <Bar key={row.reason} label={row.label} value={row.n} max={maxWaitReasonN} suffix={row.ms ? ` · ${fmtDur(row.ms)}` : ""} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · סיבת המתנה · ${row.label}`, lifecycleKey: `waiting:${row.reason}` } })} />)}
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>מגמות קצרות</b><span>מה השתנה בשבוע האחרון ומה חוזר על עצמו</span></div></div>
+        <div className="bi-mini-stats">
+          <span><b>{createdLast7.length}</b><small>נפתחו 7 ימים</small></span>
+          <span><b>{closedLast7.length}</b><small>נסגרו 7 ימים</small></span>
+          <span><b>{trendDelta > 0 ? `+${trendDelta}` : trendDelta}</b><small>מול שבוע קודם</small></span>
+        </div>
+        {repeatProblemRows.length > 0 && <div className="bi-subtitle">חזרתיות ב-30 ימים</div>}
+        {repeatProblemRows.length ? repeatProblemRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxRepeatN} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: row.track, focus: { label: `BI · חזרתיות · ${row.label}`, ...row.focus } })} />) : <div className="note" style={{ marginTop: 10 }}>אין כרגע דפוס חזרתי בולט ב-30 הימים האחרונים.</div>}
       </section>
 
       <section className="panel bi-panel">
@@ -7584,6 +7628,31 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
       </section>
     </div>
   </div>;
+}
+
+function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], config = {} } = {}) {
+  const focus = nav.focus || {};
+  const currentTrack = trackOf(ticket);
+  if (nav.track && nav.track !== "all" && currentTrack !== nav.track) return false;
+  if (focus.forkliftId && ticket.forkliftId !== focus.forkliftId) return false;
+  if (Array.isArray(focus.statuses) && focus.statuses.length && !focus.statuses.includes(ticket.status)) return false;
+  if (focus.supplier && (ticket.closure?.costSupplier || "") !== focus.supplier) return false;
+  if (focus.waitReason && ticket.waitingReason !== focus.waitReason) return false;
+  if (focus.lifecycleKey && !ticketHasLifecycleStage(ticket, focus.lifecycleKey, { isOpen })) return false;
+  if (focus.overdue && !ticketMissedSla(ticket, config)) return false;
+  if (focus.criticalEscalated && !isCriticalEscalated(ticket, config)) return false;
+  if (focus.activeCriticalTransport && !(currentTrack === "transport" && ticket.downtimeType === "critical" && !isCriticalEscalated(ticket, config))) return false;
+  if (focus.assetKey && (ticket.asset || "") !== focus.assetKey) return false;
+  if (focus.zoneKey && (ticket.zone || "") !== focus.zoneKey) return false;
+  if (focus.categoryId && catOf(ticket).id !== focus.categoryId) return false;
+  if (focus.department) {
+    const unit = (fleet || []).find((item) => item.id === ticket.forkliftId);
+    const ticketDepts = currentTrack === "transport"
+      ? fleetDepts(unit)
+      : [ticket.reportedBy?.dept, ticket.createdBy?.dept, ticket.department, ticket.dept].filter(Boolean);
+    if (!ticketDepts.includes(focus.department)) return false;
+  }
+  return true;
 }
 
 function AdminApp(p) {
@@ -7996,6 +8065,8 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       if (focus.criticalEscalated && !isCriticalEscalated(t, config)) return false;
       if (focus.activeCriticalTransport && !((t.track || (t.forkliftId ? "transport" : "facility")) === "transport" && t.downtimeType === "critical" && !isCriticalEscalated(t, config))) return false;
       if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
+      if (focus.zoneKey && (t.zone || "") !== focus.zoneKey) return false;
+      if (focus.categoryId && catOf(t).id !== focus.categoryId) return false;
       if (focus.department) {
         const ff = (fleet || []).find((x) => x.id === t.forkliftId);
         const currentTrack = t.track || (t.forkliftId ? "transport" : "facility");
@@ -11544,6 +11615,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-command-meta{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
 .bi-command-meta em{font-style:normal;font-size:11px;font-weight:650;color:var(--primary);background:rgba(31,78,140,.08);border:1px solid rgba(31,78,140,.14);border-radius:999px;padding:2px 7px;line-height:1.4;}
 .bi-command-meta small{margin:0;font-size:11px;color:var(--muted);}
+.bi-command-next{color:var(--ink)!important;font-weight:600;}
 .bi-dot{width:10px;height:10px;border-radius:999px;}
 .bi-mini-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
 .bi-mini-stats span{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px;text-align:center;}
@@ -11560,6 +11632,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-subtitle{margin:2px 0 6px;color:var(--muted);font-size:11.5px;font-weight:650;}
 .bi-subdivider{height:1px;background:var(--line);margin:10px 0;}
 .bi-panel .big-stat{font-weight:650;}
+.bi-filter-note{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
 .ppe-dash-flow{display:flex;flex-direction:column;gap:22px;}
 .ppe-dash-section{min-width:0;}
 .ppe-dashboard{display:flex;flex-direction:column;gap:22px;}

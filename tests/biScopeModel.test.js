@@ -14,7 +14,8 @@ const data = {
   ],
   pm: [
     { id: "pm-a", fleetId: "f-a" },
-    { id: "pm-b", fleetId: "f-b" }
+    { id: "pm-b", fleetId: "f-b" },
+    { id: "pm-a-alt", forkliftId: "f-a" }
   ],
   zones: [
     { id: "z-a", dept: "A" },
@@ -86,7 +87,7 @@ describe("BI scope model", () => {
     expect(scope.departments).toEqual(["A"]);
     expect(scope.tickets.map((ticket) => ticket.id)).toEqual(["t-fac-a", "t-fleet-a"]);
     expect(scope.fleet.map((unit) => unit.id)).toEqual(["f-a"]);
-    expect(scope.pm.map((record) => record.id)).toEqual(["pm-a"]);
+    expect(scope.pm.map((record) => record.id)).toEqual(["pm-a", "pm-a-alt"]);
     expect(scope.ppe.map((item) => item.id)).toEqual(["ppe-a", "ppe-a-item"]);
     expect(scope.ppeItems.map((item) => item.id)).toEqual(["item-a", "item-req-a"]);
     expect(scope.ppeReqs.map((request) => request.id)).toEqual(["req-a"]);
