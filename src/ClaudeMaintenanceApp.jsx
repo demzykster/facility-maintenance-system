@@ -328,17 +328,17 @@ const imageFileToDataUrl = (file, maxSide = 1100, quality = 0.7) => new Promise(
 });
 
 const TRACKS = {
-  facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#0EA5E9" },
+  facility: { id: "facility", label: "אחזקת מבנה ומתקנים", short: "מבנה", Icon: Building2, color: "#1F4E8C" },
   transport: { id: "transport", label: "כלי שינוע / מלגזות", short: "שינוע", Icon: Truck, color: "#1F4E8C" },
 };
 
 const CATEGORIES = [
   { id: "electric", label: "חשמל", Icon: Zap, color: "#F59E0B" },
-  { id: "plumbing", label: "אינסטלציה", Icon: Droplets, color: "#0EA5E9" },
+  { id: "plumbing", label: "אינסטלציה", Icon: Droplets, color: "#3E6DB0" },
   { id: "hvac", label: "מיזוג אוויר", Icon: Wind, color: "#14B8A6" },
-  { id: "mechanical", label: "ציוד מכני", Icon: Cog, color: "#8B5CF6" },
+  { id: "mechanical", label: "ציוד מכני", Icon: Cog, color: "#3E6DB0" },
   { id: "safety", label: "בטיחות", Icon: ShieldAlert, color: "#EF4444" },
-  { id: "it", label: "מערכות IT", Icon: Monitor, color: "#6366F1" },
+  { id: "it", label: "מערכות IT", Icon: Monitor, color: "#6F7680" },
   { id: "building", label: "בניין", Icon: Building2, color: "#64748B" },
   { id: "cleaning", label: "ניקיון", Icon: Sparkles, color: "#10B981" },
   { id: "other", label: "אחר", Icon: Wrench, color: "#94A3B8" },
@@ -383,9 +383,9 @@ const uName = (id, users) => (users || []).find((u) => u.id === id)?.name || "�
 const taskVisible = (t, session, users) => { if (session.role === "admin") return true; const me = session.id; return t.ownerId === me || (t.responsibleIds || []).includes(me) || (t.participantIds || []).includes(me); };
 // ---- פגישות (Meetings) ----
 const MEETING_TYPES = [
-  { id: "boss", label: "פ.ע עם מנהל שלי", color: "#7C3AED" },
+  { id: "boss", label: "פ.ע עם מנהל שלי", color: "#1F4E8C" },
   { id: "peers", label: "פ.ע עם קולגה", color: "#0891B2" },
-  { id: "leadership", label: "פגישה קבוצתית", color: "#2563EB" },
+  { id: "leadership", label: "פגישה קבוצתית", color: "#1F4E8C" },
 ];
 const MTG_FALLBACK = { id: "general", label: "פגישה", color: "#64748B" };
 const mtgType = (id) => MEETING_TYPES.find((m) => m.id === id) || MTG_FALLBACK;
@@ -459,7 +459,7 @@ const DOWNTIME = [
 // Уровни тяжести настраиваются админом (config.downtimeLevels); fallback — DOWNTIME. Поиск всегда что-то возвращает (целостность: ссылка на удалённый уровень не уронит экран).
 const dtLevels = (cfg) => (cfg && Array.isArray(cfg.downtimeLevels) && cfg.downtimeLevels.length) ? cfg.downtimeLevels : DOWNTIME;
 const dtOf = (id, cfg) => dtLevels(cfg).find((d) => d.id === id) || DOWNTIME.find((d) => d.id === id) || { id: id || "", label: id || "—", desc: "", color: "#6B7280", prio: "medium", oos: false };
-const DT_PALETTE = ["#16A34A", "#65A30D", "#CA8A04", "#EA580C", "#DC2626", "#B91C1C", "#7C3AED", "#0891B2", "#475569"];
+const DT_PALETTE = ["#1F4E8C", "#3E6DB0", "#6F7680", "#A4A9B0", "#16A34A", "#CA8A04", "#EA580C", "#DC2626", "#B91C1C"];
 const WEAR = [{ id: "natural", label: "בלאי טבעי" }, { id: "disproportionate", label: "נזק בלתי פרופורציונלי" }];
 
 const FORKLIFT_TYPES = ["52-8FDF20", "8FBE15T", "GS4047", "LPE200", "LWE250", "LWI160", "MX-X", "OSE250", "RRE140B", "RRE200H", "RRE250E", "SPE160", "SWE160", "VCE150A"];
@@ -805,14 +805,14 @@ const LOG_KINDS = [
   { id: "cancel", label: "ביטול", color: "#64748B", re: /בוטל|ביטול/ },
   { id: "reopen", label: "החזרה לטיפול", color: "#B45309", re: /מחדש|הוחזר/ },
   { id: "approve", label: "אישור", color: "#16A34A", re: /אושר|אישר/ },
-  { id: "forward", label: "העברה לטכנאי", color: "#7C3AED", re: /הועבר לטכנאי|נפתחה והועברה|הועברה לטכנאים/ },
+  { id: "forward", label: "העברה לטכנאי", color: "#1F4E8C", re: /הועבר לטכנאי|נפתחה והועברה|הועברה לטכנאים/ },
   { id: "accept", label: "קבלה לטיפול", color: "#0891B2", re: /קיבל|התקבל/ },
   { id: "treat", label: "טיפול", color: "#0D9488", re: /הטיפול הסתיים|טופל|תיקון|הועבר לאישור|הועבר לסגירת/ },
   { id: "waiting", label: "המתנה", color: "#CA8A04", re: /ממתי[נן]|המתנה/ },
-  { id: "open", label: "פתיחה", color: "#2563EB", re: /נפתח|דיווח נשלח|נשלח לאישור/ },
-  { id: "classify", label: "סיווג", color: "#9333EA", re: /סיווג/ },
+  { id: "open", label: "פתיחה", color: "#1F4E8C", re: /נפתח|דיווח נשלח|נשלח לאישור/ },
+  { id: "classify", label: "סיווג", color: "#3E6DB0", re: /סיווג/ },
   { id: "driver", label: "נהגים", color: "#0D9488", re: /(?!)/ },
-  { id: "cleaning", label: "ניקיון", color: "#0EA5E9", re: /סבב ניקיון/ },
+  { id: "cleaning", label: "ניקיון", color: "#3E6DB0", re: /סבב ניקיון/ },
 ];
 const logKind = (text) => { const s = text || ""; for (const k of LOG_KINDS) if (k.re.test(s)) return k.id; return "other"; };
 const logKindOf = (l) => (l && l.kind) || logKind(l && l.text); // явный kind, иначе вывод по тексту
@@ -825,7 +825,7 @@ const machineDocs = (f, cfg) => DOC_DEFS.filter((d) => {
 // --- Водители на транспорте (по 3 категории-смены) ---
 const DRIVER_SHIFTS = [
   { id: "morning", label: "בוקר", color: "#F59E0B" },
-  { id: "night", label: "לילה", color: "#6366F1" },
+  { id: "night", label: "לילה", color: "#1F4E8C" },
 ];
 const workShiftsOf = (cfg) => (cfg && cfg.workShifts && cfg.workShifts.length) ? cfg.workShifts : DRIVER_SHIFTS;
 const driverShiftMeta = (id) => DRIVER_SHIFTS.find((s) => s.id === id) || { id, label: id === "overlap" ? "חפיפה" : (id || "—"), color: "#0D9488" };
@@ -1057,7 +1057,7 @@ const ballIn = (t) => {
 // «у кого мяч» — кто сейчас держит заявку, для отображения на карточке
 const ballHolder = (t) => {
   const who = ballIn(t);
-  if (who === "admin") return { key: "admin", label: "מנהל המערכת", Icon: ShieldCheck, color: "#4F46E5" };
+  if (who === "admin") return { key: "admin", label: "מנהל המערכת", Icon: ShieldCheck, color: "#1F4E8C" };
   if (who === "manager") return { key: "manager", label: (t.status === "waiting" && t.waitingReason === "no_equipment") ? "מנהל מחלקה · להעביר כלי" : (t.status === "pending_manager" ? "מנהל מחלקה · לאישור דיווח" : (t.status === "pending_user" ? "מנהל מחלקה · לאישור ביצוע" : "מנהל מחלקה")), Icon: User, color: "#0D9488" };
   if (who === "tech") return { key: "tech", label: t.assignee ? (t.assignee === "טכנאי" ? "טכנאי מטפל" : "טכנאי · " + t.assignee) : "צוות טכני · ממתין לקבלה", Icon: Wrench, color: "#D97706" };
   return null; // none — סגורה/בוטלה/הוחזרה לעובד
@@ -3800,7 +3800,7 @@ function WorkerReportView({ report, session, saveTicket, onClose }) {
       {photo && <div className="photo-prev" style={{ marginTop: 10 }}><img src={photo} alt="" /></div>}
       {report.status === "cancelled" && report.rejectReason && <div className="banner" style={{ marginTop: 14, background: "#FEE2E2", color: "#991B1B", borderColor: "#FCA5A5" }}><X size={16} /> הדיווח נדחה — {rejectLabel(report.rejectReason.code)}{report.rejectReason.comment ? `: ${report.rejectReason.comment}` : ""}</div>}
       {report.status === "rework" && (<>
-        <div className="banner" style={{ marginTop: 14, background: "#CFFAFE", color: "#155E75", borderColor: "#67E8F9" }}><AlertTriangle size={16} /> המנהל החזיר לתיקון. הוסיפו פרטים/תמונה ושלחו שוב.</div>
+        <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><AlertTriangle size={16} /> המנהל החזיר לתיקון. הוסיפו פרטים/תמונה ושלחו שוב.</div>
         <label className="field" style={{ marginTop: 10 }}><span>הוספת הערה (אופציונלי)</span><textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} /></label>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />
         {newPhoto ? <div className="photo-prev"><img src={newPhoto} alt="" /><button className="photo-x" onClick={() => setNewPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> החלפת תמונה</button>}
@@ -4344,7 +4344,7 @@ function UserApp(p) {
                   {awaiting.length > 0 && <><SectionTitle><CheckCircle2 size={15} color="#0D9488" /> פעולה שלך — ממתינות לאישורך ({awaiting.length})</SectionTitle><div className="cards">{sortByImportance(awaiting, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                   <SectionTitle><Wrench size={15} /> מעקב — בטיפול הטכנאי ({atTech.length})</SectionTitle>
                   {atTech.length === 0 ? <div className="note">אין קריאות בטיפול.</div> : <div className="cards">{sortByImportance(atTech, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>}
-                  {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#4F46E5" /> מעקב — אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#1F4E8C" /> מעקב — אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                 </>;
               }
               const list = filter === "closed" ? mine.filter((t) => !isOpen(t)) : mine;
@@ -4423,7 +4423,7 @@ function TechApp(p) {
           {sessWarn && <div className="ovl-backdrop modal2" style={{ zIndex: 60 }}><div className="modal2-panel" style={{ textAlign: "center" }}><div className="modal2-body"><div style={{ fontSize: 38, marginBottom: 6 }}>⏰</div><div className="form-title" style={{ marginBottom: 6 }}>המשמרת עומדת להסתיים</div><div className="note" style={{ margin: "0 0 14px" }}>בעוד כ-10 דקות תתבצע יציאה אוטומטית. ללא בחירה תוך 5 דקות — המערכת תוציא אותך אוטומטית.</div><div className="row2"><button className="btn-ghost" onClick={extendShift}>הארכה ב-60 ד׳</button><button className="btn-primary" onClick={endAndLogout}><Power size={15} /> סיום ויציאה</button></div></div></div></div>}
           {view === "tickets" ? (<>
             <div className="stat-strip">
-              <div className="stat-box"><div className="stat-num" style={{ color: "#2563EB" }}>{pool.length}</div><div className="stat-lbl">ממתינות לקבלה</div></div>
+              <div className="stat-box"><div className="stat-num" style={{ color: "var(--primary)" }}>{pool.length}</div><div className="stat-lbl">ממתינות לקבלה</div></div>
               <div className="stat-box"><div className="stat-num" style={{ color: "#D97706" }}>{working.length + returnedToMe.length}</div><div className="stat-lbl">בטיפולי</div></div>
               {tw.sla !== false && <div className="stat-box"><div className="stat-num" style={{ color: "#DC2626" }}>{mine.filter((t) => ticketMissedSla(t, config)).length}</div><div className="stat-lbl">חריגת SLA</div></div>}
             </div>
@@ -4839,7 +4839,7 @@ const zoneTodayStatuses = (zone, rounds, now, cfg = {}) => {
     return { win, status, target, slotStart, slotEnd, round };
   });
 };
-const WIN_META = { done: { label: "בוצע", color: "#16A34A", bg: "#DCFCE7" }, due: { label: "כעת", color: "#B45309", bg: "#FEF3C7" }, overdue: { label: "באיחור", color: "#EA580C", bg: "#FFEDD5" }, missed: { label: "פוספס", color: "#DC2626", bg: "#FEE2E2" }, upcoming: { label: "מתקרב", color: "#7C3AED", bg: "#EDE9FE" }, pending: { label: "מתוכנן", color: "#64748B", bg: "var(--surface-2)" } };
+const WIN_META = { done: { label: "בוצע", color: "#16A34A", bg: "#DCFCE7" }, due: { label: "כעת", color: "#B45309", bg: "#FEF3C7" }, overdue: { label: "באיחור", color: "#EA580C", bg: "#FFEDD5" }, missed: { label: "פוספס", color: "#DC2626", bg: "#FEE2E2" }, upcoming: { label: "מתקרב", color: "#1F4E8C", bg: "var(--primary-soft)" }, pending: { label: "מתוכנן", color: "#64748B", bg: "var(--surface-2)" } };
 const materializeMissedCleaningRounds = async ({ zones = [], rounds = [], now = Date.now(), config = {}, saveRound, inFlightRef }) => {
   if (!saveRound) return;
   const ds = dayStart(now), eod = ds + 86400000;
@@ -4868,7 +4868,7 @@ const dayCompliance = (zone, rounds, dayTs, now) => {
     return { resolved, done: !!r, onTime: r ? r.at <= target + tol : false };
   });
 };
-const COMPLAINT_KIND = { dirty: { label: "לכלוך", color: "#0EA5E9", Icon: Sparkles }, broken: { label: "תקלה / שבר", color: "#B45309", Icon: Wrench }, round: { label: "הערות סבב", color: "#DC2626", Icon: AlertTriangle } };
+const COMPLAINT_KIND = { dirty: { label: "לכלוך", color: "#1F4E8C", Icon: Sparkles }, broken: { label: "תקלה / שבר", color: "#B45309", Icon: Wrench }, round: { label: "הערות סבב", color: "#DC2626", Icon: AlertTriangle } };
 const hasCleaningPhoto = (record) => !!(record?.photo || record?.photoPath);
 function CleaningPhoto({ record, className = "cmp-photo", style }) {
   const [src, setSrc] = useState(record?.photo || null);
@@ -4884,14 +4884,14 @@ function ComplaintCard({ c, onResolve, onApprove, onReject, onEscalate, onOpen }
   const k = COMPLAINT_KIND[c.kind] || COMPLAINT_KIND.dirty; const Ic = k.Icon;
   const anon = c.reportedByRole === "anonymous";
   const escalated = c.escalatedTo === "admin";
-  const border = (c.status === "resolved" || c.status === "rejected") ? "var(--muted)" : c.status === "pending" ? "#7C3AED" : escalated ? "#DC2626" : k.color;
+  const border = (c.status === "resolved" || c.status === "rejected") ? "var(--muted)" : c.status === "pending" ? "#1F4E8C" : escalated ? "#DC2626" : k.color;
   const srcLabel = anon ? "דיווח אנונימי · לא מאומת" : `${c.reportedByName}${c.reportedByRole === "user" ? " · מנהל מחלקה" : c.reportedByRole === "admin" ? " · מנהל מערכת" : c.reportedByRole === "worker" ? " · עובד" : c.reportedByRole === "cleaner" ? " · עובד ניקיון" : ""}`;
   const nIss = (c.issues || []).length;
-  const statusLine = c.status === "pending" ? <span className="badge sm" style={{ background: "#EDE9FE", color: "#6D28D9" }}>ממתין לאישור</span>
+  const statusLine = c.status === "pending" ? <span className="badge sm" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>ממתין לאישור</span>
     : c.status === "resolved" ? <span className="cmp-done"><CheckCircle2 size={13} /> טופל{c.resolvedBy ? " · " + c.resolvedBy : ""}</span>
       : c.status === "rejected" ? <span className="cmp-done" style={{ color: "var(--muted)" }}><X size={13} /> נדחה{c.resolvedBy ? " · " + c.resolvedBy : ""}</span>
         : escalated ? <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>הועבר למנהל המערכת</span>
-          : c.ownerRole === "admin" ? (c.progress === "in_progress" ? <span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309" }}>בטיפול{c.progressNote ? " · " + c.progressNote : ""}</span> : <span className="badge sm" style={{ background: "#E0E7FF", color: "#4338CA" }}>התקבל — בטיפול ההנהלה</span>)
+          : c.ownerRole === "admin" ? (c.progress === "in_progress" ? <span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309" }}>בטיפול{c.progressNote ? " · " + c.progressNote : ""}</span> : <span className="badge sm" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>התקבל — בטיפול ההנהלה</span>)
             : c.kind === "broken" ? <span className="cmp-done" style={{ color: "var(--muted)" }}><Wrench size={13} /> מסלול אחזקה</span>
               : <span className="cmp-done" style={{ color: "var(--muted)" }}>אצל עובד הניקיון</span>;
   if (onOpen) return (<button className="cmp-card clk" style={{ borderInlineStartColor: border, width: "100%", textAlign: "start", cursor: "pointer" }} onClick={() => onOpen(c)}>
@@ -4906,7 +4906,7 @@ function ComplaintCard({ c, onResolve, onApprove, onReject, onEscalate, onOpen }
   return (<div className="cmp-card" style={{ borderInlineStartColor: border }}>
     <CleaningPhoto record={c} />
     <div className="cmp-body">
-      <div className="cmp-row1"><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}</span>{c.status === "pending" && <span className="badge sm" style={{ background: "#EDE9FE", color: "#6D28D9" }}>ממתין לאישור</span>}{escalated && (c.status === "open") && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>הועבר למנהל המערכת</span>}<span className="cmp-zone">{c.zoneName}</span></div>
+      <div className="cmp-row1"><span className="badge sm" style={{ background: k.color + "22", color: k.color }}><Ic size={12} /> {k.label}</span>{c.status === "pending" && <span className="badge sm" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>ממתין לאישור</span>}{escalated && (c.status === "open") && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>הועבר למנהל המערכת</span>}<span className="cmp-zone">{c.zoneName}</span></div>
       <div className="cmp-meta">{c.zoneLoc ? c.zoneLoc + " · " : ""}{srcLabel} · {timeAgo(c.at)}{c.ticketId ? " · נפתחה קריאת אחזקה" : ""}</div>
       {c.text && <div className="cmp-text">{c.text}</div>}
       {!hasCleaningPhoto(c) && c.noPhotoReason && <div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div>}
@@ -4936,7 +4936,7 @@ function ComplaintDetail({ c, round, zone, caps, onApprove, onReject, onResolve,
       {issues.length > 0 && <div className="field"><span><AlertTriangle size={14} /> הערות ({countLabel(issues.length, "הערה", "הערות")})</span><div className="cards">{issues.map((iss, i) => <div key={i} className="cmp-card" style={{ borderInlineStartColor: "#DC2626" }}><CleaningPhoto record={iss} /><div className="cmp-body"><div className="cmp-row1"><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{iss.label || "פריט"}</span></div><div className="cmp-text">{iss.reason}</div></div></div>)}</div></div>}
       {hasCleaningPhoto(c) && issues.length === 0 && <div className="field"><span>תמונה</span><CleaningPhoto record={c} className="" style={{ width: "100%", borderRadius: 12 }} /></div>}
       {!hasCleaningPhoto(c) && c.noPhotoReason && <div className="field"><span>תמונה</span><div className="cmp-text" style={{ color: "var(--muted)", fontStyle: "italic" }}><Camera size={12} /> ללא תמונה · {c.noPhotoReason}</div></div>}
-      {round && <div className="field"><span>מקור</span><div className="audit-row"><span className="audit-kdot" style={{ background: "#0EA5E9" }} /><div className="audit-main"><div className="audit-text">סבב ניקיון{round.winTime ? " · " + round.winTime : ""}</div><div className="audit-meta">{round.byName} · {fmtTime(round.at)} · {round.doneCount}/{countLabel(round.total, "פריט", "פריטים")}</div></div></div></div>}
+      {round && <div className="field"><span>מקור</span><div className="audit-row"><span className="audit-kdot" style={{ background: "var(--primary)" }} /><div className="audit-main"><div className="audit-text">סבב ניקיון{round.winTime ? " · " + round.winTime : ""}</div><div className="audit-meta">{round.byName} · {fmtTime(round.at)} · {round.doneCount}/{countLabel(round.total, "פריט", "פריטים")}</div></div></div></div>}
       <div className="field"><span>סטטוס והיסטוריה</span><div className="cmp-meta">
         {c.status === "pending" ? "ממתין לאישור" : c.status === "resolved" ? "טופל" : c.status === "rejected" ? "נדחה" : inProg ? "בטיפול" : c.ownerRole === "admin" ? "התקבל — בטיפול ההנהלה" : c.escalatedTo === "admin" ? "הועבר למנהל המערכת" : "אצל עובד הניקיון"}
         {c.approvedBy ? ` · אושר ע״י ${c.approvedBy}` : ""}{c.resolvedBy ? ` · נסגר ע״י ${c.resolvedBy}` : ""}
@@ -5027,7 +5027,7 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
         <div className="hint">לכל סבב אפשר לבחור אילו פריטים נבדקים בו (כברירת מחדל — כולם). למשל סבב אמצע היום יכול לכלול רק חלק מהפריטים.</div>
       </div>
       <div className="field"><span>ימי פעילות (באילו ימים האזור מנוקה)</span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>{WEEKDAYS.map((w) => { const on = activeDays.includes(w.d); return <button key={w.d} type="button" onClick={() => toggleDay(w.d)} className={"pr-pick" + (on ? " on" : "")} style={on ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9", minWidth: 40, justifyContent: "center" } : { minWidth: 40, justifyContent: "center" }}>{w.short}</button>; })}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>{WEEKDAYS.map((w) => { const on = activeDays.includes(w.d); return <button key={w.d} type="button" onClick={() => toggleDay(w.d)} className={"pr-pick" + (on ? " on" : "")} style={on ? { background: "var(--primary)", color: "#fff", borderColor: "var(--primary)", minWidth: 40, justifyContent: "center" } : { minWidth: 40, justifyContent: "center" }}>{w.short}</button>; })}</div>
         <div className="hint">בימים שלא נבחרו לא ייווצרו סבבים ולא יירשם «פוספס». ברירת מחדל: ראשון–חמישי.</div>
       </div>
       <label className="field"><span>אחראי סבבים</span><select value={cleanerId} onChange={(e) => setCleanerId(e.target.value)}><option value="">— ללא שיוך —</option>{cleaners.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="hint">כל עובד עם גישה לניקיון יכול לבצע סבב ככיסוי. האחראי הוא ברירת המחדל של האזור.</div></label>
@@ -5183,7 +5183,7 @@ function CleaningAdmin(p) {
       : (<>
         <div className="row-between"><SectionTitle><Sparkles size={15} /> אזורי ניקיון ({list.length})</SectionTitle><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> אזור חדש</button></div>
         {cleaners.length === 0 && <div className="note" style={{ marginBottom: 10 }}>אין עדיין עובדים עם גישה לניקיון. הוסיפו עובד למחלקת ניקיון תחת «צוות ומשתמשים» כדי לשייך אחראי לאזור.</div>}
-        {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : renderAreaSections(list, (z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "#0EA5E9" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}
+        {list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלחיצה על «אזור חדש»" /> : renderAreaSections(list, (z) => { const lr = lastRoundOf(z.id, rounds); return <div key={z.id} className="tcard" style={{ borderInlineStartColor: z.active !== false ? "var(--primary)" : "var(--muted)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{countLabel((z.windows || []).length, "סבב", "סבבים")} · {activeDaysLabel(z)}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {z.cleanerName || "ללא אחראי"} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div></div><div className="tcard-actions"><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button><button className="icon-btn sm" title="תווית / QR" aria-label={`הדפסת תווית QR לאזור ${z.name}`} onClick={() => setTag(z)}><Printer size={17} /></button><button className="icon-btn sm" title="עריכה" aria-label={`עריכת אזור ${z.name}`} onClick={() => setEdit(z)}><PenLine size={17} /></button></div></div>; })}
       </>)}
     {edit && <Overlay onClose={() => setEdit(null)}><ZoneForm zone={edit} config={p.config} zones={zones} cleaners={cleaners} managers={managers} canDelete={!!edit.id} deleteBlockers={editDeleteBlockers} onOpenBlocker={openZoneBlocker} onCancel={() => setEdit(null)} onSave={async (z, mgrIds) => {
       if (!await saveZone(z)) return false;
@@ -5260,7 +5260,7 @@ function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, co
     </div></div>;
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label={t("common.close")} onClick={onCancel}><X size={22} /></button><div className="form-title">{t("cleaningRound.title")}{win?.time ? " · " + win.time : ""}</div></div>
     <div className="body">
-      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{win?.time ? " · " + t("cleaningRound.roundAt", { time: win.time }) : ""}</div>{isCover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{zone.cleanerName ? " · " + t("cleaner.coverFor", { name: zone.cleanerName }) : " — " + t("cleaningRound.notYourZone")}</span>}</div>
+      <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{win?.time ? " · " + t("cleaningRound.roundAt", { time: win.time }) : ""}</div>{isCover && <span className="badge sm" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>{t("cleaner.coverBadge")}{zone.cleanerName ? " · " + t("cleaner.coverFor", { name: zone.cleanerName }) : " — " + t("cleaningRound.notYourZone")}</span>}</div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grabIssuePhoto(e.target.files?.[0])} />
       <div className="field"><span>{t("cleaningRound.checklist")} · {doneCount}/{t("cleaningRound.itemsCount", { count: cl.length })}{Object.keys(issues).length ? ` · ${t("cleaningRound.issuesCount", { count: Object.keys(issues).length })}` : ""}</span>
         <div className="round-cl">{cl.map((c) => { const iss = issues[c.id]; return <div key={c.id} style={{ border: iss ? "1.5px solid #FCA5A5" : "1px solid var(--line)", borderRadius: 10, marginBottom: 6, overflow: "hidden", background: iss ? "#FEF2F2" : "transparent" }}>
@@ -5269,7 +5269,7 @@ function RoundForm({ zone, win, session, onCancel, onSave, scanToken = false, co
             <button type="button" className="icon-btn sm" title={iss ? t("cleaningRound.clearIssue") : t("cleaningRound.markIssue")} aria-label={iss ? t("cleaningRound.clearIssue") : t("cleaningRound.markIssue")} onClick={() => toggleIssue(c.id)} style={{ color: iss ? "#DC2626" : "var(--muted)", background: iss ? "#FEE2E2" : "var(--surface-2)" }}>{iss ? <X size={16} /> : <AlertTriangle size={16} />}</button>
           </div>
           {iss && <div style={{ padding: "0 10px 10px" }}>
-            <div className="pr-row" style={{ marginBottom: 6 }}><button type="button" className={"pr-pick" + (iss.kind !== "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "dirty")} style={iss.kind !== "broken" ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9" } : {}}>{t("cleaningRound.dirtyKind")}</button><button type="button" className={"pr-pick" + (iss.kind === "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "broken")} style={iss.kind === "broken" ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" } : {}}>{t("cleaningRound.brokenKind")}</button></div>
+            <div className="pr-row" style={{ marginBottom: 6 }}><button type="button" className={"pr-pick" + (iss.kind !== "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "dirty")} style={iss.kind !== "broken" ? { background: "var(--primary)", color: "#fff", borderColor: "var(--primary)" } : {}}>{t("cleaningRound.dirtyKind")}</button><button type="button" className={"pr-pick" + (iss.kind === "broken" ? " on" : "")} onClick={() => setIssueKind(c.id, "broken")} style={iss.kind === "broken" ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" } : {}}>{t("cleaningRound.brokenKind")}</button></div>
             <textarea rows={2} value={iss.reason} onChange={(e) => setIssueReason(c.id, e.target.value)} placeholder={iss.kind === "broken" ? t("cleaningRound.brokenPlaceholder") : t("cleaningRound.dirtyPlaceholder")} />
             <div style={{ marginTop: 6 }}>{iss.photo ? <div className="photo-prev"><img src={iss.photo} alt="" /><button className="photo-x" onClick={() => setIssues((s) => ({ ...s, [c.id]: { ...s[c.id], photo: null } }))}><X size={16} /></button></div> : <button type="button" className="photo-add" onClick={() => { photoTarget.current = c.id; fileRef.current?.click(); }}><Camera size={18} /> {t("cleaningRound.photoOptional")}</button>}</div>
           </div>}
@@ -5347,7 +5347,7 @@ function ComplaintForm({ zone, session, onCancel, onSave }) {
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">דיווח על בעיה באזור</div></div>
     <div className="body">
       <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}</div></div>
-      <div className="field"><span>סוג הבעיה</span><div className="pr-row"><button className={"pr-pick" + (kind === "dirty" ? " on" : "")} onClick={() => setKind("dirty")} style={kind === "dirty" ? { background: "#0EA5E9", color: "#fff", borderColor: "#0EA5E9" } : {}}><Sparkles size={15} /> לכלוך — נדרש ניקיון</button><button className={"pr-pick" + (kind === "broken" ? " on" : "")} onClick={() => setKind("broken")} style={kind === "broken" ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}><Wrench size={15} /> תקלה / שבר</button></div>{kind === "broken" && <div className="hint">ייפתח כקריאת אחזקה רגילה ויעבור לטיפול הצוות הטכני.</div>}</div>
+      <div className="field"><span>סוג הבעיה</span><div className="pr-row"><button className={"pr-pick" + (kind === "dirty" ? " on" : "")} onClick={() => setKind("dirty")} style={kind === "dirty" ? { background: "var(--primary)", color: "#fff", borderColor: "var(--primary)" } : {}}><Sparkles size={15} /> לכלוך — נדרש ניקיון</button><button className={"pr-pick" + (kind === "broken" ? " on" : "")} onClick={() => setKind("broken")} style={kind === "broken" ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}><Wrench size={15} /> תקלה / שבר</button></div>{kind === "broken" && <div className="hint">ייפתח כקריאת אחזקה רגילה ויעבור לטיפול הצוות הטכני.</div>}</div>
       <div className="field"><span>תמונה {noPhoto ? "" : "* (חובה)"}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{!noPhoto && (photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>)}
         <label className="chk-line" style={{ marginTop: 8 }}><input type="checkbox" checked={noPhoto} onChange={(e) => { setNoPhoto(e.target.checked); if (e.target.checked) setPhoto(null); setErr(""); }} /> אין אפשרות לצרף תמונה</label>
         {noPhoto && <textarea rows={2} value={noPhotoReason} onChange={(e) => setNoPhotoReason(e.target.value)} placeholder="חובה לפרט: מדוע אין אפשרות לצרף תמונה?" style={{ marginTop: 6 }} />}
@@ -5367,7 +5367,7 @@ function ZoneSpec({ zone, onClose }) {
     <div className="body">
       <div className="round-zone"><div className="rz-name">{zone.name}</div><div className="rz-loc">{zoneLoc(zone) || "—"}{zone.cleanerName ? " · אחראי: " + zone.cleanerName : " · ללא אחראי"}</div></div>
       <div className="field"><span><CalendarClock size={14} /> ימי פעילות · {activeDaysLabel(zone)}</span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>{WEEKDAYS.map((w) => { const on = days.includes(w.d); return <span key={w.d} className="badge sm" style={on ? { background: "#0EA5E9", color: "#fff", minWidth: 34, justifyContent: "center" } : { background: "var(--surface-2)", color: "var(--muted)", minWidth: 34, justifyContent: "center" }}>{w.short}</span>; })}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>{WEEKDAYS.map((w) => { const on = days.includes(w.d); return <span key={w.d} className="badge sm" style={on ? { background: "var(--primary)", color: "#fff", minWidth: 34, justifyContent: "center" } : { background: "var(--surface-2)", color: "var(--muted)", minWidth: 34, justifyContent: "center" }}>{w.short}</span>; })}</div>
       </div>
       <div className="field"><span><Clock size={14} /> סבבים וצ׳קליסט לכל סבב ({ws.length})</span>
         {ws.length === 0
@@ -5590,10 +5590,10 @@ function CleanerApp(p) {
     if (notDay) st = { txt: t("cleaner.notCleaningDay"), color: "var(--muted)", bg: "var(--surface-2)" };
     else if (dueNow) { st = { txt: roundOrdinal(dueNow.win), color: WIN_META[dueNow.status].color, bg: WIN_META[dueNow.status].bg, go: 1 }; target = dueNow.win; }
     else if (allDone) st = { txt: t("cleaner.doneForToday"), color: "#16A34A", bg: "#DCFCE7" };
-    else if (nextP) st = { txt: t("cleaner.nextRound", { time: nextP.win.time }), color: "#0369A1", bg: "#E0F2FE" };
+    else if (nextP) st = { txt: t("cleaner.nextRound", { time: nextP.win.time }), color: "#1F4E8C", bg: "var(--primary-soft)" };
     else if (missed.length) st = { txt: t("cleaner.missedRound", { time: missed[0].win.time }), color: "#DC2626", bg: "#FEE2E2" };
     else st = { txt: "—", color: "var(--muted)", bg: "var(--surface-2)" };
-    const border = cover ? "#A855F7" : (st.go ? st.color : (allDone ? "#16A34A" : "#0EA5E9"));
+    const border = cover ? "#1F4E8C" : (st.go ? st.color : (allDone ? "#16A34A" : "var(--primary)"));
     const subMissed = !notDay && !dueNow && nextP && missed.length ? " · " + t("cleaner.missedShort", { times: missed.map((m) => m.win.time).join(",") }) : "";
     const openRound = () => {
       if (!target) return;
@@ -5601,7 +5601,7 @@ function CleanerApp(p) {
       if (!qr.allowed) return setQrBlockedZone(z);
       setRun({ zone: z, win: target, scanToken: qr.reason === "scan_matched" });
     };
-    return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "#F3E8FF", color: "#7C3AED" }}>{t("cleaner.coverBadge")}{z.cleanerName ? " · " + t("cleaner.coverFor", { name: z.cleanerName }) : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{t("cleaner.reportsBadge", { count: oc })}</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? t("cleaner.cleanedAgo", { time: timeAgo(lr) }) : t("cleaner.neverCleaned")}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
+    return <button key={z.id} className="tcard clk" disabled={!target} onClick={openRound} style={{ borderInlineStartColor: border, ...(target ? {} : { opacity: 0.95 }) }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{cover && <span className="badge sm" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>{t("cleaner.coverBadge")}{z.cleanerName ? " · " + t("cleaner.coverFor", { name: z.cleanerName }) : ""}</span>}{oc > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{t("cleaner.reportsBadge", { count: oc })}</span>}</div><div style={{ textAlign: "center", margin: "5px 0 3px" }}><span className="badge" style={{ background: st.bg, color: st.color, fontWeight: 700 }}>{st.txt}</span></div><div className="tcard-sub">{zoneLoc(z) || "—"} · {lr ? t("cleaner.cleanedAgo", { time: timeAgo(lr) }) : t("cleaner.neverCleaned")}{subMissed}</div></div>{target && <ChevronLeft size={18} className="ni-go" />}</button>;
   };
   return (<div className={"worker-shell" + (p.embedded ? " embedded-cleaning-shell" : "")}>
     {!p.embedded && <div className="worker-top">
@@ -5669,7 +5669,7 @@ function ManagerCleaning({ session, zones, rounds, complaints, fileComplaint, re
     <div className="note" style={{ marginBottom: 12 }}>מצב הניקיון באזורים של מחלקתך. ניתן לדווח על בעיה — הדיווח מגיע אליך, לעובד הניקיון של האזור ולמנהל המערכת.</div>
     <button className="btn-primary full" style={{ marginBottom: 14 }} onClick={() => setReport(true)}><AlertTriangle size={15} /> דיווח על בעיה (סריקת QR)</button>
     <SectionTitle><Sparkles size={15} /> אזורי מחלקתי ({myZones.length})</SectionTitle>
-    {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : renderAreaSections(myZones, (z) => { const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "#0EA5E9" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}
+    {myZones.length === 0 ? <Empty text="אין אזורים פעילים" Icon={Sparkles} /> : renderAreaSections(myZones, (z) => { const sts = zoneTodayStatuses(z, rounds, now, config); const lr = lastRoundOf(z.id, rounds); const zo = open.filter((c) => c.zoneId === z.id).length; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: sts.some((s) => s.status === "missed") ? "#DC2626" : "var(--primary)" }}><span className="avatar"><Sparkles size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{z.name}</span>{zo > 0 && <span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{zo} דיווחים</span>}</div><div className="tcard-sub">{zoneLoc(z) || "—"} · {activeDaysLabel(z)} · {lr ? "נוקה " + timeAgo(lr) : "טרם נוקה"}</div>{sts.length > 0 ? <div className="win-chips">{sts.map((s, i) => <span key={i} className="win-chip" style={{ background: WIN_META[s.status].bg, color: WIN_META[s.status].color }}>{s.win.time}</span>)}</div> : <div className="win-chips"><span className="win-chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא יום ניקיון</span></div>}</div><div className="tcard-actions"><button className="icon-btn sm" title="מפרט האזור — ימים, שעות וצ׳קליסט" aria-label={`מפרט אזור ${z.name}`} onClick={() => setSpec(z)}><ClipboardList size={17} /></button><button className="icon-btn sm" title="דיווח על בעיה" aria-label={`דיווח על בעיה באזור ${z.name}`} onClick={() => setRep(z)}><AlertTriangle size={17} /></button></div></div>; })}
     {open.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דיווחים פתוחים ({countLabel(open.length, "דיווח", "דיווחים")})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>הקישו לצפייה בפרטים המלאים. דיווחי לכלוך נסגרים ע״י עובד הניקיון; דיווחים מעובד הניקיון בטיפול ההנהלה.</div><div className="cards">{open.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div></>}
     {closed.length > 0 && <><button className="day-toggle" onClick={() => setShowClosed((v) => !v)}>{showClosed ? "▾" : "▸"} טופלו / נדחו ({closed.length})</button>{showClosed && <div className="cards">{closed.map((c) => <ComplaintCard key={c.id} c={c} onOpen={setCDetail} />)}</div>}</>}
     {rep && <Overlay onClose={() => setRep(null)}>{cleaningQrAccess({ appMode: APP_MODE, scannedZoneId, zoneId: rep.id }).allowed ? <ComplaintForm zone={rep} session={session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /> : <CleaningQrRequired zone={rep} scannedZoneId={scannedZoneId} language={language} onClose={() => setRep(null)} />}</Overlay>}
@@ -5714,13 +5714,13 @@ function CleaningAnalytics({ zones, rounds, complaints }) {
     <div className="hint" style={{ marginBottom: 12 }}>נתוני 7 הימים האחרונים.</div>
     <div className="kpi-row">
       <Kpi num={data.pct == null ? "—" : data.pct + "%"} label="עמידה בחלונות" color="#16A34A" />
-      <Kpi num={data.totRounds} label="סבבים בוצעו" color="#0EA5E9" />
+      <Kpi num={data.totRounds} label="סבבים בוצעו" color="var(--primary)" />
       <Kpi num={data.totComps} label="דיווחים" color="#DC2626" />
     </div>
     <SectionTitle><BarChart3 size={15} /> עמידה בחלונות לפי אזור</SectionTitle>
     {worst.length === 0 ? <div className="note">אין עדיין חלונות שהסתיימו למדידה.</div> : <div className="cards" style={{ marginBottom: 6 }}>{worst.map((r) => <div key={r.z.id} className="ca-row"><div className="ca-row1"><span className="ca-name">{r.z.name}</span><span className="ca-pct" style={{ color: pctColor(r.pct) }}>{r.pct}%</span></div><div className="ca-bar"><span style={{ width: r.pct + "%", background: pctColor(r.pct) }} /></div><div className="ca-sub">{r.done}/{r.sched} חלונות · {r.onTime} בזמן{zoneLoc(r.z) ? " · " + zoneLoc(r.z) : ""}</div></div>)}</div>}
     {dirty.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הכי הרבה דיווחים</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{dirty.map((r) => <div key={r.z.id} className="tcard"><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{r.z.name}</span><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{r.comps} דיווחים</span></div><div className="tcard-sub">{zoneLoc(r.z) || "—"}</div></div></div>)}</div></>}
-    {Object.keys(data.byArea).length > 0 && <><SectionTitle><Building2 size={15} /> דיווחים לפי אזור מערכת</SectionTitle><div className="cards">{Object.entries(data.byArea).sort((a, b) => b[1] - a[1]).map(([b, n]) => <div key={b} className="ca-row"><div className="ca-row1"><span className="ca-name">{b}</span><span className="ca-pct">{n}</span></div><div className="ca-bar"><span style={{ width: Math.round(n / maxB * 100) + "%", background: "#0EA5E9" }} /></div></div>)}</div></>}
+    {Object.keys(data.byArea).length > 0 && <><SectionTitle><Building2 size={15} /> דיווחים לפי אזור מערכת</SectionTitle><div className="cards">{Object.entries(data.byArea).sort((a, b) => b[1] - a[1]).map(([b, n]) => <div key={b} className="ca-row"><div className="ca-row1"><span className="ca-name">{b}</span><span className="ca-pct">{n}</span></div><div className="ca-bar"><span style={{ width: Math.round(n / maxB * 100) + "%", background: "var(--primary)" }} /></div></div>)}</div></>}
   </>);
 }
 
@@ -5750,7 +5750,7 @@ function ManageStats({ tasks, meetings, users }) {
     <SectionTitle><BarChart3 size={15} /> מטלות שהושלמו לפי חודש</SectionTitle>
     <div className="panel">{byMonth.map((mm) => <Bar key={mm.key} label={mm.label} value={mm.n} max={maxMonth} color="#16A34A" />)}</div>
     <SectionTitle><Users size={15} /> הושלמו לפי אחראי</SectionTitle>
-    {byResp.length === 0 ? <div className="note">אין מטלות שהושלמו עדיין</div> : <div className="panel">{byResp.map((r) => <Bar key={r.id} label={r.name} value={r.n} max={maxResp} color="#2563EB" />)}</div>}
+    {byResp.length === 0 ? <div className="note">אין מטלות שהושלמו עדיין</div> : <div className="panel">{byResp.map((r) => <Bar key={r.id} label={r.name} value={r.n} max={maxResp} color="var(--primary)" />)}</div>}
     <SectionTitle><CalendarClock size={15} /> פגישות (30 ימים אחרונים)</SectionTitle>
     <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{held}</span><span className="kpi-mini-l">התקיימו</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={cancelledM ? { color: "#DC2626" } : {}}>{cancelledM}</span><span className="kpi-mini-l">בוטלו</span></div><div className="kpi-mini"><span className="kpi-mini-v">{plannedM}</span><span className="kpi-mini-l">מתוכננות קדימה</span></div></div>
     <div className="hint" style={{ marginTop: 8 }}>הנתונים לפי ההרשאות שלך. לדוח מפורט — «ייצוא ל-Excel» במסכי מטלות/פגישות.</div>
@@ -5849,7 +5849,7 @@ function BigudAnalytics({ ppe, items, users, config }) {
       <div style={tile}><div style={{ fontSize: 22, fontWeight: 800, color: charged ? "#B45309" : "inherit" }}>{ils(charged)}</div><div className="hint">חויב מעובדים</div></div>
     </div>{reasonRows.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>{reasonRows.map(([k, v]) => <span key={k} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: "#FEF3C7", color: "#92400E", fontWeight: 600 }}>{k}: {ils(v)}</span>)}</div>}</div>
     {top.length > 0 && <div style={card}><SectionTitle>הנפקות לפי פריט</SectionTitle><div style={{ marginTop: 8 }}>{top.map((r, i) => <Bar key={i} label={r.name} value={r.qty} max={topMax} color="#0D9488" />)}</div></div>}
-    {byDept.length > 0 && <div style={card}><SectionTitle>עלות לפי מחלקה</SectionTitle><div style={{ marginTop: 8 }}>{byDept.map((r, i) => <Bar key={i} label={r.name + " · " + r.n + " הנפקות"} value={r.cost} max={deptMax} color="#2563EB" money />)}</div></div>}
+    {byDept.length > 0 && <div style={card}><SectionTitle>עלות לפי מחלקה</SectionTitle><div style={{ marginTop: 8 }}>{byDept.map((r, i) => <Bar key={i} label={r.name + " · " + r.n + " הנפקות"} value={r.cost} max={deptMax} color="var(--primary)" money />)}</div></div>}
     <div style={card}><SectionTitle>עובדים חדשים מול קיימים</SectionTitle><div style={{ display: "flex", gap: 10, marginTop: 8 }}><div style={tile}><div style={{ fontSize: 20, fontWeight: 800 }}>{newN}</div><div className="hint">לעובדים חדשים (קליטה ≤14 ימים) · {ils(newCost)}</div></div><div style={tile}><div style={{ fontSize: 20, fontWeight: 800 }}>{exN}</div><div className="hint">לעובדים קיימים</div></div></div></div>
     <div style={card}><SectionTitle>הנפקות חוזרות בחיוב (חריגות)</SectionTitle>{repeats.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין חריגות חיוב בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{repeats.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#B45309", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}{r.no ? " · מס׳ " + r.no : ""}</div><div className="task-row-sub">{r.n} הנפקות בחיוב</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: "#B45309" }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
     <div style={card}><SectionTitle>פריטים שניתנו בתשלום</SectionTitle>{paidItems.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין פריטים בתשלום בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{paidItems.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#EA580C", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}</div><div className="task-row-sub">{r.n} הנפקות בתשלום</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700 }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
@@ -6890,7 +6890,7 @@ function PpeLog({ ppe, items, norms, users, config, session, deptScope, canIssue
   return (<>
     <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><PackageCheck size={15} /> תנועות מלאי</SectionTitle><div style={{ display: "flex", gap: 8 }}>{canExit && <button className="btn-ghost sm" onClick={() => setExit(true)}>עזיבת עובד</button>}{canIssue && <button className="btn-primary sm" onClick={() => setEdit(true)}><Plus size={15} /> הנפקה</button>}{reqMode && <span className="hint" style={{ alignSelf: "center" }}>להנפקה — פנה למנהל הציוד</span>}</div></div>
     <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{iss30.length}</span><span className="kpi-mini-l">{"הנפקות · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={{ color: "#16A34A" }}>＋{restockQty30}</span><span className="kpi-mini-l">{"חידושי מלאי · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v">{ret30}</span><span className="kpi-mini-l">{"החזרות · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v">{ils(charge30)}</span><span className="kpi-mini-l">{"חיוב עובדים · " + _mL}</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={lowItems.length ? { color: "#DC2626" } : {}}>{lowItems.length}</span><span className="kpi-mini-l">פריטים במלאי נמוך</span></div></div>
-    {(canIssue || (orders || []).length > 0) && <div style={{ marginBottom: 10 }}><button className="task-row" onClick={() => setOrdOpen((v) => !v)} style={{ borderInlineStartColor: "#2563EB", background: "var(--surface-2)" }}><div className="task-row-main"><div className="task-row-t">הזמנות רכש{ordN ? ` · ${countLabel(ordN, "הזמנה פתוחה", "הזמנות פתוחות")}` : ""}</div><div className="task-row-sub">קבלות ויצירת הזמנות לספק</div></div><div className="task-row-side"><ChevronLeft size={16} style={{ transform: ordOpen ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></div></button>{ordOpen && <div style={{ marginTop: 8 }}><PpeOrders embedded orders={orders} items={items} config={config} session={session} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpeItem={savePpeItem} savePpe={savePpe} /></div>}</div>}
+    {(canIssue || (orders || []).length > 0) && <div style={{ marginBottom: 10 }}><button className="task-row" onClick={() => setOrdOpen((v) => !v)} style={{ borderInlineStartColor: "var(--primary)", background: "var(--surface-2)" }}><div className="task-row-main"><div className="task-row-t">הזמנות רכש{ordN ? ` · ${countLabel(ordN, "הזמנה פתוחה", "הזמנות פתוחות")}` : ""}</div><div className="task-row-sub">קבלות ויצירת הזמנות לספק</div></div><div className="task-row-side"><ChevronLeft size={16} style={{ transform: ordOpen ? "rotate(-90deg)" : "none", transition: "transform .15s" }} /></div></button>{ordOpen && <div style={{ marginTop: 8 }}><PpeOrders embedded orders={orders} items={items} config={config} session={session} savePpeOrder={savePpeOrder} delPpeOrder={delPpeOrder} savePpeItem={savePpeItem} savePpe={savePpe} /></div>}</div>}
     <div className="seg-tabs" style={{ flexWrap: "wrap", marginBottom: 10 }}>{TYPES.map(([k, l]) => <button key={k} className={fType === k ? "on" : ""} onClick={() => setFType(k)}>{l}</button>)}</div>
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "center" }}>
       <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש תנועות מלאי לפי פריט, עובד או מספר" placeholder="חיפוש פריט / עובד / מספר (בכל התקופה)" style={{ minWidth: 200, flex: "1 1 200px" }} />{q && <button className="btn-ghost sm" onClick={() => setQ("")}>נקה</button>}
@@ -7179,7 +7179,7 @@ function PpeRequests({ ppe, reqs, items, norms, users, config, session, savePpe,
   </>);
 }
 
-const PPE_ORDER_ST = { draft: { label: "טיוטה", color: "#64748B" }, sent: { label: "נשלחה לספק", color: "#2563EB" }, received: { label: "התקבלה ונסגרה", color: "#16A34A" }, cancelled: { label: "בוטלה", color: "#DC2626" } };
+const PPE_ORDER_ST = { draft: { label: "טיוטה", color: "#64748B" }, sent: { label: "נשלחה לספק", color: "#1F4E8C" }, received: { label: "התקבלה ונסגרה", color: "#16A34A" }, cancelled: { label: "בוטלה", color: "#DC2626" } };
 const ppeOrderQty = (o) => (o.lines || []).reduce((s, l) => s + (l.qty || 0), 0);
 const ppeOrderRecv = (o) => (o.lines || []).reduce((s, l) => s + (l.received || 0), 0);
 
@@ -7213,7 +7213,7 @@ function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config 
         <label className="field"><span>בחרו פריט</span><select value={pid} onChange={(e) => pickAndSuggest(e.target.value)}><option value="">בחרו פריט…</option>{active.map((it) => <option key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ""}</option>)}</select></label>
         {pickItem && <><div className="hint" style={{ margin: "6px 0" }}>כמות לכל מידה (מוצע אוטומטית לפי חוסרים — ניתן לשנות)</div><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{psizes.map((sz) => { const lw = ppeLowSize(pickItem, sz); const m = ppeMinOf(pickItem, sz); return <div key={sz} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 86, border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}><span style={{ fontSize: 12, fontWeight: 700, textAlign: "center", color: lw ? "#B91C1C" : "inherit" }}>{szLbl(sz)}</span><span style={{ fontSize: 10, color: "var(--muted)", textAlign: "center" }}>במלאי {ppeStockOf(pickItem, sz)}{m ? ` / מינ׳ ${m}` : ""}</span><input type="number" min="0" value={sizeQty[sz] ?? 0} onChange={(e) => setSQ(sz, e.target.value)} style={{ width: 76 }} /></div>; })}</div><button className="btn-ghost sm" style={{ marginTop: 8 }} onClick={addLines}><Plus size={14} /> הוסף לפריט</button></>}
       </div>
-      {lines.length === 0 ? <Empty text="טרם נוספו פריטים להזמנה" Icon={Package} sub="בחרו פריט ומידה למעלה, הזינו כמות ולחצו «הוסף לפריט». אם אין חוסרים, ניתן עדיין ליצור הזמנה ידנית." /> : <div className="task-list">{lines.map((l, i) => { const it = (items || []).find((x) => x.id === l.itemId); const stk = it ? ppeStockOf(it, l.size) : 0; const mn = it ? ppeMinOf(it, l.size) : 0; const mx = it ? ppeMaxOf(it, l.size) : 0; const after = stk + (l.qty || 0); const warn = (mx && after > mx) ? `מעל המקסימום (${mx})` : ((mn && after < mn) ? "עדיין מתחת למינימום" : ""); const rmLabel = `הסרת ${l.itemName}${l.size && l.size !== "אחיד" ? ` במידה ${l.size}` : ""} מההזמנה`; return <div key={i} className="task-row" style={{ borderInlineStartColor: warn ? "#B45309" : "#2563EB", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{l.itemName}{l.size && l.size !== "אחיד" ? ` · ${l.size}` : ""}</div><div className="task-row-sub">{l.sku ? `מק״ט ${l.sku}` : ppeCatLabel(l.category)}{warn ? ` · ${warn}` : ""}</div></div><div className="task-row-side"><input type="number" min="1" value={l.qty} onChange={(e) => setQty(i, e.target.value)} style={{ width: 70 }} /><button className="btn-ghost sm" aria-label={rmLabel} title={rmLabel} onClick={() => rm(i)}><X size={14} /></button></div></div>; })}</div>}
+      {lines.length === 0 ? <Empty text="טרם נוספו פריטים להזמנה" Icon={Package} sub="בחרו פריט ומידה למעלה, הזינו כמות ולחצו «הוסף לפריט». אם אין חוסרים, ניתן עדיין ליצור הזמנה ידנית." /> : <div className="task-list">{lines.map((l, i) => { const it = (items || []).find((x) => x.id === l.itemId); const stk = it ? ppeStockOf(it, l.size) : 0; const mn = it ? ppeMinOf(it, l.size) : 0; const mx = it ? ppeMaxOf(it, l.size) : 0; const after = stk + (l.qty || 0); const warn = (mx && after > mx) ? `מעל המקסימום (${mx})` : ((mn && after < mn) ? "עדיין מתחת למינימום" : ""); const rmLabel = `הסרת ${l.itemName}${l.size && l.size !== "אחיד" ? ` במידה ${l.size}` : ""} מההזמנה`; return <div key={i} className="task-row" style={{ borderInlineStartColor: warn ? "#B45309" : "var(--primary)", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{l.itemName}{l.size && l.size !== "אחיד" ? ` · ${l.size}` : ""}</div><div className="task-row-sub">{l.sku ? `מק״ט ${l.sku}` : ppeCatLabel(l.category)}{warn ? ` · ${warn}` : ""}</div></div><div className="task-row-side"><input type="number" min="1" value={l.qty} onChange={(e) => setQty(i, e.target.value)} style={{ width: 70 }} /><button className="btn-ghost sm" aria-label={rmLabel} title={rmLabel} onClick={() => rm(i)}><X size={14} /></button></div></div>; })}</div>}
       <label className="field" style={{ marginTop: 10 }}><span>הערה</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="הערה לספק / פנימית" /></label>
       <button className="btn-primary full" style={{ marginTop: 12 }} onClick={save} disabled={!lines.length}>שמירת טיוטה</button>
       <div style={{ height: 24 }} />
@@ -7261,7 +7261,7 @@ function PpeOrderCard({ order, items, session, savePpeOrder, delPpeOrder, savePp
         {order.note ? <Row k="הערה" v={order.note} /> : null}
       </div>
       <SectionTitle>שורות ההזמנה</SectionTitle>
-      <div className="task-list">{(order.lines || []).map((l, i) => { const rem = (l.qty || 0) - (l.received || 0); return <div key={i} className="task-row" style={{ borderInlineStartColor: rem <= 0 ? "#16A34A" : "#2563EB", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{l.itemName}{l.size && l.size !== "אחיד" ? ` · ${l.size}` : ""}</div><div className="task-row-sub">{l.sku ? `מק״ט ${l.sku} · ` : ""}הוזמן {l.qty} · נקלט {l.received || 0}</div></div><div className="task-row-side">{recv ? <input type="number" min="0" max={rem} value={recv[i] ?? 0} onChange={(e) => setRecv((s) => ({ ...s, [i]: Math.max(0, Math.min(rem, parseInt(e.target.value || "0", 10) || 0)) }))} style={{ width: 70 }} /> : <span className="task-due" style={{ fontWeight: 700, color: rem <= 0 ? "#16A34A" : "var(--muted)" }}>{rem <= 0 ? "הושלם" : `נותרו ${rem}`}</span>}</div></div>; })}</div>
+      <div className="task-list">{(order.lines || []).map((l, i) => { const rem = (l.qty || 0) - (l.received || 0); return <div key={i} className="task-row" style={{ borderInlineStartColor: rem <= 0 ? "#16A34A" : "var(--primary)", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{l.itemName}{l.size && l.size !== "אחיד" ? ` · ${l.size}` : ""}</div><div className="task-row-sub">{l.sku ? `מק״ט ${l.sku} · ` : ""}הוזמן {l.qty} · נקלט {l.received || 0}</div></div><div className="task-row-side">{recv ? <input type="number" min="0" max={rem} value={recv[i] ?? 0} onChange={(e) => setRecv((s) => ({ ...s, [i]: Math.max(0, Math.min(rem, parseInt(e.target.value || "0", 10) || 0)) }))} style={{ width: 70 }} /> : <span className="task-due" style={{ fontWeight: 700, color: rem <= 0 ? "#16A34A" : "var(--muted)" }}>{rem <= 0 ? "הושלם" : `נותרו ${rem}`}</span>}</div></div>; })}</div>
       {(order.lines || []).length > 0 && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={orderXlsx}><FileSpreadsheet size={15} /> הורדת קובץ הזמנה לספק (Excel)</button>}
       {(order.lines || []).length > 0 && <div style={{ marginTop: 10 }}><div className="hint">טקסט להעתקה (למייל/וואטסאפ):</div><textarea id={`ordtxt-${order.id}`} readOnly value={orderText} style={{ width: "100%", minHeight: 92, fontSize: 12, marginTop: 4, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 4 }} onClick={copyText}>העתק טקסט</button></div>}
       {sendMode ? <div style={{ marginTop: 12 }}><div className="hint" style={{ marginBottom: 6 }}>הורידו את קובץ ההזמנה (כפתור למעלה) ושלחו לספק בנפרד. כאן רק מסמנים שנשלח.</div><label className="field"><span>צפי הגעה (לא חובה)</span><input type="date" value={expected} onChange={(e) => setExpected(e.target.value)} /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-primary full" onClick={send}>אישור שליחה</button><button className="btn-ghost sm" onClick={() => setSendMode(false)}>ביטול</button></div></div>
@@ -7752,7 +7752,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
   const grouped = st === "open";
   const G = [
     { key: "needEquip", label: "יש להעביר כלי לטכנאי", Icon: Truck, color: "#DC2626", test: (t) => t.status === "waiting" && t.waitingReason === "no_equipment" },
-    { key: "admin", label: "לטיפול / סגירה על ידך", Icon: ShieldCheck, color: "#4F46E5", test: (t) => ballIn(t) === "admin" },
+    { key: "admin", label: "לטיפול / סגירה על ידך", Icon: ShieldCheck, color: "#1F4E8C", test: (t) => ballIn(t) === "admin" },
     { key: "tech", label: "בטיפול הטכנאי", Icon: Wrench, color: "#D97706", test: (t) => ballIn(t) === "tech" },
     { key: "manager", label: "ממתינות לאישור מנהל מחלקה", Icon: CheckCircle2, color: "#0D9488", test: (t) => ballIn(t) === "manager" && !(t.status === "waiting" && t.waitingReason === "no_equipment") },
   ];
@@ -8631,7 +8631,7 @@ const PM_STAT = {
   done: { c: "#16A34A", lbl: "בוצע" },
   missed: { c: "#D97706", lbl: "נדחה / לא בוצע" },
   overdue: { c: "#DC2626", lbl: "באיחור" },
-  planned: { c: "#6366F1", lbl: "מתוכנן" },
+  planned: { c: "#1F4E8C", lbl: "מתוכנן" },
 };
 const FREQ_MONTHS = { daily: 1, weekly: 1, monthly: 1, quarterly: 3, yearly: 12 };
 const pmRules = (config) => normalizeMaintenanceRules(config?.maintenanceRules || []);
@@ -8792,7 +8792,7 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
     <div className="cal-grid">{weeks.map((row, wi) => row.map((day, di) => { const inMonth = day.getMonth() === month; const k = startOfDay(day.getTime()); const list = byDay[k] || []; const isToday = k === todayK; return (
       <div key={wi + "-" + di} className={"cal-cell" + (inMonth ? "" : " out") + (isToday ? " today" : "")}>
         <div className="cal-daynum">{day.getDate()}</div>
-        {list.slice(0, 3).map(({ task: x, projected }) => { const f = pmFleet(x, fleet); const od = k < todayK; const type = unitTypeName(f, config) || unitModelCode(f) || "כלי"; return <button key={`${x.id}-${k}`} className={"cal-pill pm-cal-pill" + (projected ? " projected" : "")} style={{ background: od ? "#FEE2E2" : projected ? "#EEF2FF" : "#FFEDD5", color: od ? "#B91C1C" : projected ? "#4338CA" : "#9A3412" }} onClick={() => onOpen(x)} title={f ? unitLabel(f, config) : "כלי"}><span className="pm-cal-type">{type}</span><span className="pm-cal-code">{f?.code || "—"}</span></button>; })}
+        {list.slice(0, 3).map(({ task: x, projected }) => { const f = pmFleet(x, fleet); const od = k < todayK; const type = unitTypeName(f, config) || unitModelCode(f) || "כלי"; return <button key={`${x.id}-${k}`} className={"cal-pill pm-cal-pill" + (projected ? " projected" : "")} style={{ background: od ? "#FEE2E2" : projected ? "var(--primary-soft)" : "#FFEDD5", color: od ? "#B91C1C" : projected ? "var(--primary)" : "#9A3412" }} onClick={() => onOpen(x)} title={f ? unitLabel(f, config) : "כלי"}><span className="pm-cal-type">{type}</span><span className="pm-cal-code">{f?.code || "—"}</span></button>; })}
         {list.length > 3 && <div className="cal-more">+{list.length - 3}</div>}
       </div>); }))}</div>
     {overdue.length > 0 && <><SectionTitle><AlertTriangle size={15} /> באיחור</SectionTitle><div className="cards">{overdue.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); return <div key={x.id} className="pm-card" onClick={() => onOpen(x)}><span className="pm-bar" style={{ background: "#DC2626" }} /><div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span></div><div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)} · באיחור {-d} ימים{fleetDepts(f).length ? <> · {fleetDepts(f).join(", ")}</> : null}</div></div></div>; })}</div></>}
@@ -9250,8 +9250,8 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     <div className="kpi-grid">
       <Kpi num={ils(totalCost)} label="עלות כוללת" color="#16A34A" small />
       <Kpi num={compliance !== null ? compliance + "%" : "—"} label={compliance !== null ? "עמידה ב-SLA" : "SLA — אין מספיק נתונים"} color={compliance === null ? "var(--muted)" : compliance >= 80 ? "#16A34A" : "#EA580C"} small />
-      <Kpi num={mttr ? fmtDur(mttr) : "—"} label="זמן תיקון ממוצע" color="#2563EB" small />
-      <Kpi num={ils(avgCost)} label="ממוצע לתיקון" color="#7C3AED" small />
+      <Kpi num={mttr ? fmtDur(mttr) : "—"} label="זמן תיקון ממוצע" color="var(--primary)" small />
+      <Kpi num={ils(avgCost)} label="ממוצע לתיקון" color="var(--primary-d)" small />
     </div>
     <SectionTitle><Sparkles size={15} /> תובנות · {PERIOD_LBL[period]}</SectionTitle>
     {!hasInsights ? <div className="note">אין תובנות לתקופה שנבחרה — נסו טווח רחב יותר.</div> : <>
@@ -9264,7 +9264,7 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
       <SectionTitle><Building2 size={15} /> אחזקת מבנה — עלות וקריאות לפי קטגוריה</SectionTitle>
       {catArr.length === 0 ? <div className="note">אין נתוני אחזקת מבנה.</div> : <div className="panel">{catArr.slice(0, 8).map(([c, n]) => <Bar key={c} label={c} value={n} max={maxCat} color={TRACKS.facility.color} />)}</div>}
       <SectionTitle><MapPin size={15} /> בעיות חוזרות לפי אזור</SectionTitle>
-      {zoneArr.length === 0 ? <div className="note">אין נתוני אזורים.</div> : <div className="panel">{zoneArr.slice(0, 8).map(([z, n]) => <Bar key={z} label={z} value={n} max={maxZone} color="#0EA5E9" />)}</div>}
+      {zoneArr.length === 0 ? <div className="note">אין נתוני אזורים.</div> : <div className="panel">{zoneArr.slice(0, 8).map(([z, n]) => <Bar key={z} label={z} value={n} max={maxZone} color="var(--primary)" />)}</div>}
     </>)}
     {atab === "all" && <><SectionTitle><BarChart3 size={15} /> עלויות: מבנה מול שינוע</SectionTitle><div className="panel"><Bar label="אחזקת מבנה" value={facCost} max={Math.max(facCost, transCost, 1)} money color={TRACKS.facility.color} /><Bar label="כלי שינוע" value={transCost} max={Math.max(facCost, transCost, 1)} money color={TRACKS.transport.color} /></div></>}
     {stuckParts.length > 0 && <div className="parts-card"><div className="parts-row"><span className="parts-icon"><Clock size={16} /></span><div><div className="parts-title">{partsWaitTitle}</div><div className="parts-sub">מתוכן, {partsBreachText} מ-SLA — עיכוב שאינו בהכרח באחריות הטכנאי</div></div></div></div>}
@@ -9279,12 +9279,12 @@ function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setC
     {pausedTotal > 0 && <div className="note" style={{ borderColor: "#DDD6FE", marginBottom: 8 }}><CalendarClock size={13} /> זמן המתנה שלא נספר ל-SLA (המתנה לגורם חיצוני): <b>{fmtDur(pausedTotal)}</b></div>}
     {returnsCount > 0 && <div className="note" style={{ borderColor: "#FECACA", marginBottom: 8 }}><RefreshCw size={13} /> קריאות שהוחזרו לתיקון (לא טופלו בפעם הראשונה): <b>{returnsCount}</b></div>}
     {showFleet && unitStats.length > 0 && <><SectionTitle><Truck size={15} /> כלים בעייתיים — תקלות ועלות</SectionTitle><div className="panel">{unitStats.map((u) => <div key={u.f.id} className={"kpi-unit-row" + (onFilter ? " bar-click" : "")} onClick={onFilter ? () => drill({ label: `כלי ${u.f.code}`, forkliftId: u.f.id }, { track: "transport", period: "quarter" }) : undefined} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: "1px solid var(--line)" }}><span style={{ fontWeight: 700, minWidth: 64 }}>{u.f.code}</span><div style={{ flex: 1 }}><div style={{ height: 8, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: (u.c90 / maxUnitC * 100) + "%", height: "100%", background: u.c90 >= 3 ? "#DC2626" : "#EA580C" }} /></div></div><span style={{ fontSize: 12.5, color: "var(--muted)", minWidth: 92, textAlign: "left" }}>{u.c90} ב-90 ימים</span><span style={{ fontWeight: 700, minWidth: 70, textAlign: "left" }}>{u.cost ? ils(u.cost) : "—"}</span>{onFilter && <ChevronLeft size={14} style={{ color: "var(--muted)" }} />}</div>)}<div className="hint" style={{ marginTop: 6 }}>מבוסס על קריאות שינוע 90 הימים האחרונים והעלות המצטברת. כלי עם 3+ תקלות מסומן אדום — מועמד לבחינת החלפה.</div></div></>}
-    {stageArr.length > 0 && <><SectionTitle><Clock size={15} /> זמן לפי שלבי קריאה</SectionTitle><div className="panel">{stageArr.map((s) => <Bar key={s.key} label={s.label} value={Math.round(s.ms / 360000) / 10} max={maxStageHours} suffix={` שע׳ · ${lifecycleOwnerLabel(s.owner)} · ${countLabel(s.n, "קריאה", "קריאות")}${s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}`} color={s.kind === "waiting" ? "#B45309" : s.kind === "rework" ? "#DC2626" : "#2563EB"} onClick={onFilter ? () => drill({ label: `שלב · ${s.label}`, lifecycleKey: s.key }, { st: "all", period }) : undefined} />)}</div></>}
+    {stageArr.length > 0 && <><SectionTitle><Clock size={15} /> זמן לפי שלבי קריאה</SectionTitle><div className="panel">{stageArr.map((s) => <Bar key={s.key} label={s.label} value={Math.round(s.ms / 360000) / 10} max={maxStageHours} suffix={` שע׳ · ${lifecycleOwnerLabel(s.owner)} · ${countLabel(s.n, "קריאה", "קריאות")}${s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}`} color={s.kind === "waiting" ? "#B45309" : s.kind === "rework" ? "#DC2626" : "var(--primary)"} onClick={onFilter ? () => drill({ label: `שלב · ${s.label}`, lifecycleKey: s.key }, { st: "all", period }) : undefined} />)}</div></>}
     {waitReasonArr.length === 0 ? <div className="note">אין זמני המתנה בתקופה שנבחרה.</div> : <div className="panel">{waitReasonArr.map(({ reason, label, n, ms }) => <Bar key={reason} label={label} value={n} max={maxWait} suffix={ms ? ` · ${fmtDur(ms)}` : ""} color="#B45309" onClick={onFilter ? () => drill({ label: `סיבת המתנה · ${label}`, lifecycleKey: `waiting:${reason}` }, { st: "all", period }) : undefined} />)}</div>}
     <SectionTitle>עלויות לפי ספק</SectionTitle>
     {supArr.length === 0 ? <div className="note">טרם נרשמו עלויות.</div> : <div className="panel">{supArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxSup} money color="#16A34A" onClick={onFilter ? () => drill({ label: `ספק · ${s}`, supplier: s }, { period }) : undefined} />)}</div>}
     <SectionTitle>עומס טכנאים</SectionTitle>
-    {techArr.length === 0 ? <div className="note">אין שיוכים פעילים.</div> : <div className="panel">{techArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxTech} color="#2563EB" />)}</div>}
+    {techArr.length === 0 ? <div className="note">אין שיוכים פעילים.</div> : <div className="panel">{techArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxTech} color="var(--primary)" />)}</div>}
     {showFleet && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים — תכנון מול ביצוע</SectionTitle>
     {pmPlanned === 0 ? <div className="note">לא תוכננו טיפולים {PERIOD_PREP[period]}.</div> : <div className="panel"><div className="row-stats">
       <div><div className="rs-num">{pmPlanned}</div><div className="rs-lbl">תוכננו</div></div>
@@ -9356,7 +9356,7 @@ function WorkerReportsAnalytics({ tickets, dept = null, depts = null }) {
         <Bar label="שינוע" value={transCount} max={Math.max(facCount, transCount, 1)} color={TRACKS.transport.color} />
       </div>
       <SectionTitle>עובדים מדווחים מובילים</SectionTitle>
-      {workerArr.length === 0 ? <div className="note">—</div> : <div className="panel">{workerArr.slice(0, 8).map(([n, v]) => <Bar key={n} label={n} value={v} max={maxWorker} color="#7C3AED" />)}</div>}
+      {workerArr.length === 0 ? <div className="note">—</div> : <div className="panel">{workerArr.slice(0, 8).map(([n, v]) => <Bar key={n} label={n} value={v} max={maxWorker} color="var(--primary)" />)}</div>}
       {reasonArr.length > 0 && <><SectionTitle>סיבות דחייה</SectionTitle><div className="panel">{reasonArr.map(([code, n]) => <Bar key={code} label={rejectLabel(code)} value={n} max={maxReason} color="#DC2626" />)}</div></>}
     </>}
   </>);
@@ -9464,7 +9464,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
   const relOrders = (orders || []).filter((o) => o.supplier === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const relFleet = (fleet || []).filter((f) => f.supplier === name);
   const stLbl = (st) => st === "draft" ? "טיוטה" : st === "sent" ? "נשלחה" : st === "received" ? "התקבלה" : st || "—";
-  const Tab = ({ id, label, n }) => <button onClick={() => setTab(id)} className="btn-ghost sm" style={{ fontWeight: tab === id ? 800 : 500, borderBottom: tab === id ? "2px solid #EA580C" : "2px solid transparent", borderRadius: 0 }}>{label}{n != null ? ` (${n})` : ""}</button>;
+  const Tab = ({ id, label, n }) => <button onClick={() => setTab(id)} className="btn-ghost sm" style={{ fontWeight: tab === id ? 800 : 500, borderBottom: tab === id ? "2px solid var(--primary)" : "2px solid transparent", borderRadius: 0 }}>{label}{n != null ? ` (${n})` : ""}</button>;
   return (<div>
     <button className="btn-ghost sm" onClick={onBack} style={{ marginBottom: 8 }}><ChevronLeft size={15} /> חזרה לרשימה</button>
     <SectionTitle><Building2 size={16} /> {name}</SectionTitle>
@@ -9553,7 +9553,7 @@ function SettingsPanel(p) {
   const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [brandDirty, setBrandDirty] = useState(false), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
-  const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
+  const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#CA8A04" }, { id: "night", label: "לילה", color: "#1F4E8C" }]);
   const [tw, setTw] = useState({ ...(config.techWidgets || {}) }), [mw, setMw] = useState({ ...(config.mgrWidgets || {}) });
   const [maintMsg, setMaintMsg] = useState("");
   const mkRows = (arr) => (arr || []).map((s, i) => ({ id: "r" + i + "_" + s, name: s, _orig: s }));
@@ -9589,7 +9589,7 @@ function SettingsPanel(p) {
     setDepts(mkRows(config.departments));
     setTw({ ...(config.techWidgets || {}) });
     setMw({ ...(config.mgrWidgets || {}) });
-    setWshifts(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
+    setWshifts(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#CA8A04" }, { id: "night", label: "לילה", color: "#1F4E8C" }]);
     setShiftGrace(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0));
     setPmDailyCapacity(clampPmDailyCapacity(config.pmDailyCapacity ?? 4));
     setCleaningReminderMins(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
@@ -9895,12 +9895,12 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
   const roleIcons = { admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus };
   const permIcons = { fleetDocs: FileText, fleetTickets: ClipboardList, ppe: Shirt, workerAccess: KeyRound, users: Users, analytics: BarChart3, suppliers: Truck, settings: Settings, audit: Clock };
   const permLevelLabels = { none: "אין", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
-  const pickCard = (on, tone = "#EA580C") => ({ borderColor: on ? tone : undefined, background: on ? "var(--primary-soft,#FFF4ED)" : undefined, color: on ? "var(--primary)" : undefined });
+  const pickCard = (on, tone = "#1F4E8C") => ({ borderColor: on ? tone : undefined, background: on ? "var(--primary-soft)" : undefined, color: on ? "var(--primary)" : undefined });
   const changeRole = (nextRole) => {
     setRole(nextRole);
     if (!user.id && nextRole === "user" && Object.keys(cleanPerms(perms)).length === 0) setPerms({ ...DEFAULT_MANAGER_PERMS });
   };
-  const ChoiceGrid = ({ options, value, onChange, columns = "auto", tone = "#EA580C" }) => (
+  const ChoiceGrid = ({ options, value, onChange, columns = "auto", tone = "#1F4E8C" }) => (
     <div className={"uf-choice-grid cols-" + columns}>{options.map((opt) => {
       const Icon = opt.Icon;
       const on = value === opt.id;
@@ -9980,7 +9980,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@example.local" /></label>}
       <label className="field"><span>טלפון{role === "tech" ? " (שם משתמש לכניסה) *" : ""}</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">{role === "tech" ? "הטכנאי ייכנס עם מספר הטלפון ויגדיר קוד אישי בכניסה הראשונה." : "יכול לשמש גם כפרטי כניסה אם הוזן, ומוצג לאנשי טיפול כדי שיוכלו להתקשר בלחיצה."}</div></label>
       {!lockRole && <div className="field"><span>תפקיד</span><ChoiceGrid columns="role" value={role} onChange={changeRole} options={USER_FORM_ROLE_OPTIONS.map(([id, label]) => ({ id, label, Icon: roleIcons[id] || User }))} /></div>}
-      {role && role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} tone="#0EA5E9" options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
+      {role && role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
       {role === "user" && (lockDept
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
@@ -10323,7 +10323,7 @@ function TicketDetail(p) {
         : (<><button className="btn-ghost full" style={{ marginTop: 12 }} onClick={() => setShowSim((v) => !v)}><Search size={15} /> {showSim ? "הסתר קריאות דומות" : `הצג קריאות דומות${related.length ? " (" + related.length + ")" : ""}`}</button>
           {showSim && (related.length === 0 ? <div className="note">לא נמצאו קריאות דומות.</div> : <div className="cards" style={{ marginTop: 10 }}>{related.slice(0, 12).map((t) => <button key={t.id} className="mini-ticket" onClick={() => onOpenTicket && onOpenTicket(t.id)}><span className="badge sm" style={{ color: stOf(t.status).color, background: stOf(t.status).bg }}>{stOf(t.status).label}</span><span className="mt-subj">#{ticketNo(t)} · {t.subject}</span><span className="mt-date">{fmtDate(t.createdAt)}</span></button>)}</div>)}</>)}
       {ticket.closure && <><SectionTitle><DollarSign size={15} /> סגירה</SectionTitle><div className="close-box">
-        {ticket.closure.quality && (() => { const qc = { resolved: "#16A34A", temporary: "#CA8A04", likely_repeat: "#EA580C", purchase_needed: "#7C3AED", external_needed: "#0EA5E9" }; const ql = { resolved: "טופל לחלוטין", temporary: "פתרון זמני", likely_repeat: "עשוי לחזור", purchase_needed: "נדרשת רכש", external_needed: "נדרש קבלן חוץ" }; const c = qc[ticket.closure.quality]; return <div className="cb-row"><span>איכות סגירה</span><b style={{ color: c }}>{ql[ticket.closure.quality]}</b></div>; })()}
+        {ticket.closure.quality && (() => { const qc = { resolved: "#16A34A", temporary: "#CA8A04", likely_repeat: "#EA580C", purchase_needed: "#1F4E8C", external_needed: "#3E6DB0" }; const ql = { resolved: "טופל לחלוטין", temporary: "פתרון זמני", likely_repeat: "עשוי לחזור", purchase_needed: "נדרשת רכש", external_needed: "נדרש קבלן חוץ" }; const c = qc[ticket.closure.quality]; return <div className="cb-row"><span>איכות סגירה</span><b style={{ color: c }}>{ql[ticket.closure.quality]}</b></div>; })()}
         <div className="cb-row"><span>עלות</span><b>{ils(ticket.closure.costAmount || 0)}</b></div>
         {ticket.closure.costSupplier && <div className="cb-row"><span>ספק</span><b>{ticket.closure.costSupplier}</b></div>}
         {ticket.closure.costNote && <div className="cb-row"><span>הערה</span><b>{ticket.closure.costNote}</b></div>}
@@ -10356,7 +10356,7 @@ function TicketDetail(p) {
       </>)}
 
       {isMgrExec && isOpen(ticket) && (<>
-        <div className="banner" style={{ marginTop: 14, background: "#EEF2FF", color: "#4338CA", borderColor: "#C7D2FE" }}><User size={16} /> הקריאה שויכה אליך לטיפול.</div>
+        <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><User size={16} /> הקריאה שויכה אליך לטיפול.</div>
         {ticket.status === "new" ? (
           <button className="btn-primary full" style={{ marginTop: 12 }} onClick={takeMgr}><User size={16} /> קבל לטיפול</button>
         ) : (ticket.status !== "pending_admin" && ticket.status !== "pending_user") && (<>
@@ -10408,7 +10408,7 @@ function TicketDetail(p) {
           : <button className="btn-danger full" style={{ marginTop: 8 }} onClick={() => setRev((s) => ({ ...s, mode: "reject", comment: "" }))}><X size={15} /> דחיית הדיווח</button>)}
       </>)}
 
-      {!isTech && ticket.status === "rework" && <div className="banner" style={{ marginTop: 14, background: "#CFFAFE", color: "#155E75", borderColor: "#67E8F9" }}><AlertTriangle size={16} /> הוחזר לעובד לתיקון — ממתין לשליחה חוזרת.</div>}
+      {!isTech && ticket.status === "rework" && <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><AlertTriangle size={16} /> הוחזר לעובד לתיקון — ממתין לשליחה חוזרת.</div>}
 
       {role === "admin" && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework" && (<>
         {track === "facility" && <><SectionTitle>סטטוס</SectionTitle><div className="status-seg">{["new", "in_progress"].map((st) => <button key={st} className={"seg" + (ticket.status === st ? " on" : "")} onClick={() => setStatus(st)} style={ticket.status === st ? { background: stOf(st).color, color: "#fff", borderColor: stOf(st).color } : {}}>{stOf(st).label}</button>)}</div>
@@ -10437,8 +10437,8 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
     { id: "resolved", label: "טופל לחלוטין", color: "#16A34A" },
     { id: "temporary", label: "פתרון זמני", color: "#CA8A04" },
     { id: "likely_repeat", label: "עשוי לחזור", color: "#EA580C" },
-    { id: "purchase_needed", label: "נדרשת רכש/החלפה", color: "#7C3AED" },
-    { id: "external_needed", label: "נדרש קבלן חוץ", color: "#0EA5E9" },
+    { id: "purchase_needed", label: "נדרשת רכש/החלפה", color: "#1F4E8C" },
+    { id: "external_needed", label: "נדרש קבלן חוץ", color: "#3E6DB0" },
   ];
   const finish = () => { if (busy) return; setBusy(true); const closedAt = realDt ? new Date(realDt).getTime() : null; onClose({ costAmount: Number(amount) || 0, costSupplier: supplier, costNote: note.trim(), closedAt, quality }); };
   const qItem = QUALITY.find((x) => x.id === quality) || QUALITY[0];
@@ -10901,7 +10901,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
         {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
         {missingHandler && <span className="badge sm" style={{ color: "#7F1D1D", background: "#FEE2E2" }}><AlertTriangle size={11} /> ללא מטפל פעיל</span>}
         {showRiskBadge && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
-        {t.byAdmin && <span className="badge sm" style={{ color: "#7C3AED", background: "#EDE9FE" }}><ShieldCheck size={11} /> מנהל</span>}
+        {t.byAdmin && <span className="badge sm" style={{ color: "var(--primary)", background: "var(--primary-soft)" }}><ShieldCheck size={11} /> מנהל</span>}
         {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
         {ticketMissedSla(t, config) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
         {t.status === "waiting" && t.waitingReason && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>{waitReasonLabel(t.waitingReason, config)}</span>}
@@ -11002,10 +11002,11 @@ function ColorPaletteButton({ value, onChange, label = "בחירת צבע", pale
 function Style() {
   return (<style>{`
 :root{--font-body:'Assistant','Rubik',system-ui,'Segoe UI',Arial,sans-serif;--font-head:'Rubik','Assistant',system-ui,sans-serif;
---bg:#FFFFFF;--surface:#FFFFFF;--surface-2:#F7F8FA;--pearl:#E6E7E9;--warm-surface:#F4EBDD;--warm-line:#E7D8C1;--warning-surface:#FFF8E8;--critical-surface:#FFF1F0;--critical-line:#F5B8B2;--ink:#2E3138;--muted:#6F7680;--line:#C9CDD1;--border:var(--line);--input:#FFFFFF;
---primary:#1F4E8C;--primary-d:#3E6DB0;--primary-soft:#E6E7E9;--orange:var(--primary);--accent:#E9DFC9;--slate:#2E3138;--side:#FFFFFF;--side-ink:#6F7680;
+--brand-white:#FFFFFF;--brand-pearl:#E6E7E9;--brand-dark-pearl:#C9CDD1;--brand-icon:#A4A9B0;--brand-blue:#1F4E8C;--brand-blue-hover:#3E6DB0;--brand-beige:#E9DFC9;--brand-light:#F7F8FA;--brand-ink:#2E3138;--brand-muted:#6F7680;
+--bg:var(--brand-white);--surface:var(--brand-white);--surface-2:var(--brand-light);--pearl:var(--brand-pearl);--warm-surface:var(--brand-beige);--warm-soft:#F6EFE2;--warm-line:#D8C8AE;--warning-surface:#F6EFE2;--critical-surface:#FFF1F0;--critical-line:#F5B8B2;--ink:var(--brand-ink);--muted:var(--brand-muted);--line:var(--brand-dark-pearl);--border:var(--line);--input:var(--brand-white);
+--primary:var(--brand-blue);--primary-d:var(--brand-blue-hover);--primary-soft:rgba(31,78,140,.10);--primary-line:rgba(31,78,140,.32);--orange:var(--primary);--accent:var(--brand-beige);--slate:var(--brand-ink);--side:var(--brand-white);--side-ink:var(--brand-muted);--icon-muted:var(--brand-icon);
 --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);--ease-drawer:cubic-bezier(0.32,0.72,0,1);
---press:scale(.975);--lift-shadow:0 10px 26px rgba(46,49,56,.10);--control-shadow:0 1px 2px rgba(46,49,56,.04),0 0 0 1px rgba(46,49,56,.025);--surface-glow:linear-gradient(180deg,rgba(255,255,255,.95),rgba(247,248,250,.78));}
+--press:scale(.975);--lift-shadow:0 10px 26px rgba(46,49,56,.10);--control-shadow:0 1px 2px rgba(46,49,56,.04),0 0 0 1px rgba(46,49,56,.025);--surface-glow:linear-gradient(180deg,rgba(255,255,255,.96),rgba(247,248,250,.84));}
 .app-dark{--bg:#111418;--surface:#1B2027;--surface-2:#15191F;--pearl:#252B33;--warm-surface:#27231D;--warm-line:#474033;--warning-surface:#2B2416;--critical-surface:#2A1717;--critical-line:#743535;--ink:#EEF2F7;--muted:#A4A9B0;--line:#343B45;--border:var(--line);--input:#20262E;--orange:var(--primary);--slate:#10141A;--side:#15191F;--side-ink:#A4A9B0;--control-shadow:0 0 0 1px rgba(255,255,255,.05);--surface-glow:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{scrollbar-gutter:stable;}
@@ -11138,16 +11139,16 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .btn-close{min-height:44px;background:#065F46;color:#fff;font-weight:600;border-radius:11px;padding:13px 18px;display:inline-flex;align-items:center;justify-content:center;gap:7px;}
 .btn-close.full{width:100%;}.btn-close:hover{background:#047857;}
 .icon-btn{width:44px;min-width:44px;height:44px;min-height:44px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;border-radius:11px;color:var(--ink);}
-.icon-btn:hover{background:#88888822;}
+.icon-btn:hover{background:var(--pearl);color:var(--primary);}
 .row2{display:flex;gap:8px;}.row2>*{flex:1;}
 
-.app-root{min-height:100vh;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;}
+.app-root{min-height:100vh;background:linear-gradient(180deg,var(--brand-white),var(--brand-light));color:var(--ink);-webkit-font-smoothing:antialiased;}
 .sidebar{display:none;}
 .main-col{display:flex;flex-direction:column;min-height:100vh;}
 .content{flex:1;padding:16px;max-width:640px;margin:0 auto;width:100%;}
 .content.with-nav{padding-bottom:88px;}
 .row-between{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.banner{display:flex;align-items:center;gap:8px;background:var(--warning-surface);color:#7C4A03;border:1px solid var(--warm-line);border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;margin-bottom:12px;}
+.banner{display:flex;align-items:center;gap:8px;background:var(--warm-soft);color:var(--ink);border:1px solid var(--warm-line);border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;margin-bottom:12px;}
 
 .topbar{background:rgba(255,255,255,.94);color:var(--ink);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:20;box-shadow:0 1px 0 var(--line),0 10px 24px rgba(46,49,56,.08);backdrop-filter:saturate(160%) blur(14px);flex-wrap:wrap;}
 .tb-left{display:flex;align-items:center;gap:12px;min-width:0;}
@@ -11217,7 +11218,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 
 .fab{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;border-radius:999px;padding:14px 22px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;box-shadow:0 8px 22px rgba(31,78,140,.30);z-index:18;}
 .fab:hover{background:var(--primary-d);}
-.ai-fab{position:fixed;bottom:calc(82px + env(safe-area-inset-bottom));inset-inline-end:18px;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(99,102,241,.45);z-index:19;}
+.ai-fab{position:fixed;bottom:calc(82px + env(safe-area-inset-bottom));inset-inline-end:18px;width:54px;height:54px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(31,78,140,.30);z-index:19;}
 .ai-fab:hover{transform:scale(1.05);}
 .sect{font-family:var(--font-head);font-weight:650;font-size:14px;color:var(--ink);margin:18px 0 9px;display:flex;align-items:center;gap:7px;}
 .sect svg{color:var(--muted);}
@@ -11251,7 +11252,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .ovl-panel{background:var(--bg);width:100%;height:100%;display:flex;flex-direction:column;animation:cmmsSheetIn 240ms var(--ease-drawer) both;will-change:transform,opacity;}
 .ovl-inner{display:flex;flex-direction:column;height:100%;min-height:0;}
 .body{flex:1;padding:16px;overflow-y:auto;}
-.form-head{background:var(--slate);color:#fff;padding:12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5;box-shadow:0 2px 0 var(--accent);}
+.form-head{background:var(--primary);color:#fff;padding:12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5;box-shadow:0 2px 0 var(--accent);}
 .form-head .icon-btn{color:#fff;}
 .form-title{font-family:var(--font-head);font-weight:600;font-size:17px;}
 .track-q{font-family:var(--font-head);font-weight:600;font-size:16px;margin-bottom:14px;}
@@ -11273,9 +11274,9 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .photo-add{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:1.5px dashed var(--line);background:var(--surface-2);border-radius:12px;padding:16px;color:var(--muted);font-weight:500;}
 .photo-prev{position:relative;border-radius:12px;overflow:hidden;}.photo-prev img{width:100%;display:block;}
 .photo-x{position:absolute;top:8px;left:8px;background:#000000aa;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
-.ai-suggest{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);color:#6366F1;border:1.5px solid #C7D2FE;border-radius:11px;padding:13px;font-weight:600;font-size:14px;margin:14px 0 8px;}
+.ai-suggest{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--primary-soft);color:var(--primary);border:1.5px solid var(--primary-line);border-radius:11px;padding:13px;font-weight:600;font-size:14px;margin:14px 0 8px;}
 .app-dark .ai-suggest{background:#1e2438;border-color:#3730a3;color:#a5b4fc;}
-.ai-note{font-size:12.5px;color:#6366F1;margin:-6px 0 12px;font-weight:600;}
+.ai-note{font-size:12.5px;color:var(--primary);margin:-6px 0 12px;font-weight:600;}
 
 .detail-top{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
 .detail-subj{font-family:var(--font-head);font-weight:700;font-size:21px;line-height:1.3;margin:0;}
@@ -11305,10 +11306,10 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .health-rec{display:flex;align-items:flex-start;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink);}
 .demo-badge{display:inline-block;font-size:10.5px;font-weight:700;color:#B45309;background:#FEF3C7;border-radius:6px;padding:2px 7px;margin-inline-start:8px;vertical-align:middle;}
 .app-dark .demo-badge{background:#3a2e10;color:#fcd34d;}
-.empty-demo{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+.empty-demo{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--warm-soft);border:1px solid var(--warm-line);border-radius:12px;padding:14px 16px;margin-bottom:16px;}
 .empty-demo-main{min-width:0;}
-.empty-demo-title{font-size:14px;font-weight:800;color:#1D4ED8;margin-bottom:3px;}
-.empty-demo-text{font-size:12.5px;color:#1E3A8A;line-height:1.45;}
+.empty-demo-title{font-size:14px;font-weight:800;color:var(--primary);margin-bottom:3px;}
+.empty-demo-text{font-size:12.5px;color:var(--muted);line-height:1.45;}
 .app-dark .empty-demo{background:#0f1f35;border-color:#1d4ed8;}
 .app-dark .empty-demo-title{color:#93C5FD;}
 .app-dark .empty-demo-text{color:#BFDBFE;}
@@ -11459,7 +11460,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .tr-to{font-weight:600;color:var(--ink);}
 .tr-src{display:inline-flex;align-items:center;gap:3px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ECFDF5;color:#047857;border-radius:6px;padding:1px 7px;font-weight:700;}
 .tr-src svg{flex:none;}
-.tr-mtg{display:inline-flex;align-items:center;gap:3px;background:rgba(124,58,237,0.1);color:#7C3AED;border-radius:6px;padding:1px 7px;font-weight:600;}
+.tr-mtg{display:inline-flex;align-items:center;gap:3px;background:var(--primary-soft);color:var(--primary);border-radius:6px;padding:1px 7px;font-weight:600;}
 .tr-cat{background:var(--surface-2);border-radius:6px;padding:1px 7px;}
 .tr-wait{color:#B45309;}
 .task-row-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none;}
@@ -11511,7 +11512,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .imp-meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
 .dup-tag{display:inline-block;background:#FEE2E2;color:#B91C1C;border-radius:6px;padding:1px 6px;font-size:10.5px;font-weight:700;margin-inline-end:6px;}
 .qchips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;}
-.more-toggle{background:none;border:none;color:var(--accent,#2563EB);font-size:13px;font-weight:600;cursor:pointer;padding:6px 2px;margin:2px 0;}
+.more-toggle{background:none;border:none;color:var(--primary);font-size:13px;font-weight:600;cursor:pointer;padding:6px 2px;margin:2px 0;}
 .more-fields{border-top:1px dashed var(--line);margin-top:6px;padding-top:8px;}
 .topic-edit{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
 .topic-edit input{flex:1;}
@@ -11534,16 +11535,16 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .issue-box{background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:9px;margin-top:6px;display:flex;flex-direction:column;gap:7px;}
 .issue-box input{width:100%;}
 .topic-wrap{display:flex;flex-direction:column;}
-.mlink{display:inline-flex;align-items:center;gap:5px;background:rgba(124,58,237,0.1);color:#7C3AED;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:600;}
-.mlink.src{background:rgba(37,99,235,0.1);color:#2563EB;}
+.mlink{display:inline-flex;align-items:center;gap:5px;background:var(--primary-soft);color:var(--primary);border-radius:7px;padding:3px 9px;font-size:12px;font-weight:600;}
+.mlink.src{background:var(--primary-soft);color:var(--primary);}
 .mlink-x{background:none;border:none;color:inherit;font-size:15px;line-height:1;cursor:pointer;padding:0 0 0 2px;opacity:0.7;}
 .mlink-x:hover{opacity:1;}
 .link-panel{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px;margin-top:6px;display:flex;flex-direction:column;gap:8px;}
-.mlink-tag{display:inline-block;background:rgba(124,58,237,0.12);color:#7C3AED;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-inline-end:6px;}
+.mlink-tag{display:inline-block;background:var(--primary-soft);color:var(--primary);border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-inline-end:6px;}
 .seg-tabs.s2{display:grid;grid-template-columns:1fr 1fr;}
 .act-tag{display:inline-block;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-inline-end:6px;}
 .act-tag.new{background:#DCFCE7;color:#15803D;}
-.act-tag.update{background:#DBEAFE;color:#1D4ED8;}
+.act-tag.update{background:var(--primary-soft);color:var(--primary);}
 .act-tag.nochange{background:var(--surface-2);color:var(--muted);}
 .confirm-line{display:flex;align-items:flex-start;gap:8px;margin-top:9px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;line-height:1.45;}
 .confirm-line input{margin-top:2px;flex-shrink:0;}
@@ -11552,13 +11553,13 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .qc-loc{flex:0 0 38%;}
 .qc-title{flex:1;}
 .qc-pp{flex:1;min-width:0;}
-.tr-loc{background:rgba(2,132,199,0.1);color:#0369A1;border-radius:6px;padding:1px 7px;cursor:pointer;}
-.tr-loc:hover{background:rgba(2,132,199,0.2);}
-.tag-bar{display:flex;align-items:center;gap:8px;background:rgba(2,132,199,0.08);border:1px solid rgba(2,132,199,0.25);color:#0369A1;border-radius:9px;padding:7px 11px;font-size:12.5px;margin:6px 0;}
+.tr-loc{background:var(--primary-soft);color:var(--primary);border-radius:6px;padding:1px 7px;cursor:pointer;}
+.tr-loc:hover{background:var(--pearl);}
+.tag-bar{display:flex;align-items:center;gap:8px;background:var(--primary-soft);border:1px solid var(--primary-line);color:var(--primary);border-radius:9px;padding:7px 11px;font-size:12.5px;margin:6px 0;}
 .tag-bar b{font-weight:700;}
-.tag-bar button{margin-inline-start:auto;background:none;border:none;color:#0369A1;font-size:15px;cursor:pointer;line-height:1;}
+.tag-bar button{margin-inline-start:auto;background:none;border:none;color:var(--primary);font-size:15px;cursor:pointer;line-height:1;}
 .qchip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
-.qchip.on{background:var(--ink);color:var(--surface);border-color:var(--ink);}
+.qchip.on{background:var(--primary);color:#fff;border-color:var(--primary);}
 .qchip.danger.on{background:#DC2626;border-color:#DC2626;color:#fff;}
 .more-wrap{position:relative;display:inline-block;}
 .more-back{position:fixed;inset:0;z-index:30;}
@@ -11770,10 +11771,10 @@ body *{visibility:hidden!important;}
 .rz-name{font-weight:800;font-size:16px;}.rz-loc{font-size:13px;color:var(--muted);margin:2px 0 4px;}
 .round-cl{display:flex;flex-direction:column;gap:7px;}
 .round-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;cursor:pointer;font-size:14.5px;font-weight:500;}
-.round-item.on{border-color:#0EA5E9;background:#0EA5E90f;}
+.round-item.on{border-color:var(--primary);background:var(--primary-soft);}
 .round-item input{display:none;}
 .ri-box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;}
-.round-item.on .ri-box{background:#0EA5E9;border-color:#0EA5E9;}
+.round-item.on .ri-box{background:var(--primary);border-color:var(--primary);}
 .todo-card{border:1px solid #FCD34D;background:#FFFBEB;border-radius:14px;padding:12px;margin-bottom:16px;}
 .app-dark .todo-card{background:#3a2e0e;border-color:#a87f1a;}
 .clean-missed-note{display:flex;align-items:flex-start;gap:8px;border:1px solid #FCA5A5;background:#FEF2F2;color:#991B1B;border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:13px;font-weight:700;line-height:1.45;}
@@ -11806,10 +11807,10 @@ body *{visibility:hidden!important;}
 .todo-card .clean-floor-title{font-size:11px;color:#92400E99;}
 .app-dark .todo-card .clean-floor-title{color:#FCD34D99;}
 .comp-card{border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:8px;text-align:center;background:var(--surface);}
-.comp-big{font-size:30px;font-weight:800;color:#0EA5E9;line-height:1;}
+.comp-big{font-size:30px;font-weight:800;color:var(--primary);line-height:1;}
 .comp-lbl{font-size:13px;color:var(--muted);margin:4px 0 10px;}
 .comp-bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;}
-.comp-bar span{display:block;height:100%;background:#0EA5E9;border-radius:99px;}
+.comp-bar span{display:block;height:100%;background:var(--primary);border-radius:99px;}
 .win-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
 .win-chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;}
 .cmp-card{display:flex;gap:11px;border:1px solid var(--line);border-inline-start-width:4px;border-radius:12px;padding:11px;background:var(--surface);}
@@ -11833,21 +11834,21 @@ body *{visibility:hidden!important;}
 .ca-bar span{display:block;height:100%;border-radius:99px;}
 .ca-sub{font-size:12px;color:var(--muted);}
 .pub-entry{min-height:44px;display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:12px;background:none;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
-.pub-entry:hover{border-color:#0EA5E9;color:#0EA5E9;}
+.pub-entry:hover{border-color:var(--primary);color:var(--primary);}
 .pub-wrap{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;}
 .pub-card{position:relative;width:100%;max-width:420px;background:var(--surface);border-radius:18px;padding:22px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:cmmsSurfaceIn 220ms var(--ease-out) both;will-change:transform,opacity;}
 .pub-x{position:absolute;inset-inline-end:12px;top:12px;}
-.pub-logo{width:52px;height:52px;border-radius:14px;background:#0EA5E91a;color:#0EA5E9;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+.pub-logo{width:52px;height:52px;border-radius:14px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
 .pub-title{font-size:20px;font-weight:800;}
 .pub-sub{font-size:13px;color:var(--muted);margin:4px 0 16px;line-height:1.5;}
 .pub-scan-btn{margin-bottom:10px;}
 .pub-zones{display:flex;flex-direction:column;gap:8px;}
 .pub-zone{text-align:start;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;cursor:pointer;color:var(--ink);}
-.pub-zone:hover{border-color:#0EA5E9;}
+.pub-zone:hover{border-color:var(--primary);}
 .pub-zone-n{font-weight:700;font-size:15px;}.pub-zone-l{font-size:12px;color:var(--muted);margin-top:2px;}
 .pub-chips{display:flex;flex-wrap:wrap;gap:7px;}
 .pub-chip{background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:8px 13px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink);}
-.pub-chip.on{background:#0EA5E9;color:#fff;border-color:#0EA5E9;}
+.pub-chip.on{background:var(--primary);color:#fff;border-color:var(--primary);}
 .pub-foot{font-size:11px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5;}
 .pub-done{text-align:center;padding:14px 0;}
 .pub-done-t{font-size:19px;font-weight:800;margin:12px 0 4px;}
@@ -11860,8 +11861,8 @@ body *{visibility:hidden!important;}
 .notif-item.unread{background:#F7F8FA;border-color:#C9CDD1;box-shadow:inset 0 0 0 1px rgba(255,255,255,.55);}
 .app-dark .notif-item.unread{background:#242A32;border-color:#3E4650;box-shadow:none;}
 .ni-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--muted);box-shadow:0 0 0 4px rgba(164,169,176,.12);}
-.ni-dot.new{background:#2563EB;}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:#4F46E5;}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:#0EA5E9;}.ni-dot.task{background:#7C3AED;}.ni-dot.doc{background:#EA580C;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}.ni-dot.ppe{background:#64748B;}
-.ni-dot.cleaning{background:#0EA5E9;}
+.ni-dot.new{background:var(--primary);}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:var(--primary-d);}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:var(--primary);}.ni-dot.task{background:var(--primary);}.ni-dot.doc{background:#B45309;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}.ni-dot.ppe{background:#64748B;}
+.ni-dot.cleaning{background:var(--primary);}
 .notif-item.clk{cursor:pointer;}.notif-item .ni-go{color:var(--muted);align-self:center;flex-shrink:0;opacity:.72;}
 .icon-btn.on2{background:var(--primary-soft,#FFF4ED);color:var(--primary);}
 .notif-push{border-bottom:1px solid var(--line);padding:10px 14px;background:var(--surface);}
@@ -11921,7 +11922,7 @@ body *{visibility:hidden!important;}
 .issue-main{min-width:0;}
 .issue-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
 .issue-status{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:800;background:#FEF3C7;color:#92400E;}
-.issue-status.reviewing{background:#DBEAFE;color:#1D4ED8;}
+.issue-status.reviewing{background:var(--primary-soft);color:var(--primary);}
 .issue-status.resolved{background:#DCFCE7;color:#15803D;}
 .issue-date,.issue-meta{font-size:11.5px;color:var(--muted);}
 .issue-desc{font-size:14px;font-weight:700;line-height:1.45;color:var(--ink);}
@@ -11948,7 +11949,7 @@ body *{visibility:hidden!important;}
 .ai-panel{background:var(--surface);width:100%;max-width:520px;height:84vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -10px 50px rgba(0,0,0,.3);}
 .ai-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--line);}
 .ai-title{font-family:var(--font-head);font-weight:700;font-size:16px;display:flex;align-items:center;gap:9px;}
-.ai-orb{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;display:flex;align-items:center;justify-content:center;}
+.ai-orb{width:30px;height:30px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;}
 .ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
 .ai-msg{max-width:84%;padding:11px 14px;border-radius:15px;font-size:14px;line-height:1.55;white-space:pre-wrap;}
 .ai-msg.assistant{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-right-radius:5px;}
@@ -11957,9 +11958,9 @@ body *{visibility:hidden!important;}
 .ai-quick button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;font-size:12.5px;color:var(--muted);font-weight:500;}
 .ai-input{display:flex;gap:8px;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);}
 .ai-input input{flex:1;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;outline:none;background:var(--input);}
-.ai-input .btn-primary{background:#6366F1;padding:0 16px;}
+.ai-input .btn-primary{background:var(--primary);padding:0 16px;}
 
-.dash-command{--dash-cream:#FBF7EF;--dash-warm:#F4EBDD;--dash-critical:#FFF1F0;--dash-critical-border:#F5B8B2;--dash-warning:#FFF8E8;display:flex;flex-direction:column;gap:18px;}
+.dash-command{--dash-cream:var(--warm-soft);--dash-warm:var(--accent);--dash-critical:#FFF1F0;--dash-critical-border:#F5B8B2;--dash-warning:var(--warm-soft);display:flex;flex-direction:column;gap:18px;}
 .dash-hero{display:block;padding:10px 0 8px;}
 .dash-kicker{font-size:13px;color:var(--muted);font-weight:650;margin-bottom:8px;text-transform:none;}
 .dash-hero h1{font-family:var(--font-head);font-size:30px;line-height:1.08;margin:0;color:var(--ink);font-weight:750;letter-spacing:0;text-wrap:balance;}
@@ -11969,7 +11970,7 @@ body *{visibility:hidden!important;}
 .dash-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start;}
 .dash-main{display:flex;flex-direction:column;gap:18px;min-width:0;}
 .dash-rail{display:flex;flex-direction:column;gap:12px;min-width:0;position:sticky;top:18px;}
-.dash-priority-band{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--dash-warm);border:1px solid #E7D8C1;border-radius:18px;overflow:hidden;box-shadow:var(--control-shadow);}
+.dash-priority-band{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--dash-warm);border:1px solid var(--warm-line);border-radius:18px;overflow:hidden;box-shadow:var(--control-shadow);}
 .dash-signal{min-height:96px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;align-content:center;gap:7px 12px;padding:16px 18px;text-align:start;border-inline-start:1px solid rgba(201,205,209,.55);color:var(--ink);}
 .dash-signal:first-child{border-inline-start:none;}
 .dash-signal:hover{background:rgba(255,255,255,.34);}
@@ -11987,7 +11988,7 @@ body *{visibility:hidden!important;}
 .dash-mini-signal:first-child{border-inline-start:none;}
 .dash-mini-signal:hover{background:var(--surface-2);color:var(--primary);}
 .dash-mini-num{font-family:var(--font-head);font-size:20px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
-.dash-message-card,.dash-quick-create{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--dash-cream);border:1px solid #E7D8C1;border-radius:16px;padding:14px 16px;box-shadow:var(--control-shadow);}
+.dash-message-card,.dash-quick-create{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--dash-cream);border:1px solid var(--warm-line);border-radius:16px;padding:14px 16px;box-shadow:var(--control-shadow);}
 .dash-message-ic{width:42px;height:42px;border-radius:12px;background:#fff;color:var(--primary);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(46,49,56,.06);}
 .dash-message-card>div:nth-child(2),.dash-quick-create>div{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1;}
 .dash-message-card b,.dash-quick-create b{font-size:14px;font-weight:730;color:var(--ink);}
@@ -12000,7 +12001,7 @@ body *{visibility:hidden!important;}
 .dash-section-head button{display:inline-flex;align-items:center;gap:5px;color:var(--primary);font-size:12.5px;font-weight:700;}
 .dash-ticket-grid,.dash-attention-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
 .dash-ticket-card{position:relative;min-height:72px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px 10px;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;color:var(--ink);box-shadow:var(--control-shadow);}
-.dash-ticket-card.alert{background:#fff;border-color:#E7D8C1;}
+.dash-ticket-card.alert{background:var(--warm-soft);border-color:var(--warm-line);}
 .dash-ticket-card:hover{border-color:var(--primary);box-shadow:var(--lift-shadow);transform:translateY(-1px);}
 .dash-ticket-icon{width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--muted);display:flex;align-items:center;justify-content:center;}
 .dash-ticket-main{min-width:0;display:flex;flex-direction:column;gap:4px;}
@@ -12028,7 +12029,7 @@ body *{visibility:hidden!important;}
 .dash-insight:hover{background:var(--surface-2);}
 .dash-insight span{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;}
 .dash-insight b{font-size:12.5px;font-weight:560;line-height:1.38;color:var(--muted);}
-.dash-quick-create{background:#fff;border-color:#E7D8C1;}
+.dash-quick-create{background:var(--surface);border-color:var(--warm-line);}
 .dash-chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .dash-chart-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:15px 16px;box-shadow:var(--control-shadow);min-height:172px;}
 .dash-bars{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
@@ -12047,9 +12048,9 @@ body *{visibility:hidden!important;}
 .export-bar .btn-ghost.sm{width:44px;min-width:44px;padding:0;font-size:0;overflow:hidden;}
 .export-bar .btn-ghost.sm svg{width:17px;height:17px;margin:0;}
 .export-bar .btn-ghost.sm:has(svg + *){gap:0;}
-.parts-card{background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid #7C3AED;border-radius:13px;padding:13px 15px;margin:12px 0 4px;}
+.parts-card{background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid var(--primary);border-radius:13px;padding:13px 15px;margin:12px 0 4px;}
 .parts-row{display:flex;align-items:center;gap:11px;}
-.parts-icon{width:34px;height:34px;border-radius:10px;background:#EDE9FE;color:#7C3AED;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.parts-icon{width:34px;height:34px;border-radius:10px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .app-dark .parts-icon{background:#2e2748;}
 .parts-title{font-weight:600;font-size:14px;}
 .parts-sub{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}
@@ -12172,7 +12173,7 @@ body *{visibility:hidden!important;}
 .perm-hint{font-size:11.5px;color:var(--muted);line-height:1.35;margin-top:2px;}
 .perm-levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr));gap:5px;}
 .perm-levels button{border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);min-height:32px;padding:5px 7px;font-size:11.5px;font-weight:800;cursor:pointer;line-height:1.15;}
-.perm-levels button.on{background:var(--ink);border-color:var(--ink);color:var(--surface);}
+.perm-levels button.on{background:var(--primary);border-color:var(--primary);color:#fff;}
 .perm-levels button:disabled{opacity:.7;cursor:not-allowed;}
 .cleaning-access-card{margin:0 14px 10px;}
 .cleaning-zone-scope-card{margin:0 14px 10px;}
@@ -12264,7 +12265,7 @@ body *{visibility:hidden!important;}
 .drv-ok,.drv-no2{width:36px;height:36px;border-radius:9px;border:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;}
 .drv-ok{background:#16A34A;}.drv-no2{background:#DC2626;}
 .drv-cross{font-size:10px;font-weight:700;color:#0D9488;background:#0D948822;border-radius:5px;padding:1px 5px;}
-.drv-access{flex-basis:100%;display:flex;align-items:center;gap:4px;font-size:11px;color:#0369A1;background:#E0F2FE;border-radius:6px;padding:3px 7px;margin-top:2px;}
+.drv-access{flex-basis:100%;display:flex;align-items:center;gap:4px;font-size:11px;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:3px 7px;margin-top:2px;}
 .acc-row{display:flex;align-items:center;gap:9px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 11px;cursor:pointer;}
 .acc-row.on{border-color:var(--primary);background:var(--primary-soft,#FFF4ED);}
 .acc-code{font-weight:700;font-size:13px;}
@@ -12343,7 +12344,7 @@ body *{visibility:hidden!important;}
 .stage-chip-name{font-size:12px;font-weight:800;color:var(--ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .stage-chip-meta{font-size:11px;color:var(--muted);white-space:nowrap;}
 .admin-route{background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:15px;}
-.ar-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#7C3AED;margin-bottom:10px;}
+.ar-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;}
 
 @media(min-width:980px){
   .desk-only{display:inline-flex!important;}.desk-hide{display:none;}
@@ -12423,17 +12424,17 @@ body *{visibility:hidden!important;}
 .ymx-chip{display:inline-flex;align-items:center;justify-content:center;width:40px;height:26px;border-radius:7px;border:1.5px solid;}
 .ymx-dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
 .worker-shell{min-height:100vh;background:var(--bg);width:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;overflow-x:hidden;}
-.worker-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 18px 12px;background:var(--slate);color:#fff;}
+.worker-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 18px 12px;background:var(--primary);color:#fff;}
 .worker-top > div:first-child{min-width:0;flex:1;padding-top:2px;}
 .worker-top-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;max-width:100%;flex-wrap:wrap;}
 .worker-top .icon-btn{color:#fff;}.worker-top .icon-btn:hover{background:rgba(255,255,255,.14);}
 .worker-action-btn{min-height:38px;border:1px solid #ffffff1a;border-radius:999px;background:#ffffff10;color:#fff;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:800;cursor:pointer;}
 .worker-action-btn:hover{background:#ffffff1c;}
-.worker-preview{background:var(--slate);padding:0 16px 12px;}
+.worker-preview{background:var(--primary);padding:0 16px 12px;}
 .worker-preview .role-preview{margin-top:0;}
 .wk-title{font-family:var(--font-head);font-weight:700;font-size:20px;line-height:1.16;overflow-wrap:anywhere;}
 .wk-sub{color:#94A3B8;font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
-.wk-tabs{display:flex;gap:8px;padding:12px 16px 0;background:var(--slate);}
+.wk-tabs{display:flex;gap:8px;padding:12px 16px 0;background:var(--primary);}
 .wk-tabs button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border:none;border-radius:12px 12px 0 0;background:transparent;color:#94A3B8;font-weight:600;font-size:14px;cursor:pointer;}
 .wk-tabs button.on{background:var(--bg);color:var(--ink);}
 .worker-body{padding:18px 16px 40px;flex:1;}
