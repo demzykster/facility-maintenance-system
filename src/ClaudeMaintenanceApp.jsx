@@ -9430,7 +9430,7 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     {workers.length === 0 && <Empty text="לא נמצאו עובדים" />}
   </div>;
 }
-function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete, canManage }) {
+function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete, onOpenFleet, canManage }) {
   const meta = supMeta(config, name);
   const [tab, setTab] = useState("details");
   const [ind, setInd] = useState(meta.industries || []);
@@ -9487,7 +9487,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
       <SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle>
       {relOrders.length === 0 ? <div className="hint" style={{ marginBottom: 12 }}>אין הזמנות לספק זה.</div> : <div className="task-list" style={{ marginBottom: 12 }}>{relOrders.map((o) => <div key={o.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{countLabel((o.lines || []).length, "פריט", "פריטים")} · {stLbl(o.status)}</div><div className="task-row-sub">{o.note || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(o.createdAt)}</span></div></div>)}</div>}
       <SectionTitle><Truck size={15} /> כלים / ליסינג</SectionTitle>
-      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => <div key={f.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {unitDesc(f, config)}</div><div className="task-row-sub">{unitNote(f, config) || "—"}</div></div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}</div></div>)}</div>}
+      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {unitDesc(f, config)}</div><div className="task-row-sub">{unitNote(f, config) || "—"}</div></div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>)}</div>}
     </div>}
     {tab === "invoices" && <div className="hint" style={{ padding: 18, textAlign: "center" }}>ניהול חשבוניות יתווסף עם מודול התקציב.</div>}
   </div>);
@@ -9495,10 +9495,12 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
 
 function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, canManage }) {
   const [sel, setSel] = useState(null);
+  const [openFleetId, setOpenFleetId] = useState(null);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState("");
   const [err, setErr] = useState("");
   const names = config.suppliers || [];
+  const openFleet = openFleetId ? (fleet || []).find((f) => f.id === openFleetId) : null;
   const renameSup = async (oldN, newN) => {
     newN = (newN || "").trim(); if (!newN || newN === oldN) return;
     setErr("");
@@ -9525,7 +9527,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
     if (!names.includes(n) && await saveConfig({ ...config, suppliers: [...names, n] }) === false) return setErr("הוספת הספק לא נשמרה. נסו שוב.");
     setAdding(""); setSel(n);
   };
-  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} canManage={canManage} /></div>;
+  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} canManage={canManage} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}</div>;
   const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
   return (<div className="supplier-shell">
     <div className="supplier-head">
@@ -11666,6 +11668,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .supplier-tag.muted{background:var(--surface-2);color:var(--muted);border-color:var(--line);}
 .supplier-metrics{margin-top:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:11.5px;font-weight:800;}
 .supplier-metrics span{border-radius:8px;background:rgba(100,116,139,.08);padding:3px 7px;}
+.supplier-linked-row .task-row-side{flex-direction:row;align-items:center;gap:8px;color:var(--muted);}
+.supplier-linked-row:hover .task-row-side{color:var(--primary);}
 
 .empty{text-align:center;padding:46px 20px;color:var(--muted);}.empty.sm{padding:32px;}
 .empty svg{color:var(--line);}
