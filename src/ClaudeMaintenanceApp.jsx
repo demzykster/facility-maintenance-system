@@ -7513,8 +7513,34 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, config, users, pre
     ordRecv.length ? { sev: 0, Icon: Package, text: "הזמנות רכש לקליטה", n: ordRecv.length, go: () => setTab("ppe") } : null,
     dashTrack !== "facility" && pmSoon.length ? { sev: 0, Icon: Truck, text: "תחזוקות מתוכננות קרובות", n: pmSoon.length, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") } : null,
   ].filter(Boolean).sort((a, b) => b.sev - a.sev);
+  const todayLabel = new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
+  const sessionName = session?.name || "Vadim";
+  const myTickets = open.filter((t) => ownsTicket(session, t) || t.assignee === sessionName);
+  const assignedMine = open.filter((t) => t.assignee === sessionName);
+  const todayWork = open.filter((t) => t.dueAt && new Date(t.dueAt).toDateString() === new Date().toDateString());
+  const highOpen = open.filter((t) => prOf(t.priority).id === "high");
+  const latestTickets = sortByImportance(open, config).slice(0, 9);
+  const currentSignals = [
+    { label: "חריגות SLA", n: breach.length, sub: "דורש תגובה", Icon: AlertTriangle, tone: "critical", go: () => flt({ st: "open", focus: { label: "חריגות SLA", overdue: true } }) },
+    { label: "ממתינות לאישורך", n: waitUser.length, sub: "קריאות שלך", Icon: CheckCircle2, tone: "warm", go: () => flt({ st: "pending_user" }, "לאישור מנהל מחלקה") },
+    { label: "עבודות להיום", n: todayWork.length, sub: "לפי SLA / תאריך יעד", Icon: CalendarClock, tone: "blue", go: () => flt({ st: "open", focus: { label: "עבודות להיום" } }) },
+    { label: "משויכות אליך", n: assignedMine.length, sub: "באחריות אישית", Icon: User, tone: "blue", go: () => flt({ st: "open", focus: { label: "משויכות אליך" } }) },
+  ];
+  const systemSignals = [
+    { label: "טיפולים קרובים", n: dashTrack === "facility" ? 0 : pmSoon.length, Icon: CalendarClock, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") },
+    { label: "מסמכים קרובים", n: dashTrack === "facility" ? 0 : expDocs.length, Icon: FileText, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") },
+    { label: "בקשות ביגוד", n: ppeReqPend.length, Icon: Shirt, go: () => setTab("ppe") },
+    { label: "תלונות ניקיון", n: complOpen.length, Icon: Sparkles, go: () => setTab("cleaning") },
+    { label: "משימות באיחור", n: tasksOverdue.length, Icon: ClipboardList, go: () => setTab("tasks") },
+  ];
+  const domainCards = [
+    { title: "ציוד וכלים", value: fleet.length, meta: `${transOpen.length} פתוחים · ${expDocs.length} מסמכים`, Icon: Truck, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") },
+    { title: "קריאות", value: open.length, meta: `${highOpen.length} דחופות · ${waitParts.length} חלקים`, Icon: ListChecks, go: () => setTab("tickets") },
+    { title: "ביגוד", value: (ppeItems || []).length, meta: `${lowPpe.length} חוסרים · ${ppeReqPend.length} בקשות`, Icon: Shirt, go: () => setTab("ppe") },
+    { title: "ניקיון", value: (zones || []).length, meta: `${complOpen.length} דיווחים פתוחים`, Icon: Sparkles, go: () => setTab("cleaning") },
+  ];
   
-  return (<>
+  return (<div className="dash-command">
     {isEmptyDemo && loadDemo && <div className="empty-demo">
       <div className="empty-demo-main">
         <div className="empty-demo-title">המערכת ריקה כרגע</div>
@@ -7529,35 +7555,108 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, config, users, pre
       </div>
       <ConfirmBtn className="btn-danger sm" label={demoBusy === "clear" ? "מוחק…" : "מחק נתוני דמו"} onConfirm={async () => { setDemoBusy("clear"); try { await clearDemo(); } finally { setDemoBusy(""); } }} />
     </div>}
-    <div style={{ marginBottom: 16 }}><SectionTitle><Bell size={15} /> דורש טיפול</SectionTitle>{attn.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>הכל תחת שליטה — אין פריטים שדורשים טיפול דחוף כעת.</div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10, marginTop: 8 }}>{attn.map((a, i) => { const col = a.sev === 2 ? "#DC2626" : a.sev === 1 ? "#D97706" : "#0D9488"; const AIcon = a.Icon; return <button key={i} onClick={a.go} style={{ minHeight: 48, display: "flex", alignItems: "center", gap: 10, textAlign: "start", border: `1px solid ${col}33`, borderRadius: 10, padding: "12px 14px", background: "var(--surface)", cursor: "pointer" }}><AIcon size={18} color={col} /><span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{a.text}</span><span style={{ fontWeight: 800, fontSize: 18, color: col }}>{a.n}</span></button>; })}</div>}</div>
-    
-    <div className="row-between"><div className="seg-tabs s3" style={{ maxWidth: 320, marginBottom: 0 }}><button className={dashTrack === "all" ? "on" : ""} onClick={() => setDashTrack("all")}>הכל</button><button className={dashTrack === "facility" ? "on" : ""} onClick={() => setDashTrack("facility")}>מבנה</button><button className={dashTrack === "transport" ? "on" : ""} onClick={() => setDashTrack("transport")}>שינוע</button></div><button className="btn-ghost sm" onClick={() => setCfgOpen((v) => !v)}><SlidersHorizontal size={15} /> התאמת לוח</button></div>
-    {cfgOpen && <div className="panel" style={{ marginBottom: 12 }}><div className="wtoggles">{WIDGETS.map((x) => <button key={x.id} className={"wtoggle" + (w[x.id] ? " on" : "")} onClick={() => toggle(x.id)}>{w[x.id] ? <Eye size={14} /> : <EyeOff size={14} />} {x.label}</button>)}</div></div>}
-    {attnShown.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש את תשומת לבך{attention.length > attnShown.length ? ` · ${attention.length}` : ""}</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{attnShown.map(({ t, tag, color }) => <button key={t.id + tag} className="attn-row" onClick={() => onOpen(t.id)}><span className="attn-dot" style={{ background: color }} /><span className="attn-main"><span className="attn-subj">#{ticketNo(t)} · {t.subject}</span><span className="attn-meta">{t.asset || catOf(t).label}</span></span><span className="attn-tag" style={{ color, background: color + "1a" }}>{tag}</span></button>)}</div></>}
-    {insights.length > 0 && <><SectionTitle><Sparkles size={15} /> תובנות מערכת</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{insights.map((ins, i) => { const c = ins.sev === "risk" ? "#DC2626" : ins.sev === "warn" ? "#EA580C" : "#4F46E5"; const go = ins.go === "fleet" ? () => setTab("assets") : ins.go === "pm" ? () => setTab("assets") : ins.go === "facility" ? () => flt({ track: "facility" }, "תובנה · אחזקת מבנה") : ins.go === "wait" ? () => flt({ st: "waiting" }, "תובנה · קריאות בהמתנה") : null; const Tag = go ? "button" : "div"; return <Tag key={i} className={"insight-row" + (go ? " clickable" : "")} onClick={go || undefined}><span className="insight-dot" style={{ background: c }} /><span className="insight-text">{ins.text}</span>{go && <ChevronLeft size={15} className="insight-chev" />}</Tag>; })}</div></>}
-    {critEsc.length > 0 && <div className="alert-esc" onClick={() => onOpen(critEsc[0].id)}><AlertTriangle size={18} /> <b>{critEsc.length} השבתות קריטיות</b> ללא טכנאי מעל {config.escalateCriticalHours} שע׳ — נדרש טיפול מיידי</div>}
-    {w.kpis && <><div className="kpi-grid">
-      <button className="kpi-btn" onClick={() => flt({ st: "open" }, "קריאות פתוחות")}><Kpi num={open.length} label="קריאות פתוחות" color="#2563EB" /></button>
-      <button className="kpi-btn" onClick={() => flt({ st: "open", track: "transport" }, "כלי שינוע פתוחים")}><Kpi num={transOpen.length} label="כלי שינוע פתוחים" color="#EA580C" /></button>
-      <button className="kpi-btn" onClick={() => flt({ st: "open", track: "facility" }, "אחזקת מבנה פתוחה")}><Kpi num={facilityOpen.length} label="אחזקת מבנה" color="#0EA5E9" /></button>
-      <button className="kpi-btn" onClick={() => flt({ st: "open", focus: { label: "חריגות SLA", overdue: true } })}><Kpi num={breach.length} label="חריגות SLA" color="#DC2626" /></button>
+
+    <header className="dash-hero">
+      <div>
+        <div className="dash-kicker">{todayLabel}</div>
+        <h1>בוקר טוב, {sessionName}</h1>
+        <p>תמונת מצב תפעולית: מה דורש תגובה עכשיו, מה באחריותך, ומה מתקדם ברקע.</p>
+      </div>
+      <div className="dash-hero-actions">
+        <button className="btn-ghost sm" onClick={() => setCfgOpen((v) => !v)}><SlidersHorizontal size={15} /> התאמה</button>
+        <button className="btn-primary sm" onClick={() => setTab("tickets")}><Plus size={15} /> פתיחת קריאה</button>
+      </div>
+    </header>
+    {cfgOpen && <div className="panel dash-config"><div className="wtoggles">{WIDGETS.map((x) => <button key={x.id} className={"wtoggle" + (w[x.id] ? " on" : "")} onClick={() => toggle(x.id)}>{w[x.id] ? <Eye size={14} /> : <EyeOff size={14} />} {x.label}</button>)}</div></div>}
+
+    <div className="dash-layout">
+      <main className="dash-main">
+        <section className="dash-priority-band">
+          {currentSignals.map((a) => <button key={a.label} className={"dash-signal " + a.tone} onClick={a.go}>
+            <span className="dash-signal-ic"><a.Icon size={17} /></span>
+            <span className="dash-signal-num">{a.n}</span>
+            <span className="dash-signal-copy"><b>{a.label}</b><small>{a.sub}</small></span>
+          </button>)}
+        </section>
+
+        {w.kpis && <section className="dash-system-strip">
+          {systemSignals.map((a) => <button key={a.label} className="dash-mini-signal" onClick={a.go}>
+            <a.Icon size={16} />
+            <span className="dash-mini-num">{a.n}</span>
+            <span>{a.label}</span>
+          </button>)}
+        </section>}
+
+        <section className="dash-message-card">
+          <div className="dash-message-ic"><Bell size={17} /></div>
+          <div>
+            <b>הודעות ועדכונים</b>
+            <span>{attn.length ? `${attn.length} אותות תפעוליים מחכים לבדיקה` : "אין הודעות דחופות כרגע"}</span>
+          </div>
+          <button className="dash-link-btn" onClick={() => attn[0]?.go ? attn[0].go() : setTab("tickets")}>פתיחה <ChevronLeft size={14} /></button>
+        </section>
+
+        {attnShown.length > 0 && <section>
+          <div className="dash-section-head"><h2>דורש את תשומת לבך</h2><span>{attention.length > attnShown.length ? `${attention.length} פריטים` : countLabel(attnShown.length, "פריט", "פריטים")}</span></div>
+          <div className="dash-attention-grid">{attnShown.slice(0, 6).map(({ t, tag, color }) => <button key={t.id + tag} className="dash-ticket-card alert" onClick={() => onOpen(t.id)}>
+            <span className="dash-ticket-icon"><Wrench size={15} /></span>
+            <span className="dash-ticket-main"><b>{ticketNo(t)} · {t.subject}</b><small>{t.asset || catOf(t).label} · {fmtDate(t.createdAt)}</small></span>
+            <span className="dash-ticket-dot" style={{ background: color }} />
+            <span className="dash-ticket-tag" style={{ color, background: color + "1a" }}>{tag}</span>
+          </button>)}</div>
+        </section>}
+
+        {latestTickets.length > 0 && <section>
+          <div className="dash-section-head"><h2>קריאות אחרונות</h2><button onClick={() => setTab("tickets")}>מעבר לכל הקריאות <ChevronLeft size={14} /></button></div>
+          <div className="dash-ticket-grid">{latestTickets.map((t) => { const overdue = ticketMissedSla(t, config); const tone = overdue ? "#DC2626" : prOf(t.priority).id === "high" ? "#B45309" : "#1F4E8C"; return <button key={t.id} className="dash-ticket-card" onClick={() => onOpen(t.id)}>
+            <span className="dash-ticket-icon"><PenLine size={15} /></span>
+            <span className="dash-ticket-main"><b>{ticketNo(t)} · {t.subject}</b><small>{prOf(t.priority).label} · {fmtDate(t.createdAt)}</small></span>
+            <span className="dash-ticket-dot" style={{ background: tone }} />
+          </button>; })}</div>
+        </section>}
+
+        <section className="dash-quick-create">
+          <div>
+            <b>פתיחה מהירה</b>
+            <span>התחילו מקריאה קצרה, ואז השלימו פרטים במסך הקריאות.</span>
+          </div>
+          <button className="btn-primary sm" onClick={() => setTab("tickets")}><Plus size={15} /> יצירת קריאה</button>
+        </section>
+
+        <section className="dash-domain-grid">
+          {domainCards.map((d) => <button key={d.title} className="dash-domain-card" onClick={d.go}>
+            <div className="dash-domain-top"><d.Icon size={18} /><span>{d.title}</span></div>
+            <div className="dash-domain-value">{d.value}</div>
+            <div className="dash-domain-meta">{d.meta}</div>
+            <ChevronLeft size={15} />
+          </button>)}
+        </section>
+      </main>
+
+      <aside className="dash-rail">
+        <div className="seg-tabs s3 dash-track-tabs"><button className={dashTrack === "all" ? "on" : ""} onClick={() => setDashTrack("all")}>הכל</button><button className={dashTrack === "facility" ? "on" : ""} onClick={() => setDashTrack("facility")}>מבנה</button><button className={dashTrack === "transport" ? "on" : ""} onClick={() => setDashTrack("transport")}>שינוע</button></div>
+        <section className="dash-rail-card">
+          <h3>האחריות שלי</h3>
+          <button className="dash-rail-row" onClick={() => flt({ st: "open", focus: { label: "הקריאות שלי" } })}><span>קריאות שלי</span><b>{myTickets.length}</b></button>
+          <button className="dash-rail-row" onClick={() => flt({ st: "pending_user" }, "ממתינות לאישור")}><span>ממתינות לאישור</span><b>{waitUser.length}</b></button>
+          <button className="dash-rail-row" onClick={() => flt({ st: "pending_admin" }, "לסגירה")}><span>לסגירה ניהולית</span><b>{waitAdmin.length}</b></button>
+        </section>
+        <section className="dash-rail-card">
+          <h3>המערכות שלי</h3>
+          <button className="dash-rail-row" onClick={() => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets")}><span>כלי שינוע עם מסמכים</span><b>{expDocs.length}</b></button>
+          <button className="dash-rail-row" onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span>טיפולים קרובים</span><b>{pmSoon.length}</b></button>
+        </section>
+        {insights.length > 0 && <section className="dash-rail-card">
+          <h3>תובנות</h3>
+          <div className="dash-insight-list">{insights.slice(0, 3).map((ins, i) => { const c = ins.sev === "risk" ? "#DC2626" : ins.sev === "warn" ? "#B45309" : "#1F4E8C"; const go = ins.go === "fleet" ? () => setTab("assets") : ins.go === "pm" ? () => setTab("assets") : ins.go === "facility" ? () => flt({ track: "facility" }, "תובנה · אחזקת מבנה") : ins.go === "wait" ? () => flt({ st: "waiting" }, "תובנה · קריאות בהמתנה") : null; const Tag = go ? "button" : "div"; return <Tag key={i} className="dash-insight" onClick={go || undefined}><span style={{ background: c }} /><b>{ins.text}</b></Tag>; })}</div>
+        </section>}
+        {lifecycleBottlenecks.length > 0 && <section className="dash-rail-card">
+          <h3>צווארי בקבוק</h3>
+          {lifecycleBottlenecks.slice(0, 4).map((s) => <button key={s.key} className="dash-rail-row" onClick={() => flt({ st: "open", focus: { label: `שלב · ${s.label}`, lifecycleKey: s.key } })}><span>{s.label}</span><b>{s.n}</b></button>)}
+        </section>}
+      </aside>
     </div>
-    <div className="queue-row">
-      <button className="queue-chip" onClick={() => flt({ st: "open", pr: "high" }, "קריאות דחופות")}><span className="q-num" style={{ color: "#7C3AED" }}>{open.filter((t) => prOf(t.priority).id === "high").length}</span><span className="q-lbl">דחופות</span></button>
-      <button className="queue-chip" onClick={() => flt({ st: "open", focus: { lifecycleKey: "waiting:parts", label: "עיכוב חלקים" } })}><span className="q-num" style={{ color: "#7C3AED" }}>{waitParts.length}</span><span className="q-lbl">עיכוב חלקים</span></button>
-      <button className="queue-chip" onClick={() => flt({ st: "pending_user" }, "לאישור מנהל מחלקה")}><span className="q-num" style={{ color: "#0D9488" }}>{waitUser.length}</span><span className="q-lbl">לאישור מנהל מחלקה</span></button>
-      <button className="queue-chip" onClick={() => flt({ st: "pending_admin" }, "לסגירה על ידך")}><span className="q-num" style={{ color: "#4F46E5" }}>{waitAdmin.length}</span><span className="q-lbl">לסגירה על ידך</span></button>
-    </div>
-    {lifecycleBottlenecks.length > 0 && <div className="stage-watch"><div className="stage-watch-title"><Clock size={14} /> שלבים שדורשים מעקב</div><div className="stage-watch-grid">{lifecycleBottlenecks.map((s) => <button key={s.key} className="stage-chip" onClick={() => flt({ st: "open", focus: { label: `שלב · ${s.label}`, lifecycleKey: s.key } })}><span className="stage-chip-name">{s.label}</span><span className="stage-chip-meta">{lifecycleOwnerLabel(s.owner)} · {countLabel(s.n, "קריאה", "קריאות")}{s.ms ? ` · ${fmtDur(s.ms)}` : ""}{s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}</span></button>)}</div></div>}
-    </>}
-    {w.docs && dashTrack !== "facility" && <><SectionTitle><FileText size={15} /> מסמכי כלי שינוע פגי-תוקף (30 ימים){expDocs.length ? ` · ${expDocs.length}` : ""}</SectionTitle>
-      {expDocs.length === 0 ? <div className="note">אין כלי שינוע שעומדים לפוג להם מסמכים או רישיונות ב-30 הימים הקרובים. הכול בתוקף ✓</div>
-        : <div className="cards">{expDocs.map(({ f, s }) => <button key={f.id} type="button" className="doc-line doc-line-click" onClick={() => onAsset ? onAsset({ tab: "fleet", fleetId: f.id }) : setTab("assets")}><span className="dot-lg" style={{ background: s.color }} /><div className="doc-line-main"><div className="doc-line-t">{unitLabel(f, config)}</div><div className="doc-line-s" style={{ color: s.color }}>{s.which}: {s.label}</div></div><span className="doc-line-action" aria-hidden="true"><PenLine size={15} /></span></button>)}</div>}</>}
-    {w.pm && dashTrack !== "facility" && pmSoon.length > 0 && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים קרובים</SectionTitle><div className="pm-mini">{pmSoon.slice(0, 5).map((x) => { const d = daysLeft(x.nextDue); const f = fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId); return <div key={x.id} className="pm-mini-item" style={{ cursor: "pointer" }} onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span className="dot-lg" style={{ background: pmColor(d) }} /><span className="pm-mini-t">{f ? `${unitLabel(f, config)}` : "כלי"}</span><span className="pm-mini-d" style={{ color: pmColor(d) }}>{d < 0 ? "באיחור" : d === 0 ? "היום" : `בעוד ${d} י׳`}</span></div>; })}</div></>}
-    {w.presence && <><SectionTitle><HardHat size={15} /> נוכחות טכנאים</SectionTitle><div className="panel">{(users || []).filter((u) => u.role === "tech" && u.active !== false).length === 0 ? <div className="note" style={{ margin: 0 }}>אין טכנאים מוגדרים.</div> : (users || []).filter((u) => u.role === "tech" && u.active !== false).map((u) => { const pr = presenceOf(presence, u.id); return <div key={u.id} className="presence-row"><span className={"presence-dot" + (isPresenceOnline(pr) ? " on" : "")} /><span className="presence-name">{u.name}{u.supplier ? <span className="presence-sup"> · {u.supplier}</span> : ""}</span><span className="presence-stat">{shiftPresenceStatusText(pr)}</span></div>; })}</div></>}
-    {w.costs && <><SectionTitle><DollarSign size={15} /> עלויות 30 ימים אחרונים</SectionTitle><div className="panel"><div className="big-stat">{ils(monthCost)}</div></div></>}
-    <div style={{ height: 8 }} />
-  </>);
+  </div>);
 }
 
 /* ---------- Admin tickets ---------- */
@@ -10793,11 +10892,11 @@ function ConfirmBtn({ onConfirm, label, className = "btn-danger full", style, ic
 function Style() {
   return (<style>{`
 :root{--font-body:'Assistant','Rubik',system-ui,'Segoe UI',Arial,sans-serif;--font-head:'Rubik','Assistant',system-ui,sans-serif;
---bg:#FFFFFF;--surface:#FFFFFF;--surface-2:#F7F8FA;--pearl:#E6E7E9;--ink:#2E3138;--muted:#6F7680;--line:#C9CDD1;--border:var(--line);--input:#FFFFFF;
+--bg:#FFFFFF;--surface:#FFFFFF;--surface-2:#F7F8FA;--pearl:#E6E7E9;--warm-surface:#F4EBDD;--warm-line:#E7D8C1;--warning-surface:#FFF8E8;--critical-surface:#FFF1F0;--critical-line:#F5B8B2;--ink:#2E3138;--muted:#6F7680;--line:#C9CDD1;--border:var(--line);--input:#FFFFFF;
 --primary:#1F4E8C;--primary-d:#3E6DB0;--primary-soft:#E6E7E9;--orange:var(--primary);--accent:#E9DFC9;--slate:#2E3138;--side:#FFFFFF;--side-ink:#6F7680;
 --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);--ease-drawer:cubic-bezier(0.32,0.72,0,1);
 --press:scale(.975);--lift-shadow:0 10px 26px rgba(46,49,56,.10);--control-shadow:0 1px 2px rgba(46,49,56,.04),0 0 0 1px rgba(46,49,56,.025);--surface-glow:linear-gradient(180deg,rgba(255,255,255,.95),rgba(247,248,250,.78));}
-.app-dark{--bg:#111418;--surface:#1B2027;--surface-2:#15191F;--pearl:#252B33;--ink:#EEF2F7;--muted:#A4A9B0;--line:#343B45;--border:var(--line);--input:#20262E;--orange:var(--primary);--slate:#10141A;--side:#15191F;--side-ink:#A4A9B0;--control-shadow:0 0 0 1px rgba(255,255,255,.05);--surface-glow:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));}
+.app-dark{--bg:#111418;--surface:#1B2027;--surface-2:#15191F;--pearl:#252B33;--warm-surface:#27231D;--warm-line:#474033;--warning-surface:#2B2416;--critical-surface:#2A1717;--critical-line:#743535;--ink:#EEF2F7;--muted:#A4A9B0;--line:#343B45;--border:var(--line);--input:#20262E;--orange:var(--primary);--slate:#10141A;--side:#15191F;--side-ink:#A4A9B0;--control-shadow:0 0 0 1px rgba(255,255,255,.05);--surface-glow:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{scrollbar-gutter:stable;}
 body{margin:0;overflow-x:hidden;}
@@ -10934,7 +11033,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .content{flex:1;padding:16px;max-width:640px;margin:0 auto;width:100%;}
 .content.with-nav{padding-bottom:88px;}
 .row-between{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.banner{display:flex;align-items:center;gap:8px;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;margin-bottom:12px;}
+.banner{display:flex;align-items:center;gap:8px;background:var(--warning-surface);color:#7C4A03;border:1px solid var(--warm-line);border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;margin-bottom:12px;}
 
 .topbar{background:rgba(255,255,255,.94);color:var(--ink);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:20;box-shadow:0 1px 0 var(--line),0 10px 24px rgba(46,49,56,.08);backdrop-filter:saturate(160%) blur(14px);flex-wrap:wrap;}
 .tb-left{display:flex;align-items:center;gap:12px;min-width:0;}
@@ -11017,6 +11116,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .settings-wrap{max-width:600px;}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;}
 .note{font-size:12.5px;color:var(--muted);line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:13px;margin-top:10px;}
+.note.warm,.panel.warm{background:var(--warm-surface);border-color:var(--warm-line);}
+.note.critical,.panel.critical{background:var(--critical-surface);border-color:var(--critical-line);color:#7F1D1D;}
 .row-stats{display:flex;gap:20px;}.rs-num{font-family:var(--font-head);font-weight:700;font-size:22px;}.rs-lbl{font-size:12px;color:var(--muted);margin-top:3px;}
 .seg-tabs{display:flex;gap:6px;margin-bottom:14px;background:rgba(148,163,184,.13);padding:5px;border:1px solid rgba(148,163,184,.2);border-radius:14px;box-shadow:inset 0 1px 2px rgba(15,23,42,.04);}
 .seg-tabs button{flex:1;min-width:44px;min-height:44px;padding:10px 12px;border-radius:10px;font-weight:650;font-size:13.5px;color:var(--muted);position:relative;}
@@ -11725,6 +11826,75 @@ body *{visibility:hidden!important;}
 .ai-input input{flex:1;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;outline:none;background:var(--input);}
 .ai-input .btn-primary{background:#6366F1;padding:0 16px;}
 
+.dash-command{--dash-cream:#FBF7EF;--dash-warm:#F4EBDD;--dash-critical:#FFF1F0;--dash-critical-border:#F5B8B2;--dash-warning:#FFF8E8;display:flex;flex-direction:column;gap:18px;}
+.dash-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:10px 0 8px;}
+.dash-kicker{font-size:13px;color:var(--muted);font-weight:650;margin-bottom:8px;text-transform:none;}
+.dash-hero h1{font-family:var(--font-head);font-size:30px;line-height:1.08;margin:0;color:var(--ink);font-weight:750;letter-spacing:0;text-wrap:balance;}
+.dash-hero p{margin:8px 0 0;color:var(--muted);font-size:14px;line-height:1.55;max-width:620px;text-wrap:pretty;}
+.dash-hero-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+.dash-config{background:var(--dash-cream);}
+.dash-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start;}
+.dash-main{display:flex;flex-direction:column;gap:18px;min-width:0;}
+.dash-rail{display:flex;flex-direction:column;gap:12px;min-width:0;position:sticky;top:18px;}
+.dash-priority-band{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--dash-warm);border:1px solid #E7D8C1;border-radius:18px;overflow:hidden;box-shadow:var(--control-shadow);}
+.dash-signal{min-height:104px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;align-content:center;gap:7px 12px;padding:18px 20px;text-align:start;border-inline-start:1px solid rgba(201,205,209,.55);color:var(--ink);}
+.dash-signal:first-child{border-inline-start:none;}
+.dash-signal:hover{background:rgba(255,255,255,.34);}
+.dash-signal-ic{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.62);color:var(--primary);display:flex;align-items:center;justify-content:center;grid-row:1 / span 2;box-shadow:inset 0 0 0 1px rgba(46,49,56,.06);}
+.dash-signal-num{font-family:var(--font-head);font-size:28px;font-weight:760;line-height:1;font-variant-numeric:tabular-nums;}
+.dash-signal-copy{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.dash-signal-copy b{font-size:13.5px;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-signal-copy small{font-size:12px;color:var(--muted);line-height:1.25;}
+.dash-signal.critical{background:var(--dash-critical);color:#7F1D1D;}
+.dash-signal.critical .dash-signal-ic{color:#DC2626;background:#fff7f7;}
+.dash-signal.warm .dash-signal-ic{color:#B45309;}
+.dash-signal.blue .dash-signal-ic{color:var(--primary);}
+.dash-system-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--control-shadow);}
+.dash-mini-signal{min-height:82px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;padding:14px 16px;text-align:start;border-inline-start:1px solid var(--line);color:var(--muted);}
+.dash-mini-signal:first-child{border-inline-start:none;}
+.dash-mini-signal:hover{background:var(--surface-2);color:var(--primary);}
+.dash-mini-num{font-family:var(--font-head);font-size:22px;font-weight:730;color:var(--ink);font-variant-numeric:tabular-nums;}
+.dash-message-card,.dash-quick-create{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--dash-cream);border:1px solid #E7D8C1;border-radius:16px;padding:14px 16px;box-shadow:var(--control-shadow);}
+.dash-message-ic{width:42px;height:42px;border-radius:12px;background:#fff;color:var(--primary);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(46,49,56,.06);}
+.dash-message-card>div:nth-child(2),.dash-quick-create>div{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1;}
+.dash-message-card b,.dash-quick-create b{font-size:14px;font-weight:730;color:var(--ink);}
+.dash-message-card span,.dash-quick-create span{font-size:12.5px;color:var(--muted);line-height:1.35;}
+.dash-link-btn{min-height:44px;display:inline-flex;align-items:center;gap:5px;border-radius:999px;color:var(--primary);font-size:12.5px;font-weight:720;padding:0 12px;}
+.dash-link-btn:hover{background:#fff;}
+.dash-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;}
+.dash-section-head h2{font-family:var(--font-head);font-size:16px;font-weight:740;margin:0;color:var(--ink);}
+.dash-section-head span{font-size:12px;color:var(--muted);font-weight:650;}
+.dash-section-head button{display:inline-flex;align-items:center;gap:5px;color:var(--primary);font-size:12.5px;font-weight:700;}
+.dash-ticket-grid,.dash-attention-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.dash-ticket-card{position:relative;min-height:70px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;color:var(--ink);box-shadow:var(--control-shadow);}
+.dash-ticket-card.alert{background:#fff;border-color:#E7D8C1;}
+.dash-ticket-card:hover{border-color:var(--primary);box-shadow:var(--lift-shadow);transform:translateY(-1px);}
+.dash-ticket-icon{width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--muted);display:flex;align-items:center;justify-content:center;}
+.dash-ticket-main{min-width:0;display:flex;flex-direction:column;gap:4px;}
+.dash-ticket-main b{font-size:13px;font-weight:680;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-ticket-main small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-ticket-dot{width:8px;height:8px;border-radius:50%;align-self:start;margin-top:6px;box-shadow:0 0 0 3px rgba(201,205,209,.25);}
+.dash-ticket-tag{position:absolute;inset-inline-start:12px;bottom:8px;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:750;max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-domain-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.dash-domain-card{position:relative;min-height:150px;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;color:var(--ink);box-shadow:var(--control-shadow);overflow:hidden;}
+.dash-domain-card:hover{border-color:var(--primary);box-shadow:var(--lift-shadow);transform:translateY(-1px);}
+.dash-domain-top{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;font-weight:700;}
+.dash-domain-value{font-family:var(--font-head);font-size:30px;font-weight:760;margin-top:18px;font-variant-numeric:tabular-nums;}
+.dash-domain-meta{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4;}
+.dash-domain-card>svg{position:absolute;inset-inline-start:14px;bottom:14px;color:var(--primary);}
+.dash-rail-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--control-shadow);}
+.dash-rail-card h3{font-family:var(--font-head);font-size:14px;font-weight:740;margin:0 0 10px;color:var(--ink);}
+.dash-rail-row{width:100%;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:start;border-radius:11px;padding:10px 10px;color:var(--ink);}
+.dash-rail-row:hover{background:var(--surface-2);}
+.dash-rail-row span{font-size:12.5px;color:var(--muted);font-weight:650;}
+.dash-rail-row b{font-size:16px;font-weight:760;color:var(--primary);font-variant-numeric:tabular-nums;}
+.dash-track-tabs{margin:0;}
+.dash-insight-list{display:flex;flex-direction:column;gap:8px;}
+.dash-insight{display:flex;align-items:flex-start;gap:9px;text-align:start;width:100%;border-radius:10px;padding:8px 4px;color:var(--ink);}
+.dash-insight:hover{background:var(--surface-2);}
+.dash-insight span{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;}
+.dash-insight b{font-size:12.5px;font-weight:650;line-height:1.35;}
+.dash-quick-create{background:#fff;border-color:#E7D8C1;}
 .alert-esc{display:flex;align-items:center;gap:9px;background:#FEF2F2;color:#B91C1C;border:1.5px solid #FCA5A5;border-radius:12px;padding:13px 15px;font-size:13.5px;margin-bottom:12px;cursor:pointer;font-weight:500;}
 .alert-esc b{font-weight:700;}
 .app-dark .alert-esc{background:#2a1212;border-color:#7f1d1d;color:#fca5a5;}
@@ -11750,6 +11920,29 @@ body *{visibility:hidden!important;}
 .cal-daynum{font-size:12px;font-weight:600;color:var(--muted);}
 .cal-pill{font-size:11px;font-weight:600;border-radius:7px;padding:3px 6px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cal-more{font-size:10.5px;color:var(--muted);font-weight:600;}
+
+@media(max-width:1180px){
+  .dash-layout{grid-template-columns:1fr;}
+  .dash-rail{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+  .dash-track-tabs{grid-column:1 / -1;}
+  .dash-ticket-grid,.dash-attention-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .dash-domain-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:760px){
+  .dash-command{gap:14px;}
+  .dash-hero{flex-direction:column;padding-top:4px;}
+  .dash-hero h1{font-size:25px;}
+  .dash-hero-actions{width:100%;justify-content:stretch;}
+  .dash-hero-actions .btn-primary,.dash-hero-actions .btn-ghost{flex:1;}
+  .dash-priority-band,.dash-system-strip{grid-template-columns:1fr 1fr;border-radius:15px;}
+  .dash-signal,.dash-mini-signal{border-inline-start:0;border-top:1px solid rgba(201,205,209,.62);}
+  .dash-signal:nth-child(-n+2),.dash-mini-signal:nth-child(-n+2){border-top:0;}
+  .dash-signal{min-height:94px;padding:15px;}
+  .dash-message-card,.dash-quick-create{align-items:flex-start;flex-direction:column;}
+  .dash-link-btn{align-self:flex-start;}
+  .dash-ticket-grid,.dash-attention-grid,.dash-domain-grid,.dash-rail{grid-template-columns:1fr;}
+  .dash-ticket-tag{position:static;justify-self:start;grid-column:2 / -1;max-width:100%;}
+}
 
 @media(max-width:760px){
   .pm-topbar{flex-direction:column;align-items:stretch;}
