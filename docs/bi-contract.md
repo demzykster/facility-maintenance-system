@@ -261,3 +261,4 @@ The first implementation PRs should cover:
 - `admin` and `executive` receive `company` BI scope.
 - `user` receives `department` BI scope only; missing departments produce empty operational slices, not company-wide fallback.
 - `tech`, `worker`, and `cleaner` are outside the first BI rollout.
+- `biDepartmentRiskRows()` owns the first department-risk summary seam for BI. It must stay scope-fed and should not fetch or expose data outside the already computed BI scope.

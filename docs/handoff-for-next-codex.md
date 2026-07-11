@@ -1,13 +1,13 @@
 # Handoff For Next Codex
 
-Updated: 2026-07-11
+Updated: 2026-07-12
 
 ## Startup Checklist
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean.
-- Latest app/UI commit before this handoff: `5d0a7c2 Add financial drilldown to BI`.
+- Latest app/UI commit before this handoff: `bf7fec9 Add BI department risk drilldowns`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,6 +56,11 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `bf7fec9 Add BI department risk drilldowns`
+  - Added a compact BI `אזורי סיכון` / department-risk panel.
+  - Risk rows summarize open tickets, SLA breaches, critical downtime, overdue PM, cleaning issues, and PPE requests by department.
+  - Rows route through existing modules: department ticket drill-downs go to the ticket list, while PM/cleaning/PPE-only rows go to their existing module flows.
+  - Added `biDepartmentRiskRows()` coverage in `tests/biScopeModel.test.js`.
 - `5d0a7c2 Add financial drilldown to BI`
   - Expanded the BI finance panel for `admin`/`executive`.
   - Shows 30-day closure count, average closure cost, supplier count, and top supplier costs with ticket drill-down.
