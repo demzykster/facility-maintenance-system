@@ -7356,8 +7356,11 @@ function PpeHub(p) {
 function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, onOpenTicket, onGoTickets, onGoAssets }) {
   const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, users, ppe }), [session, tickets, fleet, pm, zones, users, ppe]);
   const openTickets = scope.tickets.filter(isOpen);
+  const isTransportTicket = (ticket) => ticket.track === "transport" || (!ticket.track && ticket.forkliftId);
+  const facilityOpen = openTickets.filter((ticket) => !isTransportTicket(ticket));
+  const transportOpen = openTickets.filter(isTransportTicket);
   const slaBreaches = openTickets.filter(isOverdue);
-  const critical = openTickets.filter((ticket) => ticket.track === "transport" && ticket.downtimeType === "critical");
+  const critical = transportOpen.filter((ticket) => ticket.downtimeType === "critical");
   const waiting = openTickets.filter((ticket) => ticket.status === "waiting" || ticket.status === "pending_user" || ticket.status === "pending_admin");
   const pmOverdue = scope.pm.filter((task) => task.active !== false && daysLeft(task.nextDue) < 0);
   const expiringDocs = scope.fleet.map((unit) => ({ unit, status: docStatus(unit, config) })).filter((row) => row.status.d != null && row.status.d <= 30).sort((a, b) => a.status.d - b.status.d);
@@ -7384,7 +7387,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, on
     <div className="kpi-grid bi-kpis">
       <Kpi num={openTickets.length} label="קריאות פתוחות" color="var(--primary)" small />
       <Kpi num={slaBreaches.length} label="חריגות SLA" color={slaBreaches.length ? "#B91C1C" : "#64748B"} small />
-      <Kpi num={critical.length} label="השבתות קריטיות" color={critical.length ? "#C2410C" : "#64748B"} small />
+      <Kpi num={critical.length} label="השבתות שינוע" color={critical.length ? "#C2410C" : "#64748B"} small />
       <Kpi num={pmOverdue.length} label="טיפולים באיחור" color={pmOverdue.length ? "#B45309" : "#64748B"} small />
       {scope.canViewFinancialBI && <Kpi num={ils(monthCost)} label="עלות 30 ימים" color="#0D9488" small />}
     </div>
@@ -7401,6 +7404,8 @@ function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, on
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>סיבות עומס</b><span>מה מסביר את מצב הקריאות</span></div></div>
+        <Bar label="קריאות מבנה פתוחות" value={facilityOpen.length} max={Math.max(openTickets.length, 1)} color="var(--primary)" onClick={() => onGoTickets?.({ st: "open", track: "facility", focus: { label: "BI · קריאות מבנה פתוחות" } })} />
+        <Bar label="קריאות שינוע פתוחות" value={transportOpen.length} max={Math.max(openTickets.length, 1)} color="var(--primary)" onClick={() => onGoTickets?.({ st: "open", track: "transport", focus: { label: "BI · קריאות שינוע פתוחות" } })} />
         <Bar label="ממתין לגורם או אישור" value={waiting.length} max={Math.max(openTickets.length, 1)} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · ממתין לגורם או אישור", statuses: ["waiting", "pending_user", "pending_admin"] } })} />
         <Bar label="חריגות SLA" value={slaBreaches.length} max={Math.max(openTickets.length, 1)} color="#B91C1C" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · חריגות SLA", overdue: true } })} />
         <Bar label="השבתה קריטית" value={critical.length} max={Math.max(openTickets.length, 1)} color="#C2410C" onClick={() => onGoTickets?.({ st: "open", track: "transport", focus: { label: "BI · השבתה קריטית", activeCriticalTransport: true } })} />
