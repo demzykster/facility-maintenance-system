@@ -7378,6 +7378,25 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
   const monthCost = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000).reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0) : 0;
+  const lifecycleOptions = {
+    now: Date.now(),
+    isOpen,
+    statusLabel: (id) => stOf(id).label,
+    waitReasonLabel: (id) => waitReasonLabel(id, config),
+    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id)
+  };
+  const lifecycleStageRows = openTickets.flatMap((ticket) => normalizedTicketLifecycleStages(ticket, lifecycleOptions)).filter((stage) => stage.current || stage.kind === "rework");
+  const lifecycleStageMap = {};
+  lifecycleStageRows.forEach((stage) => {
+    const row = lifecycleStageMap[stage.key] || { ...stage, n: 0, ms: 0 };
+    row.n += 1;
+    row.ms += stage.ms || 0;
+    lifecycleStageMap[stage.key] = row;
+  });
+  const lifecycleBottlenecks = Object.values(lifecycleStageMap).sort((a, b) => b.n - a.n || b.ms - a.ms).slice(0, 4);
+  const waitReasonRows = ticketLifecycleWaitReasonStats(openTickets, lifecycleOptions).slice(0, 4);
+  const maxLifecycleN = Math.max(1, ...lifecycleBottlenecks.map((row) => row.n));
+  const maxWaitReasonN = Math.max(1, ...waitReasonRows.map((row) => row.n));
   const unownedTickets = openTickets.filter((ticket) => needsHandler(ticket, scope.users, scope.fleet));
   const ticketDomain = (ticket) => isTransportTicket(ticket) ? "שינוע" : "מבנה";
   const ticketCause = (ticket, fallback) => ticketWaitReasonLabel(ticket, config) || ballHolder(ticket)?.label || fallback || stOf(ticket.status).label;
@@ -7455,6 +7474,15 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         <Bar label="ממתין לגורם או אישור" value={waiting.length} max={Math.max(openTickets.length, 1)} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · ממתין לגורם או אישור", statuses: ["waiting", "pending_user", "pending_admin"] } })} />
         <Bar label="חריגות SLA" value={slaBreaches.length} max={Math.max(openTickets.length, 1)} color="#B91C1C" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · חריגות SLA", overdue: true } })} />
         <Bar label="השבתה קריטית" value={critical.length} max={Math.max(openTickets.length, 1)} color="#C2410C" onClick={() => onGoTickets?.({ st: "open", track: "transport", focus: { label: "BI · השבתה קריטית", activeCriticalTransport: true } })} />
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>למה זה תקוע</b><span>צווארי בקבוק וסיבות המתנה מתוך הקריאות הפתוחות</span></div></div>
+        {lifecycleBottlenecks.length > 0 && <div className="bi-subtitle">שלבים פעילים</div>}
+        {lifecycleBottlenecks.length ? lifecycleBottlenecks.map((stage) => <Bar key={stage.key} label={stage.label} value={stage.n} max={maxLifecycleN} suffix={stage.ms ? ` · ${fmtDur(stage.ms)} · ${lifecycleOwnerLabel(stage.owner)}` : ` · ${lifecycleOwnerLabel(stage.owner)}`} color={stage.kind === "waiting" ? "#B45309" : stage.kind === "rework" ? "#B91C1C" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · שלב · ${stage.label}`, lifecycleKey: stage.key } })} />) : <div className="note">אין כרגע צווארי בקבוק פתוחים.</div>}
+        {waitReasonRows.length > 0 && <div className="bi-subdivider" />}
+        {waitReasonRows.length > 0 && <div className="bi-subtitle">סיבות המתנה</div>}
+        {waitReasonRows.map((row) => <Bar key={row.reason} label={row.label} value={row.n} max={maxWaitReasonN} suffix={row.ms ? ` · ${fmtDur(row.ms)}` : ""} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · סיבת המתנה · ${row.label}`, lifecycleKey: `waiting:${row.reason}` } })} />)}
       </section>
 
       <section className="panel bi-panel">
@@ -11461,6 +11489,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-mini-stats b{display:block;font-family:var(--font-head);font-size:19px;font-weight:650;color:var(--primary);}
 .bi-mini-stats small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
 .bi-doc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:9px;margin-top:9px;}
+.bi-subtitle{margin:2px 0 6px;color:var(--muted);font-size:11.5px;font-weight:650;}
+.bi-subdivider{height:1px;background:var(--line);margin:10px 0;}
 .bi-panel .big-stat{font-weight:650;}
 .ppe-dash-flow{display:flex;flex-direction:column;gap:22px;}
 .ppe-dash-section{min-width:0;}
