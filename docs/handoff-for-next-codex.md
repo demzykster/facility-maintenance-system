@@ -7,7 +7,7 @@ Updated: 2026-07-11
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean.
-- Latest app/UI commit before this handoff: `0832e63 Soften ticket status palette`.
+- Latest app/UI commit before this handoff: `c490f9d Keep admin command BI separate`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,6 +56,26 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `c490f9d Keep admin command BI separate`
+  - Kept the admin-only BI command center separate from the `executive` leadership BI view.
+  - Added `executive` to admin role preview so leadership BI can be checked visually.
+- `88708b3 Add admin command queue to BI`
+  - Added the first admin command-center queue inside BI.
+  - Surfaces urgent items from tickets, SLA, critical transport downtime, cleaning, PPE, PM, and fleet documents.
+- `1ac382c Add PPE summary to BI`
+  - Added PPE request, low-stock, and open-order summary into BI.
+- `3a4bc14 Add cleaning summary to BI`
+  - Added cleaning zones, open reports, missed rounds, and recent cleaning issue signals into BI.
+- `d2cb8b8 Show facility tickets in BI drilldowns`
+  - Ensured BI drill-downs include facility/building tickets, not only transport.
+- `3defbc0 Add BI ticket drilldowns`
+  - Added BI navigation into filtered ticket lists and ticket details.
+- `06c92d9 Soften BI typography`
+  - Reduced overly heavy typography in the new BI shell.
+- `a4ba542 Add BI shell`
+  - Added the first unified BI shell.
+- `f999e67 Add BI scope model`
+  - Added the first `biScopeForSession` data scope model and tests.
 - `0832e63 Soften ticket status palette`
   - Replaced bright status-token colors with calmer brand-compatible tones.
   - Routed ticket-card SLA/risk/status/downtime badges through the muted token palette.
@@ -97,6 +117,7 @@ Shared models / tests recently touched:
 
 Important docs to read before broad decisions:
 
+- `docs/bi-contract.md`
 - `docs/active-work.md`
 - `docs/current-status.md`
 - `docs/release-checklist.md`
@@ -127,6 +148,8 @@ Current visual direction:
 
 Screens already touched in this design pass:
 
+- BI shell / first unified leadership view;
+- admin BI command-center queue;
 - dashboard;
 - mobile dashboard;
 - ticket cards;
@@ -209,18 +232,26 @@ For docs-only changes:
 
 ## Recommended Next Steps
 
-1. Let Vercel finish deploying `0832e63`, then visually check the live ticket cards.
-2. Continue the same design-system polish on remaining old-looking screens:
+1. Continue the BI consolidation carefully:
+   - keep admin command center operational;
+   - keep `executive` BI calmer and leadership-oriented;
+   - keep department BI strictly scoped before expanding the screen.
+2. Move useful Analytics concepts into BI without duplicating everything:
+   - SLA and lifecycle bottlenecks;
+   - downtime causes and time by status;
+   - repeated problems;
+   - supplier/cost views only where finance is allowed.
+3. Continue the same design-system polish on remaining old-looking screens:
    - settings first;
    - cleaning;
    - analytics;
    - PPE;
    - suppliers/fleet details.
-3. Revisit notifications UI as an integrated side drawer, not as a centered modal.
-4. Do a small manifest/PWA icon cache check if the old iPhone app icon still appears after deploy.
-5. When UI dust settles, run a broader smoke:
+4. Revisit notifications UI as an integrated side drawer, not as a centered modal.
+5. Do a small manifest/PWA icon cache check if the old iPhone app icon still appears after deploy.
+6. When UI dust settles, run a broader smoke:
    - `npm run release:check`
    - `npm run build`
    - existing demo UI smoke if available
    - optional live staging smoke only if credentials/environment are ready and the owner expects live verification.
-6. Later: create a separate performance slice for code splitting / initial JS reduction.
+7. Later: create a separate performance slice for code splitting / initial JS reduction.

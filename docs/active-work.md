@@ -4,7 +4,7 @@
 
 - Active branch: `none`.
 - Current branch: `main`.
-- Last completed work: controlled-rollout UI polish and ticket status palette refresh, with next-session handoff updated.
+- Last completed work: unified BI foundation with admin-only command center, executive role separation, cleaning/PPE/facility coverage, and next-session handoff updated.
 - Current work: none.
 
 ## Current Product Direction

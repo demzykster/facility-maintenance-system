@@ -123,6 +123,10 @@ Admin command-center items should be compact and concrete. They should not repla
 the ticket, cleaning, fleet, or PPE modules. They should route the admin to the
 right existing workflow with the right filter or context.
 
+The command queue should stay balanced across domains. A large number of ticket
+or cleaning issues must not hide PM, document, PPE, or other operational risks
+from the first screen.
+
 ## Department BI Scope
 
 Department BI is visible to `user`.
