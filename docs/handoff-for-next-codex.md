@@ -6,8 +6,8 @@ Updated: 2026-07-12
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
-- Current local state at handoff time: `main...origin/main`, clean.
-- Latest app/UI commit before this handoff: `bf7fec9 Add BI department risk drilldowns`.
+- Current local state at handoff time: `main...origin/main`, clean after push.
+- Latest app/UI commit before this handoff: `b42c808 Make department BI the manager entry point`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,6 +56,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `b42c808 Make department BI the manager entry point`
+  - Made BI the default first screen for department managers (`user`) while keeping admin on the existing dashboard/control-center start.
+  - Added manager BI drill-down routes into the existing ticket list and department modules instead of adding BI-only actions.
+  - Added short trend/repeat-problem BI signals using existing ticket data.
+  - Extended strict department PM scope to handle `fleetId`, `forkliftId`, and `unitId`.
+  - Kept admin command BI action-oriented with explicit "next step" labels.
 - `bf7fec9 Add BI department risk drilldowns`
   - Added a compact BI `אזורי סיכון` / department-risk panel.
   - Risk rows summarize open tickets, SLA breaches, critical downtime, overdue PM, cleaning issues, and PPE requests by department.
@@ -255,17 +261,22 @@ For docs-only changes:
    - downtime causes and time by status;
    - repeated problems;
    - supplier/cost views only where finance is allowed.
-3. Continue the same design-system polish on remaining old-looking screens:
+3. Keep department-manager BI as the main entry point and deepen only the drill-downs that route through existing workflows:
+   - PM task context inside department fleet;
+   - cleaning zones/rounds in scope;
+   - PPE request details in scope;
+   - ticket lifecycle/stage reasons.
+4. Continue the same design-system polish on remaining old-looking screens:
    - settings first;
    - cleaning;
    - analytics;
    - PPE;
    - suppliers/fleet details.
-4. Revisit notifications UI as an integrated side drawer, not as a centered modal.
-5. Do a small manifest/PWA icon cache check if the old iPhone app icon still appears after deploy.
-6. When UI dust settles, run a broader smoke:
+5. Revisit notifications UI as an integrated side drawer, not as a centered modal.
+6. Do a small manifest/PWA icon cache check if the old iPhone app icon still appears after deploy.
+7. When UI dust settles, run a broader smoke:
    - `npm run release:check`
    - `npm run build`
    - existing demo UI smoke if available
    - optional live staging smoke only if credentials/environment are ready and the owner expects live verification.
-7. Later: create a separate performance slice for code splitting / initial JS reduction.
+8. Later: create a separate performance slice for code splitting / initial JS reduction.

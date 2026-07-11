@@ -258,6 +258,14 @@ The first implementation PRs should cover:
 ## Implementation Checkpoints
 
 - `src/biScopeModel.js` owns the first strict BI scope seam.
+- `UserApp` now opens `user` / department managers on BI by default.
+- Department BI routes to existing workflows instead of creating BI-only actions:
+  filtered tickets, department fleet/PM, cleaning, and PPE.
+- Admin remains on the existing dashboard start while BI keeps an admin-only
+  command-center queue for cross-domain operational decisions.
+- Short trend and repeat-problem signals are now part of BI, but deeper Analytics
+  consolidation should continue incrementally and only after scope/permissions stay
+  proven.
 - `admin` and `executive` receive `company` BI scope.
 - `user` receives `department` BI scope only; missing departments produce empty operational slices, not company-wide fallback.
 - `tech`, `worker`, and `cleaner` are outside the first BI rollout.

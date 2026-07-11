@@ -4,7 +4,7 @@
 
 - Active branch: `none`.
 - Current branch: `main`.
-- Last completed work: unified BI foundation with admin-only command center, bottleneck explanation, financial drill-down, department risk drill-downs, executive role separation, cleaning/PPE/facility coverage, and next-session handoff updated.
+- Last completed work: unified BI foundation with admin-only command center, bottleneck explanation, financial drill-down, department risk drill-downs, department-manager BI entry point, short trend/repeat-problem signals, executive role separation, cleaning/PPE/facility coverage, and next-session handoff updated.
 - Current work: none.
 
 ## Current Product Direction
