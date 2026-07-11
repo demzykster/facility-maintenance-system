@@ -16,17 +16,21 @@ const overlaps = (left = [], right = []) => {
 
 const ticketTrack = (ticket = {}) => ticket.track || (ticket.forkliftId ? "transport" : "facility");
 
+const ticketDepartments = (ticket = {}, fleet = []) => {
+  const direct = cleanStringList([
+    ticket.reportedBy?.dept,
+    ticket.createdBy?.dept,
+    ticket.department,
+    ticket.dept
+  ]);
+  if (ticketTrack(ticket) !== "transport" || !ticket.forkliftId) return direct;
+  const unit = (fleet || []).find((item) => item.id === ticket.forkliftId);
+  return cleanStringList([...direct, ...fleetDepartments(unit)]);
+};
+
 export const ticketInDepartments = (ticket = {}, departments = [], fleet = []) => {
   if (!departments.length) return false;
-  if (ticket.reportedBy?.dept && departments.includes(ticket.reportedBy.dept)) return true;
-  if (ticket.createdBy?.dept && departments.includes(ticket.createdBy.dept)) return true;
-  if (ticket.department && departments.includes(ticket.department)) return true;
-  if (ticket.dept && departments.includes(ticket.dept)) return true;
-  if (ticketTrack(ticket) === "transport" && ticket.forkliftId) {
-    const unit = (fleet || []).find((item) => item.id === ticket.forkliftId);
-    if (unit && overlaps(fleetDepartments(unit), departments)) return true;
-  }
-  return false;
+  return overlaps(ticketDepartments(ticket, fleet), departments);
 };
 
 const userInDepartments = (user = {}, departments = []) =>
@@ -139,4 +143,78 @@ export function biScopeForSession(session, data = {}) {
     ppeOrders: [],
     users: scopedUsers
   };
+}
+
+const defaultIsOpenTicket = (ticket = {}) => {
+  const status = ticket.status || "";
+  return !["closed", "done", "resolved", "cancelled", "archived"].includes(status);
+};
+
+const riskRow = (name) => ({
+  name,
+  openTickets: 0,
+  slaBreaches: 0,
+  criticalDowntime: 0,
+  pmOverdue: 0,
+  cleaningOpen: 0,
+  ppePending: 0,
+  score: 0
+});
+
+export function biDepartmentRiskRows(data = {}, options = {}) {
+  const {
+    departments = [],
+    tickets = [],
+    fleet = [],
+    pm = [],
+    zones = [],
+    complaints = [],
+    ppeReqs = []
+  } = data;
+  const isOpenTicket = options.isOpenTicket || defaultIsOpenTicket;
+  const isOverdueTicket = options.isOverdueTicket || (() => false);
+  const pmIsOverdue = options.pmIsOverdue || (() => false);
+  const complaintNeedsAction = options.complaintNeedsAction || ((complaint) => ["open", "pending"].includes(complaint?.status));
+  const ppeRequestNeedsAction = options.ppeRequestNeedsAction || ((request) => ["pending", "worker_sign"].includes(request?.status));
+  const rows = new Map(cleanStringList(departments).map((name) => [name, riskRow(name)]));
+  const ensure = (name) => {
+    const safeName = String(name || "").trim() || "ללא מחלקה";
+    if (!rows.has(safeName)) rows.set(safeName, riskRow(safeName));
+    return rows.get(safeName);
+  };
+  const addTo = (names, update) => {
+    const cleanNames = cleanStringList(names);
+    (cleanNames.length ? cleanNames : ["ללא מחלקה"]).forEach((name) => update(ensure(name)));
+  };
+  const fleetById = new Map((fleet || []).map((unit) => [unit.id, unit]));
+  const zoneDeptById = new Map((zones || []).map((zone) => [zone.id, zone.department || zone.dept || ""]));
+
+  (tickets || []).filter(isOpenTicket).forEach((ticket) => {
+    addTo(ticketDepartments(ticket, fleet), (row) => {
+      row.openTickets += 1;
+      if (isOverdueTicket(ticket)) row.slaBreaches += 1;
+      if (ticketTrack(ticket) === "transport" && ticket.downtimeType === "critical") row.criticalDowntime += 1;
+    });
+  });
+
+  (pm || []).filter(pmIsOverdue).forEach((record) => {
+    addTo(fleetDepartments(fleetById.get(record.fleetId || record.forkliftId || record.unitId)), (row) => { row.pmOverdue += 1; });
+  });
+
+  (complaints || []).filter(complaintNeedsAction).forEach((complaint) => {
+    const departmentsForComplaint = cleanStringList([complaint.dept, complaint.department, zoneDeptById.get(complaint.zoneId)]);
+    addTo(departmentsForComplaint.length ? departmentsForComplaint : ["ניקיון"], (row) => { row.cleaningOpen += 1; });
+  });
+
+  (ppeReqs || []).filter(ppeRequestNeedsAction).forEach((request) => {
+    addTo([request.dept, request.department], (row) => { row.ppePending += 1; });
+  });
+
+  return [...rows.values()]
+    .map((row) => ({
+      ...row,
+      score: row.slaBreaches * 5 + row.criticalDowntime * 5 + row.pmOverdue * 3 + row.cleaningOpen * 2 + row.ppePending * 2 + row.openTickets
+    }))
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score || b.openTickets - a.openTickets || a.name.localeCompare(b.name, "he"));
 }

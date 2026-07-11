@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biScopeForSession } from "../src/biScopeModel.js";
+import { biDepartmentRiskRows, biScopeForSession } from "../src/biScopeModel.js";
 
 const data = {
   tickets: [
@@ -120,5 +120,39 @@ describe("BI scope model", () => {
     expect(biScopeForSession({ role: "tech" }, data).kind).toBe("none");
     expect(biScopeForSession({ role: "worker" }, data).kind).toBe("none");
     expect(biScopeForSession(null, data).kind).toBe("none");
+  });
+
+  it("summarizes department risk without mixing unrelated departments", () => {
+    const rows = biDepartmentRiskRows({
+      departments: ["A", "B"],
+      tickets: [
+        { id: "open-a", track: "facility", status: "new", reportedBy: { dept: "A" } },
+        { id: "closed-a", track: "facility", status: "closed", reportedBy: { dept: "A" } },
+        { id: "fleet-b", status: "waiting", forkliftId: "f-b", downtimeType: "critical" }
+      ],
+      fleet: data.fleet,
+      pm: [{ id: "pm-b", forkliftId: "f-b", late: true }],
+      zones: [{ id: "z-a", dept: "A" }],
+      complaints: [{ id: "clean-a", zoneId: "z-a", status: "pending" }],
+      ppeReqs: [{ id: "ppe-b", dept: "B", status: "pending" }]
+    }, {
+      isOverdueTicket: (ticket) => ticket.id === "fleet-b",
+      pmIsOverdue: (record) => record.late
+    });
+
+    expect(rows.map((row) => row.name)).toEqual(["B", "A"]);
+    expect(rows.find((row) => row.name === "A")).toMatchObject({
+      openTickets: 1,
+      cleaningOpen: 1,
+      criticalDowntime: 0,
+      ppePending: 0
+    });
+    expect(rows.find((row) => row.name === "B")).toMatchObject({
+      openTickets: 1,
+      slaBreaches: 1,
+      criticalDowntime: 1,
+      pmOverdue: 1,
+      ppePending: 1
+    });
   });
 });

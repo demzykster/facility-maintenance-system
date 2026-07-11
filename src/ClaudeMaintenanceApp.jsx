@@ -12,7 +12,7 @@ import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { productionAccessToken, store } from "./storageAdapter.js";
 import { DEFAULT_MANAGER_PERMS, USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
-import { biScopeForSession } from "./biScopeModel.js";
+import { biDepartmentRiskRows, biScopeForSession } from "./biScopeModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, isWorkerLoginRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
@@ -7377,6 +7377,20 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const ppeLowItems = scope.ppeItems.filter((item) => item.active !== false && ppeLow(item));
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
+  const departmentRiskRows = biDepartmentRiskRows({
+    departments: scope.kind === "company" ? (config.departments || []) : scope.departments,
+    tickets: scope.tickets,
+    fleet: scope.fleet,
+    pm: scope.pm,
+    zones: scope.zones,
+    complaints: scope.complaints,
+    ppeReqs: scope.ppeReqs
+  }, {
+    isOpenTicket: isOpen,
+    isOverdueTicket: isOverdue,
+    pmIsOverdue: (task) => task.active !== false && daysLeft(task.nextDue) < 0,
+    ppeRequestNeedsAction
+  });
   const closedLast30 = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000) : [];
   const monthCost = closedLast30.reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0);
   const avgClosedCost = closedLast30.length ? Math.round(monthCost / closedLast30.length) : 0;
@@ -7434,6 +7448,13 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const firstByDomain = Object.keys(commandDomainCounts).map((domain) => commandItems.find((item) => item.domain === domain)).filter(Boolean);
   const commandQueue = [...firstByDomain, ...commandItems.filter((item) => !firstByDomain.some((first) => first.key === item.key))].slice(0, 8);
   const scopeTitle = scope.kind === "company" ? "תמונת חברה" : scope.departments.length ? `מחלקות: ${scope.departments.join(", ")}` : "לא הוגדר scope";
+  const riskRowAction = (row) => {
+    if (row.openTickets) return () => onGoTickets?.({ st: "open", focus: { label: `BI · מחלקה · ${row.name}`, department: row.name } });
+    if (row.pmOverdue) return () => onGoAssets?.({ tab: "pm" });
+    if (row.cleaningOpen) return onGoCleaning || null;
+    if (row.ppePending) return onGoPpe || null;
+    return null;
+  };
 
   if (scope.kind === "none") return <Empty text="אין הרשאת BI" Icon={Gauge} sub="המודול פתוח בשלב הראשון להנהלה, מנהלי מערכת ומנהלי מחלקות." />;
 
@@ -7491,6 +7512,24 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         {waitReasonRows.length > 0 && <div className="bi-subdivider" />}
         {waitReasonRows.length > 0 && <div className="bi-subtitle">סיבות המתנה</div>}
         {waitReasonRows.map((row) => <Bar key={row.reason} label={row.label} value={row.n} max={maxWaitReasonN} suffix={row.ms ? ` · ${fmtDur(row.ms)}` : ""} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · סיבת המתנה · ${row.label}`, lifecycleKey: `waiting:${row.reason}` } })} />)}
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>{scope.kind === "company" ? "אזורי סיכון" : "המחלקות שלי"}</b><span>איפה מצטברת עבודה שדורשת תשומת לב</span></div></div>
+        {departmentRiskRows.length ? departmentRiskRows.slice(0, 5).map((row) => {
+          const action = riskRowAction(row);
+          return <button key={row.name} className="bi-risk-row" onClick={action || undefined} disabled={!action}>
+            <span><b>{row.name}</b><small>{row.openTickets ? `${countLabel(row.openTickets, "קריאה פתוחה", "קריאות פתוחות")}` : "ללא קריאות פתוחות"}</small></span>
+            <span className="bi-risk-tags">
+              {row.slaBreaches > 0 && <em>‏SLA {row.slaBreaches}</em>}
+              {row.criticalDowntime > 0 && <em>השבתה {row.criticalDowntime}</em>}
+              {row.pmOverdue > 0 && <em>PM {row.pmOverdue}</em>}
+              {row.cleaningOpen > 0 && <em>ניקיון {row.cleaningOpen}</em>}
+              {row.ppePending > 0 && <em>ביגוד {row.ppePending}</em>}
+            </span>
+            {action && <ChevronLeft size={15} />}
+          </button>;
+        }) : <div className="note">אין כרגע מוקדי עומס לפי מחלקות.</div>}
       </section>
 
       <section className="panel bi-panel">
@@ -7957,6 +7996,14 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
       if (focus.criticalEscalated && !isCriticalEscalated(t, config)) return false;
       if (focus.activeCriticalTransport && !((t.track || (t.forkliftId ? "transport" : "facility")) === "transport" && t.downtimeType === "critical" && !isCriticalEscalated(t, config))) return false;
       if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
+      if (focus.department) {
+        const ff = (fleet || []).find((x) => x.id === t.forkliftId);
+        const currentTrack = t.track || (t.forkliftId ? "transport" : "facility");
+        const ticketDepts = currentTrack === "transport"
+          ? fleetDepts(ff)
+          : [t.reportedBy?.dept, t.createdBy?.dept, t.department, t.dept].filter(Boolean);
+        if (!ticketDepts.includes(focus.department)) return false;
+      }
     }
     if (q.trim()) { const s = `${ticketNo(t)} ${t.subject} ${t.description} ${t.asset || ""} ${t.assignee || ""} ${t.createdBy?.name}`.toLowerCase(); if (!s.includes(q.toLowerCase())) return false; }
     return true;
@@ -11504,6 +11551,12 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-mini-stats small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
 .bi-finance-stats{margin:10px 0;}
 .bi-doc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:9px;margin-top:9px;}
+.bi-risk-row{width:100%;min-height:48px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;text-align:start;border:1px solid var(--line);background:var(--surface-glow);border-radius:12px;padding:8px 10px;margin-bottom:8px;box-shadow:var(--control-shadow);}
+.bi-risk-row:disabled{cursor:default;opacity:.76;}
+.bi-risk-row b{display:block;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bi-risk-row small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px;}
+.bi-risk-tags{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;}
+.bi-risk-tags em{font-style:normal;border:1px solid rgba(201,205,209,.9);background:var(--surface-2);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:11px;font-weight:650;line-height:1.45;}
 .bi-subtitle{margin:2px 0 6px;color:var(--muted);font-size:11.5px;font-weight:650;}
 .bi-subdivider{height:1px;background:var(--line);margin:10px 0;}
 .bi-panel .big-stat{font-weight:650;}
@@ -12442,6 +12495,8 @@ body *{visibility:hidden!important;}
   .bi-mini-stats b{font-size:17px;}
   .bi-panel-head{align-items:flex-start;}
   .bi-doc-row{align-items:flex-start;flex-direction:column;gap:2px;}
+  .bi-risk-row{grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;}
+  .bi-risk-tags{grid-column:1 / -1;justify-content:flex-start;}
   .dash-command{gap:14px;}
   .dash-hero{flex-direction:column;padding-top:4px;}
   .dash-hero h1{font-size:25px;}
