@@ -12049,8 +12049,8 @@ body *{visibility:hidden!important;}
 .dash-signal{min-height:96px;direction:rtl;display:grid;grid-template-columns:62px minmax(0,148px);grid-template-rows:auto auto;grid-template-areas:"icon num" "icon copy";justify-content:start;align-content:center;align-items:center;gap:5px 18px;padding:14px 24px;text-align:center;border-inline-start:1px solid rgba(201,205,209,.55);color:var(--ink);}
 .dash-signal:first-child{border-inline-start:none;}
 .dash-signal:hover{background:rgba(46,49,56,.035);}
-.dash-signal-ic{grid-area:icon;width:62px;height:62px;border-radius:18px;background:transparent;color:#A4A9B0;display:flex;align-items:center;justify-content:center;box-shadow:none;transition:color 160ms var(--ease-out),transform 160ms var(--ease-out);}
-.dash-signal:hover .dash-signal-ic{color:#6F7680;transform:translateY(-1px);}
+.dash-signal-ic{grid-area:icon;width:62px;height:62px;border-radius:18px;background:transparent;color:#A4A9B0;display:flex;align-items:center;justify-content:center;box-shadow:none;transition:color 160ms var(--ease-out);}
+.dash-signal:hover .dash-signal-ic{color:#6F7680;}
 .dash-signal-ic svg{width:34px;height:34px;stroke-width:1.9;}
 .dash-signal-num{grid-area:num;direction:rtl;font-family:var(--font-head);font-size:31px;font-weight:760;line-height:.95;font-variant-numeric:tabular-nums;text-align:center;}
 .dash-signal-copy{grid-area:copy;direction:rtl;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;text-align:center;}
