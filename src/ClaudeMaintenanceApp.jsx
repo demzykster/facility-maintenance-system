@@ -4312,11 +4312,11 @@ function UserApp(p) {
   ].filter(Boolean);
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
         primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }}
         nav={userNav} />
       <div className="main-col">
-        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
+        <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeView === "tickets" ? (<>
             {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {countLabel(needAct, "קריאה דורשת", "קריאות דורשות")} פעולה שלך</div>}
@@ -4413,10 +4413,10 @@ function TechApp(p) {
   const extendShift = () => { setExtendUntil(effectiveEnd + 60 * 60000); setSessWarn(false); setWarnAt(0); };
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile}
         nav={[{ id: "tickets", Icon: ListChecks, label: "קריאות שינוע", active: view === "tickets", onClick: () => setView("tickets") }, { id: "pm", Icon: CalendarClock, label: "לוח טיפולים", active: view === "pm", onClick: () => setView("pm") }, { id: "activity", Icon: Clock, label: "יומן פעילות", active: view === "activity", onClick: () => setView("activity") }]} />
       <div className="main-col">
-        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
+        <TopBar title={view === "pm" ? "לוח טיפולים" : view === "activity" ? "יומן פעילות" : "קריאות שינוע"} subtitle={session.name + " · טכנאי"} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {tw.presence !== false && <div className="shift-bar"><div className="shift-info"><span className="presence-dot on" /><div><div className="shift-stat">במשמרת</div><div className="shift-sub">{myShift.since ? "מאז " + fmtTime(myShift.since) : "מחובר"} · עד {fmtTime(effectiveEnd)}{myIdle.lateMin > 0 ? " · איחור " + myIdle.lateMin + " ד׳" : ""}</div></div></div><button className="btn-ghost sm" onClick={endAndLogout}><Power size={15} /> סיום משמרת ויציאה</button></div>}
           {sessWarn && <div className="ovl-backdrop modal2" style={{ zIndex: 60 }}><div className="modal2-panel" style={{ textAlign: "center" }}><div className="modal2-body"><div style={{ fontSize: 38, marginBottom: 6 }}>⏰</div><div className="form-title" style={{ marginBottom: 6 }}>המשמרת עומדת להסתיים</div><div className="note" style={{ margin: "0 0 14px" }}>בעוד כ-10 דקות תתבצע יציאה אוטומטית. ללא בחירה תוך 5 דקות — המערכת תוציא אותך אוטומטית.</div><div className="row2"><button className="btn-ghost" onClick={extendShift}>הארכה ב-60 ד׳</button><button className="btn-primary" onClick={endAndLogout}><Power size={15} /> סיום ויציאה</button></div></div></div></div>}
@@ -5605,7 +5605,7 @@ function CleanerApp(p) {
   return (<div className={"worker-shell" + (p.embedded ? " embedded-cleaning-shell" : "")}>
     {!p.embedded && <div className="worker-top">
       <div><div className="wk-title">{t("cleaner.title")}</div><div className="wk-sub">{session.name}</div></div>
-      <div className="worker-top-actions"><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif(true)} title={t("common.notifications")} aria-label={t("common.notifications")}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
+      <div className="worker-top-actions"><LanguagePicker value={language} onChange={setLanguage} compact /><button className="icon-btn" onClick={toggleTheme} title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")} aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}>{theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-btn bell" onClick={() => setShowNotif((v) => !v)} title={t("common.notifications")} aria-label={t("common.notifications")}><Bell size={20} />{notif?.unread > 0 && <span className="dot">{notif.unread > 9 ? "9+" : notif.unread}</span>}</button>{p.onReportIssue && <button className="icon-btn" onClick={p.onReportIssue} title={t("common.reportSystemIssue")} aria-label={t("common.reportSystemIssue")}><Bug size={20} /></button>}{p.onProfile && <button className="icon-btn" onClick={p.onProfile} title={t("common.profile")} aria-label={t("common.profile")}><User size={20} /></button>}<button className="worker-action-btn" onClick={onLogout} title={t("common.logout")} aria-label={t("common.logout")}><LogOut size={18} /><span>{t("common.logout")}</span></button></div>
     </div>}
     {!p.embedded && p.rolePreview && <div className="worker-preview"><RolePreviewBox rolePreview={p.rolePreview} language={language} /></div>}
     <main className="content">
@@ -7382,9 +7382,9 @@ function AdminApp(p) {
   ].filter(Boolean).map((n) => ({ ...n, active: activeTab === n.id, onClick: () => { if (n.id === "tickets") clearTicketFilter(); setTab(n.id); } }));
   return (
     <div className="app-root">
-      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
+      <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
-        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif(true)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
+        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
@@ -11683,8 +11683,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .nav-more-item.on{border-color:rgba(31,78,140,.34);background:var(--primary-soft);color:var(--primary);}
 .app-dark .nav-more-item.on{background:rgba(31,78,140,.18);border-color:rgba(31,78,140,.45);}
 
-.ovl-backdrop.notif-back{align-items:stretch;justify-content:flex-start;padding:18px;z-index:70;background:rgba(46,49,56,.38);backdrop-filter:saturate(130%) blur(2px);}
-.notif-panel{background:var(--surface);width:min(430px,calc(100vw - 36px));height:calc(100dvh - 36px);max-height:none;border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:-20px 0 54px rgba(46,49,56,.22);animation:cmmsDrawerIn 190ms var(--ease-out) both;will-change:transform,opacity;}
+.ovl-backdrop.notif-back{align-items:stretch;justify-content:flex-start;padding:18px;z-index:70;background:rgba(46,49,56,.28);backdrop-filter:none;}
+.notif-panel{direction:rtl;background:var(--surface);width:min(430px,calc(100vw - 36px));height:calc(100dvh - 36px);max-height:none;border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:-20px 0 54px rgba(46,49,56,.22);animation:cmmsDrawerIn 190ms var(--ease-out) both;will-change:transform,opacity;}
 .app-dark .notif-panel{box-shadow:-20px 0 54px rgba(0,0,0,.42);}
 .notif-head{display:flex;align-items:center;justify-content:space-between;padding:15px 16px;border-bottom:1px solid var(--line);background:var(--surface-glow);}
 .notif-title{font-family:var(--font-head);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;}
@@ -12366,13 +12366,16 @@ body *{visibility:hidden!important;}
   .ovl-panel.issue-report-shell{max-width:420px;background:transparent;box-shadow:none;overflow:visible;}
   .ymx-wrap{overflow:visible;}
   .ai-back{align-items:center;}.ai-panel{max-width:560px;height:80vh;border-radius:18px;}
+  .ovl-backdrop.notif-back{inset:0 304px 0 0;direction:ltr;justify-content:flex-end;padding:18px;background:rgba(46,49,56,.14);}
+  .notif-panel{direction:rtl;box-shadow:-14px 0 38px rgba(46,49,56,.16);}
+  .app-dark .ovl-backdrop.notif-back{background:rgba(0,0,0,.2);}
   .ai-fab{inset-inline-end:28px;bottom:28px;}.toast{bottom:24px;width:380px;}.version-update-banner{bottom:24px;flex-direction:row;align-items:center;justify-content:space-between;}.version-update-refresh{flex:0 0 auto;}
   .cat-grid{grid-template-columns:repeat(3,1fr);}
 }
 @media(max-width:640px){
   .ovl-backdrop{align-items:stretch;justify-content:stretch;padding:0;}
   .ovl-panel{height:100dvh;max-height:100dvh;overflow:hidden;}
-  .notif-back{padding:0;align-items:stretch;justify-content:stretch;}
+  .ovl-backdrop.notif-back{inset:0;padding:0;align-items:stretch;justify-content:stretch;direction:rtl;}
   .notif-panel{width:100vw;height:100dvh;max-width:none;border:0;border-radius:0;box-shadow:none;animation:cmmsSheetIn 170ms var(--ease-out) both;}
   .notif-head{padding-top:calc(13px + env(safe-area-inset-top));}
   .notif-list{padding-bottom:calc(16px + env(safe-area-inset-bottom));}
