@@ -12317,8 +12317,14 @@ body *{visibility:hidden!important;}
   .desk-only{display:inline-flex!important;}.desk-hide{display:none;}
   .app-root{display:flex;}
   .main-col{flex:1;min-width:0;}
-  .sidebar{display:flex;flex-direction:column;width:262px;background:var(--side);color:var(--ink);padding:20px 14px;position:sticky;top:0;height:100vh;height:100dvh;flex-shrink:0;overflow:hidden;border-inline-start:1px solid var(--line);box-shadow:-8px 0 24px rgba(46,49,56,.04);}
-  .side-brand{display:flex;align-items:center;gap:11px;margin-bottom:20px;padding:0 6px;}
+  .sidebar{display:flex;flex-direction:column;width:304px;background:var(--side);color:var(--ink);padding:22px 18px;position:sticky;top:0;height:100vh;height:100dvh;flex-shrink:0;overflow:hidden;border-inline-start:1px solid var(--line);box-shadow:-8px 0 24px rgba(46,49,56,.04);}
+  .side-brand{display:flex;align-items:center;gap:14px;margin-bottom:22px;padding:0 4px;min-width:0;}
+  .side-brand .brand-mark.sm{width:60px;height:60px;border-radius:17px;}
+  .side-brand .brand-mark.sm .brand-mark-hex{width:38px;height:38px;}
+  .side-brand .brand-mark.sm .brand-mark-core{width:12px;height:12px;border-width:2px;border-radius:4px;}
+  .side-brand>div{min-width:0;display:flex;flex-direction:column;justify-content:center;}
+  .side-brand .brand-title.sm{font-size:19px;line-height:1.05;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .side-brand .brand-sub.sm{font-size:12px;line-height:1.25;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:5px;}
   .side-newbtn{min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--primary);color:#fff;font-weight:650;font-size:14.5px;border-radius:11px;padding:12px;margin-bottom:16px;box-shadow:0 10px 20px rgba(31,78,140,.16);}
   .side-nav{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:#C9CDD1 transparent;}
   .side-nav::-webkit-scrollbar{width:6px;height:6px;}.side-nav::-webkit-scrollbar-thumb{background:#C9CDD1;border-radius:999px;}
