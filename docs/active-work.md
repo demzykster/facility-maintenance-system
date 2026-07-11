@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `none`.
-- Current branch: `main`.
+- Active branch: `codex/fix-staging-settings-smoke`.
+- Current branch: `codex/fix-staging-settings-smoke`.
 - Last completed work: staging load-test threshold calibration.
-- Current work: none.
+- Current work: staging gate/browser smoke alignment after R10 normalized-authority cleanup plus production-readiness/load verification.
 
 ## Current Product Direction
 

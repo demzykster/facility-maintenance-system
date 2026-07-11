@@ -46,7 +46,8 @@ Closed notes:
 - Supabase KV compatibility is the accepted staging/pilot bridge, not the final CMMS source of truth.
 - Production file metadata, audit events, first-admin bootstrap, backup/restore drill, and staging gates are documented in the production docs.
 - `src/productionReadinessModel.js` names the current state as `staging_pilot` when production config, Supabase schema, staging gate, and backup/restore drill are verified.
-- Live staging/pilot gate passed on 2026-07-10 against the Vercel production alias and linked Supabase staging project at commit `cb1f9b4`: env shape, schema/bucket, live commit, bootstrap-closed state, admin session, KV bridge, settings persistence, normalized tickets/fleet/PM API smokes, fleet UI/API/Supabase parity, AI intake smoke, system-error smoke, and desktop/mobile UI smoke.
+- Live staging/pilot gate passed on 2026-07-11 against the Vercel production alias and linked Supabase staging project at commit `32de319`: env shape, schema/bucket, live commit, bootstrap-closed state, admin session, KV bridge, settings persistence, normalized tickets/fleet/PM/users/PIN/PPE/work/presence/push/app-config/settings-records/cleaning API smokes, fleet UI/API/Supabase parity, AI intake smoke, browser smoke, system-error smoke, and desktop/mobile UI smoke. The Vercel production env-name contract includes `CMMS_DATA_AUTHORITY=normalized`.
+- Pilot load testing passed on 2026-07-11 with 1000 tickets, 1000 tasks, 100 meetings, 250 fleet units, and 500 cleaning complaints; API p95/max was 1126ms against the 1500/3000ms thresholds, and cleanup left 0 temporary business rows.
 - Final production data-core cleanup moved beyond the accepted KV bridge into normalized business tables and server-side operations during R10. Remaining final-production approval work should be tracked as audit/acceptance/load-test work, not as an unclosed R9 tail.
 
 ### R10 — Final Production Data Core
