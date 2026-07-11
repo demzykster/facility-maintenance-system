@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `codex/clear-stale-production-warning`.
-- Current branch: `codex/clear-stale-production-warning`.
-- Last completed work: staging gate/browser smoke alignment after R10 normalized-authority cleanup plus production-readiness/load verification.
-- Current work: clear stale production-config warning after R10 normalized-authority completion.
+- Active branch: `none`.
+- Current branch: `main`.
+- Last completed work: clear stale production-config warning after R10 normalized-authority completion.
+- Current work: none.
 
 ## Current Product Direction
 
