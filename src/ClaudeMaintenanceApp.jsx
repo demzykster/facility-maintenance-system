@@ -8278,7 +8278,7 @@ function FleetModule(p) {
   return (<>
     <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
     {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} users={p.users} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
-    <div className="fleet-topbar"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="fleet-actions"><button className="btn-ghost sm" onClick={exportFleet} disabled={!rows.length} title={!rows.length ? "אין נתונים לייצוא" : ""}><FileSpreadsheet size={15} /> ייצוא Excel</button>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)}><FileSpreadsheet size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
+    <div className="fleet-topbar"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="fleet-actions"><button className="btn-ghost sm" onClick={exportFleet} disabled={!rows.length} title={!rows.length ? "אין נתונים לייצוא" : "ייצוא Excel"} aria-label="ייצוא Excel"><FileSpreadsheet size={15} /> ייצוא Excel</button>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)} title="ייבוא Excel" aria-label="ייבוא Excel"><Download size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
     <div className="search-wrap fleet-search"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="סוג" value={type} onChange={setType}>{types.map((t) => <option key={t}>{t}</option>)}</Sel>
@@ -8627,7 +8627,7 @@ function PMHistory({ pm, fleet, onOpen, config }) {
       <label className="flt-field"><span className="flt-lbl">תוצאה</span><select value={fResult} onChange={(e) => setFResult(e.target.value)}><option value="all">הכל</option><option value="done">בוצע</option><option value="missed">לא הגיע</option><option value="followup">עם עבודות המשך</option></select></label>
       <label className="flt-field"><span className="flt-lbl">מיון</span><select value={sort} onChange={(e) => setSort(e.target.value)}><option value="date_desc">חדש לישן</option><option value="date_asc">ישן לחדש</option></select></label>
     </div>
-    <div className="fleet-results-bar"><span className="fleet-count">{filtered.length} רשומות</span><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportXlsx}><FileText size={14} /> Excel</button><button className="btn-ghost sm" onClick={exportPdf}><FileText size={14} /> PDF</button></div></div>
+    <div className="fleet-results-bar"><span className="fleet-count">{filtered.length} רשומות</span><div className="row2" style={{ width: "auto", gap: 8 }}><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={14} /> Excel</button><button className="btn-ghost sm" onClick={exportPdf}><Printer size={14} /> PDF</button></div></div>
     {filtered.length === 0 ? <Empty text="אין היסטוריית טיפולים" Icon={CalendarClock} sub="לאחר ביצוע טיפול הוא יירשם כאן" />
       : <div className="cards">{filtered.map((r) => { const done = r.type !== "missed"; return <button key={r.key} className="tl-item pm-hist-item" onClick={() => onOpen(r.pm)}><div className="tl-dot" style={{ background: done ? "#16A34A" : "#CA8A04" }} /><div className="tl-body"><div className="tl-text">{fmtDate(r.at)} · {r.f ? `${unitLabel(r.f, config)}` : "כלי"} · {r.ruleTitle || "טיפול תקופתי"} · {done ? "בוצע" : "לא הגיע"}{r.hadPaid ? " · עבודות המשך" : ""}</div><div className="tl-meta">{r.by || "—"}{r.paidNote ? ` · ${r.paidNote}` : ""}</div></div><ChevronLeft size={15} className="tl-chev" /></button>; })}</div>}
     {report && <ReportView html={report} onClose={() => setReport(null)} />}
@@ -9393,14 +9393,29 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     return out.filter(Boolean).join(" · ");
   };
   const iconFor = (u) => ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User;
-  const PersonRow = ({ u }) => {
+  const userStatus = (u) => {
+    const rec = presenceOf(presence, u.id);
+    const online = isPresenceOnline(rec);
+    const unconfigured = isActivationLinkRole(u.role) && !userHasLoginSecret(u);
+    const inactive = u.active === false;
+    if (online) return { className: " online", text: "פעיל כעת" };
+    if (unconfigured) return { className: " pending", text: "טרם הוגדרה כניסה" };
+    if (inactive) return { className: " seen", text: "מושבת" };
+    return { className: " seen", text: fmtDateTimeShort(rec?.lastSeen) || "לא נראה במערכת" };
+  };
+  const TeamUserCard = ({ u }) => {
     const Icon = iconFor(u);
     const RowTag = pickable ? "button" : "div";
-    return <RowTag className={"tcard" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined} style={{ borderInlineStartColor: u.active === false ? "var(--muted)" : "var(--border)", cursor: pickable ? "pointer" : "default", textAlign: "start" }}>
-      <span className="avatar"><Icon size={18} /></span>
-      <div className="tcard-main">
-        <div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{userTitle(u)}</span></div>
-        <div className="tcard-sub">{metaParts(u) || roleTitle(u)}</div>
+    const status = userStatus(u);
+    const primaryMeta = metaParts(u) || roleTitle(u);
+    const secondaryMeta = u.role === "user" ? (userDepts(u).join(", ") || u.dept || "ללא מחלקה") : u.role === "tech" ? (u.supplier || "פנימי") : (u.email || u.phone || "—");
+    return <RowTag className={"worker-card team-user-card" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined}>
+      <span className="worker-avatar"><Icon size={20} /></span>
+      <div className="worker-card-main">
+        <div className="worker-card-head"><div className="worker-name">{u.name || "ללא שם"}</div><span className="team-user-badge">{userTitle(u)}</span></div>
+        <div className="worker-meta">{primaryMeta}</div>
+        <div className="worker-meta">{secondaryMeta}</div>
+        <div className={"worker-seen" + status.className}><span className={"worker-state" + status.className} aria-hidden="true" /> <span>{status.text}</span></div>
       </div>
     </RowTag>;
   };
@@ -9415,35 +9430,20 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
   if (activeList.length === 0) return <Empty />;
   if (mode === "managers") {
     const managers = activeList.filter((u) => u.role === "user");
-    return managers.length ? <Section title="מנהלים" count={managers.length} actionLabel="מנהל" actionPatch={{ role: "user" }}>{managers.map((u) => <PersonRow key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלים" />;
+    return managers.length ? <Section title="מנהלים" count={managers.length} actionLabel="מנהל" actionPatch={{ role: "user" }}>{managers.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלים" />;
   }
   if (mode === "techs") {
     const techs = activeList.filter((u) => u.role === "tech");
     const bySupplier = [...new Set(techs.map((u) => u.supplier || "פנימי"))];
-    return techs.length ? <>{bySupplier.map((sp) => { const rows = techs.filter((u) => (u.supplier || "פנימי") === sp); return <Section key={sp} title={sp} count={rows.length} actionLabel="טכנאי" actionPatch={{ role: "tech", supplier: sp === "פנימי" ? "" : sp }}>{rows.map((u) => <PersonRow key={u.id} u={u} />)}</Section>; })}</> : <Empty text="לא נמצאו טכנאים" />;
+    return techs.length ? <>{bySupplier.map((sp) => { const rows = techs.filter((u) => (u.supplier || "פנימי") === sp); return <Section key={sp} title={sp} count={rows.length} actionLabel="טכנאי" actionPatch={{ role: "tech", supplier: sp === "פנימי" ? "" : sp }}>{rows.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section>; })}</> : <Empty text="לא נמצאו טכנאים" />;
   }
   if (mode === "admins") {
     const admins = activeList.filter((u) => u.role === "admin");
-    return admins.length ? <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.map((u) => <PersonRow key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלי מערכת" />;
+    return admins.length ? <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלי מערכת" />;
   }
   const workers = activeList.filter((u) => isWorkerLike(u));
   const WorkerCard = ({ u }) => {
-    const rec = presenceOf(presence, u.id);
-    const online = isPresenceOnline(rec);
-    const unconfigured = isActivationLinkRole(u.role) && !userHasLoginSecret(u);
-    const inactive = u.active === false;
-    let statusClass = " seen";
-    let statusText = fmtDateTimeShort(rec?.lastSeen) || "לא נראה במערכת";
-    if (online) {
-      statusClass = " online";
-      statusText = "פעיל כעת";
-    } else if (unconfigured) {
-      statusClass = " pending";
-      statusText = "טרם הוגדרה כניסה";
-    } else if (inactive) {
-      statusClass = " seen";
-      statusText = "מושבת";
-    }
+    const status = userStatus(u);
     const RowTag = pickable ? "button" : "div";
     return <RowTag className={"worker-card" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined}>
       <span className="worker-avatar"><UserPlus size={20} /></span>
@@ -9451,15 +9451,18 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
         <div className="worker-name">{u.name || "ללא שם"}</div>
         <div className="worker-meta">מס׳ עובד {u.workerNo || "—"}</div>
         <div className="worker-meta">{u.phone || u.dept || "ללא טלפון"}</div>
-        <div className={"worker-seen" + statusClass}><span className={"worker-state" + statusClass} aria-hidden="true" /> <span>{statusText}</span></div>
+        <div className={"worker-seen" + status.className}><span className={"worker-state" + status.className} aria-hidden="true" /> <span>{status.text}</span></div>
       </div>
     </RowTag>;
   };
   const DeptWorkers = ({ deptName, rows }) => {
     const managers = activeList.filter((u) => u.role === "user" && userDepts(u).includes(deptName));
-    const activated = rows.filter((u) => userHasLoginSecret(u)).length;
     const shiftGroups = shiftDefs.map((s) => ({ ...s, rows: rows.filter((u) => (u.shift || "") === s.id) }));
     const noShift = rows.filter((u) => !shiftDefs.some((s) => s.id === (u.shift || "")));
+    const morningShift = shiftDefs.find((s) => s.id === "morning") || shiftDefs.find((s) => /בוקר/.test(s.label || "")) || shiftDefs[0] || { id: "morning", label: "בוקר" };
+    const nightShift = shiftDefs.find((s) => s.id === "night") || shiftDefs.find((s) => /לילה/.test(s.label || "")) || shiftDefs[1] || { id: "night", label: "לילה" };
+    const morningCount = rows.filter((u) => (u.shift || "") === morningShift.id).length;
+    const nightCount = rows.filter((u) => (u.shift || "") === nightShift.id).length;
     return <details className="dept-card">
       <summary className="dept-card-summary">
         <div className="dept-card-main">
@@ -9468,7 +9471,8 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
         </div>
         <div className="dept-card-metrics">
           <span><b>{rows.length}</b><small>סה״כ עובדים</small></span>
-          <span><b>{activated}</b><small>כניסה פעילה</small></span>
+          <span><b>{morningCount}</b><small>{morningShift.label || "בוקר"}</small></span>
+          <span><b>{nightCount}</b><small>{nightShift.label || "לילה"}</small></span>
         </div>
         {canAdd && <button className="btn-ghost sm dept-add" type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCreate({ role: "worker", dept: deptName }); }}><Plus size={14} /> עובד</button>}
       </summary>
@@ -9786,7 +9790,7 @@ function SettingsPanel(p) {
     if (ok !== false) setArcView(null);
     return ok;
   };
-  return (<div className="settings-wrap">
+  return (<div className={`settings-wrap settings-tab-${tab}`}>
     {!p.only && <div className="seg-tabs s3"><button className={tab === "general" ? "on" : ""} onClick={() => setTab("general")}>כללי</button><button className={tab === "maint" ? "on" : ""} onClick={() => setTab("maint")}>אחזקה</button><button className={tab === "issues" ? "on" : ""} onClick={() => setTab("issues")}>דיווחי בעיות</button></div>}
 
     {tab === "general" && (<>
@@ -9813,9 +9817,9 @@ function SettingsPanel(p) {
           <span>סיבה</span><span>אחריות עכשיו</span><span>מי רשאי לבחור</span><span>נספר ב-SLA</span><span />
         </div>
         {wreasons.map((r, i) => <div key={r.id || i} className="reg-row wait-reason-row">
-          <input className="reg-name" value={r.label} placeholder="שם הסיבה" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
-          <select value={r.ball || "executor"} title="אצל מי האחריות להמשך טיפול" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, ball: e.target.value } : x))}>{WAIT_BALL_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
-          <select value={r.setters || "both"} title="מי רשאי לבחור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, setters: e.target.value } : x))}>{WAIT_SETTER_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+          <input className="reg-name" value={r.label} aria-label="שם סיבת המתנה" placeholder="שם הסיבה" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+          <select value={r.ball || "executor"} aria-label={`אחריות עכשיו עבור ${r.label || "סיבת המתנה"}`} title="אצל מי האחריות להמשך טיפול" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, ball: e.target.value } : x))}>{WAIT_BALL_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+          <select value={r.setters || "both"} aria-label={`מי רשאי לבחור ${r.label || "סיבת המתנה"}`} title="מי רשאי לבחור" onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, setters: e.target.value } : x))}>{WAIT_SETTER_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
           <label className="chk-line" title="כאשר מסומן, זמן ההמתנה נשמר אך לא נספר ב-SLA התפעולי" style={{ margin: 0, whiteSpace: "nowrap" }}><input type="checkbox" checked={!r.pauseSla} onChange={(e) => setWreasons((a) => a.map((x, j) => j === i ? { ...x, pauseSla: !e.target.checked } : x))} /> נספר</label>
           <button className="reg-del" disabled={r.id === "no_equipment"} title={r.id === "no_equipment" ? "סיבה מערכתית" : "מחק"} aria-label={`${r.id === "no_equipment" ? "סיבה מערכתית — לא ניתן למחוק" : "מחק סיבת המתנה"}: ${r.label || "ללא שם"}`} onClick={() => setWreasons((a) => r.id === "no_equipment" ? a : a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
         </div>)}
@@ -9825,13 +9829,13 @@ function SettingsPanel(p) {
       <div className="hint" style={{ marginBottom: 8 }}>נבחרות בעת פתיחת קריאת שינוע ובסיום בקרת כלי. «מוציא מכלל שימוש» = הכלי מסומן «מושבת» בכל המסכים (פארק, נהגים, התראות) עד לסגירת הקריאה או החזרה לשירות.</div>
       {dlevels.map((d, i) => <div key={d.id || i} className="dt-edit-row">
         <div className="dt-edit-line">
-          <input className="reg-name" value={d.label} placeholder="שם הרמה" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
-          <input className="reg-name dt-desc-in" value={d.desc || ""} placeholder="תיאור קצר (מוצג בבחירה)" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))} />
+          <input className="reg-name" value={d.label} aria-label="שם רמת חומרה" placeholder="שם הרמה" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+          <input className="reg-name dt-desc-in" value={d.desc || ""} aria-label={`תיאור רמת חומרה: ${d.label || "ללא שם"}`} placeholder="תיאור קצר (מוצג בבחירה)" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))} />
           <button className="reg-del" aria-label={`מחק רמת חומרה: ${d.label || "ללא שם"}`} onClick={() => setDlevels((a) => a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
         </div>
         <div className="dt-edit-line">
           <ColorPaletteButton value={d.color} label={`צבע רמת חומרה: ${d.label || "ללא שם"}`} onChange={(c) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, color: c } : x))} />
-          <select value={d.prio || "medium"} title="עדיפות ברירת מחדל" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, prio: e.target.value } : x))}><option value="low">עדיפות: נמוכה</option><option value="medium">עדיפות: בינונית</option><option value="high">עדיפות: גבוהה</option></select>
+          <select value={d.prio || "medium"} aria-label={`עדיפות ברירת מחדל לרמת חומרה: ${d.label || "ללא שם"}`} title="עדיפות ברירת מחדל" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, prio: e.target.value } : x))}><option value="low">עדיפות: נמוכה</option><option value="medium">עדיפות: בינונית</option><option value="high">עדיפות: גבוהה</option></select>
           <label className="chk-line" style={{ margin: 0 }}><input type="checkbox" checked={!!d.oos} onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, oos: e.target.checked } : x))} /> מוציא מכלל שימוש</label>
         </div>
       </div>)}
@@ -11190,7 +11194,7 @@ a{color:inherit;}
 .field textarea,.ta{resize:vertical;line-height:1.5;}
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),select,textarea{min-height:44px;border:1px solid rgba(148,163,184,.38);border-radius:12px;background:var(--input);color:var(--ink);font:inherit;box-shadow:var(--control-shadow);outline:none;transition:border-color 160ms var(--ease-out),box-shadow 160ms var(--ease-out),background-color 160ms var(--ease-out);}
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):focus,select:focus,textarea:focus{border-color:rgba(31,78,140,.72);box-shadow:0 0 0 3px rgba(31,78,140,.13),var(--control-shadow);}
-select{appearance:none;-webkit-appearance:none;padding:0 13px 0 38px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:left 17px center,left 11px center;background-size:6px 6px,6px 6px;background-repeat:no-repeat;font-weight:750;}
+select{appearance:none;-webkit-appearance:none;padding:0 13px 0 38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236f7680' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-position:left 13px center;background-size:18px 18px;background-repeat:no-repeat;font-weight:750;}
 select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):hover,textarea:hover{border-color:rgba(100,116,139,.55);}
 .chk-line{min-height:44px;display:flex;align-items:center;gap:9px;font-size:14px;margin-bottom:15px;cursor:pointer;}
 .chk-line input{width:20px;height:20px;}
@@ -11312,16 +11316,22 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .filter-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px;}
 .filter-row select{border:1.5px solid var(--line);border-radius:10px;padding:9px 6px;background:var(--input);font-size:12.5px;}
 .count-line{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
-.settings-wrap{width:min(100%,1040px);margin:0 auto;display:flex;flex-direction:column;gap:14px;}
+.settings-wrap{width:min(100%,1040px);margin:0 auto;display:flex;flex-direction:column;gap:12px;}
 .settings-wrap input,.settings-wrap select,.settings-wrap button{font-weight:500;}
 .settings-wrap .btn-primary,.settings-wrap .btn-ghost,.settings-wrap .btn-danger,.settings-wrap .sect{font-weight:600;}
-.settings-table-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:var(--control-shadow);overflow-x:auto;}
-.wait-reasons-card{display:grid;gap:8px;}
-.wait-reason-head,.wait-reason-row{display:grid;grid-template-columns:minmax(220px,1.5fr) minmax(150px,1fr) minmax(150px,1fr) minmax(112px,.72fr) 44px;gap:8px;align-items:center;min-width:790px;}
-.wait-reason-head{padding:0 8px 2px;font-weight:600;}
-.wait-reason-row{margin-bottom:0;}
-.wait-reason-row input,.wait-reason-row select{min-height:42px;}
-.wait-reason-row .chk-line{min-height:42px;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:0 10px;font-weight:500;}
+.settings-wrap>.seg-tabs{margin-bottom:6px;}
+.settings-wrap .sect{margin:18px 0 8px;padding-top:7px;border-top:1px solid rgba(201,205,209,.58);font-size:13.5px;}
+.settings-wrap .sect:first-of-type{margin-top:4px;padding-top:0;border-top:0;}
+.settings-wrap .field{margin-bottom:11px;}
+.settings-wrap .hint{line-height:1.48;}
+.settings-wrap .note{padding:11px 12px;line-height:1.52;}
+.settings-table-card{background:var(--surface-glow);border:1px solid rgba(201,205,209,.74);border-radius:15px;padding:10px;box-shadow:var(--control-shadow);overflow-x:auto;}
+.wait-reasons-card{display:grid;gap:7px;}
+.wait-reason-head,.wait-reason-row{display:grid;grid-template-columns:minmax(210px,1.45fr) minmax(145px,1fr) minmax(145px,1fr) minmax(112px,.72fr) 44px;gap:8px;align-items:center;min-width:760px;}
+.wait-reason-head{padding:4px 9px 3px;font-weight:700;color:var(--muted);}
+.wait-reason-row{margin-bottom:0;background:var(--surface);border:1px solid rgba(201,205,209,.62);border-radius:12px;padding:7px;box-shadow:0 1px 1px rgba(46,49,56,.025);}
+.wait-reason-row input,.wait-reason-row select{min-height:44px;}
+.wait-reason-row .chk-line{min-height:44px;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid rgba(201,205,209,.78);border-radius:11px;padding:0 10px;font-weight:600;}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;}
 .note{font-size:12.5px;color:var(--muted);line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:13px;margin-top:10px;}
 .note.warm,.panel.warm{background:var(--warm-surface);border-color:var(--warm-line);}
@@ -11507,10 +11517,10 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .bulk-msg.err{color:#B91C1C;}
 .group-seg{display:inline-flex;align-items:center;gap:4px;margin-inline-start:auto;}
 .group-lbl{color:var(--muted);font-size:12px;margin-inline-end:2px;}
-.dt-edit-row{border:1px solid var(--line);border-radius:11px;padding:9px 10px;margin-bottom:8px;background:var(--surface);}
-.dt-edit-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.dt-edit-row{border:1px solid rgba(201,205,209,.74);border-radius:14px;padding:10px 11px;margin-bottom:9px;background:var(--surface-glow);box-shadow:var(--control-shadow);}
+.dt-edit-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .dt-edit-line + .dt-edit-line{margin-top:8px;}
-.dt-edit-line select{font-weight:500;min-height:42px;}
+.dt-edit-line select{font-weight:500;min-height:44px;}
 .dt-edit-line .chk-line{font-weight:500;}
 .dt-desc-in{flex:2;min-width:160px;color:var(--muted);}
 .group-seg button{min-height:38px;background:var(--surface);border:1px solid rgba(201,205,209,.86);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:650;cursor:pointer;box-shadow:var(--control-shadow);}
@@ -11690,7 +11700,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .blk-set-panel textarea{width:100%;margin-bottom:8px;}
 .drv-unit.blocked{box-shadow:inset 0 0 0 1.5px rgba(220,38,38,0.4);}
 .color-popover{position:relative;display:inline-flex;align-items:center;justify-content:center;}
-.color-trigger{width:42px;height:42px;border-radius:999px;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:var(--control-shadow);}
+.color-trigger{width:44px;height:44px;border-radius:999px;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:var(--control-shadow);}
 .color-trigger span{width:26px;height:26px;border-radius:999px;border:2px solid var(--surface);box-shadow:0 0 0 1px rgba(46,49,56,.18);}
 .color-menu{position:absolute;inset-inline-start:0;top:calc(100% + 8px);z-index:30;display:grid;grid-template-columns:repeat(5,28px);gap:8px;padding:10px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 16px 42px rgba(46,49,56,.16);}
 .color-choice{width:28px;height:28px;border-radius:999px;border:2px solid var(--surface);padding:0;box-shadow:0 0 0 1px rgba(46,49,56,.14);cursor:pointer;}
@@ -12021,7 +12031,7 @@ body *{visibility:hidden!important;}
 .ovl-panel.profile-shell{align-items:center;justify-content:center;background:transparent;box-shadow:none;width:min(520px,calc(100% - 24px));height:auto;max-width:none;max-height:calc(100dvh - 24px);overflow:visible;padding:0;}
 .ovl-panel.issue-report-shell{align-items:center;justify-content:center;background:transparent;box-shadow:none;width:min(420px,calc(100% - 24px));height:auto;max-width:none;max-height:calc(100dvh - 24px);overflow:visible;padding:0;}
 .profile-shell .profile-modal,.issue-report-shell .issue-modal{width:100%;max-height:inherit;box-shadow:0 24px 60px rgba(0,0,0,.4);}
-.brand-upload{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:var(--control-shadow);}
+.brand-upload{display:grid;grid-template-columns:auto minmax(0,1fr);gap:15px;align-items:center;background:var(--surface-glow);border:1px solid rgba(201,205,209,.74);border-radius:15px;padding:14px 15px;margin-bottom:10px;box-shadow:var(--control-shadow);}
 .brand-upload-main{min-width:0;flex:1;}
 .brand-upload-title{font-size:14px;font-weight:750;color:var(--ink);margin-bottom:3px;}
 .brand-upload-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
@@ -12215,11 +12225,22 @@ body *{visibility:hidden!important;}
   .dash-domain-meta{text-align:start;font-size:11.5px;align-self:center;}
   .dash-ticket-tag{position:static;justify-self:start;grid-column:2 / -1;max-width:100%;}
   .settings-wrap{width:100%;}
-  .settings-table-card{overflow-x:visible;padding:10px;background:transparent;border:0;box-shadow:none;}
+  .settings-wrap>.seg-tabs{margin-bottom:4px;}
+  .settings-wrap .sect{margin:14px 0 7px;padding-top:6px;font-size:13px;}
+  .settings-wrap .field{margin-bottom:10px;}
+  .brand-upload{grid-template-columns:44px minmax(0,1fr);gap:11px;padding:12px;border-radius:14px;}
+  .brand-upload .brand-mark{width:44px;height:44px;border-radius:12px;}
+  .brand-upload-actions{gap:7px;}
+  .brand-upload-actions .btn-ghost{flex:1;min-width:136px;}
+  .settings-table-card{overflow-x:visible;padding:0;background:transparent;border:0;box-shadow:none;}
   .wait-reason-head{display:none;}
   .wait-reason-row{min-width:0;grid-template-columns:1fr;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--control-shadow);}
   .wait-reason-row .chk-line{justify-content:flex-start;}
   .wait-reason-row .reg-del{justify-self:flex-start;}
+  .dt-edit-row{padding:10px;border-radius:13px;}
+  .dt-edit-line{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;}
+  .dt-edit-line .dt-desc-in,.dt-edit-line select,.dt-edit-line .chk-line{grid-column:1 / -1;}
+  .sla-grid{grid-template-columns:1fr!important;}
 }
 
 @media(max-width:760px){
@@ -12308,14 +12329,14 @@ body *{visibility:hidden!important;}
 .shift-info{display:flex;align-items:center;gap:9px;}
 .shift-stat{font-weight:700;font-size:14px;}
 .shift-sub{font-size:12px;color:var(--muted);}
-.reg-item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 11px;margin-bottom:9px;}
+.reg-item{background:var(--surface-glow);border:1px solid rgba(201,205,209,.74);border-radius:13px;padding:10px 11px;margin-bottom:9px;box-shadow:var(--control-shadow);}
 .reg-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .reg-row.wait-reason-row{display:grid;grid-template-columns:minmax(220px,1.5fr) minmax(150px,1fr) minmax(150px,1fr) minmax(112px,.72fr) 44px;gap:8px;align-items:center;margin-bottom:0;}
-.reg-name{flex:1;border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--input);outline:none;font-size:14px;}
+.reg-name{flex:1;border:1px solid rgba(148,163,184,.38);border-radius:10px;padding:8px 10px;background:var(--input);outline:none;font-size:14px;box-shadow:var(--control-shadow);}
 .reg-label{flex:1;font-weight:600;font-size:14px;padding:8px 2px;display:flex;align-items:center;gap:8px;}
 .reg-count{padding:2px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.2px;}
-.reg-edit{flex-shrink:0;width:44px;height:44px;border-radius:11px;border:1.5px solid var(--line);background:var(--surface);color:var(--primary);display:flex;align-items:center;justify-content:center;}
-.reg-del{flex-shrink:0;width:44px;height:44px;border-radius:11px;border:1.5px solid var(--line);background:var(--surface);color:#DC2626;display:flex;align-items:center;justify-content:center;}
+.reg-edit{flex-shrink:0;width:44px;height:44px;border-radius:11px;border:1px solid rgba(201,205,209,.86);background:var(--surface);color:var(--primary);display:flex;align-items:center;justify-content:center;box-shadow:var(--control-shadow);}
+.reg-del{flex-shrink:0;width:44px;height:44px;border-radius:11px;border:1px solid rgba(201,205,209,.86);background:var(--surface);color:#B91C1C;display:flex;align-items:center;justify-content:center;box-shadow:var(--control-shadow);}
 .color-swatch-input{width:44px!important;height:44px!important;min-height:44px!important;padding:4px!important;border:1px solid rgba(148,163,184,.34)!important;border-radius:12px!important;background:var(--surface)!important;box-shadow:var(--control-shadow)!important;cursor:pointer;}
 .color-swatch-input::-webkit-color-swatch-wrapper{padding:0;}
 .color-swatch-input::-webkit-color-swatch{border:0;border-radius:8px;}
@@ -12424,7 +12445,7 @@ body *{visibility:hidden!important;}
 .dept-card-title{font-size:18px;font-weight:720;color:var(--ink);line-height:1.15;}
 .dept-card-sub{font-size:12.5px;color:var(--muted);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .dept-card-metrics{display:flex;align-items:stretch;gap:8px;}
-.dept-card-metrics span{min-width:78px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:7px 10px;text-align:center;}
+.dept-card-metrics span{min-width:72px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:7px 10px;text-align:center;}
 .dept-card-metrics b{display:block;font-size:18px;line-height:1;color:var(--primary);font-weight:760;font-variant-numeric:tabular-nums;}
 .dept-card-metrics small{display:block;margin-top:4px;font-size:10.5px;color:var(--muted);white-space:nowrap;}
 .dept-add{white-space:nowrap;}
@@ -12442,7 +12463,11 @@ body *{visibility:hidden!important;}
 .worker-card.inert{cursor:default;}
 .worker-avatar{width:46px;height:46px;border-radius:16px;background:linear-gradient(145deg,#E6E7E9,#FFFFFF);border:1px solid var(--line);color:var(--primary);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
 .worker-card-main{min-width:0;display:grid;gap:2px;}
+.worker-card-head{min-width:0;display:flex;align-items:center;gap:8px;}
 .worker-name{font-size:14.5px;font-weight:720;line-height:1.2;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.team-user-badge{display:inline-flex;align-items:center;max-width:46%;min-width:0;border-radius:999px;background:var(--surface-2);color:var(--muted);padding:3px 9px;font-size:11.5px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.team-user-card .worker-card-main{gap:3px;}
+.team-user-card .worker-name{flex:1;min-width:0;}
 .worker-meta{font-size:12.5px;color:var(--muted);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .worker-seen{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);line-height:1.25;margin-top:2px;}
 .worker-seen.online{color:#047857;font-weight:700;}
@@ -12456,11 +12481,13 @@ body *{visibility:hidden!important;}
 .dept-empty{margin:14px;}
 @media(max-width:760px){
   .dept-card-summary{grid-template-columns:1fr;align-items:start;}
-  .dept-card-metrics{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+  .dept-card-metrics{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
   .dept-card-metrics span{min-width:0;}
   .dept-add{justify-self:start;}
   .dept-shift-board{grid-template-columns:1fr;padding:10px;}
   .worker-card-grid{grid-template-columns:1fr;}
+  .worker-card-head{align-items:flex-start;}
+  .team-user-badge{max-width:42%;}
 }
 .unit-pick-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer;text-align:start;}
 .unit-pick-btn:hover{border-color:var(--primary);}
@@ -12693,9 +12720,10 @@ body *{visibility:hidden!important;}
   .fleet-unit-table .ft-type b{font-size:14px;line-height:1.25;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
   .fleet-unit-table .ft-model{grid-area:model;text-align:start;font-size:13px;line-height:1.25;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
   .fleet-unit-table .ft-sup{grid-area:supplier;text-align:start;font-size:12.5px;line-height:1.3;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
-  .fleet-unit-table .ft-doc{grid-area:docs;margin-top:5px;}
-  .fleet-unit-table .doc-chip-stack{grid-template-columns:1fr;gap:5px;}
-  .fleet-unit-table .doc-chip{max-width:100%;}
+.fleet-unit-table .ft-doc{grid-area:docs;margin-top:5px;width:100%;}
+.fleet-unit-table .doc-chip-stack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;justify-content:stretch;overflow:visible;}
+.fleet-unit-table .doc-chip{max-width:none;min-height:28px;grid-template-columns:7px minmax(0,1fr) auto;padding:4px 8px;}
+.fleet-unit-table .doc-chip-days{text-align:end;}
 }
 @media(max-width:390px){
   .worker-top{padding-inline:8px;}
