@@ -7401,9 +7401,9 @@ function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, on
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>סיבות עומס</b><span>מה מסביר את מצב הקריאות</span></div></div>
-        <Bar label="ממתין לגורם או אישור" value={waiting.length} max={Math.max(openTickets.length, 1)} color="#B45309" />
-        <Bar label="חריגות SLA" value={slaBreaches.length} max={Math.max(openTickets.length, 1)} color="#B91C1C" />
-        <Bar label="השבתה קריטית" value={critical.length} max={Math.max(openTickets.length, 1)} color="#C2410C" />
+        <Bar label="ממתין לגורם או אישור" value={waiting.length} max={Math.max(openTickets.length, 1)} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · ממתין לגורם או אישור", statuses: ["waiting", "pending_user", "pending_admin"] } })} />
+        <Bar label="חריגות SLA" value={slaBreaches.length} max={Math.max(openTickets.length, 1)} color="#B91C1C" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · חריגות SLA", overdue: true } })} />
+        <Bar label="השבתה קריטית" value={critical.length} max={Math.max(openTickets.length, 1)} color="#C2410C" onClick={() => onGoTickets?.({ st: "open", track: "transport", focus: { label: "BI · השבתה קריטית", activeCriticalTransport: true } })} />
       </section>
 
       <section className="panel bi-panel">
@@ -7833,6 +7833,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
     if (period !== "all" && t.createdAt < from) return false;
     if (focus) {
       if (focus.forkliftId && t.forkliftId !== focus.forkliftId) return false;
+      if (Array.isArray(focus.statuses) && focus.statuses.length && !focus.statuses.includes(t.status)) return false;
       if (focus.supplier && (t.closure?.costSupplier || "") !== focus.supplier) return false;
       if (focus.waitReason && t.waitingReason !== focus.waitReason) return false;
       if (focus.lifecycleKey && !ticketHasLifecycleStage(t, focus.lifecycleKey, { isOpen })) return false;
