@@ -12090,12 +12090,16 @@ body *{visibility:hidden!important;}
 .dash-ticket-main small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .dash-ticket-dot{width:8px;height:8px;border-radius:50%;align-self:start;margin-top:6px;box-shadow:0 0 0 3px rgba(201,205,209,.25);}
 .dash-ticket-tag{grid-column:2 / -1;justify-self:start;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:720;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dash-domain-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
-.dash-domain-card{position:relative;min-height:108px;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;color:var(--ink);box-shadow:var(--control-shadow);overflow:hidden;}
-.dash-domain-card:hover{border-color:var(--primary);box-shadow:var(--lift-shadow);transform:translateY(-1px);}
-.dash-domain-top{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;font-weight:700;}
-.dash-domain-value{font-family:var(--font-head);font-size:26px;font-weight:700;margin-top:8px;font-variant-numeric:tabular-nums;}
-.dash-domain-meta{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.35;}
+.dash-domain-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--control-shadow);}
+.dash-domain-card{position:relative;min-height:84px;direction:rtl;display:grid;grid-template-columns:44px minmax(0,128px);grid-template-rows:auto auto auto;grid-template-areas:"icon title" "icon value" "icon meta";justify-content:center;align-content:center;align-items:center;gap:2px 14px;text-align:center;background:transparent;border:0;border-inline-start:1px solid var(--line);border-radius:0;padding:10px 14px;color:var(--ink);overflow:hidden;}
+.dash-domain-card:first-child{border-inline-start:0;}
+.dash-domain-card:hover{background:var(--surface-2);color:var(--primary);}
+.dash-domain-top{display:contents;}
+.dash-domain-top svg{grid-area:icon;width:36px;height:36px;justify-self:center;color:var(--icon-muted);stroke-width:1.8;}
+.dash-domain-card:hover .dash-domain-top svg{color:var(--primary);}
+.dash-domain-top span{grid-area:title;color:var(--muted);font-size:13.5px;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
+.dash-domain-value{grid-area:value;font-family:var(--font-head);font-size:28px;font-weight:760;line-height:1;font-variant-numeric:tabular-nums;text-align:center;}
+.dash-domain-meta{grid-area:meta;font-size:12px;color:var(--muted);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
 .dash-domain-card>svg{display:none;}
 .dash-rail-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--control-shadow);}
 .dash-rail-card h3{font-family:var(--font-head);font-size:14px;font-weight:690;margin:0 0 10px;color:var(--ink);}
@@ -12155,6 +12159,8 @@ body *{visibility:hidden!important;}
   .dash-ticket-grid,.dash-attention-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
   .dash-chart-grid{grid-template-columns:1fr;}
   .dash-domain-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .dash-domain-card:nth-child(odd){border-inline-start:0;}
+  .dash-domain-card:nth-child(n+3){border-top:1px solid var(--line);}
 }
 @media(max-width:760px){
   .dash-command{gap:14px;}
@@ -12173,6 +12179,8 @@ body *{visibility:hidden!important;}
   .dash-message-card,.dash-quick-create{align-items:flex-start;flex-direction:column;}
   .dash-link-btn{align-self:flex-start;}
   .dash-ticket-grid,.dash-attention-grid,.dash-chart-grid,.dash-domain-grid,.dash-rail{grid-template-columns:1fr;}
+  .dash-domain-card{border-inline-start:0;border-top:1px solid var(--line);}
+  .dash-domain-card:first-child{border-top:0;}
   .dash-ticket-tag{position:static;justify-self:start;grid-column:2 / -1;max-width:100%;}
   .settings-wrap{width:100%;}
   .settings-table-card{overflow-x:visible;padding:10px;background:transparent;border:0;box-shadow:none;}
