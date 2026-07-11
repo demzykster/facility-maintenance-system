@@ -8,6 +8,13 @@ export const ROLE_PERM_DEFAULT = {
   cleaner: { ppe: "none" }
 };
 
+export const DEFAULT_MANAGER_PERMS = {
+  fleetTickets: "view",
+  ppe: "request",
+  users: "view",
+  audit: "view"
+};
+
 export const USER_PERMISSION_MODULES = [
   { mod: "fleetDocs", label: "מסמכי ותוקף כלי שינוע", levels: ["none", "view"], hint: "צפייה במסמכים ותאריכי תוקף של כלי המחלקות שלו." },
   { mod: "fleetTickets", label: "היסטוריית קריאות על כלים", levels: ["none", "view"], hint: "צפייה בקריאות עבר על כלי המחלקות שלו." },

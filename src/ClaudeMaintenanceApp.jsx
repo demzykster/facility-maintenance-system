@@ -11,7 +11,7 @@ import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { productionAccessToken, store } from "./storageAdapter.js";
-import { USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
+import { DEFAULT_MANAGER_PERMS, USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, isWorkerLoginRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
@@ -9610,7 +9610,7 @@ function SettingsPanel(p) {
     return "עובדים";
   };
   const userSubCreatePatch = () => {
-    if (userSub === "managers") return { role: "user" };
+    if (userSub === "managers") return { role: "user", perms: { ...DEFAULT_MANAGER_PERMS } };
     if (userSub === "techs") return { role: "tech" };
     if (userSub === "admins") return { role: "admin" };
     return { role: "worker" };
@@ -9849,8 +9849,8 @@ function SettingsPanel(p) {
   </div>);
 }
 function UserForm({ user, config, users, zones, presence = [], canDelete, lockRole, lockDept, canManageWorkerAccess: canWorkerAccess = false, onCancel, onSave, onDelete, onArchive }) {
-  const initialPerms = normalizePerms(user);
   const initialRole = user.role === "cleaner" ? "worker" : (user.role || lockRole || "");
+  const initialPerms = !user.id && initialRole === "user" && !user.perms ? { ...DEFAULT_MANAGER_PERMS } : normalizePerms(user);
   const initialDept = user.role === "cleaner" ? "ניקיון" : (user.dept || lockDept || "");
   const [name, setName] = useState(user.name || ""), [position, setPosition] = useState(user.position || user.jobTitle || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
@@ -9875,6 +9875,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
   const pickCard = (on, tone = "#EA580C") => ({ borderColor: on ? tone : undefined, background: on ? "var(--primary-soft,#FFF4ED)" : undefined, color: on ? "var(--primary)" : undefined });
   const changeRole = (nextRole) => {
     setRole(nextRole);
+    if (!user.id && nextRole === "user" && Object.keys(cleanPerms(perms)).length === 0) setPerms({ ...DEFAULT_MANAGER_PERMS });
   };
   const ChoiceGrid = ({ options, value, onChange, columns = "auto", tone = "#EA580C" }) => (
     <div className={"uf-choice-grid cols-" + columns}>{options.map((opt) => {
