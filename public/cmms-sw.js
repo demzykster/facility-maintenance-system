@@ -11,8 +11,8 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body || "יש עדכון חדש במערכת",
     tag: data.tag || "cmms-update",
-    icon: "/pwa-icon.svg",
-    badge: "/pwa-icon.svg",
+    icon: "/pwa-icon.svg?v=brand-20260711",
+    badge: "/pwa-icon.svg?v=brand-20260711",
     data: { url: data.url || "/" }
   };
   event.waitUntil(self.registration.showNotification(title, options));
