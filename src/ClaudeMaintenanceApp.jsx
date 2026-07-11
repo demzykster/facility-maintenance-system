@@ -468,6 +468,11 @@ const DOC_DEFS = [
   { id: "license", label: "רישיון רכב" },
   { id: "lease", label: "סיום ליזינג" },
 ];
+const COMPACT_DOC_LABELS = {
+  license: "ר. רכב",
+  lease: "ס. ליסינג"
+};
+const compactDocLabel = (doc) => COMPACT_DOC_LABELS[doc?.id] || doc?.label || "";
 // Профиль документов по типу: tasrir (мачта/подъём → תסקיר), license (רישיון רכב), insurance (ביטוח), lease (סיום ליזינג).
 const TYPE_META_SEED = {
   "52-8FDF20": { insurance: true, tasrir: true, license: true, lease: true },
@@ -8238,7 +8243,7 @@ function FleetModule(p) {
       </select>
     </label>
   );
-  const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const missing = ts == null; const col = missing ? "#DC2626" : docWarnColor(dl, config); return <span key={d.id} className="doc-chip"><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{d.label}</span><span className="doc-chip-days" style={{ color: col }}>{missing ? "חסר" : docDaysLabel(dl)}</span></span>; };
+  const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const missing = ts == null; const col = missing ? "#DC2626" : docWarnColor(dl, config); return <span key={d.id} className="doc-chip" title={d.label}><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{compactDocLabel(d)}</span><span className="doc-chip-days" style={{ color: col }}>{missing ? "חסר" : docDaysLabel(dl)}</span></span>; };
   const renderRow = (f) => { const blk = unitBlock(f, tickets, config); const selected = selectedFleetIds.includes(f.id); return <div key={f.id} role="button" tabIndex={0} className={"ftable-row fleet-unit-row" + (blk ? " blocked" : "") + (selected ? " selected" : "")} onClick={() => setOpenId(f.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(f.id); } }} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
     <label className="ft-select" aria-label={`בחר ${f.code}`} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleFleetSelection(f.id)} /></label>
     <span className="ft-code">{f.code}</span>
