@@ -332,6 +332,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
           const usersById = new Map();
           for (const profile of profiles) {
             const user = userRecordFromAppUserProfile(profile, {});
+            if (user.active === false) continue;
             usersById.set(user.id, publicUserForSession(appUserRecordKey(user), user, auth.user));
           }
           return json(res, 200, { ok: true, users: [...usersById.values()], source: "app_users" });

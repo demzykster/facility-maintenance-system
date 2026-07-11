@@ -299,6 +299,28 @@ describe("users API handler", () => {
     expect(profileClient.listAppUserProfiles).toHaveBeenCalled();
   });
 
+  it("does not list deactivated app_users after user-management delete", async () => {
+    const profileClient = {
+      listAppUserProfiles: vi.fn().mockResolvedValue([
+        { id: "active-user", auth_user_id: "auth-active", role: "user", name: "Active User", active: true, email: "active@example.com" },
+        { id: "deleted-user", auth_user_id: "auth-deleted", role: "worker", name: "Deleted User", active: false, worker_no: "2042" }
+      ]),
+      getAppUserProfileById: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "view" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer manager-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().users.map((user) => user.id)).toEqual(["active-user"]);
+  });
+
   it("reads a single app_users profile without requiring a KV mirror", async () => {
     const driver = {
       get: vi.fn(async (key) => key === "user:app-user-1" ? JSON.stringify({ id: "app-user-1", authUserId: "auth-1", techCats: ["electric"] }) : null),

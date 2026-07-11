@@ -10921,8 +10921,18 @@ function Meta({ Icon, iconColor, label, value }) { return <div className="meta">
 function Empty({ text, sub, Icon = CheckCircle2 }) { return <div className="empty"><Icon size={34} /><div className="empty-t">{text}</div>{sub && <div className="empty-s">{sub}</div>}</div>; }
 function ConfirmBtn({ onConfirm, label, className = "btn-danger full", style, icon = <Trash2 size={15} /> }) {
   const [armed, setArmed] = useState(false);
+  const [busy, setBusy] = useState(false);
   useEffect(() => { if (!armed) return; const id = setTimeout(() => setArmed(false), 3500); return () => clearTimeout(id); }, [armed]);
-  return <button className={className} style={style} onClick={() => { if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}>{armed ? "לחצו שוב לאישור" : <>{icon} {label}</>}</button>;
+  return <button className={className} style={style} disabled={busy} onClick={async () => {
+    if (!armed) return setArmed(true);
+    setBusy(true);
+    try {
+      await onConfirm();
+      setArmed(false);
+    } finally {
+      setBusy(false);
+    }
+  }}>{busy ? <><span className="spinner sm" /> מוחק…</> : armed ? "לחצו שוב לאישור" : <>{icon} {label}</>}</button>;
 }
 
 /* ============================================================ STYLES */
