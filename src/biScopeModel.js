@@ -56,6 +56,9 @@ export function biScopeForSession(session, data = {}) {
     rounds: [],
     complaints: [],
     ppe: [],
+    ppeItems: [],
+    ppeReqs: [],
+    ppeOrders: [],
     users: []
   };
   if (!session) return empty;
@@ -68,6 +71,9 @@ export function biScopeForSession(session, data = {}) {
     rounds = [],
     complaints = [],
     ppe = [],
+    ppeItems = [],
+    ppeReqs = [],
+    ppeOrders = [],
     users = []
   } = data;
 
@@ -85,6 +91,9 @@ export function biScopeForSession(session, data = {}) {
       rounds,
       complaints,
       ppe,
+      ppeItems,
+      ppeReqs,
+      ppeOrders,
       users
     };
   }
@@ -99,6 +108,16 @@ export function biScopeForSession(session, data = {}) {
     ? fleet.filter((unit) => overlaps(fleetDepartments(unit), departments))
     : [];
   const scopedFleetIds = new Set(scopedFleet.map((unit) => unit.id));
+  const scopedUsers = departments.length ? users.filter((user) => userInDepartments(user, departments)) : [];
+  const scopedUserIds = new Set(scopedUsers.map((user) => user.id));
+  const scopedPpe = departments.length ? ppe.filter((item) => item.dept && departments.includes(item.dept)) : [];
+  const scopedPpeReqs = departments.length
+    ? ppeReqs.filter((request) => (request.workerId && scopedUserIds.has(request.workerId)) || (request.dept && departments.includes(request.dept)))
+    : [];
+  const scopedPpeItemIds = new Set([
+    ...scopedPpe.map((item) => item.itemId).filter(Boolean),
+    ...scopedPpeReqs.flatMap((request) => (request.lines || []).map((line) => line.itemId).filter(Boolean))
+  ]);
 
   return {
     kind: "department",
@@ -114,7 +133,10 @@ export function biScopeForSession(session, data = {}) {
     zones: scopedZones,
     rounds: rounds.filter((round) => zoneIds.has(round.zoneId)),
     complaints: complaints.filter((complaint) => zoneIds.has(complaint.zoneId)),
-    ppe: departments.length ? ppe.filter((item) => item.dept && departments.includes(item.dept)) : [],
-    users: departments.length ? users.filter((user) => userInDepartments(user, departments)) : []
+    ppe: scopedPpe,
+    ppeItems: ppeItems.filter((item) => scopedPpeItemIds.has(item.id)),
+    ppeReqs: scopedPpeReqs,
+    ppeOrders: [],
+    users: scopedUsers
   };
 }
