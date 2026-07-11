@@ -9556,7 +9556,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
       <SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle>
       {relOrders.length === 0 ? <div className="hint" style={{ marginBottom: 12 }}>אין הזמנות לספק זה.</div> : <div className="task-list" style={{ marginBottom: 12 }}>{relOrders.map((o) => <div key={o.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{countLabel((o.lines || []).length, "פריט", "פריטים")} · {stLbl(o.status)}</div><div className="task-row-sub">{o.note || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(o.createdAt)}</span></div></div>)}</div>}
       <SectionTitle><Truck size={15} /> כלים / ליסינג</SectionTitle>
-      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {unitDesc(f, config)}</div><div className="task-row-sub">{unitNote(f, config) || "—"}</div></div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>)}</div>}
+      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => { const note = unitNote(f, config); return <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {unitDesc(f, config)}</div>{note ? <div className="task-row-sub">{note}</div> : null}</div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>; })}</div>}
     </div>}
     {tab === "invoices" && <div className="hint" style={{ padding: 18, textAlign: "center" }}>ניהול חשבוניות יתווסף עם מודול התקציב.</div>}
   </div>);
@@ -9607,7 +9607,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
       <div className="search-wrap supplier-search"><Search size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש ספק או קבלן" placeholder="חיפוש ספק / קבלן…" /></div>
       {canManage && <div className="supplier-add">
         <input value={adding} onChange={(e) => setAdding(e.target.value)} aria-label="שם ספק או קבלן חדש" placeholder="שם ספק חדש" />
-        <button className="btn-primary sm" type="submit" disabled={!adding.trim()}><Plus size={15} /> הוסף</button>
+        <button className="btn-primary sm" type="submit"><Plus size={15} /> הוסף</button>
       </div>}
     </form>
     {err && <div className="err" style={{ marginBottom: 10 }}>{err}</div>}
@@ -11735,8 +11735,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .supplier-tags{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:24px;}
 .supplier-tag{display:inline-flex;align-items:center;border-radius:999px;background:rgba(31,78,140,.09);color:var(--primary);border:1px solid rgba(31,78,140,.18);font-size:11.5px;font-weight:650;padding:3px 8px;}
 .supplier-tag.muted{background:var(--surface-2);color:var(--muted);border-color:var(--line);}
-.supplier-metrics{margin-top:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:11.5px;font-weight:800;}
-.supplier-metrics span{border-radius:8px;background:rgba(100,116,139,.08);padding:3px 7px;}
+.supplier-metrics{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;color:var(--muted);font-size:11px;font-weight:800;}
+.supplier-metrics span{min-width:0;border-radius:8px;background:rgba(100,116,139,.08);padding:3px 5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .supplier-linked-row .task-row-side{flex-direction:row;align-items:center;gap:8px;color:var(--muted);}
 .supplier-linked-row:hover .task-row-side{color:var(--primary);}
 
