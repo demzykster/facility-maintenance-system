@@ -12,6 +12,7 @@ import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { productionAccessToken, store } from "./storageAdapter.js";
 import { DEFAULT_MANAGER_PERMS, USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
+import { biScopeForSession } from "./biScopeModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, isWorkerLoginRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
@@ -3670,7 +3671,7 @@ export default function App() {
       {!ready ? <div className="boot"><div className="spinner" /></div>
         : !session ? <Login users={users} config={config} onLogin={login} saveUser={saveUser} theme={theme} toggleTheme={toggleTheme} language={language} setLanguage={setLanguage} zones={zones} onAnonReport={submitAnonymousComplaint} builtinLogins={builtinLoginsForMode(APP_MODE, BUILTIN_LOGINS)} seedPolicy={SEED_POLICY} productionLoginConfig={PRODUCTION_LOGIN_CONFIG} />
           : (<>
-            {effSession.role === "admin" ? <AdminApp {...shared} />
+            {effSession.role === "admin" || effSession.role === "executive" ? <AdminApp {...shared} />
               : effSession.role === "tech" ? <TechApp {...shared} key="imp-tech" />
                 : effSession.role === "worker" ? <WorkerApp {...shared} key="imp-worker" />
                   : effSession.role === "cleaner" ? <CleanerApp {...shared} key="imp-cleaner" />
@@ -7352,38 +7353,124 @@ function PpeHub(p) {
   </>);
 }
 
+function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, onOpenTicket, onGoTickets, onGoAssets }) {
+  const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, users, ppe }), [session, tickets, fleet, pm, zones, users, ppe]);
+  const openTickets = scope.tickets.filter(isOpen);
+  const slaBreaches = openTickets.filter(isOverdue);
+  const critical = openTickets.filter((ticket) => ticket.track === "transport" && ticket.downtimeType === "critical");
+  const waiting = openTickets.filter((ticket) => ticket.status === "waiting" || ticket.status === "pending_user" || ticket.status === "pending_admin");
+  const pmOverdue = scope.pm.filter((task) => task.active !== false && daysLeft(task.nextDue) < 0);
+  const expiringDocs = scope.fleet.map((unit) => ({ unit, status: docStatus(unit, config) })).filter((row) => row.status.d != null && row.status.d <= 30).sort((a, b) => a.status.d - b.status.d);
+  const monthCost = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000).reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0) : 0;
+  const topAttention = [
+    ...slaBreaches.map((ticket) => ({ ticket, label: "חריגת SLA", color: "#B91C1C" })),
+    ...critical.filter((ticket) => !slaBreaches.some((item) => item.id === ticket.id)).map((ticket) => ({ ticket, label: "השבתה קריטית", color: "#C2410C" })),
+    ...waiting.filter((ticket) => !slaBreaches.some((item) => item.id === ticket.id) && !critical.some((item) => item.id === ticket.id)).map((ticket) => ({ ticket, label: "ממתין לגורם", color: "#B45309" }))
+  ].slice(0, 6);
+  const scopeTitle = scope.kind === "company" ? "תמונת חברה" : scope.departments.length ? `מחלקות: ${scope.departments.join(", ")}` : "לא הוגדר scope";
+
+  if (scope.kind === "none") return <Empty text="אין הרשאת BI" Icon={Gauge} sub="המודול פתוח בשלב הראשון להנהלה, מנהלי מערכת ומנהלי מחלקות." />;
+
+  return <div className="bi-shell">
+    <div className="bi-hero">
+      <div>
+        <div className="bi-kicker">BI · {scopeTitle}</div>
+        <h2>מה דורש תשומת לב עכשיו</h2>
+        <p>תמונה ניהולית קצרה לשבוע הקרוב, עם אפשרות להיכנס לפרטים דרך המודולים הקיימים.</p>
+      </div>
+      <div className="bi-period">7 ימים / מצב נוכחי</div>
+    </div>
+
+    <div className="kpi-grid bi-kpis">
+      <Kpi num={openTickets.length} label="קריאות פתוחות" color="var(--primary)" small />
+      <Kpi num={slaBreaches.length} label="חריגות SLA" color={slaBreaches.length ? "#B91C1C" : "#64748B"} small />
+      <Kpi num={critical.length} label="השבתות קריטיות" color={critical.length ? "#C2410C" : "#64748B"} small />
+      <Kpi num={pmOverdue.length} label="טיפולים באיחור" color={pmOverdue.length ? "#B45309" : "#64748B"} small />
+      {scope.canViewFinancialBI && <Kpi num={ils(monthCost)} label="עלות 30 ימים" color="#0D9488" small />}
+    </div>
+
+    <div className="bi-grid">
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>דורש טיפול</b><span>{topAttention.length ? `${topAttention.length} פריטים ראשונים` : "אין חריגים פתוחים"}</span></div><button className="btn-ghost sm" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · דורש טיפול" } })}>לכל הקריאות</button></div>
+        {topAttention.length ? topAttention.map(({ ticket, label, color }) => <button key={ticket.id} className="bi-attn-row" onClick={() => onOpenTicket?.(ticket.id)}>
+          <span className="bi-dot" style={{ background: color }} />
+          <span><b>{ticketNo(ticket)} · {ticket.subject || ticket.asset || "קריאה"}</b><small>{label} · {stOf(ticket.status).label}</small></span>
+          <ChevronLeft size={15} />
+        </button>) : <div className="note">אין כרגע חריגות מרכזיות בתחום הזה.</div>}
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>סיבות עומס</b><span>מה מסביר את מצב הקריאות</span></div></div>
+        <Bar label="ממתין לגורם או אישור" value={waiting.length} max={Math.max(openTickets.length, 1)} color="#B45309" />
+        <Bar label="חריגות SLA" value={slaBreaches.length} max={Math.max(openTickets.length, 1)} color="#B91C1C" />
+        <Bar label="השבתה קריטית" value={critical.length} max={Math.max(openTickets.length, 1)} color="#C2410C" />
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>צי ותחזוקה מונעת</b><span>מסמכים וטיפולים שיכולים להפוך לבעיה</span></div><button className="btn-ghost sm" onClick={() => onGoAssets?.({ tab: "fleet" })}>לכלים</button></div>
+        <div className="bi-mini-stats">
+          <span><b>{scope.fleet.length}</b><small>כלים בתחום</small></span>
+          <span><b>{expiringDocs.length}</b><small>מסמכים קרובים/פגי תוקף</small></span>
+          <span><b>{pmOverdue.length}</b><small>PM באיחור</small></span>
+        </div>
+        {expiringDocs.slice(0, 3).map(({ unit, status }) => <div key={unit.id} className="bi-doc-row"><b>{unitLabel(unit, config)}</b><span>{status.label} · {status.d < 0 ? "פג תוקף" : `בעוד ${status.d} ימים`}</span></div>)}
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>{scope.canViewFinancialBI ? "פיננסים" : "אנשים ושטח"}</b><span>{scope.canViewFinancialBI ? "מוצג רק להנהלה ולאדמין" : "ללא נתוני עלות"}</span></div></div>
+        {scope.canViewFinancialBI ? <>
+          <div className="big-stat">{ils(monthCost)}</div>
+          <div className="rs-lbl">עלות סגירות ב-30 הימים האחרונים</div>
+        </> : <div className="bi-mini-stats">
+          <span><b>{scope.users.length}</b><small>עובדים/משתמשים</small></span>
+          <span><b>{scope.zones.length}</b><small>אזורי ניקיון</small></span>
+          <span><b>{scope.ppe.length}</b><small>רשומות ציוד</small></span>
+        </div>}
+      </section>
+    </div>
+  </div>;
+}
+
 function AdminApp(p) {
   const { session, config, fleet, tickets, pm, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
-  const [tab, setTab] = useState("dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
+  const [tab, setTab] = useState(() => session.role === "executive" ? "bi" : "dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
   const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const clearTicketFilter = () => setTFilter(null);
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
   const goPpe = (nav = {}) => { setPpeNav({ ...nav, _t: Date.now() }); setTab("ppe"); };
+  const isAdminRole = session.role === "admin";
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
   const mayViewAnalytics = canViewAnalytics(session);
+  const mayViewAssets = canFleetDocs(session) || canFleetTickets(session) || isAdminRole;
   const mayViewSuppliers = canViewSuppliers(session);
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
   const mayViewAudit = canViewAudit(session);
   const blockedTab = {
+    dash: !isAdminRole,
     insights: !mayViewAnalytics,
+    assets: !mayViewAssets,
+    tasks: !isAdminRole,
+    ppe: !isAdminRole,
+    cleaning: !isAdminRole,
     team: !mayViewUsers,
     suppliers: !mayViewSuppliers,
     activity: !mayViewAudit,
     settings: !mayManageSettings
   };
-  const activeTab = blockedTab[tab] ? "dash" : tab;
+  const activeTab = blockedTab[tab] ? "bi" : tab;
   const nav = [
-    { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" },
+    { id: "bi", Icon: Gauge, label: "BI" },
+    isAdminRole ? { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" } : null,
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
-    { id: "tasks", Icon: ClipboardList, label: "מטלות" },
-    { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" },
-    { id: "assets", Icon: Truck, label: "כלי שינוע" },
+    isAdminRole ? { id: "tasks", Icon: ClipboardList, label: "מטלות" } : null,
+    isAdminRole ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" } : null,
+    mayViewAssets ? { id: "assets", Icon: Truck, label: "כלי שינוע" } : null,
     mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה" } : null,
-    { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" },
+    isAdminRole ? { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" } : null,
     mayViewUsers ? { id: "team", Icon: Users, label: "צוות ומשתמשים" } : null,
     mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" } : null,
     mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן פעילות" } : null,
@@ -7395,6 +7482,7 @@ function AdminApp(p) {
       <div className="main-col">
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
+          {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} />}
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
@@ -7408,7 +7496,7 @@ function AdminApp(p) {
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
-      <MobileBottomNav nav={nav} primaryIds={["dash", "tickets", "tasks"]} />
+      <MobileBottomNav nav={nav} primaryIds={isAdminRole ? ["bi", "tickets", "tasks"] : ["bi", "tickets", "insights"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
@@ -11268,6 +11356,27 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;transition:border-color 180ms var(--ease-out),box-shadow 180ms var(--ease-out),transform 180ms var(--ease-out);}
 .kpi-num{font-family:var(--font-head);font-weight:700;font-size:28px;line-height:1;}.kpi-num.sm{font-size:20px;}
 .kpi-lbl{color:var(--muted);font-size:12.5px;margin-top:5px;}
+.bi-shell{display:flex;flex-direction:column;gap:14px;}
+.bi-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--control-shadow);}
+.bi-hero h2{font-family:var(--font-head);font-size:24px;line-height:1.15;margin:4px 0 5px;letter-spacing:0;}
+.bi-hero p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55;}
+.bi-kicker{font-size:12px;font-weight:750;color:var(--primary);}
+.bi-period{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);padding:8px 12px;font-size:12px;font-weight:700;color:var(--muted);}
+.bi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.bi-kpis{grid-template-columns:repeat(5,minmax(0,1fr));}
+.bi-panel{min-width:0;}
+.bi-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.bi-panel-head b{display:block;font-size:14.5px;}
+.bi-panel-head span{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
+.bi-attn-row{width:100%;min-height:54px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:start;border:1px solid var(--line);background:var(--surface-glow);border-radius:12px;padding:9px 10px;margin-bottom:8px;box-shadow:var(--control-shadow);}
+.bi-attn-row b,.bi-doc-row b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bi-attn-row small,.bi-doc-row span{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
+.bi-dot{width:10px;height:10px;border-radius:999px;}
+.bi-mini-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.bi-mini-stats span{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px;text-align:center;}
+.bi-mini-stats b{display:block;font-family:var(--font-head);font-size:20px;color:var(--primary);}
+.bi-mini-stats small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
+.bi-doc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:9px;margin-top:9px;}
 .ppe-dash-flow{display:flex;flex-direction:column;gap:22px;}
 .ppe-dash-section{min-width:0;}
 .ppe-dashboard{display:flex;flex-direction:column;gap:22px;}
@@ -12193,6 +12302,16 @@ body *{visibility:hidden!important;}
   .dash-domain-card:nth-child(n+3){border-top:1px solid var(--line);}
 }
 @media(max-width:760px){
+  .bi-hero{align-items:flex-start;flex-direction:column;padding:14px 15px;gap:10px;}
+  .bi-hero h2{font-size:20px;}
+  .bi-period{align-self:flex-start;}
+  .bi-grid{grid-template-columns:1fr;}
+  .bi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .bi-mini-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+  .bi-mini-stats span{padding:8px 6px;}
+  .bi-mini-stats b{font-size:17px;}
+  .bi-panel-head{align-items:flex-start;}
+  .bi-doc-row{align-items:flex-start;flex-direction:column;gap:2px;}
   .dash-command{gap:14px;}
   .dash-hero{flex-direction:column;padding-top:4px;}
   .dash-hero h1{font-size:25px;}
