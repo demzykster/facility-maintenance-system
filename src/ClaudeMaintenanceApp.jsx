@@ -11002,8 +11002,8 @@ function ColorPaletteButton({ value, onChange, label = "בחירת צבע", pale
 function Style() {
   return (<style>{`
 :root{--font-body:'Assistant','Rubik',system-ui,'Segoe UI',Arial,sans-serif;--font-head:'Rubik','Assistant',system-ui,sans-serif;
---brand-white:#FFFFFF;--brand-pearl:#E6E7E9;--brand-dark-pearl:#C9CDD1;--brand-icon:#A4A9B0;--brand-blue:#1F4E8C;--brand-blue-hover:#3E6DB0;--brand-beige:#E9DFC9;--brand-light:#F7F8FA;--brand-ink:#2E3138;--brand-muted:#6F7680;
---bg:var(--brand-white);--surface:var(--brand-white);--surface-2:var(--brand-light);--pearl:var(--brand-pearl);--warm-surface:var(--brand-beige);--warm-soft:#F6EFE2;--warm-line:#D8C8AE;--warning-surface:#F6EFE2;--critical-surface:#FFF1F0;--critical-line:#F5B8B2;--ink:var(--brand-ink);--muted:var(--brand-muted);--line:var(--brand-dark-pearl);--border:var(--line);--input:var(--brand-white);
+--brand-white:#FFFFFF;--brand-pearl:#E6E7E9;--brand-dark-pearl:#C9CDD1;--brand-icon:#A4A9B0;--brand-blue:#1F4E8C;--brand-blue-hover:#3E6DB0;--brand-beige:#EDEBE7;--brand-light:#F7F8FA;--brand-ink:#2E3138;--brand-muted:#6F7680;
+--bg:var(--brand-white);--surface:var(--brand-white);--surface-2:var(--brand-light);--pearl:var(--brand-pearl);--warm-surface:var(--brand-beige);--warm-soft:#F5F4F1;--warm-line:#D7D5D0;--warning-surface:#F5F4F1;--critical-surface:#FFF1F0;--critical-line:#F5B8B2;--ink:var(--brand-ink);--muted:var(--brand-muted);--line:var(--brand-dark-pearl);--border:var(--line);--input:var(--brand-white);
 --primary:var(--brand-blue);--primary-d:var(--brand-blue-hover);--primary-soft:rgba(31,78,140,.10);--primary-line:rgba(31,78,140,.32);--orange:var(--primary);--accent:var(--brand-beige);--slate:var(--brand-ink);--side:var(--brand-white);--side-ink:var(--brand-muted);--icon-muted:var(--brand-icon);
 --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);--ease-drawer:cubic-bezier(0.32,0.72,0,1);
 --press:scale(.975);--lift-shadow:0 10px 26px rgba(46,49,56,.10);--control-shadow:0 1px 2px rgba(46,49,56,.04),0 0 0 1px rgba(46,49,56,.025);--surface-glow:linear-gradient(180deg,rgba(255,255,255,.96),rgba(247,248,250,.84));}
