@@ -80,7 +80,7 @@ import { normalizedPpeAuthorityEnabled, ppeAuthorityFailureIssue, ppeForAuthorit
 import { normalizedWorkAuthorityEnabled, workAuthorityFailureIssue, workForAuthority } from "./workAuthorityModel.js";
 import { normalizedSettingsRecordsAuthorityEnabled, settingsRecordsAuthorityFailureIssue, settingsRecordsForAuthority } from "./settingsRecordsAuthorityModel.js";
 import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, presenceForAuthority } from "./presenceAuthorityModel.js";
-import { priorityToken, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
+import { priorityToken, statusTokenTone, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
 
@@ -10926,11 +10926,20 @@ function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
   </div></div>);
 }
 function Toast({ t, onClose }) { return <div className="toast" onClick={onClose}><Bell size={18} style={{ flexShrink: 0, marginTop: 1 }} /><div><div className="toast-title">{t.title}</div><div className="toast-body">{t.body}</div></div></div>; }
+const ticketTone = (tone) => statusTokenTone(tone);
+const ticketToneForColor = (color, fallbackTone = "neutral") => {
+  const value = String(color || "").toUpperCase();
+  if (value.includes("DC2626") || value.includes("B91C1C") || value.includes("7F1D1D")) return ticketTone("danger");
+  if (value.includes("EA580C") || value.includes("F59E0B") || value.includes("CA8A04") || value.includes("B45309") || value.includes("D97706")) return ticketTone("warning");
+  if (value.includes("16A34A") || value.includes("0D9488") || value.includes("047857")) return ticketTone("success");
+  if (value.includes("1D4ED8") || value.includes("2563EB") || value.includes("3B82F6") || value.includes("1F4E8C")) return ticketTone("info");
+  return ticketTone(fallbackTone);
+};
 function SlaBar({ t, config, big }) {
   const total = Math.max(0, (t.dueAt ?? 0) - (t.createdAt ?? 0)), elapsed = ticketOperationalElapsed(t, config);
   const pct = Math.min(100, Math.max(0, total > 0 ? (elapsed / total) * 100 : 0));
   const done = t.status === "done" || t.status === "cancelled";
-  const color = done ? "var(--muted)" : pct >= 100 ? "#DC2626" : pct >= 75 ? "#EA580C" : pct >= 50 ? "#CA8A04" : "#16A34A";
+  const color = done ? "var(--muted)" : pct >= 100 ? ticketTone("danger").color : pct >= 75 ? ticketTone("process").color : pct >= 50 ? ticketTone("warning").color : ticketTone("success").color;
   const remain = ticketOperationalRemaining(t, config);
   const label = done ? (t.status === "done" ? "טופל" : "בוטל") : remain == null ? "ללא SLA" : remain > 0 ? `נותרו ${fmtDur(remain)}` : `חריגה ${fmtDur(-remain)}`;
   return (<div className={"sla" + (big ? " big" : "")}><div className="sla-track"><div className="sla-fill" style={{ width: (done ? 100 : pct) + "%", background: color }} /></div>{big && <div className="sla-lbl" style={{ color }}>{label}</div>}</div>);
@@ -10941,13 +10950,19 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const showRiskBadge = risk && (risk.level === "orange" || risk.level === "red");
   const showStatusBadge = !(t.status === "waiting" && t.waitingReason);
   const waitingForTechAcceptance = isOpen(t) && t.status === "new" && ballIn(t) === "tech" && !t.assignee;
+  const waitTone = ticketTone("warning");
+  const dangerTone = ticketTone("danger");
+  const adminTone = ticketTone("info");
   const statusBadge = waitingForTechAcceptance
-    ? { label: "ממתין לקבלה", color: "#D97706", bg: "#FEF3C7" }
+    ? { label: "ממתין לקבלה", color: waitTone.color, bg: waitTone.bg }
     : s;
+  const riskTone = showRiskBadge ? ticketToneForColor(risk.color, risk.level === "red" ? "danger" : "warning") : null;
+  const downtimeTone = ticketToneForColor(dtOf(t.downtimeType, config).color, "warning");
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
   const holder = isOpen(t) ? ballHolder(t) : null;
   const stateSince = t.updatedAt || t.createdAt;
+  const holderTone = holder ? ticketToneForColor(holder.color, "info") : null;
   const meta = [
     tr ? <span key="track" className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span> : null,
     t.track === "transport" ? t.asset : t.zone,
@@ -10955,24 +10970,24 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
     timeAgo(t.createdAt),
     t.closure ? ils(t.closure.costAmount || 0) : null
   ].filter(Boolean);
-  return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? "#7F1D1D" : pr.color }}>
-    <div className="tcard-icon" style={{ background: c.color + "22" }}><c.Icon size={20} color={c.color} /></div>
+  return (<button className="tcard" onClick={onClick} style={{ borderInlineStartColor: missingHandler ? dangerTone.color : pr.color }}>
+    <div className="tcard-icon" style={{ background: ticketToneForColor(c.color, "accent").bg }}><c.Icon size={20} color={ticketToneForColor(c.color, "accent").color} /></div>
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
       <div className="tcard-sub">{meta.map((x, i) => <React.Fragment key={i}>{i > 0 && <span className="sep">·</span>}{x}</React.Fragment>)}</div>
       {holder
-        ? <div className="tcard-state" style={{ color: holder.color }}><holder.Icon size={12} /> אצל: {holder.label} · {fmtDur(Date.now() - stateSince)}</div>
+        ? <div className="tcard-state" style={{ color: holderTone.color }}><holder.Icon size={12} /> אצל: {holder.label} · {fmtDur(Date.now() - stateSince)}</div>
         : <div className="tcard-state" style={{ color: s.color }}>סטטוס: {s.label}</div>}
       {isOpen(t) && <SlaBar t={t} config={config} />}
       <div className="tcard-badges">
         {showStatusBadge && <span className="badge sm" style={{ color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>}
-        {ticketBlocks(t, config) && <span className="badge sm" style={{ color: "#fff", background: dtOf(t.downtimeType, config).color }}><ShieldAlert size={11} /> מושבת</span>}
-        {missingHandler && <span className="badge sm" style={{ color: "#7F1D1D", background: "#FEE2E2" }}><AlertTriangle size={11} /> ללא מטפל פעיל</span>}
-        {showRiskBadge && <span className="risk-badge" style={{ background: risk.color + "22", color: risk.color }}>{risk.label}</span>}
-        {t.byAdmin && <span className="badge sm" style={{ color: "var(--primary)", background: "var(--primary-soft)" }}><ShieldCheck size={11} /> מנהל</span>}
-        {t.returned && isOpen(t) && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>⤺ הוחזר</span>}
+        {ticketBlocks(t, config) && <span className="badge sm" style={{ color: downtimeTone.color, background: downtimeTone.bg }}><ShieldAlert size={11} /> מושבת</span>}
+        {missingHandler && <span className="badge sm" style={{ color: dangerTone.color, background: dangerTone.bg }}><AlertTriangle size={11} /> ללא מטפל פעיל</span>}
+        {showRiskBadge && <span className="risk-badge" style={{ background: riskTone.bg, color: riskTone.color, borderColor: riskTone.border }}>{risk.label}</span>}
+        {t.byAdmin && <span className="badge sm" style={{ color: adminTone.color, background: adminTone.bg }}><ShieldCheck size={11} /> מנהל</span>}
+        {t.returned && isOpen(t) && <span className="badge sm" style={{ color: waitTone.color, background: waitTone.bg }}>⤺ הוחזר</span>}
         {ticketMissedSla(t, config) && <span className="badge sm ovd"><AlertTriangle size={11} /> SLA</span>}
-        {t.status === "waiting" && t.waitingReason && <span className="badge sm" style={{ color: "#B45309", background: "#FEF3C7" }}>{waitReasonLabel(t.waitingReason, config)}</span>}
+        {t.status === "waiting" && t.waitingReason && <span className="badge sm" style={{ color: waitTone.color, background: waitTone.bg }}>{waitReasonLabel(t.waitingReason, config)}</span>}
       </div>
     </div>
   </button>);
@@ -11272,10 +11287,11 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .tcard-state{display:flex;align-items:center;gap:4px;margin:3px 0 1px;font-size:12px;font-weight:700;}
 .tcard-state svg{flex-shrink:0;}
 .tcard-badges{display:flex;align-items:center;gap:7px;margin-top:7px;}
+.tcard-badges .badge,.tcard-badges .risk-badge{border:1px solid rgba(201,205,209,.72);}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}
 .badge.sm{font-size:11.5px;padding:3px 9px;}
-.badge.ovd{color:#B91C1C;background:#FEE2E2;}
+.badge.ovd{color:#8F1D1D;background:#F7EAEA;border-color:#D8B7B7;}
 
 .sla{margin-top:2px;}
 .sla-track{height:5px;border-radius:999px;background:var(--surface-2);overflow:hidden;}

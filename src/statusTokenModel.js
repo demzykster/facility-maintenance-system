@@ -1,13 +1,13 @@
 const STATUS_TOKEN_TONES = Object.freeze({
-  danger: { color: "#B91C1C", bg: "#FEE2E2", border: "#FCA5A5" },
-  warning: { color: "#92400E", bg: "#FEF3C7", border: "#FCD34D" },
-  process: { color: "#B45309", bg: "#FEF3C7", border: "#FCD34D" },
-  success: { color: "#166534", bg: "#DCFCE7", border: "#86EFAC" },
-  info: { color: "#1D4ED8", bg: "#DBEAFE", border: "#93C5FD" },
-  accent: { color: "#6D28D9", bg: "#EDE9FE", border: "#C4B5FD" },
-  teal: { color: "#0F766E", bg: "#CCFBF1", border: "#5EEAD4" },
-  indigo: { color: "#4338CA", bg: "#E0E7FF", border: "#A5B4FC" },
-  neutral: { color: "#475569", bg: "#F1F5F9", border: "#CBD5E1" }
+  danger: { color: "#8F1D1D", bg: "#F7EAEA", border: "#D8B7B7" },
+  warning: { color: "#8A4A12", bg: "#F4EBDD", border: "#D9C3A7" },
+  process: { color: "#7A4A1C", bg: "#F3ECE2", border: "#D8C3AA" },
+  success: { color: "#286645", bg: "#E9F1EC", border: "#B9CCBF" },
+  info: { color: "#1F4E8C", bg: "#EAF0F7", border: "#B8C8DB" },
+  accent: { color: "#4B5F7A", bg: "#EEF2F6", border: "#C9CDD1" },
+  teal: { color: "#2D665F", bg: "#EAF2F1", border: "#B9CDC9" },
+  indigo: { color: "#314F7E", bg: "#E9EEF6", border: "#B7C3D6" },
+  neutral: { color: "#6F7680", bg: "#F7F8FA", border: "#C9CDD1" }
 });
 
 const PRIORITY_TONES = Object.freeze({
