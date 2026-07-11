@@ -2,7 +2,7 @@ import { PERM_LEVELS, USER_PERMISSION_MODULES } from "./permissionModel.js";
 
 export const SUPABASE_APP_USER_TABLE = "app_users";
 
-export const SUPABASE_APP_USER_ROLES = Object.freeze(["admin", "user", "tech", "worker", "cleaner"]);
+export const SUPABASE_APP_USER_ROLES = Object.freeze(["admin", "executive", "user", "tech", "worker", "cleaner"]);
 
 export const SUPABASE_PERMISSION_LEVEL_RANK = Object.freeze(
   Object.fromEntries(PERM_LEVELS.map((level, index) => [level, index]))

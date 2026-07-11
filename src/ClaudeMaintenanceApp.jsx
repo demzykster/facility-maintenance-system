@@ -94,8 +94,8 @@ const SAVE_FAILED_MESSAGE = "השמירה נכשלה. בדקו חיבור ונס
    ============================================================ */
 
 /* ---------- domain ---------- */
-const ROLE_LABEL = { admin: "מנהל מערכת", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
-const USER_FORM_ROLE_OPTIONS = ["worker", "tech", "user", "admin"].map((role) => [role, ROLE_LABEL[role]]);
+const ROLE_LABEL = { admin: "מנהל מערכת", executive: "הנהלה", tech: "טכנאי", user: "מנהל מחלקה", worker: "עובד", cleaner: "עובד ניקיון" };
+const USER_FORM_ROLE_OPTIONS = ["worker", "tech", "user", "executive", "admin"].map((role) => [role, ROLE_LABEL[role]]);
 const isActiveCleaningWorker = (user = {}) => user?.active !== false && hasCleaningAccess(user);
 const localizedUiLabel = (language, key, fallback) => {
   const value = uiText(language || DEFAULT_LANGUAGE, key);
@@ -9392,7 +9392,7 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     if (u.active === false) out.push("מושבת");
     return out.filter(Boolean).join(" · ");
   };
-  const iconFor = (u) => ({ admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus })[u.role] || User;
+  const iconFor = (u) => ({ admin: ShieldCheck, executive: BarChart3, tech: HardHat, user: User, worker: UserPlus })[u.role] || User;
   const userStatus = (u) => {
     const rec = presenceOf(presence, u.id);
     const online = isPresenceOnline(rec);
@@ -9439,7 +9439,11 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
   }
   if (mode === "admins") {
     const admins = activeList.filter((u) => u.role === "admin");
-    return admins.length ? <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלי מערכת" />;
+    const executives = activeList.filter((u) => u.role === "executive");
+    return admins.length || executives.length ? <>
+      <Section title="הנהלה" count={executives.length} actionLabel="הנהלה" actionPatch={{ role: "executive" }}>{executives.length ? executives.map((u) => <TeamUserCard key={u.id} u={u} />) : <Empty text="לא נמצאו משתמשי הנהלה" />}</Section>
+      <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.length ? admins.map((u) => <TeamUserCard key={u.id} u={u} />) : <Empty text="לא נמצאו מנהלי מערכת" />}</Section>
+    </> : <Empty text="לא נמצאו מנהלי מערכת או הנהלה" />;
   }
   const workers = activeList.filter((u) => isWorkerLike(u));
   const WorkerCard = ({ u }) => {
@@ -9694,19 +9698,19 @@ function SettingsPanel(p) {
   const usersForSub = (arr, sub) => {
     if (sub === "managers") return arr.filter((u) => u.role === "user");
     if (sub === "techs") return arr.filter((u) => u.role === "tech");
-    if (sub === "admins") return arr.filter((u) => u.role === "admin");
+    if (sub === "admins") return arr.filter((u) => u.role === "admin" || u.role === "executive");
     return arr.filter((u) => isWorkerLike(u));
   };
   const userSubTitle = () => {
     if (userSub === "managers") return "מנהלים";
     if (userSub === "techs") return "טכנאים";
-    if (userSub === "admins") return "מנהלי מערכת";
+    if (userSub === "admins") return "הנהלה ומנהלי מערכת";
     return "עובדים";
   };
   const userSubCreatePatch = () => {
     if (userSub === "managers") return { role: "user", perms: { ...DEFAULT_MANAGER_PERMS } };
     if (userSub === "techs") return { role: "tech" };
-    if (userSub === "admins") return { role: "admin" };
+    if (userSub === "admins") return { role: "executive" };
     return { role: "worker" };
   };
   const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; setBrandDirty(false); flash(); };
@@ -9964,7 +9968,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
   const explicitCleaningAccess = hasCleaningAccess({ role: "worker", active: true, cleaningAccess: user.cleaningAccess });
   const [manualCleaningAccess, setManualCleaningAccess] = useState(explicitCleaningAccess);
   const cleaningDeptSelected = ["ניקיון", "נקיון", "cleaning"].includes(String(dept || "").trim().toLowerCase());
-  const roleIcons = { admin: ShieldCheck, tech: HardHat, user: User, worker: UserPlus };
+  const roleIcons = { admin: ShieldCheck, executive: BarChart3, tech: HardHat, user: User, worker: UserPlus };
   const permIcons = { fleetDocs: FileText, fleetTickets: ClipboardList, ppe: Shirt, workerAccess: KeyRound, users: Users, analytics: BarChart3, suppliers: Truck, settings: Settings, audit: Clock };
   const permLevelLabels = { none: "אין", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
   const pickCard = (on, tone = "#1F4E8C") => ({ borderColor: on ? tone : undefined, background: on ? "var(--primary-soft)" : undefined, color: on ? "var(--primary)" : undefined });
@@ -10019,7 +10023,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       techCats: (role === "tech" && techScope === "facility") ? techCats : [],
       mgrZones: role === "user" ? mgrZones : [], perms: Object.keys(nextPerms).length ? nextPerms : undefined,
       notificationPrefs: Object.keys(nextNotificationPrefs.enabled).length ? nextNotificationPrefs : undefined,
-      shift: role !== "admin" ? shift : "",
+      shift: role !== "admin" && role !== "executive" ? shift : "",
       reportsTo: role === "user" ? reportsTo : "",
       active,
       activationToken: "",
@@ -10052,7 +10056,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       {roleUsesPassword && <label className="field"><span>דוא״ל (שם משתמש לכניסה) *</span><input className="ltr-input" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoCapitalize="off" placeholder="name@example.local" /></label>}
       <label className="field"><span>טלפון{role === "tech" ? " (שם משתמש לכניסה) *" : ""}</span><input className="ltr-input" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="050-0000000" /><div className="hint">{role === "tech" ? "הטכנאי ייכנס עם מספר הטלפון ויגדיר קוד אישי בכניסה הראשונה." : "יכול לשמש גם כפרטי כניסה אם הוזן, ומוצג לאנשי טיפול כדי שיוכלו להתקשר בלחיצה."}</div></label>
       {!lockRole && <div className="field"><span>תפקיד</span><ChoiceGrid columns="role" value={role} onChange={changeRole} options={USER_FORM_ROLE_OPTIONS.map(([id, label]) => ({ id, label, Icon: roleIcons[id] || User }))} /></div>}
-      {role && role !== "admin" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
+      {role && role !== "admin" && role !== "executive" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
       {role === "user" && (lockDept
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>

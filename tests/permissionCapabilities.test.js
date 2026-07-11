@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canFull, canManage, canRequest, canView, hasPermission } from "../src/permissionModel.js";
+import { canFull, canManage, canRequest, canView, canViewCompanyBI, canViewFinancialBI, hasPermission } from "../src/permissionModel.js";
 
 describe("permission capability helpers", () => {
   it("maps levels to capability checks", () => {
@@ -68,5 +68,22 @@ describe("permission capability helpers", () => {
     expect(canFull(hrAndOpsManager, "ppe")).toBe(true);
     expect(canView(hrAndOpsManager, "analytics")).toBe(true);
     expect(canManage(hrAndOpsManager, "analytics")).toBe(false);
+  });
+
+  it("keeps executive leadership broad for BI but separate from system admin", () => {
+    const executive = { role: "executive" };
+
+    expect(canViewCompanyBI(executive)).toBe(true);
+    expect(canViewFinancialBI(executive)).toBe(true);
+    expect(canView(executive, "analytics")).toBe(true);
+    expect(canView(executive, "fleetDocs")).toBe(true);
+    expect(canView(executive, "fleetTickets")).toBe(true);
+    expect(canView(executive, "suppliers")).toBe(true);
+    expect(canView(executive, "audit")).toBe(true);
+    expect(canManage(executive, "settings")).toBe(false);
+    expect(canFull(executive, "settings")).toBe(false);
+    expect(canFull({ role: "admin" }, "settings")).toBe(true);
+    expect(canViewCompanyBI({ role: "user" })).toBe(false);
+    expect(canViewFinancialBI({ role: "user", perms: { analytics: "view" } })).toBe(false);
   });
 });

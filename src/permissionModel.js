@@ -2,6 +2,13 @@ export const PERM_LEVELS = ["none", "view", "request", "manage", "full"];
 
 export const ROLE_PERM_DEFAULT = {
   admin: { ppe: "full" },
+  executive: {
+    analytics: "view",
+    fleetDocs: "view",
+    fleetTickets: "view",
+    suppliers: "view",
+    audit: "view"
+  },
   user: { ppe: "request" },
   tech: { ppe: "view" },
   worker: { ppe: "none" },
@@ -55,3 +62,6 @@ export const canView = (session, mod) => hasPermission(session, mod, "view");
 export const canRequest = (session, mod) => hasPermission(session, mod, "request");
 export const canManage = (session, mod) => hasPermission(session, mod, "manage");
 export const canFull = (session, mod) => hasPermission(session, mod, "full");
+export const isCompanyLeadershipRole = (role) => role === "admin" || role === "executive";
+export const canViewCompanyBI = (session) => isCompanyLeadershipRole(session?.role);
+export const canViewFinancialBI = (session) => isCompanyLeadershipRole(session?.role);

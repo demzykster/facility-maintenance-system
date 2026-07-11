@@ -1,6 +1,6 @@
 export const isWorkerLoginRole = (role) => role === "worker" || role === "cleaner";
 export const isPinActivationRole = (role) => role === "worker" || role === "cleaner" || role === "tech";
-export const isPasswordActivationRole = (role) => role === "admin" || role === "user";
+export const isPasswordActivationRole = (role) => role === "admin" || role === "executive" || role === "user";
 export const isActivationLinkRole = (role) => isPinActivationRole(role) || isPasswordActivationRole(role);
 
 export function loginSecretKindForRole(role) {

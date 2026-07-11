@@ -6,7 +6,7 @@ import { hashPin, verifyPin } from "./pinHash.js";
 import { normalizeSupabaseAppUserProfile } from "../../src/supabaseProfileModel.js";
 
 const PIN_ROLES = new Set(["worker", "cleaner", "tech"]);
-const PASSWORD_ROLES = new Set(["admin", "user"]);
+const PASSWORD_ROLES = new Set(["admin", "executive", "user"]);
 
 const json = (res, status, body) => {
   res.statusCode = status;

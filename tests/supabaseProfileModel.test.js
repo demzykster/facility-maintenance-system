@@ -15,6 +15,11 @@ const migrationSql = readFileSync(
   new URL("../supabase/migrations/20260627173000_app_users_permissions.sql", import.meta.url),
   "utf8"
 );
+const executiveRoleMigrationSql = readFileSync(
+  new URL("../supabase/migrations/20260711223000_app_users_executive_role.sql", import.meta.url),
+  "utf8"
+);
+const appUsersRoleSql = `${migrationSql}\n${executiveRoleMigrationSql}`;
 
 describe("supabase profile foundation", () => {
   it("maps the current user collection to the app profile table, not auth.users", () => {
@@ -39,6 +44,9 @@ describe("supabase profile foundation", () => {
   });
 
   it("normalizes app user profiles for the Supabase auth adapter", () => {
+    expect(normalizeSupabaseAppUserProfile({ role: "executive" }).role).toBe("executive");
+    expect(normalizeSupabaseAppUserProfile({ role: "unknown" }).role).toBe("user");
+
     expect(normalizeSupabaseAppUserProfile({
       auth_user_id: "auth-1",
       id: "app-user-1",
@@ -96,6 +104,7 @@ describe("supabase profile foundation", () => {
     expect(migrationSql).toContain("create policy app_users_admin_all");
     expect(migrationSql).toContain("create or replace function public.cmms_has_permission");
     expect(migrationSql).not.toContain("for update");
-    for (const role of SUPABASE_APP_USER_ROLES) expect(migrationSql).toContain(`'${role}'`);
+    for (const role of SUPABASE_APP_USER_ROLES) expect(appUsersRoleSql).toContain(`'${role}'`);
+    expect(executiveRoleMigrationSql).toContain("'executive'");
   });
 });

@@ -15,11 +15,14 @@ describe("first-login credential rules", () => {
   it("new login-capable users are saved without generated secrets or links", () => {
     const newWorker = { role: "worker", workerNo: "4010", pin: "", activationToken: "", activationStatus: "" };
     const newManager = { role: "user", email: "manager@example.com", password: "", activationToken: "", activationStatus: "" };
+    const newExecutive = { role: "executive", email: "leadership@example.com", password: "", activationToken: "", activationStatus: "" };
 
     expect(userNeedsInitialLoginSetup(newWorker)).toBe(true);
     expect(userNeedsInitialLoginSetup(newManager)).toBe(true);
+    expect(userNeedsInitialLoginSetup(newExecutive)).toBe(true);
     expect(userHasLoginSecret(newWorker)).toBe(false);
     expect(userHasLoginSecret(newManager)).toBe(false);
+    expect(userHasLoginSecret(newExecutive)).toBe(false);
   });
 
   it("marks users as configured only after they set their own password or PIN", () => {
@@ -37,8 +40,10 @@ describe("first-login credential rules", () => {
     expect(isPinActivationRole("cleaner")).toBe(true);
     expect(isPinActivationRole("tech")).toBe(true);
     expect(isPasswordActivationRole("user")).toBe(true);
+    expect(isPasswordActivationRole("executive")).toBe(true);
     expect(isPasswordActivationRole("admin")).toBe(true);
     expect(isPinActivationRole("admin")).toBe(false);
+    expect(isPinActivationRole("executive")).toBe(false);
     expect(isPasswordActivationRole("worker")).toBe(false);
   });
 

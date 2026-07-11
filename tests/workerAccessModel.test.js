@@ -13,6 +13,7 @@ import {
 describe("worker access model", () => {
   it("classifies login secret kinds by role", () => {
     expect(loginSecretKindForRole("admin")).toBe("password");
+    expect(loginSecretKindForRole("executive")).toBe("password");
     expect(loginSecretKindForRole("user")).toBe("password");
     expect(loginSecretKindForRole("worker")).toBe("pin");
     expect(loginSecretKindForRole("cleaner")).toBe("pin");
@@ -49,8 +50,10 @@ describe("worker access model", () => {
     expect(isPinActivationRole("cleaner")).toBe(true);
     expect(isPinActivationRole("tech")).toBe(true);
     expect(isPasswordActivationRole("user")).toBe(true);
+    expect(isPasswordActivationRole("executive")).toBe(true);
     expect(isPasswordActivationRole("admin")).toBe(true);
     expect(isPinActivationRole("admin")).toBe(false);
+    expect(isPinActivationRole("executive")).toBe(false);
     expect(isPasswordActivationRole("worker")).toBe(false);
   });
 
@@ -60,6 +63,7 @@ describe("worker access model", () => {
 
   it("prompts users to set their own first secret by identifier", () => {
     expect(loginSetupPrompt({ role: "user" })).toContain("דוא״ל");
+    expect(loginSetupPrompt({ role: "executive" })).toContain("דוא״ל");
     expect(loginSetupPrompt({ role: "worker" })).toContain("מספר העובד");
     expect(loginSetupPrompt({ role: "tech" })).toContain("מספר הטלפון");
   });

@@ -46,7 +46,7 @@ describe("admin profile handler", () => {
       authUserId: "auth-1",
       patch: {
         active: false,
-        role: "tech",
+        role: "executive",
         departments: ["נפחי", ""],
         manager_zones: ["z1"],
         permissions: { fleet: "view" }
@@ -56,7 +56,7 @@ describe("admin profile handler", () => {
       authUserId: "auth-1",
       patch: {
         active: false,
-        role: "tech",
+        role: "executive",
         departments: ["נפחי"],
         manager_zones: ["z1"],
         permissions: { fleet: "view" }

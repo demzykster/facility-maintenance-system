@@ -20,7 +20,17 @@ Permission levels are defined in `src/permissionModel.js`:
 - `settings`
 - `audit`
 
-Admins receive full access by role. Non-admin users receive explicit permissions plus role defaults where defined.
+Admins receive full access by role.
+
+Executives use the internal role key `executive` and Hebrew label `הנהלה`. They are not admins: they receive broad management visibility for BI-oriented modules (`analytics`, `fleetDocs`, `fleetTickets`, `suppliers`, `audit`) but do not receive `settings` or `full` access by role.
+
+Other non-admin users receive explicit permissions plus role defaults where defined.
+
+## BI Visibility Helpers
+
+- `canViewCompanyBI(session)` is true for `admin` and `executive`.
+- `canViewFinancialBI(session)` is true for `admin` and `executive`.
+- `analytics:view` is not enough for financial BI. Managers can receive analytics visibility without seeing financial blocks.
 
 ## Notes
 
