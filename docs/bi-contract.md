@@ -23,6 +23,12 @@ System administrator.
 - Can manage settings, users, permissions, and sensitive system actions.
 - Sees company-wide BI.
 - Sees financial BI.
+- Uses BI as an operational command center, not only as a management indicator.
+- Must not lose quick situation-understanding tools from the current dashboard.
+- Needs fast routes into the modules they personally operate: facility tickets,
+  transport, cleaning, PPE, PM, fleet documents, ownership gaps, and SLA issues.
+- Admin BI may surface stronger action-oriented queues than executive BI, but
+  actions still route through the existing module workflows.
 
 ### `executive`
 
@@ -99,6 +105,23 @@ Company BI may include:
 
 Company BI should present department comparison neutrally. Prefer "risk areas" and
 "requires attention" over blame-oriented ranking language.
+
+## Admin Command Center
+
+For `admin`, the unified BI is both a leadership view and the daily control room.
+
+It should answer:
+
+- what needs a decision now;
+- which domain owns the issue: facility, transport, cleaning, PPE, PM, documents,
+  users/ownership, suppliers, or finance;
+- who currently owns the next action where that is known;
+- why the item is stuck, using existing lifecycle/status/waiting data;
+- where to continue the work in the existing module.
+
+Admin command-center items should be compact and concrete. They should not replace
+the ticket, cleaning, fleet, or PPE modules. They should route the admin to the
+right existing workflow with the right filter or context.
 
 ## Department BI Scope
 

@@ -7375,11 +7375,27 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
   const monthCost = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000).reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0) : 0;
+  const unownedTickets = openTickets.filter((ticket) => needsHandler(ticket, scope.users, scope.fleet));
   const topAttention = [
     ...slaBreaches.map((ticket) => ({ ticket, label: "חריגת SLA", color: "#B91C1C" })),
     ...critical.filter((ticket) => !slaBreaches.some((item) => item.id === ticket.id)).map((ticket) => ({ ticket, label: "השבתה קריטית", color: "#C2410C" })),
     ...waiting.filter((ticket) => !slaBreaches.some((item) => item.id === ticket.id) && !critical.some((item) => item.id === ticket.id)).map((ticket) => ({ ticket, label: "ממתין לגורם", color: "#B45309" }))
   ].slice(0, 6);
+  const commandSeen = new Set();
+  const commandQueue = [
+    ...unownedTickets.map((ticket) => ({ key: `owner-${ticket.id}`, title: `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "קריאה"}`, sub: "קריאה ללא בעלים פעיל · נדרש שיבוץ", color: "#7F1D1D", action: () => onOpenTicket?.(ticket.id) })),
+    ...slaBreaches.map((ticket) => ({ key: `sla-${ticket.id}`, title: `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "קריאה"}`, sub: "חריגת SLA · לפתוח קריאה", color: "#B91C1C", action: () => onOpenTicket?.(ticket.id) })),
+    ...critical.map((ticket) => ({ key: `critical-${ticket.id}`, title: `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "כלי שינוע"}`, sub: "השבתת שינוע קריטית", color: "#C2410C", action: () => onOpenTicket?.(ticket.id) })),
+    ...cleaningOpen.map((complaint) => ({ key: `clean-${complaint.id}`, title: complaint.zoneName || "אזור ניקיון", sub: `${complaint.status === "pending" ? "דיווח ממתין לאישור" : "דיווח פתוח"} · ${complaint.kind === "broken" ? "תקלה" : "לכלוך"}`, color: "#B45309", action: onGoCleaning })),
+    ...cleaningMissed.map((row) => ({ key: `clean-missed-${row.zone.id}-${row.win?.id || row.win?.time || "win"}`, title: row.zone.name || "אזור ניקיון", sub: `סבב ניקיון פוספס · ${row.win?.time || "היום"}`, color: "#B91C1C", action: onGoCleaning })),
+    ...ppePending.map((request) => ({ key: `ppe-${request.id}`, title: request.workerName || "בקשת ביגוד", sub: `${ppeRequestStatusLabel(request.status)} · ${(request.lines || []).length || 1} פריטים`, color: "#0D9488", action: onGoPpe })),
+    ...pmOverdue.map((task) => ({ key: `pm-${task.id}`, title: "טיפול תקופתי באיחור", sub: `${task.name || task.title || task.fleetCode || "PM"} · לפתוח צי`, color: "#B45309", action: () => onGoAssets?.({ tab: "pm" }) })),
+    ...expiringDocs.filter((row) => row.status.d < 0).map(({ unit, status }) => ({ key: `doc-${unit.id}-${status.label}`, title: unitLabel(unit, config), sub: `${status.label} · פג תוקף`, color: "#B45309", action: () => onGoAssets?.({ tab: "fleet" }) })),
+  ].filter((item) => {
+    if (commandSeen.has(item.key)) return false;
+    commandSeen.add(item.key);
+    return true;
+  }).slice(0, 8);
   const scopeTitle = scope.kind === "company" ? "תמונת חברה" : scope.departments.length ? `מחלקות: ${scope.departments.join(", ")}` : "לא הוגדר scope";
 
   if (scope.kind === "none") return <Empty text="אין הרשאת BI" Icon={Gauge} sub="המודול פתוח בשלב הראשון להנהלה, מנהלי מערכת ומנהלי מחלקות." />;
@@ -7403,6 +7419,15 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     </div>
 
     <div className="bi-grid">
+      <section className="panel bi-panel bi-command-panel">
+        <div className="bi-panel-head"><div><b>דורש החלטה עכשיו</b><span>{commandQueue.length ? `${commandQueue.length} פריטים ראשונים מכל המודולים` : "אין כרגע פריטים דחופים"}</span></div></div>
+        {commandQueue.length ? commandQueue.map((item) => <button key={item.key} className="bi-attn-row" onClick={item.action || undefined} disabled={!item.action}>
+          <span className="bi-dot" style={{ background: item.color }} />
+          <span><b>{item.title}</b><small>{item.sub}</small></span>
+          {item.action && <ChevronLeft size={15} />}
+        </button>) : <div className="note">אין כרגע החלטות דחופות. המשיכו לעקוב אחרי המדדים והמודולים.</div>}
+      </section>
+
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>דורש טיפול</b><span>{topAttention.length ? `${topAttention.length} פריטים ראשונים` : "אין חריגים פתוחים"}</span></div><button className="btn-ghost sm" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · דורש טיפול" } })}>לכל הקריאות</button></div>
         {topAttention.length ? topAttention.map(({ ticket, label, color }) => <button key={ticket.id} className="bi-attn-row" onClick={() => onOpenTicket?.(ticket.id)}>
@@ -11404,11 +11429,13 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .bi-kpis{grid-template-columns:repeat(5,minmax(0,1fr));}
 .bi-kpis .kpi-num{font-weight:650;}
+.bi-command-panel{grid-column:1/-1;}
 .bi-panel{min-width:0;}
 .bi-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .bi-panel-head b{display:block;font-size:14px;font-weight:650;}
 .bi-panel-head span{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
 .bi-attn-row{width:100%;min-height:54px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:start;border:1px solid var(--line);background:var(--surface-glow);border-radius:12px;padding:9px 10px;margin-bottom:8px;box-shadow:var(--control-shadow);}
+.bi-attn-row:disabled{cursor:default;opacity:.72;}
 .bi-attn-row b,.bi-doc-row b{display:block;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bi-attn-row small,.bi-doc-row span{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
 .bi-dot{width:10px;height:10px;border-radius:999px;}
