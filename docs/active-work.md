@@ -4,7 +4,7 @@
 
 - Active branch: `none`.
 - Current branch: `main`.
-- Last completed work: harden `/api/push` business notification authorization and partial-failure handling from independent audit.
+- Last completed work: controlled-rollout UI polish and ticket status palette refresh, with next-session handoff updated.
 - Current work: none.
 
 ## Current Product Direction
@@ -25,6 +25,7 @@
 - Treat removed storage prefixes and docs as intentionally retired, not as migration backlog.
 - Use `npm run staging:kv:retire-mirrors -- --prefix <prefix>` as a dry-run before deleting old compatibility mirrors; `-- --prefix <prefix> --apply` deletes only shared KV records whose key matches a normalized table row's `source_kv_key`.
 - Do not invent broad product-polish backlog from screenshots or old notes. Wait for a concrete owner-reported issue.
+- If the owner continues visual polish in a new session, use `docs/handoff-for-next-codex.md` as the current UI direction and strategy. Continue with small, scoped screen-by-screen patches and browser/mobile verification.
 - Tickets, fleet, periodic maintenance, users, cleaning, PPE, work records, settings records, app config, presence, push subscriptions, ticket photos, and the shared KV write guard are now closed for the current R10 production data-core scope. Do not open another R10 migration slice unless a live bug, an explicit new business domain, or independent review finding identifies one.
 - User identity/session is already backed by Supabase `app_users` and `/api/session/me`, and `/api/users` now reads login-capable users from `app_users`, creates new users in `app_users`, writes expanded profile fields there, deactivates matching rows on delete, and resets login authority state on manager-triggered reset without creating new production/API `user:*` KV mirrors. `app_users` also carries PIN authority fields (`pin_hash`, `pin_updated_at`, `login_state`) so first-login/PIN setup, reset, and PIN session restore use `app_users` when configured. On 2026-07-10 staging backfilled the remaining legacy-only `user:` rows into `app_users`; after the user mirror guard was live, `npm run staging:users:retire-kv-mirrors -- --apply` deleted all 12 matched `user:*` mirrors. The follow-up residual report showed `cmms_kv_records=0`.
 - Cleaning zones, rounds, complaints, and worker absences now use normalized API authority in production/API mode. Production/API saves no longer write cleaning compatibility KV mirrors, and staging retired all matched cleaning zone/round mirrors after guarded dry-run proof. Public QR zone listing and public complaint zone lookup read normalized cleaning zones before falling back to legacy `czone:` KV mirrors when present. Public complaints write normalized complaints without creating new `ccomplaint:*` KV mirrors when the normalized complaints driver is configured.
