@@ -53,6 +53,8 @@ export function biScopeForSession(session, data = {}) {
     fleet: [],
     pm: [],
     zones: [],
+    rounds: [],
+    complaints: [],
     ppe: [],
     users: []
   };
@@ -63,6 +65,8 @@ export function biScopeForSession(session, data = {}) {
     fleet = [],
     pm = [],
     zones = [],
+    rounds = [],
+    complaints = [],
     ppe = [],
     users = []
   } = data;
@@ -78,6 +82,8 @@ export function biScopeForSession(session, data = {}) {
       fleet,
       pm,
       zones,
+      rounds,
+      complaints,
       ppe,
       users
     };
@@ -87,7 +93,7 @@ export function biScopeForSession(session, data = {}) {
 
   const departments = userDepartments(session);
   const zoneIds = new Set(cleanStringList(session.mgrZones || []));
-  const scopedZones = zones.filter((zone) => zoneIds.has(zone.id) || zoneInDepartments(zone, departments));
+  const scopedZones = zones.filter((zone) => zoneIds.has(zone.id) || (departments.length > 0 && zoneInDepartments(zone, departments)));
   scopedZones.forEach((zone) => zone.id && zoneIds.add(zone.id));
   const scopedFleet = departments.length
     ? fleet.filter((unit) => overlaps(fleetDepartments(unit), departments))
@@ -106,6 +112,8 @@ export function biScopeForSession(session, data = {}) {
     fleet: scopedFleet,
     pm: pm.filter((record) => record.fleetId && scopedFleetIds.has(record.fleetId)),
     zones: scopedZones,
+    rounds: rounds.filter((round) => zoneIds.has(round.zoneId)),
+    complaints: complaints.filter((complaint) => zoneIds.has(complaint.zoneId)),
     ppe: departments.length ? ppe.filter((item) => item.dept && departments.includes(item.dept)) : [],
     users: departments.length ? users.filter((user) => userInDepartments(user, departments)) : []
   };

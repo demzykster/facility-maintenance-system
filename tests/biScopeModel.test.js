@@ -21,6 +21,18 @@ const data = {
     { id: "z-shared", shared: true },
     { id: "z-b", dept: "B" }
   ],
+  rounds: [
+    { id: "r-a", zoneId: "z-a" },
+    { id: "r-shared", zoneId: "z-shared" },
+    { id: "r-b", zoneId: "z-b" },
+    { id: "r-manual", zoneId: "z-manual" }
+  ],
+  complaints: [
+    { id: "c-a", zoneId: "z-a" },
+    { id: "c-shared", zoneId: "z-shared" },
+    { id: "c-b", zoneId: "z-b" },
+    { id: "c-manual", zoneId: "z-manual" }
+  ],
   ppe: [
     { id: "ppe-a", dept: "A" },
     { id: "ppe-b", dept: "B" }
@@ -43,6 +55,8 @@ describe("BI scope model", () => {
     expect(executiveScope.canViewFinancialBI).toBe(true);
     expect(executiveScope.tickets.map((ticket) => ticket.id)).toEqual(["t-fac-a", "t-fac-b", "t-fleet-a", "t-fleet-b"]);
     expect(executiveScope.fleet.map((unit) => unit.id)).toEqual(["f-a", "f-b"]);
+    expect(executiveScope.rounds.map((round) => round.id)).toEqual(["r-a", "r-shared", "r-b", "r-manual"]);
+    expect(executiveScope.complaints.map((complaint) => complaint.id)).toEqual(["c-a", "c-shared", "c-b", "c-manual"]);
     expect(executiveScope.users.map((user) => user.id)).toEqual(["u-a", "u-b", "admin"]);
   });
 
@@ -59,6 +73,8 @@ describe("BI scope model", () => {
     expect(scope.ppe.map((item) => item.id)).toEqual(["ppe-a"]);
     expect(scope.users.map((user) => user.id)).toEqual(["u-a"]);
     expect(scope.zones.map((zone) => zone.id)).toEqual(["z-a", "z-shared"]);
+    expect(scope.rounds.map((round) => round.id)).toEqual(["r-a", "r-shared", "r-manual"]);
+    expect(scope.complaints.map((complaint) => complaint.id)).toEqual(["c-a", "c-shared", "c-manual"]);
     expect(scope.zoneIds).toEqual(["z-manual", "z-a", "z-shared"]);
   });
 
@@ -71,6 +87,8 @@ describe("BI scope model", () => {
     expect(scope.canViewFinancialBI).toBe(false);
     expect(scope.tickets).toEqual([]);
     expect(scope.fleet).toEqual([]);
+    expect(scope.rounds).toEqual([]);
+    expect(scope.complaints).toEqual([]);
     expect(scope.users).toEqual([]);
   });
 

@@ -7353,8 +7353,8 @@ function PpeHub(p) {
   </>);
 }
 
-function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, onOpenTicket, onGoTickets, onGoAssets }) {
-  const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, users, ppe }), [session, tickets, fleet, pm, zones, users, ppe]);
+function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning }) {
+  const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, rounds, complaints, users, ppe }), [session, tickets, fleet, pm, zones, rounds, complaints, users, ppe]);
   const openTickets = scope.tickets.filter(isOpen);
   const isTransportTicket = (ticket) => ticket.track === "transport" || (!ticket.track && ticket.forkliftId);
   const facilityOpen = openTickets.filter((ticket) => !isTransportTicket(ticket));
@@ -7364,6 +7364,13 @@ function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, on
   const waiting = openTickets.filter((ticket) => ticket.status === "waiting" || ticket.status === "pending_user" || ticket.status === "pending_admin");
   const pmOverdue = scope.pm.filter((task) => task.active !== false && daysLeft(task.nextDue) < 0);
   const expiringDocs = scope.fleet.map((unit) => ({ unit, status: docStatus(unit, config) })).filter((row) => row.status.d != null && row.status.d <= 30).sort((a, b) => a.status.d - b.status.d);
+  const cleaningZones = scope.zones.filter((zone) => zone.active !== false);
+  const cleaningNow = Date.now();
+  const cleaningToday = cleaningZones.flatMap((zone) => zoneTodayStatuses(zone, scope.rounds, cleaningNow, config).map((status) => ({ zone, ...status })));
+  const cleaningMissed = cleaningToday.filter((row) => row.status === "missed");
+  const cleaningDue = cleaningToday.filter((row) => isCleaningRoundActionableStatus(row.status));
+  const cleaningOpen = scope.complaints.filter((complaint) => complaint.status === "open" || complaint.status === "pending");
+  const cleaningIssueRounds = scope.rounds.filter((round) => (round.at || 0) >= cleaningNow - 7 * 86400000 && (round.issues || []).length > 0);
   const monthCost = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000).reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0) : 0;
   const topAttention = [
     ...slaBreaches.map((ticket) => ({ ticket, label: "חריגת SLA", color: "#B91C1C" })),
@@ -7419,6 +7426,18 @@ function BIOverview({ session, tickets, fleet, pm, zones, users, ppe, config, on
           <span><b>{pmOverdue.length}</b><small>PM באיחור</small></span>
         </div>
         {expiringDocs.slice(0, 3).map(({ unit, status }) => <div key={unit.id} className="bi-doc-row"><b>{unitLabel(unit, config)}</b><span>{status.label} · {status.d < 0 ? "פג תוקף" : `בעוד ${status.d} ימים`}</span></div>)}
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>ניקיון</b><span>סבבים ודיווחים לפי אזורי האחריות</span></div>{onGoCleaning && <button className="btn-ghost sm" onClick={onGoCleaning}>לניקיון</button>}</div>
+        <div className="bi-mini-stats">
+          <span><b>{cleaningZones.length}</b><small>אזורי ניקיון</small></span>
+          <span><b>{cleaningOpen.length}</b><small>דיווחים פתוחים</small></span>
+          <span><b>{cleaningMissed.length}</b><small>סבבים שפוספסו היום</small></span>
+        </div>
+        {cleaningOpen.slice(0, 2).map((complaint) => <div key={complaint.id} className="bi-doc-row"><b>{complaint.zoneName || "אזור ניקיון"}</b><span>{complaint.status === "pending" ? "ממתין לאישור" : "פתוח"} · {complaint.kind === "broken" ? "תקלה" : "לכלוך"}</span></div>)}
+        {!cleaningOpen.length && cleaningDue.length > 0 && <div className="bi-doc-row"><b>{cleaningDue[0].zone.name}</b><span>לביצוע עכשיו · {cleaningDue[0].win?.time || "חלון ניקיון"}</span></div>}
+        {!cleaningOpen.length && !cleaningDue.length && cleaningIssueRounds.length > 0 && <div className="bi-doc-row"><b>סבבים עם הערות</b><span>{cleaningIssueRounds.length} ב-7 ימים</span></div>}
       </section>
 
       <section className="panel bi-panel">
@@ -7487,7 +7506,7 @@ function AdminApp(p) {
       <div className="main-col">
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
-          {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} />}
+          {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} />}
           {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
