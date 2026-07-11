@@ -9739,7 +9739,7 @@ function SettingsPanel(p) {
           <button className="reg-del" aria-label={`מחק רמת חומרה: ${d.label || "ללא שם"}`} onClick={() => setDlevels((a) => a.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
         </div>
         <div className="dt-edit-line">
-          <div className="pal">{DT_PALETTE.map((c) => <button key={c} type="button" className={"pal-sw" + (d.color === c ? " on" : "")} style={{ background: c }} title={c} onClick={() => setDlevels((a) => a.map((x, j) => j === i ? { ...x, color: c } : x))} />)}</div>
+          <ColorPaletteButton value={d.color} label={`צבע רמת חומרה: ${d.label || "ללא שם"}`} onChange={(c) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, color: c } : x))} />
           <select value={d.prio || "medium"} title="עדיפות ברירת מחדל" onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, prio: e.target.value } : x))}><option value="low">עדיפות: נמוכה</option><option value="medium">עדיפות: בינונית</option><option value="high">עדיפות: גבוהה</option></select>
           <label className="chk-line" style={{ margin: 0 }}><input type="checkbox" checked={!!d.oos} onChange={(e) => setDlevels((a) => a.map((x, j) => j === i ? { ...x, oos: e.target.checked } : x))} /> מוציא מכלל שימוש</label>
         </div>
@@ -10940,6 +10940,35 @@ function ConfirmBtn({ onConfirm, label, className = "btn-danger full", style, ic
   }}>{busy ? <><span className="spinner sm" /> מוחק…</> : armed ? "לחצו שוב לאישור" : <>{icon} {label}</>}</button>;
 }
 
+function ColorPaletteButton({ value, onChange, label = "בחירת צבע", palette = DT_PALETTE }) {
+  const [open, setOpen] = useState(false);
+  const activeColor = palette.includes(value) ? value : (value || palette[0]);
+  return <div className="color-popover">
+    <button
+      type="button"
+      className="color-trigger"
+      aria-label={label}
+      aria-expanded={open}
+      title={label}
+      onClick={() => setOpen((v) => !v)}
+    >
+      <span style={{ background: activeColor }} />
+    </button>
+    {open && <div className="color-menu" role="listbox" aria-label={label}>
+      {palette.map((color) => <button
+        key={color}
+        type="button"
+        className={"color-choice" + (value === color ? " on" : "")}
+        style={{ background: color }}
+        aria-label={color}
+        aria-selected={value === color}
+        title={color}
+        onClick={() => { onChange(color); setOpen(false); }}
+      />)}
+    </div>}
+  </div>;
+}
+
 /* ============================================================ STYLES */
 function Style() {
   return (<style>{`
@@ -11169,13 +11198,15 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .filter-row select{border:1.5px solid var(--line);border-radius:10px;padding:9px 6px;background:var(--input);font-size:12.5px;}
 .count-line{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
 .settings-wrap{width:min(100%,1040px);margin:0 auto;display:flex;flex-direction:column;gap:14px;}
+.settings-wrap input,.settings-wrap select,.settings-wrap button{font-weight:500;}
+.settings-wrap .btn-primary,.settings-wrap .btn-ghost,.settings-wrap .btn-danger,.settings-wrap .sect{font-weight:600;}
 .settings-table-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:var(--control-shadow);overflow-x:auto;}
 .wait-reasons-card{display:grid;gap:8px;}
 .wait-reason-head,.wait-reason-row{display:grid;grid-template-columns:minmax(220px,1.5fr) minmax(150px,1fr) minmax(150px,1fr) minmax(112px,.72fr) 44px;gap:8px;align-items:center;min-width:790px;}
-.wait-reason-head{padding:0 8px 2px;font-weight:800;}
+.wait-reason-head{padding:0 8px 2px;font-weight:600;}
 .wait-reason-row{margin-bottom:0;}
 .wait-reason-row input,.wait-reason-row select{min-height:42px;}
-.wait-reason-row .chk-line{min-height:42px;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:0 10px;}
+.wait-reason-row .chk-line{min-height:42px;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:0 10px;font-weight:500;}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;}
 .note{font-size:12.5px;color:var(--muted);line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:13px;margin-top:10px;}
 .note.warm,.panel.warm{background:var(--warm-surface);border-color:var(--warm-line);}
@@ -11364,6 +11395,8 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .dt-edit-row{border:1px solid var(--line);border-radius:11px;padding:9px 10px;margin-bottom:8px;background:var(--surface);}
 .dt-edit-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .dt-edit-line + .dt-edit-line{margin-top:8px;}
+.dt-edit-line select{font-weight:500;min-height:42px;}
+.dt-edit-line .chk-line{font-weight:500;}
 .dt-desc-in{flex:2;min-width:160px;color:var(--muted);}
 .group-seg button{min-height:38px;background:var(--surface);border:1px solid rgba(201,205,209,.86);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:650;cursor:pointer;box-shadow:var(--control-shadow);}
 .group-seg button.on{background:var(--primary);border-color:var(--primary);color:#fff;}
@@ -11541,9 +11574,12 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .blk-set-h{display:flex;align-items:center;gap:6px;font-weight:700;color:#B91C1C;font-size:13.5px;margin-bottom:8px;}
 .blk-set-panel textarea{width:100%;margin-bottom:8px;}
 .drv-unit.blocked{box-shadow:inset 0 0 0 1.5px rgba(220,38,38,0.4);}
-.pal{display:flex;gap:4px;flex-wrap:wrap;}
-.pal-sw{width:40px;height:40px;border-radius:12px;border:2px solid var(--surface);cursor:pointer;padding:0;box-shadow:0 0 0 1px rgba(15,23,42,.12),var(--control-shadow);}
-.pal-sw.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset,0 0 0 2px var(--ink);}
+.color-popover{position:relative;display:inline-flex;align-items:center;justify-content:center;}
+.color-trigger{width:42px;height:42px;border-radius:999px;border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:var(--control-shadow);}
+.color-trigger span{width:26px;height:26px;border-radius:999px;border:2px solid var(--surface);box-shadow:0 0 0 1px rgba(46,49,56,.18);}
+.color-menu{position:absolute;inset-inline-start:0;top:calc(100% + 8px);z-index:30;display:grid;grid-template-columns:repeat(5,28px);gap:8px;padding:10px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 16px 42px rgba(46,49,56,.16);}
+.color-choice{width:28px;height:28px;border-radius:999px;border:2px solid var(--surface);padding:0;box-shadow:0 0 0 1px rgba(46,49,56,.14);cursor:pointer;}
+.color-choice.on{box-shadow:0 0 0 2px var(--surface) inset,0 0 0 2px var(--ink);}
 .ft-code{font-weight:700;}.ft-model{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;}.ft-model b{color:var(--ink);font-size:12.5px;font-weight:600;}
 .ft-sup{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ft-doc{display:flex;align-items:center;gap:6px;font-weight:600;}
