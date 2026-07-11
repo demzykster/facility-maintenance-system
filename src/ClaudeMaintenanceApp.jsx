@@ -3509,7 +3509,9 @@ export default function App() {
   const firstTech = (users || []).find((u) => u.role === "tech" && u.active !== false);
   const firstMgr = (users || []).find((u) => u.role === "user" && u.active !== false);
   const firstWorker = (users || []).find((u) => u.role === "worker" && u.active !== false);
+  const firstExecutive = (users || []).find((u) => u.role === "executive" && u.active !== false);
   const effSession = !impersonating ? session
+    : rolePreviewRole === "executive" ? (firstExecutive ? { ...firstExecutive, role: "executive", dept: firstExecutive.dept || "הנהלה", depts: userDepts(firstExecutive) } : { ...session, role: "executive", dept: "הנהלה", depts: [] })
     : rolePreviewRole === "tech" ? (firstTech ? { id: firstTech.id, name: firstTech.name, role: "tech", dept: firstTech.dept || "", supplier: firstTech.supplier || "", shiftStart: firstTech.shiftStart || "", shiftEnd: firstTech.shiftEnd || "16:30", shiftId: "", techScope: firstTech.techScope || "transport", techCats: firstTech.techCats || [] } : { ...session, role: "tech", supplier: "", shiftStart: session.shiftStart || "", shiftEnd: session.shiftEnd || "16:30", shiftId: "", techScope: "transport", techCats: [] })
     : rolePreviewRole === "worker" ? (firstWorker ? { id: firstWorker.id, name: firstWorker.name, role: "worker", dept: firstWorker.dept || "", email: firstWorker.email || "" } : { ...session, role: "worker", dept: session.dept || config.departments[0] || "" })
     : (firstMgr ? { id: firstMgr.id, name: firstMgr.name, role: "user", dept: firstMgr.dept || config.departments[0] || "", depts: userDepts(firstMgr).length ? userDepts(firstMgr) : [config.departments[0] || ""], email: firstMgr.email || "", mgrZones: firstMgr.mgrZones || [], shift: firstMgr.shift || "", perms: normalizePerms(firstMgr) } : { ...session, role: "user", dept: session.dept || config.departments[0] || "", mgrZones: session.mgrZones || [] });
@@ -7355,6 +7357,7 @@ function PpeHub(p) {
 
 function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe }) {
   const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders }), [session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders]);
+  const isAdminBI = session?.role === "admin";
   const openTickets = scope.tickets.filter(isOpen);
   const isTransportTicket = (ticket) => ticket.track === "transport" || (!ticket.track && ticket.forkliftId);
   const facilityOpen = openTickets.filter((ticket) => !isTransportTicket(ticket));
@@ -7382,7 +7385,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     ...waiting.filter((ticket) => !slaBreaches.some((item) => item.id === ticket.id) && !critical.some((item) => item.id === ticket.id)).map((ticket) => ({ ticket, label: "ממתין לגורם", color: "#B45309" }))
   ].slice(0, 6);
   const commandSeen = new Set();
-  const commandQueue = [
+  const commandQueue = isAdminBI ? [
     ...unownedTickets.map((ticket) => ({ key: `owner-${ticket.id}`, title: `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "קריאה"}`, sub: "קריאה ללא בעלים פעיל · נדרש שיבוץ", color: "#7F1D1D", action: () => onOpenTicket?.(ticket.id) })),
     ...slaBreaches.map((ticket) => ({ key: `sla-${ticket.id}`, title: `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "קריאה"}`, sub: "חריגת SLA · לפתוח קריאה", color: "#B91C1C", action: () => onOpenTicket?.(ticket.id) })),
     ...critical.map((ticket) => ({ key: `critical-${ticket.id}`, title: `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "כלי שינוע"}`, sub: "השבתת שינוע קריטית", color: "#C2410C", action: () => onOpenTicket?.(ticket.id) })),
@@ -7395,7 +7398,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     if (commandSeen.has(item.key)) return false;
     commandSeen.add(item.key);
     return true;
-  }).slice(0, 8);
+  }).slice(0, 8) : [];
   const scopeTitle = scope.kind === "company" ? "תמונת חברה" : scope.departments.length ? `מחלקות: ${scope.departments.join(", ")}` : "לא הוגדר scope";
 
   if (scope.kind === "none") return <Empty text="אין הרשאת BI" Icon={Gauge} sub="המודול פתוח בשלב הראשון להנהלה, מנהלי מערכת ומנהלי מחלקות." />;
@@ -7419,14 +7422,14 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     </div>
 
     <div className="bi-grid">
-      <section className="panel bi-panel bi-command-panel">
+      {isAdminBI && <section className="panel bi-panel bi-command-panel">
         <div className="bi-panel-head"><div><b>דורש החלטה עכשיו</b><span>{commandQueue.length ? `${commandQueue.length} פריטים ראשונים מכל המודולים` : "אין כרגע פריטים דחופים"}</span></div></div>
         {commandQueue.length ? commandQueue.map((item) => <button key={item.key} className="bi-attn-row" onClick={item.action || undefined} disabled={!item.action}>
           <span className="bi-dot" style={{ background: item.color }} />
           <span><b>{item.title}</b><small>{item.sub}</small></span>
           {item.action && <ChevronLeft size={15} />}
         </button>) : <div className="note">אין כרגע החלטות דחופות. המשיכו לעקוב אחרי המדדים והמודולים.</div>}
-      </section>
+      </section>}
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>דורש טיפול</b><span>{topAttention.length ? `${topAttention.length} פריטים ראשונים` : "אין חריגים פתוחים"}</span></div><button className="btn-ghost sm" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · דורש טיפול" } })}>לכל הקריאות</button></div>
@@ -10929,7 +10932,7 @@ function AppIssuesSettings({ issues, session, onSave }) {
 }
 
 /* ============================================================ SHARED UI */
-const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus]];
+const ROLE_PREVIEW_OPTIONS = [["admin", "מנהל", ShieldCheck], ["executive", "הנהלה", BarChart3], ["user", "ראש צוות", User], ["tech", "טכנאי", HardHat], ["worker", "עובד", UserPlus]];
 
 function BrandMark({ logo, small = false }) {
   return <div className={"brand-mark" + (small ? " sm" : "") + (logo ? " has-logo" : "")}>
