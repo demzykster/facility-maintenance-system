@@ -7377,7 +7377,15 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const ppeLowItems = scope.ppeItems.filter((item) => item.active !== false && ppeLow(item));
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
-  const monthCost = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000).reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0) : 0;
+  const closedLast30 = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000) : [];
+  const monthCost = closedLast30.reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0);
+  const avgClosedCost = closedLast30.length ? Math.round(monthCost / closedLast30.length) : 0;
+  const supplierCostRows = Object.entries(closedLast30.reduce((acc, ticket) => {
+    const supplier = ticket.closure?.costSupplier || "ללא ספק";
+    acc[supplier] = (acc[supplier] || 0) + (ticket.closure?.costAmount || 0);
+    return acc;
+  }, {})).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const maxSupplierCost = Math.max(1, ...supplierCostRows.map(([, value]) => value));
   const lifecycleOptions = {
     now: Date.now(),
     isOpen,
@@ -7523,6 +7531,12 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         {scope.canViewFinancialBI ? <>
           <div className="big-stat">{ils(monthCost)}</div>
           <div className="rs-lbl">עלות סגירות ב-30 הימים האחרונים</div>
+          <div className="bi-mini-stats bi-finance-stats">
+            <span><b>{closedLast30.length}</b><small>סגירות עם עלות</small></span>
+            <span><b>{avgClosedCost ? ils(avgClosedCost) : "—"}</b><small>ממוצע לסגירה</small></span>
+            <span><b>{supplierCostRows.length}</b><small>ספקים בעלות</small></span>
+          </div>
+          {supplierCostRows.length ? supplierCostRows.map(([supplier, value]) => <Bar key={supplier} label={supplier} value={value} max={maxSupplierCost} money color="#0D9488" onClick={() => onGoTickets?.({ st: "all", focus: { label: `BI · ספק · ${supplier}`, supplier } })} />) : <div className="note" style={{ marginTop: 10 }}>אין פירוט ספקים ל-30 הימים האחרונים.</div>}
         </> : <div className="bi-mini-stats">
           <span><b>{scope.users.length}</b><small>עובדים/משתמשים</small></span>
           <span><b>{scope.zones.length}</b><small>אזורי ניקיון</small></span>
@@ -11488,6 +11502,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-mini-stats span{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px;text-align:center;}
 .bi-mini-stats b{display:block;font-family:var(--font-head);font-size:19px;font-weight:650;color:var(--primary);}
 .bi-mini-stats small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
+.bi-finance-stats{margin:10px 0;}
 .bi-doc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:9px;margin-top:9px;}
 .bi-subtitle{margin:2px 0 6px;color:var(--muted);font-size:11.5px;font-weight:650;}
 .bi-subdivider{height:1px;background:var(--line);margin:10px 0;}
