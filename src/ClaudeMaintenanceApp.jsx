@@ -713,6 +713,14 @@ const userDepts = (u) => (u && u.depts && u.depts.length) ? u.depts : (u && u.de
 const ticketNo = (t) => (t && t.num) ? `${tkLetter(t)}-${String(t.num).padStart(3, "0")}` : (t ? `${tkLetter(t)}-${String(t.id || "").slice(-4).toUpperCase()}` : "—");
 const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
+const fmtDateTimeShort = (ts) => ts ? `${fmtDate(ts)} ${fmtTime(ts)}` : "";
+const daypartGreeting = (now = new Date()) => {
+  const h = now.getHours();
+  if (h >= 5 && h < 12) return "בוקר טוב";
+  if (h >= 12 && h < 17) return "צהריים טובים";
+  if (h >= 17 && h < 22) return "ערב טוב";
+  return "לילה טוב";
+};
 const dayCountLabel = (n) => Number(n) === 1 ? "יום אחד" : `${n} ימים`;
 const countLabel = (n, one, many) => `${n} ${Number(n) === 1 ? one : many}`;
 const fmtDur = (ms) => { const h = Math.round(ms / 3600000); if (h < 1) return "פחות משעה"; if (h < 48) return `${h} שע׳`; return dayCountLabel(Math.round(h / 24)); };
@@ -7593,7 +7601,7 @@ function Dashboard({ session, tickets: allTickets, pm, fleet, config, users, pre
     <header className="dash-hero">
       <div>
         <div className="dash-kicker">{todayLabel}</div>
-        <h1>בוקר טוב, {sessionName}</h1>
+        <h1>{daypartGreeting()}, {sessionName}</h1>
         <p>תמונת מצב תפעולית: מה דורש תגובה עכשיו, מה באחריותך, ומה מתקדם ברקע.</p>
       </div>
       <div className="dash-hero-actions">
@@ -9367,9 +9375,10 @@ const SLA3 = (o) => ({ high: o?.high ?? 4, medium: o?.medium ?? 24, low: o?.low 
 function UserTree({ list, departments, presence = [], onPick, shifts, mode = "workers", onCreate, canCreate = false, showEmptyGroups = false }) {
   const pickable = typeof onPick === "function";
   const canAdd = canCreate && typeof onCreate === "function";
+  const shiftDefs = shifts?.length ? shifts : DRIVER_SHIFTS;
   const roleTitle = (u) => u.role === "tech" ? (u.techScope === "facility" ? "טכנאי מבנה" : "טכנאי צי") : (ROLE_LABEL[u.role] || "משתמש");
   const userTitle = (u) => (u.position || u.jobTitle || "").trim() || roleTitle(u);
-  const shiftName = (u) => (shifts || DRIVER_SHIFTS).find((s) => s.id === u.shift)?.label || "";
+  const shiftName = (u) => shiftDefs.find((s) => s.id === u.shift)?.label || "";
   const activeList = list.filter((u) => u.status !== "archived");
   const metaParts = (u) => {
     const out = [];
@@ -9418,16 +9427,76 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     return admins.length ? <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.map((u) => <PersonRow key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלי מערכת" />;
   }
   const workers = activeList.filter((u) => isWorkerLike(u));
+  const WorkerCard = ({ u }) => {
+    const rec = presenceOf(presence, u.id);
+    const online = isPresenceOnline(rec);
+    const unconfigured = isActivationLinkRole(u.role) && !userHasLoginSecret(u);
+    const inactive = u.active === false;
+    let statusClass = "";
+    let statusText = fmtDateTimeShort(rec?.lastSeen) || "לא נראה במערכת";
+    if (online) {
+      statusClass = " online";
+      statusText = "פעיל כעת";
+    } else if (unconfigured) {
+      statusClass = " pending";
+      statusText = "טרם הוגדרה כניסה";
+    } else if (inactive) {
+      statusClass = " off";
+      statusText = "מושבת";
+    }
+    const RowTag = pickable ? "button" : "div";
+    return <RowTag className={"worker-card" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined}>
+      <span className="worker-avatar"><UserPlus size={20} /></span>
+      <span className={"worker-state" + statusClass} aria-hidden="true" />
+      <div className="worker-card-main">
+        <div className="worker-name">{u.name || "ללא שם"}</div>
+        <div className="worker-meta">מס׳ עובד {u.workerNo || "—"}</div>
+        <div className="worker-meta">{u.phone || u.dept || "ללא טלפון"}</div>
+        <div className={"worker-seen" + statusClass}>{statusText}</div>
+      </div>
+    </RowTag>;
+  };
+  const DeptWorkers = ({ deptName, rows }) => {
+    const managers = activeList.filter((u) => u.role === "user" && userDepts(u).includes(deptName));
+    const onShift = rows.filter((u) => presenceOf(presence, u.id)?.onShift).length;
+    const activated = rows.filter((u) => userHasLoginSecret(u)).length;
+    const shiftGroups = shiftDefs.map((s) => ({ ...s, rows: rows.filter((u) => (u.shift || "") === s.id) }));
+    const noShift = rows.filter((u) => !shiftDefs.some((s) => s.id === (u.shift || "")));
+    return <details className="dept-card">
+      <summary className="dept-card-summary">
+        <div className="dept-card-main">
+          <div className="dept-card-title">{deptName}</div>
+          <div className="dept-card-sub">מנהלים: {managers.length ? managers.map((m) => m.name).join(", ") : "לא הוגדר"}</div>
+        </div>
+        <div className="dept-card-metrics">
+          <span><b>{onShift}</b><small>במשמרת</small></span>
+          <span><b>{rows.length}</b><small>סה״כ עובדים</small></span>
+          <span><b>{activated}</b><small>כניסה פעילה</small></span>
+        </div>
+        {canAdd && <button className="btn-ghost sm dept-add" type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCreate({ role: "worker", dept: deptName }); }}><Plus size={14} /> עובד</button>}
+      </summary>
+      {rows.length ? <div className="dept-shift-board">
+        {shiftGroups.map((s) => <section key={s.id} className="shift-lane">
+          <div className="shift-lane-head"><span className="shift-color" style={{ background: s.color || "var(--primary)" }} /><b>{s.label}</b><span>{s.rows.length}</span></div>
+          {s.rows.length ? <div className="worker-card-grid">{s.rows.map((u) => <WorkerCard key={u.id} u={u} />)}</div> : <div className="shift-empty">אין עובדים במשמרת הזו</div>}
+        </section>)}
+        {noShift.length > 0 && <section className="shift-lane shift-lane-wide">
+          <div className="shift-lane-head"><span className="shift-color muted" /><b>ללא שיוך משמרת</b><span>{noShift.length}</span></div>
+          <div className="worker-card-grid">{noShift.map((u) => <WorkerCard key={u.id} u={u} />)}</div>
+        </section>}
+      </div> : <div className="dept-empty">אין עובדים במחלקה הזו</div>}
+    </details>;
+  };
   const allDepts = [...new Set([...(departments || []), ...workers.map((u) => u.dept).filter(Boolean)])];
   const unassigned = workers.filter((u) => !(u.dept || ""));
-  return <div style={{ marginTop: 4 }}>
+  return <div className="dept-tree">
     {allDepts.map((d) => {
       const rows = workers.filter((u) => (u.dept || "") === d);
       if (!rows.length && !showEmptyGroups) return null;
-      return <Section key={d} title={d} count={rows.length} actionLabel="עובד" actionPatch={{ role: "worker", dept: d }}>{rows.length ? rows.map((u) => <PersonRow key={u.id} u={u} />) : <div className="hint">אין עובדים במחלקה הזו</div>}</Section>;
+      return <DeptWorkers key={d} deptName={d} rows={rows} />;
     })}
-    {unassigned.length > 0 && <Section title="ללא מחלקה" count={unassigned.length} actionLabel="עובד" actionPatch={{ role: "worker" }}>{unassigned.map((u) => <PersonRow key={u.id} u={u} />)}</Section>}
-    {workers.length === 0 && <Empty text="לא נמצאו עובדים" />}
+    {unassigned.length > 0 && <DeptWorkers deptName="ללא מחלקה" rows={unassigned} />}
+    {workers.length === 0 && !showEmptyGroups && <Empty text="לא נמצאו עובדים" />}
   </div>;
 }
 function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete, onOpenFleet, canManage }) {
@@ -12303,6 +12372,54 @@ body *{visibility:hidden!important;}
 .dept-line{flex:1;height:1px;background:var(--line);}
 .dept-name{font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap;}
 .dept-count{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:2px 9px;white-space:nowrap;}
+.dept-tree{display:grid;gap:12px;margin-top:4px;}
+.dept-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--control-shadow);}
+.dept-card[open]{border-color:rgba(31,78,140,.22);}
+.dept-card-summary{list-style:none;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:15px 16px;cursor:pointer;background:var(--surface);}
+.dept-card-summary::-webkit-details-marker{display:none;}
+.dept-card-summary:hover{background:var(--surface-2);}
+.dept-card-main{min-width:0;display:grid;gap:4px;}
+.dept-card-title{font-size:18px;font-weight:720;color:var(--ink);line-height:1.15;}
+.dept-card-sub{font-size:12.5px;color:var(--muted);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dept-card-metrics{display:flex;align-items:stretch;gap:8px;}
+.dept-card-metrics span{min-width:78px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:7px 10px;text-align:center;}
+.dept-card-metrics b{display:block;font-size:18px;line-height:1;color:var(--primary);font-weight:760;font-variant-numeric:tabular-nums;}
+.dept-card-metrics small{display:block;margin-top:4px;font-size:10.5px;color:var(--muted);white-space:nowrap;}
+.dept-add{white-space:nowrap;}
+.dept-shift-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px;background:var(--brand-light);border-top:1px solid var(--line);}
+.shift-lane{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:10px;}
+.shift-lane-wide{grid-column:1 / -1;}
+.shift-lane-head{display:flex;align-items:center;gap:8px;color:var(--ink);}
+.shift-lane-head b{font-size:13.5px;font-weight:720;}
+.shift-lane-head span:last-child{margin-inline-start:auto;font-size:11px;font-weight:700;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:2px 8px;}
+.shift-color{width:9px;height:9px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 3px rgba(31,78,140,.08);}
+.shift-color.muted{background:var(--icon-muted);}
+.worker-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px;}
+.worker-card{position:relative;width:100%;display:flex;align-items:center;gap:11px;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px;color:var(--ink);cursor:pointer;box-shadow:0 1px 0 rgba(46,49,56,.03);transition:border-color 150ms var(--ease-out),box-shadow 150ms var(--ease-out),transform 150ms var(--ease-out);}
+.worker-card:hover{border-color:rgba(31,78,140,.34);box-shadow:0 8px 20px rgba(46,49,56,.08);transform:translateY(-1px);}
+.worker-card.inert{cursor:default;}
+.worker-avatar{width:46px;height:46px;border-radius:16px;background:linear-gradient(145deg,#E6E7E9,#FFFFFF);border:1px solid var(--line);color:var(--primary);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.worker-card-main{min-width:0;display:grid;gap:2px;}
+.worker-name{font-size:14.5px;font-weight:720;line-height:1.2;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.worker-meta{font-size:12.5px;color:var(--muted);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.worker-seen{font-size:12px;color:var(--muted);line-height:1.25;margin-top:2px;}
+.worker-seen.online{color:#047857;font-weight:700;}
+.worker-seen.pending{color:#92400E;font-weight:700;}
+.worker-seen.off{color:var(--muted);font-weight:700;}
+.worker-state{position:absolute;inset-inline-start:12px;top:12px;width:9px;height:9px;border-radius:50%;background:var(--icon-muted);box-shadow:0 0 0 3px rgba(164,169,176,.16);}
+.worker-state.online{background:#16A34A;box-shadow:0 0 0 3px #16A34A24;}
+.worker-state.pending{background:#D97706;box-shadow:0 0 0 3px #D9770624;}
+.worker-state.off{background:var(--icon-muted);}
+.shift-empty,.dept-empty{border:1px dashed var(--line);border-radius:12px;padding:14px;text-align:center;color:var(--muted);font-size:12.5px;background:var(--surface-2);}
+.dept-empty{margin:14px;}
+@media(max-width:760px){
+  .dept-card-summary{grid-template-columns:1fr;align-items:start;}
+  .dept-card-metrics{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
+  .dept-card-metrics span{min-width:0;}
+  .dept-add{justify-self:start;}
+  .dept-shift-board{grid-template-columns:1fr;padding:10px;}
+  .worker-card-grid{grid-template-columns:1fr;}
+}
 .unit-pick-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer;text-align:start;}
 .unit-pick-btn:hover{border-color:var(--primary);}
 .muted-txt{color:var(--muted);}
