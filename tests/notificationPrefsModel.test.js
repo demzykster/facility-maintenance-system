@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   browserNotificationEvents,
   initialBrowserNotificationState,
+  mergeNotificationReadStates,
   nextBrowserNotificationEvent,
   notificationReadStateForEvents,
+  notificationReadStorageKeys,
   parseBrowserNotificationState,
   parseLocalNotificationPrefs,
   parseNotificationReadState,
@@ -43,6 +45,27 @@ describe("notification prefs model", () => {
     expect(notificationReadStateForEvents([{ key: "a", at: 100 }, { key: "b", at: 200 }, { key: "a", at: 300 }], 250)).toEqual({
       seenAt: 300,
       seenKeys: ["a", "b"]
+    });
+  });
+
+  it("uses a stable user id for personal notification read storage", () => {
+    expect(notificationReadStorageKeys({ id: "user-1", role: "user", name: "Vadim" })).toEqual({
+      primary: "seen:user-1",
+      legacy: "seen:user:Vadim"
+    });
+    expect(notificationReadStorageKeys({ role: "user", name: "Vadim" })).toEqual({
+      primary: "seen:user:Vadim",
+      legacy: null
+    });
+  });
+
+  it("merges legacy and current personal read-state without losing read keys", () => {
+    const current = JSON.stringify({ seenAt: 2000, seenKeys: ["ticket-1"] });
+    const legacy = JSON.stringify({ seenAt: 1000, seenKeys: ["doc-1", "ticket-1"] });
+
+    expect(mergeNotificationReadStates(current, legacy)).toEqual({
+      seenAt: 2000,
+      seenKeys: ["ticket-1", "doc-1"]
     });
   });
 

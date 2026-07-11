@@ -41,6 +41,33 @@ export function parseNotificationReadState(raw) {
   return { seenAt: parseNotificationSeenAt(raw), seenKeys: [] };
 }
 
+export function notificationUserKey(session = {}) {
+  const id = String(session?.id || "").trim();
+  if (id) return id;
+  const role = String(session?.role || "user").trim() || "user";
+  const name = String(session?.name || "anonymous").trim() || "anonymous";
+  return `${role}:${name}`;
+}
+
+export function notificationReadStorageKeys(session = {}) {
+  const primary = `seen:${notificationUserKey(session)}`;
+  const legacy = `seen:${String(session?.role || "user").trim() || "user"}:${String(session?.name || "anonymous").trim() || "anonymous"}`;
+  return primary === legacy ? { primary, legacy: null } : { primary, legacy };
+}
+
+export function mergeNotificationReadStates(...states) {
+  const parsed = states
+    .filter((state) => state != null)
+    .map((state) => typeof state === "string" ? parseNotificationReadState(state) : {
+      seenAt: parseNotificationSeenAt(state.seenAt),
+      seenKeys: Array.isArray(state.seenKeys) ? state.seenKeys.filter((key) => typeof key === "string" && key) : []
+    });
+  return {
+    seenAt: parsed.reduce((max, state) => Math.max(max, state.seenAt || 0), 0),
+    seenKeys: [...new Set(parsed.flatMap((state) => state.seenKeys || []))]
+  };
+}
+
 export function notificationReadStateForEvents(events = [], now = Date.now()) {
   const seenAt = Math.max(
     Number(now) || 0,

@@ -21,7 +21,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
-import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, nextBrowserNotificationEvent, notificationReadStateForEvents, parseBrowserNotificationState, parseLocalNotificationPrefs, parseNotificationReadState, unreadNotificationKeySet } from "./notificationPrefsModel.js";
+import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
@@ -1510,9 +1510,10 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
   return ev.sort((a, b) => b.at - a.at);
 }
 function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = [], rounds = [], complaints = [], users = [], absences = [], tasks = [], meetings = [], ppeReqs = [], ppeItems = [], ppeOrders = []) {
-  const skey = `seen:${session.role}:${session.name}`;
-  const pkey = `notifprefs:${session.id || session.role + ":" + session.name}`;
-  const bkey = `browsernotif:${session.id || session.role + ":" + session.name}`;
+  const userNotifKey = session.id || session.role + ":" + session.name;
+  const { primary: skey, legacy: legacySkey } = notificationReadStorageKeys(session);
+  const pkey = `notifprefs:${userNotifKey}`;
+  const bkey = `browsernotif:${userNotifKey}`;
   const [readState, setReadState] = useState(null), [toast, setToast] = useState(null);
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
   const browserNotificationRef = useRef({ maxAt: 0, notifiedKeys: [], lastNotifiedAt: 0 }), initRef = useRef(false), browserStateLoadedRef = useRef(false);
@@ -1536,11 +1537,20 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   useEffect(() => {
     let cancelled = false;
     setReadState(null);
-    store.get(skey, false).then((v) => {
-      if (!cancelled) setReadState(parseNotificationReadState(v));
+    Promise.all([store.get(skey, false), legacySkey ? store.get(legacySkey, false) : Promise.resolve(null)]).then(([current, legacy]) => {
+      const next = mergeNotificationReadStates(current, legacy);
+      if (!cancelled) setReadState(next);
+      if (!cancelled && legacy) {
+        const currentNext = mergeNotificationReadStates(current);
+        const currentKeys = new Set(currentNext.seenKeys || []);
+        const hasNewLegacyKey = (next.seenKeys || []).some((key) => !currentKeys.has(key));
+        if ((next.seenAt || 0) !== (currentNext.seenAt || 0) || hasNewLegacyKey) {
+          store.set(skey, JSON.stringify(next), false);
+        }
+      }
     });
     return () => { cancelled = true; };
-  }, [skey]);
+  }, [skey, legacySkey]);
   useEffect(() => {
     let cancelled = false;
     setPrefsState(parseLocalNotificationPrefs(null, DEFAULT_NOTIF_PREFS));
@@ -1586,8 +1596,8 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
       setTimeout(() => setToast(null), 5200);
     }
   }, [browserVisible]);
-  const markRead = async () => {
-    const next = notificationReadStateForEvents(visible);
+  const markRead = async (items = visible) => {
+    const next = mergeNotificationReadStates(readState, notificationReadStateForEvents(items));
     setReadState(next);
     await store.set(skey, JSON.stringify(next), false);
   };
@@ -10752,6 +10762,11 @@ function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
   const [settings, setSettings] = useState(false), [marked, setMarked] = useState(false), [perm, setPerm] = useState(""), [showAll, setShowAll] = useState(false);
   const [marking, setMarking] = useState(false);
   const [pushMsg, setPushMsg] = useState(""), [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    const onKey = (event) => { if (event.key === "Escape") onClose && onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const markAll = async () => {
     setMarking(true);
     await notif.markRead();
@@ -10792,7 +10807,7 @@ function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
     setPushMsg(result.error === "push_not_configured" ? "התראות לטלפון עדיין לא הוגדרו בשרת." : "שליחת בדיקה נכשלה.");
   };
   const { prefs, setPrefs } = notif;
-  const click = async (ev) => { await notif.markRead(); if (ev.ticketId) onOpen && onOpen(ev.ticketId); else if (ev.go && onGo) onGo(ev.go, ev); };
+  const click = async (ev) => { await notif.markRead([ev]); if (ev.ticketId) onOpen && onOpen(ev.ticketId); else if (ev.go && onGo) onGo(ev.go, ev); };
   const item = (ev) => {
     const unread = notif.unreadKeys?.has(ev.key);
     return <button key={ev.key} className={"notif-item" + (ev.ticketId || ev.go ? " clk" : "") + (unread ? " unread" : "")} onClick={() => click(ev)}><div className={"ni-dot " + ev.kind} /><div className="ni-body"><div className="ni-title">{ev.title}{unread && <span className="ni-new">חדש</span>}</div><div className="ni-text">{ev.body}</div><div className="ni-time">{timeAgo(ev.at)}</div></div>{(ev.ticketId || ev.go) && <ChevronLeft size={15} className="ni-go" />}</button>;
@@ -10801,7 +10816,7 @@ function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
   const list = showAll ? notif.events : notif.events.slice(0, 60);
   const grouped = prefs.group ? NOTIF_KINDS.map((k) => [k, list.filter((e) => e.kind === k.kind)]).filter(([, arr]) => arr.length) : null;
   const unreadPreview = (notif.unreadEvents || []).slice(0, 3);
-  return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" onClick={(e) => e.stopPropagation()}>
+  return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" role="dialog" aria-modal="true" aria-label="התראות" onClick={(e) => e.stopPropagation()}>
     <div className="notif-head"><div><div className="notif-title"><Bell size={18} /> התראות</div><div className="notif-count">{notif.events.length ? (notif.unread ? `${notif.unread} חדשות · ${notif.events.length} מוצגות` : `${notif.events.length} מוצגות · הכל נקרא`) : "אין פריטים להצגה"}</div></div><div style={{ display: "flex", gap: 4 }}><button className={"icon-btn" + (settings ? " on2" : "")} onClick={() => setSettings((s) => !s)} title="הגדרות תצוגה" aria-label="הגדרות תצוגת התראות"><SlidersHorizontal size={18} /></button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div>
     {notif.unread > 0 && <div className="notif-unread-summary"><div className="nus-title">חדשות שלא נקראו</div>{unreadPreview.map((ev) => <div key={ev.key} className="nus-row"><span className={"ni-dot " + ev.kind} />{ev.title}</div>)}{notif.unread > unreadPreview.length && <div className="nus-more">ועוד {notif.unread - unreadPreview.length}</div>}</div>}
     {list.length > 0 && <button className="notif-markall" onClick={markAll} disabled={marking || notif.unread === 0}><Check size={14} /> {marking ? "מסמן…" : marked ? "סומן הכל כנקרא ✓" : notif.unread ? "סמן הכל כנקרא" : "הכל כבר נקרא"}</button>}
@@ -10998,6 +11013,7 @@ a{color:inherit;}
 @keyframes cmmsFade{from{opacity:0;}to{opacity:1;}}
 @keyframes cmmsSurfaceIn{from{opacity:0;transform:translateY(10px) scale(.98);}to{opacity:1;transform:none;}}
 @keyframes cmmsSheetIn{from{opacity:0;transform:translateY(3%);}to{opacity:1;transform:none;}}
+@keyframes cmmsDrawerIn{from{opacity:0;transform:translateX(18px) scale(.992);}to{opacity:1;transform:none;}}
 @keyframes cmmsToastIn{from{opacity:0;transform:translate(-50%,10px) scale(.98);}to{opacity:1;transform:translate(-50%,0) scale(1);}}
 @keyframes cmmsMenuIn{from{opacity:0;transform:translateY(-4px) scale(.985);}to{opacity:1;transform:none;}}
 @keyframes cmmsBottomMenuIn{from{opacity:0;transform:translate(-50%,8px) scale(.985);}to{opacity:1;transform:translate(-50%,0) scale(1);}}
@@ -11667,20 +11683,21 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .nav-more-item.on{border-color:rgba(31,78,140,.34);background:var(--primary-soft);color:var(--primary);}
 .app-dark .nav-more-item.on{background:rgba(31,78,140,.18);border-color:rgba(31,78,140,.45);}
 
-.notif-back{align-items:center;justify-content:center;padding:16px;z-index:70;}
-.notif-panel{background:var(--surface);width:100%;max-width:440px;max-height:80vh;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:cmmsSurfaceIn 220ms var(--ease-out) both;will-change:transform,opacity;}
-.notif-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);}
+.ovl-backdrop.notif-back{align-items:stretch;justify-content:flex-start;padding:18px;z-index:70;background:rgba(46,49,56,.38);backdrop-filter:saturate(130%) blur(2px);}
+.notif-panel{background:var(--surface);width:min(430px,calc(100vw - 36px));height:calc(100dvh - 36px);max-height:none;border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:-20px 0 54px rgba(46,49,56,.22);animation:cmmsDrawerIn 190ms var(--ease-out) both;will-change:transform,opacity;}
+.app-dark .notif-panel{box-shadow:-20px 0 54px rgba(0,0,0,.42);}
+.notif-head{display:flex;align-items:center;justify-content:space-between;padding:15px 16px;border-bottom:1px solid var(--line);background:var(--surface-glow);}
 .notif-title{font-family:var(--font-head);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;}
 .notif-count{font-size:12px;color:var(--muted);margin-top:3px;}
 .notif-perm{display:flex;align-items:center;justify-content:center;gap:7px;margin:12px 16px 0;background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;border-radius:10px;padding:10px;font-size:13.5px;font-weight:600;cursor:pointer;}
 button.notif-perm:hover{background:#D1FAE5;}
 .notif-perm.warn{background:#FEF3C7;color:#92400E;border-color:#FCD34D;cursor:default;}
 .notif-perm.ok{cursor:default;}
-.notif-markall{display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);margin:10px 16px 0;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+.notif-markall{display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);margin:10px 16px 0;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
 .notif-markall:hover{border-color:var(--primary);color:var(--primary);}
 .notif-markall:disabled{opacity:.65;cursor:default;border-color:var(--line);color:var(--muted);}
-.notif-unread-summary{margin:10px 16px 0;border:1px solid #C9CDD1;background:#F7F8FA;border-radius:12px;padding:10px 12px;}
-.app-dark .notif-unread-summary{background:#2a1d10;border-color:#7c2d12;}
+.notif-unread-summary{margin:12px 16px 0;border:1px solid #E2D3BA;background:#FBF7EF;border-radius:14px;padding:11px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72);}
+.app-dark .notif-unread-summary{background:#2a2117;border-color:#5d4b32;box-shadow:none;}
 .nus-title{font-size:12px;font-weight:650;color:var(--primary);margin-bottom:6px;}
 .app-dark .nus-title{color:#FDBA74;}
 .nus-row{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink);padding:3px 0;}
@@ -11822,17 +11839,17 @@ body *{visibility:hidden!important;}
 .pub-done{text-align:center;padding:14px 0;}
 .pub-done-t{font-size:19px;font-weight:800;margin:12px 0 4px;}
 .pub-done-s{font-size:13px;color:var(--muted);margin-bottom:18px;}
-.notif-list{overflow-y:auto;padding:8px;}
+.notif-list{overflow-y:auto;padding:8px 10px 12px;display:flex;flex-direction:column;gap:6px;}
 .notif-more{border-top:1px solid var(--border);padding:11px 14px;background:var(--surface);font-weight:800;color:var(--primary);width:100%;}
 .notif-more:hover{background:var(--surface-2);}
-.notif-item{display:flex;gap:11px;width:100%;text-align:right;padding:11px;border:1px solid transparent;border-radius:11px;color:var(--ink);}
+.notif-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:11px;width:100%;text-align:right;padding:12px 13px;border:1px solid transparent;border-radius:13px;color:var(--ink);background:transparent;}
 .notif-item:hover{background:var(--surface-2);}
-.notif-item.unread{background:#F7F8FA;border-color:#C9CDD1;}
-.app-dark .notif-item.unread{background:#2a1d10;border-color:#7c2d12;}
-.ni-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0;background:var(--muted);}
+.notif-item.unread{background:#F7F8FA;border-color:#C9CDD1;box-shadow:inset 0 0 0 1px rgba(255,255,255,.55);}
+.app-dark .notif-item.unread{background:#242A32;border-color:#3E4650;box-shadow:none;}
+.ni-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--muted);box-shadow:0 0 0 4px rgba(164,169,176,.12);}
 .ni-dot.new{background:#2563EB;}.ni-dot.upd{background:var(--primary);}.ni-dot.ready{background:#4F46E5;}.ni-dot.sla{background:#DC2626;}.ni-dot.pm{background:#0EA5E9;}.ni-dot.task{background:#7C3AED;}.ni-dot.doc{background:#EA580C;}.ni-dot.confirm{background:#0D9488;}.ni-dot.back{background:#DC2626;}.ni-dot.escalate{background:#B91C1C;}.ni-dot.driver{background:#0D9488;}.ni-dot.ppe{background:#64748B;}
 .ni-dot.cleaning{background:#0EA5E9;}
-.notif-item.clk{cursor:pointer;}.notif-item .ni-go{color:var(--muted);align-self:center;flex-shrink:0;opacity:.6;}
+.notif-item.clk{cursor:pointer;}.notif-item .ni-go{color:var(--muted);align-self:center;flex-shrink:0;opacity:.72;}
 .icon-btn.on2{background:var(--primary-soft,#FFF4ED);color:var(--primary);}
 .notif-push{border-bottom:1px solid var(--line);padding:10px 14px;background:var(--surface);}
 .notif-push-main{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);}
@@ -11853,9 +11870,10 @@ body *{visibility:hidden!important;}
 .ni-group-h{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:800;color:var(--ink);padding:7px 14px 4px;}
 .ni-group-h .ni-dot{position:static;}
 .ni-group-n{font-size:10px;font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:1px 7px;}
-.ni-title{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.ni-body{min-width:0;}
+.ni-title{font-weight:650;font-size:13.5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;line-height:1.3;}
 .ni-new{display:inline-flex;align-items:center;border-radius:999px;background:var(--primary);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;line-height:1;}
-.ni-text{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}.ni-time{font-size:11px;color:var(--muted);margin-top:3px;}
+.ni-text{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.ni-time{font-size:11px;color:var(--muted);margin-top:4px;}
 .side-badge{margin-inline-start:auto;background:#EF4444;color:#fff;min-width:20px;height:20px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;}
 .role-preview{margin-top:8px;}
 .rp-toggle{display:flex;align-items:center;gap:7px;width:100%;min-height:44px;border:1px solid #ffffff1a;border-radius:999px;background:#ffffff08;color:#fff;padding:6px 9px;text-align:right;}
@@ -12354,6 +12372,10 @@ body *{visibility:hidden!important;}
 @media(max-width:640px){
   .ovl-backdrop{align-items:stretch;justify-content:stretch;padding:0;}
   .ovl-panel{height:100dvh;max-height:100dvh;overflow:hidden;}
+  .notif-back{padding:0;align-items:stretch;justify-content:stretch;}
+  .notif-panel{width:100vw;height:100dvh;max-width:none;border:0;border-radius:0;box-shadow:none;animation:cmmsSheetIn 170ms var(--ease-out) both;}
+  .notif-head{padding-top:calc(13px + env(safe-area-inset-top));}
+  .notif-list{padding-bottom:calc(16px + env(safe-area-inset-bottom));}
   .ovl-inner{height:100dvh;min-height:0;}
   .ovl-inner>.form-head{position:relative;top:auto;flex:0 0 auto;padding-top:calc(12px + env(safe-area-inset-top));}
   .ovl-inner>.body{min-height:0;flex:1;overflow-y:auto;padding-bottom:calc(24px + env(safe-area-inset-bottom));}
