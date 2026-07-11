@@ -127,6 +127,8 @@ async function authorize(req, env, fetchImpl, sessionClient) {
   }
 }
 
+const canSendBusinessPush = (user = {}) => ["admin", "user"].includes(user.role);
+
 export function createPushHandler({
   driver = null,
   subscriptionStore = null,
@@ -217,6 +219,7 @@ export function createPushHandler({
       }
 
       if (action === "notify") {
+        if (!canSendBusinessPush(auth.user)) return sendJson(res, 403, { error: "permission_required:push:notify" });
         const normalized = normalizePushNotificationRequest(body.event || body);
         if (!normalized.ok) return sendJson(res, 400, { error: normalized.error });
         if (!normalized.interrupting) {
@@ -224,18 +227,17 @@ export function createPushHandler({
         }
         const subscriptions = await enrichSubscriptionsWithUsers(backendKvDriver, current);
         const targets = selectPushNotificationTargets(subscriptions, normalized.targetUserIds, normalized.kind);
-        let sent = 0;
-        for (const target of targets) {
-          await push.sendNotification(target.subscription, pushPayload({
-            title: normalized.title,
-            body: normalized.body,
-            url: normalized.url,
-            tag: normalized.tag,
-            kind: normalized.kind
-          }));
-          sent += 1;
-        }
-        return sendJson(res, 200, { ok: true, sent, targets: targets.length });
+        const payload = pushPayload({
+          title: normalized.title,
+          body: normalized.body,
+          url: normalized.url,
+          tag: normalized.tag,
+          kind: normalized.kind
+        });
+        const results = await Promise.allSettled(targets.map((target) => push.sendNotification(target.subscription, payload)));
+        const sent = results.filter((result) => result.status === "fulfilled").length;
+        const failed = results.length - sent;
+        return sendJson(res, 200, { ok: true, sent, ...(failed ? { failed } : {}), targets: targets.length });
       }
 
       return sendJson(res, 400, { error: "push_action_unknown" });

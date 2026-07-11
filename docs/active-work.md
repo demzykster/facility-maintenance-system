@@ -2,10 +2,10 @@
 
 ## Current Branch
 
-- Active branch: `none`.
-- Current branch: `main`.
+- Active branch: `codex/harden-push-notify`.
+- Current branch: `codex/harden-push-notify`.
 - Last completed work: clear stale production-config warning after R10 normalized-authority completion.
-- Current work: none.
+- Current work: harden `/api/push` business notification authorization and partial-failure handling from independent audit.
 
 ## Current Product Direction
 
