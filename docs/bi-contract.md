@@ -227,3 +227,10 @@ The first implementation PRs should cover:
 - fleet scope uses `fleet.depts`, with fallback to `fleet.dept`;
 - shared/common zones are visible to department heads without granting admin rights;
 - BI actions do not bypass ticket workflow permissions.
+
+## Implementation Checkpoints
+
+- `src/biScopeModel.js` owns the first strict BI scope seam.
+- `admin` and `executive` receive `company` BI scope.
+- `user` receives `department` BI scope only; missing departments produce empty operational slices, not company-wide fallback.
+- `tech`, `worker`, and `cleaner` are outside the first BI rollout.
