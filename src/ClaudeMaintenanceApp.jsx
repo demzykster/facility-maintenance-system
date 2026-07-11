@@ -9432,7 +9432,7 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     const online = isPresenceOnline(rec);
     const unconfigured = isActivationLinkRole(u.role) && !userHasLoginSecret(u);
     const inactive = u.active === false;
-    let statusClass = "";
+    let statusClass = " seen";
     let statusText = fmtDateTimeShort(rec?.lastSeen) || "לא נראה במערכת";
     if (online) {
       statusClass = " online";
@@ -9441,24 +9441,22 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
       statusClass = " pending";
       statusText = "טרם הוגדרה כניסה";
     } else if (inactive) {
-      statusClass = " off";
+      statusClass = " seen";
       statusText = "מושבת";
     }
     const RowTag = pickable ? "button" : "div";
     return <RowTag className={"worker-card" + (pickable ? "" : " inert")} type={pickable ? "button" : undefined} onClick={pickable ? () => onPick(u) : undefined}>
       <span className="worker-avatar"><UserPlus size={20} /></span>
-      <span className={"worker-state" + statusClass} aria-hidden="true" />
       <div className="worker-card-main">
         <div className="worker-name">{u.name || "ללא שם"}</div>
         <div className="worker-meta">מס׳ עובד {u.workerNo || "—"}</div>
         <div className="worker-meta">{u.phone || u.dept || "ללא טלפון"}</div>
-        <div className={"worker-seen" + statusClass}>{statusText}</div>
+        <div className={"worker-seen" + statusClass}><span className={"worker-state" + statusClass} aria-hidden="true" /> <span>{statusText}</span></div>
       </div>
     </RowTag>;
   };
   const DeptWorkers = ({ deptName, rows }) => {
     const managers = activeList.filter((u) => u.role === "user" && userDepts(u).includes(deptName));
-    const onShift = rows.filter((u) => presenceOf(presence, u.id)?.onShift).length;
     const activated = rows.filter((u) => userHasLoginSecret(u)).length;
     const shiftGroups = shiftDefs.map((s) => ({ ...s, rows: rows.filter((u) => (u.shift || "") === s.id) }));
     const noShift = rows.filter((u) => !shiftDefs.some((s) => s.id === (u.shift || "")));
@@ -9469,7 +9467,6 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
           <div className="dept-card-sub">מנהלים: {managers.length ? managers.map((m) => m.name).join(", ") : "לא הוגדר"}</div>
         </div>
         <div className="dept-card-metrics">
-          <span><b>{onShift}</b><small>במשמרת</small></span>
           <span><b>{rows.length}</b><small>סה״כ עובדים</small></span>
           <span><b>{activated}</b><small>כניסה פעילה</small></span>
         </div>
@@ -12407,19 +12404,19 @@ body *{visibility:hidden!important;}
 .worker-card-main{min-width:0;display:grid;gap:2px;}
 .worker-name{font-size:14.5px;font-weight:720;line-height:1.2;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .worker-meta{font-size:12.5px;color:var(--muted);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.worker-seen{font-size:12px;color:var(--muted);line-height:1.25;margin-top:2px;}
+.worker-seen{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);line-height:1.25;margin-top:2px;}
 .worker-seen.online{color:#047857;font-weight:700;}
 .worker-seen.pending{color:#92400E;font-weight:700;}
-.worker-seen.off{color:var(--muted);font-weight:700;}
-.worker-state{position:absolute;inset-inline-start:12px;top:12px;width:9px;height:9px;border-radius:50%;background:var(--icon-muted);box-shadow:0 0 0 3px rgba(164,169,176,.16);}
+.worker-seen.seen{color:#991B1B;font-weight:700;}
+.worker-state{width:9px;height:9px;border-radius:50%;background:var(--icon-muted);box-shadow:0 0 0 3px rgba(164,169,176,.16);flex:0 0 auto;}
 .worker-state.online{background:#16A34A;box-shadow:0 0 0 3px #16A34A24;}
 .worker-state.pending{background:#D97706;box-shadow:0 0 0 3px #D9770624;}
-.worker-state.off{background:var(--icon-muted);}
+.worker-state.seen{background:#DC2626;box-shadow:0 0 0 3px #DC262624;}
 .shift-empty,.dept-empty{border:1px dashed var(--line);border-radius:12px;padding:14px;text-align:center;color:var(--muted);font-size:12.5px;background:var(--surface-2);}
 .dept-empty{margin:14px;}
 @media(max-width:760px){
   .dept-card-summary{grid-template-columns:1fr;align-items:start;}
-  .dept-card-metrics{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
+  .dept-card-metrics{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
   .dept-card-metrics span{min-width:0;}
   .dept-add{justify-self:start;}
   .dept-shift-board{grid-template-columns:1fr;padding:10px;}
