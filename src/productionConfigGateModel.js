@@ -59,7 +59,6 @@ export function productionConfigGate({
     pushUnique(errors, fileStoragePolicy.errors);
     pushUnique(errors, auditPolicy.errors);
     pushUnique(errors, aiPolicy.errors);
-    warnings.push("server_auth_rls_and_normalized_tables_still_require_backend_implementation");
   }
 
   return {
