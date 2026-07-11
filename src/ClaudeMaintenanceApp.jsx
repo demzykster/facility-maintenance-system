@@ -5197,7 +5197,7 @@ function CleaningAdmin(p) {
       setEdit(null);
       return true;
     }} onDelete={async () => { if (await delZone(edit.id)) setEdit(null); }} /></Overlay>}
-    {tag && <Overlay onClose={() => setTag(null)}><ZoneTag zone={tag} onClose={() => setTag(null)} /></Overlay>}
+    {tag && <Overlay panelClassName="qr-label-panel" onClose={() => setTag(null)}><ZoneTag zone={tag} onClose={() => setTag(null)} /></Overlay>}
     {rDetail && <Overlay onClose={() => setRDetail(null)}><RoundDetail round={rDetail} zone={(zones || []).find((z) => z.id === rDetail.zoneId)} onClose={() => setRDetail(null)} /></Overlay>}
     {cDetail && <Overlay onClose={() => setCDetail(null)}><ComplaintDetail c={cDetail} round={cDetail.fromRoundId ? (rounds || []).find((r) => r.id === cDetail.fromRoundId) : null} zone={(zones || []).find((z) => z.id === cDetail.zoneId)} caps={{ approve: true, reject: true, resolve: cDetail.ownerRole === "admin" || cDetail.escalatedTo === "admin", delete: true }} onApprove={(c) => { approveComplaint(c); setCDetail(null); }} onReject={(c) => { rejectComplaint(c); setCDetail(null); }} onResolve={(c) => { resolveComplaint(c); setCDetail(null); }} onProgress={(c) => { progressComplaint(c); setCDetail(null); }} onDelete={async (c) => { if (await delComplaint(c.id)) setCDetail(null); }} onClose={() => setCDetail(null)} /></Overlay>}
     {rep && <Overlay onClose={() => setRep(null)}><ComplaintForm zone={rep} session={p.session} onCancel={() => setRep(null)} onSave={async (c) => { const ok = await fileComplaint(c); if (ok !== false) setRep(null); return ok; }} /></Overlay>}
@@ -11737,6 +11737,8 @@ button.notif-perm:hover{background:#D1FAE5;}
 .tcard-actions{display:flex;gap:4px;align-items:center;margin-inline-start:auto;}
 .tcard.clk{cursor:pointer;text-align:start;}
 .toast-ok{display:flex;align-items:center;justify-content:center;gap:7px;background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;border-radius:10px;padding:10px;font-size:13.5px;font-weight:600;margin-bottom:12px;}
+.ovl-panel.qr-label-panel{width:min(680px,calc(100vw - 56px));max-width:none;}
+.qr-label-panel .qr-label-sheet{width:100%;max-width:none;}
 .qr-label-sheet{max-width:520px;}
 .qr-label-body{display:flex;flex-direction:column;align-items:center;gap:14px;}
 .qr-label-actions{width:min(100%,340px);}
