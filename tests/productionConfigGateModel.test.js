@@ -191,7 +191,7 @@ describe("productionConfigGateModel", () => {
     })).toMatchObject({
       ok: true,
       errors: [],
-      warnings: ["server_auth_rls_and_normalized_tables_still_require_backend_implementation"]
+      warnings: []
     });
   });
 
