@@ -7,7 +7,7 @@ Updated: 2026-07-11
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean.
-- Latest app/UI commit before this handoff: `e86738a Add BI bottleneck explanation panel`.
+- Latest app/UI commit before this handoff: `5d0a7c2 Add financial drilldown to BI`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,6 +56,9 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `5d0a7c2 Add financial drilldown to BI`
+  - Expanded the BI finance panel for `admin`/`executive`.
+  - Shows 30-day closure count, average closure cost, supplier count, and top supplier costs with ticket drill-down.
 - `e86738a Add BI bottleneck explanation panel`
   - Added `למה זה תקוע` to BI using existing ticket lifecycle models.
   - Shows active bottleneck stages and waiting reasons with drill-down into filtered tickets.
