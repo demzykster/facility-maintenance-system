@@ -4,7 +4,7 @@
 
 - Active branch: `none`.
 - Current branch: `main`.
-- Last completed work: unified BI foundation with admin-only command center, bottleneck explanation, financial drill-down, department risk drill-downs, department-manager BI entry point, short trend/repeat-problem signals, executive role separation, cleaning/PPE/facility coverage, and next-session handoff updated.
+- Last completed work: unified BI is now the main operational shell for admin, executive, and department managers; old standalone dashboard/analytics UI entry points and dashboard widget preferences were retired; useful analytics were moved into compact BI evidence/drill-down panels covering facility maintenance, execution load, PM, cleaning, PPE, bottlenecks, repeat problems, department risk, and finance.
 - Current work: none.
 
 ## Current Product Direction

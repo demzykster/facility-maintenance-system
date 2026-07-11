@@ -116,7 +116,9 @@ async function scanApp(page) {
       topbarVisible: [...document.querySelectorAll(".topbar")].some(visible),
       bottomNavVisible: [...document.querySelectorAll(".bottom-nav")].some(visible),
       smallControls: smallControls.slice(0, 20),
-      loadDemoVisible: [...document.querySelectorAll("button")].some((button) => /טען נתוני דמו/.test(button.textContent || "")),
+      biVisible: document.body.innerText.includes("BI") && document.body.innerText.includes("מה דורש תשומת לב עכשיו"),
+      oldDashboardVisible: document.body.innerText.includes("לוח בקרה"),
+      oldAnalyticsVisible: document.body.innerText.includes("אנליטיקה"),
       text: document.body.innerText.slice(0, 240)
     };
   });
@@ -144,7 +146,8 @@ async function runViewport(browser, name, viewport) {
   if (scan.overflow > 2) throw new Error(`${name}_horizontal_overflow:${scan.overflow}`);
   if (!scan.sideNavVisible && !scan.topbarVisible && !scan.bottomNavVisible) throw new Error(`${name}_shell_missing`);
   if (scan.smallControls.length) throw new Error(`${name}_small_controls:${JSON.stringify(scan.smallControls.slice(0, 3))}`);
-  if (!scan.loadDemoVisible) throw new Error(`${name}_demo_action_missing`);
+  if (!scan.biVisible) throw new Error(`${name}_bi_missing`);
+  if (scan.oldDashboardVisible || scan.oldAnalyticsVisible) throw new Error(`${name}_retired_nav_visible`);
   if (consoleMessages.length) throw new Error(`${name}_console:${consoleMessages.slice(0, 3).join(" | ")}`);
   if (failedResponses.length) throw new Error(`${name}_responses:${failedResponses.slice(0, 3).join(" | ")}`);
   return { name, scan };

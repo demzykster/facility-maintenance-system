@@ -46,7 +46,6 @@ import { APP_ISSUE_STATUS, appIssueStatusLabel, createAppIssue, updateAppIssueRe
 import { appModeRequiresCleaningQr, cleaningQrAccess, cleaningQrMatchesZone, cleaningQrUrlFromWindow, extractCzoneFromRaw, findScannedCleaningZone, normalizeCleaningQrManualCode, scannedCleaningZoneIdFromWindow } from "./cleaningQrModel.js";
 import { cleaningChecklistTranslationLanguages, draftCleaningChecklistTranslations, normalizeCleaningChecklistItem } from "./cleaningChecklistTranslationModel.js";
 import { cleaningMissedRoundRecordsForStatuses, cleaningWindowBounds, cleaningWindowMinutes, isCleaningRoundActionableStatus, isCompletedCleaningRound } from "./cleaningRoundScheduleModel.js";
-import { dashboardWidgetPrefsKey, dashboardWidgetsWithPrefs, parseDashboardWidgetPrefs, toggleDashboardWidgetPref } from "./dashboardWidgetPrefsModel.js";
 import { VERSION_MANIFEST_PATH, markStandaloneVersionRefreshed, normalizeVersionManifest, shouldAutoRefreshStandaloneVersion, shouldShowVersionUpdate } from "./appVersionModel.js";
 import { softResetAppCache } from "./appCacheResetModel.js";
 import { DEFAULT_LANGUAGE, languageCookieString, languageDirection, languageFromCookie, languageOptions, normalizeLanguageCode, preferredInitialLanguage } from "./languageModel.js";
@@ -850,7 +849,6 @@ const canViewUsers = (session) => canView(session, "users");
 const canManageUsers = (session) => canManage(session, "users");
 const canRequestPpe = (session) => canRequest(session, "ppe");
 const canManagePpe = (session) => canManage(session, "ppe");
-const canViewAnalytics = (session) => canView(session, "analytics");
 const canViewSuppliers = (session) => canView(session, "suppliers");
 const canManageSuppliers = (session) => canManage(session, "suppliers");
 const canManageSettings = (session) => canManage(session, "settings");
@@ -1331,45 +1329,6 @@ const visibleTickets = (session, tickets, fleet) => {
     }
     return false;
   });
-};
-
-const analyticsScopeForSession = (session, data = {}) => {
-  if (!session || session.role === "admin") return data;
-  const {
-    tickets = [], fleet = [], pm = [], zones = [], rounds = [], complaints = [],
-    tasks = [], meetings = [], ppe = [], ppeItems = [], users = []
-  } = data;
-  const scopedTickets = visibleTickets(session, tickets, fleet);
-  const scopedFleet = fleetForSession(session, fleet);
-  const scopedTasks = tasks.filter((t) => taskVisible(t, session, users) && (!t.isPrivate || t.ownerId === session.id));
-  const scopedMeetings = meetings.filter((m) => meetingVisible(m, session, scopedTasks));
-  const deptSet = new Set(userDepts(session));
-  const zoneSet = new Set(session.mgrZones || []);
-  const scopedZones = zones.filter((z) => zoneSet.has(z.id));
-  const scopedZoneIds = new Set(scopedZones.map((z) => z.id));
-  const scopedPpe = ppe.filter((x) => {
-    if (isWorkerLike(session)) return x.workerId === session.id;
-    return deptSet.size > 0 && x.dept && deptSet.has(x.dept);
-  });
-  const scopedPpeItemIds = new Set(scopedPpe.map((x) => x.itemId).filter(Boolean));
-  const userIds = new Set([session.id]);
-  scopedTasks.forEach((t) => [t.ownerId, ...(t.responsibleIds || []), ...(t.participantIds || [])].forEach((id) => id && userIds.add(id)));
-  scopedMeetings.forEach((m) => [m.ownerId, ...(m.participantIds || [])].forEach((id) => id && userIds.add(id)));
-  scopedPpe.forEach((x) => x.workerId && userIds.add(x.workerId));
-  return {
-    ...data,
-    tickets: scopedTickets,
-    fleet: scopedFleet,
-    pm: pmVisible(session, pm, fleet),
-    zones: scopedZones,
-    rounds: rounds.filter((r) => scopedZoneIds.has(r.zoneId)),
-    complaints: complaints.filter((c) => scopedZoneIds.has(c.zoneId)),
-    tasks: scopedTasks,
-    meetings: scopedMeetings,
-    ppe: scopedPpe,
-    ppeItems: ppeItems.filter((x) => scopedPpeItemIds.has(x.id)),
-    users: users.filter((u) => userIds.has(u.id) || (deptSet.size > 0 && u.dept && deptSet.has(u.dept))),
-  };
 };
 
 function entryFor(session, text, kind) { return { at: Date.now(), by: session.name, byRole: session.role, text, ...(kind ? { kind } : {}) }; }
@@ -4303,17 +4262,12 @@ function UserApp(p) {
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
   const mayViewAudit = canViewAudit(session);
-  const mayViewAnalytics = canViewAnalytics(session);
   const mayManagePpe = canManagePpe(session);
   const mayViewSuppliers = canViewSuppliers(session);
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
-  const analyticsScope = useMemo(() => analyticsScopeForSession(session, {
-    tickets, fleet, pm, zones, rounds, complaints, tasks: p.tasks, meetings: p.meetings,
-    ppe: p.ppe, ppeItems: p.ppeItems, users
-  }), [session, tickets, fleet, pm, zones, rounds, complaints, p.tasks, p.meetings, p.ppe, p.ppeItems, users]);
-  const activeView = view === "activity" && !mayViewAudit ? "bi" : view === "insights" && !mayViewAnalytics ? "bi" : view === "ppe" && !mayManagePpe ? "bi" : view === "teamAdmin" && !mayViewUsers ? "bi" : view === "suppliers" && !mayViewSuppliers ? "bi" : view === "settings" && !mayManageSettings ? "bi" : view;
-  const pageTitle = activeView === "bi" ? "BI" : activeView === "activity" ? "יומן פעילות" : activeView === "insights" ? "אנליטיקה" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
+  const activeView = view === "activity" && !mayViewAudit ? "bi" : view === "ppe" && !mayManagePpe ? "bi" : view === "teamAdmin" && !mayViewUsers ? "bi" : view === "suppliers" && !mayViewSuppliers ? "bi" : view === "settings" && !mayManageSettings ? "bi" : view;
+  const pageTitle = activeView === "bi" ? "BI" : activeView === "activity" ? "יומן פעילות" : activeView === "ppe" ? "ביגוד עובדים" : activeView === "settings" ? "הגדרות" : activeView === "teamAdmin" ? "צוות ומשתמשים" : activeView === "suppliers" ? "ספקים / קבלנים" : activeView === "dept" ? "המחלקה שלי" : "הקריאות שלי";
   const userNav = [
     { id: "bi", Icon: Gauge, label: "BI", active: activeView === "bi", onClick: () => setView("bi") },
     { id: "tickets", Icon: ListChecks, label: "קריאות", active: activeView === "tickets", onClick: () => { setTicketNav(null); setView("tickets"); } },
@@ -4321,7 +4275,6 @@ function UserApp(p) {
     { id: "dept", Icon: Users, label: "המחלקה", active: activeView === "dept", onClick: () => setView("dept") },
     mayManagePpe ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים", active: activeView === "ppe", onClick: () => setView("ppe") } : null,
     mayViewUsers ? { id: "teamAdmin", Icon: ShieldCheck, label: "צוות ומשתמשים", active: activeView === "teamAdmin", onClick: () => setView("teamAdmin") } : null,
-    mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה", active: activeView === "insights", onClick: () => setView("insights") } : null,
     mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים", active: activeView === "suppliers", onClick: () => setView("suppliers") } : null,
     mayManageSettings ? { id: "settings", Icon: Settings, label: "הגדרות", active: activeView === "settings", onClick: () => setView("settings") } : null,
     mayViewAudit ? { id: "activity", Icon: Clock, label: "יומן", active: activeView === "activity", onClick: () => setView("activity") } : null,
@@ -4367,7 +4320,7 @@ function UserApp(p) {
               const list = filter === "closed" ? ticketRows.filter((t) => !isOpen(t)) : ticketRows;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "insights" && mayViewAnalytics ? (<InsightsHub tickets={analyticsScope.tickets} fleet={analyticsScope.fleet} pm={analyticsScope.pm} config={config} zones={analyticsScope.zones} rounds={analyticsScope.rounds} complaints={analyticsScope.complaints} tasks={analyticsScope.tasks} meetings={analyticsScope.meetings} users={analyticsScope.users} canEditDamage={false} ppe={analyticsScope.ppe} ppeItems={analyticsScope.ppeItems} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -5708,186 +5661,6 @@ function AssetsHub(p) {
   return (<>
     <div className="seg-tabs s2" style={{ maxWidth: 360, marginBottom: 14 }}><button className={t === "fleet" ? "on" : ""} onClick={() => setT("fleet")}>כלים ונהגים</button><button className={t === "pm" ? "on" : ""} onClick={() => setT("pm")}>לוח טיפולים</button></div>
     {t === "pm" ? <PMModule {...p} /> : <FleetModule {...p} openFleetId={assetNav?.tab === "fleet" ? assetNav.fleetId : null} navT={assetNav?._t} />}
-  </>);
-}
-function CleaningAnalytics({ zones, rounds, complaints }) {
-  const now = Date.now();
-  const data = useMemo(() => {
-    const active = (zones || []).filter((z) => z.active !== false);
-    const since = now - 7 * 86400000;
-    const rows = active.map((z) => {
-      let sched = 0, done = 0, onTime = 0;
-      for (let d = 0; d < 7; d++) dayCompliance(z, rounds, now - d * 86400000, now).forEach((w) => { if (w.resolved) { sched++; if (w.done) { done++; if (w.onTime) onTime++; } } });
-      const comps = (complaints || []).filter((c) => c.zoneId === z.id && c.at >= since && c.status !== "rejected").length;
-      return { z, sched, done, onTime, comps, pct: sched ? Math.round(done / sched * 100) : null };
-    });
-    const totSched = rows.reduce((n, r) => n + r.sched, 0), totDone = rows.reduce((n, r) => n + r.done, 0);
-    const totRounds = (rounds || []).filter((r) => r.at >= since).length;
-    const totComps = (complaints || []).filter((c) => c.at >= since && c.status !== "rejected").length;
-    const byArea = {}; (complaints || []).filter((c) => c.at >= since && c.status !== "rejected").forEach((c) => { const z = active.find((x) => x.id === c.zoneId); const area = z ? cleaningAreaName(z) : CLEANING_UNASSIGNED_AREA; byArea[area] = (byArea[area] || 0) + 1; });
-    return { rows, totRounds, totComps, byArea, pct: totSched ? Math.round(totDone / totSched * 100) : null };
-  }, [zones, rounds, complaints]);
-  if ((zones || []).filter((z) => z.active !== false).length === 0) return <Empty text="אין נתוני ניקיון" Icon={Sparkles} sub="הגדירו אזורים והתחילו לבצע סבבים" />;
-  const worst = data.rows.filter((r) => r.pct != null).sort((a, b) => a.pct - b.pct);
-  const dirty = data.rows.filter((r) => r.comps > 0).sort((a, b) => b.comps - a.comps);
-  const maxB = Math.max(1, ...Object.values(data.byArea));
-  const pctColor = (p) => p >= 80 ? "#16A34A" : p >= 50 ? "#B45309" : "#DC2626";
-  return (<>
-    <div className="hint" style={{ marginBottom: 12 }}>נתוני 7 הימים האחרונים.</div>
-    <div className="kpi-row">
-      <Kpi num={data.pct == null ? "—" : data.pct + "%"} label="עמידה בחלונות" color="#16A34A" />
-      <Kpi num={data.totRounds} label="סבבים בוצעו" color="var(--primary)" />
-      <Kpi num={data.totComps} label="דיווחים" color="#DC2626" />
-    </div>
-    <SectionTitle><BarChart3 size={15} /> עמידה בחלונות לפי אזור</SectionTitle>
-    {worst.length === 0 ? <div className="note">אין עדיין חלונות שהסתיימו למדידה.</div> : <div className="cards" style={{ marginBottom: 6 }}>{worst.map((r) => <div key={r.z.id} className="ca-row"><div className="ca-row1"><span className="ca-name">{r.z.name}</span><span className="ca-pct" style={{ color: pctColor(r.pct) }}>{r.pct}%</span></div><div className="ca-bar"><span style={{ width: r.pct + "%", background: pctColor(r.pct) }} /></div><div className="ca-sub">{r.done}/{r.sched} חלונות · {r.onTime} בזמן{zoneLoc(r.z) ? " · " + zoneLoc(r.z) : ""}</div></div>)}</div>}
-    {dirty.length > 0 && <><SectionTitle><AlertTriangle size={15} /> הכי הרבה דיווחים</SectionTitle><div className="cards" style={{ marginBottom: 6 }}>{dirty.map((r) => <div key={r.z.id} className="tcard"><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{r.z.name}</span><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{r.comps} דיווחים</span></div><div className="tcard-sub">{zoneLoc(r.z) || "—"}</div></div></div>)}</div></>}
-    {Object.keys(data.byArea).length > 0 && <><SectionTitle><Building2 size={15} /> דיווחים לפי אזור מערכת</SectionTitle><div className="cards">{Object.entries(data.byArea).sort((a, b) => b[1] - a[1]).map(([b, n]) => <div key={b} className="ca-row"><div className="ca-row1"><span className="ca-name">{b}</span><span className="ca-pct">{n}</span></div><div className="ca-bar"><span style={{ width: Math.round(n / maxB * 100) + "%", background: "var(--primary)" }} /></div></div>)}</div></>}
-  </>);
-}
-
-function ManageStats({ tasks, meetings, users }) {
-  const T = tasks || [], M = meetings || [];
-  const now = Date.now(), mo = now - 30 * 86400000;
-  const closed = T.filter((t) => t.status === "done" || t.status === "cancelled");
-  const openN = T.filter(taskOpen).length;
-  const overdueN = T.filter(taskOverdue).length;
-  const done30 = closed.filter((t) => (t.updatedAt || t.createdAt) >= mo).length;
-  const closeTimes = T.filter((t) => t.status === "done" && t.updatedAt && t.createdAt && t.updatedAt > t.createdAt).map((t) => (t.updatedAt - t.createdAt) / 86400000);
-  const avgClose = closeTimes.length ? Math.round((closeTimes.reduce((a, b) => a + b, 0) / closeTimes.length) * 10) / 10 : null;
-  const months = [];
-  const d0 = new Date(); d0.setDate(1); d0.setHours(0, 0, 0, 0);
-  for (let i = 5; i >= 0; i--) { const d = new Date(d0.getFullYear(), d0.getMonth() - i, 1); months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`, t: d.getTime(), end: new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() }); }
-  const byMonth = months.map((mm) => ({ ...mm, n: closed.filter((t) => { const at = t.updatedAt || t.createdAt; return at >= mm.t && at < mm.end; }).length }));
-  const maxMonth = Math.max(1, ...byMonth.map((x) => x.n));
-  const perResp = new Map();
-  T.filter((t) => t.status === "done").forEach((t) => { (t.responsibleIds || []).forEach((id) => perResp.set(id, (perResp.get(id) || 0) + 1)); });
-  const byResp = [...perResp.entries()].map(([id, n]) => ({ id, n, name: uName(id, users) })).sort((a, b) => b.n - a.n).slice(0, 8);
-  const maxResp = Math.max(1, ...byResp.map((x) => x.n));
-  const held = M.filter((m) => m.status === "done" && m.at >= mo).length;
-  const cancelledM = M.filter((m) => m.status === "cancelled" && m.at >= mo).length;
-  const plannedM = M.filter((m) => m.status === "planned" && m.at >= now).length;
-  return (<>
-    <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{openN}</span><span className="kpi-mini-l">מטלות פתוחות</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={overdueN ? { color: "#DC2626" } : {}}>{overdueN}</span><span className="kpi-mini-l">באיחור</span></div><div className="kpi-mini"><span className="kpi-mini-v">{done30}</span><span className="kpi-mini-l">הושלמו (30 ימים)</span></div><div className="kpi-mini"><span className="kpi-mini-v">{avgClose == null ? "—" : avgClose}</span><span className="kpi-mini-l">ימים לסגירה (ממוצע)</span></div></div>
-    <SectionTitle><BarChart3 size={15} /> מטלות שהושלמו לפי חודש</SectionTitle>
-    <div className="panel">{byMonth.map((mm) => <Bar key={mm.key} label={mm.label} value={mm.n} max={maxMonth} color="#16A34A" />)}</div>
-    <SectionTitle><Users size={15} /> הושלמו לפי אחראי</SectionTitle>
-    {byResp.length === 0 ? <div className="note">אין מטלות שהושלמו עדיין</div> : <div className="panel">{byResp.map((r) => <Bar key={r.id} label={r.name} value={r.n} max={maxResp} color="var(--primary)" />)}</div>}
-    <SectionTitle><CalendarClock size={15} /> פגישות (30 ימים אחרונים)</SectionTitle>
-    <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{held}</span><span className="kpi-mini-l">התקיימו</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={cancelledM ? { color: "#DC2626" } : {}}>{cancelledM}</span><span className="kpi-mini-l">בוטלו</span></div><div className="kpi-mini"><span className="kpi-mini-v">{plannedM}</span><span className="kpi-mini-l">מתוכננות קדימה</span></div></div>
-    <div className="hint" style={{ marginTop: 8 }}>הנתונים לפי ההרשאות שלך. לדוח מפורט — «ייצוא ל-Excel» במסכי מטלות/פגישות.</div>
-  </>);
-}
-function DamageReport({ tickets, fleet, config, saveTicket, canEdit = !!saveTicket }) {
-  const [days, setDays] = useState(180);
-  const CLASSES = ["ללא ידע", "נזק טבעי", "רשלנות", "טעות אנוש"];
-  const since = Date.now() - days * 86400000;
-  const fleetOf = (t) => (fleet || []).find((f) => f.id === t.forkliftId) || {};
-  const rows = (tickets || []).filter((t) => t.track === "transport" && (t.createdAt || 0) >= since && (t.closure || t.downtimeStart || t.statusMs)).sort((a, b) => (b.downtimeStart || b.createdAt || 0) - (a.downtimeStart || a.createdAt || 0));
-  const fmtDur = (ms) => { if (!ms) return "—"; const d = ms / 86400000; if (d >= 1) { const v = Math.round(d * 10) / 10; return Number(v) === 1 ? "יום אחד" : `${v} ימים`; } const h = ms / 3600000; if (h >= 1) return (Math.round(h * 10) / 10) + " שעות"; return Math.max(1, Math.round(ms / 60000)) + " ד׳"; };
-  const stName = (k) => k.startsWith("waiting:") ? ("המתנה · " + waitReasonLabel(k.slice(8), config)) : ((stOf(k) || {}).label || k);
-  const parts = (t) => Object.entries(t.statusMs || {}).filter(([k, v]) => v > 30000 && k !== "new" && k !== "done" && k !== "cancelled").sort((a, b) => b[1] - a[1]);
-  const totalDown = (t) => { const p = parts(t); if (p.length) return p.reduce((a, [, v]) => a + v, 0); return downtimeMs(t); };
-  const defDriver = (t) => { if (t.driverInvolved != null) return t.driverInvolved; const dr = fleetOf(t).drivers || {}; return (dr.morning && dr.morning.name) || (dr.night && dr.night.name) || ""; };
-  const causeOf = (t) => t.damageCause != null ? t.damageCause : ((t.closure && t.closure.costNote) || "");
-  const set = (t, patch) => canEdit && saveTicket && saveTicket({ ...t, ...patch });
-  const txt = () => rows.map((t) => { const f = fleetOf(t); return [fmtDate(t.downtimeStart || t.createdAt), "כלי " + (f.code || t.asset || ""), unitDesc(f, config), t.subject || "", "נהג: " + (defDriver(t) || "—"), "סיווג: " + (t.damageClass || "—"), "₪" + (t.closure?.costAmount || 0), "השבתה: " + fmtDur(totalDown(t)), parts(t).map(([k, v]) => stName(k) + " " + fmtDur(v)).join(", ")].join(" | "); }).join("\n");
-  const copy = () => { try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt()); return; } } catch (e) {} try { const ta = document.getElementById("dmg-txt"); if (ta) { ta.focus(); ta.select(); document.execCommand("copy"); } } catch (e) {} };
-  const xlsx = () => { const r = rows.map((t) => { const f = fleetOf(t); return { "תאריך": fmtDate(t.downtimeStart || t.createdAt), "מס׳ כלי": f.code || t.asset || "", "סוג ציוד": unitTypeName(f, config) || "", "דגם": unitModelCode(f) || "", "תיאור הנזק": t.subject || "", "תיאור האירוע": causeOf(t), "נהג מעורב": defDriver(t), "סיווג": t.damageClass || "", "עלות תיקון": (t.closure && t.closure.costAmount) || 0, "השבתה כוללת": fmtDur(totalDown(t)), "פירוט לפי סטטוס": parts(t).map(([k, v]) => `${stName(k)}: ${fmtDur(v)}`).join(" · ") }; }); if (!r.length) return; try { const ws = XLSX.utils.json_to_sheet(rowsSafe(r)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "נזקים"); downloadXlsx(wb, `damage_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (e) {} };
-  const th = { textAlign: "start", padding: "6px 8px", fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", borderBottom: "1px solid var(--border)" };
-  const td = { padding: "6px 8px", fontSize: 13, borderBottom: "1px solid var(--border)", verticalAlign: "top" };
-  return (<div>
-    <div className="row-between" style={{ marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-      <SectionTitle><AlertTriangle size={15} /> דו״ח נזקים והשבתות (שינוע)</SectionTitle>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}><option value={30}>30 ימים</option><option value={90}>90 ימים</option><option value={180}>180 ימים</option><option value={365}>שנה</option></select>
-        <button className="btn-ghost sm" onClick={xlsx}><FileSpreadsheet size={15} /> Excel</button>
-      </div>
-    </div>
-    {rows.length === 0 ? <div className="note">אין אירועי שינוע בתקופה שנבחרה.</div> : <>
-    <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 920 }}>
-        <thead><tr><th style={th}>תאריך</th><th style={th}>מס׳ כלי</th><th style={th}>סוג</th><th style={th}>תיאור הנזק</th><th style={th}>נהג מעורב</th><th style={th}>סיווג האירוע</th><th style={th}>עלות</th><th style={th}>השבתה / פירוט</th><th style={th}>תיאור האירוע</th></tr></thead>
-        <tbody>{rows.map((t) => { const f = fleetOf(t); return <tr key={t.id}>
-          <td style={td}>{fmtDate(t.downtimeStart || t.createdAt)}</td>
-          <td style={{ ...td, fontWeight: 700 }}>{f.code || t.asset || "—"}</td>
-          <td style={td}>{unitDesc(f, config) || "—"}</td>
-          <td style={{ ...td, maxWidth: 200 }}>{t.subject || t.description || "—"}</td>
-          <td style={td}><input value={defDriver(t)} onChange={(e) => set(t, { driverInvolved: e.target.value })} readOnly={!canEdit} style={{ width: 110, fontSize: 12 }} /></td>
-          <td style={td}><select value={t.damageClass || ""} onChange={(e) => set(t, { damageClass: e.target.value })} disabled={!canEdit} style={{ fontSize: 12 }}><option value="">—</option>{CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
-          <td style={{ ...td, whiteSpace: "nowrap" }}>{t.closure ? ils(t.closure.costAmount || 0) : "—"}</td>
-          <td style={{ ...td, minWidth: 160 }}><b>{fmtDur(totalDown(t))}</b>{parts(t).length > 0 && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{parts(t).map(([k, v]) => `${stName(k)}: ${fmtDur(v)}`).join(" · ")}</div>}</td>
-          <td style={td}><input value={causeOf(t)} onChange={(e) => set(t, { damageCause: e.target.value })} readOnly={!canEdit} placeholder="סיבת האירוע" style={{ width: 150, fontSize: 12 }} /></td>
-        </tr>; })}</tbody>
-      </table>
-    </div>
-    <div style={{ marginTop: 10 }}><div className="hint">טקסט להעתקה:</div><textarea id="dmg-txt" readOnly value={txt()} style={{ width: "100%", minHeight: 80, fontSize: 11, marginTop: 4, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 4 }} onClick={copy}>העתק טקסט</button></div>
-    </>}
-  </div>);
-}
-
-function BigudAnalytics({ ppe, items, users, config }) {
-  const _nd = new Date();
-  const [mY, setMY] = useState(_nd.getFullYear());
-  const [mM, setMM] = useState(_nd.getMonth());
-  const [mS, mE] = monthRange(mY, mM);
-  const mLabel = monthLabelOf(mY, mM);
-  const DAY = 86400000;
-  const uById = (id) => (users || []).find((u) => u.id === id);
-  const all = ppe || [];
-  const iss = all.filter((x) => ppeIsIssue(x) && x.at >= mS && x.at < mE);
-  const cnt = iss.length;
-  const companyCost = iss.reduce((s, x) => s + (x.unitCost || 0) * (x.qty || 1), 0);
-  const charged = iss.reduce((s, x) => s + (x.workerCharge || 0), 0);
-  const reasonBucket = (r) => { r = r || ""; if (/קבלן/.test(r)) return "קבלן — מלא"; if (/לפני תום|מוקדמת/.test(r)) return "לפני תום התקופה"; if (/לא הוחזר|הקודם|ללא החזרה/.test(r)) return "לא הוחזר הקודם"; return "אחר"; };
-  const byReason = {}; iss.filter((x) => (x.workerCharge || 0) > 0).forEach((x) => { const k = reasonBucket(x.chargeReason); byReason[k] = (byReason[k] || 0) + (x.workerCharge || 0); });
-  const reasonRows = Object.entries(byReason).sort((a, b) => b[1] - a[1]);
-  const itMap = {}; iss.forEach((x) => { itMap[x.itemId] = itMap[x.itemId] || { name: x.itemName, qty: 0 }; itMap[x.itemId].qty += (x.qty || 1); });
-  const top = Object.values(itMap).sort((a, b) => b.qty - a.qty).slice(0, 8); const topMax = Math.max(1, ...top.map((r) => r.qty));
-  const wMap = {}; iss.filter((x) => x.flagged).forEach((x) => { wMap[x.workerId] = wMap[x.workerId] || { name: x.workerName, no: x.workerNo, n: 0, sum: 0 }; wMap[x.workerId].n++; wMap[x.workerId].sum += (x.workerCharge || 0); });
-  const repeats = Object.values(wMap).sort((a, b) => b.sum - a.sum);
-  const paidMap = {}; iss.filter((x) => (x.workerCharge || 0) > 0).forEach((x) => { paidMap[x.itemId] = paidMap[x.itemId] || { name: x.itemName, n: 0, sum: 0 }; paidMap[x.itemId].n++; paidMap[x.itemId].sum += (x.workerCharge || 0); });
-  const paidItems = Object.values(paidMap).sort((a, b) => b.sum - a.sum);
-  let newN = 0, exN = 0, newCost = 0; iss.forEach((x) => { const w = uById(x.workerId); const isNew = w && w.createdAt && (x.at - w.createdAt) >= 0 && (x.at - w.createdAt) <= 14 * DAY; if (isNew) { newN++; newCost += (x.unitCost || 0) * (x.qty || 1); } else exN++; });
-  const cb = all.filter((x) => x.origin === "clawback" && x.at >= mS && x.at < mE);
-  const cbMap = {}; cb.forEach((x) => { cbMap[x.itemId] = cbMap[x.itemId] || { name: x.itemName, n: 0, sum: 0 }; cbMap[x.itemId].n++; cbMap[x.itemId].sum += (x.workerCharge || 0); });
-  const notReturned = Object.values(cbMap).sort((a, b) => b.sum - a.sum);
-  const dMap = {}; iss.forEach((x) => { const d = x.dept || "ללא מחלקה"; dMap[d] = dMap[d] || { name: d, cost: 0, n: 0 }; dMap[d].cost += (x.unitCost || 0) * (x.qty || 1); dMap[d].n++; });
-  const byDept = Object.values(dMap).sort((a, b) => b.cost - a.cost); const deptMax = Math.max(1, ...byDept.map((r) => r.cost));
-  const chargedRows = [...iss.filter((x) => (x.workerCharge || 0) > 0), ...cb.filter((x) => (x.workerCharge || 0) > 0)].sort((a, b) => (a.dept || "").localeCompare(b.dept || "") || (a.workerName || "").localeCompare(b.workerName || "") || a.at - b.at);
-  const contractors = chargedRows.filter((x) => x.employmentType === "contractor");
-  const direct = chargedRows.filter((x) => x.employmentType !== "contractor");
-  const finRows = (arr) => arr.map((x) => ({ "שם": x.workerName || "", "מספר": x.workerNo || "", "מחלקה": x.dept || "", "תאריך": fmtDate(x.at), "פריט": x.itemName + (x.size && x.size !== "אחיד" ? ` (${x.size})` : ""), "לניכוי (₪)": x.workerCharge || 0 }));
-  const exportFinance = () => { try { const wb = XLSX.utils.book_new(); const add = (arr, name) => { if (!arr.length) return; const ws = XLSX.utils.json_to_sheet(rowsSafe(finRows(arr))); ws["!cols"] = [{ wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 12 }]; XLSX.utils.book_append_sheet(wb, ws, name); }; add(contractors, "קבלנים"); add(direct, "ישירים"); if (!wb.SheetNames.length) return; downloadXlsx(wb, `ppe-finance_${mY}-${String(mM + 1).padStart(2, "0")}.xlsx`); } catch (e) {} };
-  const tdF = { padding: "4px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };
-  const card = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 12 };
-  const tile = { flex: "1 1 130px", padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10 };
-  return (<div>
-    <div className="row-between" style={{ marginBottom: 12, alignItems: "center" }}><SectionTitle><Shirt size={15} /> ביגוד עובדים — {mLabel}</SectionTitle><MonthPicker y={mY} m={mM} onChange={(Y, M) => { setMY(Y); setMM(M); }} /></div>
-    {cnt === 0 && cb.length === 0 ? <Empty text={"אין נתונים ל" + mLabel} Icon={Shirt} sub="בחרו חודש אחר עם הנפקות" /> : <>
-    <div style={card}><div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-      <div style={tile}><div style={{ fontSize: 22, fontWeight: 800 }}>{cnt}</div><div className="hint">הנפקות</div></div>
-      <div style={tile}><div style={{ fontSize: 22, fontWeight: 800 }}>{ils(companyCost)}</div><div className="hint">עלות לחברה</div></div>
-      <div style={tile}><div style={{ fontSize: 22, fontWeight: 800, color: charged ? "#B45309" : "inherit" }}>{ils(charged)}</div><div className="hint">חויב מעובדים</div></div>
-    </div>{reasonRows.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>{reasonRows.map(([k, v]) => <span key={k} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: "#FEF3C7", color: "#92400E", fontWeight: 600 }}>{k}: {ils(v)}</span>)}</div>}</div>
-    {top.length > 0 && <div style={card}><SectionTitle>הנפקות לפי פריט</SectionTitle><div style={{ marginTop: 8 }}>{top.map((r, i) => <Bar key={i} label={r.name} value={r.qty} max={topMax} color="#0D9488" />)}</div></div>}
-    {byDept.length > 0 && <div style={card}><SectionTitle>עלות לפי מחלקה</SectionTitle><div style={{ marginTop: 8 }}>{byDept.map((r, i) => <Bar key={i} label={r.name + " · " + r.n + " הנפקות"} value={r.cost} max={deptMax} color="var(--primary)" money />)}</div></div>}
-    <div style={card}><SectionTitle>עובדים חדשים מול קיימים</SectionTitle><div style={{ display: "flex", gap: 10, marginTop: 8 }}><div style={tile}><div style={{ fontSize: 20, fontWeight: 800 }}>{newN}</div><div className="hint">לעובדים חדשים (קליטה ≤14 ימים) · {ils(newCost)}</div></div><div style={tile}><div style={{ fontSize: 20, fontWeight: 800 }}>{exN}</div><div className="hint">לעובדים קיימים</div></div></div></div>
-    <div style={card}><SectionTitle>הנפקות חוזרות בחיוב (חריגות)</SectionTitle>{repeats.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין חריגות חיוב בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{repeats.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#B45309", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}{r.no ? " · מס׳ " + r.no : ""}</div><div className="task-row-sub">{r.n} הנפקות בחיוב</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: "#B45309" }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
-    <div style={card}><SectionTitle>פריטים שניתנו בתשלום</SectionTitle>{paidItems.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין פריטים בתשלום בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{paidItems.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#EA580C", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}</div><div className="task-row-sub">{r.n} הנפקות בתשלום</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700 }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
-    <div style={card}><SectionTitle>לא הוחזר בעזיבה</SectionTitle>{notReturned.length === 0 ? <div className="hint" style={{ marginTop: 6 }}>אין פריטים שלא הוחזרו בחודש זה</div> : <div className="task-list" style={{ marginTop: 6 }}>{notReturned.map((r, i) => <div key={i} className="task-row" style={{ borderInlineStartColor: "#DC2626", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{r.name}</div><div className="task-row-sub">{r.n} לא הוחזרו</div></div><div className="task-row-side"><span className="task-due" style={{ fontWeight: 700, color: "#B45309" }}>{ils(r.sum)}</span></div></div>)}</div>}</div>
-    <div style={card}><div className="row-between" style={{ marginBottom: 8 }}><SectionTitle>דוח חיובים לחשבות — {mLabel}</SectionTitle>{chargedRows.length > 0 && <button className="btn-ghost sm" onClick={exportFinance}><FileText size={14} /> ייצוא Excel</button>}</div>
-      {chargedRows.length === 0 ? <div className="hint">אין חיובים בחודש זה</div> : [["קבלנים", contractors], ["ישירים", direct]].map(([gname, arr]) => arr.length === 0 ? null : <div key={gname} style={{ marginBottom: 12 }}><div style={{ fontWeight: 800, marginBottom: 6 }}>{gname} · {arr.length} שורות · {ils(arr.reduce((s2, x) => s2 + (x.workerCharge || 0), 0))}</div><div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}><thead><tr>{["שם", "מספר", "מחלקה", "תאריך", "פריט", "לניכוי"].map((h) => <th key={h} style={{ textAlign: "start", padding: "4px 8px", borderBottom: "2px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead><tbody>{arr.map((x, i) => <tr key={i}><td style={tdF}>{x.workerName}</td><td style={tdF}>{x.workerNo || "—"}</td><td style={tdF}>{x.dept || "—"}</td><td style={tdF}>{fmtDate(x.at)}</td><td style={tdF}>{x.itemName}{x.size && x.size !== "אחיד" ? ` (${x.size})` : ""}</td><td style={{ ...tdF, fontWeight: 700, color: "#B45309" }}>{ils(x.workerCharge || 0)}</td></tr>)}</tbody></table></div></div>)}</div>
-    </>}
-    <div style={{ height: 24 }} />
-  </div>);
-}
-
-function InsightsHub({ tickets, fleet, pm, config, zones, rounds, complaints, onFilter, ctx, setCtx, tasks, meetings, users, saveTicket, canEditDamage = !!saveTicket, ppe, ppeItems }) {
-  const [t, setT] = useState("perf");
-  return (<>
-    <div className="seg-tabs" style={{ maxWidth: 700, marginBottom: 14, flexWrap: "wrap" }}><button className={t === "perf" ? "on" : ""} onClick={() => setT("perf")}>ביצועים</button><button className={t === "bigud" ? "on" : ""} onClick={() => setT("bigud")}>ביגוד עובדים</button><button className={t === "damage" ? "on" : ""} onClick={() => setT("damage")}>נזקים</button><button className={t === "manage" ? "on" : ""} onClick={() => setT("manage")}>ניהול</button><button className={t === "cleaning" ? "on" : ""} onClick={() => setT("cleaning")}>בקרת ניקיון</button><button className={t === "reports" ? "on" : ""} onClick={() => setT("reports")}>דיווחי עובדים</button></div>
-    {t === "manage" ? <ManageStats tasks={tasks} meetings={meetings} users={users} /> : t === "reports" ? <WorkerReportsAnalytics tickets={tickets} dept={null} /> : t === "cleaning" ? <CleaningAnalytics zones={zones} rounds={rounds} complaints={complaints} /> : t === "damage" ? <DamageReport tickets={tickets} fleet={fleet} config={config} saveTicket={saveTicket} canEdit={canEditDamage} /> : t === "bigud" ? <BigudAnalytics ppe={ppe} items={ppeItems} users={users} config={config} /> : <Analytics tickets={tickets} fleet={fleet} pm={pm} config={config} onFilter={onFilter} ctx={ctx} setCtx={setCtx} />}
   </>);
 }
 function PeoplePicker({ users, value, onChange, placeholder = "— בחרו אחראים —", me }) {
@@ -7389,6 +7162,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
   const biNow = Date.now();
+  const dayMs = 86400000;
   const createdLast7 = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 7 * 86400000);
   const createdPrev7 = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 14 * 86400000 && (ticket.createdAt || 0) < biNow - 7 * 86400000);
   const closedLast7 = scope.tickets.filter((ticket) => !isOpen(ticket) && (ticket.closure?.signedAt || ticket.updatedAt || 0) >= biNow - 7 * 86400000);
@@ -7488,6 +7262,62 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     if (row.ppePending) return onGoPpe || null;
     return null;
   };
+  const facilityLast30 = scope.tickets.filter((ticket) => !isTransportTicket(ticket) && (ticket.createdAt || 0) >= biNow - 30 * dayMs);
+  const facilityCategoryRows = Object.values(facilityLast30.reduce((acc, ticket) => {
+    const category = catOf(ticket);
+    const key = category.id || "other";
+    const row = acc[key] || { key, categoryId: category.id, label: category.label || "כללי", n: 0, open: 0 };
+    row.n += 1;
+    if (isOpen(ticket)) row.open += 1;
+    acc[key] = row;
+    return acc;
+  }, {})).sort((a, b) => b.open - a.open || b.n - a.n).slice(0, 4);
+  const facilityZoneRows = Object.values(facilityLast30.filter((ticket) => ticket.zone).reduce((acc, ticket) => {
+    const key = ticket.zone;
+    const row = acc[key] || { key, label: ticket.zone, n: 0, open: 0 };
+    row.n += 1;
+    if (isOpen(ticket)) row.open += 1;
+    acc[key] = row;
+    return acc;
+  }, {})).sort((a, b) => b.open - a.open || b.n - a.n).slice(0, 3);
+  const maxFacilityCategory = Math.max(1, ...facilityCategoryRows.map((row) => row.n));
+  const maxFacilityZone = Math.max(1, ...facilityZoneRows.map((row) => row.n));
+  const techLoadRows = Object.values(openTickets.filter((ticket) => ticket.assignee).reduce((acc, ticket) => {
+    const key = ticket.assignee;
+    const row = acc[key] || { key, label: ticket.assignee, n: 0, overdue: 0, critical: 0 };
+    row.n += 1;
+    if (isOverdue(ticket)) row.overdue += 1;
+    if (ticket.downtimeType === "critical") row.critical += 1;
+    acc[key] = row;
+    return acc;
+  }, {})).sort((a, b) => b.overdue - a.overdue || b.critical - a.critical || b.n - a.n).slice(0, 4);
+  const maxTechLoad = Math.max(1, ...techLoadRows.map((row) => row.n));
+  const pmHistoryLast30 = scope.pm.flatMap((task) => (task.history || []).map((entry) => ({ task, entry }))).filter(({ entry }) => (entry.at || 0) >= biNow - 30 * dayMs);
+  const pmDoneLast30 = pmHistoryLast30.filter(({ entry }) => entry.type !== "missed");
+  const pmMissedLast30 = pmHistoryLast30.filter(({ entry }) => entry.type === "missed");
+  const pmCompletionRate = pmHistoryLast30.length ? Math.round(pmDoneLast30.length / pmHistoryLast30.length * 100) : null;
+  const cleaningWindowStats = cleaningZones.reduce((acc, zone) => {
+    for (let i = 0; i < 7; i += 1) {
+      dayCompliance(zone, scope.rounds, biNow - i * dayMs, biNow).forEach((row) => {
+        acc.total += 1;
+        if (row.ok) acc.ok += 1;
+      });
+    }
+    return acc;
+  }, { total: 0, ok: 0 });
+  const cleaningCompliance = cleaningWindowStats.total ? Math.round(cleaningWindowStats.ok / cleaningWindowStats.total * 100) : null;
+  const ppeIssuedLast30 = scope.ppe.filter((entry) => ppeIsIssue(entry) && (entry.at || 0) >= biNow - 30 * dayMs);
+  const ppeCostLast30 = ppeIssuedLast30.reduce((sum, entry) => {
+    const item = scope.ppeItems.find((candidate) => candidate.id === entry.itemId);
+    return sum + (entry.workerCharge || ((item?.unitCost || 0) * Math.max(1, entry.qty || 1)) || 0);
+  }, 0);
+  const ppeRepeatWorkers = Object.values(ppeIssuedLast30.reduce((acc, entry) => {
+    const key = entry.workerId || entry.workerName || "unknown";
+    const row = acc[key] || { key, label: entry.workerName || uName(entry.workerId, scope.users) || "עובד", n: 0 };
+    row.n += 1;
+    acc[key] = row;
+    return acc;
+  }, {})).filter((row) => row.n >= 2).sort((a, b) => b.n - a.n).slice(0, 3);
 
   if (scope.kind === "none") return <Empty text="אין הרשאת BI" Icon={Gauge} sub="המודול פתוח בשלב הראשון להנהלה, מנהלי מערכת ומנהלי מחלקות." />;
 
@@ -7587,11 +7417,29 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
       </section>
 
       <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>אחזקת מבנה</b><span>קטגוריות ואזורים שמסבירים את העומס</span></div><button className="btn-ghost sm" onClick={() => onGoTickets?.({ st: "all", track: "facility", focus: { label: "BI · אחזקת מבנה" } })}>לקריאות</button></div>
+        {facilityCategoryRows.length ? facilityCategoryRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxFacilityCategory} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: "facility", focus: { label: `BI · מבנה · ${row.label}`, categoryId: row.categoryId } })} />) : <div className="note">אין עומס מבנה משמעותי ב-30 הימים האחרונים.</div>}
+        {facilityZoneRows.length > 0 && <div className="bi-subdivider" />}
+        {facilityZoneRows.length > 0 && <div className="bi-subtitle">אזורים חוזרים</div>}
+        {facilityZoneRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxFacilityZone} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: "facility", focus: { label: `BI · אזור · ${row.label}`, zoneKey: row.key } })} />)}
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>עומס ביצוע</b><span>טכנאים ו-PM בלי להיכנס לדוח מלא</span></div></div>
+        <div className="bi-mini-stats">
+          <span><b>{techLoadRows.length}</b><small>מטפלים פעילים</small></span>
+          <span><b>{pmCompletionRate == null ? "—" : `${pmCompletionRate}%`}</b><small>ביצוע PM 30 ימים</small></span>
+          <span><b>{pmMissedLast30.length}</b><small>PM שלא הגיעו</small></span>
+        </div>
+        {techLoadRows.length ? techLoadRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxTechLoad} suffix={`${row.overdue ? ` · SLA ${row.overdue}` : ""}${row.critical ? ` · השבתה ${row.critical}` : ""}`} color={row.overdue ? "#B91C1C" : row.critical ? "#C2410C" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · עומס · ${row.label}`, assignee: row.key } })} />) : <div className="note" style={{ marginTop: 10 }}>אין עומס חריג לפי מטפל.</div>}
+      </section>
+
+      <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>ניקיון</b><span>סבבים ודיווחים לפי אזורי האחריות</span></div>{onGoCleaning && <button className="btn-ghost sm" onClick={onGoCleaning}>לניקיון</button>}</div>
         <div className="bi-mini-stats">
           <span><b>{cleaningZones.length}</b><small>אזורי ניקיון</small></span>
           <span><b>{cleaningOpen.length}</b><small>דיווחים פתוחים</small></span>
-          <span><b>{cleaningMissed.length}</b><small>סבבים שפוספסו היום</small></span>
+          <span><b>{cleaningCompliance == null ? "—" : `${cleaningCompliance}%`}</b><small>עמידה 7 ימים</small></span>
         </div>
         {cleaningOpen.slice(0, 2).map((complaint) => <div key={complaint.id} className="bi-doc-row"><b>{complaint.zoneName || "אזור ניקיון"}</b><span>{complaint.status === "pending" ? "ממתין לאישור" : "פתוח"} · {complaint.kind === "broken" ? "תקלה" : "לכלוך"}</span></div>)}
         {!cleaningOpen.length && cleaningDue.length > 0 && <div className="bi-doc-row"><b>{cleaningDue[0].zone.name}</b><span>לביצוע עכשיו · {cleaningDue[0].win?.time || "חלון ניקיון"}</span></div>}
@@ -7603,10 +7451,11 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         <div className="bi-mini-stats">
           <span><b>{ppePending.length}</b><small>בקשות לטיפול</small></span>
           <span><b>{ppeLowItems.length}</b><small>פריטים במלאי נמוך</small></span>
-          <span><b>{ppeOpenOrders.length}</b><small>הזמנות פתוחות</small></span>
+          <span><b>{scope.canViewFinancialBI ? ils(ppeCostLast30) : ppeIssuedLast30.length}</b><small>{scope.canViewFinancialBI ? "עלות 30 ימים" : "הנפקות 30 ימים"}</small></span>
         </div>
         {ppePending.slice(0, 2).map((request) => <div key={request.id} className="bi-doc-row"><b>{request.workerName || "עובד"}</b><span>{ppeRequestStatusLabel(request.status)} · {(request.lines || []).length || 1} פריטים</span></div>)}
         {!ppePending.length && ppeLowItems.slice(0, 2).map((item) => <div key={item.id} className="bi-doc-row"><b>{item.name || "פריט"}</b><span>מלאי נמוך</span></div>)}
+        {!ppePending.length && !ppeLowItems.length && ppeRepeatWorkers.map((row) => <div key={row.key} className="bi-doc-row"><b>{row.label}</b><span>{row.n} הנפקות ב-30 ימים</span></div>)}
       </section>
 
       <section className="panel bi-panel">
@@ -7639,6 +7488,7 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], config = {} } = {}
   if (focus.supplier && (ticket.closure?.costSupplier || "") !== focus.supplier) return false;
   if (focus.waitReason && ticket.waitingReason !== focus.waitReason) return false;
   if (focus.lifecycleKey && !ticketHasLifecycleStage(ticket, focus.lifecycleKey, { isOpen })) return false;
+  if (focus.assignee && ticket.assignee !== focus.assignee) return false;
   if (focus.overdue && !ticketMissedSla(ticket, config)) return false;
   if (focus.criticalEscalated && !isCriticalEscalated(ticket, config)) return false;
   if (focus.activeCriticalTransport && !(currentTrack === "transport" && ticket.downtimeType === "critical" && !isCriticalEscalated(ticket, config))) return false;
@@ -7657,7 +7507,7 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], config = {} } = {}
 
 function AdminApp(p) {
   const { session, config, fleet, tickets, pm, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
-  const [tab, setTab] = useState(() => session.role === "executive" ? "bi" : "dash"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [ctx, setCtx] = useState("all"), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
+  const [tab, setTab] = useState("bi"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
   const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
@@ -7667,15 +7517,12 @@ function AdminApp(p) {
   const isAdminRole = session.role === "admin";
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
-  const mayViewAnalytics = canViewAnalytics(session);
   const mayViewAssets = canFleetDocs(session) || canFleetTickets(session) || isAdminRole;
   const mayViewSuppliers = canViewSuppliers(session);
   const mayManageSuppliers = canManageSuppliers(session);
   const mayManageSettings = canManageSettings(session);
   const mayViewAudit = canViewAudit(session);
   const blockedTab = {
-    dash: !isAdminRole,
-    insights: !mayViewAnalytics,
     assets: !mayViewAssets,
     tasks: !isAdminRole,
     ppe: !isAdminRole,
@@ -7688,12 +7535,10 @@ function AdminApp(p) {
   const activeTab = blockedTab[tab] ? "bi" : tab;
   const nav = [
     { id: "bi", Icon: Gauge, label: "BI" },
-    isAdminRole ? { id: "dash", Icon: LayoutDashboard, label: "לוח בקרה" } : null,
     { id: "tickets", Icon: ListChecks, label: "קריאות" },
     isAdminRole ? { id: "tasks", Icon: ClipboardList, label: "מטלות" } : null,
     isAdminRole ? { id: "ppe", Icon: Shirt, label: "ביגוד עובדים" } : null,
     mayViewAssets ? { id: "assets", Icon: Truck, label: "כלי שינוע" } : null,
-    mayViewAnalytics ? { id: "insights", Icon: BarChart3, label: "אנליטיקה" } : null,
     isAdminRole ? { id: "cleaning", Icon: Sparkles, label: "בקרת ניקיון" } : null,
     mayViewUsers ? { id: "team", Icon: Users, label: "צוות ומשתמשים" } : null,
     mayViewSuppliers ? { id: "suppliers", Icon: Building2, label: "ספקים / קבלנים" } : null,
@@ -7707,12 +7552,10 @@ function AdminApp(p) {
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} />}
-          {activeTab === "dash" && <Dashboard {...p} onOpen={openTicket} setTab={setTab} onFilter={goFilter} onAsset={goAsset} ctx={ctx} setCtx={setCtx} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
-          {activeTab === "insights" && <InsightsHub tickets={tickets} fleet={fleet} pm={pm} config={config} zones={zones} rounds={rounds} complaints={complaints} onFilter={goFilter} ctx={ctx} setCtx={setCtx} tasks={p.tasks} meetings={p.meetings} users={users} saveTicket={saveTicket} ppe={p.ppe} ppeItems={p.ppeItems} />}
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
           {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
           {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
@@ -7720,316 +7563,15 @@ function AdminApp(p) {
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
-      <MobileBottomNav nav={nav} primaryIds={isAdminRole ? ["bi", "tickets", "tasks"] : ["bi", "tickets", "insights"]} />
+      <MobileBottomNav nav={nav} primaryIds={isAdminRole ? ["bi", "tickets", "tasks"] : ["bi", "tickets", "assets"]} />
       {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
-      {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "dash"); }} />}
+      {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "bi"); }} />}
       {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
-}
-
-/* ---------- Dashboard ---------- */
-// Smart Insights — выводы из имеющихся данных (повторяемость, документы, узкие места, тренды, нагрузка).
-function computeInsights(tickets, fleet, pm, config) {
-  const now = Date.now(), D = 86400000, out = [];
-  const isT = (t) => t.track === "transport" || (!t.track && t.forkliftId);
-  const recent = tickets.filter((t) => now - t.createdAt <= 30 * D);
-  const byF = {}; recent.filter((t) => t.forkliftId).forEach((t) => { byF[t.forkliftId] = (byF[t.forkliftId] || 0) + 1; });
-  Object.entries(byF).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(([fid, n]) => { const f = fleet.find((x) => x.id === fid); out.push({ sev: "risk", text: `כלי ${f ? f.code : fid} — ${n} קריאות ב-30 ימים. מומלץ לבדוק שורש (root cause).`, go: "fleet" }); });
-  const byZ = {}; recent.filter((t) => !isT(t) && t.zone).forEach((t) => { byZ[t.zone] = (byZ[t.zone] || 0) + 1; });
-  Object.entries(byZ).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(([z, n]) => { out.push({ sev: "warn", text: `אזור ${z} — ${n} קריאות אחזקה ב-30 ימים. בעיה חוזרת.`, go: "facility" }); });
-  const byType = {}; fleet.forEach((f) => { const s = docStatus(f, config); const key = unitTypeName(f, config) || "כלי שינוע"; if (s.d != null && s.d <= 30) byType[key] = (byType[key] || 0) + 1; });
-  Object.entries(byType).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(([ty, n]) => { out.push({ sev: "warn", text: `מסמכי ${ty} — ${countLabel(n, "כלי", "כלים")} פגי/קרובי תוקף. בדקו מול הספק/הליסינג.`, go: "fleet" }); });
-  const open = tickets.filter(isOpen), waiting = open.filter((t) => t.status === "waiting");
-  if (open.length >= 4 && waiting.length / open.length >= 0.4) out.push({ sev: "warn", text: `${Math.round(waiting.length / open.length * 100)}% מהקריאות הפתוחות ממתינות (חלקים/ספק/אישור).`, go: "wait" });
-  const fac = tickets.filter((t) => !isT(t)), catNow = {}, catPrev = {};
-  fac.filter((t) => now - t.createdAt <= 14 * D).forEach((t) => { const c = catOf(t).label; catNow[c] = (catNow[c] || 0) + 1; });
-  fac.filter((t) => now - t.createdAt > 14 * D && now - t.createdAt <= 28 * D).forEach((t) => { const c = catOf(t).label; catPrev[c] = (catPrev[c] || 0) + 1; });
-  Object.entries(catNow).filter(([c, n]) => n >= 3 && n > (catPrev[c] || 0)).slice(0, 1).forEach(([c, n]) => { out.push({ sev: "info", text: `קריאות ${c} במבנה במגמת עלייה (${catPrev[c] || 0}→${n} בשבועיים).`, go: "facility" }); });
-  const byA = {}; open.filter((t) => t.assignee).forEach((t) => { byA[t.assignee] = (byA[t.assignee] || 0) + 1; });
-  Object.entries(byA).filter(([, n]) => n >= 4).sort((a, b) => b[1] - a[1]).slice(0, 1).forEach(([a, n]) => { out.push({ sev: "info", text: `${a} — ${n} קריאות פתוחות בטיפול. ייתכן עומס.` }); });
-  const pmOver = (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) < 0);
-  if (pmOver.length >= 3) out.push({ sev: "warn", text: `${countLabel(pmOver.length, "טיפול תקופתי באיחור", "טיפולים תקופתיים באיחור")}.`, go: "pm" });
-  return out.slice(0, 6);
-}
-function Dashboard({ session, tickets: allTickets, pm, fleet, config, users, presence, onOpen, setTab, onFilter, onAsset, ctx, setCtx, ppeItems, ppeReqs, ppeOrders, tasks, complaints, zones, demoActive, loadDemo, clearDemo }) {
-  const [cfgOpen, setCfgOpen] = useState(false);
-  const [demoBusy, setDemoBusy] = useState("");
-  const [dashTrackLocal, setDashTrackLocal] = useState("all");
-  const [widgetPrefs, setWidgetPrefs] = useState({});
-  const widgetPrefsKey = dashboardWidgetPrefsKey(session);
-  useEffect(() => {
-    let cancelled = false;
-    store.get(widgetPrefsKey, false)
-      .then((raw) => { if (!cancelled) setWidgetPrefs(parseDashboardWidgetPrefs(raw)); })
-      .catch(() => { if (!cancelled) setWidgetPrefs({}); });
-    return () => { cancelled = true; };
-  }, [widgetPrefsKey]);
-  const dashTrack = setCtx ? (ctx || "all") : dashTrackLocal;
-  const setDashTrack = setCtx || setDashTrackLocal;
-  const isTransport = (t) => t.track === "transport" || (!t.track && t.forkliftId);
-  const tickets = dashTrack === "all" ? allTickets : dashTrack === "transport" ? allTickets.filter(isTransport) : allTickets.filter((t) => !isTransport(t));
-  const flt = (f, label) => {
-    const next = dashTrack !== "all" ? { ...f, track: dashTrack } : f;
-    const focus = next.focus || (label ? { label } : null);
-    return onFilter ? onFilter(focus ? { ...next, focus } : next) : setTab("tickets");
-  };
-  const w = dashboardWidgetsWithPrefs(DEFAULT_CONFIG.widgets, config.widgets, widgetPrefs);
-  const open = tickets.filter(isOpen), breach = tickets.filter(isOverdue);
-  const transOpen = open.filter(isTransport);
-  const facilityOpen = open.filter((t) => !isTransport(t));
-  const waitUser = open.filter((t) => t.status === "pending_user");
-  const waitAdmin = open.filter((t) => t.status === "pending_admin");
-  const critNow = open.filter((t) => t.track === "transport" && t.downtimeType === "critical");
-  const critEsc = critNow.filter((t) => isCriticalEscalated(t, config));
-  const critEscIds = new Set(critEsc.map((t) => t.id));
-  const critActive = critNow.filter((t) => !critEscIds.has(t.id));
-  const expDocs = fleet.map((f) => ({ f, s: docStatus(f, config) })).filter((x) => x.s.d != null && x.s.d <= 30).sort((a, b) => a.s.d - b.s.d);
-  const pmSoon = (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue);
-  const monthCost = tickets.filter((t) => t.closure && Date.now() - t.closure.signedAt < 30 * 86400000).reduce((a, t) => a + (t.closure.costAmount || 0), 0);
-  const insights = computeInsights(tickets, dashTrack === "facility" ? [] : fleet, dashTrack === "facility" ? [] : pm, config);
-  const lifecycleOptions = {
-    now: Date.now(),
-    isOpen,
-    statusLabel: (id) => stOf(id).label,
-    waitReasonLabel: (id) => waitReasonLabel(id, config),
-    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id)
-  };
-  const waitParts = open.filter((t) => ticketHasLifecycleStage(t, "waiting:parts", lifecycleOptions));
-  const lifecycleBottlenecks = Array.from(open.reduce((acc, t) => {
-    const stages = normalizedTicketLifecycleStages(t, lifecycleOptions)
-      .filter((stage) => stage.current || stage.kind === "rework");
-    stages.forEach((stage) => {
-      const row = acc.get(stage.key) || { key: stage.key, label: stage.label, owner: stage.owner, countsOperationalSla: stage.countsOperationalSla, n: 0, ms: 0 };
-      row.n += 1;
-      row.ms += stage.ms || 0;
-      acc.set(stage.key, row);
-    });
-    return acc;
-  }, new Map()).values()).sort((a, b) => b.n - a.n || b.ms - a.ms).slice(0, 4);
-  // Единая дедуплицированная очередь действий: каждая заявка попадает один раз, с НАИВЫСШИМ применимым приоритетом.
-  const attnRules = [
-    { test: (t) => needsHandler(t, users, fleet), tag: "ללא מטפל פעיל — נדרש שיבוץ", color: "#7F1D1D" },
-    { test: (t) => isOpen(t) && t.downtimeType === "critical" && !t.assignee, tag: "השבתה קריטית · ללא טכנאי", color: "#B91C1C" },
-    { test: (t) => isOpen(t) && t.downtimeType === "critical", tag: "השבתה קריטית", color: "#DC2626" },
-    { test: (t) => ticketMissedSla(t, config), tag: "חריגת SLA", color: "#DC2626" },
-    { test: (t) => isOpen(t) && t.returned, tag: "הוחזרה לטיפול", color: "#B45309" },
-    { test: (t) => isOpen(t) && t.status === "pending_user", tag: "ממתינה לאישורך", color: "#0D9488" },
-    { test: (t) => !ticketMissedSla(t, config) && t.dueAt && (t.dueAt - Date.now()) < 4 * 3600000 && isOpen(t), tag: "SLA קרוב", color: "#EA580C" },
-  ];
-  const seen = new Set();
-  const attention = [];
-  for (const r of attnRules) for (const t of open) { if (seen.has(t.id)) continue; if (r.test(t)) { seen.add(t.id); attention.push({ t, tag: r.tag, color: r.color }); } }
-  const attnShown = attention.slice(0, 10);
-  const toggle = (id) => {
-    const next = toggleDashboardWidgetPref(widgetPrefs, id, w[id]);
-    setWidgetPrefs(next);
-    store.set(widgetPrefsKey, JSON.stringify(next), false).catch(() => {});
-  };
-  const _now = Date.now();
-  const lowPpe = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
-  const ppeReqPend = (ppeReqs || []).filter(ppeRequestNeedsAction);
-  const ordRecv = (ppeOrders || []).filter((o) => o.status === "sent");
-  const tasksOverdue = (tasks || []).filter((t) => t.dueAt && t.dueAt < _now && t.status !== "done" && t.status !== "cancelled");
-  const complOpen = (complaints || []).filter((c) => c.status === "open" || c.status === "pending");
-  const isEmptyDemo = !demoActive && allTickets.length === 0 && fleet.length === 0 && (pm || []).length === 0 && (ppeItems || []).length === 0 && (zones || []).length === 0 && (complaints || []).length === 0;
-  const attn = [
-    critEsc.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות קריטיות שהוסלמו", n: critEsc.length, go: () => onFilter ? onFilter({ st: "open", track: "transport", focus: { label: "תקלות קריטיות שהוסלמו", criticalEscalated: true } }) : setTab("tickets") } : null,
-    critActive.length ? { sev: 2, Icon: AlertTriangle, text: "תקלות שינוע קריטיות פתוחות", n: critActive.length, go: () => onFilter ? onFilter({ st: "open", track: "transport", focus: { label: "תקלות שינוע קריטיות פתוחות", activeCriticalTransport: true } }) : setTab("tickets") } : null,
-    tasksOverdue.length ? { sev: 2, Icon: ClipboardList, text: "משימות באיחור", n: tasksOverdue.length, go: () => setTab("tasks") } : null,
-    waitAdmin.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לאישורך", n: waitAdmin.length, go: () => onFilter ? onFilter({ st: "pending_admin", focus: { label: "קריאות ממתינות לאישורך" } }) : setTab("tickets") } : null,
-    waitUser.length ? { sev: 1, Icon: Clock, text: "קריאות ממתינות לסגירה על ידך", n: waitUser.length, go: () => onFilter ? onFilter({ st: "pending_user", focus: { label: "קריאות ממתינות לסגירה על ידך" } }) : setTab("tickets") } : null,
-    ppeReqPend.length ? { sev: 1, Icon: Shirt, text: "בקשות ביגוד ממתינות", n: ppeReqPend.length, go: () => setTab("ppe") } : null,
-    lowPpe.length ? { sev: 1, Icon: Shirt, text: "חוסרי ביגוד לפי מידה", n: lowPpe.length, go: () => setTab("ppe") } : null,
-    complOpen.length ? { sev: 1, Icon: AlertTriangle, text: "תלונות פתוחות", n: complOpen.length, go: () => setTab("cleaning") } : null,
-    dashTrack !== "facility" && expDocs.length ? { sev: 1, Icon: Truck, text: "מסמכי כלים פגי/קרובי תוקף", n: expDocs.length, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") } : null,
-    ordRecv.length ? { sev: 0, Icon: Package, text: "הזמנות רכש לקליטה", n: ordRecv.length, go: () => setTab("ppe") } : null,
-    dashTrack !== "facility" && pmSoon.length ? { sev: 0, Icon: Truck, text: "תחזוקות מתוכננות קרובות", n: pmSoon.length, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") } : null,
-  ].filter(Boolean).sort((a, b) => b.sev - a.sev);
-  const todayLabel = new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
-  const sessionName = session?.name || "Vadim";
-  const myTickets = open.filter((t) => ownsTicket(session, t) || t.assignee === sessionName);
-  const assignedMine = open.filter((t) => t.assignee === sessionName);
-  const todayWork = open.filter((t) => t.dueAt && new Date(t.dueAt).toDateString() === new Date().toDateString());
-  const highOpen = open.filter((t) => prOf(t.priority).id === "high");
-  const latestTickets = sortByImportance(open, config).slice(0, 9);
-  const recentClosed = tickets.filter((t) => !isOpen(t) && t.closure?.signedAt && Date.now() - t.closure.signedAt < 30 * 86400000);
-  const ticketMix = [
-    { label: "פתוחות", value: open.length, color: "var(--primary)" },
-    { label: "חריגות", value: breach.length, color: "#DC2626" },
-    { label: "בהמתנה", value: waitParts.length + waitAdmin.length + waitUser.length, color: "#B45309" },
-    { label: "נסגרו", value: recentClosed.length, color: "#16A34A" },
-  ];
-  const maxTicketMix = Math.max(1, ...ticketMix.map((x) => x.value));
-  const activityDays = Array.from({ length: 7 }, (_, i) => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - (6 - i));
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    const count = tickets.filter((t) => t.createdAt >= start.getTime() && t.createdAt < end.getTime()).length;
-    return { label: new Intl.DateTimeFormat("he-IL", { weekday: "short" }).format(start), count };
-  });
-  const maxActivity = Math.max(1, ...activityDays.map((x) => x.count));
-  const currentSignals = [
-    { label: "חריגות SLA", n: breach.length, sub: "דורש תגובה", Icon: AlertTriangle, tone: "critical", go: () => flt({ st: "open", focus: { label: "חריגות SLA", overdue: true } }) },
-    { label: "ממתינות לאישורך", n: waitUser.length, sub: "קריאות שלך", Icon: CheckCircle2, tone: "warm", go: () => flt({ st: "pending_user" }, "לאישור מנהל מחלקה") },
-    { label: "עבודות להיום", n: todayWork.length, sub: "לפי SLA / תאריך יעד", Icon: CalendarClock, tone: "blue", go: () => flt({ st: "open", focus: { label: "עבודות להיום" } }) },
-    { label: "משויכות אליך", n: assignedMine.length, sub: "באחריות אישית", Icon: User, tone: "blue", go: () => flt({ st: "open", focus: { label: "משויכות אליך" } }) },
-  ];
-  const systemSignals = [
-    { label: "טיפולים קרובים", n: dashTrack === "facility" ? 0 : pmSoon.length, Icon: CalendarClock, go: () => onAsset ? onAsset({ tab: "pm" }) : setTab("assets") },
-    { label: "מסמכים קרובים", n: dashTrack === "facility" ? 0 : expDocs.length, Icon: FileText, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") },
-    { label: "בקשות ביגוד", n: ppeReqPend.length, Icon: Shirt, go: () => setTab("ppe") },
-    { label: "תלונות ניקיון", n: complOpen.length, Icon: Sparkles, go: () => setTab("cleaning") },
-    { label: "משימות באיחור", n: tasksOverdue.length, Icon: ClipboardList, go: () => setTab("tasks") },
-  ];
-  const domainCards = [
-    { title: "ציוד וכלים", value: fleet.length, meta: `${transOpen.length} פתוחים · ${expDocs.length} מסמכים`, Icon: Truck, go: () => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets") },
-    { title: "קריאות", value: open.length, meta: `${highOpen.length} דחופות · ${waitParts.length} חלקים`, Icon: ListChecks, go: () => setTab("tickets") },
-    { title: "ביגוד", value: (ppeItems || []).length, meta: `${lowPpe.length} חוסרים · ${ppeReqPend.length} בקשות`, Icon: Shirt, go: () => setTab("ppe") },
-    { title: "ניקיון", value: (zones || []).length, meta: `${complOpen.length} דיווחים פתוחים`, Icon: Sparkles, go: () => setTab("cleaning") },
-  ];
-  
-  return (<div className="dash-command">
-    {isEmptyDemo && loadDemo && <div className="empty-demo">
-      <div className="empty-demo-main">
-        <div className="empty-demo-title">המערכת ריקה כרגע</div>
-        <div className="empty-demo-text">טענו נתוני דמו כדי לראות קריאות, כלים, טיפולים, ניקיון וביגוד עובדים בסביבת ההדגמה.</div>
-      </div>
-      <button className="btn-primary sm" disabled={!!demoBusy} onClick={async () => { setDemoBusy("load"); try { await loadDemo(); } finally { setDemoBusy(""); } }}>{demoBusy === "load" ? "טוען…" : "טען נתוני דמו"}</button>
-    </div>}
-    {demoActive && clearDemo && <div className="empty-demo">
-      <div className="empty-demo-main">
-        <div className="empty-demo-title">נתוני דמו פעילים</div>
-        <div className="empty-demo-text">אפשר למחוק רק את נתוני הדמו. נתונים שהוזנו ידנית לא יימחקו.</div>
-      </div>
-      <ConfirmBtn className="btn-danger sm" label={demoBusy === "clear" ? "מוחק…" : "מחק נתוני דמו"} onConfirm={async () => { setDemoBusy("clear"); try { await clearDemo(); } finally { setDemoBusy(""); } }} />
-    </div>}
-
-    <header className="dash-hero">
-      <div>
-        <div className="dash-kicker">{todayLabel}</div>
-        <h1>{daypartGreeting()}, {sessionName}</h1>
-        <p>תמונת מצב תפעולית: מה דורש תגובה עכשיו, מה באחריותך, ומה מתקדם ברקע.</p>
-      </div>
-      <div className="dash-hero-actions">
-        <button className="btn-ghost sm" onClick={() => setCfgOpen((v) => !v)}><SlidersHorizontal size={15} /> התאמה</button>
-        <button className="btn-primary sm" onClick={() => setTab("tickets")}><Plus size={15} /> פתיחת קריאה</button>
-      </div>
-    </header>
-    {cfgOpen && <div className="panel dash-config"><div className="wtoggles">{WIDGETS.map((x) => <button key={x.id} className={"wtoggle" + (w[x.id] ? " on" : "")} onClick={() => toggle(x.id)}>{w[x.id] ? <Eye size={14} /> : <EyeOff size={14} />} {x.label}</button>)}</div></div>}
-
-    <div className="dash-layout">
-      <main className="dash-main">
-        <section className="dash-priority-band">
-          {currentSignals.map((a) => <button key={a.label} className={"dash-signal " + a.tone} onClick={a.go}>
-            <span className="dash-signal-ic"><a.Icon size={17} /></span>
-            <span className="dash-signal-num">{a.n}</span>
-            <span className="dash-signal-copy"><b>{a.label}</b><small>{a.sub}</small></span>
-          </button>)}
-        </section>
-
-        <section className="dash-chart-grid">
-          <div className="dash-chart-card">
-            <div className="dash-section-head"><h2>מצב קריאות</h2><span>30 ימים / פתוחות</span></div>
-            <div className="dash-bars">{ticketMix.map((x) => <div key={x.label} className="dash-bar-row">
-              <span>{x.label}</span>
-              <div className="dash-bar-track"><i style={{ width: `${Math.max(5, Math.round(x.value / maxTicketMix * 100))}%`, background: x.color }} /></div>
-              <b>{x.value}</b>
-            </div>)}</div>
-          </div>
-          <div className="dash-chart-card">
-            <div className="dash-section-head"><h2>פעילות שבועית</h2><span>קריאות שנפתחו</span></div>
-            <div className="dash-week-bars">{activityDays.map((x) => <div key={x.label} className="dash-week-bar">
-              <i style={{ height: `${Math.max(8, Math.round(x.count / maxActivity * 100))}%` }} />
-              <b>{x.count}</b>
-              <span>{x.label}</span>
-            </div>)}</div>
-          </div>
-        </section>
-
-        {w.kpis && <section className="dash-system-strip">
-          {systemSignals.map((a) => <button key={a.label} className="dash-mini-signal" onClick={a.go}>
-            <a.Icon size={16} />
-            <span className="dash-mini-num">{a.n}</span>
-            <span>{a.label}</span>
-          </button>)}
-        </section>}
-
-        <section className="dash-message-card">
-          <div className="dash-message-ic"><Bell size={17} /></div>
-          <div>
-            <b>הודעות ועדכונים</b>
-            <span>{attn.length ? `${attn.length} אותות תפעוליים מחכים לבדיקה` : "אין הודעות דחופות כרגע"}</span>
-          </div>
-          <button className="dash-link-btn" onClick={() => attn[0]?.go ? attn[0].go() : setTab("tickets")}>פתיחה <ChevronLeft size={14} /></button>
-        </section>
-
-        {attnShown.length > 0 && <section>
-          <div className="dash-section-head"><h2>דורש את תשומת לבך</h2><span>{attention.length > attnShown.length ? `${attention.length} פריטים` : countLabel(attnShown.length, "פריט", "פריטים")}</span></div>
-          <div className="dash-attention-grid">{attnShown.slice(0, 6).map(({ t, tag, color }) => <button key={t.id + tag} className="dash-ticket-card alert" onClick={() => onOpen(t.id)}>
-            <span className="dash-ticket-icon"><Wrench size={15} /></span>
-            <span className="dash-ticket-main"><b>{ticketNo(t)} · {t.subject}</b><small>{t.asset || catOf(t).label} · {fmtDate(t.createdAt)}</small></span>
-            <span className="dash-ticket-dot" style={{ background: color }} />
-            <span className="dash-ticket-tag" style={{ color, background: color + "1a" }}>{tag}</span>
-          </button>)}</div>
-        </section>}
-
-        {latestTickets.length > 0 && <section>
-          <div className="dash-section-head"><h2>קריאות אחרונות</h2><button onClick={() => setTab("tickets")}>מעבר לכל הקריאות <ChevronLeft size={14} /></button></div>
-          <div className="dash-ticket-grid">{latestTickets.map((t) => { const overdue = ticketMissedSla(t, config); const tone = overdue ? "#DC2626" : prOf(t.priority).id === "high" ? "#B45309" : "#1F4E8C"; return <button key={t.id} className="dash-ticket-card" onClick={() => onOpen(t.id)}>
-            <span className="dash-ticket-icon"><PenLine size={15} /></span>
-            <span className="dash-ticket-main"><b>{ticketNo(t)} · {t.subject}</b><small>{prOf(t.priority).label} · {fmtDate(t.createdAt)}</small></span>
-            <span className="dash-ticket-dot" style={{ background: tone }} />
-          </button>; })}</div>
-        </section>}
-
-        <section className="dash-quick-create">
-          <div>
-            <b>פתיחה מהירה</b>
-            <span>התחילו מקריאה קצרה, ואז השלימו פרטים במסך הקריאות.</span>
-          </div>
-          <button className="btn-primary sm" onClick={() => setTab("tickets")}><Plus size={15} /> יצירת קריאה</button>
-        </section>
-
-        <section className="dash-domain-grid">
-          {domainCards.map((d) => <button key={d.title} className="dash-domain-card" onClick={d.go}>
-            <div className="dash-domain-top"><d.Icon size={18} /><span>{d.title}</span></div>
-            <div className="dash-domain-value">{d.value}</div>
-            <div className="dash-domain-meta">{d.meta}</div>
-            <ChevronLeft size={15} />
-          </button>)}
-        </section>
-      </main>
-
-      <aside className="dash-rail">
-        <div className="seg-tabs s3 dash-track-tabs"><button className={dashTrack === "all" ? "on" : ""} onClick={() => setDashTrack("all")}>הכל</button><button className={dashTrack === "facility" ? "on" : ""} onClick={() => setDashTrack("facility")}>מבנה</button><button className={dashTrack === "transport" ? "on" : ""} onClick={() => setDashTrack("transport")}>שינוע</button></div>
-        <section className="dash-rail-card">
-          <h3>האחריות שלי</h3>
-          <button className="dash-rail-row" onClick={() => flt({ st: "open", focus: { label: "הקריאות שלי" } })}><span>קריאות שלי</span><b>{myTickets.length}</b></button>
-          <button className="dash-rail-row" onClick={() => flt({ st: "pending_user" }, "ממתינות לאישור")}><span>ממתינות לאישור</span><b>{waitUser.length}</b></button>
-          <button className="dash-rail-row" onClick={() => flt({ st: "pending_admin" }, "לסגירה")}><span>לסגירה ניהולית</span><b>{waitAdmin.length}</b></button>
-        </section>
-        <section className="dash-rail-card">
-          <h3>המערכות שלי</h3>
-          <button className="dash-rail-row" onClick={() => onAsset ? onAsset({ tab: "fleet" }) : setTab("assets")}><span>כלי שינוע עם מסמכים</span><b>{expDocs.length}</b></button>
-          <button className="dash-rail-row" onClick={() => onAsset ? onAsset({ tab: "pm" }) : setTab("assets")}><span>טיפולים קרובים</span><b>{pmSoon.length}</b></button>
-        </section>
-        {insights.length > 0 && <section className="dash-rail-card">
-          <h3>תובנות</h3>
-          <div className="dash-insight-list">{insights.slice(0, 3).map((ins, i) => { const c = ins.sev === "risk" ? "#DC2626" : ins.sev === "warn" ? "#B45309" : "#1F4E8C"; const go = ins.go === "fleet" ? () => setTab("assets") : ins.go === "pm" ? () => setTab("assets") : ins.go === "facility" ? () => flt({ track: "facility" }, "תובנה · אחזקת מבנה") : ins.go === "wait" ? () => flt({ st: "waiting" }, "תובנה · קריאות בהמתנה") : null; const Tag = go ? "button" : "div"; return <Tag key={i} className="dash-insight" onClick={go || undefined}><span style={{ background: c }} /><b>{ins.text}</b></Tag>; })}</div>
-        </section>}
-        {lifecycleBottlenecks.length > 0 && <section className="dash-rail-card">
-          <h3>צווארי בקבוק</h3>
-          {lifecycleBottlenecks.slice(0, 4).map((s) => <button key={s.key} className="dash-rail-row" onClick={() => flt({ st: "open", focus: { label: `שלב · ${s.label}`, lifecycleKey: s.key } })}><span>{s.label}</span><b>{s.n}</b></button>)}
-        </section>}
-      </aside>
-    </div>
-  </div>);
 }
 
 /* ---------- Admin tickets ---------- */
@@ -8039,10 +7581,10 @@ function ReportView({ html, count, onClose }) {
 }
 function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, users, config }) {
   const [q, setQ] = useState(""), [track, setTrack] = useState("all"), [st, setSt] = useState("open"), [pr, setPr] = useState("all"), [cat, setCat] = useState("all"), [costF, setCostF] = useState("all"), [period, setPeriod] = useState("all"), [report, setReport] = useState(null), [unitType, setUnitType] = useState("all"), [focus, setFocus] = useState(initial?.focus || null);
-  const [drilldownLabel, setDrilldownLabel] = useState(initial ? (initial.focus?.label || "סינון מלוח הבקרה / אנליטיקה") : "");
+  const [drilldownLabel, setDrilldownLabel] = useState(initial ? (initial.focus?.label || "סינון BI") : "");
   const PERIODS = [["all", "כל הזמן"], ["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"]];
   const from = period === "all" ? 0 : Date.now() - ({ week: 7, month: 30, quarter: 90, year: 365 }[period]) * 86400000;
-  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setPeriod(initial.period ?? "all"); setUnitType(initial.unitType ?? "all"); setCat(initial.cat ?? "all"); setCostF("all"); setFocus(initial.focus ?? null); setDrilldownLabel(initial.focus?.label || "סינון מלוח הבקרה / אנליטיקה"); setQ(""); onInitialConsumed?.(); } }, [initial?._t]);
+  useEffect(() => { if (initial) { setSt(initial.st ?? "open"); setTrack(initial.track ?? "all"); setPr(initial.pr ?? "all"); setPeriod(initial.period ?? "all"); setUnitType(initial.unitType ?? "all"); setCat(initial.cat ?? "all"); setCostF("all"); setFocus(initial.focus ?? null); setDrilldownLabel(initial.focus?.label || "סינון BI"); setQ(""); onInitialConsumed?.(); } }, [initial?._t]);
   const resetFilters = () => { setQ(""); setTrack("all"); setSt("open"); setPr("all"); setCat("all"); setCostF("all"); setPeriod("all"); setUnitType("all"); setFocus(null); setDrilldownLabel(""); onInitialConsumed?.(); };
   const f = tickets.filter((t) => {
     if (st === "open") { if (!isOpen(t)) return false; }
@@ -9384,251 +8926,6 @@ function PMEntry({ task, session, fleet, tickets = [], config, canManage, onTick
     </div></div>);
 }
 
-/* ============================================================ ANALYTICS */
-function Analytics({ tickets: allTickets, fleet, pm, config, onFilter, ctx, setCtx }) {
-  const [atabLocal, setAtabLocal] = useState("all");
-  const ctxToAtab = (c) => c === "facility" ? "maint" : c === "transport" ? "fleet" : "all";
-  const atabToCtx = (a) => a === "maint" ? "facility" : a === "fleet" ? "transport" : "all";
-  const atab = setCtx ? ctxToAtab(ctx || "all") : atabLocal;
-  const setAtab = setCtx ? ((a) => setCtx(atabToCtx(a))) : setAtabLocal;
-  const drill = (focus, extra = {}) => onFilter && onFilter({ st: "all", ...extra, focus });
-  const [report, setReport] = useState(null);
-  const [period, setPeriod] = useState("month");
-  const PERIODS = [["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"], ["all", "הכול"]];
-  const PERIOD_LBL = { week: "השבוע האחרון", month: "החודש האחרון", quarter: "הרבעון האחרון", year: "השנה האחרונה", all: "כל הזמן" };
-  const PERIOD_PREP = { week: "בשבוע האחרון", month: "בחודש האחרון", quarter: "ברבעון האחרון", year: "בשנה האחרונה", all: "בכל הזמן" };
-  const from = period === "all" ? 0 : Date.now() - ({ week: 7, month: 30, quarter: 90, year: 365 }[period]) * 86400000;
-  const inP = (ts) => period === "all" || (!!ts && ts >= from);
-  const lifecycleOptions = {
-    now: Date.now(),
-    isOpen,
-    statusLabel: (id) => stOf(id).label,
-    waitReasonLabel: (id) => waitReasonLabel(id, config),
-    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id),
-    wearLabel: (id) => WEAR.find((w) => w.id === id)?.label || id,
-    durationText: fmtDur
-  };
-  const missedSla = (ticket) => ticketLifecycleMissedOperationalSla(ticket, lifecycleOptions);
-  const metSla = (ticket) => ticketLifecycleMetOperationalSla(ticket, lifecycleOptions);
-  const slaRatio = (ticket) => ticketLifecycleOperationalSlaRatio(ticket, lifecycleOptions);
-  const isT = (t) => t.track === "transport" || (!t.track && t.forkliftId);
-  const segAll = atab === "maint" ? allTickets.filter((t) => !isT(t)) : atab === "fleet" ? allTickets.filter(isT) : allTickets;
-  const tickets = segAll.filter((t) => inP(t.createdAt));
-  const closedP = segAll.filter((t) => t.closure && inP(t.closure.signedAt || t.updatedAt));
-  const showFleet = atab !== "maint";
-  const withCost = closedP.filter((t) => t.closure?.costAmount);
-  const totalCost = withCost.reduce((a, t) => a + t.closure.costAmount, 0);
-  const avgCost = withCost.length ? Math.round(totalCost / withCost.length) : 0;
-  const pmHist = (pm || []).flatMap((x) => { const f = pmFleet(x, fleet); return (x.history || []).map((h) => ({ ...h, code: f ? f.code : "—", ruleTitle: pmRuleTitle(x, config) })); }).filter((h) => inP(h.at));
-  const pmDone = pmHist.filter((h) => h.type === "done").length;
-  const pmMissed = pmHist.filter((h) => h.type === "missed").length;
-  const pmPaid = pmHist.filter((h) => h.type === "done" && h.hadPaid).length;
-  const pmPlanned = pmDone + pmMissed;
-  const pmRate = pmPlanned ? Math.round((pmDone / pmPlanned) * 100) : null;
-  const pmTicketCost = closedP.filter((t) => t.sourcePmId).reduce((a, t) => a + (t.closure?.costAmount || 0), 0);
-  const considered = tickets.filter((t) => t.status === "done" || missedSla(t));
-  const met = tickets.filter((t) => t.status === "done" && metSla(t));
-  const compliance = considered.length >= 3 ? Math.round((met.length / considered.length) * 100) : null;
-  // Facility analytics
-  const facTickets = tickets.filter((t) => !isT(t));
-  const byCat = {}; facTickets.forEach((t) => { const c = catOf(t).label; byCat[c] = (byCat[c] || 0) + 1; });
-  const catArr = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-  const maxCat = catArr.length ? Math.max(1, ...catArr.map(([, n]) => n)) : 1;
-  const byZone = {}; facTickets.forEach((t) => { if (t.zone) byZone[t.zone] = (byZone[t.zone] || 0) + 1; });
-  const zoneArr = Object.entries(byZone).sort((a, b) => b[1] - a[1]);
-  const maxZone = zoneArr.length ? Math.max(1, ...zoneArr.map(([, n]) => n)) : 1;
-  const facCost = closedP.filter((t) => !isT(t) && t.closure?.costAmount).reduce((a, t) => a + t.closure.costAmount, 0);
-  const transCost = closedP.filter((t) => isT(t) && t.closure?.costAmount).reduce((a, t) => a + t.closure.costAmount, 0);
-  const done = tickets.filter((t) => t.status === "done");
-  const mttr = done.length ? done.reduce((a, t) => a + ((t.closure?.signedAt || t.updatedAt) - t.createdAt), 0) / done.length : 0;
-  const transDone = done.filter((t) => t.track === "transport");
-  const totalDowntime = tickets.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
-  const breach = tickets.filter(missedSla);
-  const hasPartsLifecycleStage = (t) => ticketHasLifecycleStage(t, "waiting:parts", lifecycleOptions);
-  const stuckParts = tickets.filter(hasPartsLifecycleStage);
-  const partsBreach = breach.filter(hasPartsLifecycleStage);
-  const byUnit = {}; tickets.filter((t) => t.forkliftId).forEach((t) => { byUnit[t.forkliftId] = byUnit[t.forkliftId] || { n: 0, dt: 0 }; byUnit[t.forkliftId].n++; byUnit[t.forkliftId].dt += downtimeMs(t); });
-  const unitArr = Object.entries(byUnit).map(([id, v]) => ({ f: fleet.find((x) => x.id === id), ...v })).filter((x) => x.f).sort((a, b) => b.n - a.n);
-  const maxUnit = Math.max(1, ...unitArr.map((x) => x.n));
-  const wear = countBy(transDone.filter((t) => t.wearType), (t) => t.wearType);
-  const lifecycleStageRows = tickets.flatMap((t) => normalizedTicketLifecycleStages(t, lifecycleOptions));
-  const waitReasonArr = ticketLifecycleWaitReasonStats(tickets, lifecycleOptions);
-  const maxWait = Math.max(1, ...waitReasonArr.map((row) => row.n));
-  const stageMap = {};
-  lifecycleStageRows.forEach((s) => {
-    const row = stageMap[s.key] || { ...s, n: 0, ms: 0 };
-    row.n += 1; row.ms += s.ms || 0; stageMap[s.key] = row;
-  });
-  const stageArr = Object.values(stageMap).sort((a, b) => b.ms - a.ms || b.n - a.n).slice(0, 8);
-  const maxStageHours = Math.max(1, ...stageArr.map((s) => Math.round(s.ms / 360000) / 10));
-  const equipWaitTotal = lifecycleStageRows.filter((s) => s.reason === "no_equipment").reduce((a, s) => a + (s.ms || 0), 0);
-  const pausedTotal = lifecycleStageRows.filter((s) => s.countsOperationalSla === false && s.reason !== "no_equipment").reduce((a, s) => a + (s.ms || 0), 0);
-  const D90 = 90 * 86400000;
-  const unitStats = (fleet || []).map((f) => { const rel = allTickets.filter((t) => t.forkliftId === f.id); const c90 = rel.filter((t) => Date.now() - t.createdAt <= D90).length; const cost = rel.reduce((a, t) => a + (t.closure?.costAmount || 0), 0); return { f, c90, total: rel.length, cost }; }).filter((x) => x.c90 >= 2 || x.cost > 0).sort((a, b) => b.c90 - a.c90 || b.cost - a.cost).slice(0, 8);
-  const returnsCount = allTickets.filter((t) => t.returned).length;
-  const maxUnitC = Math.max(1, ...unitStats.map((u) => u.c90));
-  const bySup = {}; withCost.forEach((t) => { const s = t.closure.costSupplier || "—"; bySup[s] = (bySup[s] || 0) + t.closure.costAmount; });
-  const supArr = Object.entries(bySup).sort((a, b) => b[1] - a[1]); const maxSup = Math.max(1, ...supArr.map(([, v]) => v));
-  const techLoad = countBy(tickets.filter(isOpen).filter((t) => t.assignee), (t) => t.assignee);
-  const techArr = Object.entries(techLoad).sort((a, b) => b[1] - a[1]); const maxTech = Math.max(1, ...techArr.map(([, v]) => v));
-  const mtbf = (() => { const units = Object.entries(byUnit).filter(([, v]) => v.n >= 2); if (!units.length) return 0; let tot = 0, cnt = 0; units.forEach(([id]) => { const ts = tickets.filter((t) => t.forkliftId === id).map((t) => t.createdAt).sort((a, b) => a - b); for (let i = 1; i < ts.length; i++) { tot += ts[i] - ts[i - 1]; cnt++; } }); return cnt ? tot / cnt : 0; })();
-
-  const REPEAT_MIN = 3, SLA_FACTOR = 1.5;
-  const facAssetCount = {}; tickets.filter((t) => !isT(t) && t.asset).forEach((t) => { facAssetCount[t.asset] = (facAssetCount[t.asset] || 0) + 1; });
-  const recurUnits = unitArr.filter((x) => x.n >= REPEAT_MIN).slice(0, 5).map((x) => ({ name: `${unitLabel(x.f, config)}`, n: x.n }));
-  const recurFac = Object.entries(facAssetCount).filter(([, n]) => n >= REPEAT_MIN).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, n]) => ({ name, n }));
-  const recurList = atab === "fleet" ? recurUnits : atab === "maint" ? recurFac : [...recurUnits, ...recurFac].slice(0, 6);
-  const longList = closedP.map((t) => ({ t, ratio: slaRatio(t) })).filter((x) => x.ratio != null && x.ratio >= SLA_FACTOR).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
-  const costByCat = {}; closedP.filter((t) => t.closure?.costAmount).forEach((t) => { const key = isT(t) ? (unitTypeName(fleet.find((f) => f.id === t.forkliftId), config) || "כלי שינוע") : catOf(t).label; costByCat[key] = (costByCat[key] || 0) + t.closure.costAmount; });
-  const costCatArr = Object.entries(costByCat).sort((a, b) => b[1] - a[1]).slice(0, 6); const maxCostCat = Math.max(1, ...costCatArr.map(([, v]) => v));
-  const costCatTitle = atab === "fleet" ? "עלות לפי סוג כלי" : atab === "maint" ? "עלות לפי קטגוריה" : "עלות לפי קטגוריה / סוג";
-  const costByAsset = {}; closedP.filter((t) => t.closure?.costAmount).forEach((t) => { const key = t.forkliftId ? (fleet.find((f) => f.id === t.forkliftId)?.code || t.asset || "—") : (t.asset || "כללי"); costByAsset[key] = (costByAsset[key] || 0) + t.closure.costAmount; });
-  const costAssetArr = Object.entries(costByAsset).sort((a, b) => b[1] - a[1]).slice(0, 6); const maxCostAsset = Math.max(1, ...costAssetArr.map(([, v]) => v));
-  const hasInsights = recurList.length || longList.length || costCatArr.length || costAssetArr.length;
-  const partsWaitTitle = `${countLabel(stuckParts.length, "קריאה", "קריאות")} ${stuckParts.length === 1 ? "עוכבה" : "עוכבו"} בשל המתנה לחלקים`;
-  const partsBreachText = partsBreach.length === 1 ? "אחת חרגה" : `${partsBreach.length} חרגו`;
-  const exportExcel = () => {
-    try {
-      const rows = tickets.map((t) => {
-        const life = ticketLifecycleSummary(t, lifecycleOptions);
-        return ({
-        "מספר": ticketNo(t), "מסלול": TRACKS[t.track]?.label || (t.forkliftId ? "שינוע" : "מבנה"),
-        "נושא": t.subject, "תיאור התקלה": life.description, "קטגוריה": catOf(t).label, "סיווג מקור התקלה": life.sourceClass,
-        "עדיפות": prOf(t.priority).label, "סטטוס": stOf(t.status).label, "סיבת המתנה נוכחית": ticketWaitReasonLabel(t, config),
-        "כלי/ציוד": t.asset || "", "סוג/דגם": (() => { const ff = (fleet || []).find((f) => f.id === t.forkliftId); return ff ? unitDesc(ff, config) : ""; })(), "אחראי": t.assignee || "", "פותח": t.createdBy?.name || "",
-        "נפתח": fmtDate(t.createdAt), "נסגר": t.closure ? fmtDate(t.closure.signedAt) : "",
-        "עלות (₪)": t.closure?.costAmount || 0, "ספק": t.closure?.costSupplier || "",
-        "השבתה (שע׳)": t.track === "transport" ? Math.round(downtimeMs(t) / 3600000) : "",
-        "המתנה לחלקים": hasPartsLifecycleStage(t) ? "כן" : "", "פירוט זמני המתנה": life.waitingDurations, "המתנה לקבלת כלי": life.equipmentWait,
-        "פירוט זמני סטטוס": life.statusDurations, "הוחזר לטיפול": life.returned, "סיבת החזרה": life.returnReason,
-        "הערת סגירה": life.closureNote, "אופן סגירה": life.closureQuality, "חריגת SLA": missedSla(t) ? "כן" : "",
-      });
-      });
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(rowsSafe(rows));
-      const wideCols = new Set(["תיאור התקלה", "פירוט זמני המתנה", "פירוט זמני סטטוס", "סיבת החזרה", "הערת סגירה"]);
-      ws["!cols"] = Object.keys(rows[0] || { a: 1 }).map((key) => ({ wch: wideCols.has(key) ? 30 : 14 }));
-      XLSX.utils.book_append_sheet(wb, ws, "קריאות");
-      const lifecycleRows = tickets.flatMap((t) => normalizedTicketLifecycleStages(t, lifecycleOptions).map((row) => ({
-        "מספר": ticketNo(t), "מסלול": TRACKS[t.track]?.label || (t.forkliftId ? "שינוע" : "מבנה"), "נושא": t.subject,
-        "סוג שורה": row.kind === "waiting" ? "המתנה" : row.kind === "rework" ? "החזרה לטיפול" : "סטטוס",
-        "סטטוס/סיבה": row.label,
-        "נוכחי": row.current ? "כן" : "",
-        "מחזיק פעולה": row.owner || "",
-        "נספר ב-SLA תפעולי": row.countsOperationalSla ? "כן" : "לא",
-        "נספר כהשבתה": row.countsDowntime ? "כן" : "לא",
-        "משך": fmtDur(row.ms), "משך (שעות)": Math.round(row.ms / 360000) / 10
-      })));
-      if (lifecycleRows.length) {
-        const lifeWs = XLSX.utils.json_to_sheet(rowsSafe(lifecycleRows));
-        lifeWs["!cols"] = Object.keys(lifecycleRows[0] || { a: 1 }).map((key) => ({ wch: key === "נושא" ? 28 : 14 }));
-        XLSX.utils.book_append_sheet(wb, lifeWs, "מחזור חיים");
-      }
-      const sum = [
-        { "מדד": "תקופה", "ערך": PERIOD_LBL[period] },
-        { "מדד": "עלות אחזקה כוללת (קריאות)", "ערך": totalCost }, { "מדד": "מתוכן טיפול תקופתי", "ערך": pmTicketCost },
-        { "מדד": "עלות ממוצעת לתיקון", "ערך": avgCost },
-        { "מדד": "עמידה ב-SLA (%)", "ערך": compliance }, { "מדד": "חריגות SLA", "ערך": breach.length },
-        { "מדד": "המתנה לחלקים (קריאות)", "ערך": stuckParts.length }, { "מדד": "מתוכן בחריגת SLA", "ערך": partsBreach.length },
-        { "מדד": "השבתה מצטברת (שע׳)", "ערך": Math.round(totalDowntime / 3600000) },
-        { "מדד": "טיפול תקופתי — תוכננו", "ערך": pmPlanned }, { "מדד": "טיפול תקופתי — בוצעו", "ערך": pmDone }, { "מדד": "טיפול תקופתי — לא הגיעו", "ערך": pmMissed }, { "מדד": "עמידה בטיפולים (%)", "ערך": pmRate }, { "מדד": "מתוכם עם עבודות בתשלום", "ערך": pmPaid },
-      ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(sum)), "סיכום");
-      if (pmHist.length) {
-        const pmRows = pmHist.sort((a, b) => b.at - a.at).map((h) => ({
-          "כלי": h.code, "רגולציה": h.ruleTitle || "", "פעולה": h.type === "missed" ? "לא הגיע" : "בוצע", "תאריך": fmtDate(h.at), "ע״י": h.by,
-          "עבודות בתשלום": h.hadPaid ? "כן" : "", "הערה": h.paidNote || "",
-        }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsSafe(pmRows)), "טיפולים תקופתיים");
-      }
-      downloadXlsx(wb, `דוח_אחזקה_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (e) { notifyUser("ייצוא ל-Excel נכשל בסביבת ההדגמה. נסו דפדפן אחר או הגרסה עם שרת."); }
-  };
-
-  const exportPdf = () => {
-    const m = new Date().toLocaleDateString("he-IL", { month: "long", year: "numeric" });
-    const rowsHtml = tickets.slice(0, 200).map((t) => `<tr><td>${ticketNo(t)}</td><td>${(TRACKS[t.track]?.short) || "—"}</td><td>${esc(t.subject)}</td><td>${stOf(t.status).label}</td><td>${esc(ticketWaitReasonLabel(t, config) || "—")}</td><td>${esc(t.assignee || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`).join("");
-    const html = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>דוח אחזקה</title>
-      <style>@page{margin:18mm}body{font-family:Arial,Helvetica,sans-serif;color:#16202E;direction:rtl}
-      h1{font-size:20px;margin:0 0 2px}.sub{color:#64748B;font-size:12px;margin-bottom:18px}
-      .kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
-      .k{border:1px solid #E2E7ED;border-radius:10px;padding:10px 14px;min-width:120px}
-      .kn{font-size:20px;font-weight:700}.kl{font-size:11px;color:#64748B}
-      table{width:100%;border-collapse:collapse;font-size:11px}
-      th,td{border:1px solid #E2E7ED;padding:5px 7px;text-align:right}th{background:#F4F6F9}
-      .foot{margin-top:16px;font-size:10px;color:#94A3B8}</style></head>
-      <body><h1>דוח אחזקה — ${m}</h1><div class="sub">${config?.companyName ? esc(config.companyName) + (config?.siteName ? " · " + esc(config.siteName) : "") + " · " : ""}${PERIOD_LBL[period]} · הופק ${fmtDate(Date.now())} ${fmtTime(Date.now())}</div>
-      <div class="kpis">
-        <div class="k"><div class="kn">${ils(totalCost)}</div><div class="kl">עלות אחזקה כוללת</div></div>
-        <div class="k"><div class="kn">${ils(pmTicketCost)}</div><div class="kl">מתוכן טיפול תקופתי</div></div>
-        <div class="k"><div class="kn">${compliance}%</div><div class="kl">עמידה ב-SLA</div></div>
-        <div class="k"><div class="kn">${breach.length}</div><div class="kl">חריגות SLA</div></div>
-        <div class="k"><div class="kn">${stuckParts.length}</div><div class="kl">המתנה לחלקים</div></div>
-        <div class="k"><div class="kn">${fmtDur(totalDowntime)}</div><div class="kl">השבתה מצטברת</div></div>
-      </div>
-      <table><thead><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>סטטוס</th><th>סיבת המתנה</th><th>אחראי</th><th>נפתח</th><th>עלות</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-      <div class="foot">הופק ממערכת אחזקה · גרסת הדגמה</div></body></html>`;
-    setReport(html);
-  };
-
-  return (<>
-    <div className="seg-tabs s3"><button className={atab === "all" ? "on" : ""} onClick={() => setAtab("all")}>הכל</button><button className={atab === "maint" ? "on" : ""} onClick={() => setAtab("maint")}>אחזקה</button><button className={atab === "fleet" ? "on" : ""} onClick={() => setAtab("fleet")}>כלי שינוע</button></div>
-    <div className="wtoggles" style={{ marginBottom: 12 }}>{PERIODS.map(([k, l]) => <button key={k} className={"wtoggle" + (period === k ? " on" : "")} onClick={() => setPeriod(k)}>{l}</button>)}</div>
-    {tickets.length === 0 && closedP.length === 0 && pmPlanned === 0
-      ? <div className="note" style={{ textAlign: "center", padding: "18px 14px" }}>אין פעילות {PERIOD_PREP[period]}. נסו טווח רחב יותר.</div>
-      : null}
-    <div className="export-bar"><button className="btn-ghost sm" onClick={exportExcel}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={exportPdf}><Printer size={15} /> דוח חודשי (PDF)</button></div>
-    <div className="kpi-grid">
-      <Kpi num={ils(totalCost)} label="עלות כוללת" color="#16A34A" small />
-      <Kpi num={compliance !== null ? compliance + "%" : "—"} label={compliance !== null ? "עמידה ב-SLA" : "SLA — אין מספיק נתונים"} color={compliance === null ? "var(--muted)" : compliance >= 80 ? "#16A34A" : "#EA580C"} small />
-      <Kpi num={mttr ? fmtDur(mttr) : "—"} label="זמן תיקון ממוצע" color="var(--primary)" small />
-      <Kpi num={ils(avgCost)} label="ממוצע לתיקון" color="var(--primary-d)" small />
-    </div>
-    <SectionTitle><Sparkles size={15} /> תובנות · {PERIOD_LBL[period]}</SectionTitle>
-    {!hasInsights ? <div className="note">אין תובנות לתקופה שנבחרה — נסו טווח רחב יותר.</div> : <>
-      {recurList.length > 0 && <div className="panel"><div className="ins-h"><AlertTriangle size={14} color="#DC2626" /> כלים/ציוד עם תקלות חוזרות ({REPEAT_MIN}+ בתקופה)</div>{recurList.map((r, i) => <div key={i} className="ins-row"><span className="ins-name">{r.name}</span><span className="ins-val" style={{ color: "#DC2626" }}>{countLabel(r.n, "קריאה", "קריאות")}</span></div>)}</div>}
-      {longList.length > 0 && <div className="panel"><div className="ins-h"><Clock size={14} color="#B45309" /> טיפולים ארוכים משמעותית מ-SLA</div>{longList.map((x, i) => <div key={i} className="ins-row"><span className="ins-name">{x.t.asset || x.t.subject}</span><span className="ins-val" style={{ color: "#B45309" }}>×{x.ratio.toFixed(1)} מ-SLA</span></div>)}</div>}
-      {costCatArr.length > 0 && <><div className="ins-h" style={{ marginTop: 14 }}><DollarSign size={14} color="#16A34A" /> {costCatTitle}</div><div className="panel">{costCatArr.map(([c, v]) => <Bar key={c} label={c} value={v} max={maxCostCat} money color="#16A34A" />)}</div></>}
-      {costAssetArr.length > 0 && <><div className="ins-h" style={{ marginTop: 14 }}><DollarSign size={14} color="#0D9488" /> עלות לפי כלי/ציוד</div><div className="panel">{costAssetArr.map(([c, v]) => { const ff = (fleet || []).find((x) => x.code === c); return <Bar key={c} label={c} value={v} max={maxCostAsset} money color="#0D9488" onClick={onFilter ? () => drill(ff ? { label: `כלי ${c}`, forkliftId: ff.id } : { label: c, assetKey: c }, ff ? { track: "transport", period } : { period }) : undefined} />; })}</div></>}
-    </>}
-    {atab !== "fleet" && (<>
-      <SectionTitle><Building2 size={15} /> אחזקת מבנה — עלות וקריאות לפי קטגוריה</SectionTitle>
-      {catArr.length === 0 ? <div className="note">אין נתוני אחזקת מבנה.</div> : <div className="panel">{catArr.slice(0, 8).map(([c, n]) => <Bar key={c} label={c} value={n} max={maxCat} color={TRACKS.facility.color} />)}</div>}
-      <SectionTitle><MapPin size={15} /> בעיות חוזרות לפי אזור</SectionTitle>
-      {zoneArr.length === 0 ? <div className="note">אין נתוני אזורים.</div> : <div className="panel">{zoneArr.slice(0, 8).map(([z, n]) => <Bar key={z} label={z} value={n} max={maxZone} color="var(--primary)" />)}</div>}
-    </>)}
-    {atab === "all" && <><SectionTitle><BarChart3 size={15} /> עלויות: מבנה מול שינוע</SectionTitle><div className="panel"><Bar label="אחזקת מבנה" value={facCost} max={Math.max(facCost, transCost, 1)} money color={TRACKS.facility.color} /><Bar label="כלי שינוע" value={transCost} max={Math.max(facCost, transCost, 1)} money color={TRACKS.transport.color} /></div></>}
-    {stuckParts.length > 0 && <div className="parts-card"><div className="parts-row"><span className="parts-icon"><Clock size={16} /></span><div><div className="parts-title">{partsWaitTitle}</div><div className="parts-sub">מתוכן, {partsBreachText} מ-SLA — עיכוב שאינו בהכרח באחריות הטכנאי</div></div></div></div>}
-    {showFleet && <><SectionTitle><Gauge size={15} /> השבתת כלי שינוע</SectionTitle>
-    <div className="panel"><div className="row-stats"><div><div className="rs-num">{fmtDur(totalDowntime)}</div><div className="rs-lbl">השבתה מצטברת</div></div><div><div className="rs-num">{mtbf ? fmtDur(mtbf) : "—"}</div><div className="rs-lbl">זמן ממוצע בין תקלות</div></div></div></div>
-    <SectionTitle>כלים בעייתיים (מספר קריאות)</SectionTitle>
-    {unitArr.length === 0 ? <div className="note">אין נתונים.</div> : <div className="panel">{unitArr.slice(0, 8).map((x) => <Bar key={x.f.id} label={`${unitLabel(x.f, config)}`} value={x.n} max={maxUnit} suffix={x.dt ? ` · ${fmtDur(x.dt)}` : ""} color={TRACKS.transport.color} onClick={onFilter ? () => drill({ label: `כלי ${unitLabel(x.f, config)}`, forkliftId: x.f.id }, { track: "transport", period }) : undefined} />)}</div>}
-    <SectionTitle>סיבת תקלה (שינוע)</SectionTitle>
-    <div className="panel">{WEAR.map((wr) => <Bar key={wr.id} label={wr.label} value={wear[wr.id] || 0} max={Math.max(1, ...WEAR.map((x) => wear[x.id] || 0))} color={wr.id === "natural" ? "#16A34A" : "#DC2626"} />)}</div></>}
-    <SectionTitle>השבתה לפי סיבת המתנה</SectionTitle>
-    {showFleet && equipWaitTotal > 0 && <div className="note" style={{ borderColor: "#FED7AA", marginBottom: 8 }}><Truck size={13} /> זמן השבתה מצטבר בשל אי-קבלת כלי מהמנהל: <b>{fmtDur(equipWaitTotal)}</b></div>}
-    {pausedTotal > 0 && <div className="note" style={{ borderColor: "#DDD6FE", marginBottom: 8 }}><CalendarClock size={13} /> זמן המתנה שלא נספר ל-SLA (המתנה לגורם חיצוני): <b>{fmtDur(pausedTotal)}</b></div>}
-    {returnsCount > 0 && <div className="note" style={{ borderColor: "#FECACA", marginBottom: 8 }}><RefreshCw size={13} /> קריאות שהוחזרו לתיקון (לא טופלו בפעם הראשונה): <b>{returnsCount}</b></div>}
-    {showFleet && unitStats.length > 0 && <><SectionTitle><Truck size={15} /> כלים בעייתיים — תקלות ועלות</SectionTitle><div className="panel">{unitStats.map((u) => <div key={u.f.id} className={"kpi-unit-row" + (onFilter ? " bar-click" : "")} onClick={onFilter ? () => drill({ label: `כלי ${u.f.code}`, forkliftId: u.f.id }, { track: "transport", period: "quarter" }) : undefined} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: "1px solid var(--line)" }}><span style={{ fontWeight: 700, minWidth: 64 }}>{u.f.code}</span><div style={{ flex: 1 }}><div style={{ height: 8, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" }}><div style={{ width: (u.c90 / maxUnitC * 100) + "%", height: "100%", background: u.c90 >= 3 ? "#DC2626" : "#EA580C" }} /></div></div><span style={{ fontSize: 12.5, color: "var(--muted)", minWidth: 92, textAlign: "left" }}>{u.c90} ב-90 ימים</span><span style={{ fontWeight: 700, minWidth: 70, textAlign: "left" }}>{u.cost ? ils(u.cost) : "—"}</span>{onFilter && <ChevronLeft size={14} style={{ color: "var(--muted)" }} />}</div>)}<div className="hint" style={{ marginTop: 6 }}>מבוסס על קריאות שינוע 90 הימים האחרונים והעלות המצטברת. כלי עם 3+ תקלות מסומן אדום — מועמד לבחינת החלפה.</div></div></>}
-    {stageArr.length > 0 && <><SectionTitle><Clock size={15} /> זמן לפי שלבי קריאה</SectionTitle><div className="panel">{stageArr.map((s) => <Bar key={s.key} label={s.label} value={Math.round(s.ms / 360000) / 10} max={maxStageHours} suffix={` שע׳ · ${lifecycleOwnerLabel(s.owner)} · ${countLabel(s.n, "קריאה", "קריאות")}${s.countsOperationalSla === false ? " · מחוץ ל-SLA" : ""}`} color={s.kind === "waiting" ? "#B45309" : s.kind === "rework" ? "#DC2626" : "var(--primary)"} onClick={onFilter ? () => drill({ label: `שלב · ${s.label}`, lifecycleKey: s.key }, { st: "all", period }) : undefined} />)}</div></>}
-    {waitReasonArr.length === 0 ? <div className="note">אין זמני המתנה בתקופה שנבחרה.</div> : <div className="panel">{waitReasonArr.map(({ reason, label, n, ms }) => <Bar key={reason} label={label} value={n} max={maxWait} suffix={ms ? ` · ${fmtDur(ms)}` : ""} color="#B45309" onClick={onFilter ? () => drill({ label: `סיבת המתנה · ${label}`, lifecycleKey: `waiting:${reason}` }, { st: "all", period }) : undefined} />)}</div>}
-    <SectionTitle>עלויות לפי ספק</SectionTitle>
-    {supArr.length === 0 ? <div className="note">טרם נרשמו עלויות.</div> : <div className="panel">{supArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxSup} money color="#16A34A" onClick={onFilter ? () => drill({ label: `ספק · ${s}`, supplier: s }, { period }) : undefined} />)}</div>}
-    <SectionTitle>עומס טכנאים</SectionTitle>
-    {techArr.length === 0 ? <div className="note">אין שיוכים פעילים.</div> : <div className="panel">{techArr.map(([s, v]) => <Bar key={s} label={s} value={v} max={maxTech} color="var(--primary)" />)}</div>}
-    {showFleet && <><SectionTitle><CalendarClock size={15} /> טיפולים תקופתיים — תכנון מול ביצוע</SectionTitle>
-    {pmPlanned === 0 ? <div className="note">לא תוכננו טיפולים {PERIOD_PREP[period]}.</div> : <div className="panel"><div className="row-stats">
-      <div><div className="rs-num">{pmPlanned}</div><div className="rs-lbl">תוכננו</div></div>
-      <div><div className="rs-num" style={{ color: "#16A34A" }}>{pmDone}</div><div className="rs-lbl">בוצעו</div></div>
-      <div><div className="rs-num" style={{ color: "#CA8A04" }}>{pmMissed}</div><div className="rs-lbl">לא הגיעו</div></div>
-      <div><div className="rs-num" style={{ color: pmRate >= 80 ? "#16A34A" : "#EA580C" }}>{pmRate}%</div><div className="rs-lbl">עמידה</div></div>
-    </div>{pmPaid > 0 && <div className="rs-lbl" style={{ marginTop: 8, textAlign: "center" }}>מתוך שבוצעו, {pmPaid} כללו עבודות בתשלום</div>}</div>}</>}
-    <SectionTitle><DollarSign size={15} /> {atab === "maint" ? "עלות אחזקת מבנה" : atab === "fleet" ? "עלות כלי שינוע" : "עלות אחזקה כוללת"}</SectionTitle>
-    <div className="panel"><div className="big-stat">{ils(totalCost)}</div>{showFleet && <div className="rs-lbl" style={{ marginTop: 4 }}>מתוכן טיפולים תקופתיים {ils(pmTicketCost)}</div>}</div>
-    <div style={{ height: 8 }} />
-    {report && <ReportView html={report} onClose={() => setReport(null)} />}
-  </>);
-}
 function Bar({ label, value, max, suffix, color, money, onClick }) {
   const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0;
   const inner = (<><div className="bar-top"><span className="bar-lbl">{label}</span><span className="bar-val">{money ? ils(value) : value}{suffix || ""}</span></div><div className="bar-track"><div className="bar-fill" style={{ width: pct + "%", background: color || "var(--primary)" }} /></div></>);
@@ -12427,100 +11724,6 @@ body *{visibility:hidden!important;}
 .ai-input input{flex:1;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;outline:none;background:var(--input);}
 .ai-input .btn-primary{background:var(--primary);padding:0 16px;}
 
-.dash-command{--dash-cream:var(--warm-soft);--dash-warm:var(--accent);--dash-critical:#FFF1F0;--dash-critical-border:#F5B8B2;--dash-warning:var(--warm-soft);display:flex;flex-direction:column;gap:18px;}
-.dash-hero{display:block;padding:10px 0 8px;}
-.dash-kicker{font-size:13px;color:var(--muted);font-weight:650;margin-bottom:8px;text-transform:none;}
-.dash-hero h1{font-family:var(--font-head);font-size:30px;line-height:1.08;margin:0;color:var(--ink);font-weight:750;letter-spacing:0;text-wrap:balance;}
-.dash-hero p{margin:8px 0 0;color:var(--muted);font-size:14px;line-height:1.55;max-width:620px;text-wrap:pretty;}
-.dash-hero-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:16px;}
-.dash-config{background:var(--dash-cream);}
-.dash-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start;}
-.dash-main{display:flex;flex-direction:column;gap:18px;min-width:0;}
-.dash-rail{display:flex;flex-direction:column;gap:12px;min-width:0;position:sticky;top:18px;}
-.dash-priority-band{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--dash-warm);border:1px solid var(--warm-line);border-radius:18px;overflow:hidden;box-shadow:var(--control-shadow);}
-.dash-signal{min-height:96px;direction:rtl;display:grid;grid-template-columns:62px minmax(0,148px);grid-template-rows:auto auto;grid-template-areas:"icon num" "icon copy";justify-content:start;align-content:center;align-items:center;gap:5px 18px;padding:14px 24px;text-align:center;border-inline-start:1px solid rgba(201,205,209,.55);color:var(--ink);}
-.dash-signal:first-child{border-inline-start:none;}
-.dash-signal:hover{background:rgba(46,49,56,.035);}
-.dash-signal-ic{grid-area:icon;width:62px;height:62px;border-radius:18px;background:transparent;color:#A4A9B0;display:flex;align-items:center;justify-content:center;box-shadow:none;transition:color 160ms var(--ease-out);}
-.dash-signal:hover .dash-signal-ic{color:#6F7680;}
-.dash-signal-ic svg{width:34px;height:34px;stroke-width:1.9;}
-.dash-signal-num{grid-area:num;direction:rtl;font-family:var(--font-head);font-size:31px;font-weight:760;line-height:.95;font-variant-numeric:tabular-nums;text-align:center;}
-.dash-signal-copy{grid-area:copy;direction:rtl;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;text-align:center;}
-.dash-signal-copy b{font-size:13.5px;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dash-signal-copy small{font-size:12px;color:var(--muted);line-height:1.25;}
-.dash-signal.critical{background:var(--dash-critical);color:#7F1D1D;}
-.dash-signal.critical:hover{background:#FDE7E8;}
-.dash-signal.critical .dash-signal-ic{color:#DC2626;background:transparent;}
-.dash-signal.critical:hover .dash-signal-ic{color:#991B1B;}
-.dash-signal.warm .dash-signal-ic{color:#B45309;}
-.dash-signal.warm:hover .dash-signal-ic{color:#7C2D12;}
-.dash-signal.blue .dash-signal-ic{color:#7C8693;}
-.dash-signal.blue:hover .dash-signal-ic{color:#4B5563;}
-.dash-system-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--control-shadow);}
-.dash-mini-signal{min-height:66px;direction:rtl;display:grid;grid-template-columns:46px minmax(0,128px);grid-template-rows:auto auto;grid-template-areas:"icon num" "icon label";justify-content:center;align-content:center;align-items:center;gap:2px 16px;padding:8px 14px;text-align:center;border-inline-start:1px solid var(--line);color:var(--muted);}
-.dash-mini-signal:first-child{border-inline-start:none;}
-.dash-mini-signal:hover{background:var(--surface-2);color:var(--primary);}
-.dash-mini-signal>svg{grid-area:icon;width:38px;height:38px;justify-self:center;color:var(--icon-muted);stroke-width:1.8;}
-.dash-mini-signal:hover>svg{color:var(--primary);}
-.dash-mini-num{grid-area:num;direction:rtl;font-family:var(--font-head);font-size:23px;font-weight:710;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;text-align:center;}
-.dash-mini-signal>span:not(.dash-mini-num){grid-area:label;direction:rtl;font-size:13.5px;line-height:1.2;white-space:nowrap;text-align:center;}
-.dash-message-card,.dash-quick-create{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--dash-cream);border:1px solid var(--warm-line);border-radius:16px;padding:14px 16px;box-shadow:var(--control-shadow);}
-.dash-message-ic{width:42px;height:42px;border-radius:12px;background:#fff;color:var(--primary);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(46,49,56,.06);}
-.dash-message-card>div:nth-child(2),.dash-quick-create>div{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1;}
-.dash-message-card b,.dash-quick-create b{font-size:14px;font-weight:730;color:var(--ink);}
-.dash-message-card span,.dash-quick-create span{font-size:12.5px;color:var(--muted);line-height:1.35;}
-.dash-link-btn{min-height:44px;display:inline-flex;align-items:center;gap:5px;border-radius:999px;color:var(--primary);font-size:12.5px;font-weight:720;padding:0 12px;}
-.dash-link-btn:hover{background:#fff;}
-.dash-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;}
-.dash-section-head h2{font-family:var(--font-head);font-size:16px;font-weight:740;margin:0;color:var(--ink);}
-.dash-section-head span{font-size:12px;color:var(--muted);font-weight:650;}
-.dash-section-head button{display:inline-flex;align-items:center;gap:5px;color:var(--primary);font-size:12.5px;font-weight:700;}
-.dash-ticket-grid,.dash-attention-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
-.dash-ticket-card{position:relative;min-height:72px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px 10px;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;color:var(--ink);box-shadow:var(--control-shadow);}
-.dash-ticket-card.alert{background:var(--warm-soft);border-color:var(--warm-line);}
-.dash-ticket-card:hover{border-color:var(--primary);box-shadow:var(--lift-shadow);transform:translateY(-1px);}
-.dash-ticket-icon{width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--muted);display:flex;align-items:center;justify-content:center;}
-.dash-ticket-main{min-width:0;display:flex;flex-direction:column;gap:4px;}
-.dash-ticket-main b{font-size:13px;font-weight:680;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dash-ticket-main small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dash-ticket-dot{width:8px;height:8px;border-radius:50%;align-self:start;margin-top:6px;box-shadow:0 0 0 3px rgba(201,205,209,.25);}
-.dash-ticket-tag{grid-column:2 / -1;justify-self:start;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:720;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dash-domain-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--control-shadow);}
-.dash-domain-card{position:relative;min-height:84px;direction:rtl;display:grid;grid-template-columns:44px minmax(0,128px);grid-template-rows:auto auto auto;grid-template-areas:"icon title" "icon value" "icon meta";justify-content:center;align-content:center;align-items:center;gap:2px 14px;text-align:center;background:transparent;border:0;border-inline-start:1px solid var(--line);border-radius:0;padding:10px 14px;color:var(--ink);overflow:hidden;}
-.dash-domain-card:first-child{border-inline-start:0;}
-.dash-domain-card:hover{background:var(--surface-2);color:var(--primary);}
-.dash-domain-top{display:contents;}
-.dash-domain-top svg{grid-area:icon;width:36px;height:36px;justify-self:center;color:var(--icon-muted);stroke-width:1.8;}
-.dash-domain-card:hover .dash-domain-top svg{color:var(--primary);}
-.dash-domain-top span{grid-area:title;color:var(--muted);font-size:13.5px;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
-.dash-domain-value{grid-area:value;font-family:var(--font-head);font-size:28px;font-weight:760;line-height:1;font-variant-numeric:tabular-nums;text-align:center;}
-.dash-domain-meta{grid-area:meta;font-size:12px;color:var(--muted);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
-.dash-domain-card>svg{display:none;}
-.dash-rail-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--control-shadow);}
-.dash-rail-card h3{font-family:var(--font-head);font-size:14px;font-weight:690;margin:0 0 10px;color:var(--ink);}
-.dash-rail-row{width:100%;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:start;border-radius:0;padding:10px 4px;color:var(--ink);}
-.dash-rail-row + .dash-rail-row{border-top:1px solid rgba(201,205,209,.62);}
-.dash-rail-row:hover{background:var(--surface-2);}
-.dash-rail-row span{font-size:12.5px;color:var(--muted);font-weight:560;}
-.dash-rail-row b{font-size:16px;font-weight:720;color:var(--primary);font-variant-numeric:tabular-nums;}
-.dash-track-tabs{margin:0;}
-.dash-insight-list{display:flex;flex-direction:column;gap:8px;}
-.dash-insight{display:flex;align-items:flex-start;gap:9px;text-align:start;width:100%;border-radius:10px;padding:8px 4px;color:var(--ink);}
-.dash-insight:hover{background:var(--surface-2);}
-.dash-insight span{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;}
-.dash-insight b{font-size:12.5px;font-weight:560;line-height:1.38;color:var(--muted);}
-.dash-quick-create{background:var(--surface);border-color:var(--warm-line);}
-.dash-chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.dash-chart-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:15px 16px;box-shadow:var(--control-shadow);min-height:172px;}
-.dash-bars{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
-.dash-bar-row{display:grid;grid-template-columns:72px minmax(0,1fr) 28px;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);}
-.dash-bar-row b{font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums;text-align:end;}
-.dash-bar-track{height:9px;border-radius:999px;background:var(--surface-2);overflow:hidden;}
-.dash-bar-track i{display:block;height:100%;border-radius:999px;}
-.dash-week-bars{height:106px;display:grid;grid-template-columns:repeat(7,1fr);gap:9px;align-items:end;margin-top:12px;}
-.dash-week-bar{height:100%;display:grid;grid-template-rows:1fr auto auto;gap:4px;align-items:end;justify-items:center;color:var(--muted);font-size:11px;}
-.dash-week-bar i{width:22px;border-radius:999px 999px 4px 4px;background:linear-gradient(180deg,var(--primary),var(--primary-d));box-shadow:0 6px 14px rgba(31,78,140,.14);}
-.dash-week-bar b{font-size:11px;color:var(--ink);font-variant-numeric:tabular-nums;}
 .alert-esc{display:flex;align-items:center;gap:9px;background:#FEF2F2;color:#B91C1C;border:1.5px solid #FCA5A5;border-radius:12px;padding:13px 15px;font-size:13.5px;margin-bottom:12px;cursor:pointer;font-weight:500;}
 .alert-esc b{font-weight:700;}
 .app-dark .alert-esc{background:#2a1212;border-color:#7f1d1d;color:#fca5a5;}
@@ -12547,16 +11750,6 @@ body *{visibility:hidden!important;}
 .cal-pill{font-size:11px;font-weight:600;border-radius:7px;padding:3px 6px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cal-more{font-size:10.5px;color:var(--muted);font-weight:600;}
 
-@media(max-width:1180px){
-  .dash-layout{grid-template-columns:1fr;}
-  .dash-rail{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
-  .dash-track-tabs{grid-column:1 / -1;}
-  .dash-ticket-grid,.dash-attention-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .dash-chart-grid{grid-template-columns:1fr;}
-  .dash-domain-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .dash-domain-card:nth-child(odd){border-inline-start:0;}
-  .dash-domain-card:nth-child(n+3){border-top:1px solid var(--line);}
-}
 @media(max-width:760px){
   .bi-hero{align-items:flex-start;flex-direction:column;padding:14px 15px;gap:10px;}
   .bi-hero h2{font-size:19px;}
@@ -12570,41 +11763,6 @@ body *{visibility:hidden!important;}
   .bi-doc-row{align-items:flex-start;flex-direction:column;gap:2px;}
   .bi-risk-row{grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;}
   .bi-risk-tags{grid-column:1 / -1;justify-content:flex-start;}
-  .dash-command{gap:14px;}
-  .dash-hero{flex-direction:column;padding-top:4px;}
-  .dash-hero h1{font-size:25px;}
-  .dash-hero-actions{width:100%;justify-content:stretch;}
-  .dash-hero-actions .btn-primary,.dash-hero-actions .btn-ghost{flex:1;}
-  .dash-priority-band,.dash-system-strip{grid-template-columns:1fr 1fr;border-radius:15px;}
-  .dash-signal,.dash-mini-signal{border-inline-start:0;border-top:1px solid rgba(201,205,209,.62);}
-  .dash-signal:nth-child(-n+2),.dash-mini-signal:nth-child(-n+2){border-top:0;}
-  .dash-signal{min-height:72px;grid-template-columns:34px minmax(0,96px);justify-content:center;gap:2px 9px;padding:9px 10px;}
-  .dash-signal-ic{width:34px;height:34px;border-radius:10px;}
-  .dash-signal-ic svg{width:21px;height:21px;}
-  .dash-signal-num{font-size:25px;}
-  .dash-signal-copy{gap:1px;}
-  .dash-signal-copy b{font-size:12.5px;}
-  .dash-signal-copy small{font-size:11.5px;line-height:1.18;}
-  .dash-mini-signal{min-height:52px;grid-template-columns:28px minmax(0,96px);gap:1px 8px;padding:7px 9px;}
-  .dash-mini-signal:nth-child(5){grid-column:1 / -1;border-top:1px solid rgba(201,205,209,.62);}
-  .dash-mini-signal>svg{width:24px;height:24px;}
-  .dash-mini-num{font-size:20px;}
-  .dash-mini-signal>span:not(.dash-mini-num){font-size:12px;line-height:1.15;}
-  .dash-message-card{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px 12px;border-radius:14px;}
-  .dash-message-ic{width:34px;height:34px;border-radius:10px;}
-  .dash-message-card>div:nth-child(2){gap:1px;}
-  .dash-message-card b{font-size:13px;}
-  .dash-message-card span{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .dash-link-btn{min-height:44px;align-self:center;padding:0 8px;font-size:12px;}
-  .dash-quick-create{align-items:flex-start;flex-direction:column;}
-  .dash-ticket-grid,.dash-attention-grid,.dash-chart-grid,.dash-domain-grid,.dash-rail{grid-template-columns:1fr;}
-  .dash-domain-card{min-height:46px;grid-template-columns:28px minmax(74px,.72fr) minmax(0,1fr) auto;grid-template-rows:1fr;grid-template-areas:"icon title meta value";justify-content:stretch;gap:7px;padding:7px 10px;border-inline-start:0;border-top:1px solid var(--line);}
-  .dash-domain-card:first-child{border-top:0;}
-  .dash-domain-top svg{width:23px;height:23px;align-self:center;}
-  .dash-domain-top span{text-align:start;font-size:12.5px;align-self:center;}
-  .dash-domain-value{font-size:21px;text-align:end;align-self:center;}
-  .dash-domain-meta{text-align:start;font-size:11.5px;align-self:center;}
-  .dash-ticket-tag{position:static;justify-self:start;grid-column:2 / -1;max-width:100%;}
   .settings-wrap{width:100%;}
   .settings-wrap>.seg-tabs{margin-bottom:4px;}
   .settings-wrap .sect{margin:14px 0 7px;padding-top:6px;font-size:13px;}

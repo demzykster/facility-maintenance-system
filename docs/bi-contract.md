@@ -6,7 +6,7 @@ contract instead of creating a separate shortcut around existing workflows.
 
 ## Goal
 
-Replace the current split between `לוח בקרה` and `אנליטיקה` with one BI module
+Replace the old split between `לוח בקרה` and `אנליטיקה` with one BI module
 that gives managers a clear operational picture and supports drill-down into
 causes, tickets, assets, departments, costs, and lifecycle stages.
 
@@ -293,10 +293,10 @@ Prefer small, contract-driven changes.
 2. Add the `executive` role foundation without changing the BI UI.
 3. Add BI visibility and finance helpers with tests.
 4. Add `biScopeForSession(session, data)` with tests.
-5. Build the new BI shell using existing Dashboard and Analytics calculations.
+5. Build the new BI shell using existing dashboard and analytics calculations.
 6. Move useful Analytics concepts into BI as drill-down depth, not as a crowded
    first screen.
-7. Remove the old standalone `אנליטיקה` menu entry after BI covers the required use cases.
+7. Remove the old standalone `לוח בקרה` and `אנליטיקה` entry points after BI covers the required use cases.
 8. Refine visual design and drill-down flows in browser after the data contract is stable.
 
 ## First Required Tests
@@ -319,11 +319,14 @@ The first implementation PRs should cover:
 - `UserApp` now opens `user` / department managers on BI by default.
 - Department BI routes to existing workflows instead of creating BI-only actions:
   filtered tickets, department fleet/PM, cleaning, and PPE.
-- Admin remains on the existing dashboard start while BI keeps an admin-only
+- Admin and `executive` now enter through BI. Admin keeps an admin-only
   command-center queue for cross-domain operational decisions.
-- Short trend and repeat-problem signals are now part of BI, but deeper Analytics
-  consolidation should continue incrementally and only after scope/permissions stay
-  proven.
+- Old standalone `לוח בקרה` and `אנליטיקה` UI code has been retired from the
+  main app. BI is now the management shell; detailed analytics should continue
+  to appear as compact evidence and drill-down panels inside BI.
+- Short trend, repeat-problem, facility maintenance, execution-load, PM,
+  cleaning, PPE, bottleneck, department-risk, and financial signals are now part
+  of BI. Future additions should stay compact and route to existing workflows.
 - `admin` and `executive` receive `company` BI scope.
 - `user` receives `department` BI scope only; missing departments produce empty operational slices, not company-wide fallback.
 - `tech`, `worker`, and `cleaner` are outside the first BI rollout.

@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: `b42c808 Make department BI the manager entry point`.
+- Latest app/UI commit before this handoff: current commit, `Consolidate dashboard analytics into BI`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,8 +56,13 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Consolidate dashboard analytics into BI` (current commit)
+  - Made BI the unified first screen for `admin`, `executive`, and department managers.
+  - Retired the old standalone `לוח בקרה` and `אנליטיקה` UI entry points and removed the stale dashboard widget-preference model.
+  - Moved useful analytics into BI as compact drill-down/evidence panels: facility maintenance categories/zones, execution load, PM completion, cleaning compliance, PPE issue/cost/repeat signals, bottlenecks, repeat problems, department risk, and finance.
+  - Kept admin command-center behavior inside BI so admin still has fast operational decision routes for tickets, transport, facility, cleaning, PPE, PM, fleet documents, ownership gaps, and SLA issues.
 - `b42c808 Make department BI the manager entry point`
-  - Made BI the default first screen for department managers (`user`) while keeping admin on the existing dashboard/control-center start.
+  - Made BI the default first screen for department managers (`user`) while admin still used the existing dashboard/control-center start at that time. Superseded by the current BI consolidation: admin now starts on BI.
   - Added manager BI drill-down routes into the existing ticket list and department modules instead of adding BI-only actions.
   - Added short trend/repeat-problem BI signals using existing ticket data.
   - Extended strict department PM scope to handle `fleetId`, `forkliftId`, and `unitId`.
@@ -193,6 +198,8 @@ Current agreed principle:
 - BI should show the decision signal, cause, operational owner, and route to the
   existing workflow.
 - Detailed analytics should be reached by drill-down from the relevant BI signal.
+- Old standalone Dashboard/Analytics screens should not be reintroduced unless a
+  specific owner-approved product decision reverses this consolidation.
 
 Good candidates for BI first-screen signals:
 

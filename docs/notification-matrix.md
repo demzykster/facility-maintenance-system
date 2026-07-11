@@ -16,7 +16,7 @@ Source of truth in code:
 - `go: "cleaning"` opens `בקרת ניקיון`.
 - `go: "pm"` opens `כלי שינוע` with PM tab.
 - `go: "fleet"` opens `כלי שינוע` with fleet tab; `fleetId` opens the exact unit card when present.
-- Unknown or missing `go` falls back to `לוח בקרה` or does nothing.
+- Unknown or missing `go` falls back to BI or does nothing.
 
 ## Browser Notification Policy
 
@@ -26,7 +26,7 @@ Panel-only events:
 
 - `doc` fleet document warnings, because large fleets can create many simultaneous expiring-document reminders.
 - `pm` periodic maintenance due-soon reminders, because they are a planning backlog rather than a one-off interruption.
-- `ppe` clothing/PPE aggregates, including pending requests, low stock, and open orders, because these are dashboard queues.
+- `ppe` clothing/PPE aggregates, including pending requests, low stock, and open orders, because these are BI/module queues.
 - Technician shift start/end information (`sh-on-*`, `sh-off-*`). Shift exceptions such as late/no-show/early-finish remain interrupting escalations.
 
 Interrupting browser events remain enabled for operational changes such as new tickets, ticket updates requiring action, SLA/escalations, cleaning rounds/complaints, driver approvals, tasks, and meetings.
