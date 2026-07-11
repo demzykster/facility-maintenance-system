@@ -13,6 +13,63 @@ causes, tickets, assets, departments, costs, and lifecycle stages.
 BI must explain what is happening and why. It must not be a decorative dashboard
 or a duplicate collection of widgets.
 
+## BI And Analytics Product Principle
+
+The top BI screen should be a decision map, not a full analytics report.
+
+BI should show:
+
+- what needs attention now;
+- why it matters;
+- what operational domain owns it;
+- what the likely cause is;
+- where to continue the work in the existing system.
+
+Analytics is the evidence layer under BI. Useful analytics should move into BI as
+drill-downs and explanations, not as a long first-screen list of charts.
+
+Product rule:
+
+`BI shows the decision. Analytics proves it and lets the user investigate.`
+
+### First-Screen BI Signals
+
+The BI first screen should stay compact and prioritize signals that can change a
+manager decision today:
+
+- SLA breaches and urgent open tickets;
+- repeated problems by fleet unit, facility asset, zone, or category;
+- downtime causes and current waiting owner;
+- top risk departments / areas;
+- PM, fleet documents, cleaning, and PPE health signals;
+- financial signals only for `admin` and `executive`, such as 30-day cost,
+  top supplier/category cost, or a clear anomaly.
+
+### BI Drill-Down Depth
+
+Detailed Analytics content should be reachable from the related BI signal:
+
+- facility maintenance by category from facility-ticket risk;
+- repeat issues by area/asset/category from repeated-problem signals;
+- downtime and time-by-status from downtime / "why stuck" signals;
+- supplier/category/asset costs from financial BI;
+- technician load from admin command-center execution bottlenecks;
+- PM planned versus completed from PM health;
+- cleaning compliance and complaint density from cleaning health;
+- PPE issue/cost/repeat usage from PPE health.
+
+### What Should Stay Out Of The BI First Screen
+
+Do not put everything from Analytics on the BI top level.
+
+Keep these out of the first screen unless they become an active risk signal:
+
+- long tables;
+- export/report-only blocks;
+- empty "no data" sections;
+- secondary comparisons that do not imply an action;
+- full historical views that are useful for audit but not for today's decision.
+
 ## Roles
 
 ### `admin`
@@ -237,7 +294,8 @@ Prefer small, contract-driven changes.
 3. Add BI visibility and finance helpers with tests.
 4. Add `biScopeForSession(session, data)` with tests.
 5. Build the new BI shell using existing Dashboard and Analytics calculations.
-6. Move useful Analytics blocks into BI.
+6. Move useful Analytics concepts into BI as drill-down depth, not as a crowded
+   first screen.
 7. Remove the old standalone `אנליטיקה` menu entry after BI covers the required use cases.
 8. Refine visual design and drill-down flows in browser after the data contract is stable.
 

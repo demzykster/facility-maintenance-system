@@ -181,6 +181,47 @@ Screens already touched in this design pass:
 - logo/sidebar sizing;
 - notification panel direction was explored.
 
+## BI / Analytics Direction
+
+The owner confirmed that the existing Analytics module contains useful content,
+but BI must not become a crowded analytics report.
+
+Current agreed principle:
+
+- BI top level is a compact decision map.
+- Analytics is the evidence and investigation layer underneath BI.
+- BI should show the decision signal, cause, operational owner, and route to the
+  existing workflow.
+- Detailed analytics should be reached by drill-down from the relevant BI signal.
+
+Good candidates for BI first-screen signals:
+
+- SLA breaches and urgent open tickets;
+- repeated problems by fleet unit, facility asset, zone, or category;
+- downtime causes / waiting owner / time by stage;
+- top risk departments or areas;
+- PM, fleet document, cleaning, and PPE health;
+- finance only for `admin` / `executive`.
+
+Keep out of the first BI screen unless it becomes an active risk:
+
+- long tables;
+- export/report-only blocks;
+- empty "no data" sections;
+- full historical report views;
+- secondary comparisons that do not change a current decision.
+
+Useful Analytics blocks should migrate into BI as drill-downs:
+
+- facility maintenance by category;
+- repeat issues by area/asset/category;
+- downtime and time-by-status;
+- supplier/category/asset cost breakdowns;
+- technician load;
+- PM planned versus completed;
+- cleaning compliance and complaint density;
+- PPE issue/cost/repeat usage.
+
 ## What Was Tried And Rejected / Needs Caution
 
 - A notification panel that opened as a floating overlay over the side menu was rejected by the owner as visually wrong.
