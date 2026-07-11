@@ -7,7 +7,7 @@ Updated: 2026-07-11
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean.
-- Latest app/UI commit before this handoff: `c490f9d Keep admin command BI separate`.
+- Latest app/UI commit before this handoff: `e86738a Add BI bottleneck explanation panel`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,6 +56,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `e86738a Add BI bottleneck explanation panel`
+  - Added `למה זה תקוע` to BI using existing ticket lifecycle models.
+  - Shows active bottleneck stages and waiting reasons with drill-down into filtered tickets.
+- `9875151 Balance admin BI command queue`
+  - Balanced the admin command queue across domains so tickets/cleaning do not hide PM, documents, PPE, or other operational risks.
+  - Added compact domain counters and domain/action labels to command-center rows.
 - `c490f9d Keep admin command BI separate`
   - Kept the admin-only BI command center separate from the `executive` leadership BI view.
   - Added `executive` to admin role preview so leadership BI can be checked visually.
