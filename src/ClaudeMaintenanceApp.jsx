@@ -57,6 +57,7 @@ import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScre
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 import { defaultWorkerView } from "./workerProfileModel.js";
 import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
+import { parseStoredAppConfigValue } from "./appConfigRecordModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { createApiFleetProvider } from "./apiFleetAdapter.js";
 import { createApiPmProvider } from "./apiPmAdapter.js";
@@ -1741,7 +1742,7 @@ export default function App() {
   const applySavedConfig = (savedConfig) => {
     if (!savedConfig) return;
     try {
-      const sv = JSON.parse(savedConfig);
+      const sv = parseStoredAppConfigValue(savedConfig);
       const D = DEFAULT_CONFIG;
       const typeMaps = catalogAwareTypeMaps(sv, D);
       setConfig({
@@ -9549,7 +9550,7 @@ function SettingsPanel(p) {
   const [uq, setUq] = useState(""), [urole, setUrole] = useState("all"), [pendImport, setPendImport] = useState(null), [impMsg, setImpMsg] = useState(""), [impBusy, setImpBusy] = useState(false);
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("workers"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
-  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
+  const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [brandDirty, setBrandDirty] = useState(false), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#F59E0B" }, { id: "night", label: "לילה", color: "#6366F1" }]);
@@ -9573,6 +9574,11 @@ function SettingsPanel(p) {
     pmDailyCapacity: config.pmDailyCapacity,
     cleaningReminderMins: config.cleaningReminderMins
   });
+  const brandConfigSyncKey = JSON.stringify({
+    companyName: config.companyName || "",
+    siteName: config.siteName || "",
+    brandLogo: config.brandLogo || ""
+  });
   useEffect(() => {
     if (openCat !== null) return;
     setCats((config.categories || CATEGORIES).map((c) => ({ id: c.id, label: c.label, ...SLA3(config.catSla?.[c.id]) })));
@@ -9588,6 +9594,12 @@ function SettingsPanel(p) {
     setPmDailyCapacity(clampPmDailyCapacity(config.pmDailyCapacity ?? 4));
     setCleaningReminderMins(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
   }, [userConfigSyncKey, uEdit, uArchive, arcView]);
+  useEffect(() => {
+    if (brandDirty) return;
+    setCoName(config.companyName || "");
+    setSiteName(config.siteName || "");
+    setBrandLogo(config.brandLogo || "");
+  }, [brandConfigSyncKey, brandDirty]);
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
   const doExport = async () => { try { const data = await getBackup(); downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `backup_${new Date().toISOString().slice(0, 10)}.json`); } catch (e) {} };
   const onPickBackup = async (e) => {
@@ -9625,7 +9637,7 @@ function SettingsPanel(p) {
     if (userSub === "admins") return { role: "admin" };
     return { role: "worker" };
   };
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; setBrandDirty(false); flash(); };
   const pickLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -9633,6 +9645,7 @@ function SettingsPanel(p) {
     setLogoMsg("");
     try {
       setBrandLogo(await imageFileToSquareDataUrl(file));
+      setBrandDirty(true);
       setLogoMsg("הלוגו הוכן לתצוגה. שמרו את ההגדרות כדי לעדכן את המערכת.");
     } catch {
       setLogoMsg("לא ניתן לקרוא את התמונה. נסו קובץ PNG או JPG.");
@@ -9717,13 +9730,13 @@ function SettingsPanel(p) {
           <div className="hint">העלו תמונה בכל גודל. המערכת תתאים אותה לריבוע בלי לחתוך לוגו רחב.</div>
           <div className="brand-upload-actions">
             <label className="btn-ghost sm"><input type="file" accept="image/*" onChange={pickLogo} hidden /> העלאת לוגו</label>
-            {brandLogo && <button className="btn-ghost sm" onClick={() => { setBrandLogo(""); setLogoMsg("הלוגו הוסר. שמרו את ההגדרות כדי לעדכן."); }}>חזרה לאייקון ברירת מחדל</button>}
+            {brandLogo && <button className="btn-ghost sm" onClick={() => { setBrandLogo(""); setBrandDirty(true); setLogoMsg("הלוגו הוסר. שמרו את ההגדרות כדי לעדכן."); }}>חזרה לאייקון ברירת מחדל</button>}
           </div>
           {logoMsg && <div className="hint" style={{ marginTop: 6 }}>{logoMsg}</div>}
         </div>
       </div>
-      <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => setCoName(e.target.value)} placeholder="לדוגמה: חברה לדוגמה בע״מ" /></label>
-      <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
+      <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => { setCoName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: חברה לדוגמה בע״מ" /></label>
+      <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => { setSiteName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
       <SectionTitle>סיבות המתנה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>סיבה נבחרת כאשר קריאה נעצרת באמצע טיפול. ההגדרה קובעת אצל מי האחריות להמשך, מי רשאי לבחור את הסיבה, והאם זמן ההמתנה נחשב ב-SLA התפעולי. בכל מקרה הזמן נשמר בהיסטוריה, בדוחות ובאנליטיקה.</div>

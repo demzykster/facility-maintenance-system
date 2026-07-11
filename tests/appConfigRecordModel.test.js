@@ -5,6 +5,7 @@ import {
   appConfigRecordFromSupabaseRow,
   appConfigRecordToSupabaseRow,
   normalizeAppConfigRecord,
+  parseStoredAppConfigValue,
   serializeAppConfigValue
 } from "../src/appConfigRecordModel.js";
 
@@ -38,5 +39,14 @@ describe("app config record model", () => {
   it("accepts serialized legacy config values", () => {
     expect(normalizeAppConfigRecord("{\"companyName\":\"CDSL\"}").config).toEqual({ companyName: "CDSL" });
     expect(serializeAppConfigValue({ companyName: "CDSL" })).toBe("{\"companyName\":\"CDSL\"}");
+  });
+
+  it("extracts config from the settings API envelope used by storage reads", () => {
+    expect(parseStoredAppConfigValue({
+      ok: true,
+      source: "normalized",
+      value: "{\"companyName\":\"Old\"}",
+      config: { companyName: "New", siteName: "North site" }
+    })).toEqual({ companyName: "New", siteName: "North site" });
   });
 });

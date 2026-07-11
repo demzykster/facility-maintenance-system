@@ -10,6 +10,13 @@ export function parseAppConfigValue(value) {
   return cleanObject(value);
 }
 
+export function parseStoredAppConfigValue(value) {
+  const envelope = cleanObject(value);
+  if (envelope.config != null) return parseAppConfigValue(envelope.config);
+  if (envelope.value != null) return parseAppConfigValue(envelope.value);
+  return parseAppConfigValue(value);
+}
+
 export function normalizeAppConfigRecord(value = {}, { id = APP_CONFIG_ID, sourceKvKey = APP_CONFIG_KEY } = {}) {
   const config = parseAppConfigValue(value);
   return {
