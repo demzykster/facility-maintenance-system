@@ -12337,7 +12337,7 @@ body *{visibility:hidden!important;}
   .dash-message-card>div:nth-child(2){gap:1px;}
   .dash-message-card b{font-size:13px;}
   .dash-message-card span{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .dash-link-btn{min-height:34px;align-self:center;padding:0 6px;font-size:12px;}
+  .dash-link-btn{min-height:44px;align-self:center;padding:0 8px;font-size:12px;}
   .dash-quick-create{align-items:flex-start;flex-direction:column;}
   .dash-ticket-grid,.dash-attention-grid,.dash-chart-grid,.dash-domain-grid,.dash-rail{grid-template-columns:1fr;}
   .dash-domain-card{min-height:46px;grid-template-columns:28px minmax(74px,.72fr) minmax(0,1fr) auto;grid-template-rows:1fr;grid-template-areas:"icon title meta value";justify-content:stretch;gap:7px;padding:7px 10px;border-inline-start:0;border-top:1px solid var(--line);}
