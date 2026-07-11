@@ -25,15 +25,17 @@ async function main() {
     await page.goto(appUrl, { waitUntil: "networkidle", timeout: 30000 });
     await page.waitForTimeout(1000);
 
-    const emailVisible = await page.locator('input[placeholder="owner@example.com"]').isVisible().catch(() => false);
+    const loginVisible = await page.locator(".login-card").isVisible().catch(() => false);
+    const identityInputVisible = await page.locator(".login-card input.ltr-input").first().isVisible().catch(() => false);
     const relevantConsole = consoleMessages.filter(relevantConsoleMessage);
     const relevantFailures = failed.filter((item) => !isExpectedBrowserSmokeResponse(item));
-    const ok = emailVisible && unauthKv.length === 0 && relevantConsole.length === 0 && relevantFailures.length === 0;
+    const ok = loginVisible && identityInputVisible && unauthKv.length === 0 && relevantConsole.length === 0 && relevantFailures.length === 0;
 
     const report = {
       ok,
       url: appUrl,
-      emailVisible,
+      loginVisible,
+      identityInputVisible,
       failedCount: relevantFailures.length,
       unauthKvCount: unauthKv.length,
       consoleErrorCount: relevantConsole.length,

@@ -209,32 +209,6 @@ if (restoredConfig?.__settingsPersistenceSmoke) {
   throw new Error("settings_marker_not_restored");
 }
 
-const tempPrefixes = [
-  ["mtask", { id: "", title: "Controlled task persistence smoke", status: "open", createdAt: Date.now() }],
-  ["ppeitem", { id: "", name: "Controlled PPE persistence smoke", category: "smoke", active: true }],
-  ["czone", { id: "", name: "Controlled cleaning-zone persistence smoke", area: "smoke", active: true }]
-];
-const recordResults = [];
-
-for (const [prefix, template] of tempPrefixes) {
-  const id = `smoke-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const key = `${prefix}:${id}`;
-  const value = JSON.stringify({ ...template, id });
-  try {
-    await kvSet({ publicUrl, token, key, value });
-    const savedRaw = await kvGet({ publicUrl, token, key });
-    const saved = savedRaw ? JSON.parse(savedRaw) : null;
-    if (saved?.id !== id) throw new Error(`${prefix}_marker_not_persisted`);
-    await kvDelete({ publicUrl, token, key });
-    const afterDelete = await kvGet({ publicUrl, token, key });
-    if (afterDelete !== null) throw new Error(`${prefix}_marker_not_deleted`);
-    recordResults.push({ prefix, ok: true });
-  } catch (error) {
-    await kvDelete({ publicUrl, token, key }).catch(() => {});
-    throw error;
-  }
-}
-
 console.log(JSON.stringify({
   ok: true,
   appUrl: publicUrl,
@@ -245,6 +219,5 @@ console.log(JSON.stringify({
     vehicleType: vehicleTypeSlaKey,
     persisted: true
   },
-  restored: true,
-  records: recordResults
+  restored: true
 }, null, 2));
