@@ -84,6 +84,7 @@ import { priorityToken, statusTokenTone, taskStatusToken, ticketStatusToken } fr
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
 import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibleTicketsForSession } from "./ticketVisibilityModel.js";
+import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValueToMs, statusMsToHours } from "./adminTicketManualEditModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -715,6 +716,13 @@ const ticketNo = (t) => (t && t.num) ? `${tkLetter(t)}-${String(t.num).padStart(
 const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
 const fmtDateTimeShort = (ts) => ts ? `${fmtDate(ts)} ${fmtTime(ts)}` : "";
+const inputDateTime = (ts) => {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 const daypartGreeting = (now = new Date()) => {
   const h = now.getHours();
   if (h >= 5 && h < 12) return "בוקר טוב";
@@ -9843,6 +9851,7 @@ function TicketForm(p) {
   const [assignTo, setAssignTo] = useState("self");
   const [supplierAssign, setSupplierAssign] = useState("");
   const [slaOn, setSlaOn] = useState(false), [slaH, setSlaH] = useState(8);
+  const [retro, setRetro] = useState({ on: false, createdAt: "", updatedAt: "", dueAt: "", status: "done", waitingReason: "parts", closedAt: "", downtimeStart: "", downtimeEnd: "", costAmount: "", costSupplier: "", costNote: "", quality: "resolved" });
   const [dupeReview, setDupeReview] = useState(null), [pendingT, setPendingT] = useState(null);
   const [photo, setPhoto] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [aiBusy, setAiBusy] = useState(false), [aiNote, setAiNote] = useState("");
   const busyRef = useRef(false), fileRef = useRef(null);
@@ -9878,27 +9887,35 @@ function TicketForm(p) {
   };
   const buildTicket = () => {
     const id = uid(); const now = Date.now();
+    const retroOn = isAdmin && retro.on;
+    const createdAt = retroOn ? datetimeValueToMs(retro.createdAt, now) : now;
+    const status = retroOn ? (retro.status || "new") : "new";
+    const closedAt = retroOn ? datetimeValueToMs(retro.closedAt, datetimeValueToMs(retro.updatedAt, now)) : null;
+    const updatedAt = retroOn ? datetimeValueToMs(retro.updatedAt, closedAt || now) : now;
     const pr = track === "transport" ? dtOf(downtimeType, config).prio : priority;
     const hrs = (isAdmin && slaOn) ? (Number(slaH) || DEFAULT_SLA[pr]) : slaForTicket({ track, forkliftId, category, priority: pr }, config, fleet);
+    const dueAt = retroOn ? datetimeValueToMs(retro.dueAt, createdAt + hrs * 3600000) : createdAt + hrs * 3600000;
     const selectedFleet = track === "transport" ? fleet.find((f) => f.id === forkliftId) : null;
     const routedSupplier = track === "transport" ? (selectedFleet?.supplier || "") : supplierAssign;
     let assignee = "", routedTech = track === "transport" || !!routedSupplier || undefined, mgrExec = undefined, routeText;
     if (track === "transport") routeText = routedSupplier ? `הקריאה נפתחה והועברה לספק ${routedSupplier}` : "הקריאה נפתחה והועברה למאגר שינוע";
     else if (!isAdmin) routeText = "הקריאה נפתחה";
     else if (routedSupplier) { routedTech = true; routeText = `נפתחה ע״י מנהל — שויכה לספק ${routedSupplier}`; }
-    else if (assignTo.startsWith("mgr:")) { const u = (users || []).find((x) => x.id === assignTo.slice(4)); assignee = u?.name || ""; mgrExec = assignee ? true : undefined; routeText = assignee ? `נפתחה ע״י מנהל — שויכה למנהל ${assignee}` : "נפתחה ע״י מנהל"; }
-    else routeText = "נפתחה ע״י מנהל — נשארת לטיפולך";
-    return {
+	    else if (assignTo.startsWith("mgr:")) { const u = (users || []).find((x) => x.id === assignTo.slice(4)); assignee = u?.name || ""; mgrExec = assignee ? true : undefined; routeText = assignee ? `נפתחה ע״י מנהל — שויכה למנהל ${assignee}` : "נפתחה ע״י מנהל"; }
+	    else routeText = "נפתחה ע״י מנהל — נשארת לטיפולך";
+	    return {
       id, track, subject: subject.trim(), category: track === "transport" ? "transport" : category, categoryLabel: track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === category)?.label || ""), priority: pr, zone: track === "facility" ? facilityZone : zone,
       asset: track === "transport" ? (selectedFleet?.code || "") : asset.trim(),
       forkliftId: track === "transport" ? forkliftId : null, downtimeType: track === "transport" ? downtimeType : null,
-      wearType: null, downtimeStart: track === "transport" ? now : null, downtimeEnd: null, driverInvolved: track === "transport" ? driverInv.trim() : "", driverInvolvedId: track === "transport" ? driverInvId : "", incidentShift: track === "transport" ? incShift : "",
-      description: description.trim(), status: "new", assignee,
+      wearType: null, downtimeStart: track === "transport" ? (retroOn ? datetimeValueToMs(retro.downtimeStart, createdAt) : now) : null, downtimeEnd: track === "transport" && retroOn ? datetimeValueToMs(retro.downtimeEnd, status === "done" ? closedAt : null) : null, driverInvolved: track === "transport" ? driverInv.trim() : "", driverInvolvedId: track === "transport" ? driverInvId : "", incidentShift: track === "transport" ? incShift : "",
+      description: description.trim(), status, waitingReason: status === "waiting" ? retro.waitingReason : null, waitBall: status === "waiting" ? reasonBall(config, retro.waitingReason) : null, assignee,
       routedTech, mgrExec, supplier: routedSupplier || "",
       byAdmin: isAdmin || undefined, slaHoursOverride: (isAdmin && slaOn) ? Number(slaH) : undefined,
-      createdBy: { id: session.id, name: session.name, role: session.role, dept: session.dept, phone: session.phone || "", email: session.email || "" }, createdAt: now, updatedAt: now,
-      dueAt: now + hrs * 3600000, hasPhoto: !!photo, closure: null,
-      log: [{ at: now, by: session.name, byRole: session.role, text: routeText }],
+      createdBy: { id: session.id, name: session.name, role: session.role, dept: session.dept, phone: session.phone || "", email: session.email || "" }, createdAt, updatedAt,
+      dueAt, hasPhoto: !!photo, closure: status === "done" ? { costAmount: Number(retro.costAmount) || 0, costSupplier: retro.costSupplier || routedSupplier || "", costNote: retro.costNote.trim(), quality: retro.quality || "resolved", signedBy: session.name, signedAt: closedAt || updatedAt, recordedAt: now } : null,
+      statusSince: status === "done" || status === "cancelled" ? updatedAt : createdAt,
+      origin: retroOn ? "retro_manual" : undefined,
+      log: [{ at: createdAt, by: session.name, byRole: session.role, text: retroOn ? `${routeText} · פתיחה רטרואקטיבית` : routeText, kind: retroOn ? "history" : undefined }],
     };
   };
   const finalize = async (t) => {
@@ -9964,6 +9981,26 @@ function TicketForm(p) {
         })()}
         <label className="chk-line"><input type="checkbox" checked={slaOn} onChange={(e) => setSlaOn(e.target.checked)} /> הגדרת SLA ידני (שעות)</label>
         {slaOn && <label className="field"><input type="number" inputMode="numeric" value={slaH} onChange={(e) => setSlaH(e.target.value)} /></label>}
+        <details className="perm-fold admin-manual-fold">
+          <summary><span>פתיחה רטרואקטיבית</span><span className="perm-summary">{retro.on ? "פעיל" : "כבוי"}</span></summary>
+          <label className="chk-line"><input type="checkbox" checked={retro.on} onChange={(e) => setRetro((s) => ({ ...s, on: e.target.checked }))} /> הזנת קריאה היסטורית ידנית</label>
+          {retro.on && <>
+            <div className="manual-grid">
+              <label className="field"><span>נפתחה בפועל</span><input type="datetime-local" value={retro.createdAt} onChange={(e) => setRetro((s) => ({ ...s, createdAt: e.target.value }))} /></label>
+              <label className="field"><span>עודכנה / נסגרה בפועל</span><input type="datetime-local" value={retro.updatedAt} onChange={(e) => setRetro((s) => ({ ...s, updatedAt: e.target.value }))} /></label>
+              <label className="field"><span>יעד SLA</span><input type="datetime-local" value={retro.dueAt} onChange={(e) => setRetro((s) => ({ ...s, dueAt: e.target.value }))} /></label>
+              <label className="field"><span>סטטוס סופי</span><select value={retro.status} onChange={(e) => setRetro((s) => ({ ...s, status: e.target.value }))}>{STATUSES.filter((st) => st.id !== "pending_manager" && st.id !== "rework").map((st) => <option key={st.id} value={st.id}>{st.label}</option>)}</select></label>
+              {retro.status === "waiting" && <label className="field"><span>סיבת המתנה</span><select value={retro.waitingReason} onChange={(e) => setRetro((s) => ({ ...s, waitingReason: e.target.value }))}>{wReasons(config).map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></label>}
+              {track === "transport" && <label className="field"><span>תחילת השבתה</span><input type="datetime-local" value={retro.downtimeStart} onChange={(e) => setRetro((s) => ({ ...s, downtimeStart: e.target.value }))} /></label>}
+              {track === "transport" && <label className="field"><span>סיום השבתה</span><input type="datetime-local" value={retro.downtimeEnd} onChange={(e) => setRetro((s) => ({ ...s, downtimeEnd: e.target.value }))} /></label>}
+              {retro.status === "done" && <label className="field"><span>מועד חתימה / סגירה</span><input type="datetime-local" value={retro.closedAt} onChange={(e) => setRetro((s) => ({ ...s, closedAt: e.target.value }))} /></label>}
+              {retro.status === "done" && <label className="field"><span>עלות</span><input type="number" value={retro.costAmount} onChange={(e) => setRetro((s) => ({ ...s, costAmount: e.target.value }))} inputMode="decimal" /></label>}
+              {retro.status === "done" && <label className="field"><span>ספק בעלות</span><select value={retro.costSupplier} onChange={(e) => setRetro((s) => ({ ...s, costSupplier: e.target.value }))}><option value="">— ללא —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select></label>}
+              {retro.status === "done" && <label className="field wide"><span>הערת סגירה</span><input value={retro.costNote} onChange={(e) => setRetro((s) => ({ ...s, costNote: e.target.value }))} /></label>}
+            </div>
+            <div className="hint">מיועד לייבוא ידני של קריאות ישנות. פירוק זמן לפי שלבי טיפול אפשר לדייק אחר כך מתוך כרטיס הקריאה.</div>
+          </>}
+        </details>
       </div>}
       <div className="field"><span>תמונה (אופציונלי)</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handlePhoto(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> צירוף תמונה</button>}</div>
       {track === "facility" && BROWSER_AI_ENABLED && <><button className="ai-suggest" onClick={aiSuggest} disabled={aiBusy}>{aiBusy ? <><span className="spinner sm" /> מנתח…</> : <><Sparkles size={16} /> ניתוח חכם (AI) — לפי תיאור{photo ? " ותמונה" : ""}</>}</button>
@@ -10218,6 +10255,8 @@ function TicketDetail(p) {
         <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>
       </>)}
 
+      {role === "admin" && <AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} />}
+
       {mine && ticket.status === "new" && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} icon={null} label="ביטול הקריאה" onConfirm={cancelOwn} />}
 
       {role === "admin" && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} icon={<Trash2 size={15} />} label="מחיקת הקריאה לצמיתות" onConfirm={() => { onBack(); if (p.delTicket) p.delTicket(ticket.id); }} />}
@@ -10228,6 +10267,119 @@ function TicketDetail(p) {
     </div>
     {closing && <CloseModal ticket={ticket} config={config} session={session} onCancel={() => setClosing(false)} onClose={doClose} />}
   </div>);
+}
+
+function AdminTicketManualPanel({ ticket, config, session, fleet, onSave }) {
+  const durationLabels = {
+    new: "חדשה / ממתינה לקבלה",
+    in_progress: "בטיפול",
+    "waiting:parts": "המתנה לחלקים",
+    "waiting:supplier": "המתנה לספק",
+    "waiting:no_equipment": "המתנה לקבלת כלי",
+    "waiting:budget_approval": "המתנה לאישור תקציב",
+    pending_user: "אישור פותח",
+    pending_admin: "סגירת מנהל",
+    rework: "הוחזר לטיפול"
+  };
+  const initial = () => ({
+    subject: ticket.subject || "",
+    description: ticket.description || "",
+    status: ticket.status || "new",
+    waitingReason: ticket.waitingReason || "parts",
+    supplier: ticket.supplier || "",
+    assignee: ticket.assignee || "",
+    routedTech: !!ticket.routedTech,
+    mgrExec: !!ticket.mgrExec,
+    priority: ticket.priority || "medium",
+    category: ticket.category || "",
+    zone: ticket.zone || "",
+    asset: ticket.asset || "",
+    downtimeType: ticket.downtimeType || "",
+    createdAt: inputDateTime(ticket.createdAt),
+    updatedAt: inputDateTime(ticket.updatedAt),
+    dueAt: inputDateTime(ticket.dueAt),
+    statusSince: inputDateTime(ticket.statusSince),
+    downtimeStart: inputDateTime(ticket.downtimeStart),
+    downtimeEnd: inputDateTime(ticket.downtimeEnd),
+    closureSignedAt: inputDateTime(ticket.closure?.signedAt),
+    closureRecordedAt: inputDateTime(ticket.closure?.recordedAt),
+    costAmount: ticket.closure?.costAmount ?? "",
+    costSupplier: ticket.closure?.costSupplier || ticket.supplier || "",
+    costNote: ticket.closure?.costNote || "",
+    quality: ticket.closure?.quality || "resolved",
+    signedBy: ticket.closure?.signedBy || session.name || "",
+    historyText: "",
+    historyAt: "",
+    statusHours: statusMsToHours(ticket.statusMs || {})
+  });
+  const [form, setForm] = useState(initial);
+  const [err, setErr] = useState("");
+  useEffect(() => { setForm(initial()); setErr(""); }, [ticket.id]);
+  const set = (key, value) => setForm((s) => ({ ...s, [key]: value }));
+  const setHours = (key, value) => setForm((s) => ({ ...s, statusHours: { ...(s.statusHours || {}), [key]: value } }));
+  const track = trackOf(ticket);
+  const supplierOptions = Array.from(new Set([...(config.suppliers || []), ...supplierCandidatesForTicket(config, ticket, fleet), ticket.supplier].filter(Boolean)));
+  const save = () => {
+    if (!form.subject.trim()) return setErr("נושא הקריאה לא יכול להיות ריק");
+    const created = datetimeValueToMs(form.createdAt, null);
+    const updated = datetimeValueToMs(form.updatedAt, null);
+    if (!created || !updated) return setErr("חובה להזין מועד פתיחה ומועד עדכון");
+    if (updated < created) return setErr("מועד העדכון לא יכול להיות לפני מועד הפתיחה");
+    setErr("");
+    const next = applyAdminTicketManualEdit(ticket, form, { session });
+    onSave(next);
+  };
+
+  return <details className="perm-fold admin-ticket-manual">
+    <summary><span>עריכת מנהל מלאה</span><span className="perm-summary">מסלול · תאריכים · היסטוריה</span></summary>
+    <div className="manual-grid">
+      <label className="field wide"><span>נושא</span><input value={form.subject} onChange={(e) => set("subject", e.target.value)} /></label>
+      <label className="field wide"><span>תיאור</span><textarea rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} /></label>
+      <label className="field"><span>סטטוס</span><select value={form.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((st) => <option key={st.id} value={st.id}>{st.label}</option>)}</select></label>
+      {form.status === "waiting" && <label className="field"><span>סיבת המתנה</span><select value={form.waitingReason} onChange={(e) => set("waitingReason", e.target.value)}>{wReasons(config).map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></label>}
+      <label className="field"><span>עדיפות</span><select value={form.priority} onChange={(e) => set("priority", e.target.value)}>{PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
+      {track === "facility" && <label className="field"><span>קטגוריה</span><select value={form.category} onChange={(e) => { const cat = (config.categories || CATEGORIES).find((c) => c.id === e.target.value); setForm((s) => ({ ...s, category: e.target.value, categoryLabel: cat?.label || "" })); }}>{(config.categories || CATEGORIES).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>}
+      {track === "facility" && <label className="field"><span>אזור</span><select value={form.zone} onChange={(e) => set("zone", e.target.value)}>{(config.zones || []).map((z) => <option key={z}>{z}</option>)}</select></label>}
+      <label className="field"><span>ציוד / כלי</span><input value={form.asset} onChange={(e) => set("asset", e.target.value)} /></label>
+      <label className="field"><span>ספק / קבלן</span><select value={form.supplier} onChange={(e) => set("supplier", e.target.value)}><option value="">— ללא —</option>{supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+      <label className="field"><span>אחראי / מבצע</span><input value={form.assignee} onChange={(e) => set("assignee", e.target.value)} placeholder="שם טכנאי / מנהל" /></label>
+      <label className="chk-line"><input type="checkbox" checked={form.routedTech} onChange={(e) => set("routedTech", e.target.checked)} /> גלוי לטכנאי / ספק</label>
+      <label className="chk-line"><input type="checkbox" checked={form.mgrExec} onChange={(e) => set("mgrExec", e.target.checked)} /> טיפול מנהל מחלקה</label>
+      <label className="field"><span>נפתחה</span><input type="datetime-local" value={form.createdAt} onChange={(e) => set("createdAt", e.target.value)} /></label>
+      <label className="field"><span>עודכנה</span><input type="datetime-local" value={form.updatedAt} onChange={(e) => set("updatedAt", e.target.value)} /></label>
+      <label className="field"><span>יעד SLA</span><input type="datetime-local" value={form.dueAt} onChange={(e) => set("dueAt", e.target.value)} /></label>
+      <label className="field"><span>תחילת סטטוס נוכחי</span><input type="datetime-local" value={form.statusSince} onChange={(e) => set("statusSince", e.target.value)} /></label>
+      {track === "transport" && <label className="field"><span>מצב כלי</span><select value={form.downtimeType} onChange={(e) => set("downtimeType", e.target.value)}><option value="">— ללא —</option>{dtLevels(config).map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
+      {track === "transport" && <label className="field"><span>תחילת השבתה</span><input type="datetime-local" value={form.downtimeStart} onChange={(e) => set("downtimeStart", e.target.value)} /></label>}
+      {track === "transport" && <label className="field"><span>סיום השבתה</span><input type="datetime-local" value={form.downtimeEnd} onChange={(e) => set("downtimeEnd", e.target.value)} /></label>}
+    </div>
+    <div className="admin-manual-section">
+      <div className="ar-title"><History size={14} /> זמני שלבים ל-BI</div>
+      <div className="manual-duration-grid">{ADMIN_TICKET_DURATION_FIELDS.map((key) => <label key={key} className="field"><span>{durationLabels[key] || key}</span><input type="number" min="0" step="0.25" inputMode="decimal" value={form.statusHours?.[key] || ""} onChange={(e) => setHours(key, e.target.value)} placeholder="שעות" /></label>)}</div>
+      <div className="hint">ריק = לא נרשם זמן בשלב. הערכים האלה מזינים BI/אנליטיקה ולא מוחקים את היסטוריית הפעולות.</div>
+    </div>
+    <div className="admin-manual-section">
+      <div className="ar-title"><PenLine size={14} /> סגירה / עלות</div>
+      <div className="manual-grid">
+        <label className="field"><span>מועד חתימה</span><input type="datetime-local" value={form.closureSignedAt} onChange={(e) => set("closureSignedAt", e.target.value)} /></label>
+        <label className="field"><span>נרשם במערכת</span><input type="datetime-local" value={form.closureRecordedAt} onChange={(e) => set("closureRecordedAt", e.target.value)} /></label>
+        <label className="field"><span>עלות</span><input type="number" value={form.costAmount} onChange={(e) => set("costAmount", e.target.value)} inputMode="decimal" /></label>
+        <label className="field"><span>ספק עלות</span><select value={form.costSupplier} onChange={(e) => set("costSupplier", e.target.value)}><option value="">— ללא —</option>{supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+        <label className="field"><span>איכות סגירה</span><select value={form.quality} onChange={(e) => set("quality", e.target.value)}><option value="resolved">טופל לחלוטין</option><option value="temporary">פתרון זמני</option><option value="likely_repeat">עשוי לחזור</option><option value="purchase_needed">נדרשת רכש</option><option value="external_needed">נדרש קבלן חוץ</option></select></label>
+        <label className="field"><span>חתום ע״י</span><input value={form.signedBy} onChange={(e) => set("signedBy", e.target.value)} /></label>
+        <label className="field wide"><span>הערת סגירה</span><input value={form.costNote} onChange={(e) => set("costNote", e.target.value)} /></label>
+      </div>
+    </div>
+    <div className="admin-manual-section">
+      <div className="ar-title"><History size={14} /> הוספת פעולה היסטורית</div>
+      <div className="manual-grid">
+        <label className="field"><span>מועד הפעולה</span><input type="datetime-local" value={form.historyAt} onChange={(e) => set("historyAt", e.target.value)} /></label>
+        <label className="field wide"><span>תיאור הפעולה</span><input value={form.historyText} onChange={(e) => set("historyText", e.target.value)} placeholder="לדוגמה: הספק הגיע, הוזמן חלק, הכלי חזר לעבודה..." /></label>
+      </div>
+    </div>
+    {err && <div className="err">{err}</div>}
+    <button className="btn-primary full" style={{ marginTop: 12 }} onClick={save}><ShieldCheck size={16} /> שמירת עריכת מנהל</button>
+  </details>;
 }
 
 function CloseModal({ ticket, config, session, onCancel, onClose }) {
@@ -12211,6 +12363,17 @@ body *{visibility:hidden!important;}
 .stage-chip-meta{font-size:11px;color:var(--muted);white-space:nowrap;}
 .admin-route{background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:15px;}
 .ar-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;}
+.admin-manual-fold{margin-top:12px;}
+.admin-ticket-manual{margin-top:16px;}
+.manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;margin:10px 14px;}
+.manual-grid .field{margin:0;}
+.manual-grid .wide{grid-column:1/-1;}
+.manual-duration-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 14px;}
+.manual-duration-grid .field{margin:0;}
+.admin-manual-section{border-top:1px solid var(--line);padding-top:12px;margin-top:12px;}
+.admin-ticket-manual .chk-line,.admin-manual-fold .chk-line{margin:10px 14px;}
+.admin-ticket-manual .hint,.admin-manual-fold .hint{margin:0 14px 10px;}
+@media(max-width:720px){.manual-grid,.manual-duration-grid{grid-template-columns:1fr;}.manual-grid .wide{grid-column:auto;}}
 
 @media(min-width:980px){
   .desk-only{display:inline-flex!important;}.desk-hide{display:none;}

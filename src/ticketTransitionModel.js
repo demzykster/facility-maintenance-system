@@ -12,7 +12,17 @@ const transitionTime = (ticket, now) => {
 export function applyTicketStatusTiming(nextTicket, previousTicket, now = Date.now()) {
   let rec = { ...nextTicket };
   const at = transitionTime(rec, now);
+  const manualTimingOverride = rec.manualTimingOverride === true;
   delete rec.statusTransitionAt;
+  delete rec.manualTimingOverride;
+
+  if (manualTimingOverride) {
+    return {
+      ...rec,
+      statusMs: rec.statusMs || {},
+      statusSince: rec.statusSince || rec.updatedAt || rec.createdAt || at
+    };
+  }
 
   if (!previousTicket) {
     return {
