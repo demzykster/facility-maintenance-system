@@ -1,7 +1,7 @@
 import { aiAssistAuditEvent } from "../../src/auditEventModel.js";
 import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
-import { aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
+import { aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv } from "../../src/aiProviderModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
@@ -93,6 +93,7 @@ function providerPrompt({ draft, user, context, workflow }) {
       id: safeWorkflow,
       instruction: aiAssistWorkflowInstruction(safeWorkflow)
     },
+    roleGuidance: aiAssistRoleGuidance(user.role),
     actor: {
       role: user.role || "",
       department: user.department || user.dept || "",

@@ -230,6 +230,7 @@ describe("AI assist handler", () => {
       id: "sla_explanation",
       instruction: expect.stringContaining("SLA")
     });
+    expect(prompt.roleGuidance).toContain("department manager");
     expect(prompt.context.tickets.map((ticket) => ticket.id)).toEqual(["visible"]);
     expect(prompt.context.tickets[0]).not.toHaveProperty("cost");
     expect(JSON.stringify(prompt)).not.toContain("Hidden");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AI_ASSIST_WORKFLOWS, aiAssistWorkflowInstruction, aiAssistWorkflowLabel, normalizeAiAssistWorkflow } from "../src/aiAssistWorkflowModel.js";
+import { AI_ASSIST_WORKFLOWS, aiAssistRoleGuidance, aiAssistWorkflowInstruction, aiAssistWorkflowLabel, normalizeAiAssistWorkflow } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI assist workflow model", () => {
   it("normalizes unknown workflow ids to general", () => {
@@ -18,5 +18,14 @@ describe("AI assist workflow model", () => {
   it("has Hebrew labels for UI-oriented workflow names", () => {
     expect(aiAssistWorkflowLabel(AI_ASSIST_WORKFLOWS.nextActions)).toBe("מה לעשות עכשיו");
     expect(aiAssistWorkflowLabel("bad")).toBe("כללי");
+  });
+
+  it("provides role-specific guidance without granting write authority", () => {
+    expect(aiAssistRoleGuidance("admin")).toContain("system administrator");
+    expect(aiAssistRoleGuidance("executive")).toContain("business impact");
+    expect(aiAssistRoleGuidance("user")).toContain("department manager");
+    expect(aiAssistRoleGuidance("tech")).toContain("field-ready");
+    expect(aiAssistRoleGuidance("worker")).toContain("simple");
+    expect(aiAssistRoleGuidance("admin")).toContain("do not claim to change");
   });
 });
