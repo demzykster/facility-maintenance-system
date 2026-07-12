@@ -117,6 +117,7 @@ async function scanApp(page) {
       bottomNavVisible: [...document.querySelectorAll(".bottom-nav")].some(visible),
       smallControls: smallControls.slice(0, 20),
       biVisible: document.body.innerText.includes("BI") && document.body.innerText.includes("מה דורש תשומת לב עכשיו"),
+      heatmapVisible: document.body.innerText.includes("מפת חום קריאות"),
       oldDashboardVisible: document.body.innerText.includes("לוח בקרה"),
       oldAnalyticsVisible: document.body.innerText.includes("אנליטיקה"),
       text: document.body.innerText.slice(0, 240)
@@ -147,6 +148,7 @@ async function runViewport(browser, name, viewport) {
   if (!scan.sideNavVisible && !scan.topbarVisible && !scan.bottomNavVisible) throw new Error(`${name}_shell_missing`);
   if (scan.smallControls.length) throw new Error(`${name}_small_controls:${JSON.stringify(scan.smallControls.slice(0, 3))}`);
   if (!scan.biVisible) throw new Error(`${name}_bi_missing`);
+  if (!scan.heatmapVisible) throw new Error(`${name}_heatmap_missing`);
   if (scan.oldDashboardVisible || scan.oldAnalyticsVisible) throw new Error(`${name}_retired_nav_visible`);
   if (consoleMessages.length) throw new Error(`${name}_console:${consoleMessages.slice(0, 3).join(" | ")}`);
   if (failedResponses.length) throw new Error(`${name}_responses:${failedResponses.slice(0, 3).join(" | ")}`);

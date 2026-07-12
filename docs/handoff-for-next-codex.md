@@ -64,6 +64,7 @@ Recent commits on `main`:
   - Heatmap columns cover open tickets, SLA, critical transport downtime, waiting states, aging backlog, and tickets with no recent movement.
   - Cell clicks route into the existing filtered ticket list via `focus.heatmapMetric` and `focus.department`; no parallel BI-only action path was created.
   - This is also the first small monolith-reduction slice in this area: heatmap calculation and drill-down matching are model-level functions with tests, and the heatmap renderer is a small `src/BIHeatmapPanel.jsx` component while the monolithic app remains the surrounding shell.
+  - Demo and staging UI smokes now assert that the heatmap panel exists on desktop/mobile, so future BI changes should not silently remove it.
 - `Tighten BI notifications and runtime rendering`
   - Notification read-state remains personal per user, and the notification panel now hides read notifications by default. Read history is available through an explicit control, so "mark all as read" clears the active list instead of leaving the same old items visually hanging.
   - Follow-up notification storage is now server-backed for production sessions: `/api/session/profile` accepts the current user's `notificationReadState` and writes it into `app_users.notification_prefs.readState`. The app still keeps localStorage as a fallback, but production read-state can now survive across devices, including CMMS PIN sessions.

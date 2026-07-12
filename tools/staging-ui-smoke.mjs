@@ -103,6 +103,17 @@ async function assertMobileNotificationSheet(page) {
   await page.keyboard.press("Escape").catch(() => {});
 }
 
+async function assertBIHeatmap(page, label) {
+  const panel = page.locator(".bi-heatmap-panel").first();
+  await panel.waitFor({ state: "visible", timeout: 10000 });
+  const text = await panel.innerText();
+  if (!text.includes("מפת חום קריאות")) throw new Error(`${label}_heatmap_title_missing`);
+  if (!text.includes("לכל הפתוחות")) throw new Error(`${label}_heatmap_open_all_missing`);
+  const hasGrid = await panel.locator(".bi-heatmap").count();
+  const hasEmpty = text.includes("אין כרגע קריאות פתוחות");
+  if (!hasGrid && !hasEmpty) throw new Error(`${label}_heatmap_content_missing`);
+}
+
 async function waitForAnyVisible(page, selectors, timeout = 15000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -142,6 +153,7 @@ async function desktopSmoke(browser, credentials, expectedCommit) {
   const firstScreen = await page.locator("body").innerText();
   if (!firstScreen.includes("BI")) throw new Error("desktop_bi_missing");
   if (firstScreen.includes("התאמת לוח")) throw new Error("desktop_retired_dashboard_customize_visible");
+  await assertBIHeatmap(page, "desktop");
 
   const modules = [];
   for (const label of DESKTOP_MODULES) {
@@ -190,6 +202,7 @@ async function mobileSmoke(browser, credentials) {
   if (bottomItems.length < 4) throw new Error("mobile_bottom_nav_too_short");
   if (bottomItems.length > 4 && (!String(bottomNav.className).includes("nav-scroll") || bottomNav.scrollWidth <= bottomNav.clientWidth)) throw new Error("mobile_bottom_nav_not_scrollable");
   if (Math.abs(overflow) > 2) throw new Error(`mobile_overflow:${overflow}`);
+  await assertBIHeatmap(page, "mobile");
 
   await assertMobileNotificationSheet(page);
 
