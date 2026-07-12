@@ -7149,6 +7149,7 @@ function PpeHub(p) {
 
 function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe, onGoTasks }) {
   const [periodId, setPeriodId] = useState("now");
+  const [expandedCommandDomain, setExpandedCommandDomain] = useState("");
   const period = biPeriodRange(periodId);
   const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings }), [session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings]);
   const isAdminBI = session?.role === "admin";
@@ -7289,6 +7290,21 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const commandDomainCounts = commandItems.reduce((acc, item) => ({ ...acc, [item.domain]: (acc[item.domain] || 0) + 1 }), {});
   const firstByDomain = Object.keys(commandDomainCounts).map((domain) => commandItems.find((item) => item.domain === domain)).filter(Boolean);
   const commandQueue = [...firstByDomain, ...commandItems.filter((item) => !firstByDomain.some((first) => first.key === item.key))].slice(0, 8);
+  const commandDomainMeta = {
+    "מבנה": { Icon: Building2, color: "#1F4E8C" },
+    "שינוע": { Icon: Truck, color: "#B45309" },
+    "ניקיון": { Icon: Sparkles, color: "#0D9488" },
+    "ביגוד": { Icon: Shirt, color: "#475569" },
+    "PM": { Icon: CalendarClock, color: "#B45309" },
+    "מסמכים": { Icon: FileText, color: "#64748B" }
+  };
+  const commandDomainGroups = Object.entries(commandDomainCounts).map(([domain, count]) => ({
+    domain,
+    count,
+    items: commandItems.filter((item) => item.domain === domain),
+    ...(commandDomainMeta[domain] || { Icon: ClipboardList, color: "var(--primary)" })
+  }));
+  const activeCommandDomain = commandDomainGroups.some((group) => group.domain === expandedCommandDomain) ? expandedCommandDomain : expandedCommandDomain === "__none" ? "" : commandDomainGroups[0]?.domain;
   const scopeTitle = scope.kind === "company" ? "תמונת חברה" : scope.departments.length ? `מחלקות: ${scope.departments.join(", ")}` : "לא הוגדר scope";
   const openTasks = scope.tasks.filter(taskOpen);
   const overdueTasks = openTasks.filter(taskOverdue);
@@ -7382,12 +7398,26 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     <div className="bi-grid">
       {isAdminBI && <section className="panel bi-panel bi-command-panel">
         <div className="bi-panel-head"><div><b>דורש החלטה עכשיו</b><span>{commandQueue.length ? `${commandQueue.length} פריטים ראשונים מכל המודולים` : "אין כרגע פריטים דחופים"}</span></div></div>
-        {Object.keys(commandDomainCounts).length > 1 && <div className="bi-command-domains">{Object.entries(commandDomainCounts).map(([domain, count]) => <span key={domain}>{domain}<b>{count}</b></span>)}</div>}
-        {commandQueue.length ? commandQueue.map((item) => <button key={item.key} className="bi-attn-row" onClick={item.action || undefined} disabled={!item.action}>
-          <span className="bi-dot" style={{ background: item.color }} />
-          <span><span className="bi-command-meta"><em>{item.domain}</em>{item.actionLabel && <small>{item.actionLabel}</small>}</span><b>{item.title}</b><small>{item.sub}</small>{item.nextStep && <small className="bi-command-next">המשך: {item.nextStep}</small>}</span>
-          {item.action && <ChevronLeft size={15} />}
-        </button>) : <div className="note">אין כרגע החלטות דחופות. המשיכו לעקוב אחרי המדדים והמודולים.</div>}
+        {commandDomainGroups.length ? <div className="bi-command-stack">
+          <div className="bi-command-domains">
+            {commandDomainGroups.map(({ domain, count, Icon, color }) => {
+              const open = activeCommandDomain === domain;
+              return <button key={domain} type="button" className={"bi-command-domain" + (open ? " on" : "")} aria-expanded={open} onClick={() => setExpandedCommandDomain(open ? "__none" : domain)}>
+                <span className="bi-command-domain-icon" style={{ color }}><Icon size={18} /></span>
+                <span className="bi-command-domain-text"><span>{domain}</span><small>{count} לטיפול</small></span>
+                <span className="bi-command-domain-count">{count}</span>
+                <ChevronLeft size={15} className="bi-command-domain-chev" />
+              </button>;
+            })}
+          </div>
+          {commandDomainGroups.map((group) => activeCommandDomain === group.domain ? <div key={group.domain} className="bi-command-list" aria-label={`פריטי ${group.domain}`}>
+            {group.items.map((item) => <button key={item.key} className="bi-attn-row" onClick={item.action || undefined} disabled={!item.action}>
+              <span className="bi-dot" style={{ background: item.color }} />
+              <span><span className="bi-command-meta">{item.actionLabel && <small>{item.actionLabel}</small>}</span><b>{item.title}</b><small>{item.sub}</small>{item.nextStep && <small className="bi-command-next">המשך: {item.nextStep}</small>}</span>
+              {item.action && <ChevronLeft size={15} />}
+            </button>)}
+          </div> : null)}
+        </div> : <div className="note">אין כרגע החלטות דחופות. המשיכו לעקוב אחרי המדדים והמודולים.</div>}
       </section>}
 
       <section className="panel bi-panel">
@@ -11225,37 +11255,48 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .kpi-lbl{color:var(--muted);font-size:12.5px;margin-top:5px;}
 .bi-shell{display:flex;flex-direction:column;gap:14px;}
 .bi-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--control-shadow);}
-.bi-hero h2{font-family:var(--font-head);font-size:22px;font-weight:650;line-height:1.18;margin:4px 0 5px;letter-spacing:0;}
+.bi-hero h2{font-family:var(--font-head);font-size:22px;font-weight:500;line-height:1.18;margin:4px 0 5px;letter-spacing:0;}
 .bi-hero p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55;}
-.bi-kicker{font-size:12px;font-weight:650;color:var(--primary);}
-.bi-period{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);padding:8px 12px;font-size:12px;font-weight:700;color:var(--muted);}
+.bi-kicker{font-size:12px;font-weight:500;color:var(--primary);}
+.bi-period{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);padding:8px 12px;font-size:12px;font-weight:500;color:var(--muted);}
 .bi-period-switch{flex:0 0 auto;display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);padding:4px;box-shadow:inset 0 1px 2px rgba(15,23,42,.04);}
-.bi-period-switch button{min-height:44px;border-radius:999px;padding:9px 12px;color:var(--muted);font-size:12px;font-weight:650;white-space:nowrap;}
+.bi-period-switch button{min-height:44px;border-radius:999px;padding:9px 12px;color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap;}
 .bi-period-switch button:hover{color:var(--ink);background:rgba(255,255,255,.58);}
 .bi-period-switch button.on{background:var(--surface);color:var(--primary);box-shadow:var(--control-shadow);}
 .bi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .bi-kpis{grid-template-columns:repeat(5,minmax(0,1fr));}
-.bi-kpis .kpi-num{font-weight:650;}
+.bi-kpis .kpi-num{font-weight:500;}
 .bi-command-panel{grid-column:1/-1;}
 .bi-panel{min-width:0;}
 .bi-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.bi-panel-head b{display:block;font-size:14px;font-weight:650;}
+.bi-panel-head b{display:block;font-size:14px;font-weight:500;}
 .bi-panel-head span{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
-.bi-command-domains{display:flex;flex-wrap:wrap;gap:6px;margin:-3px 0 10px;}
-.bi-command-domains span{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:3px 8px;color:var(--muted);font-size:11px;font-weight:600;}
-.bi-command-domains b{color:var(--primary);font-weight:700;}
+.bi-shell b{font-weight:500;}
+.bi-command-stack{display:flex;flex-direction:column;gap:12px;}
+.bi-command-domains{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:9px;margin:-2px 0 0;}
+.bi-command-domain{min-height:64px;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:10px;text-align:start;border:1px solid var(--line);background:var(--surface-2);border-radius:13px;padding:10px 12px;color:var(--ink);box-shadow:var(--control-shadow);transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),box-shadow 160ms var(--ease-out),transform 160ms var(--ease-out);}
+.bi-command-domain:hover{border-color:rgba(31,78,140,.24);background:var(--surface);}
+.bi-command-domain.on{border-color:rgba(31,78,140,.42);background:var(--surface);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 10px 22px rgba(31,78,140,.08);}
+.bi-command-domain-icon{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(201,205,209,.8);background:var(--surface);border-radius:10px;}
+.bi-command-domain-text{min-width:0;display:flex;flex-direction:column;gap:2px;}
+.bi-command-domain-text span{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bi-command-domain-text small{font-size:11.5px;color:var(--muted);}
+.bi-command-domain-count{min-width:30px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;}
+.bi-command-domain-chev{color:var(--muted);transition:transform 160ms var(--ease-out);}
+.bi-command-domain.on .bi-command-domain-chev{transform:rotate(-90deg);color:var(--primary);}
+.bi-command-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;}
 .bi-attn-row{width:100%;min-height:54px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:start;border:1px solid var(--line);background:var(--surface-glow);border-radius:12px;padding:9px 10px;margin-bottom:8px;box-shadow:var(--control-shadow);}
 .bi-attn-row:disabled{cursor:default;opacity:.72;}
-.bi-attn-row b,.bi-doc-row b{display:block;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bi-command-list .bi-attn-row{margin-bottom:0;}
+.bi-attn-row b,.bi-doc-row b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bi-attn-row small,.bi-doc-row span{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
 .bi-command-meta{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
-.bi-command-meta em{font-style:normal;font-size:11px;font-weight:650;color:var(--primary);background:rgba(31,78,140,.08);border:1px solid rgba(31,78,140,.14);border-radius:999px;padding:2px 7px;line-height:1.4;}
 .bi-command-meta small{margin:0;font-size:11px;color:var(--muted);}
-.bi-command-next{color:var(--ink)!important;font-weight:600;}
+.bi-command-next{color:var(--ink)!important;font-weight:500;}
 .bi-dot{width:10px;height:10px;border-radius:999px;}
 .bi-mini-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
 .bi-mini-stats span{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px;text-align:center;}
-.bi-mini-stats b{display:block;font-family:var(--font-head);font-size:19px;font-weight:650;color:var(--primary);}
+.bi-mini-stats b{display:block;font-family:var(--font-head);font-size:19px;font-weight:500;color:var(--primary);}
 .bi-mini-stats small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
 .bi-finance-stats{margin:10px 0;}
 .bi-doc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:9px;margin-top:9px;}
@@ -11263,13 +11304,13 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-doc-action:hover{color:var(--primary);}
 .bi-risk-row{width:100%;min-height:48px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;text-align:start;border:1px solid var(--line);background:var(--surface-glow);border-radius:12px;padding:8px 10px;margin-bottom:8px;box-shadow:var(--control-shadow);}
 .bi-risk-row:disabled{cursor:default;opacity:.76;}
-.bi-risk-row b{display:block;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bi-risk-row b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bi-risk-row small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px;}
 .bi-risk-tags{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;}
-.bi-risk-tags em{font-style:normal;border:1px solid rgba(201,205,209,.9);background:var(--surface-2);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:11px;font-weight:650;line-height:1.45;}
-.bi-subtitle{margin:2px 0 6px;color:var(--muted);font-size:11.5px;font-weight:650;}
+.bi-risk-tags em{font-style:normal;border:1px solid rgba(201,205,209,.9);background:var(--surface-2);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:11px;font-weight:500;line-height:1.45;}
+.bi-subtitle{margin:2px 0 6px;color:var(--muted);font-size:11.5px;font-weight:500;}
 .bi-subdivider{height:1px;background:var(--line);margin:10px 0;}
-.bi-panel .big-stat{font-weight:650;}
+.bi-panel .big-stat{font-weight:500;}
 .bi-filter-note{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
 .ppe-dash-flow{display:flex;flex-direction:column;gap:22px;}
 .ppe-dash-section{min-width:0;}
