@@ -8,6 +8,7 @@ import {
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon,
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
+import { AISettingsCard } from "./AISettingsCard.jsx";
 import { BIHeatmapPanel } from "./BIHeatmapPanel.jsx";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
@@ -29,7 +30,7 @@ import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionM
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { AI_MODES, AI_PROVIDER_LABELS, AI_PROVIDER_OPTIONS, DEFAULT_AI_MODELS, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
+import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
 import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
@@ -9928,12 +9929,6 @@ function SettingsPanel(p) {
   const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["task", "מטלות ופגישות"], ["doc", "מסמכים ובקרת כלים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"], ["driver", "נהגים ושיבוצים"], ["ppe", "ביגוד עובדים"], ["cleaning", "ניקיון וסבבים"]];
   const WAIT_BALL_OPTIONS = [["executor", "המבצע"], ["manager", "מנהל המחלקה"], ["admin", "מנהל מערכת"]];
   const WAIT_SETTER_OPTIONS = [["both", "טכנאי + מנהל"], ["tech", "טכנאי בלבד"], ["manager", "מנהל בלבד"]];
-  const aiProviderOptions = Array.isArray(aiStatus?.supportedProviderOptions) && aiStatus.supportedProviderOptions.length
-    ? aiStatus.supportedProviderOptions
-    : AI_PROVIDER_OPTIONS;
-  const aiStatusProviderLabel = AI_PROVIDER_LABELS[aiStatus?.provider] || aiStatus?.provider || "";
-  const aiStatusText = aiStatusBusy ? "בודק חיבור…" : (aiStatus?.serverReady ? "שרת AI מוכן" : "שרת AI לא פעיל");
-  const aiStatusErrors = (aiStatus?.errors || []).filter(Boolean).join(" · ");
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
   // редактор справочника с защитой от рассинхрона: используемые элементы заблокированы для правки/удаления
   const regEditor = (rows, setRows, usage, addLabel, oneLabel) => (<>
@@ -9976,24 +9971,7 @@ function SettingsPanel(p) {
       <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => { setCoName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: חברה לדוגמה בע״מ" /></label>
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => { setSiteName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
-      {mayFullSettings && <>
-      <SectionTitle><Sparkles size={15} /> חיבור AI</SectionTitle>
-      <div className="settings-table-card" style={{ display: "grid", gap: 12, padding: 14, marginBottom: 14 }}>
-        <div className="row-between" style={{ gap: 12, alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontWeight: 800, color: "var(--text)" }}>{aiStatusText}</div>
-            <div className="hint">הבחירה כאן שומרת רק מצב, ספק ומודל. מפתחות API נשארים רק בשרת / Vercel env ולא נשמרים בדפדפן.</div>
-          </div>
-          <span className={"badge sm " + (aiStatus?.serverReady ? "ok" : "warn")}>{aiStatus?.serverReady ? "מוכן" : "כבוי"}</span>
-        </div>
-        <div className="grid2">
-          <label className="field"><span>מצב</span><select value={aiCfg.mode} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, mode: e.target.value }))}><option value="disabled">כבוי</option><option value="server">שרת בלבד</option></select></label>
-          <label className="field"><span>ספק</span><select value={aiCfg.provider} onChange={(e) => { const provider = e.target.value; setAiCfg((s) => normalizeAiSettings({ ...s, provider, model: DEFAULT_AI_MODELS[provider] || "" })); }}><option value="">בחר ספק</option>{aiProviderOptions.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
-        </div>
-        <label className="field"><span>מודל</span><input value={aiCfg.model} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, model: e.target.value }))} placeholder={aiCfg.provider ? DEFAULT_AI_MODELS[aiCfg.provider] : "בחרו ספק כדי לקבל ברירת מחדל"} /></label>
-        <div className="hint">{aiStatusProviderLabel ? `שרת: ${aiStatusProviderLabel} · ${aiStatus.model || "ללא מודל"} · מפתח ${aiStatus.providerKeyConfigured ? "מוגדר" : "חסר"}` : "השרת ידווח כאן אם הוגדר ספק ומפתח."}{aiStatusErrors ? ` · ${aiStatusErrors}` : ""}</div>
-      </div>
-      </>}
+      {mayFullSettings && <AISettingsCard aiCfg={aiCfg} setAiCfg={setAiCfg} aiStatus={aiStatus} aiStatusBusy={aiStatusBusy} />}
       <SectionTitle>סיבות המתנה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>סיבה נבחרת כאשר קריאה נעצרת באמצע טיפול. ההגדרה קובעת אצל מי האחריות להמשך, מי רשאי לבחור את הסיבה, והאם זמן ההמתנה נחשב ב-SLA התפעולי. בכל מקרה הזמן נשמר בהיסטוריה, בדוחות ובאנליטיקה.</div>
       <div className="settings-table-card wait-reasons-card">
