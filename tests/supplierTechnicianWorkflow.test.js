@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("../src/ClaudeMaintenanceApp.jsx", import.meta.url), "utf8");
+const ticketVisibilitySource = readFileSync(new URL("../src/ticketVisibilityModel.js", import.meta.url), "utf8");
 
 describe("supplier technician workflow wiring", () => {
   it("keeps technicians connected to supplier cards", () => {
@@ -31,12 +32,8 @@ describe("supplier technician workflow wiring", () => {
   });
 
   it("keeps transport tickets visible to technicians from the linked fleet supplier", () => {
-    const start = source.indexOf("const visibleTickets = (session, tickets, fleet) =>");
-    const end = source.indexOf("function entryFor(", start);
-    const visibleTicketsSource = source.slice(start, end);
-
-    expect(visibleTicketsSource).toContain("session.supplier");
-    expect(visibleTicketsSource).toContain("f.supplier !== session.supplier");
+    expect(ticketVisibilitySource).toContain("session.supplier");
+    expect(ticketVisibilitySource).toContain("unit.supplier !== session.supplier");
   });
 
   it("routes ticket assignment through suppliers instead of direct technician picks", () => {

@@ -83,6 +83,7 @@ import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, pres
 import { priorityToken, statusTokenTone, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
+import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibleTicketsForSession } from "./ticketVisibilityModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
@@ -706,10 +707,10 @@ const openReport = (html) => {
   return false;
 };
 const tkLetter = (t) => ((t?.track === "transport") || (!t?.track && t?.forkliftId)) ? "T" : "F";
-const fleetDepts = (f) => (f?.depts && f.depts.length ? f.depts : (f?.dept ? [f.dept] : []));
+const fleetDepts = ticketFleetDepartments;
 const fleetDeptOf = (t, fleet) => { const f = (fleet || []).find((x) => x.id === t.forkliftId); return fleetDepts(f).join(", "); };
 const fleetInDept = (f, dept) => fleetDepts(f).includes(dept);
-const userDepts = (u) => (u && u.depts && u.depts.length) ? u.depts : (u && u.dept ? [u.dept] : []);
+const userDepts = ticketUserDepartments;
 const ticketNo = (t) => (t && t.num) ? `${tkLetter(t)}-${String(t.num).padStart(3, "0")}` : (t ? `${tkLetter(t)}-${String(t.id || "").slice(-4).toUpperCase()}` : "—");
 const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -1288,55 +1289,11 @@ const docDaysLabel = (days) => days == null ? "—" : days < 0 ? "פג תוקף"
 
 // Владелец заявки = тот, кто её открыл. Сверяем по id (имя ненадёжно при совпадениях).
 // На будущее: сюда же добавится логика «подчинённых менеджера», когда понадобится.
-const ownsTicket = (session, t) => (t.createdBy?.id ? t.createdBy.id === session.id : t.createdBy?.name === session.name);
+const ownsTicket = ownsTicketRecord;
 // Заявка-обращение от работника (нижний канал). reportedBy остаётся на всю жизнь заявки — для «моих обращений» работника и для статистики.
 const isWorkerReport = (t) => !!t.reportedBy;
 
-const visibleTickets = (session, tickets, fleet) => {
-  if (session.role === "admin") return tickets;
-  // Работник видит ТОЛЬКО свои обращения (любой статус)
-  if (session.role === "worker") return tickets.filter((t) => t.reportedBy && t.reportedBy.id === session.id);
-  const trackOf = (t) => t.track || (t.forkliftId ? "transport" : "facility");
-  if (session.role === "tech") {
-    const scope = session.techScope || "transport";
-    const cats = session.techCats || [];
-    return tickets.filter((t) => {
-      const track = trackOf(t);
-      const mineOrFree = t.assignee === session.name || !t.assignee;
-      if (scope === "transport") {
-        if (track !== "transport") return false;
-        if (!mineOrFree) return false;
-        if (session.supplier) {
-          if (t.supplier) return t.supplier === session.supplier;
-          if (t.forkliftId) { const f = (fleet || []).find((x) => x.id === t.forkliftId); if (f && f.supplier && f.supplier !== session.supplier) return false; }
-        }
-        return true;
-      }
-      // טכנאי מבנה: רק קריאות מבנה בקטגוריות שלו — שמשויכות אליו או חופשיות במאגר (routedTech)
-      if (track !== "facility") return false;
-      if (session.supplier && t.supplier !== session.supplier) return false;
-      if (!session.supplier && t.supplier) return false;
-      if (cats.length && t.category && !cats.includes(t.category)) return false;
-      if (t.assignee) return t.assignee === session.name;
-      return !!t.routedTech;
-    });
-  }
-  // מנהל מחלקה: כל מה שקשור למחלקות שלו — דיווחי עובדיו (לאורך כל חיי הקריאה), קריאות שהוא/מחלקתו פתחו, ומה ששויך אליו או לכלי המחלקה
-  const mDepts = userDepts(session);
-  return tickets.filter((t) => {
-    if (!mDepts.length) return true; // מנהל ללא מחלקה (ברירת מחדל) — ללא הגבלה
-    if (t.reportedBy?.dept && mDepts.includes(t.reportedBy.dept)) return true;   // עובד מאחת ממחלקותיו דיווח — בכל סטטוס
-    if (t.createdBy?.dept && mDepts.includes(t.createdBy.dept)) return true;     // הוא או מחלקתו פתחו
-    if (ownsTicket(session, t)) return true;                // הוא פתח (לפי מזהה)
-    if (t.assignee === session.name) return true;           // משויכת אליו לטיפול
-    if (trackOf(t) === "transport") {                        // קריאת שינוע על כלי של אחת ממחלקותיו
-      const f = (fleet || []).find((x) => x.id === t.forkliftId);
-      const fdepts = f ? (f.depts || (f.dept ? [f.dept] : [])) : [];
-      if (fdepts.some((d) => mDepts.includes(d))) return true;
-    }
-    return false;
-  });
-};
+const visibleTickets = visibleTicketsForSession;
 
 function entryFor(session, text, kind) { return { at: Date.now(), by: session.name, byRole: session.role, text, ...(kind ? { kind } : {}) }; }
 
@@ -9502,6 +9459,7 @@ function SettingsPanel(p) {
         for (const f of (fleet || [])) if (f.zone === o && await saveFleet({ ...f, zone: n }) === false) throw new Error("save_failed");
         for (const t of (tickets || [])) if (t.zone === o && await saveTicket({ ...t, zone: n }) === false) throw new Error("save_failed");
         for (const z of (cleaningZones || [])) if (cleaningAreaName(z) === o && await saveZone({ ...z, areaName: n, building: n }) === false) throw new Error("save_failed");
+        for (const u of (users || [])) if (Array.isArray(u.mgrZones) && u.mgrZones.includes(o) && await saveUser({ ...u, mgrZones: u.mgrZones.map((item) => item === o ? n : item) }) === false) throw new Error("save_failed");
       }
       if (await saveConfig({ ...config, categories: list.map((c) => ({ id: c.id, label: c.label.trim() })), catSla: list.reduce((a, c) => ((a[c.id] = SLA3(c)), a), {}), zones: cleanRegistry(zones) }) === false) throw new Error("save_failed");
       setZones((s) => s.map((r) => ({ ...r, _orig: r.name.trim() })));
@@ -9705,6 +9663,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
   const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const [loginResetRequested, setLoginResetRequested] = useState(false);
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
+  const toggleMgrZone = (zoneName) => setMgrZones((s) => s.includes(zoneName) ? s.filter((x) => x !== zoneName) : [...s, zoneName]);
   const setPerm = (mod, level) => setPerms((s) => ({ ...s, [mod]: level }));
   const roleUsesLogin = isActivationLinkRole(role);
   const roleUsesPin = isPinActivationRole(role);
@@ -9809,6 +9768,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       {role === "user" && (lockDept
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
+          <div className="field" style={{ marginTop: 12 }}><span>אזורי אחריות לאחזקה</span><div className="chk-grid">{(config.zones || []).map((z) => <label key={z} className={"chk-pill" + (mgrZones.includes(z) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z)} onChange={() => toggleMgrZone(z)} /> {z}</label>)}</div><div className="hint">קריאות מבנה באזור שנבחר יהיו משותפות לכל המנהלים שאחראים לאותו אזור.</div></div>
           <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
         </div>)}
       {role === "worker" && (lockDept
@@ -9886,6 +9846,10 @@ function TicketForm(p) {
   const [dupeReview, setDupeReview] = useState(null), [pendingT, setPendingT] = useState(null);
   const [photo, setPhoto] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [aiBusy, setAiBusy] = useState(false), [aiNote, setAiNote] = useState("");
   const busyRef = useRef(false), fileRef = useRef(null);
+  const configuredMaintZones = (config.zones && config.zones.length) ? config.zones : ["כללי"];
+  const managerMaintZones = session.role === "user" ? (session.mgrZones || []).filter((z) => configuredMaintZones.includes(z)) : [];
+  const facilityZoneOptions = managerMaintZones.length ? managerMaintZones : configuredMaintZones;
+  const facilityZone = facilityZoneOptions.includes(zone) ? zone : (facilityZoneOptions[0] || zone);
   const handlePhoto = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const aiSuggest = async () => {
     const text = `${subject}\n${description}`.trim(); if (!text && !photo) { setErr("כתבו נושא/תיאור או צרפו תמונה"); return; }
@@ -9925,7 +9889,7 @@ function TicketForm(p) {
     else if (assignTo.startsWith("mgr:")) { const u = (users || []).find((x) => x.id === assignTo.slice(4)); assignee = u?.name || ""; mgrExec = assignee ? true : undefined; routeText = assignee ? `נפתחה ע״י מנהל — שויכה למנהל ${assignee}` : "נפתחה ע״י מנהל"; }
     else routeText = "נפתחה ע״י מנהל — נשארת לטיפולך";
     return {
-      id, track, subject: subject.trim(), category: track === "transport" ? "transport" : category, categoryLabel: track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === category)?.label || ""), priority: pr, zone,
+      id, track, subject: subject.trim(), category: track === "transport" ? "transport" : category, categoryLabel: track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === category)?.label || ""), priority: pr, zone: track === "facility" ? facilityZone : zone,
       asset: track === "transport" ? (selectedFleet?.code || "") : asset.trim(),
       forkliftId: track === "transport" ? forkliftId : null, downtimeType: track === "transport" ? downtimeType : null,
       wearType: null, downtimeStart: track === "transport" ? now : null, downtimeEnd: null, driverInvolved: track === "transport" ? driverInv.trim() : "", driverInvolvedId: track === "transport" ? driverInvId : "", incidentShift: track === "transport" ? incShift : "",
@@ -9979,7 +9943,7 @@ function TicketForm(p) {
       </>) : (<>
         <div className="field"><span>קטגוריה *</span><div className="cat-grid">{(config.categories || CATEGORIES).map((c) => { const m = catMeta(c.id); return <button key={c.id} className={"cat-pick" + (category === c.id ? " on" : "")} onClick={() => setCategory(c.id)} style={category === c.id ? { borderColor: m.color, background: m.color + "1f" } : {}}><m.Icon size={19} color={m.color} /><span>{c.label}</span></button>; })}</div></div>
         <div className="field"><span>עדיפות *</span><div className="pr-row">{PRIORITIES.map((x) => <button key={x.id} className={"pr-pick" + (priority === x.id ? " on" : "")} onClick={() => setPriority(x.id)} style={priority === x.id ? { background: x.color, color: "#fff", borderColor: x.color } : {}}>{x.label}</button>)}</div></div>
-        <label className="field"><span>אזור</span><select value={zone} onChange={(e) => setZone(e.target.value)}>{config.zones.map((z) => <option key={z}>{z}</option>)}</select></label>
+        <label className="field"><span>אזור</span><select value={facilityZone} onChange={(e) => setZone(e.target.value)}>{facilityZoneOptions.map((z) => <option key={z}>{z}</option>)}</select>{managerMaintZones.length > 0 && <div className="hint">מוצגים רק אזורי האחריות שלך.</div>}</label>
         <label className="field"><span>ציוד (אופציונלי)</span><input value={asset} onChange={(e) => setAsset(e.target.value)} /></label>
       </>)}
       <label className="field"><span>תיאור התקלה *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
