@@ -9,13 +9,15 @@ export const BI_PERIOD_OPTIONS = Object.freeze([
 ]);
 
 export const BI_HEATMAP_COLUMNS = Object.freeze([
-  { key: "open", label: "פתוחות", weight: 1 },
-  { key: "sla", label: "SLA", weight: 5 },
-  { key: "critical", label: "השבתה", weight: 5 },
-  { key: "waiting", label: "ממתין", weight: 3 },
-  { key: "aging", label: "מעל שבוע", weight: 2 },
-  { key: "idle", label: "ללא תנועה", weight: 3 }
+  { key: "open", label: "פתוחות", weight: 1, priority: 1 },
+  { key: "sla", label: "SLA", weight: 5, priority: 5 },
+  { key: "critical", label: "השבתה", weight: 5, priority: 6 },
+  { key: "waiting", label: "ממתין", weight: 3, priority: 4 },
+  { key: "aging", label: "מעל שבוע", weight: 2, priority: 2 },
+  { key: "idle", label: "ללא תנועה", weight: 3, priority: 3 }
 ]);
+
+const HEATMAP_BASE_METRIC = "open";
 
 export const normalizeBiPeriod = (value) =>
   BI_PERIOD_OPTIONS.some((option) => option.id === String(value || "")) ? String(value || "") : "now";
@@ -295,15 +297,29 @@ export function biTicketHeatmapRows(data = {}, options = {}) {
   });
   return [...rows.values()]
     .filter((row) => row.total > 0)
-    .map((row) => ({
-      ...row,
-      cells: columns.map((column) => ({
+    .map((row) => {
+      const cells = columns.map((column) => ({
         key: column.key,
         label: column.label,
         value: row.values[column.key] || 0,
-        weight: column.weight || 1
-      }))
-    }))
+        weight: column.weight || 1,
+        priority: column.priority || column.weight || 1,
+        score: (row.values[column.key] || 0) * (column.weight || 1)
+      }));
+      const riskCells = cells
+        .filter((cell) => cell.key !== HEATMAP_BASE_METRIC && cell.value > 0)
+        .sort((a, b) => b.score - a.score || b.priority - a.priority || b.value - a.value || a.label.localeCompare(b.label, "he"));
+      return {
+        ...row,
+        cells,
+        primaryRisk: riskCells[0] || null,
+        riskTags: riskCells.slice(0, 3).map((cell) => ({
+          key: cell.key,
+          label: cell.label,
+          value: cell.value
+        }))
+      };
+    })
     .sort((a, b) => b.score - a.score || b.total - a.total || a.name.localeCompare(b.name, "he"))
     .slice(0, maxRows);
 }

@@ -232,12 +232,22 @@ describe("BI scope model", () => {
       idle: 1,
       critical: 0
     });
+    expect(rows.find((row) => row.name === "A").primaryRisk).toMatchObject({
+      key: "waiting",
+      label: "ממתין",
+      value: 1
+    });
+    expect(rows.find((row) => row.name === "A").riskTags.map((tag) => tag.key)).toEqual(["waiting", "idle", "aging"]);
     expect(rows.find((row) => row.name === "B").values).toMatchObject({
       open: 1,
       sla: 1,
       critical: 1,
       aging: 1,
       idle: 1
+    });
+    expect(rows.find((row) => row.name === "B").primaryRisk).toMatchObject({
+      key: "critical",
+      value: 1
     });
   });
 
