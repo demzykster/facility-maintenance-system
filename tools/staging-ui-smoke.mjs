@@ -61,6 +61,48 @@ async function assertNoSaveFailureToast(page, label) {
   if (await page.locator('[role="alert"]').count()) throw new Error(`${label}_alert`);
 }
 
+async function assertDesktopNotificationTray(page) {
+  await page.locator(".notif-panel").waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForTimeout(250);
+  const geometry = await page.evaluate(() => {
+    const visibleRect = (selector) => [...document.querySelectorAll(selector)]
+      .map((element) => element.getBoundingClientRect())
+      .find((rect) => rect.width > 0 && rect.height > 0);
+    const panel = visibleRect(".notif-panel");
+    const sidebar = visibleRect(".sidebar");
+    if (!panel || !sidebar) return null;
+    return {
+      panel: { left: panel.left, right: panel.right, width: panel.width },
+      sidebar: { left: sidebar.left, right: sidebar.right, width: sidebar.width },
+      overlap: Math.max(0, Math.min(panel.right, sidebar.right) - Math.max(panel.left, sidebar.left)),
+      gap: Math.max(panel.left - sidebar.right, sidebar.left - panel.right, 0),
+      backdrop: getComputedStyle(document.querySelector(".notif-back")).backgroundColor,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+    };
+  });
+  if (!geometry) throw new Error("desktop_notification_tray_missing");
+  if (geometry.overlap > 1) throw new Error(`desktop_notification_tray_overlaps_sidebar:${JSON.stringify(geometry)}`);
+  if (geometry.backdrop !== "rgba(0, 0, 0, 0)" && geometry.backdrop !== "transparent") throw new Error(`desktop_notification_tray_dimmed:${geometry.backdrop}`);
+  if (Math.abs(geometry.overflow) > 2) throw new Error(`desktop_notification_tray_overflow:${geometry.overflow}`);
+}
+
+async function assertMobileNotificationSheet(page) {
+  await page.locator('.tb-actions button[aria-label="התראות"]').click();
+  await page.locator(".notif-panel").waitFor({ state: "visible", timeout: 10000 });
+  const geometry = await page.evaluate(() => {
+    const panel = document.querySelector(".notif-panel")?.getBoundingClientRect();
+    if (!panel) return null;
+    return {
+      widthDelta: Math.abs(panel.width - window.innerWidth),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+    };
+  });
+  if (!geometry) throw new Error("mobile_notification_sheet_missing");
+  if (geometry.widthDelta > 2) throw new Error(`mobile_notification_sheet_not_full_width:${JSON.stringify(geometry)}`);
+  if (Math.abs(geometry.overflow) > 2) throw new Error(`mobile_notification_sheet_overflow:${geometry.overflow}`);
+  await page.keyboard.press("Escape").catch(() => {});
+}
+
 async function waitForAnyVisible(page, selectors, timeout = 15000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -110,6 +152,7 @@ async function desktopSmoke(browser, credentials, expectedCommit) {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (Math.abs(overflow) > 2) throw new Error(`desktop_overflow:${label}:${overflow}`);
     if (label === "התראות" && await page.getByRole("dialog").count()) {
+      await assertDesktopNotificationTray(page);
       await page.keyboard.press("Escape").catch(() => {});
     }
     modules.push(label);
@@ -147,6 +190,8 @@ async function mobileSmoke(browser, credentials) {
   if (bottomItems.length < 4) throw new Error("mobile_bottom_nav_too_short");
   if (bottomItems.length > 4 && (!String(bottomNav.className).includes("nav-scroll") || bottomNav.scrollWidth <= bottomNav.clientWidth)) throw new Error("mobile_bottom_nav_not_scrollable");
   if (Math.abs(overflow) > 2) throw new Error(`mobile_overflow:${overflow}`);
+
+  await assertMobileNotificationSheet(page);
 
   await page.locator('.tb-actions button[aria-label="הפרופיל שלי"]').click();
   await page.getByRole("dialog").waitFor({ timeout: 10000 });
