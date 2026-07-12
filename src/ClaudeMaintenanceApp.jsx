@@ -9766,9 +9766,11 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       {role && role !== "admin" && role !== "executive" && role !== "tech" && <div className="field"><span>משמרת</span><ChoiceGrid columns="shift" value={shift} onChange={setShift} options={[{ id: "", label: "ללא", Icon: Clock }, ...workShiftsOf(config).map((sh) => ({ id: sh.id, label: sh.label, Icon: Clock }))]} /></div>}
       {role === "user" && (lockDept
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
-        : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
-          <div className="field" style={{ marginTop: 12 }}><span>אזורי אחריות לאחזקה</span><div className="chk-grid">{(config.zones || []).map((z) => <label key={z} className={"chk-pill" + (mgrZones.includes(z) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z)} onChange={() => toggleMgrZone(z)} /> {z}</label>)}</div><div className="hint">קריאות מבנה באזור שנבחר יהיו משותפות לכל המנהלים שאחראים לאותו אזור.</div></div>
-        </div>)}
+        : <details className="perm-fold manager-scope-fold">
+          <summary><span>תחומי אחריות</span><span className="perm-summary">{countLabel(depts.length, "מחלקה", "מחלקות")} · {countLabel(mgrZones.filter((z) => (config.zones || []).includes(z)).length, "אזור", "אזורים")}</span></summary>
+          <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div></div>
+          <div className="field"><span>אזורי אחריות לאחזקה</span><div className="chk-grid">{(config.zones || []).map((z) => <label key={z} className={"chk-pill" + (mgrZones.includes(z) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z)} onChange={() => toggleMgrZone(z)} /> {z}</label>)}</div><div className="hint">קריאות מבנה באזור שנבחר יהיו משותפות לכל המנהלים שאחראים לאותו אזור.</div></div>
+        </details>)}
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
         : <div className="field"><span>מחלקה (משויך אליה)</span><ChoiceGrid columns="dept" value={dept} onChange={setDept} tone="#0D9488" options={config.departments.map((d) => ({ id: d, label: d, Icon: d === "ניקיון" ? Sparkles : Building2 }))} /><div className="hint">העובד מדווח תקלות, וההפניה עוברת למנהלי המחלקה הזו לאישור.</div></div>)}
@@ -11942,10 +11944,15 @@ body *{visibility:hidden!important;}
 .presence-name{flex:1;font-weight:600;font-size:13.5px;}
 .presence-sup{font-weight:400;color:var(--muted);font-size:12px;}
 .presence-stat{font-size:12px;color:var(--muted);}
-.chk-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
-.chk-pill{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;background:var(--surface);white-space:normal;min-width:0;max-width:100%;}
-.chk-pill input{width:16px;height:16px;flex-shrink:0;margin:0;}
+.chk-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;align-items:flex-start;}
+.chk-pill{box-sizing:border-box;display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.2;cursor:pointer;background:var(--surface);white-space:normal;min-width:0;max-width:100%;min-height:38px;contain:layout paint;}
+.chk-pill input{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:16px;height:16px;flex:0 0 16px;margin:0;border:1.5px solid var(--line-strong,#CBD5E1);border-radius:4px;background:var(--surface);display:grid;place-items:center;color:#fff;}
+.chk-pill input:checked{border-color:var(--primary);background:var(--primary);}
+.chk-pill input:checked::after{content:"";width:8px;height:5px;border:solid currentColor;border-width:0 0 2px 2px;transform:rotate(-45deg) translateY(-1px);}
 .chk-pill.on{border-color:var(--primary);background:var(--primary-soft,#FFF4ED);color:var(--primary);}
+.manager-scope-fold{margin-top:12px;}
+.manager-scope-fold > .field{margin:0 14px 12px;}
+.manager-scope-fold > .field:first-of-type{margin-top:2px;}
 .perm-fold{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0;overflow:hidden;}
 .perm-fold summary{list-style:none;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:12px 14px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;}
 .perm-fold summary > span:first-child{min-width:0;}
