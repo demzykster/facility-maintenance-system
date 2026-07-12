@@ -70,5 +70,7 @@ describe("facility ticket route model", () => {
     expect(appSource).toContain("setFacilityAdminStatus");
     expect(appSource).toContain('ticket.supplier ? "supplier" : "other"');
     expect(appSource).toContain("סיבת המתנה");
+    expect(appSource).not.toContain("admin-status-grid");
+    expect(appSource).not.toContain("ניהול טיפול שוטף");
   });
 });

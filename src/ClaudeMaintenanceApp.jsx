@@ -10502,16 +10502,13 @@ function TicketDetail(p) {
       {!isTech && ticket.status === "rework" && <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><AlertTriangle size={16} /> הוחזר לעובד לתיקון — ממתין לשליחה חוזרת.</div>}
 
       {role === "admin" && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework" && (<>
-        <div className="ticket-ops-panel">
-        <SectionTitle><ShieldCheck size={15} /> ניהול טיפול שוטף</SectionTitle>
-        {track === "facility" && <><div className="admin-status-grid">{FACILITY_ADMIN_STATUS_OPTIONS.map((st) => <button key={st} className={"admin-status-btn" + ((FACILITY_ADMIN_STATUS_OPTIONS.includes(ticket.status) ? ticket.status : "new") === st ? " on" : "")} onClick={() => setFacilityAdminStatus(st)} style={(FACILITY_ADMIN_STATUS_OPTIONS.includes(ticket.status) ? ticket.status : "new") === st ? { borderColor: stOf(st).color, background: stOf(st).bg, color: stOf(st).color } : {}}>{stOf(st).label}</button>)}</div>
+        {track === "facility" && <><SectionTitle>סטטוס</SectionTitle><select className="ta" value={FACILITY_ADMIN_STATUS_OPTIONS.includes(ticket.status) ? ticket.status : "new"} onChange={(ev) => setFacilityAdminStatus(ev.target.value)}>{FACILITY_ADMIN_STATUS_OPTIONS.map((st) => <option key={st} value={st}>{stOf(st).label}</option>)}</select>
           {ticket.status === "waiting" && <label className="field" style={{ marginTop: 10 }}><span>סיבת המתנה</span><select value={ticket.waitingReason || "supplier"} onChange={(ev) => setWaiting(ev.target.value)}>{wReasons(config).filter((r) => r.id !== "no_equipment").map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></label>}
           <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
         {track === "transport" && <><SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— מאגר שינוע / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">ברירת המחדל מגיעה מספק הכלי, ואפשר לשנות ידנית אם הטיפול עובר לקבלן אחר.</div></>}
         <SectionTitle>הערה</SectionTitle>
         <div className="note-row"><input value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" onKeyDown={(ev) => ev.key === "Enter" && addNote()} /><button className="btn-primary" aria-label="שליחת עדכון לקריאה" onClick={addNote}><Send size={16} /></button></div>
         <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>
-        </div>
       </>)}
 
       {role === "admin" && <div className="admin-ticket-manual-shell"><AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} /></div>}
@@ -11658,10 +11655,6 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .admin-quick-edit{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:12px;box-shadow:var(--control-shadow);}
 .admin-quick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:13.5px;font-weight:650;color:var(--ink);}
 .icon-btn.tiny{width:30px;height:30px;min-width:30px;}
-.ticket-ops-panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:14px;box-shadow:var(--control-shadow);}
-.admin-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin:8px 0 10px;}
-.admin-status-btn{min-height:44px;border:1px solid var(--line);border-radius:11px;background:var(--surface-glow);color:var(--ink);font-size:13px;font-weight:500;padding:9px 10px;box-shadow:var(--control-shadow);}
-.admin-status-btn.on{box-shadow:inset 0 0 0 1px currentColor;}
 .desc-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14.5px;line-height:1.6;white-space:pre-wrap;}
 .detail-photo{width:100%;border-radius:12px;border:1px solid var(--line);}
 .note-row{display:flex;gap:8px;}
