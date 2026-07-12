@@ -713,15 +713,15 @@ const fleetDeptOf = (t, fleet) => { const f = (fleet || []).find((x) => x.id ===
 const fleetInDept = (f, dept) => fleetDepts(f).includes(dept);
 const userDepts = ticketUserDepartments;
 const ticketNo = (t) => (t && t.num) ? `${tkLetter(t)}-${String(t.num).padStart(3, "0")}` : (t ? `${tkLetter(t)}-${String(t.id || "").slice(-4).toUpperCase()}` : "—");
-const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
-const fmtTime = (ts) => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
+const pad2 = (n) => String(n).padStart(2, "0");
+const fmtDate = (ts) => { if (!ts) return "—"; const d = new Date(ts); return Number.isNaN(d.getTime()) ? "—" : `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${String(d.getFullYear()).slice(-2)}`; };
+const fmtTime = (ts) => { const d = new Date(ts); return Number.isNaN(d.getTime()) ? "—" : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const fmtDateTimeShort = (ts) => ts ? `${fmtDate(ts)} ${fmtTime(ts)}` : "";
 const inputDateTime = (ts) => {
   if (!ts) return "";
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return "";
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 const daypartGreeting = (now = new Date()) => {
   const h = now.getHours();
@@ -1224,6 +1224,62 @@ const countBy = (list, f) => { const c = {}; list.forEach((x) => { const k = f(x
 const ils = (n) => "₪" + (n || 0).toLocaleString("he-IL");
 const dateToTs = (s) => s ? new Date(s + "T00:00:00").getTime() : null;
 const tsToDate = (ts) => ts ? new Date(ts).toISOString().slice(0, 10) : "";
+const isoDateToDisplay = (value) => {
+  if (!value) return "";
+  const [y, m, d] = String(value).slice(0, 10).split("-");
+  return y && m && d ? `${d}.${m}.${String(y).slice(-2)}` : "";
+};
+const displayDateToIso = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/^(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2}|\d{4}))?$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = match[3] ? Number(match[3].length === 2 ? "20" + match[3] : match[3]) : new Date().getFullYear();
+  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+};
+const normalizeTimeText = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const match = raw.replace(/\s+/g, "").match(/^(\d{1,2})(?::?(\d{2}))?$/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = match[2] == null ? 0 : Number(match[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return `${pad2(hour)}:${pad2(minute)}`;
+};
+function DateInput({ value, onChange, disabled = false, className = "", ...props }) {
+  const [text, setText] = useState(isoDateToDisplay(value));
+  useEffect(() => { setText(isoDateToDisplay(value)); }, [value]);
+  const commit = (raw) => {
+    const parsed = displayDateToIso(raw);
+    if (parsed !== null) {
+      setText(isoDateToDisplay(parsed));
+      onChange?.(parsed);
+    } else {
+      setText(isoDateToDisplay(value));
+    }
+  };
+  return <input {...props} className={className} dir="ltr" inputMode="numeric" disabled={disabled} value={text} placeholder={props.placeholder || "dd.mm.yy"} onChange={(e) => setText(e.target.value.replace(/[^\d./-]/g, ""))} onBlur={(e) => commit(e.target.value)} />;
+}
+function TimeInput({ value, onChange, className = "", ...props }) {
+  const [text, setText] = useState(value || "");
+  useEffect(() => { setText(value || ""); }, [value]);
+  const commit = (raw) => {
+    const parsed = normalizeTimeText(raw);
+    if (parsed !== null) {
+      setText(parsed);
+      onChange?.(parsed);
+    } else {
+      setText(value || "");
+    }
+  };
+  return <input {...props} className={className} dir="ltr" inputMode="numeric" value={text} placeholder={props.placeholder || "HH:mm"} onChange={(e) => { const next = e.target.value.replace(/[^\d:]/g, "").slice(0, 5); setText(next); const parsed = normalizeTimeText(next); if (parsed !== null && next.includes(":")) onChange?.(parsed); }} onBlur={(e) => commit(e.target.value)} />;
+}
 const daysLeft = (ts) => Math.ceil((ts - Date.now()) / 86400000);
 const isWorkday = (d) => { const w = new Date(d).getDay(); return w !== 5 && w !== 6; }; // 5=Fri 6=Sat off
 const toWorkday = (ts) => { let d = new Date(ts); while (!isWorkday(d)) d.setDate(d.getDate() + 1); return d.getTime(); };
@@ -4981,7 +5037,7 @@ function ZoneForm({ zone, config, zones = [], cleaners, managers, onCancel, onSa
       </div>
       <div className="field"><span>חלונות סבב (שעה + סטייה מותרת בדקות)</span>
         {windows.map((w, i) => { const valid = checklist.filter((c) => (c.label || "").trim()); const sel = Array.isArray(w.items) ? w.items : null; const cnt = sel ? valid.filter((c) => sel.includes(c.id)).length : valid.length; return <div key={w.id || i} style={{ marginBottom: 8 }}>
-          <div className="cl-row"><input type="time" value={w.time} onChange={(e) => setWin(i, "time", e.target.value)} /><div className="win-tol">± <input type="number" min="0" value={w.tol} onChange={(e) => setWin(i, "tol", e.target.value)} /> ד׳</div><button className="icon-btn sm" aria-label={`מחק חלון סבב: ${w.time || "ללא שעה"}`} onClick={() => setWindows((s) => s.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>
+          <div className="cl-row"><TimeInput value={w.time} onChange={(value) => setWin(i, "time", value)} /><div className="win-tol">± <input type="number" min="0" value={w.tol} onChange={(e) => setWin(i, "tol", e.target.value)} /> ד׳</div><button className="icon-btn sm" aria-label={`מחק חלון סבב: ${w.time || "ללא שעה"}`} onClick={() => setWindows((s) => s.filter((_, j) => j !== i))}><Trash2 size={16} /></button></div>
           <button className="btn-ghost sm" type="button" onClick={() => setOpenWin(openWin === i ? null : i)} style={{ marginTop: 4 }}>{openWin === i ? "▾" : "▸"} פריטים בסבב זה ({cnt}/{countLabel(valid.length, "פריט", "פריטים")}){cnt < valid.length ? " · חלקי" : ""}</button>
           {openWin === i && (valid.length === 0 ? <div className="hint">הגדירו תחילה פריטי צ׳קליסט למעלה.</div> : <div style={{ padding: "6px 8px", background: "var(--surface-2)", borderRadius: 10, marginTop: 4 }}>{valid.map((c) => { const on = sel ? sel.includes(c.id) : true; return <label key={c.id} className="chk-line"><input type="checkbox" checked={on} onChange={() => toggleWinItem(i, c.id)} /> {c.label}</label>; })}</div>)}
         </div>; })}
@@ -5686,7 +5742,7 @@ function CleanerApp(p) {
         {showAbs && <div className="panel" style={{ marginTop: 6 }}>
           <div className="hint" style={{ marginBottom: 8 }}>{t("cleaner.absenceHint")}</div>
           {myAbs.map((a) => <div key={a.id} className="reg-row" style={{ marginBottom: 6 }}><span style={{ flex: 1 }}>{fmtDate(new Date(a.from).getTime())}{(a.to && a.to !== a.from) ? " – " + fmtDate(new Date(a.to).getTime()) : ""}</span><button className="reg-del" onClick={() => delAbsence(a.id)}><Trash2 size={15} /></button></div>)}
-          <div className="field-row absence-date-row" style={{ marginTop: 6 }}><label className="field"><span>{t("cleaner.fromDate")}</span><input type="date" value={absFrom} onChange={(e) => setAbsFrom(e.target.value)} /></label><label className="field"><span>{t("cleaner.toDate")}</span><input type="date" value={absTo} onChange={(e) => setAbsTo(e.target.value)} /></label></div>
+          <div className="field-row absence-date-row" style={{ marginTop: 6 }}><label className="field"><span>{t("cleaner.fromDate")}</span><DateInput value={absFrom} onChange={setAbsFrom} /></label><label className="field"><span>{t("cleaner.toDate")}</span><DateInput value={absTo} onChange={setAbsTo} /></label></div>
           <button className="btn-ghost sm" disabled={!absFrom || (absTo && absTo < absFrom)} onClick={() => { saveAbsence({ id: uid(), userId: session.id, name: session.name, from: absFrom, to: absTo || absFrom, at: Date.now() }); setAbsFrom(""); setAbsTo(""); }}><Plus size={14} /> {t("cleaner.addAbsence")}</button>
         </div>}
       </div>; })()}
@@ -5790,7 +5846,7 @@ function TaskForm({ task, users, session, onCancel, onSave }) {
       <div className="field"><span>אחראים *</span><PeoplePicker users={users} value={f.responsibleIds} onChange={(v) => set("responsibleIds", v)} me={session.id} /></div>
       <div className="row2">
         <label className="field"><span>עדיפות</span><select value={f.priority} onChange={(e) => set("priority", e.target.value)}>{PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
-        <label className="field"><span>תאריך יעד</span><input type="date" value={f.dueAt ? tsToDate(f.dueAt) : ""} onChange={(e) => set("dueAt", dateToTs(e.target.value))} disabled={f.mode === "permanent" || f.mode === "deferred"} /></label>
+        <label className="field"><span>תאריך יעד</span><DateInput value={f.dueAt ? tsToDate(f.dueAt) : ""} onChange={(value) => set("dueAt", dateToTs(value))} disabled={f.mode === "permanent" || f.mode === "deferred"} /></label>
       </div>
       <button type="button" className="more-toggle" onClick={() => setShowMore((v) => !v)}>{showMore ? "− פחות פרטים" : "+ פרטים נוספים"}</button>
       {showMore && <div className="more-fields">
@@ -5801,7 +5857,7 @@ function TaskForm({ task, users, session, onCancel, onSave }) {
         </div>
         {f.status === "waiting" && <label className="field"><span>ממתין למי / למה</span><input value={f.waitingFor} onChange={(e) => set("waitingFor", e.target.value)} placeholder="לדוגמה: ממתין לאישור תקציב מהמנכ״ל" /></label>}
         {f.mode === "recurring" && <label className="field"><span>תדירות</span><select value={f.recur} onChange={(e) => set("recur", e.target.value)}><option value="weekly">שבועית</option><option value="monthly">חודשית</option><option value="quarterly">רבעונית</option></select></label>}
-        <label className="field"><span>תאריך מעקב / תזכורת הבאה</span><input type="date" value={f.nextActionAt ? tsToDate(f.nextActionAt) : ""} onChange={(e) => set("nextActionAt", dateToTs(e.target.value))} /><div className="hint">«מתי לחזור לבדוק» — נפרד מתאריך היעד הסופי.</div></label>
+        <label className="field"><span>תאריך מעקב / תזכורת הבאה</span><DateInput value={f.nextActionAt ? tsToDate(f.nextActionAt) : ""} onChange={(value) => set("nextActionAt", dateToTs(value))} /><div className="hint">«מתי לחזור לבדוק» — נפרד מתאריך היעד הסופי.</div></label>
         <label className="field"><span>קטגוריה / תחום</span><input value={f.category} onChange={(e) => set("category", e.target.value)} placeholder="לדוגמה: תקציב · ספקים · כ״א · בטיחות" /></label>
         <label className="field"><span>הקשר / תיוג</span><input value={f.locationText} onChange={(e) => set("locationText", e.target.value)} placeholder="מיקום · מכשיר · נושא (לדוגמה: מחסן צפון · מלגזה 8FDF20 · בטיחות)" /></label>
         <label className="chk-line"><input type="checkbox" checked={f.isPrivate} onChange={(e) => set("isPrivate", e.target.checked)} /> פרטית — רק אני רואה</label>
@@ -6154,7 +6210,7 @@ function MeetingForm({ meeting, users, session, onCancel, onSave }) {
       <label className="field"><span>סוג</span><select value={f.type} onChange={(e) => set("type", e.target.value)}>{MEETING_TYPES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></label>
       {cfg.hint && <div className="hint" style={{ marginTop: -4 }}>{cfg.hint}</div>}
       <label className="field"><span>מטרה</span><input value={f.purpose} onChange={(e) => set("purpose", e.target.value)} placeholder="מה רוצים להשיג בפגישה (לא חובה)" /></label>
-      <div className="row2"><label className="field"><span>תאריך</span><input type="date" value={f.date} onChange={(e) => set("date", e.target.value)} /></label><label className="field"><span>שעה</span><input type="time" value={f.time} onChange={(e) => set("time", e.target.value)} /></label></div>
+      <div className="row2"><label className="field"><span>תאריך</span><DateInput value={f.date} onChange={(value) => set("date", value)} /></label><label className="field"><span>שעה</span><TimeInput value={f.time} onChange={(value) => set("time", value)} /></label></div>
       <div className="field"><span>משתתפים</span><PeoplePicker users={users} value={f.participantIds} onChange={(v) => set("participantIds", v)} placeholder="— בחרו משתתפים —" me={session.id} /></div>
       <label className="field"><span>סדר יום</span><textarea rows={3} value={f.agenda} onChange={(e) => set("agenda", e.target.value)} placeholder="נושאים לדיון…" /></label>
       {cfg.standingTopics && <div className="field"><span>נקודות קבע (נבדקות בכל פגישה: תקין / בעיה)</span>
@@ -6479,7 +6535,7 @@ function SignaturePad({ value, onChange, required }) {
 function ppeDocBody(recs, worker, config) {
   const w = worker || {};
   const tpl = (config && config.ppeSignText) || PPE_SIGN_DEFAULT;
-  const today = new Date().toLocaleDateString("he-IL");
+  const today = fmtDate(Date.now());
   const dept = w.dept || (typeof ppeWorkerDept === "function" ? ppeWorkerDept(w) : "") || "";
   const fill = (s) => (s || "").split("{שם}").join(w.name || "").split("{מספר}").join(w.workerNo || "").split("{מחלקה}").join(dept).split("{תאריך}").join(today);
   const list = (recs || []).filter((r) => r.origin !== "return");
@@ -7178,7 +7234,7 @@ function PpeOrderCard({ order, items, session, savePpeOrder, delPpeOrder, savePp
       <div className="task-list">{(order.lines || []).map((l, i) => { const rem = (l.qty || 0) - (l.received || 0); return <div key={i} className="task-row" style={{ borderInlineStartColor: rem <= 0 ? "#16A34A" : "var(--primary)", cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{l.itemName}{l.size && l.size !== "אחיד" ? ` · ${l.size}` : ""}</div><div className="task-row-sub">{l.sku ? `מק״ט ${l.sku} · ` : ""}הוזמן {l.qty} · נקלט {l.received || 0}</div></div><div className="task-row-side">{recv ? <input type="number" min="0" max={rem} value={recv[i] ?? 0} onChange={(e) => setRecv((s) => ({ ...s, [i]: Math.max(0, Math.min(rem, parseInt(e.target.value || "0", 10) || 0)) }))} style={{ width: 70 }} /> : <span className="task-due" style={{ fontWeight: 700, color: rem <= 0 ? "#16A34A" : "var(--muted)" }}>{rem <= 0 ? "הושלם" : `נותרו ${rem}`}</span>}</div></div>; })}</div>
       {(order.lines || []).length > 0 && <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={orderXlsx}><FileSpreadsheet size={15} /> הורדת קובץ הזמנה לספק (Excel)</button>}
       {(order.lines || []).length > 0 && <div style={{ marginTop: 10 }}><div className="hint">טקסט להעתקה (למייל/וואטסאפ):</div><textarea id={`ordtxt-${order.id}`} readOnly value={orderText} style={{ width: "100%", minHeight: 92, fontSize: 12, marginTop: 4, fontFamily: "inherit" }} /><button className="btn-ghost sm" style={{ marginTop: 4 }} onClick={copyText}>העתק טקסט</button></div>}
-      {sendMode ? <div style={{ marginTop: 12 }}><div className="hint" style={{ marginBottom: 6 }}>הורידו את קובץ ההזמנה (כפתור למעלה) ושלחו לספק בנפרד. כאן רק מסמנים שנשלח.</div><label className="field"><span>צפי הגעה (לא חובה)</span><input type="date" value={expected} onChange={(e) => setExpected(e.target.value)} /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-primary full" onClick={send}>אישור שליחה</button><button className="btn-ghost sm" onClick={() => setSendMode(false)}>ביטול</button></div></div>
+      {sendMode ? <div style={{ marginTop: 12 }}><div className="hint" style={{ marginBottom: 6 }}>הורידו את קובץ ההזמנה (כפתור למעלה) ושלחו לספק בנפרד. כאן רק מסמנים שנשלח.</div><label className="field"><span>צפי הגעה (לא חובה)</span><DateInput value={expected} onChange={setExpected} /></label><div style={{ display: "flex", gap: 8 }}><button className="btn-primary full" onClick={send}>אישור שליחה</button><button className="btn-ghost sm" onClick={() => setSendMode(false)}>ביטול</button></div></div>
         : recv ? <div style={{ display: "flex", gap: 8, marginTop: 12 }}><button className="btn-primary full" onClick={doReceive}>אישור קליטה למלאי</button><button className="btn-ghost sm" onClick={() => setRecv(null)}>ביטול</button></div>
         : <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
           {order.status === "draft" && <><button className="btn-primary sm" onClick={() => setSendMode(true)}>שליחה לספק</button><button className="btn-ghost sm" onClick={onEdit}><PenLine size={14} /> עריכה</button><ConfirmBtn className="btn-danger sm" label="מחיקה" onConfirm={async () => { await delPpeOrder(); }} /></>}
@@ -8375,7 +8431,7 @@ function FleetModule(p) {
           <select value={bulkDoc} onChange={(e) => setBulkDoc(e.target.value)} aria-label="מסמך לעדכון מרוכז">
             {DOC_DEFS.map((d) => <option key={d.id} value={d.id}>{bulkFleetDocumentLabels[d.id] || d.label}</option>)}
           </select>
-          <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} aria-label="תאריך תוקף לעדכון מרוכז" />
+          <DateInput value={bulkDate} onChange={setBulkDate} aria-label="תאריך תוקף לעדכון מרוכז" />
           <button className="btn-ghost sm" disabled={bulkBusy || !bulkDate} onClick={applyBulkDoc}>עדכן תוקף</button>
         </div>
         {canEditSettings && <button className={"btn-ghost sm" + (bulkDeleteConfirm ? " danger" : "")} disabled={bulkBusy} onClick={deleteSelectedFleet}>{bulkDeleteConfirm ? "לחצו שוב למחיקה" : "מחיקת נבחרים"}</button>}
@@ -8435,7 +8491,7 @@ function FleetForm({ item, config, onCancel, onSave }) {
       <label className="field"><span>מספר שלדה</span><input className="ltr-input" dir="ltr" value={f.chassis} onChange={(e) => setF({ ...f, chassis: e.target.value })} /></label>
       {showLicense && <label className="field"><span>מספר רישוי</span><input className="ltr-input" dir="ltr" value={f.license} onChange={(e) => setF({ ...f, license: e.target.value })} /></label>}
       <SectionTitle><FileText size={15} /> מסמכים ותוקף</SectionTitle>
-      {machineDocs(f, config).length === 0 ? <div className="hint">לסוג זה לא הוגדרו מסמכים מנוהלים. ניתן להגדיר בהגדרות → כלי שינוע.</div> : machineDocs(f, config).map((d) => <div key={d.id} className="doc-edit"><div className="doc-edit-lbl">{d.label}</div><div className="doc-edit-row"><input type="date" value={f.docs[d.id]?.date || ""} onChange={(e) => setDoc(d.id, "date", e.target.value)} /><input value={f.docs[d.id]?.link || ""} onChange={(e) => setDoc(d.id, "link", e.target.value)} placeholder="קישור לקובץ (Drive/SharePoint)" /></div></div>)}
+      {machineDocs(f, config).length === 0 ? <div className="hint">לסוג זה לא הוגדרו מסמכים מנוהלים. ניתן להגדיר בהגדרות → כלי שינוע.</div> : machineDocs(f, config).map((d) => <div key={d.id} className="doc-edit"><div className="doc-edit-lbl">{d.label}</div><div className="doc-edit-row"><DateInput value={f.docs[d.id]?.date || ""} onChange={(value) => setDoc(d.id, "date", value)} /><input value={f.docs[d.id]?.link || ""} onChange={(e) => setDoc(d.id, "link", e.target.value)} placeholder="קישור לקובץ (Drive/SharePoint)" /></div></div>)}
       <label className="field" style={{ marginTop: 14 }}><span>הערות</span><textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" disabled={busy} onClick={save}>{busy ? "שומר..." : "שמירה"}</button><div style={{ height: 24 }} />
@@ -8957,8 +9013,8 @@ function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
         <button className="btn-ghost full" style={{ marginTop: 10 }} onClick={onCancel}>סגור</button><div style={{ height: 24 }} />
       </> : <>
         <div className="row2" style={{ marginTop: 12 }}>
-          <label className="field"><span>תאריך ראשון לשיבוצים חדשים</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-          <label className="field"><span>לפרוס עד תאריך</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+          <label className="field"><span>תאריך ראשון לשיבוצים חדשים</span><DateInput value={date} onChange={setDate} /></label>
+          <label className="field"><span>לפרוס עד תאריך</span><DateInput value={endDate} onChange={setEndDate} /></label>
         </div>
         <div className="hint">שיבוצים קיימים עם תאריך עתידי ישמרו את מועד הטיפול הבא שכבר נקבע להם. שיבוצים באיחור או חדשים ייפרסו בתוך חלון התכנון.</div>
         {!validPlanningWindow && <div className="note" style={{ color: "#B45309", background: "#FEF3C7", marginTop: 10 }}>בחרו טווח תכנון תקין של עד שנה אחת כדי לראות תצוגה מקדימה.</div>}
@@ -9032,7 +9088,7 @@ function PMForm({ task, fleet, config, onCancel, onSave }) {
         <UnitPicker fleet={fleet} config={config} value={forkliftId} onChange={(id) => { setFork(id); setErr(""); }} />
       </div>
       {selFleet && applicableRules.length > 0 && <label className="field"><span>רגולציית טיפול *</span><select value={ruleId} onChange={(e) => setRuleId(e.target.value)}>{applicableRules.map((rule) => <option key={rule.id} value={rule.id}>{rule.name} · כל {rule.intervalMonths} חודשים</option>)}</select></label>}
-      <label className="field"><span>מועד הטיפול הבא *</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><div className="hint">ימי עבודה: ראשון–חמישי. תאריך שיחול בשישי/שבת יוזז ליום העבודה הקרוב.</div></label>
+      <label className="field"><span>מועד הטיפול הבא *</span><DateInput value={date} onChange={setDate} /><div className="hint">ימי עבודה: ראשון–חמישי. תאריך שיחול בשישי/שבת יוזז ליום העבודה הקרוב.</div></label>
       {selFleet && <div className="note" style={{ borderColor: "var(--primary)" }}><CalendarClock size={13} /> {selectedRule ? <>נבחר: <b>{selectedRule.name}</b> · כל {selectedRule.intervalMonths} חודשים.</> : <>לא נמצאה רגולציה מתאימה לכלי זה. נשמרת תאימות ישנה לפי סוג {unitTypeName(selFleet, config)}: <b>{freqOf(freq).label}</b>.</>}</div>}
       <label className="chk-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> שיבוץ פעיל</label>
       {err && <div className="err">{err}</div>}
@@ -9795,7 +9851,7 @@ function SettingsPanel(p) {
       <div className="search-wrap" style={{ marginTop: 8 }}><Search size={16} /><input value={uq} onChange={(e) => setUq(e.target.value)} placeholder="חיפוש לפי שם / טלפון / מס׳ עובד / דוא״ל" /></div>
       {duplicateUserGroups.length > 0 && <div className="note warn" style={{ marginTop: 10 }}>נמצאו {countLabel(duplicateUserGroups.length, "כפילות אפשרית", "כפילויות אפשריות")} בזהות כניסה. בדקו רשומות עם אותו דוא״ל, טלפון או מספר עובד לפני מחיקה או איחוד.</div>}
       <UserTree list={visibleUsers} departments={config.departments} presence={presence} onPick={mayManageUsers ? setUEdit : undefined} shifts={workShiftsOf(config)} mode={userSub} canCreate={mayManageUsers} showEmptyGroups={!uq.trim()} onCreate={(patch) => setUEdit(patch || {})} />
-      {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : new Date(k + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
+      {(() => { const arr = users.filter((u) => u.status === "archived").sort((a, b) => (b.exitAt || 0) - (a.exitAt || 0)); if (!arr.length) return null; const g = {}; arr.forEach((u) => { const d = u.exitAt ? new Date(u.exitAt) : null; const k = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` : "—"; (g[k] = g[k] || []).push(u); }); return <div style={{ marginTop: 18 }}><button className="btn-ghost sm" onClick={() => setShowArch((v) => !v)}>{showArch ? "הסתר" : "הצג"} ארכיון עובדים ({arr.length})</button>{showArch && Object.keys(g).sort().reverse().map((k) => <div key={k} style={{ marginTop: 10 }}><div className="hint" style={{ fontWeight: 700, marginBottom: 4 }}>{k === "—" ? "ללא תאריך" : `${HE_MONTHS[Number(k.slice(5, 7)) - 1]} ${k.slice(0, 4)}`}</div><div className="cards">{g[k].map((u) => <button key={u.id} className="tcard" onClick={() => setArcView(u)} style={{ borderInlineStartColor: "var(--muted)", cursor: "pointer", textAlign: "start" }}><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{ROLE_LABEL[u.role]}</span></div><div className="tcard-sub">{u.workerNo ? `מס׳ ${u.workerNo} · ` : ""}{u.dept || "—"} · עזב {u.exitAt ? fmtDate(u.exitAt) : "—"}</div></div></button>)}</div></div>)}</div>; })()}
       {uArchive && <Overlay persistent onClose={() => setUArchive(null)}><PpeExitSettlement ppe={p.ppe} users={users} items={p.ppeItems} config={config} session={session} savePpe={p.savePpe} savePpeItem={p.savePpeItem} saveUser={saveUser} onClose={() => setUArchive(null)} initialWid={uArchive.id} /></Overlay>}
       {arcView && <Overlay onClose={() => setArcView(null)}><ArchiveWorkerCard worker={arcView} ppe={p.ppe} onClose={() => setArcView(null)} onRestore={mayManageUsers ? restoreWorker : undefined} onDelete={mayManageUsers ? deleteArchivedWorker : undefined} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} zones={p.zones || []} presence={presence} canDelete={uEdit.id && !(uEdit.role === "admin" && adminCount <= 1) && uEdit.id !== session.id} canManageWorkerAccess={canManageWorkerAccess(session)} onArchive={(u) => { setUEdit(null); setUArchive(u); }} onCancel={() => setUEdit(null)} onSave={async (u) => { if (await saveUser(u) === false) return false; setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return true; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
@@ -9933,7 +9989,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
         </div><div className="hint">תחום העבודה קובע אילו קריאות הטכנאי רואה. שיוך לספק קובע את צוות הקבלן שאליו הוא שייך.</div></div>
         {techScope === "facility" && <div className="field"><span>קטגוריות מבנה (בחרו לפחות אחת) *</span><div className="cat-grid">{(config.categories || CATEGORIES).map((c) => { const on = techCats.includes(c.id); const m = catMeta(c.id); return <button key={c.id} className={"cat-pick" + (on ? " on" : "")} onClick={() => setTechCats((s) => on ? s.filter((x) => x !== c.id) : [...s, c.id])} style={on ? { borderColor: m.color, background: m.color + "1f" } : {}}><m.Icon size={19} color={m.color} /><span>{c.label}</span></button>; })}</div></div>}
         <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— פנימי / ללא ספק —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select><div className="hint">{techScope === "transport" ? "בקריאות שינוע, טכנאי של ספק יראה את כלי הספק שלו." : "בכרטיס הספק יוצג צוות הטכנאים המשויך אליו."}</div></label>
-        <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>
+        <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><TimeInput value={shiftStart} onChange={setShiftStart} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><TimeInput value={shiftEnd} onChange={setShiftEnd} /></label></div>
         <label className="field"><span>סבילות משמרת אישית (דקות)</span><input type="number" min="0" value={techGrace} onChange={(e) => setTechGrace(e.target.value)} placeholder={`ברירת מחדל: ${Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)}`} /><div className="hint">השאירו ריק כדי להשתמש בברירת המחדל. ערך אישי משנה את בדיקת האיחור והיציאה המוקדמת של הטכנאי הזה בלבד.</div></label>
       </>) : role === "worker" ? (<>
         <ActivationControls />
@@ -12791,7 +12847,7 @@ body *{visibility:hidden!important;}
   .worker-body{padding:16px 12px 40px;}
   .absence-date-row{display:grid;grid-template-columns:1fr;gap:10px;}
   .absence-date-row .field{min-width:0;}
-  .absence-date-row input[type="date"]{width:100%;min-height:48px;color:var(--ink);background:var(--input);-webkit-appearance:none;appearance:none;}
+  .absence-date-row input{width:100%;min-height:48px;color:var(--ink);background:var(--input);}
   .ppe-request-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"worker actions" "main main" "by status";align-items:start;gap:8px;padding:10px;}
   .ppe-request-row.rejecting{grid-template-areas:"worker status" "main main" "by by" "reject reject";}
   .ppe-req-worker{grid-area:worker;}

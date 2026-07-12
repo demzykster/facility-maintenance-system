@@ -26,7 +26,9 @@ export function relativePresenceTime(ts, { now = Date.now() } = {}) {
   if (hours < 24) return `לפני ${hours} שע׳`;
   const days = Math.floor(hours / 24);
   if (days < 30) return days === 1 ? "אתמול" : `לפני ${days} ימים`;
-  return new Date(lastSeen).toLocaleDateString("he-IL");
+  const date = new Date(lastSeen);
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${String(date.getFullYear()).slice(-2)}`;
 }
 
 export function userPresenceStatusText(record = {}, options = {}) {
