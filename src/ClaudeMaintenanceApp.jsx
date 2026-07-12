@@ -31,6 +31,7 @@ import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
+import { biHeatmapAiPrompt } from "./aiAssistEntryPointModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7430,7 +7431,7 @@ function PpeHub(p) {
   </>);
 }
 
-function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe, onGoTasks }) {
+function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe, onGoTasks, onAskAI }) {
   const [periodId, setPeriodId] = useState("now");
   const [expandedCommandDomain, setExpandedCommandDomain] = useState("");
   const period = biPeriodRange(periodId);
@@ -7716,6 +7717,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         onOpenAll={() => onGoTickets?.({ st: "open", focus: { label: "BI · מפת חום קריאות" } })}
         onOpenDepartment={(row) => onGoTickets?.({ st: "open", focus: { label: `BI · מפת חום · ${row.name}`, department: row.name } })}
         onOpenCell={(row, cell) => onGoTickets?.({ st: "open", focus: { label: `BI · ${row.name} · ${cell.label}`, department: row.name, heatmapMetric: cell.key } })}
+        onAskAI={onAskAI ? ({ rows, row, cell }) => onAskAI(biHeatmapAiPrompt({ rows, row, cell })) : null}
       />
 
       {isAdminBI && <section className="panel bi-panel bi-command-panel">
@@ -7934,13 +7936,14 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config
 
 function AdminApp(p) {
   const { session, config, fleet, tickets, pm, presence, users, zones, rounds, complaints, absences, fileComplaint, resolveComplaint, saveTicket, onLogout, theme, toggleTheme } = p;
-  const [tab, setTab] = useState("bi"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [tFilter, setTFilter] = useState(null), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
+  const [tab, setTab] = useState("bi"), [overlay, setOverlay] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [aiDraft, setAiDraft] = useState(null), [tFilter, setTFilter] = useState(null), [assetNav, setAssetNav] = useState(null), [ppeNav, setPpeNav] = useState(null), [taskNav, setTaskNav] = useState(null);
   const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, absences, p.tasks, p.meetings, p.ppeReqs, p.ppeItems, p.ppeOrders);
   const openTicket = (id) => setOverlay({ type: "detail", id });
   const goFilter = (f) => { setTFilter({ ...f, _t: Date.now() }); setTab("tickets"); };
   const clearTicketFilter = () => setTFilter(null);
   const goAsset = (nav) => { setAssetNav({ ...nav, _t: Date.now() }); setTab("assets"); };
   const goPpe = (nav = {}) => { setPpeNav({ ...nav, _t: Date.now() }); setTab("ppe"); };
+  const askAI = (draft) => { setAiDraft(draft || null); setShowAI(true); };
   const isAdminRole = session.role === "admin";
   const mayViewUsers = canViewUsers(session);
   const mayManageUsers = canManageUsers(session);
@@ -7978,7 +7981,7 @@ function AdminApp(p) {
       <div className="main-col">
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
-          {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} onGoTasks={isAdminRole ? (nav) => { setTaskNav(nav || null); setTab("tasks"); } : null} />}
+          {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} onGoTasks={isAdminRole ? (nav) => { setTaskNav(nav || null); setTab("tasks"); } : null} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} zones={zones} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
@@ -7991,11 +7994,11 @@ function AdminApp(p) {
         </div>
       </div>
       <MobileBottomNav nav={nav} primaryIds={isAdminRole ? ["bi", "tickets", "tasks"] : ["bi", "tickets", "assets"]} />
-      {aiAssistantEnabled(config) && <AIFab onClick={() => setShowAI(true)} />}
+      {aiAssistantEnabled(config) && <AIFab onClick={() => askAI(null)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "bi"); }} />}
-      {showAI && <LazyAIPanel {...p} onClose={() => setShowAI(false)} />}
+      {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -11667,6 +11670,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-heatmap-panel{grid-column:1/-1;}
 .bi-heatmap-insight{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px;padding:8px 10px;border:1px solid rgba(31,78,140,.14);border-radius:11px;background:var(--surface-2);color:var(--muted);font-size:var(--bi-caption);}
 .bi-heatmap-insight b{color:var(--ink);font-size:var(--bi-row);font-weight:var(--bi-weight);}
+.bi-panel-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .bi-heatmap{display:flex;flex-direction:column;gap:6px;overflow-x:auto;padding-bottom:2px;}
 .bi-heatmap-head,.bi-heatmap-row{display:grid;grid-template-columns:minmax(150px,1.25fr) repeat(6,minmax(76px,1fr));gap:6px;min-width:720px;}
 .bi-heatmap-head span{font-size:var(--bi-caption);font-weight:var(--bi-weight);color:var(--muted);padding:0 6px;text-align:center;}
@@ -11678,6 +11682,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-heatmap-name small{color:var(--muted);font-size:var(--bi-caption);white-space:nowrap;}
 .bi-heatmap-risk-tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
 .bi-heatmap-risk-tags i{font-style:normal;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:2px 6px;font-size:10.5px;line-height:1.2;white-space:nowrap;}
+.bi-heatmap-ai{display:inline-flex;align-items:center;gap:3px;border-radius:999px;border:1px solid rgba(31,78,140,.18);background:rgba(31,78,140,.06);color:var(--primary);padding:2px 6px;font-size:10.5px;font-weight:600;white-space:nowrap;}
+.bi-heatmap-ai:hover{background:rgba(31,78,140,.10);border-color:rgba(31,78,140,.28);}
 .bi-heatmap-cell{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;background:var(--surface);}
 .bi-heatmap-cell::before{content:"";position:absolute;inset:0;background:var(--primary);opacity:calc(.05 + var(--heat,0) * .18);pointer-events:none;}
 .bi-heatmap-cell.hot{border-color:rgba(31,78,140,.28);}

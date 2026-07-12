@@ -37,6 +37,7 @@ Provider names are normalized for operator-friendly setup: `claude` maps to the 
 - Browser AI buttons are hidden unless the frontend AI mode is `client` or saved app settings select server AI mode.
 - Demo/local can still use the existing browser AI path and local keyword fallback.
 - The `עוזר AI` panel is split into `src/AIPanel.jsx` and loads only when the AI UI is actually opened. Role-specific welcome text and quick workflow prompts live in `src/aiAssistQuickPromptModel.js`, so the UI shell stays thin while admin, executive, manager, technician, cleaner, and worker entry points can evolve independently. The same prompt model also reads the current snapshot metrics to surface contextual prompts such as heatmap load, SLA exposure, pending approvals, PM due items, or field-work urgency before the generic role prompts.
+- The first dedicated screen-level AI entry point is in the BI ticket heatmap. `src/aiAssistEntryPointModel.js` builds human-reviewable heatmap questions, `src/BIHeatmapPanel.jsx` exposes the entry point, and `src/AIPanel.jsx` opens with the suggested question prefilled. The assistant still waits for the human to send the question and remains read-only.
 - In server mode, the panel calls `POST /api/ai/assist` instead of a browser provider URL. The browser/client provider path remains only a demo/development fallback.
 - The browser-side AI context snapshot shape lives in `src/aiAssistSnapshotModel.js`. `src/ClaudeMaintenanceApp.jsx` now only adapts existing ticket/SLA/document helpers into that model before the server route applies authenticated role filtering.
 - The first server provider adapter lives in `server/ai/providerClient.js`. It supports Anthropic Messages and OpenAI Responses API request shapes with injected `fetch` and tests. `src/aiProviderModel.js` owns the safe provider options, labels, default models, and aliases used by the server status route and admin settings UI.
@@ -64,6 +65,7 @@ When AI is reopened as a product module, build it as a separate server-backed as
 Build the next AI product slice on top of the read-only assistant:
 
 - deepen the first workflow modes (`risk_summary`, `sla_explanation`, `next_actions`, `draft_preparation`) with richer workflow-specific summaries and dedicated screen-level entry points beyond the shared quick prompts;
+- repeat the same dedicated-entry pattern for ticket detail, fleet/PPE/cleaning risk panels, and supplier queues where a user naturally wants an explanation or next-action summary;
 - expand the audit surface only if new workflow-specific AI actions need additional non-sensitive metadata;
 - keep financial and broad company analytics limited to `admin` / `executive`;
 - keep every future AI write behind a human-confirmed normal server operation with validation, authorization, and audit.

@@ -3,14 +3,21 @@ import { Send, Sparkles, X } from "lucide-react";
 import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
 import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "./aiAssistQuickPromptModel.js";
 
-export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant }) {
+export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
   const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config), [session, vis, pm, fleet, config, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialText || "");
+  const [inputWorkflow, setInputWorkflow] = useState(initialWorkflow || AI_ASSIST_WORKFLOWS.general);
   const [busy, setBusy] = useState(false);
   const endRef = useRef(null);
   const quick = useMemo(() => aiAssistQuickPrompts(session, contextPreview), [session, contextPreview]);
+
+  useEffect(() => {
+    if (!initialText) return;
+    setInput(initialText);
+    setInputWorkflow(initialWorkflow || AI_ASSIST_WORKFLOWS.general);
+  }, [initialText, initialWorkflow]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -22,6 +29,7 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
     const history = [...msgs, { role: "user", content: q }];
     setMsgs(history);
     setInput("");
+    setInputWorkflow(AI_ASSIST_WORKFLOWS.general);
     setBusy(true);
     try {
       const context = contextPreview;
@@ -53,8 +61,8 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
       </div>
       {msgs.length <= 1 && <div className="ai-quick">{quick.map((q) => <button key={q.text} onClick={() => send(q.text, q.workflow)}>{q.text}</button>)}</div>}
       <div className="ai-input">
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="שאלו אותי…" onKeyDown={(e) => e.key === "Enter" && send()} disabled={busy} />
-        <button className="btn-primary" onClick={() => send()} disabled={busy}><Send size={16} /></button>
+        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="שאלו אותי…" onKeyDown={(e) => e.key === "Enter" && send(input, inputWorkflow)} disabled={busy} />
+        <button className="btn-primary" onClick={() => send(input, inputWorkflow)} disabled={busy}><Send size={16} /></button>
       </div>
     </div>
   </div>;
