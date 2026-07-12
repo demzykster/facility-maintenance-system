@@ -9047,7 +9047,6 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 8, padding: 10 }}>{children}</div>
   </section>;
   const Empty = ({ text = "לא נמצאו משתמשים" }) => <div className="note" style={{ marginTop: 10 }}>{text}</div>;
-  if (activeList.length === 0) return <Empty />;
   if (mode === "managers") {
     const managers = activeList.filter((u) => u.role === "user");
     return managers.length ? <Section title="מנהלים" count={managers.length} actionLabel="מנהל" actionPatch={{ role: "user" }}>{managers.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלים" />;
@@ -9057,13 +9056,13 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     const bySupplier = [...new Set(techs.map((u) => u.supplier || "פנימי"))];
     return techs.length ? <>{bySupplier.map((sp) => { const rows = techs.filter((u) => (u.supplier || "פנימי") === sp); return <Section key={sp} title={sp} count={rows.length} actionLabel="טכנאי" actionPatch={{ role: "tech", supplier: sp === "פנימי" ? "" : sp }}>{rows.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section>; })}</> : <Empty text="לא נמצאו טכנאים" />;
   }
+  if (mode === "executives") {
+    const executives = activeList.filter((u) => u.role === "executive");
+    return executives.length ? <Section title="הנהלה" count={executives.length} actionLabel="הנהלה" actionPatch={{ role: "executive" }}>{executives.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו משתמשי הנהלה" />;
+  }
   if (mode === "admins") {
     const admins = activeList.filter((u) => u.role === "admin");
-    const executives = activeList.filter((u) => u.role === "executive");
-    return admins.length || executives.length ? <>
-      <Section title="הנהלה" count={executives.length} actionLabel="הנהלה" actionPatch={{ role: "executive" }}>{executives.length ? executives.map((u) => <TeamUserCard key={u.id} u={u} />) : <Empty text="לא נמצאו משתמשי הנהלה" />}</Section>
-      <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.length ? admins.map((u) => <TeamUserCard key={u.id} u={u} />) : <Empty text="לא נמצאו מנהלי מערכת" />}</Section>
-    </> : <Empty text="לא נמצאו מנהלי מערכת או הנהלה" />;
+    return admins.length ? <Section title="מנהלי מערכת" count={admins.length} actionLabel="מנהל מערכת" actionPatch={{ role: "admin" }}>{admins.map((u) => <TeamUserCard key={u.id} u={u} />)}</Section> : <Empty text="לא נמצאו מנהלי מערכת" />;
   }
   const workers = activeList.filter((u) => isWorkerLike(u));
   const WorkerCard = ({ u }) => {
@@ -9318,19 +9317,22 @@ function SettingsPanel(p) {
   const usersForSub = (arr, sub) => {
     if (sub === "managers") return arr.filter((u) => u.role === "user");
     if (sub === "techs") return arr.filter((u) => u.role === "tech");
-    if (sub === "admins") return arr.filter((u) => u.role === "admin" || u.role === "executive");
+    if (sub === "executives") return arr.filter((u) => u.role === "executive");
+    if (sub === "admins") return arr.filter((u) => u.role === "admin");
     return arr.filter((u) => isWorkerLike(u));
   };
   const userSubTitle = () => {
     if (userSub === "managers") return "מנהלים";
     if (userSub === "techs") return "טכנאים";
-    if (userSub === "admins") return "הנהלה ומנהלי מערכת";
+    if (userSub === "executives") return "הנהלה";
+    if (userSub === "admins") return "מנהלי מערכת";
     return "עובדים";
   };
   const userSubCreatePatch = () => {
     if (userSub === "managers") return { role: "user", perms: { ...DEFAULT_MANAGER_PERMS } };
     if (userSub === "techs") return { role: "tech" };
-    if (userSub === "admins") return { role: "executive" };
+    if (userSub === "executives") return { role: "executive" };
+    if (userSub === "admins") return { role: "admin" };
     return { role: "worker" };
   };
   const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; setBrandDirty(false); flash(); };
@@ -9536,6 +9538,7 @@ function SettingsPanel(p) {
         <button className={userSub === "workers" ? "on" : ""} onClick={() => setUserSub("workers")}>עובדים</button>
         <button className={userSub === "managers" ? "on" : ""} onClick={() => setUserSub("managers")}>מנהלים</button>
         <button className={userSub === "techs" ? "on" : ""} onClick={() => setUserSub("techs")}>טכנאים</button>
+        <button className={userSub === "executives" ? "on" : ""} onClick={() => setUserSub("executives")}>הנהלה</button>
         <button className={userSub === "admins" ? "on" : ""} onClick={() => setUserSub("admins")}>מנהלי מערכת</button>
         <button className={userSub === "settings" ? "on" : ""} onClick={() => setUserSub("settings")}>הגדרות</button>
       </div>
