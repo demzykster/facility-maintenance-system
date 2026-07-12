@@ -12,16 +12,6 @@ export const ticketTrack = (ticket = {}) => ticket.track || (ticket.forkliftId ?
 export const ownsTicketRecord = (session = {}, ticket = {}) =>
   ticket.createdBy?.id ? ticket.createdBy.id === session.id : ticket.createdBy?.name === session.name;
 
-const ticketZoneValues = (ticket = {}) =>
-  cleanStringList([ticket.zone, ticket.zoneId, ticket.location, ticket.areaName]);
-
-export const ticketInManagerZones = (ticket = {}, managerZones = []) => {
-  const zones = cleanStringList(managerZones);
-  if (!zones.length) return false;
-  const zoneSet = new Set(zones);
-  return ticketZoneValues(ticket).some((zone) => zoneSet.has(zone));
-};
-
 const ticketInManagerDepartments = (ticket = {}, departments = []) => {
   if (!departments.length) return false;
   return [ticket.reportedBy?.dept, ticket.createdBy?.dept, ticket.department, ticket.dept]
@@ -64,14 +54,11 @@ const visibleToManager = (session = {}, ticket = {}, fleet = []) => {
   if (ticket.assignee === session.name) return true;
 
   const departments = ticketUserDepartments(session);
-  const managerZones = cleanStringList(session.mgrZones || []);
   const track = ticketTrack(ticket);
   if (track === "transport") {
     return transportTicketInManagerDepartments(ticket, departments, fleet);
   }
 
-  if (ticketInManagerZones(ticket, managerZones)) return true;
-  if (ticketZoneValues(ticket).length > 0 && managerZones.length > 0) return false;
   return ticketInManagerDepartments(ticket, departments);
 };
 

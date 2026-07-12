@@ -14,14 +14,14 @@ describe("ticket visibility model", () => {
     { id: "fork-a", depts: ["A"] }
   ];
 
-  it("lets managers share facility tickets through maintenance responsibility zones", () => {
+  it("lets managers share tickets through common departments, not common maintenance zones", () => {
     const managerA = { id: "manager-a", role: "user", name: "Manager A", depts: ["A"], mgrZones: ["משרדים"] };
     const managerPeer = { id: "manager-peer", role: "user", name: "Manager Peer", depts: ["C"], mgrZones: ["משרדים"] };
     const managerOtherZone = { id: "manager-other", role: "user", name: "Manager Other", depts: ["A"], mgrZones: ["רציפים"] };
 
     expect(visibleTicketsForSession(managerA, tickets, fleet).map((ticket) => ticket.id)).toEqual(["aircon", "legacy-a", "fleet-a", "own"]);
-    expect(visibleTicketsForSession(managerPeer, tickets, fleet).map((ticket) => ticket.id)).toEqual(["aircon"]);
-    expect(visibleTicketsForSession(managerOtherZone, tickets, fleet).map((ticket) => ticket.id)).toEqual(["dock", "legacy-a", "fleet-a"]);
+    expect(visibleTicketsForSession(managerPeer, tickets, fleet).map((ticket) => ticket.id)).toEqual([]);
+    expect(visibleTicketsForSession(managerOtherZone, tickets, fleet).map((ticket) => ticket.id)).toEqual(["aircon", "legacy-a", "fleet-a", "own"]);
   });
 
   it("does not give manager-wide visibility when no department or zone is configured", () => {
