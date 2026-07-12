@@ -26,6 +26,39 @@ function topHeatmapRows(rows = []) {
     });
 }
 
+export function ticketAiPrompt({ ticket = {}, labels = {} } = {}) {
+  const number = safeLabel(labels.number, ticket.number || ticket.no || ticket.id || "—");
+  const subject = safeLabel(ticket.subject, "קריאה");
+  const status = safeLabel(labels.status, ticket.status || "לא ידוע");
+  const priority = safeLabel(labels.priority, ticket.priority || "לא ידוע");
+  const track = safeLabel(labels.track, ticket.track || "כללי");
+  const category = safeLabel(labels.category, ticket.categoryLabel || ticket.category || "");
+  const asset = safeLabel(labels.asset, ticket.asset || "");
+  const assignee = safeLabel(labels.assignee, ticket.assignee || ticket.supplier || "טרם שויך");
+  const waitReason = safeLabel(labels.waitReason, "");
+  const age = safeLabel(labels.age, "");
+  const slaBreached = labels.slaBreached === true;
+  const workflow = slaBreached ? AI_ASSIST_WORKFLOWS.slaExplanation : AI_ASSIST_WORKFLOWS.nextActions;
+  const contextParts = [
+    `מסלול: ${track}`,
+    `סטטוס: ${status}`,
+    `עדיפות: ${priority}`,
+    category ? `קטגוריה: ${category}` : "",
+    asset ? `ציוד/אזור: ${asset}` : "",
+    `אחראי: ${assignee}`,
+    waitReason ? `סיבת המתנה: ${waitReason}` : "",
+    age ? `זמן/גיל: ${age}` : ""
+  ].filter(Boolean);
+  const slaLine = slaBreached
+    ? "מסומנת חריגת SLA או חשיפת SLA."
+    : "לא מסומנת חריגת SLA כרגע.";
+
+  return Object.freeze({
+    workflow,
+    text: `נתח את קריאה #${number}: "${subject}". ${contextParts.join("; ")}. ${slaLine} הסבר מה הסיכון, מה חסר כדי להתקדם, ומה 3 הפעולות הבטוחות הבאות.`
+  });
+}
+
 export function biHeatmapAiPrompt({ rows = [], row = null, cell = null } = {}) {
   const selectedRow = row || null;
   const selectedCell = cell || null;

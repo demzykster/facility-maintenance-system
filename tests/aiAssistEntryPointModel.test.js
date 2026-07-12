@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biHeatmapAiPrompt } from "../src/aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI assist entry point model", () => {
@@ -39,5 +39,41 @@ describe("AI assist entry point model", () => {
     expect(prompt.text).toContain("\"ללא תנועה\"");
     expect(prompt.text).toContain("\"מבנה\"");
     expect(prompt.text).toContain("למנהל לבדוק");
+  });
+
+  it("builds an SLA-focused ticket prompt from a specific ticket", () => {
+    const prompt = ticketAiPrompt({
+      ticket: { subject: "מזגן חדר הפצה", asset: "F-001", assignee: "יוסי" },
+      labels: {
+        number: "F-001",
+        status: "בטיפול",
+        priority: "גבוהה",
+        track: "אחזקת מבנה",
+        category: "מיזוג",
+        waitReason: "ממתין לספק",
+        slaBreached: true,
+        age: "נפתחה 11.07.26 18:00"
+      }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.slaExplanation);
+    expect(prompt.text).toContain("קריאה #F-001");
+    expect(prompt.text).toContain("מזגן חדר הפצה");
+    expect(prompt.text).toContain("ממתין לספק");
+    expect(prompt.text).toContain("חריגת SLA");
+    expect(prompt.text).toContain("3 הפעולות הבטוחות הבאות");
+  });
+
+  it("builds a next-action ticket prompt without claiming it changed anything", () => {
+    const prompt = ticketAiPrompt({
+      ticket: { id: "t1", subject: "רישיון רכב", asset: "מלגזה 120823", assignee: "" },
+      labels: { status: "חדש", priority: "רגילה", track: "שינוע", slaBreached: false }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
+    expect(prompt.text).toContain("מלגזה 120823");
+    expect(prompt.text).toContain("טרם שויך");
+    expect(prompt.text).toContain("לא מסומנת חריגת SLA");
+    expect(prompt.text).not.toContain("עדכנתי");
   });
 });

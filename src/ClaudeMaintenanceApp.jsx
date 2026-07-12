@@ -31,7 +31,7 @@ import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
-import { biHeatmapAiPrompt } from "./aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -4365,7 +4365,8 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
 function UserApp(p) {
   const { session, config, fleet, tickets, pm, presence, users, zones, rounds, complaints, saveTicket, saveUser, delUser, fileComplaint, resolveComplaint, onLogout, theme, toggleTheme } = p;
   const [view, setView] = useState("bi");
-  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [ticketNav, setTicketNav] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null), [taskNav, setTaskNav] = useState(null);
+  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [ticketNav, setTicketNav] = useState(null), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [aiDraft, setAiDraft] = useState(null), [pmView, setPmView] = useState(null), [uEdit, setUEdit] = useState(null), [deptTab, setDeptTab] = useState("equip"), [deptNav, setDeptNav] = useState(null), [taskNav, setTaskNav] = useState(null);
+  const askAI = (draft) => { setAiDraft(draft || null); setShowAI(true); };
   const goNotif = (go, ev) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); setDeptNav(ev?.fleetId ? { fleetId: ev.fleetId, _t: Date.now() } : null); } };
   const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
@@ -4456,13 +4457,13 @@ function UserApp(p) {
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
       <MobileBottomNav nav={userNav} primaryIds={["bi", "tickets", "dept"]} />
-      {aiAssistantEnabled(config) && <AIFab onClick={() => setShowAI(true)} />}
+      {aiAssistantEnabled(config) && <AIFab onClick={() => askAI(null)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
-      {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
+      {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} onAskAI={aiAssistantEnabled(config) ? askAI : null} /></Overlay>}
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} session={session} canManageUsers={canManageUsers(session)} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return ok; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
-      {showAI && <LazyAIPanel {...p} onClose={() => setShowAI(false)} />}
+      {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -4472,7 +4473,8 @@ function UserApp(p) {
 function TechApp(p) {
   const { session, config, fleet, tickets, pm, presence, savePm, saveTicket, setShift, techNames, onLogout, theme, toggleTheme } = p;
   const [view, setView] = useState("tickets");
-  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [pmRun, setPmRun] = useState(null);
+  const [overlay, setOverlay] = useState(null), [filter, setFilter] = useState("open"), [showNotif, setShowNotif] = useState(false), [showAI, setShowAI] = useState(false), [aiDraft, setAiDraft] = useState(null), [pmRun, setPmRun] = useState(null);
+  const askAI = (draft) => { setAiDraft(draft || null); setShowAI(true); };
   const notif = useNotifications(session, tickets, pm, fleet, config, presence);
   const myShift = presenceOf(presence, session.id);
   const myIdle = shiftIdle(myShift, session, config);
@@ -4538,11 +4540,11 @@ function TechApp(p) {
         </div>
       </div>
       <nav className="bottom-nav"><NavBtn active={view === "tickets"} onClick={() => setView("tickets")} Icon={Truck} label="קריאות" /><NavBtn active={view === "pm"} onClick={() => setView("pm")} Icon={CalendarClock} label="טיפולים" /><NavBtn active={view === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" /></nav>
-      {aiAssistantEnabled(config) && <AIFab onClick={() => setShowAI(true)} />}
-      {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} /></Overlay>}
+      {aiAssistantEnabled(config) && <AIFab onClick={() => askAI(null)} />}
+      {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onAskAI={aiAssistantEnabled(config) ? askAI : null} /></Overlay>}
       {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
-      {showAI && <LazyAIPanel {...p} onClose={() => setShowAI(false)} />}
+      {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -7995,7 +7997,7 @@ function AdminApp(p) {
       </div>
       <MobileBottomNav nav={nav} primaryIds={isAdminRole ? ["bi", "tickets", "tasks"] : ["bi", "tickets", "assets"]} />
       {aiAssistantEnabled(config) && <AIFab onClick={() => askAI(null)} />}
-      {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
+      {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} onAskAI={aiAssistantEnabled(config) ? askAI : null} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "bi"); }} />}
       {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
@@ -10447,7 +10449,7 @@ function TicketForm(p) {
 
 /* ============================================================ TICKET DETAIL */
 function TicketDetail(p) {
-  const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, tickets } = p;
+  const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
   const role = session.role;
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const [adminQuickEdit, setAdminQuickEdit] = useState("");
@@ -10558,7 +10560,22 @@ function TicketDetail(p) {
     .reduce((sum, stage) => sum + (stage.ms || 0), 0);
   const requesterPhone = String(ticket.createdBy?.phone || ticket.reportedBy?.phone || "").trim();
   const requesterTel = requesterPhone.replace(/[^\d+]/g, "");
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onBack} aria-label="חזרה מרשימת הקריאה"><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">קריאה #{ticketNo(ticket)}</div>{onRepeat && <button className="icon-btn" onClick={repeat} style={{ marginInlineStart: "auto" }} title="פתח קריאה דומה" aria-label="פתיחת קריאה דומה"><Copy size={18} /></button>}</div>
+  const askTicketAI = onAskAI ? () => onAskAI(ticketAiPrompt({
+    ticket,
+    labels: {
+      number: ticketNo(ticket),
+      status: s.label,
+      priority: pr.label,
+      track: tr.label,
+      category: ticket.categoryLabel || c.label,
+      asset: ticket.asset || ticket.zone || "",
+      assignee: ticket.assignee || ticket.supplier || "",
+      waitReason: ticketWaitReasonLabel(ticket, config),
+      slaBreached: ticketMissedSla(ticket, config),
+      age: ticket.createdAt ? `נפתחה ${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}` : ""
+    }
+  })) : null;
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={onBack} aria-label="חזרה מרשימת הקריאה"><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">קריאה #{ticketNo(ticket)}</div><div className="form-head-actions">{askTicketAI && <button className="icon-btn" onClick={askTicketAI} title="שאל AI על הקריאה" aria-label="שאל AI על הקריאה"><Sparkles size={18} /></button>}{onRepeat && <button className="icon-btn" onClick={repeat} title="פתח קריאה דומה" aria-label="פתיחת קריאה דומה"><Copy size={18} /></button>}</div></div>
     <div className="body">
       <div className="detail-top">
         <span className="badge" style={{ color: s.color, background: s.bg }}>{s.label}</span>
@@ -11827,6 +11844,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .body{flex:1;padding:16px;overflow-y:auto;}
 .form-head{background:var(--primary);color:#fff;padding:12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5;box-shadow:0 2px 0 var(--accent);}
 .form-head .icon-btn{color:#fff;}
+.form-head-actions{margin-inline-start:auto;display:flex;align-items:center;gap:8px;}
 .form-title{font-family:var(--font-body);font-weight:600;font-size:17px;}
 .ovl-panel,.modal2-panel{font-family:var(--font-body);font-size:14px;font-weight:400;letter-spacing:0;}
 .ovl-panel *,.modal2-panel *{letter-spacing:0;}
