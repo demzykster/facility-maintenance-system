@@ -6526,7 +6526,7 @@ function UserPicker({ users, config, saveUser, value, onChange, label, pool, loc
       {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא «{q.trim()}» במערכת.</div>}
       {saveUser && <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור חדש"}</button>}
     </div> : (hint ? <div className="hint">{hint}</div> : null)}
-    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={{ ...scopedDefaults, ...(/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})) }} config={config} users={users} session={session} canManageUsers={mayManageUsers} canDelete={false} lockRole={lockRole || "worker"} canManageWorkerAccess={canWorkerAccess} onCancel={() => setCreating(false)} onSave={async (u) => { const saved = await saveUser(u); if (saved !== false) { const next = saved?.id ? saved : u; setCreated(next); onChange(next); setCreating(false); setQ(""); } return saved; }} /></Overlay>}
+    {creating && <Overlay persistent panelClassName="user-picker-form-panel" onClose={() => setCreating(false)}><UserForm user={{ ...scopedDefaults, ...(/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})) }} config={config} users={users} session={session} canManageUsers={mayManageUsers} canDelete={false} lockRole={lockRole || "worker"} canManageWorkerAccess={canWorkerAccess} onCancel={() => setCreating(false)} onSave={async (u) => { const saved = await saveUser(u); if (saved !== false) { const next = saved?.id ? saved : u; setCreated(next); onChange(next); setCreating(false); setQ(""); } return saved; }} /></Overlay>}
   </div>);
 }
 
@@ -6602,7 +6602,7 @@ function PpeWorkerPicker({ users, config, session, saveUser, value, onChange, de
       {matches.length === 0 && <div className="hint" style={{ padding: "10px 12px", color: "#B45309" }}>לא נמצא עובד «{q.trim()}» במערכת.</div>}
       <button style={{ ...rowStyle, borderBottom: "none", color: "var(--primary)", fontWeight: 600, justifyContent: "flex-start", gap: 6 }} onClick={() => setCreating(true)}><Plus size={14} /> {matches.length === 0 ? `צור עובד חדש «${q.trim()}»` : "לא ברשימה — צור עובד חדש"}</button>
     </div> : <div className="hint">הקלידו מספר עובד — המערכת תאתר אותו. לא קיים? תוכלו ליצור אותו כאן (חיפוש לפי מספר מונע כפילות).</div>}
-    {creating && <Overlay persistent onClose={() => setCreating(false)}><UserForm user={{ ...scopedDefaults, ...(/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})) }} config={config} users={users} session={session} canManageUsers={mayManageUsers} canDelete={false} lockRole="worker" canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setCreating(false)} onSave={async (u) => { const saved = await saveUser(u); if (saved !== false) { const next = saved?.id ? saved : u; setCreated(next); onChange(next.id); setCreating(false); setQ(""); } return saved; }} /></Overlay>}
+    {creating && <Overlay persistent panelClassName="user-picker-form-panel" onClose={() => setCreating(false)}><UserForm user={{ ...scopedDefaults, ...(/^\d+$/.test(q.trim()) ? { workerNo: q.trim() } : (q.trim() ? { name: q.trim() } : {})) }} config={config} users={users} session={session} canManageUsers={mayManageUsers} canDelete={false} lockRole="worker" canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setCreating(false)} onSave={async (u) => { const saved = await saveUser(u); if (saved !== false) { const next = saved?.id ? saved : u; setCreated(next); onChange(next.id); setCreating(false); setQ(""); } return saved; }} /></Overlay>}
   </div>);
 }
 
@@ -11615,6 +11615,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 
 .ovl-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;z-index:60;animation:cmmsFade 180ms var(--ease-out) both;}
 .ovl-panel{background:var(--bg);width:100%;height:100%;display:flex;flex-direction:column;animation:cmmsSheetIn 240ms var(--ease-drawer) both;will-change:transform,opacity;}
+.ovl-panel.user-picker-form-panel{height:min(92dvh,780px);max-height:92dvh;}
+.ovl-panel.user-picker-form-panel .ovl-inner{height:100%;min-height:0;}
 .ovl-inner{display:flex;flex-direction:column;height:100%;min-height:0;}
 .body{flex:1;padding:16px;overflow-y:auto;}
 .form-head{background:var(--primary);color:#fff;padding:12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5;box-shadow:0 2px 0 var(--accent);}
