@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: current commit, `Add fleet internal numbers`.
+- Latest app/UI commit before this handoff: current commit, `Link supplier technicians in supplier cards`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,7 +56,13 @@ The current strategy is:
 
 Recent commits on `main`:
 
-- `Add fleet internal numbers` (current commit)
+- `Link supplier technicians in supplier cards` (current commit)
+  - Fixed supplier add flow by separating supplier creation from the search form submit path.
+  - Softened supplier-card typography to match the calmer operational UI style.
+  - Added a `טכנאים` tab to supplier detail, listing technician users linked through the existing `supplier` profile field.
+  - Technician profiles now keep `supplier` assignment for every technician scope, while transport ticket visibility continues to use the existing `fleet.supplier` / `session.supplier` contract.
+  - Verified with focused supplier/user/session/profile tests, full Vitest suite, `npm run lint`, `npm run build`, `npm run release:check`, and a targeted Playwright supplier smoke.
+- `Add fleet internal numbers`
   - Added a separate fleet internal number field: `internalNo` in app records and `internal_no` in normalized Supabase `fleet_units`.
   - Added migration `supabase/migrations/20260712103000_fleet_units_internal_no.sql`.
   - Fleet create/edit forms now expose `מספר פנימי`; fleet cards show it; fleet search, unit picker, ticket opening, driver coverage/actions, PM follow-up tickets, notifications, supplier-linked fleet rows, and exports use it with fallback to the existing `code`.

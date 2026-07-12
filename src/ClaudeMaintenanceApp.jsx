@@ -9181,7 +9181,7 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     {workers.length === 0 && !showEmptyGroups && <Empty text="לא נמצאו עובדים" />}
   </div>;
 }
-function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBack, onRename, onDelete, onOpenFleet, canManage }) {
+function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, users, onBack, onRename, onDelete, onOpenFleet, canManage }) {
   const meta = supMeta(config, name);
   const [tab, setTab] = useState("details");
   const [ind, setInd] = useState(meta.industries || []);
@@ -9214,13 +9214,14 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
   };
   const relOrders = (orders || []).filter((o) => o.supplier === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const relFleet = (fleet || []).filter((f) => f.supplier === name);
+  const relTechs = (users || []).filter((u) => u.role === "tech" && (u.supplier || "") === name).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
   const stLbl = (st) => st === "draft" ? "טיוטה" : st === "sent" ? "נשלחה" : st === "received" ? "התקבלה" : st || "—";
   const Tab = ({ id, label, n }) => <button onClick={() => setTab(id)} className="btn-ghost sm" style={{ fontWeight: tab === id ? 800 : 500, borderBottom: tab === id ? "2px solid var(--primary)" : "2px solid transparent", borderRadius: 0 }}>{label}{n != null ? ` (${n})` : ""}</button>;
   return (<div>
     <button className="btn-ghost sm" onClick={onBack} style={{ marginBottom: 8 }}><ChevronLeft size={15} /> חזרה לרשימה</button>
     <SectionTitle><Building2 size={16} /> {name}</SectionTitle>
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 10px" }}>{ind.length === 0 ? <span className="hint">ללא תחום</span> : ind.map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id)}</span>)}</div>
-    <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 14, flexWrap: "wrap" }}><Tab id="details" label="פרטים" /><Tab id="activity" label="הזמנות וכלים" n={relOrders.length + relFleet.length} /><Tab id="invoices" label="חשבוניות" /></div>
+    <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 14, flexWrap: "wrap" }}><Tab id="details" label="פרטים" /><Tab id="technicians" label="טכנאים" n={relTechs.length} /><Tab id="activity" label="הזמנות וכלים" n={relOrders.length + relFleet.length} /><Tab id="invoices" label="חשבוניות" /></div>
     {tab === "details" && <div>
       <label className="field"><span>שם הספק</span><div style={{ display: "flex", gap: 8 }}><input value={nm} onChange={(e) => setNm(e.target.value)} readOnly={!canManage} style={{ flex: 1 }} />{canManage && nm.trim() && nm.trim() !== name && onRename && <button className="btn-ghost sm" onClick={() => onRename(name, nm)}>שנה שם</button>}</div></label>
       <div className="field"><span>תחום / מודול</span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>{SUP_INDUSTRIES.map((x) => <button key={x.id} type="button" onClick={() => toggleInd(x.id)} disabled={!canManage} className={"chip" + (ind.includes(x.id) ? " on" : "")}>{x.label}</button>)}</div></div>
@@ -9239,6 +9240,17 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
       {relOrders.length === 0 ? <div className="hint" style={{ marginBottom: 12 }}>אין הזמנות לספק זה.</div> : <div className="task-list" style={{ marginBottom: 12 }}>{relOrders.map((o) => <div key={o.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{countLabel((o.lines || []).length, "פריט", "פריטים")} · {stLbl(o.status)}</div><div className="task-row-sub">{o.note || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(o.createdAt)}</span></div></div>)}</div>}
       <SectionTitle><Truck size={15} /> כלים / ליסינג</SectionTitle>
       {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => { const note = unitNote(f, config); return <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{unitDisplayNo(f)} · {unitDesc(f, config)}</div>{note ? <div className="task-row-sub">{note}</div> : null}</div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>; })}</div>}
+    </div>}
+    {tab === "technicians" && <div>
+      <SectionTitle><HardHat size={15} /> טכנאים משויכים</SectionTitle>
+      {relTechs.length === 0 ? <div className="hint">אין עדיין טכנאים המשויכים לספק זה.</div> : <div className="task-list">{relTechs.map((u) => {
+        const scope = u.techScope === "facility" ? "מבנה" : u.techScope === "both" ? "שינוע ומבנה" : "שינוע";
+        const contact = [u.phone, u.email].filter(Boolean).join(" · ");
+        return <div key={u.id || u.name} className="task-row supplier-tech-row" style={{ cursor: "default" }}>
+          <div className="task-row-main"><div className="task-row-t">{u.name || "ללא שם"}</div><div className="task-row-sub">{scope}{contact ? " · " + contact : ""}</div></div>
+          <div className="task-row-side"><span className="task-due">{u.active === false ? "מושבת" : "פעיל"}</span></div>
+        </div>;
+      })}</div>}
     </div>}
     {tab === "invoices" && <div className="hint" style={{ padding: 18, textAlign: "center" }}>ניהול חשבוניות יתווסף עם מודול התקציב.</div>}
   </div>);
@@ -9278,20 +9290,20 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
     if (!names.includes(n) && await saveConfig({ ...config, suppliers: [...names, n] }) === false) return setErr("הוספת הספק לא נשמרה. נסו שוב.");
     setAdding(""); setSel(n);
   };
-  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} canManage={canManage} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}</div>;
+  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} users={users} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} canManage={canManage} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}</div>;
   const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
   return (<div className="supplier-shell">
     <div className="supplier-head">
       <SectionTitle><Building2 size={16} /> ספקים / קבלנים</SectionTitle>
       <span className="supplier-total">{countLabel(names.length, "ספק", "ספקים")}</span>
     </div>
-    <form className="supplier-command" onSubmit={(e) => { e.preventDefault(); if (canManage) void add(); }}>
+    <div className="supplier-command">
       <div className="search-wrap supplier-search"><Search size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש ספק או קבלן" placeholder="חיפוש ספק / קבלן…" /></div>
       {canManage && <div className="supplier-add">
-        <input value={adding} onChange={(e) => setAdding(e.target.value)} aria-label="שם ספק או קבלן חדש" placeholder="שם ספק חדש" />
-        <button className="btn-primary sm" type="submit"><Plus size={15} /> הוסף</button>
+        <input value={adding} onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void add(); } }} aria-label="שם ספק או קבלן חדש" placeholder="שם ספק חדש" />
+        <button className="btn-primary sm" type="button" onClick={() => void add()} disabled={!adding.trim()}><Plus size={15} /> הוסף</button>
       </div>}
-    </form>
+    </div>
     {err && <div className="err" style={{ marginBottom: 10 }}>{err}</div>}
     {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div className="supplier-grid">{shown.map((n) => { const m = supMeta(config, n); const activity = supplierActivityCounts({ supplier: n, orders, fleet, contacts: m.contacts || [] }); return <button key={n} className="supplier-card" onClick={() => setSel(n)}><div className="supplier-card-top"><div className="supplier-card-name">{n}</div><ChevronLeft size={16} /></div><div className="supplier-tags">{(m.industries || []).length === 0 ? <span className="supplier-tag muted">ללא תחום</span> : (m.industries || []).map((id) => <span key={id} className="supplier-tag">{supIndLabel(id)}</span>)}</div><div className="supplier-metrics"><span>{countLabel(activity.linked, "רשומה", "רשומות")}</span><span>{countLabel(activity.orders, "הזמנה", "הזמנות")}</span><span>{countLabel(activity.fleet, "כלי", "כלים")}</span>{activity.contacts ? <span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span> : null}</div></button>; })}</div>}
   </div>);
@@ -9697,7 +9709,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       email: roleUsesPassword ? email.trim().toLowerCase() : "", password: nextPassword,
       pin: nextPin,
       workerNo: role === "worker" ? workerNo.trim() : "",
-      dept: role === "user" ? (depts[0] || "") : dept, depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: (role === "tech" && techScope === "transport") ? supplier : "", shiftId: "", shiftStart: role === "tech" ? shiftStart : "", shiftEnd: role === "tech" ? shiftEnd : "",
+      dept: role === "user" ? (depts[0] || "") : dept, depts: role === "user" ? depts : (role === "worker" ? [dept] : []), supplier: role === "tech" ? supplier : "", shiftId: "", shiftStart: role === "tech" ? shiftStart : "", shiftEnd: role === "tech" ? shiftEnd : "",
       lateTolerance: role === "tech" && techGrace !== "" ? Math.max(0, Number(techGrace) || 0) : undefined,
       earlyTolerance: role === "tech" && techGrace !== "" ? Math.max(0, Number(techGrace) || 0) : undefined,
       techScope: role === "tech" ? techScope : undefined,
@@ -9753,9 +9765,9 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
         <div className="field"><span>פרופיל טכנאי</span><div className="pr-row">
           <button className={"pr-pick" + (techScope === "transport" ? " on" : "")} onClick={() => setTechScope("transport")} style={techScope === "transport" ? { background: "#16202E", color: "#fff", borderColor: "#16202E" } : {}}><Truck size={15} /> שינוע (כל הצי)</button>
           <button className={"pr-pick" + (techScope === "facility" ? " on" : "")} onClick={() => setTechScope("facility")} style={techScope === "facility" ? { background: "#16202E", color: "#fff", borderColor: "#16202E" } : {}}><Building2 size={15} /> מבנה</button>
-        </div><div className="hint">טכנאי שינוע רואה את כל הצי. טכנאי מבנה רואה רק את הקטגוריות שתבחרו.</div></div>
+        </div><div className="hint">תחום העבודה קובע אילו קריאות הטכנאי רואה. שיוך לספק קובע את צוות הקבלן שאליו הוא שייך.</div></div>
         {techScope === "facility" && <div className="field"><span>קטגוריות מבנה (בחרו לפחות אחת) *</span><div className="cat-grid">{(config.categories || CATEGORIES).map((c) => { const on = techCats.includes(c.id); const m = catMeta(c.id); return <button key={c.id} className={"cat-pick" + (on ? " on" : "")} onClick={() => setTechCats((s) => on ? s.filter((x) => x !== c.id) : [...s, c.id])} style={on ? { borderColor: m.color, background: m.color + "1f" } : {}}><m.Icon size={19} color={m.color} /><span>{c.label}</span></button>; })}</div></div>}
-        {techScope === "transport" && <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— כל הצי (ללא שיוך) —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select><div className="hint">אם נבחר ספק — הטכנאי יראה רק כלים של אותו ספק.</div></label>}
+        <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— פנימי / ללא ספק —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select><div className="hint">{techScope === "transport" ? "בקריאות שינוע, טכנאי של ספק יראה את כלי הספק שלו." : "בכרטיס הספק יוצג צוות הטכנאים המשויך אליו."}</div></label>
         <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} /></label></div>
         <label className="field"><span>סבילות משמרת אישית (דקות)</span><input type="number" min="0" value={techGrace} onChange={(e) => setTechGrace(e.target.value)} placeholder={`ברירת מחדל: ${Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)}`} /><div className="hint">השאירו ריק כדי להשתמש בברירת המחדל. ערך אישי משנה את בדיקת האיחור והיציאה המוקדמת של הטכנאי הזה בלבד.</div></label>
       </>) : role === "worker" ? (<>
@@ -11477,7 +11489,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .supplier-shell{padding:2px;}
 .supplier-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0 12px;}
 .supplier-head .section-title{margin:0;}
-.supplier-total{display:inline-flex;align-items:center;justify-content:center;min-height:32px;border:1px solid rgba(148,163,184,.26);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:900;padding:4px 11px;box-shadow:var(--control-shadow);}
+.supplier-total{display:inline-flex;align-items:center;justify-content:center;min-height:32px;border:1px solid rgba(148,163,184,.26);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:650;padding:4px 11px;box-shadow:var(--control-shadow);}
 .supplier-command{display:grid;grid-template-columns:minmax(240px,1.25fr) minmax(280px,.95fr);gap:10px;align-items:stretch;margin:0 0 14px;}
 .supplier-search{margin:0;}
 .supplier-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--surface-glow);border:1px solid rgba(148,163,184,.28);border-radius:14px;padding:5px;box-shadow:var(--control-shadow);}
@@ -11487,11 +11499,11 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .supplier-card:hover{transform:translateY(-1px);box-shadow:var(--lift-shadow);border-color:rgba(31,78,140,.32);}
 .supplier-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
 .supplier-card-top svg{color:var(--muted);margin-top:2px;flex:none;}
-.supplier-card-name{font-weight:950;font-size:15.5px;line-height:1.25;text-wrap:balance;}
+.supplier-card-name{font-weight:700;font-size:15px;line-height:1.3;text-wrap:balance;}
 .supplier-tags{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:24px;}
-.supplier-tag{display:inline-flex;align-items:center;border-radius:999px;background:rgba(31,78,140,.09);color:var(--primary);border:1px solid rgba(31,78,140,.18);font-size:11.5px;font-weight:650;padding:3px 8px;}
+.supplier-tag{display:inline-flex;align-items:center;border-radius:999px;background:rgba(31,78,140,.09);color:var(--primary);border:1px solid rgba(31,78,140,.18);font-size:11.5px;font-weight:600;padding:3px 8px;}
 .supplier-tag.muted{background:var(--surface-2);color:var(--muted);border-color:var(--line);}
-.supplier-metrics{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;color:var(--muted);font-size:11px;font-weight:800;}
+.supplier-metrics{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;color:var(--muted);font-size:11px;font-weight:600;}
 .supplier-metrics span{min-width:0;border-radius:8px;background:rgba(100,116,139,.08);padding:3px 5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .supplier-linked-row .task-row-side{flex-direction:row;align-items:center;gap:8px;color:var(--muted);}
 .supplier-linked-row:hover .task-row-side{color:var(--primary);}
