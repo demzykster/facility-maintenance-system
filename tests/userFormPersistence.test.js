@@ -43,4 +43,15 @@ describe("user form persistence", () => {
     expect(userFormSource).toContain("const ok = await onSave(");
     expect(userFormSource).toContain("if (ok === false) setErr(SAVE_FAILED_MESSAGE)");
   });
+
+  it("does not expose or persist the generic shift picker for technicians", () => {
+    const start = source.indexOf("function UserForm(");
+    const end = source.indexOf("const ActivationControls", start);
+    const userFormSource = source.slice(start, end);
+
+    expect(userFormSource).toContain('role !== "admin" && role !== "executive" && role !== "tech"');
+    expect(userFormSource).toContain('shift: role !== "admin" && role !== "executive" && role !== "tech" ? shift : ""');
+    expect(userFormSource).toContain("shiftStart: role === \"tech\" ? shiftStart : \"\"");
+    expect(userFormSource).toContain("shiftEnd: role === \"tech\" ? shiftEnd : \"\"");
+  });
 });
