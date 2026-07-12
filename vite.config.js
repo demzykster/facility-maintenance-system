@@ -17,6 +17,18 @@ const buildTime = new Date().toISOString();
 
 export default defineConfig({
   cacheDir: "vite-cache",
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("/react/") || id.includes("/react-dom/") || id.includes("/scheduler/")) return "vendor-react";
+          if (id.includes("/lucide-react/") || id.includes("/lucide/")) return "vendor-icons";
+          return undefined;
+        }
+      }
+    }
+  },
   optimizeDeps: {
     include: ["jsqr"]
   },

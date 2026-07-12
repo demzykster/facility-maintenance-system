@@ -50,7 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget remains `19/24`.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup split after that warning is done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used. The main chunk is still large, but the latest local build moved from about 508 kB gzip to about 462 kB gzip for the startup JS chunk.
+- First startup split after that warning is done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used. React and lucide icons are now split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 303 kB gzip, with vendor React around 57 kB gzip and vendor icons around 101 kB gzip.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
 ## Recent Work Completed
@@ -67,6 +67,10 @@ Recent commits on `main`:
   - `html2canvas` is now dynamically imported only inside `captureAppIssueScreenshot`, so the screenshot renderer is not parsed on normal app startup.
   - Local build evidence after the split: `html2canvas` became a separate chunk of about 46.8 kB gzip, while the main app chunk dropped to about 461.7 kB gzip.
   - Important limitation: the app still ships a large `ClaudeMaintenanceApp.jsx` bundle. The next performance pass should lazy-split a real screen group or self-contained UI module.
+- `Split stable frontend vendor chunks`
+  - Vite now emits stable chunks for React and lucide icons, so repeated deploys can reuse cached framework/icon code while the changing app chunk is smaller.
+  - Local build evidence after the split: app chunk about 303 kB gzip, `vendor-react` about 57 kB gzip, `vendor-icons` about 101 kB gzip.
+  - Important limitation: this improves caching and parse organization, not the total amount of first-load JavaScript. A real screen-level lazy split is still the next larger performance step.
 - `b151d30 Stabilize user scope and supplier ticket routing`
   - Hardened `/api/users` so a scoped manager cannot overwrite an existing non-worker profile or an `authUserId`-backed elevated profile by re-saving it as a worker.
   - Preserved the scoped-manager ability to create/edit workers inside the manager's own department.
