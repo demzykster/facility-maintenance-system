@@ -5103,9 +5103,13 @@ function CleaningAdmin(p) {
   const cleanerTimeline = useMemo(() => {
     const groups = new Map();
     const addGroup = (id, name, unassigned = false) => {
-      const key = id || "__unassigned";
-      if (!groups.has(key)) groups.set(key, { id: key, name: name || "ללא אחראי", unassigned, items: [], conflicts: 0 });
-      return groups.get(key);
+      const label = String(name || "").trim();
+      const normalized = label.toLocaleLowerCase("he").replace(/\s+/g, " ");
+      const key = unassigned ? "__unassigned" : normalized ? `name:${normalized}` : `id:${id || "unknown"}`;
+      if (!groups.has(key)) groups.set(key, { id: key, name: label || "ללא אחראי", unassigned, items: [], itemKeys: new Set(), conflicts: 0 });
+      const group = groups.get(key);
+      if (!group.name && label) group.name = label;
+      return group;
     };
     list.filter((z) => z.active !== false).forEach((z) => {
       const ids = zoneCleanerIds(z);
@@ -5113,7 +5117,12 @@ function CleaningAdmin(p) {
       const wins = (z.windows || []).length ? z.windows : [{ id: `${z.id}-none`, time: "", tol: 0 }];
       assignees.forEach((person) => {
         const group = addGroup(person.id, person.name, person.unassigned);
-        wins.forEach((win) => group.items.push({ zone: z, win, timeKey: win.time || "—", zoneConflict: zoneWindowConflicts.has(`${z.id}|${win.time}`) }));
+        wins.forEach((win) => {
+          const itemKey = `${z.id}|${win.id || win.time || ""}`;
+          if (group.itemKeys.has(itemKey)) return;
+          group.itemKeys.add(itemKey);
+          group.items.push({ zone: z, win, timeKey: win.time || "—", zoneConflict: zoneWindowConflicts.has(`${z.id}|${win.time}`) });
+        });
       });
     });
     groups.forEach((group) => {
