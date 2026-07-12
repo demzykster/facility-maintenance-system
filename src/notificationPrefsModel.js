@@ -5,6 +5,8 @@ export const DEFAULT_LOCAL_NOTIFICATION_PREFS = Object.freeze({
   hidden: {}
 });
 
+const NOTIFICATION_READ_STATE_KEY_LIMIT = 500;
+
 export function normalizeLocalNotificationPrefs(value, defaults = DEFAULT_LOCAL_NOTIFICATION_PREFS) {
   if (!value || typeof value !== "object") return { ...defaults, hidden: { ...(defaults.hidden || {}) } };
   return {
@@ -36,11 +38,15 @@ export function parseNotificationReadState(raw) {
     if (value && typeof value === "object") {
       return {
         seenAt: parseNotificationSeenAt(value.seenAt),
-        seenKeys: Array.isArray(value.seenKeys) ? value.seenKeys.filter((key) => typeof key === "string") : []
+        seenKeys: Array.isArray(value.seenKeys) ? value.seenKeys.filter((key) => typeof key === "string").slice(-NOTIFICATION_READ_STATE_KEY_LIMIT) : []
       };
     }
   } catch {}
   return { seenAt: parseNotificationSeenAt(raw), seenKeys: [] };
+}
+
+export function normalizeNotificationReadState(value = {}) {
+  return parseNotificationReadState(JSON.stringify(value || {}));
 }
 
 export function notificationUserKey(session = {}) {
@@ -66,7 +72,7 @@ export function mergeNotificationReadStates(...states) {
     });
   return {
     seenAt: parsed.reduce((max, state) => Math.max(max, state.seenAt || 0), 0),
-    seenKeys: [...new Set(parsed.flatMap((state) => state.seenKeys || []))]
+    seenKeys: [...new Set(parsed.flatMap((state) => state.seenKeys || []))].slice(-NOTIFICATION_READ_STATE_KEY_LIMIT)
   };
 }
 

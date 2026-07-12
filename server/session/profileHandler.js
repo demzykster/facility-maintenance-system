@@ -1,6 +1,9 @@
 import { buildSessionPayload } from "./sessionHandler.js";
 import { bearerToken } from "./authCookie.js";
 import { sendServerError } from "../httpErrors.js";
+import { normalizeNotificationReadState } from "../../src/notificationPrefsModel.js";
+import { buildCmmsPinSessionPayload, createSupabaseCmmsPinSessionClient } from "./sessionHandler.js";
+import { verifyCmmsSessionToken } from "./cmmsSessionToken.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -39,9 +42,25 @@ export function validateProfilePayload(body = {}) {
     if (phone.length > 40) return { ok: false, error: "phone_too_long" };
     patch.phone = phone;
   }
+  if (Object.prototype.hasOwnProperty.call(body, "notificationReadState")) {
+    patch.notificationReadState = normalizeNotificationReadState(body.notificationReadState);
+  }
   if (!Object.keys(patch).length) return { ok: false, error: "profile_patch_empty" };
   return { ok: true, patch };
 }
+
+const cleanObject = (value) =>
+  value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+const notificationPrefsPatch = (profile = {}, readState = null) => {
+  if (!readState) return {};
+  return {
+    notification_prefs: {
+      ...cleanObject(profile.notification_prefs || profile.notificationPrefs),
+      readState
+    }
+  };
+};
 
 export function createSupabaseProfileUpdateClient({ url, anonKey, serviceRoleKey, fetchImpl = globalThis.fetch } = {}) {
   if (!url || !anonKey || !serviceRoleKey || !fetchImpl) return null;
@@ -129,6 +148,7 @@ export function createSupabaseProfileUpdateClient({ url, anonKey, serviceRoleKey
 export function createProfileHandler({
   env = process.env,
   profileClient = null,
+  pinSessionClient = null,
   fetchImpl = globalThis.fetch
 } = {}) {
   return async function profileHandler(req, res) {
@@ -153,6 +173,35 @@ export function createProfileHandler({
       const validated = validateProfilePayload(await readBody(req));
       if (!validated.ok) return json(res, 400, { error: validated.error });
 
+      const cmmsSecret = String(env.CMMS_SESSION_SECRET || "").trim();
+      const cmmsTokenSession = cmmsSecret ? verifyCmmsSessionToken(token, cmmsSecret) : null;
+      if (cmmsTokenSession) {
+        if (validated.patch.email || Object.prototype.hasOwnProperty.call(validated.patch, "phone")) {
+          return json(res, 400, { error: "profile_contact_patch_requires_password_session" });
+        }
+        const appUsersClient = pinSessionClient || createSupabaseCmmsPinSessionClient({
+          url: env.SUPABASE_URL,
+          serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+          fetchImpl
+        });
+        if (!appUsersClient || typeof client.updateAppUserProfileById !== "function") {
+          return json(res, 503, { error: "cmms_profile_not_configured" });
+        }
+        const currentUser = await appUsersClient.findPinSessionUser(cmmsTokenSession);
+        const current = buildCmmsPinSessionPayload(cmmsTokenSession, currentUser);
+        if (!current.ok) return json(res, current.error === "app_user_disabled" ? 403 : 401, { error: current.error });
+        const updatedProfile = validated.patch.notificationReadState
+          ? await client.updateAppUserProfileById(current.user.id, notificationPrefsPatch(currentUser, validated.patch.notificationReadState))
+          : currentUser;
+        const updatedUser = {
+          ...currentUser,
+          notificationPrefs: cleanObject(updatedProfile.notification_prefs || updatedProfile.notificationPrefs || currentUser.notificationPrefs)
+        };
+        const updatedSession = buildCmmsPinSessionPayload(cmmsTokenSession, updatedUser);
+        if (!updatedSession.ok) return json(res, updatedSession.error === "app_user_disabled" ? 403 : 401, { error: updatedSession.error });
+        return json(res, 200, updatedSession);
+      }
+
       const authUser = await client.getAuthUser(token);
       const profile = await client.getAppUserProfile(token, authUser?.id);
       const current = buildSessionPayload(authUser, profile);
@@ -165,6 +214,7 @@ export function createProfileHandler({
         appPatch.email = validated.patch.email;
       }
       if (Object.prototype.hasOwnProperty.call(validated.patch, "phone")) appPatch.phone = validated.patch.phone;
+      Object.assign(appPatch, notificationPrefsPatch(profile, validated.patch.notificationReadState));
       const updatedProfile = Object.keys(appPatch).length ? await client.updateAppUserProfile(authUser.id, appPatch) : profile;
       const session = buildSessionPayload(updatedAuthUser, updatedProfile);
       if (!session.ok) return sendServerError(req, res, new Error(session.error), {

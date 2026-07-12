@@ -11,6 +11,7 @@ import {
   productionAuthFromSupabase,
   productionLoginConfigFromEnv,
   productionLoginReady,
+  updateProductionNotificationReadState,
   updateProductionProfile,
   validateProductionInitialPassword
 } from "../src/productionLoginAdapter.js";
@@ -232,6 +233,44 @@ describe("productionLoginAdapter", () => {
       method: "PATCH",
       headers: expect.objectContaining({ authorization: "Bearer access-token" }),
       body: JSON.stringify({ email: "owner2@example.com", phone: "050-7654321" })
+    }));
+  });
+
+  it("updates notification read-state through the CMMS profile endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ok: true,
+          user: {
+            id: "app-user-1",
+            authUserId: "auth-user-1",
+            name: "Owner",
+            role: "admin",
+            notificationPrefs: { readState: { seenAt: 2000, seenKeys: ["n-1"] } },
+            mustChangePassword: false
+          }
+        });
+      }
+    });
+
+    const result = await updateProductionNotificationReadState({
+      accessToken: "access-token",
+      notificationReadState: { seenAt: 2000, seenKeys: ["n-1"] },
+      config: {
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon-key",
+        sessionApiUrl: "/api/session/me",
+        profileApiUrl: "/api/session/profile"
+      },
+      fetchImpl
+    });
+
+    expect(result.session.notificationPrefs).toEqual({ readState: { seenAt: 2000, seenKeys: ["n-1"] } });
+    expect(fetchImpl).toHaveBeenCalledWith("/api/session/profile", expect.objectContaining({
+      method: "PATCH",
+      headers: expect.objectContaining({ authorization: "Bearer access-token" }),
+      body: JSON.stringify({ notificationReadState: { seenAt: 2000, seenKeys: ["n-1"] } })
     }));
   });
 

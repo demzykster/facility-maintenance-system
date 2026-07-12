@@ -31,7 +31,7 @@ import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
-import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
+import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
 import { isOperationallyOverdue } from "./slaModel.js";
 import { resolveTechnicianTolerances } from "./technicianToleranceModel.js";
 import { findUserDuplicateGroups } from "./userDuplicateModel.js";
@@ -1528,6 +1528,7 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   const { primary: skey, legacy: legacySkey } = notificationReadStorageKeys(session);
   const pkey = `notifprefs:${userNotifKey}`;
   const bkey = `browsernotif:${userNotifKey}`;
+  const serverReadStateKey = JSON.stringify(session?.notificationPrefs?.readState || null);
   const [readState, setReadState] = useState(null), [toast, setToast] = useState(null);
   const [prefs, setPrefsState] = useState(DEFAULT_NOTIF_PREFS);
   const browserNotificationRef = useRef({ maxAt: 0, notifiedKeys: [], lastNotifiedAt: 0 }), initRef = useRef(false), browserStateLoadedRef = useRef(false);
@@ -1552,7 +1553,8 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
     let cancelled = false;
     setReadState(null);
     Promise.all([store.get(skey, false), legacySkey ? store.get(legacySkey, false) : Promise.resolve(null)]).then(([current, legacy]) => {
-      const next = mergeNotificationReadStates(current, legacy);
+      const serverReadState = session?.notificationPrefs?.readState || null;
+      const next = mergeNotificationReadStates(serverReadState, current, legacy);
       if (!cancelled) setReadState(next);
       if (!cancelled && legacy) {
         const currentNext = mergeNotificationReadStates(current);
@@ -1564,7 +1566,7 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
       }
     });
     return () => { cancelled = true; };
-  }, [skey, legacySkey]);
+  }, [skey, legacySkey, serverReadStateKey]);
   useEffect(() => {
     let cancelled = false;
     setPrefsState(parseLocalNotificationPrefs(null, DEFAULT_NOTIF_PREFS));
@@ -1613,7 +1615,16 @@ function useNotifications(session, tickets, pm, fleet, cfg, presence, zones = []
   const markRead = async (items = visible) => {
     const next = mergeNotificationReadStates(readState, notificationReadStateForEvents(items));
     setReadState(next);
-    await store.set(skey, JSON.stringify(next), false);
+    const localSave = store.set(skey, JSON.stringify(next), false);
+    if (session?.productionSession) {
+      void (async () => {
+        try {
+          const accessToken = await productionAccessToken();
+          await updateProductionNotificationReadState({ accessToken, notificationReadState: next, config: PRODUCTION_LOGIN_CONFIG });
+        } catch (_) {}
+      })();
+    }
+    await localSave;
   };
   return { events, unread, unreadKeys, unreadEvents, markRead, toast, dismissToast: () => setToast(null), prefs, setPrefs, presentKinds: [...new Set(rawEvents.map((e) => e.kind))] };
 }

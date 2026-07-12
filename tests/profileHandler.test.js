@@ -4,6 +4,7 @@ import {
   createSupabaseProfileUpdateClient,
   validateProfilePayload
 } from "../server/session/profileHandler.js";
+import { signCmmsSessionToken } from "../server/session/cmmsSessionToken.js";
 
 function createRes() {
   return {
@@ -36,6 +37,10 @@ describe("profile handler", () => {
     expect(validateProfilePayload({ email: "OWNER@Example.COM", phone: "050-1234567" })).toEqual({
       ok: true,
       patch: { email: "owner@example.com", phone: "050-1234567" }
+    });
+    expect(validateProfilePayload({ notificationReadState: { seenAt: "1000", seenKeys: ["a", 1, "b"] } })).toEqual({
+      ok: true,
+      patch: { notificationReadState: { seenAt: 1000, seenKeys: ["a", "b"] } }
     });
   });
 
@@ -94,6 +99,95 @@ describe("profile handler", () => {
       email: "owner2@example.com",
       phone: "050-1234567"
     });
+  });
+
+  it("updates current user notification read-state in app_users notification prefs", async () => {
+    const profileClient = {
+      getAuthUser: vi.fn().mockResolvedValue({ id: "auth-user-1", email: "owner@example.com" }),
+      getAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "admin",
+        name: "Owner",
+        email: "owner@example.com",
+        active: true,
+        notification_prefs: { enabled: { cleaning: false } },
+        must_change_password: false
+      }),
+      updateAuthEmail: vi.fn(),
+      updateAppUserProfile: vi.fn().mockResolvedValue({
+        id: "app-user-1",
+        auth_user_id: "auth-user-1",
+        role: "admin",
+        name: "Owner",
+        email: "owner@example.com",
+        active: true,
+        notification_prefs: { enabled: { cleaning: false }, readState: { seenAt: 2000, seenKeys: ["n-1"] } },
+        must_change_password: false
+      })
+    };
+    const handler = createProfileHandler({ profileClient });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { notificationReadState: { seenAt: 2000, seenKeys: ["n-1"] } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAuthEmail).not.toHaveBeenCalled();
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-user-1", {
+      notification_prefs: { enabled: { cleaning: false }, readState: { seenAt: 2000, seenKeys: ["n-1"] } }
+    });
+    expect(res.json().user.notificationPrefs).toEqual({
+      enabled: { cleaning: false },
+      readState: { seenAt: 2000, seenKeys: ["n-1"] }
+    });
+  });
+
+  it("updates notification read-state for CMMS PIN sessions without allowing contact changes", async () => {
+    const token = signCmmsSessionToken("worker-1", "worker", "11032", "secret", Date.now()).token;
+    const pinSessionClient = {
+      findPinSessionUser: vi.fn().mockResolvedValue({
+        id: "worker-1",
+        workerNo: "11032",
+        role: "worker",
+        name: "Worker",
+        active: true,
+        notificationPrefs: { enabled: { ppe: false } }
+      })
+    };
+    const profileClient = {
+      updateAppUserProfileById: vi.fn().mockResolvedValue({
+        id: "worker-1",
+        notification_prefs: { enabled: { ppe: false }, readState: { seenAt: 3000, seenKeys: ["w-1"] } }
+      })
+    };
+    const handler = createProfileHandler({
+      env: { CMMS_SESSION_SECRET: "secret" },
+      profileClient,
+      pinSessionClient
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      body: { notificationReadState: { seenAt: 3000, seenKeys: ["w-1"] } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfileById).toHaveBeenCalledWith("worker-1", {
+      notification_prefs: { enabled: { ppe: false }, readState: { seenAt: 3000, seenKeys: ["w-1"] } }
+    });
+    expect(res.json().user.notificationPrefs).toEqual({
+      enabled: { ppe: false },
+      readState: { seenAt: 3000, seenKeys: ["w-1"] }
+    });
+
+    const contactRes = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      body: { phone: "050-1234567" }
+    });
+    expect(contactRes.statusCode).toBe(400);
+    expect(contactRes.json()).toEqual({ error: "profile_contact_patch_requires_password_session" });
   });
 
   it("uses user bearer for identity and service role for updates", async () => {

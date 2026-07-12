@@ -102,6 +102,7 @@ export function cmmsSessionFromProductionUser(user = {}) {
     shift: user.shift || "",
     perms: user.permissions || user.perms || {},
     cleaningAccess: user.cleaningAccess || user.cleaning || false,
+    notificationPrefs: user.notificationPrefs || user.notification_prefs || {},
     mustChangePassword: user.mustChangePassword === true,
     productionSession: true
   };
@@ -214,7 +215,11 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
         mustChangePassword: data.user?.mustChangePassword === true
       };
     },
-    async updateProfile({ accessToken, email, phone }) {
+    async updateProfile({ accessToken, email, phone, notificationReadState }) {
+      const body = {};
+      if (email !== undefined) body.email = email;
+      if (phone !== undefined) body.phone = phone;
+      if (notificationReadState !== undefined) body.notificationReadState = notificationReadState;
       const response = await fetchImpl(config.profileApiUrl || "/api/session/profile", {
         method: "PATCH",
         credentials: "include",
@@ -222,7 +227,7 @@ export function createProductionLoginClient({ config, fetchImpl = globalThis.fet
           ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
           "content-type": "application/json"
         },
-        body: JSON.stringify({ email, phone })
+        body: JSON.stringify(body)
       });
       const data = await readJson(response);
       if (!response.ok || !data?.ok) {
@@ -311,6 +316,12 @@ export async function updateProductionProfile({ accessToken, email, phone, confi
   const client = createProductionLoginClient({ config, fetchImpl });
   if (!client) throw new Error("production_login_not_configured");
   return client.updateProfile({ accessToken, email, phone });
+}
+
+export async function updateProductionNotificationReadState({ accessToken, notificationReadState, config, fetchImpl } = {}) {
+  const client = createProductionLoginClient({ config, fetchImpl });
+  if (!client) throw new Error("production_login_not_configured");
+  return client.updateProfile({ accessToken, notificationReadState });
 }
 
 export async function validateProductionInitialPassword({ identifier, config, fetchImpl } = {}) {
