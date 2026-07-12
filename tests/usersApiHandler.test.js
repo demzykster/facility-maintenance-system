@@ -500,6 +500,47 @@ describe("users API handler", () => {
     expect(order).toEqual(["auth-email", "app-users"]);
   });
 
+  it("syncs executive role changes to app_users", async () => {
+    const profileClient = {
+      updateAuthEmail: vi.fn().mockResolvedValue({ id: "auth-2" }),
+      updateAppUserProfile: vi.fn().mockResolvedValue({
+        id: "manager-2",
+        auth_user_id: "auth-2",
+        role: "executive",
+        name: "Leadership",
+        email: "leadership@example.com",
+        active: true
+      })
+    };
+    const handler = createUsersApiHandler({
+      driver: { set: vi.fn() },
+      profileClient,
+      sessionClient: sessionClientFor({ role: "admin" })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer admin-token" },
+      body: {
+        user: {
+          id: "manager-2",
+          authUserId: "auth-2",
+          name: "Leadership",
+          role: "executive",
+          email: "LEADERSHIP@EXAMPLE.COM"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAuthEmail).toHaveBeenCalledWith("auth-2", "leadership@example.com");
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-2", expect.objectContaining({
+      role: "executive",
+      email: "leadership@example.com"
+    }));
+    expect(res.json().user).toMatchObject({ role: "executive", email: "leadership@example.com" });
+  });
+
   it("syncs login-capable users to app_users even when the temporary KV mirror is unavailable", async () => {
     const profileClient = {
       updateAuthEmail: vi.fn().mockResolvedValue({ id: "auth-2" }),
