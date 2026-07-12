@@ -26,10 +26,20 @@ export const cleanStringList = (values = []) =>
   [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
 
 export const userDepartments = (user = {}) =>
-  cleanStringList(user.depts?.length ? user.depts : (user.dept ? [user.dept] : []));
+  cleanStringList([
+    ...(Array.isArray(user.depts) ? user.depts : []),
+    ...(Array.isArray(user.departments) ? user.departments : []),
+    user.dept,
+    user.department
+  ]);
 
 export const fleetDepartments = (unit = {}) =>
-  cleanStringList(unit.depts?.length ? unit.depts : (unit.dept ? [unit.dept] : []));
+  cleanStringList([
+    ...(Array.isArray(unit.depts) ? unit.depts : []),
+    ...(Array.isArray(unit.departments) ? unit.departments : []),
+    unit.dept,
+    unit.department
+  ]);
 
 const overlaps = (left = [], right = []) => {
   const rightSet = new Set(right);

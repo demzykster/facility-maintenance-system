@@ -24,6 +24,12 @@ describe("ticket visibility model", () => {
     expect(visibleTicketsForSession(managerOtherZone, tickets, fleet).map((ticket) => ticket.id)).toEqual(["aircon", "legacy-a", "fleet-a", "own"]);
   });
 
+  it("supports production session department fields for managers", () => {
+    const manager = { id: "manager-a", role: "user", name: "Manager A", department: "A", departments: ["A"], mgrZones: ["משרדים"] };
+
+    expect(visibleTicketsForSession(manager, tickets, fleet).map((ticket) => ticket.id)).toEqual(["aircon", "legacy-a", "fleet-a", "own"]);
+  });
+
   it("does not give manager-wide visibility when no department or zone is configured", () => {
     const manager = { id: "manager-a", role: "user", name: "Manager A", depts: [], mgrZones: [] };
 

@@ -4,7 +4,7 @@ import { brandCompanyName, brandSiteSubtitle } from "../src/brandConfigModel.js"
 describe("brand config model", () => {
   it("uses default brand text only when no saved site name exists", () => {
     expect(brandCompanyName({})).toBe("CMMS CDSL");
-    expect(brandSiteSubtitle({})).toBe("ניהול תחזוקה, ציוד, משימות ותפעול");
+    expect(brandSiteSubtitle({})).toBe("ניהול אחזקה, צי, ניקיון וביגוד");
   });
 
   it("keeps an intentionally cleared site name empty", () => {

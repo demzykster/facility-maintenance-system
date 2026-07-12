@@ -124,6 +124,17 @@ describe("BI scope model", () => {
     expect(scope.zoneIds).toEqual(["z-manual", "z-a", "z-shared", "z-fac-a"]);
   });
 
+  it("supports production session department fields for department managers", () => {
+    const scope = biScopeForSession({ id: "manager-a", role: "user", department: "A", departments: ["A"], mgrZones: ["z-manual"] }, data);
+
+    expect(scope.kind).toBe("department");
+    expect(scope.departments).toEqual(["A"]);
+    expect(scope.tickets.map((ticket) => ticket.id)).toEqual(["t-fac-a", "t-fleet-a"]);
+    expect(scope.fleet.map((unit) => unit.id)).toEqual(["f-a"]);
+    expect(scope.rounds.map((round) => round.id)).toEqual(["r-a", "r-shared", "r-manual"]);
+    expect(scope.complaints.map((complaint) => complaint.id)).toEqual(["c-a", "c-shared", "c-manual"]);
+  });
+
   it("includes department facility tickets tied to scoped zones even without reporter department", () => {
     const scope = biScopeForSession({ role: "user", depts: ["A"] }, {
       ...data,

@@ -9,7 +9,7 @@ const LEVEL_RANK = Object.freeze({
   full: 4
 });
 
-const ACTIVE_ROLES = Object.freeze(["admin", "user", "tech", "worker", "cleaner"]);
+const ACTIVE_ROLES = Object.freeze(["admin", "executive", "user", "tech", "worker", "cleaner"]);
 
 const WRITE_RULES = Object.freeze([
   { prefixes: ["user:"], module: "users", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.user },

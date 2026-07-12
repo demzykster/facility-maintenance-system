@@ -43,13 +43,28 @@ function sessionClientFor(profile = {}) {
 describe("presence API handler", () => {
   it("lists presence for active roles", async () => {
     const driver = { list: vi.fn().mockResolvedValue([{ id: "user-1" }]), get: vi.fn() };
-    const handler = createPresenceApiHandler({ driver, sessionClient: sessionClientFor({ role: "worker" }) });
+    const handler = createPresenceApiHandler({ driver, sessionClient: sessionClientFor({ role: "executive" }) });
 
     const res = await call(handler, { headers: { authorization: "Bearer token" }, query: { limit: "25" } });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true, presence: [{ id: "user-1" }] });
     expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
+  });
+
+  it("allows executives to upsert their own presence", async () => {
+    const driver = { upsert: vi.fn().mockResolvedValue({ id: "user-1" }) };
+    const handler = createPresenceApiHandler({ driver, sessionClient: sessionClientFor({ role: "executive" }) });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer token" },
+      body: { presence: { id: "user-1", name: "Executive", lastSeen: 1783658300000 } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, presence: { id: "user-1", sourceKvKey: "presence:user-1" } });
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "user-1", name: "Executive" }));
   });
 
   it("allows users to upsert only their own presence", async () => {

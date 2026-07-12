@@ -70,12 +70,14 @@ describe("KV write permission policy", () => {
     expect(sessionHasKvWritePermission({ role: "tech" }, "ccomplaint:issue-1")).toBe(false);
     expect(kvWritePermissionError({ role: "tech" }, "ccomplaint:issue-1")).toBe("permission_required:cleaning:perform");
     expect(sessionHasKvWritePermission({ id: "tech-1", role: "tech" }, "presence:tech-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ id: "exec-1", role: "executive" }, "presence:exec-1")).toBe(true);
     expect(sessionHasKvWritePermission({ id: "worker-1", role: "worker" }, "presence:worker-1")).toBe(true);
     expect(sessionHasKvWritePermission({ id: "manager-1", role: "user" }, "presence:manager-1")).toBe(true);
     expect(sessionHasKvWritePermission({ id: "worker-2", role: "worker" }, "presence:worker-1")).toBe(false);
     expect(kvWritePermissionError({ id: "worker-2", role: "worker" }, "presence:worker-1")).toBe("permission_required:presence:self");
     expect(sessionHasKvWritePermission({ role: "user" }, "mtask:task-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "worker" }, "mtask:task-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ role: "executive" }, "appIssue:issue-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "cleaner" }, "appIssue:issue-1")).toBe(true);
   });
 

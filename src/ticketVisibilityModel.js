@@ -2,10 +2,20 @@ const cleanStringList = (values = []) =>
   [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
 
 export const ticketUserDepartments = (user = {}) =>
-  cleanStringList(user.depts?.length ? user.depts : (user.dept ? [user.dept] : []));
+  cleanStringList([
+    ...(Array.isArray(user.depts) ? user.depts : []),
+    ...(Array.isArray(user.departments) ? user.departments : []),
+    user.dept,
+    user.department
+  ]);
 
 export const ticketFleetDepartments = (unit = {}) =>
-  cleanStringList(unit?.depts?.length ? unit.depts : (unit?.dept ? [unit.dept] : []));
+  cleanStringList([
+    ...(Array.isArray(unit?.depts) ? unit.depts : []),
+    ...(Array.isArray(unit?.departments) ? unit.departments : []),
+    unit?.dept,
+    unit?.department
+  ]);
 
 export const ticketTrack = (ticket = {}) => ticket.track || (ticket.forkliftId ? "transport" : "facility");
 

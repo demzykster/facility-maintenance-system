@@ -6,7 +6,7 @@ import { buildSessionPayload, createSupabaseSessionClient } from "../session/ses
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { createSupabasePresenceDriverFromEnv } from "./supabasePresenceDriver.js";
 
-const ACTIVE_ROLES = Object.freeze(["admin", "user", "tech", "worker", "cleaner"]);
+const ACTIVE_ROLES = Object.freeze(["admin", "executive", "user", "tech", "worker", "cleaner"]);
 
 const json = (res, status, body) => {
   res.statusCode = status;
