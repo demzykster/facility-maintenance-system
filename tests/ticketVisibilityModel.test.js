@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { visibleTicketsForSession } from "../src/ticketVisibilityModel.js";
+import { visibleFleetForSession, visibleTicketsForSession } from "../src/ticketVisibilityModel.js";
 
 describe("ticket visibility model", () => {
   const tickets = [
@@ -39,5 +39,23 @@ describe("ticket visibility model", () => {
   it("keeps company-wide visibility explicit for admin and executive roles", () => {
     expect(visibleTicketsForSession({ role: "admin" }, tickets, fleet)).toEqual(tickets);
     expect(visibleTicketsForSession({ role: "executive" }, tickets, fleet)).toEqual(tickets);
+  });
+
+  it("limits transport choices to the actor departments", () => {
+    const fleetList = [
+      { id: "fork-a", depts: ["A"] },
+      { id: "fork-b", department: "B" },
+      { id: "fork-none" }
+    ];
+
+    expect(visibleFleetForSession({ role: "user", depts: ["A"] }, fleetList).map((unit) => unit.id)).toEqual(["fork-a"]);
+    expect(visibleFleetForSession({ role: "user", department: "B" }, fleetList).map((unit) => unit.id)).toEqual(["fork-b"]);
+    expect(visibleFleetForSession({ role: "tech", supplier: "LiftCo" }, [
+      { id: "liftco-a", supplier: "LiftCo" },
+      { id: "other-a", supplier: "Other" }
+    ]).map((unit) => unit.id)).toEqual(["liftco-a"]);
+    expect(visibleFleetForSession({ role: "user" }, fleetList)).toEqual([]);
+    expect(visibleFleetForSession({ role: "admin" }, fleetList)).toEqual(fleetList);
+    expect(visibleFleetForSession({ role: "executive" }, fleetList)).toEqual(fleetList);
   });
 });

@@ -87,7 +87,7 @@ import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, pres
 import { priorityToken, statusTokenTone, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
-import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibleTicketsForSession } from "./ticketVisibilityModel.js";
+import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibleFleetForSession, visibleTicketsForSession } from "./ticketVisibilityModel.js";
 import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValueToMs, statusMsToHours } from "./adminTicketManualEditModel.js";
 import { normalizeScopedWorkerForActor, scopedUsersForActor, scopedWorkerDefaultsForActor, userDepartments, userShift } from "./userScopeModel.js";
 
@@ -10092,6 +10092,14 @@ function TicketForm(p) {
   const managerMaintZones = session.role === "user" ? (session.mgrZones || []).filter((z) => configuredMaintZones.includes(z)) : [];
   const facilityZoneOptions = managerMaintZones.length ? managerMaintZones : configuredMaintZones;
   const facilityZone = facilityZoneOptions.includes(zone) ? zone : (facilityZoneOptions[0] || zone);
+  const ticketFleet = useMemo(() => visibleFleetForSession(session, fleet), [session, fleet]);
+  useEffect(() => {
+    if (track === "transport" && forkliftId && !ticketFleet.some((unit) => unit.id === forkliftId)) {
+      setForkliftId("");
+      setDriverInv("");
+      setDriverInvId("");
+    }
+  }, [track, forkliftId, ticketFleet]);
   const handlePhoto = (file) => { if (!file) return; const r = new FileReader(); r.onload = (e) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const c = document.createElement("canvas"); c.width = width; c.height = height; c.getContext("2d").drawImage(img, 0, 0, width, height); setPhoto(c.toDataURL("image/jpeg", 0.6)); }; img.src = e.target.result; }; r.readAsDataURL(file); };
   const aiSuggest = async () => {
     const text = `${subject}\n${description}`.trim(); if (!text && !photo) { setErr("כתבו נושא/תיאור או צרפו תמונה"); return; }
@@ -10126,9 +10134,9 @@ function TicketForm(p) {
     const closedAt = retroOn ? datetimeValueToMs(retro.closedAt, datetimeValueToMs(retro.updatedAt, now)) : null;
     const updatedAt = retroOn ? datetimeValueToMs(retro.updatedAt, closedAt || now) : now;
     const pr = track === "transport" ? dtOf(downtimeType, config).prio : priority;
-    const hrs = (isAdmin && slaOn) ? (Number(slaH) || DEFAULT_SLA[pr]) : slaForTicket({ track, forkliftId, category, priority: pr }, config, fleet);
+    const hrs = (isAdmin && slaOn) ? (Number(slaH) || DEFAULT_SLA[pr]) : slaForTicket({ track, forkliftId, category, priority: pr }, config, ticketFleet);
     const dueAt = retroOn ? datetimeValueToMs(retro.dueAt, createdAt + hrs * 3600000) : createdAt + hrs * 3600000;
-    const selectedFleet = track === "transport" ? fleet.find((f) => f.id === forkliftId) : null;
+    const selectedFleet = track === "transport" ? ticketFleet.find((f) => f.id === forkliftId) : null;
     const routedSupplier = track === "transport" ? (selectedFleet?.supplier || "") : supplierAssign;
     let assignee = "", routedTech = track === "transport" || undefined, mgrExec = undefined, routeText;
     if (track === "transport") routeText = routedSupplier ? `הקריאה נפתחה והועברה לספק ${routedSupplier}` : "הקריאה נפתחה והועברה למאגר שינוע";
@@ -10184,10 +10192,10 @@ function TicketForm(p) {
     <div className="body">
       <label className="field"><span>נושא *</span><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={track === "transport" ? "לדוגמה: רעש חריג בהרמה" : "לדוגמה: תאורה לא עובדת ברציף 3"} /></label>
       {track === "transport" ? (<>
-        <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={fleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} /></div>
+        <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={ticketFleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} /></div>
         {forkliftId && (<>
         <div className="field"><span>משמרת האירוע</span><select value={incShift} onChange={(e) => setIncShift(e.target.value)}><option value="">— בחר —</option>{workShiftsOf(config).map((sh) => <option key={sh.id} value={sh.id}>{sh.label}</option>)}</select></div>
-        <UserPicker users={users} config={config} saveUser={saveUser} session={session} canManageUsers={canManageUsers(session)} value={driverInvId} onChange={(u) => { setDriverInvId(u ? u.id : ""); setDriverInv(u ? u.name : ""); }} label="נהג מעורב (לדו״ח נזקים)" lockRole="worker" suggestName={(() => { const fk = fleet.find((f) => f.id === forkliftId); return (incShift && fk && fk.drivers && fk.drivers[incShift] && fk.drivers[incShift].name) || ""; })()} hint="חפשו לפי שם או מספר. לא קיים? אפשר ליצור כאן." />
+        <UserPicker users={users} config={config} saveUser={saveUser} session={session} canManageUsers={canManageUsers(session)} value={driverInvId} onChange={(u) => { setDriverInvId(u ? u.id : ""); setDriverInv(u ? u.name : ""); }} label="נהג מעורב (לדו״ח נזקים)" lockRole="worker" suggestName={(() => { const fk = ticketFleet.find((f) => f.id === forkliftId); return (incShift && fk && fk.drivers && fk.drivers[incShift] && fk.drivers[incShift].name) || ""; })()} hint="חפשו לפי שם או מספר. לא קיים? אפשר ליצור כאן." />
         </>)}
         <div className="field"><span>מצב הכלי *</span><div className="dt-list">{dtLevels(config).map((d) => <button key={d.id} className={"dt-pick" + (downtimeType === d.id ? " on" : "")} onClick={() => setDowntimeType(d.id)} style={downtimeType === d.id ? { borderColor: d.color, background: d.color + "14" } : {}}><span className="dt-dot" style={{ background: d.color }} /><div><div className="dt-name">{d.label}{d.oos ? " · מושבת" : ""}</div><div className="dt-desc">{d.desc}</div></div></button>)}</div></div>
       </>) : (<>
@@ -10197,7 +10205,7 @@ function TicketForm(p) {
         <label className="field"><span>ציוד (אופציונלי)</span><input value={asset} onChange={(e) => setAsset(e.target.value)} /></label>
       </>)}
       <label className="field"><span>תיאור התקלה *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
-      {track === "transport" && forkliftId && (() => { const fk = fleet.find((f) => f.id === forkliftId); return eligibleTechs({ track: "transport", forkliftId, supplier: fk?.supplier || "" }, users, fleet).length === 0; })() && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2", marginTop: 0 }}><AlertTriangle size={13} /> אין כרגע טכנאי שינוע פעיל שיכול לקבל קריאה זו. אפשר להמשיך — הקריאה תסומן «ללא מטפל» ומנהל המערכת יקבל התראה לשיבוץ ידני.</div>}
+      {track === "transport" && forkliftId && (() => { const fk = ticketFleet.find((f) => f.id === forkliftId); return eligibleTechs({ track: "transport", forkliftId, supplier: fk?.supplier || "" }, users, fleet).length === 0; })() && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2", marginTop: 0 }}><AlertTriangle size={13} /> אין כרגע טכנאי שינוע פעיל שיכול לקבל קריאה זו. אפשר להמשיך — הקריאה תסומן «ללא מטפל» ומנהל המערכת יקבל התראה לשיבוץ ידני.</div>}
       {isAdmin && <div className="admin-route">
         <div className="ar-title"><ShieldCheck size={14} /> פתיחה כמנהל</div>
         {track === "facility" && (() => {

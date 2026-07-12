@@ -17,6 +17,24 @@ export const ticketFleetDepartments = (unit = {}) =>
     unit?.department
   ]);
 
+const hasCompanyWideFleetAccess = (session = {}) =>
+  session.role === "admin" || session.role === "executive";
+
+export function visibleFleetForSession(session = {}, fleet = []) {
+  const list = Array.isArray(fleet) ? fleet : [];
+  if (hasCompanyWideFleetAccess(session)) return list;
+
+  if (session.role === "tech" && session.supplier) {
+    return list.filter((unit) => unit?.supplier === session.supplier);
+  }
+
+  const departments = ticketUserDepartments(session);
+  if (!departments.length) return [];
+  return list.filter((unit) =>
+    ticketFleetDepartments(unit).some((department) => departments.includes(department))
+  );
+}
+
 export const ticketTrack = (ticket = {}) => ticket.track || (ticket.forkliftId ? "transport" : "facility");
 
 export const ownsTicketRecord = (session = {}, ticket = {}) =>
