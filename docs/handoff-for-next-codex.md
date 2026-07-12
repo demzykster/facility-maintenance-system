@@ -56,6 +56,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Refine supplier types and startup scope`
+  - Changed supplier detail from a generic module/industry picker to first-level supplier types: `אחזקת מבנה`, `אחזקת כלי שינוע`, and `ספק ציוד`.
+  - Supplier detail activity is now contextual: transport suppliers show linked tools, facility maintenance suppliers show linked tickets, and goods suppliers show purchase orders. Clothing/goods suppliers no longer show a technicians tab.
+  - Supplier cards use calmer, consistent typography and type-specific metrics.
+  - Startup no longer tries to load settings-only app issue reports for executive/leadership sessions, avoiding the false `403`/save-failure noise after BI login.
+  - Verified with full Vitest suite, static syntax check, build, release check, and live login smoke.
 - `Revert fleet internal numbers` (current commit)
   - Safely reverted the separate fleet internal-number field, import support, tests, and Supabase migration at owner request.
   - Fleet identification returns to the existing code, chassis number, and license number behavior.

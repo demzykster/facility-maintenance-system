@@ -2202,20 +2202,29 @@ export default function App() {
 	    }
 	    if (NORMALIZED_SETTINGS_RECORDS_AUTHORITY) {
 	      normalizedLoads.push((async () => {
+        const canLoadAppIssues = canManageSettings(sessionRef.current || {});
 	      try {
 	        const normalizedSettingsRecords = await settingsRecordsForAuthority({
           kvLocations: [],
           kvAppIssues: [],
-          provider: NORMALIZED_SETTINGS_RECORDS_PROVIDER,
+          provider: canLoadAppIssues ? NORMALIZED_SETTINGS_RECORDS_PROVIDER : {
+            ...NORMALIZED_SETTINGS_RECORDS_PROVIDER,
+            appIssues: { list: async () => ({ ok: true, appIssues: [] }) }
+          },
           normalizedAuthority: true
         });
         locationRows = normalizedSettingsRecords.locations;
-        appIssueRows = normalizedSettingsRecords.appIssues;
+        appIssueRows = canLoadAppIssues ? normalizedSettingsRecords.appIssues : [];
       } catch (error) {
-        [locationRows, appIssueRows] = await fallbackMany([
-          STARTUP_KV_PREFIXES.locations,
-          STARTUP_KV_PREFIXES.appIssues
-        ]);
+        if (canLoadAppIssues) {
+          [locationRows, appIssueRows] = await fallbackMany([
+            STARTUP_KV_PREFIXES.locations,
+            STARTUP_KV_PREFIXES.appIssues
+          ]);
+        } else {
+          locationRows = await fallbackRows(STARTUP_KV_PREFIXES.locations);
+          appIssueRows = [];
+        }
         void recordAutomaticAppIssue(settingsRecordsAuthorityFailureIssue({
           action: "load",
           resource: "records",
@@ -4349,7 +4358,7 @@ function UserApp(p) {
               const list = filter === "closed" ? ticketRows.filter((t) => !isOpen(t)) : ticketRows;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -7119,29 +7128,43 @@ const ppeOrderQty = (o) => (o.lines || []).reduce((s, l) => s + (l.qty || 0), 0)
 const ppeOrderRecv = (o) => (o.lines || []).reduce((s, l) => s + (l.received || 0), 0);
 
 const supMeta = (config, name) => (config && config.supplierMeta && config.supplierMeta[name]) || {};
-const SUP_BASE_SCOPES = [{ id: "transport", label: "תחבורה / מלגזות" }, { id: "clothing", label: "ביגוד וציוד מגן" }];
-const supplierFacilityScope = (id) => `facility:${id}`;
-const supplierScopeOptions = (config) => [
-  ...SUP_BASE_SCOPES,
-  ...((config?.categories || CATEGORIES).map((c) => ({ id: supplierFacilityScope(c.id), label: c.label, group: "facility" }))),
+const SUPPLIER_TYPES = [
+  { id: "facility", label: "אחזקת מבנה", short: "מבנה", Icon: Wrench },
+  { id: "transport", label: "אחזקת כלי שינוע", short: "שינוע", Icon: Truck },
+  { id: "goods", label: "ספק ציוד", short: "ציוד", Icon: Package }
 ];
+const supplierFacilityScope = (id) => `facility:${id}`;
+const supplierFacilityScopeOptions = (config) => (config?.categories || CATEGORIES).map((c) => ({ id: supplierFacilityScope(c.id), label: c.label, group: "facility" }));
 const supplierScopesFromMeta = (industries, config) => {
   const raw = Array.isArray(industries) ? industries : [];
-  const out = new Set(raw.filter((id) => id && id !== "facility"));
+  const out = new Set(raw.filter((id) => id && id !== "facility" && id !== "transport" && id !== "clothing" && id !== "goods"));
   if (raw.includes("facility")) (config?.categories || CATEGORIES).forEach((c) => out.add(supplierFacilityScope(c.id)));
   return [...out];
 };
+const supplierTypeFromMeta = (meta = {}, config) => {
+  if (SUPPLIER_TYPES.some((item) => item.id === meta.type)) return meta.type;
+  const raw = Array.isArray(meta.industries) ? meta.industries : [];
+  const scopes = supplierScopesFromMeta(raw, config);
+  if (raw.includes("transport")) return "transport";
+  if (raw.includes("clothing") || raw.includes("goods")) return "goods";
+  if (raw.includes("facility") || scopes.some((id) => id.startsWith("facility:"))) return "facility";
+  return "";
+};
+const supplierTypeLabel = (type) => SUPPLIER_TYPES.find((item) => item.id === type)?.label || "ללא סוג";
+const supplierTypeShort = (type) => SUPPLIER_TYPES.find((item) => item.id === type)?.short || "ללא סוג";
 const supIndLabel = (id, config) => {
-  const option = supplierScopeOptions(config).find((x) => x.id === id);
+  const option = supplierFacilityScopeOptions(config).find((x) => x.id === id);
   if (option) return option.group === "facility" ? `מבנה · ${option.label}` : option.label;
   if (id === "facility") return "מבנה ותחזוקה";
   return id;
 };
-const supplierHasTransportScope = (config, name) => supplierScopesFromMeta(supMeta(config, name).industries, config).includes("transport");
-const supplierHasPpeScope = (config, name) => supplierScopesFromMeta(supMeta(config, name).industries, config).includes("clothing");
+const supplierHasTransportScope = (config, name) => supplierTypeFromMeta(supMeta(config, name), config) === "transport";
+const supplierHasPpeScope = (config, name) => supplierTypeFromMeta(supMeta(config, name), config) === "goods";
 const supplierHasFacilityCategory = (config, name, category) => {
-  const scopes = supplierScopesFromMeta(supMeta(config, name).industries, config);
-  return scopes.includes("facility") || (!!category && scopes.includes(supplierFacilityScope(category)));
+  const meta = supMeta(config, name);
+  if (supplierTypeFromMeta(meta, config) !== "facility") return false;
+  const scopes = supplierScopesFromMeta(meta.industries, config).filter((id) => id.startsWith("facility:"));
+  return scopes.length === 0 || (!!category && scopes.includes(supplierFacilityScope(category)));
 };
 const supplierCandidatesForTicket = (config, ticket, fleet = []) => {
   const names = config?.suppliers || [];
@@ -7176,7 +7199,7 @@ function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config 
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{o.id ? "עריכת הזמנה" : "הזמנת רכש חדשה"}</div></div>
     <div className="body">
       {err && <div className="note" style={{ color: "#DC2626", marginBottom: 8 }}>{err}</div>}
-      <label className="field"><span>ספק</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— בחר ספק —</option>{(((config && config.suppliers) || []).filter((n) => { const scopes = supplierScopesFromMeta(supMeta(config, n).industries, config); return scopes.length === 0 || supplierHasPpeScope(config, n); })).map((n) => <option key={n} value={n}>{n}</option>)}{supplier && !((config && config.suppliers) || []).includes(supplier) && <option value={supplier}>{supplier}</option>}</select></label>
+      <label className="field"><span>ספק</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— בחר ספק —</option>{(((config && config.suppliers) || []).filter((n) => supplierHasPpeScope(config, n) || !supplierTypeFromMeta(supMeta(config, n), config))).map((n) => <option key={n} value={n}>{n}</option>)}{supplier && !((config && config.suppliers) || []).includes(supplier) && <option value={supplier}>{supplier}</option>}</select></label>
       <SectionTitle>פריטים בהזמנה</SectionTitle>
       {!o.id && (o.lines || []).length > 0 && <div className="hint" style={{ marginBottom: 8 }}>מולא אוטומטית לפי חוסרים — אפשר לערוך כמויות, להוסיף או למחוק.</div>}
       <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, marginBottom: 8 }}>
@@ -7816,7 +7839,7 @@ function AdminApp(p) {
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
           {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
           {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
-          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} canManage={mayManageSuppliers} />}
+          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} />}
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
@@ -9380,10 +9403,11 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     {workers.length === 0 && !showEmptyGroups && <Empty text="לא נמצאו עובדים" />}
   </div>;
 }
-function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, users, onBack, onRename, onDelete, onOpenFleet, onOpenUser, canManage }) {
+function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, users, onBack, onRename, onDelete, onOpenFleet, onOpenUser, onOpenTicket, canManage }) {
   const meta = supMeta(config, name);
   const [tab, setTab] = useState("details");
-  const [ind, setInd] = useState(() => supplierScopesFromMeta(meta.industries || [], config));
+  const [supplierType, setSupplierType] = useState(() => supplierTypeFromMeta(meta, config));
+  const [facilityScopes, setFacilityScopes] = useState(() => supplierScopesFromMeta(meta.industries || [], config).filter((id) => id.startsWith("facility:")));
   const [hp, setHp] = useState(meta.hp || "");
   const [address, setAddress] = useState(meta.address || "");
   const [notes, setNotes] = useState(meta.notes || "");
@@ -9393,14 +9417,15 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
   const [busy, setBusy] = useState(false);
   const [nm, setNm] = useState(name);
   const [cd, setCd] = useState(false);
-  const toggleInd = (id) => canManage && setInd((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
+  const toggleFacilityScope = (id) => canManage && setFacilityScopes((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
   const addContact = () => canManage && setContacts((c) => [...c, { id: uid(), name: "", phone: "", email: "", role: "" }]);
   const updContact = (i, patch) => canManage && setContacts((c) => c.map((x, j) => j === i ? { ...x, ...patch } : x));
   const delContact = (i) => canManage && setContacts((c) => c.filter((_, j) => j !== i));
   const saveMeta = async () => {
     if (busy) return false;
     const m = { ...(config.supplierMeta || {}) };
-    m[name] = { industries: supplierScopesFromMeta(ind, config), hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) };
+    const industries = supplierType === "transport" ? ["transport"] : supplierType === "goods" ? ["clothing"] : supplierType === "facility" ? facilityScopes : [];
+    m[name] = { type: supplierType, industries, hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) };
     setBusy(true); setErr("");
     const ok = await saveConfig({ ...config, supplierMeta: m });
     setBusy(false);
@@ -9413,35 +9438,43 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
   };
   const relOrders = (orders || []).filter((o) => o.supplier === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const relFleet = (fleet || []).filter((f) => f.supplier === name);
+  const relTickets = (tickets || []).filter((ticket) => ticket.supplier === name || ticket.closure?.costSupplier === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const relTechs = (users || []).filter((u) => u.role === "tech" && (u.supplier || "") === name).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
   const stLbl = (st) => st === "draft" ? "טיוטה" : st === "sent" ? "נשלחה" : st === "received" ? "התקבלה" : st || "—";
-  const scopeOptions = supplierScopeOptions(config);
-  const baseScopeOptions = scopeOptions.filter((x) => !x.group);
-  const facilityScopeOptions = scopeOptions.filter((x) => x.group === "facility");
-  const displayScopes = ind.length > 4 ? ind.slice(0, 3) : ind;
-  const Tab = ({ id, label, n }) => <button onClick={() => setTab(id)} className="btn-ghost sm" style={{ fontWeight: tab === id ? 800 : 500, borderBottom: tab === id ? "2px solid var(--primary)" : "2px solid transparent", borderRadius: 0 }}>{label}{n != null ? ` (${n})` : ""}</button>;
+  const facilityScopeOptions = supplierFacilityScopeOptions(config);
+  const displayScopes = supplierType === "facility" ? (facilityScopes.length > 4 ? facilityScopes.slice(0, 3) : facilityScopes) : [];
+  const showTechnicians = supplierType === "facility" || supplierType === "transport";
+  const activityLabel = supplierType === "transport" ? "כלים" : supplierType === "goods" ? "הזמנות" : "קריאות";
+  const activityCount = supplierType === "transport" ? relFleet.length : supplierType === "goods" ? relOrders.length : relTickets.length;
+  const tabs = [
+    { id: "details", label: "פרטים" },
+    showTechnicians ? { id: "technicians", label: "טכנאים", n: relTechs.length } : null,
+    { id: "activity", label: activityLabel, n: activityCount },
+    { id: "invoices", label: "חשבוניות" }
+  ].filter(Boolean);
+  useEffect(() => { if (!tabs.some((item) => item.id === tab)) setTab("details"); }, [tab, showTechnicians, supplierType]);
+  const Tab = ({ id, label, n }) => <button onClick={() => setTab(id)} className={"supplier-tab" + (tab === id ? " on" : "")}>{label}{n != null ? ` (${n})` : ""}</button>;
   return (<div>
     <button className="btn-ghost sm" onClick={onBack} style={{ marginBottom: 8 }}><ChevronLeft size={15} /> חזרה לרשימה</button>
     <SectionTitle><Building2 size={16} /> {name}</SectionTitle>
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 10px" }}>{ind.length === 0 ? <span className="hint">ללא תחום</span> : <>{displayScopes.map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id, config)}</span>)}{ind.length > displayScopes.length && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>+{ind.length - displayScopes.length}</span>}</>}</div>
-    <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 14, flexWrap: "wrap" }}><Tab id="details" label="פרטים" /><Tab id="technicians" label="טכנאים" n={relTechs.length} /><Tab id="activity" label="הזמנות וכלים" n={relOrders.length + relFleet.length} /><Tab id="invoices" label="חשבוניות" /></div>
+    <div className="supplier-tags supplier-detail-tags"><span className={"supplier-tag" + (!supplierType ? " muted" : "")}>{supplierTypeLabel(supplierType)}</span>{supplierType === "facility" && <>{facilityScopes.length === 0 ? <span className="supplier-tag muted">כל קטגוריות המבנה</span> : <>{displayScopes.map((id) => <span key={id} className="supplier-tag muted">{supIndLabel(id, config)}</span>)}{facilityScopes.length > displayScopes.length && <span className="supplier-tag muted">+{facilityScopes.length - displayScopes.length}</span>}</>}</>}</div>
+    <div className="supplier-tabs">{tabs.map((item) => <Tab key={item.id} {...item} />)}</div>
     {tab === "details" && <div>
       <label className="field"><span>שם הספק</span><div style={{ display: "flex", gap: 8 }}><input value={nm} onChange={(e) => setNm(e.target.value)} readOnly={!canManage} style={{ flex: 1 }} />{canManage && nm.trim() && nm.trim() !== name && onRename && <button className="btn-ghost sm" onClick={() => onRename(name, nm)}>שנה שם</button>}</div></label>
-      <div className="field"><span>תחומי ספק</span>
+      <div className="field"><span>סוג ספק</span>
+        <div className="supplier-type-grid">{SUPPLIER_TYPES.map(({ id, label, Icon }) => <button key={id} type="button" disabled={!canManage} className={"supplier-type-card" + (supplierType === id ? " on" : "")} onClick={() => { setSupplierType(id); if (id !== "facility") setFacilityScopes([]); }}><Icon size={17} /><span>{label}</span></button>)}</div>
+      </div>
+      {supplierType === "facility" && <div className="field"><span>קטגוריות אחזקת מבנה</span>
         <details className="supplier-scope-picker" open>
-          <summary><span>בחירת מודולים וקטגוריות</span><span>{ind.length ? countLabel(ind.length, "שיוך", "שיוכים") : "ללא שיוך"}</span></summary>
+          <summary><span>בחירת קטגוריות קיימות</span><span>{facilityScopes.length ? countLabel(facilityScopes.length, "קטגוריה", "קטגוריות") : "כל הקטגוריות"}</span></summary>
           <div className="supplier-scope-body">
             <div className="supplier-scope-block">
-              <div className="supplier-scope-title">מודולים</div>
-              <div className="chk-grid">{baseScopeOptions.map((x) => <label key={x.id} className={"chk-pill" + (ind.includes(x.id) ? " on" : "")}><input type="checkbox" disabled={!canManage} checked={ind.includes(x.id)} onChange={() => toggleInd(x.id)} /> {x.label}</label>)}</div>
-            </div>
-            <div className="supplier-scope-block">
-              <div className="supplier-scope-title">מבנה / אחזקה לפי קטגוריה קיימת</div>
-              <div className="chk-grid">{facilityScopeOptions.map((x) => <label key={x.id} className={"chk-pill" + (ind.includes(x.id) ? " on" : "")}><input type="checkbox" disabled={!canManage} checked={ind.includes(x.id)} onChange={() => toggleInd(x.id)} /> {x.label}</label>)}</div>
+              <div className="supplier-scope-title">אם לא נבחרה קטגוריה, הספק ייחשב מתאים לכל קריאות המבנה.</div>
+              <div className="chk-grid">{facilityScopeOptions.map((x) => <label key={x.id} className={"chk-pill" + (facilityScopes.includes(x.id) ? " on" : "")}><input type="checkbox" disabled={!canManage} checked={facilityScopes.includes(x.id)} onChange={() => toggleFacilityScope(x.id)} /> {x.label}</label>)}</div>
             </div>
           </div>
         </details>
-      </div>
+      </div>}
       <label className="field"><span>ח.פ. / מספר עוסק</span><input className="ltr-input" dir="ltr" value={hp} onChange={(e) => setHp(e.target.value)} readOnly={!canManage} placeholder="לדוגמה: 514123456" /></label>
       <label className="field"><span>כתובת</span><input value={address} onChange={(e) => setAddress(e.target.value)} readOnly={!canManage} placeholder="רחוב, עיר" /></label>
       <div className="field"><div className="row-between"><span>אנשי קשר</span>{canManage && <button className="btn-ghost sm" onClick={addContact}><Plus size={14} /> איש קשר</button>}</div>
@@ -9453,10 +9486,16 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
       {canManage && onDelete && (!cd ? <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C" }} onClick={() => setCd(true)}><Trash2 size={14} /> מחיקת ספק</button> : <button className="btn-ghost full" style={{ marginTop: 10, color: "#B91C1C", fontWeight: 800 }} onClick={() => onDelete(name)}>לחצו שוב לאישור מחיקה</button>)}
     </div>}
     {tab === "activity" && <div>
-      <SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle>
-      {relOrders.length === 0 ? <div className="hint" style={{ marginBottom: 12 }}>אין הזמנות לספק זה.</div> : <div className="task-list" style={{ marginBottom: 12 }}>{relOrders.map((o) => <div key={o.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{countLabel((o.lines || []).length, "פריט", "פריטים")} · {stLbl(o.status)}</div><div className="task-row-sub">{o.note || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(o.createdAt)}</span></div></div>)}</div>}
-      <SectionTitle><Truck size={15} /> כלים / ליסינג</SectionTitle>
-      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => { const note = unitNote(f, config); return <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {unitDesc(f, config)}</div>{note ? <div className="task-row-sub">{note}</div> : null}</div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>; })}</div>}
+      {supplierType === "transport" ? <>
+        <SectionTitle><Truck size={15} /> כלים / ליסינג</SectionTitle>
+        {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => { const note = unitNote(f, config); return <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {unitDesc(f, config)}</div>{note ? <div className="task-row-sub">{note}</div> : null}</div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>; })}</div>}
+      </> : supplierType === "goods" ? <>
+        <SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle>
+        {relOrders.length === 0 ? <div className="hint">אין הזמנות לספק זה.</div> : <div className="task-list">{relOrders.map((o) => <div key={o.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{countLabel((o.lines || []).length, "פריט", "פריטים")} · {stLbl(o.status)}</div><div className="task-row-sub">{o.note || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(o.createdAt)}</span></div></div>)}</div>}
+      </> : <>
+        <SectionTitle><ClipboardList size={15} /> קריאות אחזקה</SectionTitle>
+        {relTickets.length === 0 ? <div className="hint">אין קריאות המשויכות לספק זה.</div> : <div className="task-list">{relTickets.map((ticket) => <button key={ticket.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenTicket ? onOpenTicket(ticket.id) : null} disabled={!onOpenTicket} style={{ borderInlineStartColor: stOf(ticket.status).color || "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{ticketNo(ticket)} · {ticket.subject || ticket.asset || "קריאה"}</div><div className="task-row-sub">{catOf(ticket).label} · {ticket.zone || ticket.location || "ללא מיקום"} · {stOf(ticket.status).label}</div>{ticket.description ? <div className="task-row-sub">{ticket.description}</div> : null}</div><div className="task-row-side"><span className="task-due">{fmtDate(ticket.createdAt)}</span><ChevronLeft size={16} /></div></button>)}</div>}
+      </>}
     </div>}
     {tab === "technicians" && <div>
       <SectionTitle><HardHat size={15} /> טכנאים משויכים</SectionTitle>
@@ -9473,7 +9512,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
   </div>);
 }
 
-function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, canManage }) {
+function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, onOpenTicket, canManage }) {
   const [sel, setSel] = useState(null);
   const [openFleetId, setOpenFleetId] = useState(null);
   const [openUser, setOpenUser] = useState(null);
@@ -9508,7 +9547,7 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
     if (!names.includes(n) && await saveConfig({ ...config, suppliers: [...names, n] }) === false) return setErr("הוספת הספק לא נשמרה. נסו שוב.");
     setAdding(""); setSel(n);
   };
-  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} users={users} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} onOpenUser={setOpenUser} canManage={canManage} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}{openUser && <Overlay persistent onClose={() => setOpenUser(null)}><UserForm user={openUser} config={config} users={users} canDelete={false} canManageWorkerAccess={false} onCancel={() => setOpenUser(null)} onSave={async (u) => { if (!saveUser) return false; const ok = await saveUser(u); if (ok !== false) setOpenUser(null); return ok; }} /></Overlay>}</div>;
+  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} users={users} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} onOpenUser={setOpenUser} onOpenTicket={onOpenTicket} canManage={canManage} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}{openUser && <Overlay persistent onClose={() => setOpenUser(null)}><UserForm user={openUser} config={config} users={users} canDelete={false} canManageWorkerAccess={false} onCancel={() => setOpenUser(null)} onSave={async (u) => { if (!saveUser) return false; const ok = await saveUser(u); if (ok !== false) setOpenUser(null); return ok; }} /></Overlay>}</div>;
   const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
   return (<div className="supplier-shell">
     <div className="supplier-head">
@@ -9523,7 +9562,14 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
       </div>}
     </div>
     {err && <div className="err" style={{ marginBottom: 10 }}>{err}</div>}
-    {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div className="supplier-grid">{shown.map((n) => { const m = supMeta(config, n); const scopes = supplierScopesFromMeta(m.industries || [], config); const shownScopes = scopes.slice(0, 3); const activity = supplierActivityCounts({ supplier: n, orders, fleet, contacts: m.contacts || [] }); return <button key={n} className="supplier-card" onClick={() => setSel(n)}><div className="supplier-card-top"><div className="supplier-card-name">{n}</div><ChevronLeft size={16} /></div><div className="supplier-tags">{scopes.length === 0 ? <span className="supplier-tag muted">ללא תחום</span> : <>{shownScopes.map((id) => <span key={id} className="supplier-tag">{supIndLabel(id, config)}</span>)}{scopes.length > shownScopes.length && <span className="supplier-tag muted">+{scopes.length - shownScopes.length}</span>}</>}</div><div className="supplier-metrics"><span>{countLabel(activity.linked, "רשומה", "רשומות")}</span><span>{countLabel(activity.orders, "הזמנה", "הזמנות")}</span><span>{countLabel(activity.fleet, "כלי", "כלים")}</span>{activity.contacts ? <span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span> : null}</div></button>; })}</div>}
+    {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div className="supplier-grid">{shown.map((n) => {
+      const m = supMeta(config, n);
+      const type = supplierTypeFromMeta(m, config);
+      const facilityScopes = supplierScopesFromMeta(m.industries || [], config).filter((id) => id.startsWith("facility:"));
+      const shownScopes = facilityScopes.slice(0, 2);
+      const activity = supplierActivityCounts({ supplier: n, orders, fleet, tickets, contacts: m.contacts || [] });
+      return <button key={n} className="supplier-card" onClick={() => setSel(n)}><div className="supplier-card-top"><div className="supplier-card-name">{n}</div><ChevronLeft size={16} /></div><div className="supplier-tags"><span className={"supplier-tag" + (!type ? " muted" : "")}>{supplierTypeShort(type)}</span>{type === "facility" && (facilityScopes.length === 0 ? <span className="supplier-tag muted">כל קטגוריות המבנה</span> : <>{shownScopes.map((id) => <span key={id} className="supplier-tag muted">{supIndLabel(id, config).replace("מבנה · ", "")}</span>)}{facilityScopes.length > shownScopes.length && <span className="supplier-tag muted">+{facilityScopes.length - shownScopes.length}</span>}</>)}</div><div className="supplier-metrics">{type === "transport" ? <><span>{countLabel(activity.fleet, "כלי", "כלים")}</span><span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span></> : type === "goods" ? <><span>{countLabel(activity.orders, "הזמנה", "הזמנות")}</span><span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span></> : type === "facility" ? <><span>{countLabel(activity.tickets, "קריאה", "קריאות")}</span><span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span></> : <><span>{countLabel(activity.linked, "רשומה", "רשומות")}</span><span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span></>}</div></button>;
+    })}</div>}
   </div>);
 }
 
@@ -9988,7 +10034,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
           <button className={"pr-pick" + (techScope === "facility" ? " on" : "")} onClick={() => setTechScope("facility")} style={techScope === "facility" ? { background: "#16202E", color: "#fff", borderColor: "#16202E" } : {}}><Building2 size={15} /> מבנה</button>
         </div><div className="hint">תחום העבודה קובע אילו קריאות הטכנאי רואה. שיוך לספק קובע את צוות הקבלן שאליו הוא שייך.</div></div>
         {techScope === "facility" && <div className="field"><span>קטגוריות מבנה (בחרו לפחות אחת) *</span><div className="cat-grid">{(config.categories || CATEGORIES).map((c) => { const on = techCats.includes(c.id); const m = catMeta(c.id); return <button key={c.id} className={"cat-pick" + (on ? " on" : "")} onClick={() => setTechCats((s) => on ? s.filter((x) => x !== c.id) : [...s, c.id])} style={on ? { borderColor: m.color, background: m.color + "1f" } : {}}><m.Icon size={19} color={m.color} /><span>{c.label}</span></button>; })}</div></div>}
-        <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— פנימי / ללא ספק —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select><div className="hint">{techScope === "transport" ? "בקריאות שינוע, טכנאי של ספק יראה את כלי הספק שלו." : "בכרטיס הספק יוצג צוות הטכנאים המשויך אליו."}</div></label>
+        <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— פנימי / ללא ספק —</option>{(() => { const supplierOptions = config.suppliers.filter((s) => { const type = supplierTypeFromMeta(supMeta(config, s), config); return !type || type === "transport" || type === "facility"; }); return <>{supplierOptions.map((s) => <option key={s}>{s}</option>)}{supplier && !supplierOptions.includes(supplier) && <option value={supplier}>{supplier}</option>}</>; })()}</select><div className="hint">{techScope === "transport" ? "בקריאות שינוע, טכנאי של ספק יראה את כלי הספק שלו." : "בכרטיס הספק יוצג צוות הטכנאים המשויך אליו."}</div></label>
         <div className="field-row"><label className="field"><span>שעת תחילת משמרת</span><TimeInput value={shiftStart} onChange={setShiftStart} /></label><label className="field"><span>שעת סיום (יציאה אוטומטית)</span><TimeInput value={shiftEnd} onChange={setShiftEnd} /></label></div>
         <label className="field"><span>סבילות משמרת אישית (דקות)</span><input type="number" min="0" value={techGrace} onChange={(e) => setTechGrace(e.target.value)} placeholder={`ברירת מחדל: ${Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)}`} /><div className="hint">השאירו ריק כדי להשתמש בברירת המחדל. ערך אישי משנה את בדיקת האיחור והיציאה המוקדמת של הטכנאי הזה בלבד.</div></label>
       </>) : role === "worker" ? (<>
@@ -11971,7 +12017,7 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .supplier-shell{padding:2px;}
 .supplier-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0 12px;}
 .supplier-head .section-title{margin:0;}
-.supplier-total{display:inline-flex;align-items:center;justify-content:center;min-height:32px;border:1px solid rgba(148,163,184,.26);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:650;padding:4px 11px;box-shadow:var(--control-shadow);}
+.supplier-total{display:inline-flex;align-items:center;justify-content:center;min-height:32px;border:1px solid rgba(148,163,184,.26);border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:500;padding:4px 11px;box-shadow:var(--control-shadow);}
 .supplier-command{display:grid;grid-template-columns:minmax(240px,1.25fr) minmax(280px,.95fr);gap:10px;align-items:stretch;margin:0 0 14px;}
 .supplier-search{margin:0;}
 .supplier-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--surface-glow);border:1px solid rgba(148,163,184,.28);border-radius:14px;padding:5px;box-shadow:var(--control-shadow);}
@@ -11981,19 +12027,27 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .supplier-card:hover{transform:translateY(-1px);box-shadow:var(--lift-shadow);border-color:rgba(31,78,140,.32);}
 .supplier-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
 .supplier-card-top svg{color:var(--muted);margin-top:2px;flex:none;}
-.supplier-card-name{font-weight:700;font-size:15px;line-height:1.3;text-wrap:balance;}
+.supplier-card-name{font-weight:500;font-size:15px;line-height:1.3;text-wrap:balance;}
 .supplier-tags{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:24px;}
-.supplier-tag{display:inline-flex;align-items:center;border-radius:999px;background:rgba(31,78,140,.09);color:var(--primary);border:1px solid rgba(31,78,140,.18);font-size:11.5px;font-weight:600;padding:3px 8px;}
+.supplier-tag{display:inline-flex;align-items:center;border-radius:999px;background:rgba(31,78,140,.09);color:var(--primary);border:1px solid rgba(31,78,140,.18);font-size:11.5px;font-weight:500;padding:3px 8px;}
 .supplier-tag.muted{background:var(--surface-2);color:var(--muted);border-color:var(--line);}
-.supplier-metrics{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;color:var(--muted);font-size:11px;font-weight:600;}
+.supplier-metrics{margin-top:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;color:var(--muted);font-size:11px;font-weight:500;}
 .supplier-metrics span{min-width:0;border-radius:8px;background:rgba(100,116,139,.08);padding:3px 5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.supplier-detail-tags{margin:4px 0 10px;}
+.supplier-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap;}
+.supplier-tab{min-height:36px;padding:8px 10px;border-bottom:2px solid transparent;border-radius:0;color:var(--muted);font-size:13px;font-weight:500;}
+.supplier-tab.on{border-bottom-color:var(--primary);color:var(--ink);}
+.supplier-type-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.supplier-type-card{min-height:48px;display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--muted);font-size:13px;font-weight:500;padding:8px 10px;box-shadow:var(--control-shadow);}
+.supplier-type-card.on{border-color:rgba(31,78,140,.45);background:var(--primary-soft);color:var(--primary);}
+.supplier-type-card:disabled{cursor:default;opacity:.72;}
 .supplier-scope-picker{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;margin-top:6px;}
-.supplier-scope-picker summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;cursor:pointer;font-weight:700;list-style:none;}
+.supplier-scope-picker summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;cursor:pointer;font-weight:500;list-style:none;}
 .supplier-scope-picker summary::-webkit-details-marker{display:none;}
-.supplier-scope-picker summary span:last-child{font-size:12px;color:var(--muted);font-weight:600;}
+.supplier-scope-picker summary span:last-child{font-size:12px;color:var(--muted);font-weight:500;}
 .supplier-scope-body{display:grid;gap:12px;padding:0 12px 12px;}
 .supplier-scope-block{border-top:1px solid var(--line);padding-top:12px;}
-.supplier-scope-title{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:8px;}
+.supplier-scope-title{font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;}
 .supplier-linked-row .task-row-side{flex-direction:row;align-items:center;gap:8px;color:var(--muted);}
 .supplier-linked-row:hover .task-row-side{color:var(--primary);}
 .supplier-tech-row{width:100%;text-align:start;cursor:pointer;}
@@ -12815,6 +12869,7 @@ body *{visibility:hidden!important;}
   .supplier-head{align-items:flex-start;}
   .supplier-grid{grid-template-columns:1fr;}
   .supplier-add{grid-template-columns:1fr;}
+  .supplier-type-grid{grid-template-columns:1fr;}
   .topbar{padding:8px 12px;gap:6px;align-items:center;}
   .topbar .tb-left{display:none;}
   .tb-actions{width:100%;justify-content:flex-start;gap:4px;}

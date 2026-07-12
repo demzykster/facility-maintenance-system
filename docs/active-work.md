@@ -4,7 +4,7 @@
 
 - Active branch: `none`.
 - Current branch: `main`.
-- Last completed work: supplier routing is now supplier-first instead of technician-first. Supplier cards can add new suppliers reliably, supplier detail has a live `תחומי ספק` picker driven by existing facility categories plus transport/PPE scopes, technician rows open the technician user card, and ticket creation/detail routing writes `ticket.supplier` so all technicians linked to that supplier see the queue before one of them accepts it. The separate fleet internal-number change was reverted at owner request.
+- Last completed work: supplier routing is now supplier-first instead of technician-first. Supplier cards can add new suppliers reliably, supplier detail now uses first-level supplier types (`אחזקת מבנה`, `אחזקת כלי שינוע`, `ספק ציוד`) with contextual activity tabs, technician rows open the technician user card only for service suppliers, and ticket creation/detail routing writes `ticket.supplier` so all technicians linked to that supplier see the queue before one of them accepts it. Executive/leadership sessions no longer try to load settings-only app issue records during startup. The separate fleet internal-number change was reverted at owner request.
 - Current work: none.
 
 ## Current Product Direction

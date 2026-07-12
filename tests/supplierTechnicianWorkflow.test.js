@@ -16,7 +16,7 @@ describe("supplier technician workflow wiring", () => {
     expect(detailSource).toContain("users");
     expect(detailSource).toContain('u.role === "tech"');
     expect(detailSource).toContain("u.supplier || \"\"");
-    expect(detailSource).toContain('label="טכנאים"');
+    expect(detailSource).toContain('label: "טכנאים"');
     expect(detailSource).toContain("onOpenUser");
     expect(detailSource).toContain("supplier-tech-row");
     expect(panelSource).toContain("users={users}");
@@ -54,10 +54,13 @@ describe("supplier technician workflow wiring", () => {
   });
 
   it("uses live supplier scopes for facility and PPE categories", () => {
+    expect(source).toContain("SUPPLIER_TYPES");
+    expect(source).toContain("supplierTypeFromMeta");
     expect(source).toContain("supplierFacilityScope");
-    expect(source).toContain("supplierScopeOptions");
+    expect(source).toContain("supplierFacilityScopeOptions");
     expect(source).toContain("supplier-scope-picker");
     expect(source).toContain("supplierHasPpeScope");
     expect(source).toContain("supplierHasFacilityCategory");
+    expect(source).toContain("קטגוריות אחזקת מבנה");
   });
 });
