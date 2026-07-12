@@ -10157,7 +10157,7 @@ function TicketDetail(p) {
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
         {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <div className="meta"><AlertTriangle size={15} color={r.color} /><div><div className="meta-lbl">רמת סיכון</div><div className="meta-val" style={{ color: r.color, fontWeight: 700 }}>{r.label}</div></div></div> : null; })()}
       </div>
-      {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickSave} />}
+      {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} users={p.users || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickSave} />}
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>
       {photo && <><SectionTitle>תמונה</SectionTitle><img className="detail-photo" src={photo} alt="" /></>}
       {afterPhoto && <><SectionTitle><CheckCircle2 size={15} /> תמונת ביצוע</SectionTitle><img className="detail-photo" src={afterPhoto} alt="" /></>}
@@ -10393,14 +10393,22 @@ function AdminTicketManualPanel({ ticket, config, session, fleet, onSave }) {
   </details>;
 }
 
-function AdminTicketQuickEdit({ field, ticket, config, fleet, onCancel, onSave }) {
+function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCancel, onSave }) {
   const track = ticket.track || (ticket.forkliftId ? "transport" : "facility");
   const supplierOptions = supplierCandidatesForTicket(config, ticket, fleet || []);
+  const zoneOptions = Array.from(new Set([ticket.zone, ...(config.zones || [])].filter(Boolean)));
+  const fleetOptions = (fleet || []).filter((unit) => unit?.id || unit?.code || unit?.license || unit?.chassis);
+  const assigneeOptions = Array.from(new Set([
+    ticket.assignee,
+    ...users
+      .filter((user) => user?.active !== false && ["admin", "user", "tech"].includes(user.role))
+      .map((user) => user.name)
+  ].filter(Boolean)));
   const [value, setValue] = useState(() => {
     if (field === "category") return ticket.category || "";
     if (field === "priority") return ticket.priority || "medium";
     if (field === "zone") return ticket.zone || "";
-    if (field === "asset") return ticket.asset || "";
+    if (field === "asset") return track === "transport" ? (ticket.forkliftId || "") : (ticket.asset || "");
     if (field === "assignee") return ticket.assignee || "";
     if (field === "supplier") return ticket.supplier || "";
     return "";
@@ -10422,7 +10430,11 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, onCancel, onSave }
     }
     if (field === "priority") return onSave("עדיפות", { priority: clean || "medium" });
     if (field === "zone") return onSave("מיקום", { zone: clean });
-    if (field === "asset") return onSave(track === "transport" ? "כלי" : "ציוד", { asset: clean });
+    if (field === "asset") {
+      const unit = fleetOptions.find((item) => item.id === clean);
+      if (track === "transport" && unit) return onSave("כלי", { forkliftId: unit.id, asset: unitLabel(unit, config) });
+      return onSave(track === "transport" ? "כלי" : "ציוד", { asset: clean });
+    }
     if (field === "assignee") return onSave("אחראי", { assignee: clean, mgrExec: false });
     if (field === "supplier") return onSave("ספק", { supplier: clean, assignee: "", routedTech: clean ? true : ticket.routedTech });
   };
@@ -10433,6 +10445,12 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, onCancel, onSave }
       <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{(config.categories || CATEGORIES).map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
     ) : field === "priority" ? (
       <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+    ) : field === "zone" ? (
+      <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{zoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}</select>
+    ) : field === "asset" && track === "transport" ? (
+      <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{fleetOptions.map((unit) => <option key={unit.id} value={unit.id}>{unitLabel(unit, config)}</option>)}</select>
+    ) : field === "assignee" ? (
+      <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}><option value="">— ללא אחראי —</option>{assigneeOptions.map((name) => <option key={name} value={name}>{name}</option>)}</select>
     ) : field === "supplier" ? (
       <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}><option value="">— ללא ספק —</option>{(ticket.supplier && !supplierOptions.includes(ticket.supplier) ? [ticket.supplier, ...supplierOptions] : supplierOptions).map((name) => <option key={name} value={name}>{name}</option>)}</select>
     ) : (
@@ -11366,8 +11384,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-top:8px;}
 .meta{display:flex;gap:9px;align-items:flex-start;position:relative;min-width:0;}.meta svg{margin-top:2px;flex-shrink:0;}.meta>div{min-width:0;flex:1;}
 .meta-lbl{font-size:11.5px;color:var(--muted);}.meta-val{font-size:13.5px;font-weight:600;margin-top:1px;}
-.meta-edit{width:28px;height:28px;border:1px solid var(--line);border-radius:9px;background:var(--surface-glow);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;margin-inline-start:auto;cursor:pointer;}
-.meta-edit:hover{border-color:rgba(31,78,140,.34);color:var(--primary);background:var(--primary-soft);}
+.meta-edit{position:absolute;inset-inline-start:0;top:0;width:24px;height:24px;border:0;border-radius:50%;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;opacity:.58;cursor:pointer;}
+.meta-edit:hover{color:var(--primary);background:var(--primary-soft);opacity:1;}
 .admin-quick-edit{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:12px;box-shadow:var(--control-shadow);}
 .admin-quick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:13.5px;font-weight:650;color:var(--ink);}
 .icon-btn.tiny{width:30px;height:30px;min-width:30px;}
