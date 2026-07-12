@@ -4,6 +4,7 @@ import {
   initialBrowserNotificationState,
   mergeNotificationReadStates,
   nextBrowserNotificationEvent,
+  notificationDisplayEvents,
   notificationReadStateForEvents,
   notificationReadStorageKeys,
   parseBrowserNotificationState,
@@ -16,20 +17,21 @@ import {
 
 describe("notification prefs model", () => {
   it("returns defaults when no local prefs exist", () => {
-    expect(parseLocalNotificationPrefs(null)).toEqual({ sort: "newest", group: false, hidden: {} });
+    expect(parseLocalNotificationPrefs(null)).toEqual({ sort: "newest", group: false, showRead: false, hidden: {} });
   });
 
   it("keeps valid saved preferences", () => {
-    expect(parseLocalNotificationPrefs(JSON.stringify({ sort: "oldest", group: true, hidden: { sla: true } }))).toEqual({
+    expect(parseLocalNotificationPrefs(JSON.stringify({ sort: "oldest", group: true, showRead: true, hidden: { sla: true } }))).toEqual({
       sort: "oldest",
       group: true,
+      showRead: true,
       hidden: { sla: true }
     });
   });
 
   it("repairs invalid saved preferences", () => {
-    expect(parseLocalNotificationPrefs("{bad")).toEqual({ sort: "newest", group: false, hidden: {} });
-    expect(parseLocalNotificationPrefs(JSON.stringify({ hidden: "bad" }))).toEqual({ sort: "newest", group: false, hidden: {} });
+    expect(parseLocalNotificationPrefs("{bad")).toEqual({ sort: "newest", group: false, showRead: false, hidden: {} });
+    expect(parseLocalNotificationPrefs(JSON.stringify({ hidden: "bad" }))).toEqual({ sort: "newest", group: false, showRead: false, hidden: {} });
   });
 
   it("reads local notification seen timestamps", () => {
@@ -73,6 +75,14 @@ describe("notification prefs model", () => {
     const read = { seenAt: 1000, seenKeys: ["dynamic"] };
 
     expect(unreadNotificationKeySet([{ key: "dynamic", at: 2000 }, { key: "new", at: 2000 }], read)).toEqual(new Set(["new"]));
+  });
+
+  it("hides read notifications from the panel unless history is requested", () => {
+    const events = [{ key: "read", at: 1000 }, { key: "new", at: 2000 }];
+    const unread = new Set(["new"]);
+
+    expect(notificationDisplayEvents(events, unread, { showRead: false })).toEqual([{ key: "new", at: 2000 }]);
+    expect(notificationDisplayEvents(events, unread, { showRead: true })).toEqual(events);
   });
 
   it("does not fire a browser notification again for the same event key", () => {

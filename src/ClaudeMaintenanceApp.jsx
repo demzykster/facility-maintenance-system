@@ -26,7 +26,7 @@ import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecyc
 import { findTaskImportMatch } from "./taskImportModel.js";
 import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionModel.js";
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
-import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
+import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
@@ -7372,12 +7372,27 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings }), [session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings]);
   const isAdminBI = session?.role === "admin";
   const openTickets = scope.tickets.filter(isOpen);
+  const biNow = Date.now();
+  const dayMs = 86400000;
   const isTransportTicket = (ticket) => ticket.track === "transport" || (!ticket.track && ticket.forkliftId);
   const facilityOpen = openTickets.filter((ticket) => !isTransportTicket(ticket));
   const transportOpen = openTickets.filter(isTransportTicket);
   const slaBreaches = openTickets.filter(isOverdue);
   const critical = transportOpen.filter((ticket) => ticket.downtimeType === "critical");
   const waiting = openTickets.filter((ticket) => ticket.status === "waiting" || ticket.status === "pending_user" || ticket.status === "pending_admin");
+  const ageBuckets = [
+    { key: "today", label: "היום", min: 0, max: 1, color: "var(--primary)", focus: { maxAgeDays: 1 } },
+    { key: "week", label: "2-7 ימים", min: 1, max: 7, color: "#3E6DB0", focus: { minAgeDays: 1, maxAgeDays: 7 } },
+    { key: "aging", label: "8-30 ימים", min: 7, max: 30, color: "#8A6F3D", focus: { minAgeDays: 7, maxAgeDays: 30 } },
+    { key: "stale", label: "מעל 30 ימים", min: 30, max: Infinity, color: "#8E2F2B", focus: { minAgeDays: 30 } }
+  ].map((bucket) => {
+    const items = openTickets.filter((ticket) => {
+      const ageDays = Math.max(0, (biNow - (ticket.createdAt || biNow)) / dayMs);
+      return ageDays >= bucket.min && ageDays < bucket.max;
+    });
+    return { ...bucket, value: items.length };
+  });
+  const maxAgeBucket = Math.max(1, ...ageBuckets.map((bucket) => bucket.value));
   const pmOverdue = scope.pm.filter((task) => task.active !== false && daysLeft(task.nextDue) < 0);
   const expiringDocs = scope.fleet.map((unit) => ({ unit, status: docStatus(unit, config) })).filter((row) => row.status.d != null && row.status.d <= 30).sort((a, b) => a.status.d - b.status.d);
   const cleaningZones = scope.zones.filter((zone) => zone.active !== false);
@@ -7390,8 +7405,6 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const ppeLowItems = scope.ppeItems.filter((item) => item.active !== false && ppeLow(item));
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
-  const biNow = Date.now();
-  const dayMs = 86400000;
   const createdInTrend = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= period.trendStart);
   const createdPrevTrend = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= period.previousTrendStart && (ticket.createdAt || 0) < period.trendStart);
   const closedInTrend = scope.tickets.filter((ticket) => !isOpen(ticket) && (ticket.closure?.signedAt || ticket.updatedAt || 0) >= period.trendStart);
@@ -7651,6 +7664,11 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
       </section>
 
       <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>גיל הקריאות</b><span>האם העבודה חדשה או הופכת לחוב פתוח</span></div></div>
+        {ageBuckets.map((bucket) => <Bar key={bucket.key} label={bucket.label} value={bucket.value} max={maxAgeBucket} color={bucket.color} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · גיל קריאות · ${bucket.label}`, ...bucket.focus } })} />)}
+      </section>
+
+      <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>למה זה תקוע</b><span>צווארי בקבוק וסיבות המתנה מתוך הקריאות הפתוחות</span></div></div>
         {lifecycleBottlenecks.length > 0 && <div className="bi-subtitle">שלבים פעילים</div>}
         {lifecycleBottlenecks.length ? lifecycleBottlenecks.map((stage) => <Bar key={stage.key} label={stage.label} value={stage.n} max={maxLifecycleN} suffix={stage.ms ? ` · ${fmtDur(stage.ms)} · ${lifecycleOwnerLabel(stage.owner)}` : ` · ${lifecycleOwnerLabel(stage.owner)}`} color={stage.kind === "waiting" ? "#B45309" : stage.kind === "rework" ? "#B91C1C" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · שלב · ${stage.label}`, lifecycleKey: stage.key } })} />) : <div className="note">אין כרגע צווארי בקבוק פתוחים.</div>}
@@ -7791,6 +7809,11 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config
   if (focus.waitReason && ticket.waitingReason !== focus.waitReason) return false;
   if (focus.lifecycleKey && !ticketHasLifecycleStage(ticket, focus.lifecycleKey, { isOpen })) return false;
   if (focus.assignee && ticket.assignee !== focus.assignee) return false;
+  if (focus.minAgeDays != null || focus.maxAgeDays != null) {
+    const ageDays = Math.max(0, (Date.now() - (ticket.createdAt || Date.now())) / 86400000);
+    if (focus.minAgeDays != null && ageDays < Number(focus.minAgeDays)) return false;
+    if (focus.maxAgeDays != null && ageDays >= Number(focus.maxAgeDays)) return false;
+  }
   if (focus.overdue && !ticketMissedSla(ticket, config)) return false;
   if (focus.criticalEscalated && !isCriticalEscalated(ticket, config)) return false;
   if (focus.activeCriticalTransport && !(currentTrack === "transport" && ticket.downtimeType === "critical" && !isCriticalEscalated(ticket, config))) return false;
@@ -11118,8 +11141,10 @@ function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
     const unread = notif.unreadKeys?.has(ev.key);
     return <button key={ev.key} className={"notif-item" + (ev.ticketId || ev.go ? " clk" : "") + (unread ? " unread" : "")} onClick={() => click(ev)}><div className={"ni-dot " + ev.kind} /><div className="ni-body"><div className="ni-title">{ev.title}{unread && <span className="ni-new">חדש</span>}</div><div className="ni-text">{ev.body}</div><div className="ni-time">{timeAgo(ev.at)}</div></div>{(ev.ticketId || ev.go) && <ChevronLeft size={15} className="ni-go" />}</button>;
   };
-  const hiddenCount = Math.max(0, notif.events.length - 60);
-  const list = showAll ? notif.events : notif.events.slice(0, 60);
+  const displayEvents = notificationDisplayEvents(notif.events, notif.unreadKeys, prefs);
+  const readHiddenCount = Math.max(0, notif.events.length - displayEvents.length);
+  const hiddenCount = Math.max(0, displayEvents.length - 60);
+  const list = showAll ? displayEvents : displayEvents.slice(0, 60);
   const grouped = prefs.group ? NOTIF_KINDS.map((k) => [k, list.filter((e) => e.kind === k.kind)]).filter(([, arr]) => arr.length) : null;
   const unreadPreview = (notif.unreadEvents || []).slice(0, 3);
   return (<div className="ovl-backdrop notif-back" onClick={onClose}><div className="notif-panel" role="dialog" aria-modal="true" aria-label="התראות" onClick={(e) => e.stopPropagation()}>
@@ -11129,6 +11154,7 @@ function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
     {settings && <div className="notif-settings">
       <div className="ns-row"><span className="ns-lbl">מיון</span><div className="seg-tabs s2 mini"><button className={prefs.sort === "newest" ? "on" : ""} onClick={() => setPrefs({ sort: "newest" })}>חדש→ישן</button><button className={prefs.sort === "oldest" ? "on" : ""} onClick={() => setPrefs({ sort: "oldest" })}>ישן→חדש</button></div></div>
       <label className="ns-row clk"><span className="ns-lbl">קיבוץ לפי קטגוריה</span><input type="checkbox" checked={!!prefs.group} onChange={(e) => setPrefs({ group: e.target.checked })} /></label>
+      <label className="ns-row clk"><span className="ns-lbl">הצגת היסטוריה שנקראה</span><input type="checkbox" checked={!!prefs.showRead} onChange={(e) => setPrefs({ showRead: e.target.checked })} /></label>
       <div className="ns-sub">סינון סוגי התראות</div>
       <div className="ns-note">הסתרה כאן משפיעה רק על התצוגה שלך.</div>
       <div className="ns-kinds">{NOTIF_KINDS.map((k) => <label key={k.kind} className="ns-kind"><input type="checkbox" checked={!prefs.hidden[k.kind]} onChange={(e) => setPrefs({ hidden: { ...prefs.hidden, [k.kind]: !e.target.checked } })} /><span className={"ni-dot " + k.kind} />{k.label}</label>)}</div>
@@ -11144,7 +11170,8 @@ function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
       </div>
       {pushMsg && <div className="notif-push-msg">{pushMsg}</div>}
     </div>}
-    <div className="notif-list">{list.length === 0 ? <div className="empty sm"><Bell size={28} /><div className="empty-t">אין התראות</div></div>
+    {readHiddenCount > 0 && !prefs.showRead && <button className="notif-read-toggle" onClick={() => setPrefs({ showRead: true })}>הצג גם {readHiddenCount} שנקראו</button>}
+    <div className="notif-list">{list.length === 0 ? <div className="empty sm"><Bell size={28} /><div className="empty-t">{notif.events.length ? "אין התראות חדשות" : "אין התראות"}</div></div>
       : grouped ? grouped.map(([k, arr]) => <div key={k.kind} className="ni-group"><div className="ni-group-h"><span className={"ni-dot " + k.kind} /> {k.label} <span className="ni-group-n">{arr.length}</span></div>{arr.map(item)}</div>)
       : list.map(item)}</div>
     {hiddenCount > 0 && <button className="notif-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "הצג פחות" : `הצג עוד ${hiddenCount} ישנות יותר`}</button>}
@@ -11363,6 +11390,10 @@ a{color:inherit;}
 @media (hover:hover) and (pointer:fine){
   .tcard:hover,.supplier-card:hover,.pm-card:hover,.task-row:hover,.ppe-request-row:hover,.wk-card:hover,.doc-line-click:hover,.attn-row:hover,.insight-row.clickable:hover{box-shadow:var(--lift-shadow);transform:translateY(-1px);}
   .btn-primary:hover:not(:disabled),.btn-ghost:hover:not(:disabled),.btn-danger:hover:not(:disabled),.btn-close:hover:not(:disabled),.icon-btn:hover:not(:disabled),.navbtn:hover:not(:disabled){transform:translateY(-1px);}
+}
+@supports (content-visibility:auto){
+  .tcard,.supplier-card,.pm-card,.task-row,.ppe-request-row,.notif-item,.dept-worker-card,.manager-fleet-row{content-visibility:auto;contain-intrinsic-size:1px 84px;}
+  .bi-panel{content-visibility:auto;contain-intrinsic-size:1px 260px;}
 }
 
 .login-bg{min-height:100vh;background:linear-gradient(160deg,#FFFFFF,#E6E7E9);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;}
@@ -12319,6 +12350,8 @@ body *{visibility:hidden!important;}
 .notif-push-main b{display:block;font-size:13px;}.notif-push-main span{display:block;color:var(--muted);line-height:1.35;margin-top:2px;}
 .notif-push-actions{display:flex;gap:7px;margin-top:9px;}.notif-push-actions .btn-ghost{flex:1;justify-content:center;}
 .notif-push-msg{font-size:12px;color:var(--muted);line-height:1.4;margin-top:7px;}
+.notif-read-toggle{width:calc(100% - 32px);margin:10px 16px 0;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:12px;padding:9px 10px;font-size:12.5px;font-weight:600;}
+.notif-read-toggle:hover{border-color:var(--primary-line);color:var(--primary);background:var(--surface-2);}
 .notif-settings{border-bottom:1px solid var(--line);padding:10px 14px;background:var(--surface-2);}
 .ns-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;}
 .ns-row.clk{cursor:pointer;}
@@ -12443,7 +12476,10 @@ body *{visibility:hidden!important;}
   .bi-period-switch::-webkit-scrollbar{display:none;}
   .bi-period-switch button{flex:1;min-width:max-content;padding-inline:10px;}
   .bi-grid{grid-template-columns:1fr;}
-  .bi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .bi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .bi-kpis .kpi{min-height:66px;padding:9px 8px;border-radius:12px;}
+  .bi-kpis .kpi-num{font-size:18px;}
+  .bi-kpis .kpi-lbl{font-size:10.8px;margin-top:4px;line-height:1.25;}
   .bi-mini-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
   .bi-mini-stats span{padding:8px 6px;}
   .bi-panel-head{align-items:flex-start;}

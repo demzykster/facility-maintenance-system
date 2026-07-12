@@ -1,6 +1,7 @@
 export const DEFAULT_LOCAL_NOTIFICATION_PREFS = Object.freeze({
   sort: "newest",
   group: false,
+  showRead: false,
   hidden: {}
 });
 
@@ -9,6 +10,7 @@ export function normalizeLocalNotificationPrefs(value, defaults = DEFAULT_LOCAL_
   return {
     ...defaults,
     ...value,
+    showRead: !!value.showRead,
     hidden: value.hidden && typeof value.hidden === "object" ? value.hidden : { ...(defaults.hidden || {}) }
   };
 }
@@ -90,6 +92,12 @@ export function unreadNotificationKeySet(events = [], readState = {}) {
       .map((event) => event.key)
       .filter(Boolean)
   );
+}
+
+export function notificationDisplayEvents(events = [], unreadKeys = new Set(), prefs = {}) {
+  if (prefs?.showRead) return events;
+  const keys = unreadKeys instanceof Set ? unreadKeys : new Set(Array.isArray(unreadKeys) ? unreadKeys : []);
+  return events.filter((event) => keys.has(event?.key));
 }
 
 const NON_INTERRUPTING_BROWSER_KINDS = new Set(["doc", "pm", "ppe"]);
