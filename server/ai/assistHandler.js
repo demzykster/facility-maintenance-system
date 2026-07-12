@@ -1,7 +1,10 @@
+import { aiAssistAuditEvent } from "../../src/auditEventModel.js";
 import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
+import { aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv } from "../../src/aiProviderModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
+import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { authorizeAiRequest } from "./auth.js";
 import { callAiProvider } from "./providerClient.js";
 
@@ -77,13 +80,18 @@ function requestToDraftInput(body = {}, user = {}) {
   };
 }
 
-function providerPrompt({ draft, user, context }) {
+function providerPrompt({ draft, user, context, workflow }) {
+  const safeWorkflow = normalizeAiAssistWorkflow(workflow);
   return JSON.stringify({
     contract: {
       writePolicy: "human_confirmation_required",
       allowedToWrite: false,
       expectedOutput: "short user-facing assistant text with any missing questions",
       contextPolicy: "use only the role-filtered context below; never infer records that are not present"
+    },
+    workflow: {
+      id: safeWorkflow,
+      instruction: aiAssistWorkflowInstruction(safeWorkflow)
     },
     actor: {
       role: user.role || "",
@@ -94,6 +102,11 @@ function providerPrompt({ draft, user, context }) {
     draft
   });
 }
+
+const writeAuditEvent = async (auditDriver, event) => {
+  if (!auditDriver || !event) return;
+  if (typeof auditDriver.write === "function") return auditDriver.write(event);
+};
 
 const SYSTEM_PROMPT = [
   "You are the server-side CMMS assistant.",
@@ -109,10 +122,12 @@ export function createAiAssistHandler({
   fetchImpl = globalThis.fetch,
   sessionClient = null,
   pinSessionClient = null,
+  auditDriver = null,
   providerCall = callAiProvider,
   now = () => Date.now(),
   rateBuckets = AI_ASSIST_RATE_BUCKETS
 } = {}) {
+  const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
   return async function aiAssistHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
     if (method !== "POST") {
@@ -131,6 +146,7 @@ export function createAiAssistHandler({
       const body = await readBody(req);
       const normalized = requestToDraftInput(body, auth.user);
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
+      const workflow = normalizeAiAssistWorkflow(body.workflow);
 
       const draft = buildAiIntakeDraft(normalized.input, currentTime);
       const context = buildAiAssistContext(body.context, auth.user);
@@ -142,17 +158,34 @@ export function createAiAssistHandler({
       const result = await providerCall({
         config,
         system: SYSTEM_PROMPT,
-        prompt: providerPrompt({ draft, user: auth.user, context }),
+        prompt: providerPrompt({ draft, user: auth.user, context, workflow }),
         fetchImpl,
         maxTokens: Number(env.CMMS_AI_ASSIST_MAX_TOKENS || 700) || 700
       });
       if (!result?.ok) {
+        await writeAuditEvent(backendAuditDriver, aiAssistAuditEvent({
+          draft,
+          context,
+          provider: config.provider || "",
+          model: config.model || "",
+          providerStatus: "failed",
+          workflow
+        }, auth.user, { at: currentTime }));
         return sendJson(res, 502, {
           error: "ai_provider_failed",
           provider: config.provider || "",
           draft
         });
       }
+
+      await writeAuditEvent(backendAuditDriver, aiAssistAuditEvent({
+        draft,
+        context,
+        provider: result.provider || config.provider || "",
+        model: result.model || config.model || "",
+        providerStatus: "ok",
+        workflow
+      }, auth.user, { at: currentTime }));
 
       return sendJson(res, 200, {
         ok: true,

@@ -1499,7 +1499,7 @@ function aiAssistantEnabled(cfg) {
   return BROWSER_AI_ENABLED || normalizeAiSettings(cfg?.ai).mode === AI_MODES.server;
 }
 
-async function callAIAssistant({ text, messages, system, context }) {
+async function callAIAssistant({ text, messages, system, context, workflow }) {
   if (BROWSER_AI_ENABLED) return callClaude(messages, system, 900);
   const accessToken = await productionAccessToken();
   const headers = { "content-type": "application/json" };
@@ -1512,6 +1512,7 @@ async function callAIAssistant({ text, messages, system, context }) {
       text,
       language: "he",
       source: "ui",
+      workflow,
       context
     })
   });

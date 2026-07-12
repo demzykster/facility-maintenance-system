@@ -24,7 +24,8 @@ export const AUDIT_ACTIONS = Object.freeze({
   login: "login",
   logout: "logout",
   bootstrap: "bootstrap",
-  clientError: "client_error"
+  clientError: "client_error",
+  aiAssist: "ai_assist"
 });
 
 const ENTITY_TYPES = new Set(Object.values(AUDIT_ENTITY_TYPES));
@@ -123,6 +124,48 @@ export function fileAuditEvent(file = {}, action = AUDIT_ACTIONS.upload, actor =
     before: options.before,
     after: { path: file.path || "", kind: file.kind || "", ownerType: file.ownerType || "", ownerId: file.ownerId || "" },
     metadata: { contentType: file.contentType || "", bucket: file.bucket || "" }
+  });
+}
+
+const countArray = (value) => Array.isArray(value) ? value.length : 0;
+
+export function aiAssistAuditEvent({ draft = {}, context = {}, provider = "", model = "", providerStatus = "ok", workflow = "general" } = {}, actor = {}, options = {}) {
+  return normalizeAuditEvent({
+    at: options.at,
+    actorId: actor.id,
+    actorName: actor.name,
+    actorRole: actor.role,
+    entityType: AUDIT_ENTITY_TYPES.system,
+    entityId: "ai-assist",
+    action: AUDIT_ACTIONS.aiAssist,
+    summary: `AI assist ${providerStatus}: ${draft.module || "unknown"}`,
+    after: {
+      allowedToWrite: draft.allowedToWrite === true,
+      writePolicy: draft.writePolicy || "human_confirmation_required"
+    },
+    metadata: {
+      source: draft.source || "",
+      language: draft.language || "",
+      module: draft.module || "",
+      severity: draft.severity || "",
+      action: draft.action || "",
+      provider: provider || "",
+      model: model || "",
+      providerStatus,
+      workflow,
+      contextProfile: {
+        role: context.profile?.role || actor.role || "",
+        department: context.profile?.department || "",
+        canSeeCompany: context.profile?.canSeeCompany === true,
+        canSeeFinancials: context.profile?.canSeeFinancials === true
+      },
+      contextCounts: {
+        tickets: countArray(context.tickets),
+        fleet: countArray(context.fleet),
+        pm: countArray(context.pm),
+        metrics: context.metrics && typeof context.metrics === "object" ? Object.keys(context.metrics).length : 0
+      }
+    }
   });
 }
 

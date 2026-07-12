@@ -3,6 +3,7 @@ import {
   AUDIT_ACTIONS,
   AUDIT_ENTITY_TYPES,
   AUDIT_EVENTS_TABLE_CONTRACT,
+  aiAssistAuditEvent,
   auditEventId,
   fileAuditEvent,
   normalizeAuditEvent,
@@ -122,6 +123,57 @@ describe("auditEventModel", () => {
       },
       metadata: { contentType: "image/jpeg", bucket: "cmms-files" }
     });
+  });
+
+  it("builds AI assist audit events without raw prompt or context text", () => {
+    const event = aiAssistAuditEvent({
+      draft: {
+        source: "ui",
+        language: "he",
+        module: "transport",
+        severity: "critical",
+        action: "draft_ticket",
+        rawText: "secret user prompt",
+        allowedToWrite: false,
+        writePolicy: "human_confirmation_required"
+      },
+      context: {
+        profile: { role: "user", department: "הפצה", canSeeCompany: false, canSeeFinancials: false },
+        tickets: [{ id: "t1", subject: "hidden subject" }],
+        fleet: [{ id: "f1" }],
+        pm: [],
+        metrics: { openTickets: 1 }
+      },
+      provider: "anthropic",
+      model: "claude-test",
+      providerStatus: "ok",
+      workflow: "risk_summary"
+    }, { id: "u1", name: "Manager", role: "user" }, { at: 700 });
+
+    expect(event).toMatchObject({
+      at: 700,
+      actorId: "u1",
+      actorRole: "user",
+      entityType: "system",
+      entityId: "ai-assist",
+      action: "ai_assist",
+      after: {
+        allowedToWrite: false,
+        writePolicy: "human_confirmation_required"
+      },
+      metadata: {
+        module: "transport",
+        severity: "critical",
+        provider: "anthropic",
+        model: "claude-test",
+        providerStatus: "ok",
+        workflow: "risk_summary",
+        contextCounts: { tickets: 1, fleet: 1, pm: 0, metrics: 1 }
+      }
+    });
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain("secret user prompt");
+    expect(serialized).not.toContain("hidden subject");
   });
 
   it("documents the audit table fields in one contract", () => {

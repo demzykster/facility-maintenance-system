@@ -212,6 +212,7 @@ describe("AI assist handler", () => {
     const res = await call(handler, {
       body: {
         text: "מה פתוח אצלי?",
+        workflow: "sla_explanation",
         context: {
           metrics: { openTickets: 2, totalCost: 5000 },
           tickets: [
@@ -225,9 +226,97 @@ describe("AI assist handler", () => {
     expect(res.statusCode).toBe(200);
     const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
     expect(prompt.context.metrics).toEqual({ openTickets: 2 });
+    expect(prompt.workflow).toMatchObject({
+      id: "sla_explanation",
+      instruction: expect.stringContaining("SLA")
+    });
     expect(prompt.context.tickets.map((ticket) => ticket.id)).toEqual(["visible"]);
     expect(prompt.context.tickets[0]).not.toHaveProperty("cost");
     expect(JSON.stringify(prompt)).not.toContain("Hidden");
+  });
+
+  it("writes an audit-safe AI assist event for provider calls", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "תשובה קצרה."
+    });
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "admin", department: "הנהלה", departments: ["הנהלה"] }),
+      providerCall,
+      auditDriver,
+      now: () => 777,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "טקסט רגיש שלא אמור להיכנס ליומן",
+        context: {
+          tickets: [{ id: "t1", subject: "נושא רגיש", department: "הנהלה" }],
+          metrics: { openTickets: 1, totalCost: 10 }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      at: 777,
+      actorId: "u1",
+      entityType: "system",
+      entityId: "ai-assist",
+      action: "ai_assist",
+      metadata: expect.objectContaining({
+        provider: "openai",
+        model: "gpt-5.2",
+        providerStatus: "ok",
+        workflow: "general",
+        contextCounts: { tickets: 1, fleet: 0, pm: 0, metrics: 2 }
+      })
+    }));
+    const auditPayload = JSON.stringify(auditDriver.write.mock.calls[0][0]);
+    expect(auditPayload).not.toContain("טקסט רגיש");
+    expect(auditPayload).not.toContain("נושא רגיש");
+    expect(auditPayload).not.toContain("server-secret");
+  });
+
+  it("writes a failed provider audit event before returning provider failure", async () => {
+    const providerCall = vi.fn().mockResolvedValue({ ok: false, error: "provider_down" });
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "anthropic",
+        ANTHROPIC_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      auditDriver,
+      now: () => 888,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(502);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      at: 888,
+      action: "ai_assist",
+      metadata: expect.objectContaining({
+        provider: "anthropic",
+        providerStatus: "failed",
+        workflow: "general"
+      })
+    }));
   });
 
   it("rate limits repeated assistant requests per authenticated user", async () => {

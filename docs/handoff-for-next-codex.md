@@ -68,13 +68,14 @@ Recent commits on `main`:
   - Adds `POST /api/ai/assist` through `server/ai/assistHandler.js`.
   - The endpoint verifies Supabase/Auth-cookie or CMMS PIN sessions, rejects password-change-required users, rate-limits per user, builds the deterministic intake draft, and calls Anthropic/OpenAI only when `CMMS_AI_MODE=server`.
   - The endpoint is read-only by design: it does not create, update, delete, assign, approve, or close any CMMS business record. It returns the deterministic draft plus assistant text so the UI can later ask a human to confirm any real operation through the normal server APIs.
-  - Follow-up AI work should focus on permission-filtered context for admin, executive, and manager use cases. Keep provider secrets in deployment/server env; do not store raw keys in browser-managed app config.
+  - Provider secrets stay in deployment/server env; do not store raw keys in browser-managed app config.
 - `Add AI settings and grouped route`
   - Groups existing AI URLs under `api/ai/[action].js`, preserving `/api/ai/intake` and `/api/ai/assist` while adding `/api/ai/status` without consuming another Vercel function slot.
   - Adds authenticated `/api/ai/status` through `server/ai/statusHandler.js`; it returns public-safe mode/provider/model/readiness fields and never exposes provider keys.
   - Adds `config.ai` settings in the admin general settings screen for non-secret AI preferences: mode, provider, and model.
   - Route budget returns to `19/24`.
-  - The follow-up context slice wires the panel to `/api/ai/assist` in server mode and filters supplied UI context by the authenticated user's role/scope before provider calls. This remains read-only, not write-capable AI.
+  - The follow-up context/workflow slice wires the panel to `/api/ai/assist` in server mode, filters supplied UI context by the authenticated user's role/scope before provider calls, records non-sensitive `system / ai_assist` audit events when the audit driver is configured, and adds explicit workflow IDs for `risk_summary`, `sla_explanation`, `next_actions`, and `draft_preparation`.
+  - Next AI work should deepen those workflows with richer role-specific prompts, better UI entry points, and eventually human-confirmed normal operations for any AI-prepared business action.
 - `Add BI ticket heatmap`
   - Adds `מפת חום קריאות` to the unified BI screen.
   - Heatmap rows are scoped through the existing BI scope model, so admin/executive see company scope while department managers see only their permitted departments.
