@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Zap, Droplets, Wind, Cog, ShieldAlert, Monitor, Building2, Sparkles, Wrench, Truck,
@@ -94,6 +94,7 @@ import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValue
 import { normalizeScopedWorkerForActor, scopedUsersForActor, scopedWorkerDefaultsForActor, userDepartments, userShift } from "./userScopeModel.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
+const AIPanel = lazy(() => import("./AIPanel.jsx").then((module) => ({ default: module.AIPanel })));
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
 const APP_BUILD_TIME = typeof __CMMS_BUILD_TIME__ !== "undefined" ? __CMMS_BUILD_TIME__ : "";
 const SAVE_FAILED_MESSAGE = "השמירה נכשלה. בדקו חיבור ונסו שוב.";
@@ -4408,7 +4409,7 @@ function UserApp(p) {
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} session={session} canManageUsers={canManageUsers(session)} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return ok; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
-      {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
+      {showAI && <LazyAIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -4488,7 +4489,7 @@ function TechApp(p) {
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} /></Overlay>}
       {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
-      {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
+      {showAI && <LazyAIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -7942,7 +7943,7 @@ function AdminApp(p) {
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "bi"); }} />}
-      {showAI && <AIPanel {...p} onClose={() => setShowAI(false)} />}
+      {showAI && <LazyAIPanel {...p} onClose={() => setShowAI(false)} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -10838,33 +10839,6 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
   </div></div>);
 }
 
-/* ============================================================ AI PANEL */
-function AIPanel({ session, tickets, pm, fleet, config, onClose }) {
-  const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet]);
-  const [msgs, setMsgs] = useState([{ role: "assistant", content: session.role === "admin" ? "שלום! אפשר לשאול על קריאות, השבתות, מסמכי כלי שינוע פגי-תוקף, עלויות ותחזוקה מונעת." : session.role === "tech" ? "שלום! אפשר לשאול על קריאות השינוע שבטיפולך." : "שלום! אפשר לשאול על הקריאות שלך." }]);
-  const [input, setInput] = useState(""), [busy, setBusy] = useState(false);
-  const endRef = useRef(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, busy]);
-  const send = async (text) => {
-    const q = (text ?? input).trim(); if (!q || busy) return;
-    const history = [...msgs, { role: "user", content: q }]; setMsgs(history); setInput(""); setBusy(true);
-    try {
-      const sys = `אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הנתונים בלבד.\n\n--- נתונים ---\n${buildAIContext(session, vis, pm, fleet, config)}`;
-      const apiMsgs = history.filter((m, i) => !(i === 0 && m.role === "assistant")).map((m) => ({ role: m.role, content: m.content }));
-      const out = await callClaude(apiMsgs, sys, 900);
-      setMsgs((s) => [...s, { role: "assistant", content: out || "לא התקבלה תשובה." }]);
-    } catch (e) { setMsgs((s) => [...s, { role: "assistant", content: "לא הצלחתי להתחבר לשירות ה-AI כרגע." }]); }
-    finally { setBusy(false); }
-  };
-  const quick = session.role === "admin" ? ["מה בחריגת SLA?", "אילו מסמכים פגי-תוקף?", "סכם עלויות"] : session.role === "tech" ? ["מה ממתין לי?", "מה הכי דחוף?"] : ["מה הסטטוס של הקריאות שלי?"];
-  return (<div className="ovl-backdrop ai-back" onClick={onClose}><div className="ai-panel" onClick={(e) => e.stopPropagation()}>
-    <div className="ai-head"><div className="ai-title"><span className="ai-orb"><Sparkles size={16} /></span> עוזר AI</div><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div>
-    <div className="ai-msgs">{msgs.map((m, i) => <div key={i} className={"ai-msg " + m.role}>{m.content}</div>)}{busy && <div className="ai-msg assistant"><span className="spinner sm dark" /> חושב…</div>}<div ref={endRef} /></div>
-    {msgs.length <= 1 && <div className="ai-quick">{quick.map((q) => <button key={q} onClick={() => send(q)}>{q}</button>)}</div>}
-    <div className="ai-input"><input value={input} onChange={(e) => setInput(e.target.value)} placeholder="שאלו אותי…" onKeyDown={(e) => e.key === "Enter" && send()} disabled={busy} /><button className="btn-primary" onClick={() => send()} disabled={busy}><Send size={16} /></button></div>
-  </div></div>);
-}
-
 function ProfileModal({ session, onSave, onClose }) {
   const [email, setEmail] = useState(session?.email || "");
   const [phone, setPhone] = useState(session?.phone || "");
@@ -11140,6 +11114,22 @@ function Overlay({ children, onClose, persistent, panelClassName = "" }) {
   return typeof document === "undefined" ? node : createPortal(node, document.body);
 }
 function AIFab({ onClick }) { return <button className="ai-fab" aria-label="עוזר AI" title="עוזר AI" onClick={onClick}><Sparkles size={22} /></button>; }
+function AIPanelFallback({ onClose }) {
+  return <div className="ovl-backdrop ai-back" onClick={onClose}>
+    <div className="ai-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="ai-head">
+        <div className="ai-title"><span className="ai-orb"><Sparkles size={16} /></span> עוזר AI</div>
+        <button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
+      </div>
+      <div className="ai-msgs"><div className="ai-msg assistant"><span className="spinner sm dark" /> טוען…</div></div>
+    </div>
+  </div>;
+}
+function LazyAIPanel(props) {
+  return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContext} callModel={callClaude} />
+  </Suspense>;
+}
 function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
   const notifLanguage = normalizeLanguageCode(language || (typeof document !== "undefined" ? document.documentElement.lang : DEFAULT_LANGUAGE));
   const t = (key, vars) => uiText(notifLanguage, key, vars);

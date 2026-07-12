@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: `b151d30 Stabilize user scope and supplier ticket routing`.
+- Latest app/UI commit before this handoff: `Lazy-load AI panel and provider boundary`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -50,7 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget remains `19/24`.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup split after that warning is done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used. React and lucide icons are now split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 303 kB gzip, with vendor React around 57 kB gzip and vendor icons around 101 kB gzip.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when browser AI is enabled and opened. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 305 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, and a small `AIPanel` chunk around 1.4 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and the main app only wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Lazy-load AI panel`
+  - Extracts the browser AI chat panel from `src/ClaudeMaintenanceApp.jsx` into `src/AIPanel.jsx`.
+  - Uses `React.lazy` / `Suspense` so the panel is not part of the normal startup path; it loads only when `BROWSER_AI_ENABLED` allows the AI FAB and the user opens the panel.
+  - Leaves shared AI helpers (`callClaude`, `buildAIContext`) in the monolith for now because other AI entry points still call them.
+  - Adds the first server AI provider boundary in `server/ai/providerClient.js`, with tested request shapes for Anthropic/Claude and OpenAI Responses API provider mode. This is intentionally not wired as a broad production assistant yet; provider keys stay server-side and the existing `/api/ai/intake` remains a read-only draft contract.
+  - Local build evidence after the split: separate `AIPanel` chunk about 1.4 kB gzip; main app chunk about 305 kB gzip. This is a small monolith-reduction slice, not the final performance solution.
 - `Add BI ticket heatmap`
   - Adds `מפת חום קריאות` to the unified BI screen.
   - Heatmap rows are scoped through the existing BI scope model, so admin/executive see company scope while department managers see only their permitted departments.
