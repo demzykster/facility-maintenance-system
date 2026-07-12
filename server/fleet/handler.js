@@ -83,7 +83,7 @@ const fleetDeleteAuditEvent = (unitId, actor) => normalizeAuditEvent({
   metadata: { source: "api/fleet", sourceKvKey: `fleet:${unitId}` }
 });
 
-const canReadFleet = (user = {}) => ["admin", "user", "tech"].includes(user?.role);
+const canReadFleet = (user = {}) => ["admin", "executive", "user", "tech"].includes(user?.role);
 
 export function createFleetApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver || createSupabaseFleetDriverFromEnv(env, fetchImpl);

@@ -83,7 +83,7 @@ const pmDeleteAuditEvent = (taskId, actor) => normalizeAuditEvent({
   metadata: { source: "api/pm", sourceKvKey: `pm:${taskId}` }
 });
 
-const canReadPm = (user = {}) => ["admin", "user", "tech"].includes(user?.role);
+const canReadPm = (user = {}) => ["admin", "executive", "user", "tech"].includes(user?.role);
 
 export function createPmApiHandler({ driver = null, auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver || createSupabasePmDriverFromEnv(env, fetchImpl);

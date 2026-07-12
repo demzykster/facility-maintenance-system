@@ -81,6 +81,22 @@ describe("fleet API handler", () => {
     expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists normalized fleet units for executive BI sessions", async () => {
+    const driver = { list: vi.fn().mockResolvedValue([{ id: "fleet-1", code: "178039" }]), get: vi.fn() };
+    const handler = createFleetApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer executive-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, units: [{ id: "fleet-1", code: "178039" }] });
+  });
+
   it("blocks worker sessions from reading normalized fleet units", async () => {
     const driver = { list: vi.fn(), get: vi.fn() };
     const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;

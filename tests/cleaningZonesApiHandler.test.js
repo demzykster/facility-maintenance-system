@@ -68,6 +68,21 @@ describe("cleaning zones API handler", () => {
     expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists cleaning zones for executive BI sessions", async () => {
+    const driver = { list: vi.fn().mockResolvedValue([{ id: "zone-1", name: "Lobby" }]), get: vi.fn() };
+    const handler = createCleaningZonesApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, zones: [{ id: "zone-1", name: "Lobby" }] });
+  });
+
   it("blocks workers without cleaning access from reading cleaning zones", async () => {
     const driver = { list: vi.fn(), get: vi.fn() };
     const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;

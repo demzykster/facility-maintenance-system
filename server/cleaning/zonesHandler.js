@@ -86,6 +86,7 @@ const zoneDeleteAuditEvent = (zoneId, actor) => normalizeAuditEvent({
 
 const canReadCleaningZones = (user = {}) => (
   user.role === "admin"
+  || user.role === "executive"
   || canPerformCleaning(user)
   || canViewCleaningReports(user)
   || user.permissions?.settings === "manage"

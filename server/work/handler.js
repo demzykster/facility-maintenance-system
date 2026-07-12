@@ -8,7 +8,7 @@ import { buildSessionPayload, createSupabaseSessionClient } from "../session/ses
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { createSupabaseWorkDriversFromEnv } from "./supabaseWorkDriver.js";
 
-const ACTIVE_ROLES = Object.freeze(["admin", "user", "tech", "worker", "cleaner"]);
+const ACTIVE_ROLES = Object.freeze(["admin", "executive", "user", "tech", "worker", "cleaner"]);
 
 const RESOURCE_CONFIG = Object.freeze({
   tasks: {

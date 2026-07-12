@@ -86,6 +86,7 @@ const roundDeleteAuditEvent = (roundId, actor) => normalizeAuditEvent({
 
 const canReadCleaningRounds = (user = {}) => (
   user.role === "admin"
+  || user.role === "executive"
   || canPerformCleaning(user)
   || canViewCleaningReports(user)
   || user.permissions?.settings === "manage"

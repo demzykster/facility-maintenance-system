@@ -106,6 +106,22 @@ describe("tickets API handler", () => {
     expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists normalized tickets for executive BI sessions", async () => {
+    const driver = { list: vi.fn().mockResolvedValue([{ id: "T-1", status: "open" }]), get: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer executive-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets: [{ id: "T-1", status: "open" }] });
+  });
+
   it("gets one normalized ticket with active file metadata", async () => {
     const driver = {
       list: vi.fn(),

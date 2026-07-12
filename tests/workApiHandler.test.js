@@ -70,6 +70,22 @@ describe("work API handler", () => {
     expect(tasks.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists tasks for executive BI sessions", async () => {
+    const tasks = { list: vi.fn().mockResolvedValue([{ id: "task-1", title: "Inspect" }]), get: vi.fn() };
+    const handler = createWorkApiHandler({
+      drivers: { tasks },
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" },
+      query: { resource: "tasks" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tasks: [{ id: "task-1", title: "Inspect" }] });
+  });
+
   it("allows user roles to create tasks", async () => {
     const tasks = { upsert: vi.fn().mockResolvedValue({ id: "task-1" }) };
     const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };

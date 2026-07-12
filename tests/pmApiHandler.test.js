@@ -81,6 +81,22 @@ describe("PM API handler", () => {
     expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists normalized PM tasks for executive BI sessions", async () => {
+    const driver = { list: vi.fn().mockResolvedValue([{ id: "pm-1", title: "TO" }]), get: vi.fn() };
+    const handler = createPmApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer executive-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tasks: [{ id: "pm-1", title: "TO" }] });
+  });
+
   it("blocks worker sessions from reading normalized PM tasks", async () => {
     const driver = { list: vi.fn(), get: vi.fn() };
     const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;

@@ -134,6 +134,7 @@ async function authorize(req, env, fetchImpl, sessionClient) {
 
 const canReadPpeRecords = (user = {}) => (
   user.role === "admin"
+  || user.role === "executive"
   || user.role === "worker"
   || user.role === "cleaner"
   || canView(user, "ppe")

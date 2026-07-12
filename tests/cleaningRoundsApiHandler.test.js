@@ -68,6 +68,21 @@ describe("cleaning rounds API handler", () => {
     expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists cleaning rounds for executive BI sessions", async () => {
+    const driver = { list: vi.fn().mockResolvedValue([{ id: "round-1", zoneId: "zone-1" }]), get: vi.fn() };
+    const handler = createCleaningRoundsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, rounds: [{ id: "round-1", zoneId: "zone-1" }] });
+  });
+
   it("blocks workers without cleaning access from reading cleaning rounds", async () => {
     const driver = { list: vi.fn(), get: vi.fn() };
     const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;

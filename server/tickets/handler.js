@@ -87,7 +87,7 @@ const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
 
 const canReadTickets = (user = {}) => {
   if (!user?.role) return true;
-  return ["admin", "user", "tech", "worker"].includes(user.role);
+  return ["admin", "executive", "user", "tech", "worker"].includes(user.role);
 };
 
 const withFiles = async (ticket, metadataDriver) => {

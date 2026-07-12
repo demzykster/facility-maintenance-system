@@ -119,6 +119,7 @@ async function authorize(req, env, fetchImpl, sessionClient) {
 
 const canReadCleaningRecords = (user = {}) => (
   user.role === "admin"
+  || user.role === "executive"
   || canPerformCleaning(user)
   || canViewCleaningReports(user)
   || user.permissions?.settings === "manage"

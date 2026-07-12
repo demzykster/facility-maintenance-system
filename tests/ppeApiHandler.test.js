@@ -70,6 +70,22 @@ describe("PPE API handler", () => {
     expect(items.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists PPE items for executive BI sessions", async () => {
+    const items = { list: vi.fn().mockResolvedValue([{ id: "item-1", name: "Vest" }]), get: vi.fn() };
+    const handler = createPpeApiHandler({
+      drivers: { items },
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" },
+      query: { resource: "items" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, items: [{ id: "item-1", name: "Vest" }] });
+  });
+
   it("allows request-level users to create PPE requests", async () => {
     const requests = { upsert: vi.fn().mockResolvedValue({ id: "req-1" }) };
     const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };

@@ -113,6 +113,22 @@ describe("cleaning records API handler", () => {
     expect(complaints.list).toHaveBeenCalledWith({ limit: "25" });
   });
 
+  it("lists cleaning records for executive BI sessions", async () => {
+    const complaints = { list: vi.fn().mockResolvedValue([{ id: "complaint-1" }]), get: vi.fn() };
+    const handler = createCleaningRecordsApiHandler({
+      drivers: { complaints },
+      sessionClient: sessionClientFor({ role: "executive" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" },
+      query: { resource: "complaints" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, complaints: [{ id: "complaint-1" }] });
+  });
+
   it("blocks workers without cleaning access from reading records", async () => {
     const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;
     const complaints = { list: vi.fn(), get: vi.fn() };
