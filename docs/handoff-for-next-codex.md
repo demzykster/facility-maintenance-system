@@ -61,6 +61,7 @@ Recent commits on `main`:
   - Notification read-state remains personal per user, and the notification panel now hides read notifications by default. Read history is available through an explicit control, so "mark all as read" clears the active list instead of leaving the same old items visually hanging.
   - Follow-up notification storage is now server-backed for production sessions: `/api/session/profile` accepts the current user's `notificationReadState` and writes it into `app_users.notification_prefs.readState`. The app still keeps localStorage as a fallback, but production read-state can now survive across devices, including CMMS PIN sessions.
   - BI gained a `גיל הקריאות` panel with drill-down filters for today, 2-7 days, 8-30 days, and over 30 days. This is not a heatmap; it is a backlog-aging signal for current open tickets.
+  - BI also gained `קריאות ללא תנועה`, showing open tickets that have not been updated for over 1 day, 3-7 days, or over a week, with drill-down filters into the tickets list.
   - Mobile BI KPI cards were tightened to reduce oversized blocks on small screens.
   - Repeated long-list surfaces gained `content-visibility:auto` where supported to reduce rendering work after the app has loaded.
   - Important limitation: this pass reduced browser rendering pressure but did not reduce the main JavaScript bundle. The follow-up split below starts that work.

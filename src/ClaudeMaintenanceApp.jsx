@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Zap, Droplets, Wind, Cog, ShieldAlert, Monitor, Building2, Sparkles, Wrench, Truck,
-  Plus, LogOut, Camera, X, Clock, CheckCircle2, AlertTriangle, LayoutDashboard,
+  Plus, LogOut, Camera, X, Clock, CheckCircle2, AlertTriangle,
   ListChecks, Settings, ChevronLeft, User, MapPin, Package, Search, Trash2, Send,
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
-  FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy, Hexagon,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History, Play} from "lucide-react";
+  FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon,
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -7404,6 +7404,18 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     return { ...bucket, value: items.length };
   });
   const maxAgeBucket = Math.max(1, ...ageBuckets.map((bucket) => bucket.value));
+  const staleBuckets = [
+    { key: "day", label: "מעל יום", min: 1, max: 3, color: "var(--primary)", focus: { minIdleDays: 1, maxIdleDays: 3 } },
+    { key: "three", label: "3-7 ימים", min: 3, max: 7, color: "#8A6F3D", focus: { minIdleDays: 3, maxIdleDays: 7 } },
+    { key: "week", label: "מעל שבוע", min: 7, max: Infinity, color: "#8E2F2B", focus: { minIdleDays: 7 } }
+  ].map((bucket) => {
+    const items = openTickets.filter((ticket) => {
+      const idleDays = Math.max(0, (biNow - (ticket.updatedAt || ticket.createdAt || biNow)) / dayMs);
+      return idleDays >= bucket.min && idleDays < bucket.max;
+    });
+    return { ...bucket, value: items.length };
+  });
+  const maxStaleBucket = Math.max(1, ...staleBuckets.map((bucket) => bucket.value));
   const pmOverdue = scope.pm.filter((task) => task.active !== false && daysLeft(task.nextDue) < 0);
   const expiringDocs = scope.fleet.map((unit) => ({ unit, status: docStatus(unit, config) })).filter((row) => row.status.d != null && row.status.d <= 30).sort((a, b) => a.status.d - b.status.d);
   const cleaningZones = scope.zones.filter((zone) => zone.active !== false);
@@ -7680,6 +7692,11 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
       </section>
 
       <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>קריאות ללא תנועה</b><span>פתוחות שלא עודכנו לאחרונה</span></div></div>
+        {staleBuckets.map((bucket) => <Bar key={bucket.key} label={bucket.label} value={bucket.value} max={maxStaleBucket} color={bucket.color} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · ללא תנועה · ${bucket.label}`, ...bucket.focus } })} />)}
+      </section>
+
+      <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>למה זה תקוע</b><span>צווארי בקבוק וסיבות המתנה מתוך הקריאות הפתוחות</span></div></div>
         {lifecycleBottlenecks.length > 0 && <div className="bi-subtitle">שלבים פעילים</div>}
         {lifecycleBottlenecks.length ? lifecycleBottlenecks.map((stage) => <Bar key={stage.key} label={stage.label} value={stage.n} max={maxLifecycleN} suffix={stage.ms ? ` · ${fmtDur(stage.ms)} · ${lifecycleOwnerLabel(stage.owner)}` : ` · ${lifecycleOwnerLabel(stage.owner)}`} color={stage.kind === "waiting" ? "#B45309" : stage.kind === "rework" ? "#B91C1C" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · שלב · ${stage.label}`, lifecycleKey: stage.key } })} />) : <div className="note">אין כרגע צווארי בקבוק פתוחים.</div>}
@@ -7824,6 +7841,11 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config
     const ageDays = Math.max(0, (Date.now() - (ticket.createdAt || Date.now())) / 86400000);
     if (focus.minAgeDays != null && ageDays < Number(focus.minAgeDays)) return false;
     if (focus.maxAgeDays != null && ageDays >= Number(focus.maxAgeDays)) return false;
+  }
+  if (focus.minIdleDays != null || focus.maxIdleDays != null) {
+    const idleDays = Math.max(0, (Date.now() - (ticket.updatedAt || ticket.createdAt || Date.now())) / 86400000);
+    if (focus.minIdleDays != null && idleDays < Number(focus.minIdleDays)) return false;
+    if (focus.maxIdleDays != null && idleDays >= Number(focus.maxIdleDays)) return false;
   }
   if (focus.overdue && !ticketMissedSla(ticket, config)) return false;
   if (focus.criticalEscalated && !isCriticalEscalated(ticket, config)) return false;
