@@ -51,7 +51,7 @@ The current strategy is:
 - Route budget remains `19/24`.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
 - First startup split after that warning is done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used. React and lucide icons are now split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 303 kB gzip, with vendor React around 57 kB gzip and vendor icons around 101 kB gzip.
-- BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; the JSX only renders and routes heatmap clicks through the existing ticket list focus mechanism.
+- BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and the main app only wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
 ## Recent Work Completed
@@ -63,7 +63,7 @@ Recent commits on `main`:
   - Heatmap rows are scoped through the existing BI scope model, so admin/executive see company scope while department managers see only their permitted departments.
   - Heatmap columns cover open tickets, SLA, critical transport downtime, waiting states, aging backlog, and tickets with no recent movement.
   - Cell clicks route into the existing filtered ticket list via `focus.heatmapMetric` and `focus.department`; no parallel BI-only action path was created.
-  - This is also the first small monolith-reduction slice in this area: heatmap calculation and drill-down matching are model-level functions with tests, while the monolithic JSX remains the rendering shell.
+  - This is also the first small monolith-reduction slice in this area: heatmap calculation and drill-down matching are model-level functions with tests, and the heatmap renderer is a small `src/BIHeatmapPanel.jsx` component while the monolithic app remains the surrounding shell.
 - `Tighten BI notifications and runtime rendering`
   - Notification read-state remains personal per user, and the notification panel now hides read notifications by default. Read history is available through an explicit control, so "mark all as read" clears the active list instead of leaving the same old items visually hanging.
   - Follow-up notification storage is now server-backed for production sessions: `/api/session/profile` accepts the current user's `notificationReadState` and writes it into `app_users.notification_prefs.readState`. The app still keeps localStorage as a fallback, but production read-state can now survive across devices, including CMMS PIN sessions.

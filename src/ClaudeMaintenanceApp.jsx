@@ -8,6 +8,7 @@ import {
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon,
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
+import { BIHeatmapPanel } from "./BIHeatmapPanel.jsx";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -7656,28 +7657,13 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     </div>
 
     <div className="bi-grid">
-      <section className="panel bi-panel bi-heatmap-panel">
-        <div className="bi-panel-head"><div><b>מפת חום קריאות</b><span>איפה מצטבר עומס ומה סוג הסיכון בכל תחום</span></div><button className="btn-ghost sm" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · מפת חום קריאות" } })}>לכל הפתוחות</button></div>
-        {ticketHeatmapRows.length ? <div className="bi-heatmap" role="table" aria-label="מפת חום קריאות פתוחות">
-          <div className="bi-heatmap-head" role="row">
-            <span role="columnheader">תחום</span>
-            {ticketHeatmapRows[0].cells.map((cell) => <span key={cell.key} role="columnheader">{cell.label}</span>)}
-          </div>
-          {ticketHeatmapRows.map((row) => <div key={row.name} className="bi-heatmap-row" role="row">
-            <button type="button" className="bi-heatmap-name" role="cell" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · מפת חום · ${row.name}`, department: row.name } })}>
-              <b>{row.name}</b>
-              <small>{countLabel(row.total, "קריאה פתוחה", "קריאות פתוחות")}</small>
-            </button>
-            {row.cells.map((cell) => {
-              const heat = Math.min(1, cell.value / ticketHeatmapMax);
-              return <button key={cell.key} type="button" className={"bi-heatmap-cell" + (cell.value > 0 ? " hot" : "")} role="cell" disabled={!cell.value} style={{ "--heat": heat }} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · ${row.name} · ${cell.label}`, department: row.name, heatmapMetric: cell.key } })}>
-                <b>{cell.value}</b>
-                <small>{cell.label}</small>
-              </button>;
-            })}
-          </div>)}
-        </div> : <div className="note">אין כרגע קריאות פתוחות לבניית מפת חום.</div>}
-      </section>
+      <BIHeatmapPanel
+        rows={ticketHeatmapRows}
+        max={ticketHeatmapMax}
+        onOpenAll={() => onGoTickets?.({ st: "open", focus: { label: "BI · מפת חום קריאות" } })}
+        onOpenDepartment={(row) => onGoTickets?.({ st: "open", focus: { label: `BI · מפת חום · ${row.name}`, department: row.name } })}
+        onOpenCell={(row, cell) => onGoTickets?.({ st: "open", focus: { label: `BI · ${row.name} · ${cell.label}`, department: row.name, heatmapMetric: cell.key } })}
+      />
 
       {isAdminBI && <section className="panel bi-panel bi-command-panel">
         <div className="bi-panel-head"><div><b>דורש החלטה עכשיו</b><span>{commandQueue.length ? `${commandQueue.length} פריטים ראשונים מכל המודולים` : "אין כרגע פריטים דחופים"}</span></div></div>
