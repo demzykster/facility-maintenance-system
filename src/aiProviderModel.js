@@ -9,10 +9,30 @@ export const AI_PROVIDERS = Object.freeze({
   openai: "openai"
 });
 
+export const AI_PROVIDER_LABELS = Object.freeze({
+  [AI_PROVIDERS.anthropic]: "Claude / Anthropic",
+  [AI_PROVIDERS.openai]: "OpenAI / Codex-compatible"
+});
+
+export const AI_PROVIDER_ALIASES = Object.freeze({
+  anthropic: AI_PROVIDERS.anthropic,
+  claude: AI_PROVIDERS.anthropic,
+  openai: AI_PROVIDERS.openai,
+  codex: AI_PROVIDERS.openai,
+  chatgpt: AI_PROVIDERS.openai,
+  gpt: AI_PROVIDERS.openai
+});
+
 export const DEFAULT_AI_MODELS = Object.freeze({
   [AI_PROVIDERS.anthropic]: "claude-sonnet-4-20250514",
   [AI_PROVIDERS.openai]: "gpt-5.2"
 });
+
+export const AI_PROVIDER_OPTIONS = Object.freeze(Object.values(AI_PROVIDERS).map((id) => Object.freeze({
+  id,
+  label: AI_PROVIDER_LABELS[id],
+  defaultModel: DEFAULT_AI_MODELS[id]
+})));
 
 export const AI_SETTING_MODES = Object.freeze({
   disabled: AI_MODES.disabled,
@@ -28,7 +48,7 @@ export function aiModeFromEnv(env = {}, appMode = "demo") {
 
 export function normalizeAiProvider(value) {
   const provider = String(value || "").trim().toLowerCase();
-  return Object.values(AI_PROVIDERS).includes(provider) ? provider : "";
+  return AI_PROVIDER_ALIASES[provider] || "";
 }
 
 export function aiServerConfigFromEnv(env = {}) {
@@ -72,6 +92,7 @@ export function publicAiServerStatusFromEnv(env = {}) {
     providerKeyConfigured,
     serverReady: config.mode === AI_MODES.server && !!config.provider && providerKeyConfigured,
     supportedProviders: Object.values(AI_PROVIDERS),
+    supportedProviderOptions: AI_PROVIDER_OPTIONS,
     defaultModels: DEFAULT_AI_MODELS,
     errors
   };

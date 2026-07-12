@@ -78,6 +78,10 @@ describe("AI status handler", () => {
         model: "gpt-5.2",
         providerKeyConfigured: true,
         serverReady: true,
+        supportedProviderOptions: [
+          expect.objectContaining({ id: "anthropic", label: expect.stringContaining("Claude") }),
+          expect.objectContaining({ id: "openai", label: expect.stringContaining("Codex") })
+        ],
         errors: []
       }
     });

@@ -29,7 +29,7 @@ import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionM
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { AI_MODES, DEFAULT_AI_MODELS, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
+import { AI_MODES, AI_PROVIDER_LABELS, AI_PROVIDER_OPTIONS, DEFAULT_AI_MODELS, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
 import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
@@ -9928,7 +9928,10 @@ function SettingsPanel(p) {
   const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["task", "מטלות ופגישות"], ["doc", "מסמכים ובקרת כלים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"], ["driver", "נהגים ושיבוצים"], ["ppe", "ביגוד עובדים"], ["cleaning", "ניקיון וסבבים"]];
   const WAIT_BALL_OPTIONS = [["executor", "המבצע"], ["manager", "מנהל המחלקה"], ["admin", "מנהל מערכת"]];
   const WAIT_SETTER_OPTIONS = [["both", "טכנאי + מנהל"], ["tech", "טכנאי בלבד"], ["manager", "מנהל בלבד"]];
-  const AI_PROVIDER_OPTIONS = [["anthropic", "Claude / Anthropic"], ["openai", "OpenAI / Codex-compatible"]];
+  const aiProviderOptions = Array.isArray(aiStatus?.supportedProviderOptions) && aiStatus.supportedProviderOptions.length
+    ? aiStatus.supportedProviderOptions
+    : AI_PROVIDER_OPTIONS;
+  const aiStatusProviderLabel = AI_PROVIDER_LABELS[aiStatus?.provider] || aiStatus?.provider || "";
   const aiStatusText = aiStatusBusy ? "בודק חיבור…" : (aiStatus?.serverReady ? "שרת AI מוכן" : "שרת AI לא פעיל");
   const aiStatusErrors = (aiStatus?.errors || []).filter(Boolean).join(" · ");
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
@@ -9985,10 +9988,10 @@ function SettingsPanel(p) {
         </div>
         <div className="grid2">
           <label className="field"><span>מצב</span><select value={aiCfg.mode} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, mode: e.target.value }))}><option value="disabled">כבוי</option><option value="server">שרת בלבד</option></select></label>
-          <label className="field"><span>ספק</span><select value={aiCfg.provider} onChange={(e) => { const provider = e.target.value; setAiCfg((s) => normalizeAiSettings({ ...s, provider, model: DEFAULT_AI_MODELS[provider] || "" })); }}><option value="">בחר ספק</option>{AI_PROVIDER_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+          <label className="field"><span>ספק</span><select value={aiCfg.provider} onChange={(e) => { const provider = e.target.value; setAiCfg((s) => normalizeAiSettings({ ...s, provider, model: DEFAULT_AI_MODELS[provider] || "" })); }}><option value="">בחר ספק</option>{aiProviderOptions.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
         </div>
         <label className="field"><span>מודל</span><input value={aiCfg.model} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, model: e.target.value }))} placeholder={aiCfg.provider ? DEFAULT_AI_MODELS[aiCfg.provider] : "בחרו ספק כדי לקבל ברירת מחדל"} /></label>
-        <div className="hint">{aiStatus?.provider ? `שרת: ${aiStatus.provider} · ${aiStatus.model || "ללא מודל"} · מפתח ${aiStatus.providerKeyConfigured ? "מוגדר" : "חסר"}` : "השרת ידווח כאן אם הוגדר ספק ומפתח."}{aiStatusErrors ? ` · ${aiStatusErrors}` : ""}</div>
+        <div className="hint">{aiStatusProviderLabel ? `שרת: ${aiStatusProviderLabel} · ${aiStatus.model || "ללא מודל"} · מפתח ${aiStatus.providerKeyConfigured ? "מוגדר" : "חסר"}` : "השרת ידווח כאן אם הוגדר ספק ומפתח."}{aiStatusErrors ? ` · ${aiStatusErrors}` : ""}</div>
       </div>
       </>}
       <SectionTitle>סיבות המתנה</SectionTitle>
