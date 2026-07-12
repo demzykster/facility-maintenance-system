@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appIssueScreenContext, maskSensitiveFields } from "../src/appIssueScreenshot.js";
+import { appIssueScreenContext, captureAppIssueScreenshot, maskSensitiveFields } from "../src/appIssueScreenshot.js";
 
 function fakeInput(attrs = {}, value = "secret") {
   return {
@@ -40,5 +40,42 @@ describe("app issue screenshot helpers", () => {
     expect(password.value).toBe("••••••");
     expect(workerPin.value).toBe("••••••");
     expect(ordinary.value).toBe("OSE250");
+  });
+
+  it("loads the screenshot renderer only when capture is requested", async () => {
+    let loaded = 0;
+    const target = { querySelectorAll: () => [] };
+    const canvas = {
+      width: 320,
+      height: 180,
+      toDataURL(type, quality) {
+        return `data:${type};quality=${quality}`;
+      },
+    };
+    const documentRef = {
+      body: target,
+      querySelector() { return target; },
+      createElement() { return canvas; },
+    };
+
+    const result = await captureAppIssueScreenshot({
+      documentRef,
+      windowRef: { location: { pathname: "/issues", search: "" }, innerWidth: 1440, innerHeight: 900, devicePixelRatio: 2 },
+      navigatorRef: { userAgent: "Vitest" },
+      html2canvasLoader: async () => {
+        loaded += 1;
+        return async () => canvas;
+      },
+    });
+
+    expect(loaded).toBe(1);
+    expect(result).toMatchObject({
+      screenshot: "data:image/jpeg;quality=0.72",
+      error: "",
+      context: {
+        location: "/issues",
+        screenshotSize: "320x180",
+      },
+    });
   });
 });

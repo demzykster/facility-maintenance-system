@@ -50,6 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget remains `19/24`.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
+- First startup split after that warning is done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used. The main chunk is still large, but the latest local build moved from about 508 kB gzip to about 462 kB gzip for the startup JS chunk.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
 ## Recent Work Completed
@@ -61,7 +62,11 @@ Recent commits on `main`:
   - BI gained a `גיל הקריאות` panel with drill-down filters for today, 2-7 days, 8-30 days, and over 30 days. This is not a heatmap; it is a backlog-aging signal for current open tickets.
   - Mobile BI KPI cards were tightened to reduce oversized blocks on small screens.
   - Repeated long-list surfaces gained `content-visibility:auto` where supported to reduce rendering work after the app has loaded.
-  - Important limitation: this pass does not reduce the main JavaScript bundle. The build still warns about the large chunk, so the next performance pass should lazy-split a heavy screen group out of `ClaudeMaintenanceApp.jsx`.
+  - Important limitation: this pass reduced browser rendering pressure but did not reduce the main JavaScript bundle. The follow-up split below starts that work.
+- `Lazy-load app issue screenshot capture`
+  - `html2canvas` is now dynamically imported only inside `captureAppIssueScreenshot`, so the screenshot renderer is not parsed on normal app startup.
+  - Local build evidence after the split: `html2canvas` became a separate chunk of about 46.8 kB gzip, while the main app chunk dropped to about 461.7 kB gzip.
+  - Important limitation: the app still ships a large `ClaudeMaintenanceApp.jsx` bundle. The next performance pass should lazy-split a real screen group or self-contained UI module.
 - `b151d30 Stabilize user scope and supplier ticket routing`
   - Hardened `/api/users` so a scoped manager cannot overwrite an existing non-worker profile or an `authUserId`-backed elevated profile by re-saving it as a worker.
   - Preserved the scoped-manager ability to create/edit workers inside the manager's own department.

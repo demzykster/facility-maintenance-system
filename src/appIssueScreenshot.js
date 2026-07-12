@@ -1,7 +1,7 @@
-import html2canvas from "html2canvas";
-
 const SENSITIVE_INPUT_TYPES = new Set(["password", "email", "tel"]);
 const SENSITIVE_NAME_PATTERN = /(password|pass|pin|secret|token|email|mail|phone|tel)/i;
+
+const loadHtml2Canvas = () => import("html2canvas").then((module) => module.default || module);
 
 export function appIssueScreenContext({ windowRef = globalThis.window, navigatorRef = globalThis.navigator } = {}) {
   const location = windowRef?.location
@@ -49,11 +49,13 @@ export async function captureAppIssueScreenshot({
   target = null,
   maxWidth = 960,
   quality = 0.72,
+  html2canvasLoader = loadHtml2Canvas,
 } = {}) {
   const context = appIssueScreenContext({ windowRef, navigatorRef });
   const node = target || documentRef?.querySelector?.(".app-shell") || documentRef?.body;
   if (!node) return { screenshot: "", context, error: "capture_target_missing" };
   try {
+    const html2canvas = await html2canvasLoader();
     const canvas = await html2canvas(node, {
       backgroundColor: null,
       logging: false,
