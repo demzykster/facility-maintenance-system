@@ -19,6 +19,7 @@ import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, p
 import { ppeOpenOrderQty, ppeSmartReorderLines, ppeSmartReorderLinesForItem } from "./ppeReorderModel.js";
 import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, isWorkerLoginRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
+import { facilityOwnerPatch, normalizeFacilitySupplierPatch } from "./facilityTicketRouteModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
 import { normalizedTicketLifecycleStages, ticketHasLifecycleStage, ticketLifecycleMetOperationalSla, ticketLifecycleMissedOperationalSla, ticketLifecycleOperationalElapsedMs, ticketLifecycleOperationalSlaRatio, ticketLifecycleSummary, ticketLifecycleWaitReasonStats } from "./ticketLifecycleExportModel.js";
 import { findTaskImportMatch } from "./taskImportModel.js";
@@ -1061,9 +1062,9 @@ const ballIn = (t) => {
     case "new": case "in_progress": case "waiting":
       // Во время ожидания мяч определяется причиной (waitBall, записан при установке причины). Старые заявки: no_equipment→менеджер.
       if (t.status === "waiting") { const wb = t.waitBall || (t.waitingReason === "no_equipment" ? "manager" : "executor"); if (wb === "manager") return "manager"; if (wb === "admin") return "admin"; }
-      // facility-заявка без исполнителя и не в пуле — мяч у админа (разбор/назначение).
+      // facility-заявка на админском маршруте остаётся у админа, даже если выбран поставщик.
       // НО возвращённая заявка (t.returned) уже была у исполнителя — её НЕ диспетчеризуем заново через админа.
-      if (track === "facility" && !t.assignee && !t.routedTech && !t.returned) return "admin";
+      if (track === "facility" && !t.routedTech && !t.mgrExec && !t.returned) return "admin";
       return exec;
     case "pending_user": return "manager";
     case "pending_admin": return "admin";
@@ -10112,12 +10113,12 @@ function TicketForm(p) {
     const dueAt = retroOn ? datetimeValueToMs(retro.dueAt, createdAt + hrs * 3600000) : createdAt + hrs * 3600000;
     const selectedFleet = track === "transport" ? fleet.find((f) => f.id === forkliftId) : null;
     const routedSupplier = track === "transport" ? (selectedFleet?.supplier || "") : supplierAssign;
-    let assignee = "", routedTech = track === "transport" || !!routedSupplier || undefined, mgrExec = undefined, routeText;
+    let assignee = "", routedTech = track === "transport" || undefined, mgrExec = undefined, routeText;
     if (track === "transport") routeText = routedSupplier ? `הקריאה נפתחה והועברה לספק ${routedSupplier}` : "הקריאה נפתחה והועברה למאגר שינוע";
     else if (!isAdmin) routeText = "הקריאה נפתחה";
-    else if (routedSupplier) { routedTech = true; routeText = `נפתחה ע״י מנהל — שויכה לספק ${routedSupplier}`; }
+    else if (routedSupplier) { ({ assignee, routedTech, mgrExec } = facilityOwnerPatch({ track, status }, session, { supplier: routedSupplier, status })); routeText = `נפתחה ע״י מנהל — שויכה לספק ${routedSupplier}`; }
 	    else if (assignTo.startsWith("mgr:")) { const u = (users || []).find((x) => x.id === assignTo.slice(4)); assignee = u?.name || ""; mgrExec = assignee ? true : undefined; routeText = assignee ? `נפתחה ע״י מנהל — שויכה למנהל ${assignee}` : "נפתחה ע״י מנהל"; }
-	    else routeText = "נפתחה ע״י מנהל — נשארת לטיפולך";
+	    else { ({ assignee, routedTech, mgrExec } = facilityOwnerPatch({ track, status }, session, { supplier: "", status })); routeText = "נפתחה ע״י מנהל — נשארת לטיפולך"; }
 	    return {
       id, track, subject: subject.trim(), category: track === "transport" ? "transport" : category, categoryLabel: track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === category)?.label || ""), priority: pr, zone: track === "facility" ? facilityZone : zone,
       asset: track === "transport" ? (selectedFleet?.code || "") : asset.trim(),
@@ -10287,9 +10288,9 @@ function TicketDetail(p) {
     const approver = { id: session.id, name: session.name, role: session.role, dept: session.dept, phone: session.phone || "", email: session.email || "" };
     const supplierName = rev.route.startsWith("supplier:") ? rev.route.slice(9) : "";
     const transportSupplier = track === "transport" ? ((fleet0 || []).find((x) => x.id === ticket.forkliftId)?.supplier || "") : "";
-    let assignee = "", routedTech = track === "transport" || !!supplierName || !!transportSupplier || undefined, mgrExec = undefined, routeText = "";
+    let assignee = "", routedTech = track === "transport" || !!transportSupplier || undefined, mgrExec = undefined, routeText = "";
     if (track === "transport") { routeText = transportSupplier ? `אושר ע״י המנהל — הועבר לספק ${transportSupplier}` : "אושר ע״י המנהל — הועבר למאגר שינוע"; }
-    else if (supplierName) { routedTech = true; routeText = `אושר — שויך לספק ${supplierName}`; }
+    else if (supplierName) { ({ assignee, routedTech, mgrExec } = facilityOwnerPatch({ track, status: "new" }, session, { supplier: supplierName, status: "new" })); routeText = `אושר — שויך לספק ${supplierName}`; }
     else if (rev.route === "admin") { routeText = "אושר — הועבר למנהל המערכת"; }
     else { assignee = session.role === "user" ? session.name : ""; mgrExec = session.role === "user" ? true : undefined; routeText = session.role === "user" ? "אושר — המנהל מטפל בעצמו" : "אושר — לטיפול מנהל המערכת"; }
     onUpdate({ ...ticket, status: "new", category: catId, categoryLabel: catLabel, priority: rev.prio, assignee, routedTech, mgrExec, supplier: supplierName || transportSupplier || "", createdBy: approver, approvedAt: now, dueAt: now + hrs * 3600000, updatedAt: now, log: [...(ticket.log || []), e(`${routeText} (דיווח של ${ticket.reportedBy?.name || "עובד"})`)] });
@@ -10311,17 +10312,21 @@ function TicketDetail(p) {
   const ticketSupplierSelectOptions = ticket.supplier && !ticketSupplierOptions.includes(ticket.supplier) ? [ticket.supplier, ...ticketSupplierOptions] : ticketSupplierOptions;
   const setSupplierRoute = (name) => {
     const supplierName = (name || "").trim();
-    upd({ supplier: supplierName, assignee: "", routedTech: supplierName ? true : (track === "transport" ? true : undefined), mgrExec: false, status: ticket.status === "new" && supplierName ? "in_progress" : ticket.status }, supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
+    if (track === "facility") {
+      upd(facilityOwnerPatch(ticket, session, { supplier: supplierName, status: ticket.status }), supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
+      return;
+    }
+    upd({ supplier: supplierName, assignee: "", routedTech: true, mgrExec: false, status: ticket.status === "new" && supplierName ? "in_progress" : ticket.status }, supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
   };
   const adminQuickSave = (label, patch) => {
     setAdminQuickEdit("");
-    upd(patch, `עריכת מנהל: ${label}`, "admin_manual");
+    upd(normalizeFacilitySupplierPatch(ticket, patch, session), `עריכת מנהל: ${label}`, "admin_manual");
   };
 
   const isTech = role === "tech";
   const isAdmin = role === "admin";
   const executorRole = isTech ? "tech" : (isAdmin ? "tech" : role);
-  const canOperateAsExecutor = (isTech || isAdmin) && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework";
+  const canOperateAsExecutor = (isTech || (isAdmin && track !== "facility")) && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework";
   const canEditExecutorState = isAdmin || ticket.assignee === session.name;
   const mine = !isTech && ownsTicket(session, ticket);
   // Менеджер-исполнитель: заявка по зданию назначена ему лично — работает как техник
@@ -10473,7 +10478,7 @@ function TicketDetail(p) {
       {!isTech && ticket.status === "rework" && <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><AlertTriangle size={16} /> הוחזר לעובד לתיקון — ממתין לשליחה חוזרת.</div>}
 
       {role === "admin" && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework" && (<>
-        {track === "facility" && <><SectionTitle>סטטוס</SectionTitle><div className="status-seg">{["new", "in_progress"].map((st) => <button key={st} className={"seg" + (ticket.status === st ? " on" : "")} onClick={() => setStatus(st)} style={ticket.status === st ? { background: stOf(st).color, color: "#fff", borderColor: stOf(st).color } : {}}>{stOf(st).label}</button>)}</div>
+        {track === "facility" && <><SectionTitle>סטטוס</SectionTitle><div className="status-static"><span className="badge sm" style={{ color: stOf(ticket.status).color, background: stOf(ticket.status).bg }}>{stOf(ticket.status).label}</span></div>
           <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
         {track === "transport" && <><SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— מאגר שינוע / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">ברירת המחדל מגיעה מספק הכלי, ואפשר לשנות ידנית אם הטיפול עובר לקבלן אחר.</div></>}
         <SectionTitle>הערה</SectionTitle>
@@ -10481,7 +10486,7 @@ function TicketDetail(p) {
         <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>
       </>)}
 
-      {role === "admin" && <AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} />}
+      {role === "admin" && <div className="admin-ticket-manual-shell"><AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} /></div>}
 
       {mine && ticket.status === "new" && <ConfirmBtn className="btn-danger full" style={{ marginTop: 16 }} icon={null} label="ביטול הקריאה" onConfirm={cancelOwn} />}
 
@@ -10651,7 +10656,7 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
       return onSave(track === "transport" ? "כלי" : "ציוד", { asset: clean });
     }
     if (field === "assignee") return onSave("אחראי", { assignee: clean, mgrExec: false });
-    if (field === "supplier") return onSave("ספק", { supplier: clean, assignee: "", routedTech: clean ? true : ticket.routedTech });
+    if (field === "supplier") return onSave("ספק", track === "facility" ? { supplier: clean } : { supplier: clean, assignee: "", routedTech: clean ? true : ticket.routedTech });
   };
 
   return <div className="admin-quick-edit">
@@ -11595,6 +11600,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .cat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .cat-pick{display:flex;flex-direction:column;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);border-radius:11px;padding:11px 6px;font-size:12.5px;font-weight:500;color:var(--ink);}
 .pr-row,.status-seg{display:flex;gap:7px;flex-wrap:wrap;}
+.status-static{display:flex;align-items:center;min-height:32px;}
 .pr-pick{flex:1;min-height:44px;border:1px solid rgba(201,205,209,.86);background:var(--surface-glow);border-radius:12px;padding:10px 10px;font-size:13px;font-weight:650;color:var(--muted);min-width:80px;box-shadow:var(--control-shadow);}
 .pr-pick:hover{border-color:rgba(100,116,139,.5);color:var(--ink);}
 .seg{border:1.5px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);}
@@ -12716,7 +12722,9 @@ body *{visibility:hidden!important;}
 .admin-route{background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:15px;}
 .ar-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;}
 .admin-manual-fold{margin-top:12px;}
-.admin-ticket-manual{margin-top:16px;}
+.admin-ticket-manual-shell{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);}
+.admin-ticket-manual-shell::before{content:"ניהול חריג של מנהל מערכת";display:block;margin:0 2px 8px;color:var(--muted);font-size:12px;font-weight:600;}
+.admin-ticket-manual{margin-top:0;background:var(--surface-2);}
 .manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;margin:10px 14px;}
 .manual-grid .field{margin:0;}
 .manual-grid .wide{grid-column:1/-1;}
