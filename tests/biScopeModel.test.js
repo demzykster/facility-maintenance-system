@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biDepartmentRiskRows, biScopeForSession } from "../src/biScopeModel.js";
+import { biDepartmentRiskRows, biPeriodRange, biScopeForSession, normalizeBiPeriod } from "../src/biScopeModel.js";
 
 const data = {
   tickets: [
@@ -20,7 +20,8 @@ const data = {
   zones: [
     { id: "z-a", dept: "A" },
     { id: "z-shared", shared: true },
-    { id: "z-b", dept: "B" }
+    { id: "z-b", dept: "B" },
+    { id: "z-fac-a", name: "Boiler Room", dept: "A" }
   ],
   rounds: [
     { id: "r-a", zoneId: "z-a" },
@@ -56,10 +57,30 @@ const data = {
     { id: "u-a", role: "worker", dept: "A" },
     { id: "u-b", role: "worker", depts: ["B"] },
     { id: "admin", role: "admin" }
+  ],
+  tasks: [
+    { id: "task-a", responsibleIds: ["u-a"] },
+    { id: "task-manager-a", ownerId: "manager-a" },
+    { id: "task-b", responsibleIds: ["u-b"] },
+    { id: "task-admin", responsibleIds: ["admin"] }
+  ],
+  meetings: [
+    { id: "meeting-a", participantIds: ["u-a"] },
+    { id: "meeting-manager-a", ownerId: "manager-a" },
+    { id: "meeting-b", participantIds: ["u-b"] },
+    { id: "meeting-admin", participantIds: ["admin"] }
   ]
 };
 
 describe("BI scope model", () => {
+  it("normalizes BI period choices into current and trend windows", () => {
+    expect(normalizeBiPeriod("bad")).toBe("now");
+    expect(normalizeBiPeriod("30")).toBe("30");
+
+    expect(biPeriodRange("now", 1_000_000)).toMatchObject({ id: "now", trendDays: 7, evidenceDays: 30 });
+    expect(biPeriodRange("90", 1_000_000)).toMatchObject({ id: "90", trendDays: 90, evidenceDays: 90 });
+  });
+
   it("gives admin and executive company BI while keeping finance explicit", () => {
     const adminScope = biScopeForSession({ role: "admin" }, data);
     const executiveScope = biScopeForSession({ role: "executive" }, data);
@@ -76,10 +97,12 @@ describe("BI scope model", () => {
     expect(executiveScope.ppeReqs.map((request) => request.id)).toEqual(["req-a", "req-b"]);
     expect(executiveScope.ppeOrders.map((order) => order.id)).toEqual(["ord-a", "ord-b"]);
     expect(executiveScope.users.map((user) => user.id)).toEqual(["u-a", "u-b", "admin"]);
+    expect(executiveScope.tasks.map((task) => task.id)).toEqual(["task-a", "task-manager-a", "task-b", "task-admin"]);
+    expect(executiveScope.meetings.map((meeting) => meeting.id)).toEqual(["meeting-a", "meeting-manager-a", "meeting-b", "meeting-admin"]);
   });
 
   it("limits department managers to their departments and shared zones", () => {
-    const scope = biScopeForSession({ role: "user", depts: ["A"], mgrZones: ["z-manual"] }, data);
+    const scope = biScopeForSession({ id: "manager-a", role: "user", depts: ["A"], mgrZones: ["z-manual"] }, data);
 
     expect(scope.kind).toBe("department");
     expect(scope.canViewCompanyBI).toBe(false);
@@ -93,10 +116,25 @@ describe("BI scope model", () => {
     expect(scope.ppeReqs.map((request) => request.id)).toEqual(["req-a"]);
     expect(scope.ppeOrders).toEqual([]);
     expect(scope.users.map((user) => user.id)).toEqual(["u-a"]);
-    expect(scope.zones.map((zone) => zone.id)).toEqual(["z-a", "z-shared"]);
+    expect(scope.zones.map((zone) => zone.id)).toEqual(["z-a", "z-shared", "z-fac-a"]);
     expect(scope.rounds.map((round) => round.id)).toEqual(["r-a", "r-shared", "r-manual"]);
     expect(scope.complaints.map((complaint) => complaint.id)).toEqual(["c-a", "c-shared", "c-manual"]);
-    expect(scope.zoneIds).toEqual(["z-manual", "z-a", "z-shared"]);
+    expect(scope.tasks.map((task) => task.id)).toEqual(["task-a", "task-manager-a"]);
+    expect(scope.meetings.map((meeting) => meeting.id)).toEqual(["meeting-a", "meeting-manager-a"]);
+    expect(scope.zoneIds).toEqual(["z-manual", "z-a", "z-shared", "z-fac-a"]);
+  });
+
+  it("includes department facility tickets tied to scoped zones even without reporter department", () => {
+    const scope = biScopeForSession({ role: "user", depts: ["A"] }, {
+      ...data,
+      tickets: [
+        { id: "zone-ticket", track: "facility", zone: "Boiler Room" },
+        { id: "other-zone-ticket", track: "facility", zone: "z-b" },
+        { id: "transport-ticket", forkliftId: "f-a" }
+      ]
+    });
+
+    expect(scope.tickets.map((ticket) => ticket.id)).toEqual(["zone-ticket", "transport-ticket"]);
   });
 
   it("does not promote a department manager without departments to company scope", () => {
@@ -115,6 +153,8 @@ describe("BI scope model", () => {
     expect(scope.ppeReqs).toEqual([]);
     expect(scope.ppeOrders).toEqual([]);
     expect(scope.users).toEqual([]);
+    expect(scope.tasks).toEqual([]);
+    expect(scope.meetings).toEqual([]);
   });
 
   it("does not expose BI scopes to operational roles in the first rollout", () => {

@@ -12,7 +12,7 @@ import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { productionAccessToken, store } from "./storageAdapter.js";
 import { DEFAULT_MANAGER_PERMS, USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
-import { biDepartmentRiskRows, biScopeForSession } from "./biScopeModel.js";
+import { BI_PERIOD_OPTIONS, biDepartmentRiskRows, biPeriodRange, biScopeForSession } from "./biScopeModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, isWorkerLoginRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
@@ -4287,7 +4287,7 @@ function UserApp(p) {
       <div className="main-col">
         <TopBar title={pageTitle} subtitle={session.name + (userDepts(session).length ? " · " + userDepts(session).join(", ") : "")} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
-          {activeView === "bi" ? <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={goUserTickets} onGoAssets={(nav) => goUserDept("equip", nav || {})} onGoCleaning={() => goUserDept("cleaning")} onGoPpe={() => goUserDept("ppe")} />
+          {activeView === "bi" ? <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={goUserTickets} onGoAssets={(nav) => goUserDept("equip", nav || {})} onGoCleaning={() => goUserDept("cleaning")} onGoPpe={() => goUserDept("ppe")} onGoTasks={(nav) => { setTaskNav(nav || null); setView("tasks"); }} />
           : activeView === "tickets" ? (<>
             {needAct > 0 && <div className="banner"><AlertTriangle size={16} /> {countLabel(needAct, "קריאה דורשת", "קריאות דורשות")} פעולה שלך</div>}
             {ticketNav?.focus?.label && <div className="note bi-filter-note"><span>{ticketNav.focus.label}</span><button className="btn-ghost sm" onClick={() => setTicketNav(null)}>נקה סינון</button></div>}
@@ -7139,8 +7139,10 @@ function PpeHub(p) {
   </>);
 }
 
-function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe }) {
-  const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders }), [session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders]);
+function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe, onGoTasks }) {
+  const [periodId, setPeriodId] = useState("now");
+  const period = biPeriodRange(periodId);
+  const scope = useMemo(() => biScopeForSession(session, { tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings }), [session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings]);
   const isAdminBI = session?.role === "admin";
   const openTickets = scope.tickets.filter(isOpen);
   const isTransportTicket = (ticket) => ticket.track === "transport" || (!ticket.track && ticket.forkliftId);
@@ -7157,17 +7159,17 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const cleaningMissed = cleaningToday.filter((row) => row.status === "missed");
   const cleaningDue = cleaningToday.filter((row) => isCleaningRoundActionableStatus(row.status));
   const cleaningOpen = scope.complaints.filter((complaint) => complaint.status === "open" || complaint.status === "pending");
-  const cleaningIssueRounds = scope.rounds.filter((round) => (round.at || 0) >= cleaningNow - 7 * 86400000 && (round.issues || []).length > 0);
+  const cleaningIssueRounds = scope.rounds.filter((round) => (round.at || 0) >= period.trendStart && (round.issues || []).length > 0);
   const ppeLowItems = scope.ppeItems.filter((item) => item.active !== false && ppeLow(item));
   const ppePending = scope.ppeReqs.filter(ppeRequestNeedsAction);
   const ppeOpenOrders = scope.ppeOrders.filter((order) => order.status === "draft" || order.status === "sent");
   const biNow = Date.now();
   const dayMs = 86400000;
-  const createdLast7 = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 7 * 86400000);
-  const createdPrev7 = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 14 * 86400000 && (ticket.createdAt || 0) < biNow - 7 * 86400000);
-  const closedLast7 = scope.tickets.filter((ticket) => !isOpen(ticket) && (ticket.closure?.signedAt || ticket.updatedAt || 0) >= biNow - 7 * 86400000);
-  const trendDelta = createdLast7.length - createdPrev7.length;
-  const repeatProblemRows = Object.values(scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= biNow - 30 * 86400000).reduce((acc, ticket) => {
+  const createdInTrend = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= period.trendStart);
+  const createdPrevTrend = scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= period.previousTrendStart && (ticket.createdAt || 0) < period.trendStart);
+  const closedInTrend = scope.tickets.filter((ticket) => !isOpen(ticket) && (ticket.closure?.signedAt || ticket.updatedAt || 0) >= period.trendStart);
+  const trendDelta = createdInTrend.length - createdPrevTrend.length;
+  const repeatProblemRows = Object.values(scope.tickets.filter((ticket) => (ticket.createdAt || 0) >= period.evidenceStart).reduce((acc, ticket) => {
     const category = catOf(ticket);
     const repeatFocus = ticket.forkliftId
       ? { forkliftId: ticket.forkliftId }
@@ -7198,15 +7200,27 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     pmIsOverdue: (task) => task.active !== false && daysLeft(task.nextDue) < 0,
     ppeRequestNeedsAction
   });
-  const closedLast30 = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && Date.now() - ticket.closure.signedAt < 30 * 86400000) : [];
-  const monthCost = closedLast30.reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0);
-  const avgClosedCost = closedLast30.length ? Math.round(monthCost / closedLast30.length) : 0;
-  const supplierCostRows = Object.entries(closedLast30.reduce((acc, ticket) => {
+  const closedInEvidence = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && (ticket.closure.signedAt || 0) >= period.evidenceStart) : [];
+  const periodCost = closedInEvidence.reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0);
+  const avgClosedCost = closedInEvidence.length ? Math.round(periodCost / closedInEvidence.length) : 0;
+  const supplierCostRows = Object.entries(closedInEvidence.reduce((acc, ticket) => {
     const supplier = ticket.closure?.costSupplier || "ללא ספק";
     acc[supplier] = (acc[supplier] || 0) + (ticket.closure?.costAmount || 0);
     return acc;
   }, {})).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const maxSupplierCost = Math.max(1, ...supplierCostRows.map(([, value]) => value));
+  const categoryCostRows = Object.entries(closedInEvidence.reduce((acc, ticket) => {
+    const category = catOf(ticket).label || "כללי";
+    acc[category] = (acc[category] || 0) + (ticket.closure?.costAmount || 0);
+    return acc;
+  }, {})).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const maxCategoryCost = Math.max(1, ...categoryCostRows.map(([, value]) => value));
+  const assetCostRows = Object.entries(closedInEvidence.reduce((acc, ticket) => {
+    const asset = ticket.forkliftId ? unitLabel(scope.fleet.find((unit) => unit.id === ticket.forkliftId), config) : (ticket.asset || ticket.zone || "ללא נכס");
+    acc[asset] = (acc[asset] || 0) + (ticket.closure?.costAmount || 0);
+    return acc;
+  }, {})).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const maxAssetCost = Math.max(1, ...assetCostRows.map(([, value]) => value));
   const lifecycleOptions = {
     now: Date.now(),
     isOpen,
@@ -7226,10 +7240,23 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const waitReasonRows = ticketLifecycleWaitReasonStats(openTickets, lifecycleOptions).slice(0, 4);
   const maxLifecycleN = Math.max(1, ...lifecycleBottlenecks.map((row) => row.n));
   const maxWaitReasonN = Math.max(1, ...waitReasonRows.map((row) => row.n));
-  const unownedTickets = openTickets.filter((ticket) => needsHandler(ticket, scope.users, scope.fleet));
   const ticketDomain = (ticket) => isTransportTicket(ticket) ? "שינוע" : "מבנה";
   const ticketCause = (ticket, fallback) => ticketWaitReasonLabel(ticket, config) || ballHolder(ticket)?.label || fallback || stOf(ticket.status).label;
   const ticketTitle = (ticket) => `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "קריאה"}`;
+  const downtimeRows = critical.map((ticket) => {
+    const stages = normalizedTicketLifecycleStages(ticket, lifecycleOptions)
+      .filter((stage) => stage.countsDowntime || stage.current || stage.kind === "waiting")
+      .sort((a, b) => (b.current ? 1 : 0) - (a.current ? 1 : 0) || (b.ms || 0) - (a.ms || 0));
+    const mainStage = stages[0] || null;
+    const downtime = downtimeMs(ticket);
+    return {
+      ticket,
+      downtime,
+      stage: mainStage,
+      cause: ticketCause(ticket, mainStage?.label || "בדיקת טיפול")
+    };
+  }).sort((a, b) => b.downtime - a.downtime).slice(0, 3);
+  const unownedTickets = openTickets.filter((ticket) => needsHandler(ticket, scope.users, scope.fleet));
   const topAttention = [
     ...slaBreaches.map((ticket) => ({ ticket, label: "חריגת SLA", color: "#B91C1C" })),
     ...critical.filter((ticket) => !slaBreaches.some((item) => item.id === ticket.id)).map((ticket) => ({ ticket, label: "השבתה קריטית", color: "#C2410C" })),
@@ -7255,6 +7282,9 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const firstByDomain = Object.keys(commandDomainCounts).map((domain) => commandItems.find((item) => item.domain === domain)).filter(Boolean);
   const commandQueue = [...firstByDomain, ...commandItems.filter((item) => !firstByDomain.some((first) => first.key === item.key))].slice(0, 8);
   const scopeTitle = scope.kind === "company" ? "תמונת חברה" : scope.departments.length ? `מחלקות: ${scope.departments.join(", ")}` : "לא הוגדר scope";
+  const openTasks = scope.tasks.filter(taskOpen);
+  const overdueTasks = openTasks.filter(taskOverdue);
+  const upcomingMeetings = scope.meetings.filter((meeting) => meeting.status === "planned" && (meeting.at || 0) >= biNow && (meeting.at || 0) <= biNow + period.trendDays * dayMs).sort((a, b) => (a.at || 0) - (b.at || 0));
   const riskRowAction = (row) => {
     if (row.openTickets) return () => onGoTickets?.({ st: "open", focus: { label: `BI · מחלקה · ${row.name}`, department: row.name } });
     if (row.pmOverdue) return () => onGoAssets?.({ tab: "pm" });
@@ -7262,8 +7292,8 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     if (row.ppePending) return onGoPpe || null;
     return null;
   };
-  const facilityLast30 = scope.tickets.filter((ticket) => !isTransportTicket(ticket) && (ticket.createdAt || 0) >= biNow - 30 * dayMs);
-  const facilityCategoryRows = Object.values(facilityLast30.reduce((acc, ticket) => {
+  const facilityInEvidence = scope.tickets.filter((ticket) => !isTransportTicket(ticket) && (ticket.createdAt || 0) >= period.evidenceStart);
+  const facilityCategoryRows = Object.values(facilityInEvidence.reduce((acc, ticket) => {
     const category = catOf(ticket);
     const key = category.id || "other";
     const row = acc[key] || { key, categoryId: category.id, label: category.label || "כללי", n: 0, open: 0 };
@@ -7272,7 +7302,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     acc[key] = row;
     return acc;
   }, {})).sort((a, b) => b.open - a.open || b.n - a.n).slice(0, 4);
-  const facilityZoneRows = Object.values(facilityLast30.filter((ticket) => ticket.zone).reduce((acc, ticket) => {
+  const facilityZoneRows = Object.values(facilityInEvidence.filter((ticket) => ticket.zone).reduce((acc, ticket) => {
     const key = ticket.zone;
     const row = acc[key] || { key, label: ticket.zone, n: 0, open: 0 };
     row.n += 1;
@@ -7292,12 +7322,12 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     return acc;
   }, {})).sort((a, b) => b.overdue - a.overdue || b.critical - a.critical || b.n - a.n).slice(0, 4);
   const maxTechLoad = Math.max(1, ...techLoadRows.map((row) => row.n));
-  const pmHistoryLast30 = scope.pm.flatMap((task) => (task.history || []).map((entry) => ({ task, entry }))).filter(({ entry }) => (entry.at || 0) >= biNow - 30 * dayMs);
-  const pmDoneLast30 = pmHistoryLast30.filter(({ entry }) => entry.type !== "missed");
-  const pmMissedLast30 = pmHistoryLast30.filter(({ entry }) => entry.type === "missed");
-  const pmCompletionRate = pmHistoryLast30.length ? Math.round(pmDoneLast30.length / pmHistoryLast30.length * 100) : null;
+  const pmHistoryInEvidence = scope.pm.flatMap((task) => (task.history || []).map((entry) => ({ task, entry }))).filter(({ entry }) => (entry.at || 0) >= period.evidenceStart);
+  const pmDoneInEvidence = pmHistoryInEvidence.filter(({ entry }) => entry.type !== "missed");
+  const pmMissedInEvidence = pmHistoryInEvidence.filter(({ entry }) => entry.type === "missed");
+  const pmCompletionRate = pmHistoryInEvidence.length ? Math.round(pmDoneInEvidence.length / pmHistoryInEvidence.length * 100) : null;
   const cleaningWindowStats = cleaningZones.reduce((acc, zone) => {
-    for (let i = 0; i < 7; i += 1) {
+    for (let i = 0; i < period.trendDays; i += 1) {
       dayCompliance(zone, scope.rounds, biNow - i * dayMs, biNow).forEach((row) => {
         acc.total += 1;
         if (row.ok) acc.ok += 1;
@@ -7306,12 +7336,12 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     return acc;
   }, { total: 0, ok: 0 });
   const cleaningCompliance = cleaningWindowStats.total ? Math.round(cleaningWindowStats.ok / cleaningWindowStats.total * 100) : null;
-  const ppeIssuedLast30 = scope.ppe.filter((entry) => ppeIsIssue(entry) && (entry.at || 0) >= biNow - 30 * dayMs);
-  const ppeCostLast30 = ppeIssuedLast30.reduce((sum, entry) => {
+  const ppeIssuedInEvidence = scope.ppe.filter((entry) => ppeIsIssue(entry) && (entry.at || 0) >= period.evidenceStart);
+  const ppeCostInEvidence = ppeIssuedInEvidence.reduce((sum, entry) => {
     const item = scope.ppeItems.find((candidate) => candidate.id === entry.itemId);
     return sum + (entry.workerCharge || ((item?.unitCost || 0) * Math.max(1, entry.qty || 1)) || 0);
   }, 0);
-  const ppeRepeatWorkers = Object.values(ppeIssuedLast30.reduce((acc, entry) => {
+  const ppeRepeatWorkers = Object.values(ppeIssuedInEvidence.reduce((acc, entry) => {
     const key = entry.workerId || entry.workerName || "unknown";
     const row = acc[key] || { key, label: entry.workerName || uName(entry.workerId, scope.users) || "עובד", n: 0 };
     row.n += 1;
@@ -7326,9 +7356,11 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
       <div>
         <div className="bi-kicker">BI · {scopeTitle}</div>
         <h2>מה דורש תשומת לב עכשיו</h2>
-        <p>תמונה ניהולית קצרה לשבוע הקרוב, עם אפשרות להיכנס לפרטים דרך המודולים הקיימים.</p>
+        <p>תמונה ניהולית קצרה לתקופה שנבחרה, עם אפשרות להיכנס לפרטים דרך המודולים הקיימים.</p>
       </div>
-      <div className="bi-period">7 ימים / מצב נוכחי</div>
+      <div className="bi-period-switch" role="group" aria-label="תקופת BI">
+        {BI_PERIOD_OPTIONS.map((option) => <button key={option.id} type="button" className={period.id === option.id ? "on" : ""} onClick={() => setPeriodId(option.id)}>{option.label}</button>)}
+      </div>
     </div>
 
     <div className="kpi-grid bi-kpis">
@@ -7336,7 +7368,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
       <Kpi num={slaBreaches.length} label="חריגות SLA" color={slaBreaches.length ? "#B91C1C" : "#64748B"} small />
       <Kpi num={critical.length} label="השבתות שינוע" color={critical.length ? "#C2410C" : "#64748B"} small />
       <Kpi num={pmOverdue.length} label="טיפולים באיחור" color={pmOverdue.length ? "#B45309" : "#64748B"} small />
-      {scope.canViewFinancialBI && <Kpi num={ils(monthCost)} label="עלות 30 ימים" color="#0D9488" small />}
+      {scope.canViewFinancialBI && <Kpi num={ils(periodCost)} label={`עלות ${period.evidenceDays} ימים`} color="#0D9488" small />}
     </div>
 
     <div className="bi-grid">
@@ -7375,17 +7407,23 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         {waitReasonRows.length > 0 && <div className="bi-subdivider" />}
         {waitReasonRows.length > 0 && <div className="bi-subtitle">סיבות המתנה</div>}
         {waitReasonRows.map((row) => <Bar key={row.reason} label={row.label} value={row.n} max={maxWaitReasonN} suffix={row.ms ? ` · ${fmtDur(row.ms)}` : ""} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · סיבת המתנה · ${row.label}`, lifecycleKey: `waiting:${row.reason}` } })} />)}
+        {downtimeRows.length > 0 && <div className="bi-subdivider" />}
+        {downtimeRows.length > 0 && <div className="bi-subtitle">השבתות מוסברות</div>}
+        {downtimeRows.map((row) => <button key={row.ticket.id} className="bi-doc-row bi-doc-action" onClick={() => onOpenTicket?.(row.ticket.id)}>
+          <b>{ticketTitle(row.ticket)}</b>
+          <span>{fmtDur(row.downtime)} · {row.cause}{row.stage?.label ? ` · שלב מרכזי: ${row.stage.label}` : ""}</span>
+        </button>)}
       </section>
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>מגמות קצרות</b><span>מה השתנה בשבוע האחרון ומה חוזר על עצמו</span></div></div>
         <div className="bi-mini-stats">
-          <span><b>{createdLast7.length}</b><small>נפתחו 7 ימים</small></span>
-          <span><b>{closedLast7.length}</b><small>נסגרו 7 ימים</small></span>
-          <span><b>{trendDelta > 0 ? `+${trendDelta}` : trendDelta}</b><small>מול שבוע קודם</small></span>
+          <span><b>{createdInTrend.length}</b><small>נפתחו {period.trendDays} ימים</small></span>
+          <span><b>{closedInTrend.length}</b><small>נסגרו {period.trendDays} ימים</small></span>
+          <span><b>{trendDelta > 0 ? `+${trendDelta}` : trendDelta}</b><small>מול תקופה קודמת</small></span>
         </div>
-        {repeatProblemRows.length > 0 && <div className="bi-subtitle">חזרתיות ב-30 ימים</div>}
-        {repeatProblemRows.length ? repeatProblemRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxRepeatN} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: row.track, focus: { label: `BI · חזרתיות · ${row.label}`, ...row.focus } })} />) : <div className="note" style={{ marginTop: 10 }}>אין כרגע דפוס חזרתי בולט ב-30 הימים האחרונים.</div>}
+        {repeatProblemRows.length > 0 && <div className="bi-subtitle">חזרתיות ב-{period.evidenceDays} ימים</div>}
+        {repeatProblemRows.length ? repeatProblemRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxRepeatN} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: row.track, focus: { label: `BI · חזרתיות · ${row.label}`, ...row.focus } })} />) : <div className="note" style={{ marginTop: 10 }}>אין כרגע דפוס חזרתי בולט ב-{period.evidenceDays} הימים האחרונים.</div>}
       </section>
 
       <section className="panel bi-panel">
@@ -7418,7 +7456,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>אחזקת מבנה</b><span>קטגוריות ואזורים שמסבירים את העומס</span></div><button className="btn-ghost sm" onClick={() => onGoTickets?.({ st: "all", track: "facility", focus: { label: "BI · אחזקת מבנה" } })}>לקריאות</button></div>
-        {facilityCategoryRows.length ? facilityCategoryRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxFacilityCategory} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: "facility", focus: { label: `BI · מבנה · ${row.label}`, categoryId: row.categoryId } })} />) : <div className="note">אין עומס מבנה משמעותי ב-30 הימים האחרונים.</div>}
+        {facilityCategoryRows.length ? facilityCategoryRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxFacilityCategory} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: "facility", focus: { label: `BI · מבנה · ${row.label}`, categoryId: row.categoryId } })} />) : <div className="note">אין עומס מבנה משמעותי ב-{period.evidenceDays} הימים האחרונים.</div>}
         {facilityZoneRows.length > 0 && <div className="bi-subdivider" />}
         {facilityZoneRows.length > 0 && <div className="bi-subtitle">אזורים חוזרים</div>}
         {facilityZoneRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxFacilityZone} suffix={row.open ? ` · ${row.open} פתוחות` : ""} color={row.open ? "#B45309" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "all", track: "facility", focus: { label: `BI · אזור · ${row.label}`, zoneKey: row.key } })} />)}
@@ -7428,8 +7466,8 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         <div className="bi-panel-head"><div><b>עומס ביצוע</b><span>טכנאים ו-PM בלי להיכנס לדוח מלא</span></div></div>
         <div className="bi-mini-stats">
           <span><b>{techLoadRows.length}</b><small>מטפלים פעילים</small></span>
-          <span><b>{pmCompletionRate == null ? "—" : `${pmCompletionRate}%`}</b><small>ביצוע PM 30 ימים</small></span>
-          <span><b>{pmMissedLast30.length}</b><small>PM שלא הגיעו</small></span>
+          <span><b>{pmCompletionRate == null ? "—" : `${pmCompletionRate}%`}</b><small>ביצוע PM {period.evidenceDays} ימים</small></span>
+          <span><b>{pmMissedInEvidence.length}</b><small>PM שלא הגיעו</small></span>
         </div>
         {techLoadRows.length ? techLoadRows.map((row) => <Bar key={row.key} label={row.label} value={row.n} max={maxTechLoad} suffix={`${row.overdue ? ` · SLA ${row.overdue}` : ""}${row.critical ? ` · השבתה ${row.critical}` : ""}`} color={row.overdue ? "#B91C1C" : row.critical ? "#C2410C" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · עומס · ${row.label}`, assignee: row.key } })} />) : <div className="note" style={{ marginTop: 10 }}>אין עומס חריג לפי מטפל.</div>}
       </section>
@@ -7439,11 +7477,11 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         <div className="bi-mini-stats">
           <span><b>{cleaningZones.length}</b><small>אזורי ניקיון</small></span>
           <span><b>{cleaningOpen.length}</b><small>דיווחים פתוחים</small></span>
-          <span><b>{cleaningCompliance == null ? "—" : `${cleaningCompliance}%`}</b><small>עמידה 7 ימים</small></span>
+          <span><b>{cleaningCompliance == null ? "—" : `${cleaningCompliance}%`}</b><small>עמידה {period.trendDays} ימים</small></span>
         </div>
         {cleaningOpen.slice(0, 2).map((complaint) => <div key={complaint.id} className="bi-doc-row"><b>{complaint.zoneName || "אזור ניקיון"}</b><span>{complaint.status === "pending" ? "ממתין לאישור" : "פתוח"} · {complaint.kind === "broken" ? "תקלה" : "לכלוך"}</span></div>)}
         {!cleaningOpen.length && cleaningDue.length > 0 && <div className="bi-doc-row"><b>{cleaningDue[0].zone.name}</b><span>לביצוע עכשיו · {cleaningDue[0].win?.time || "חלון ניקיון"}</span></div>}
-        {!cleaningOpen.length && !cleaningDue.length && cleaningIssueRounds.length > 0 && <div className="bi-doc-row"><b>סבבים עם הערות</b><span>{cleaningIssueRounds.length} ב-7 ימים</span></div>}
+        {!cleaningOpen.length && !cleaningDue.length && cleaningIssueRounds.length > 0 && <div className="bi-doc-row"><b>סבבים עם הערות</b><span>{cleaningIssueRounds.length} ב-{period.trendDays} ימים</span></div>}
       </section>
 
       <section className="panel bi-panel">
@@ -7451,24 +7489,38 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         <div className="bi-mini-stats">
           <span><b>{ppePending.length}</b><small>בקשות לטיפול</small></span>
           <span><b>{ppeLowItems.length}</b><small>פריטים במלאי נמוך</small></span>
-          <span><b>{scope.canViewFinancialBI ? ils(ppeCostLast30) : ppeIssuedLast30.length}</b><small>{scope.canViewFinancialBI ? "עלות 30 ימים" : "הנפקות 30 ימים"}</small></span>
+          <span><b>{scope.canViewFinancialBI ? ils(ppeCostInEvidence) : ppeIssuedInEvidence.length}</b><small>{scope.canViewFinancialBI ? `עלות ${period.evidenceDays} ימים` : `הנפקות ${period.evidenceDays} ימים`}</small></span>
         </div>
         {ppePending.slice(0, 2).map((request) => <div key={request.id} className="bi-doc-row"><b>{request.workerName || "עובד"}</b><span>{ppeRequestStatusLabel(request.status)} · {(request.lines || []).length || 1} פריטים</span></div>)}
         {!ppePending.length && ppeLowItems.slice(0, 2).map((item) => <div key={item.id} className="bi-doc-row"><b>{item.name || "פריט"}</b><span>מלאי נמוך</span></div>)}
-        {!ppePending.length && !ppeLowItems.length && ppeRepeatWorkers.map((row) => <div key={row.key} className="bi-doc-row"><b>{row.label}</b><span>{row.n} הנפקות ב-30 ימים</span></div>)}
+        {!ppePending.length && !ppeLowItems.length && ppeRepeatWorkers.map((row) => <div key={row.key} className="bi-doc-row"><b>{row.label}</b><span>{row.n} הנפקות ב-{period.evidenceDays} ימים</span></div>)}
+      </section>
+
+      <section className="panel bi-panel">
+        <div className="bi-panel-head"><div><b>מטלות ופגישות</b><span>עבודה ניהולית שמתקדמת מחוץ לקריאה</span></div>{onGoTasks && <button className="btn-ghost sm" onClick={() => onGoTasks?.()}>למטלות</button>}</div>
+        <div className="bi-mini-stats">
+          <span><b>{openTasks.length}</b><small>מטלות פתוחות</small></span>
+          <span><b>{overdueTasks.length}</b><small>באיחור</small></span>
+          <span><b>{upcomingMeetings.length}</b><small>פגישות {period.trendDays} ימים</small></span>
+        </div>
+        {overdueTasks.slice(0, 2).map((task) => <button key={task.id} className="bi-doc-row bi-doc-action" onClick={() => onGoTasks?.({ id: task.id })}><b>{task.title || "מטלה"}</b><span>באיחור · {task.dueAt ? fmtDate(task.dueAt) : "ללא יעד"}</span></button>)}
+        {!overdueTasks.length && upcomingMeetings.slice(0, 2).map((meeting) => <div key={meeting.id} className="bi-doc-row"><b>{meeting.title || "פגישה"}</b><span>{fmtDate(meeting.at)} {fmtTime(meeting.at)}</span></div>)}
       </section>
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>{scope.canViewFinancialBI ? "פיננסים" : "אנשים ושטח"}</b><span>{scope.canViewFinancialBI ? "מוצג רק להנהלה ולאדמין" : "ללא נתוני עלות"}</span></div></div>
         {scope.canViewFinancialBI ? <>
-          <div className="big-stat">{ils(monthCost)}</div>
-          <div className="rs-lbl">עלות סגירות ב-30 הימים האחרונים</div>
+          <div className="big-stat">{ils(periodCost)}</div>
+          <div className="rs-lbl">עלות סגירות ב-{period.evidenceDays} הימים האחרונים</div>
           <div className="bi-mini-stats bi-finance-stats">
-            <span><b>{closedLast30.length}</b><small>סגירות עם עלות</small></span>
+            <span><b>{closedInEvidence.length}</b><small>סגירות עם עלות</small></span>
             <span><b>{avgClosedCost ? ils(avgClosedCost) : "—"}</b><small>ממוצע לסגירה</small></span>
             <span><b>{supplierCostRows.length}</b><small>ספקים בעלות</small></span>
           </div>
-          {supplierCostRows.length ? supplierCostRows.map(([supplier, value]) => <Bar key={supplier} label={supplier} value={value} max={maxSupplierCost} money color="#0D9488" onClick={() => onGoTickets?.({ st: "all", focus: { label: `BI · ספק · ${supplier}`, supplier } })} />) : <div className="note" style={{ marginTop: 10 }}>אין פירוט ספקים ל-30 הימים האחרונים.</div>}
+          {supplierCostRows.length > 0 && <div className="bi-subtitle">ספקים</div>}
+          {supplierCostRows.length ? supplierCostRows.map(([supplier, value]) => <Bar key={supplier} label={supplier} value={value} max={maxSupplierCost} money color="#0D9488" onClick={() => onGoTickets?.({ st: "all", focus: { label: `BI · ספק · ${supplier}`, supplier } })} />) : <div className="note" style={{ marginTop: 10 }}>אין פירוט ספקים ל-{period.evidenceDays} הימים האחרונים.</div>}
+          {categoryCostRows.length > 0 && <><div className="bi-subdivider" /><div className="bi-subtitle">קטגוריות</div>{categoryCostRows.map(([category, value]) => <Bar key={category} label={category} value={value} max={maxCategoryCost} money color="#1F4E8C" />)}</>}
+          {assetCostRows.length > 0 && <><div className="bi-subdivider" /><div className="bi-subtitle">נכסים / אזורים</div>{assetCostRows.map(([asset, value]) => <Bar key={asset} label={asset} value={value} max={maxAssetCost} money color="#475569" />)}</>}
         </> : <div className="bi-mini-stats">
           <span><b>{scope.users.length}</b><small>עובדים/משתמשים</small></span>
           <span><b>{scope.zones.length}</b><small>אזורי ניקיון</small></span>
@@ -7551,7 +7603,7 @@ function AdminApp(p) {
       <div className="main-col">
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
-          {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} />}
+          {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} onGoTasks={isAdminRole ? (nav) => { setTaskNav(nav || null); setTab("tasks"); } : null} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
@@ -10897,6 +10949,10 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-hero p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55;}
 .bi-kicker{font-size:12px;font-weight:650;color:var(--primary);}
 .bi-period{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);padding:8px 12px;font-size:12px;font-weight:700;color:var(--muted);}
+.bi-period-switch{flex:0 0 auto;display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);padding:4px;box-shadow:inset 0 1px 2px rgba(15,23,42,.04);}
+.bi-period-switch button{min-height:44px;border-radius:999px;padding:9px 12px;color:var(--muted);font-size:12px;font-weight:650;white-space:nowrap;}
+.bi-period-switch button:hover{color:var(--ink);background:rgba(255,255,255,.58);}
+.bi-period-switch button.on{background:var(--surface);color:var(--primary);box-shadow:var(--control-shadow);}
 .bi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .bi-kpis{grid-template-columns:repeat(5,minmax(0,1fr));}
 .bi-kpis .kpi-num{font-weight:650;}
@@ -10923,6 +10979,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-mini-stats small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;}
 .bi-finance-stats{margin:10px 0;}
 .bi-doc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:9px;margin-top:9px;}
+.bi-doc-action{width:100%;text-align:start;background:transparent;color:var(--ink);}
+.bi-doc-action:hover{color:var(--primary);}
 .bi-risk-row{width:100%;min-height:48px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;text-align:start;border:1px solid var(--line);background:var(--surface-glow);border-radius:12px;padding:8px 10px;margin-bottom:8px;box-shadow:var(--control-shadow);}
 .bi-risk-row:disabled{cursor:default;opacity:.76;}
 .bi-risk-row b{display:block;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -11757,6 +11815,9 @@ body *{visibility:hidden!important;}
   .bi-hero{align-items:flex-start;flex-direction:column;padding:14px 15px;gap:10px;}
   .bi-hero h2{font-size:19px;}
   .bi-period{align-self:flex-start;}
+  .bi-period-switch{align-self:stretch;overflow-x:auto;scrollbar-width:none;}
+  .bi-period-switch::-webkit-scrollbar{display:none;}
+  .bi-period-switch button{flex:1;min-width:max-content;padding-inline:10px;}
   .bi-grid{grid-template-columns:1fr;}
   .bi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
   .bi-mini-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}

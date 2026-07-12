@@ -1,5 +1,27 @@
 import { canViewCompanyBI, canViewFinancialBI } from "./permissionModel.js";
 
+export const BI_PERIOD_OPTIONS = Object.freeze([
+  { id: "now", label: "עכשיו", trendDays: 7, evidenceDays: 30 },
+  { id: "30", label: "30 ימים", trendDays: 30, evidenceDays: 30 },
+  { id: "90", label: "90 ימים", trendDays: 90, evidenceDays: 90 }
+]);
+
+export const normalizeBiPeriod = (value) =>
+  BI_PERIOD_OPTIONS.some((option) => option.id === String(value || "")) ? String(value || "") : "now";
+
+export function biPeriodRange(value, now = Date.now()) {
+  const id = normalizeBiPeriod(value);
+  const option = BI_PERIOD_OPTIONS.find((candidate) => candidate.id === id) || BI_PERIOD_OPTIONS[0];
+  const dayMs = 86400000;
+  return {
+    ...option,
+    now,
+    trendStart: now - option.trendDays * dayMs,
+    previousTrendStart: now - option.trendDays * 2 * dayMs,
+    evidenceStart: now - option.evidenceDays * dayMs
+  };
+}
+
 export const cleanStringList = (values = []) =>
   [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
 
@@ -16,21 +38,33 @@ const overlaps = (left = [], right = []) => {
 
 const ticketTrack = (ticket = {}) => ticket.track || (ticket.forkliftId ? "transport" : "facility");
 
-const ticketDepartments = (ticket = {}, fleet = []) => {
+const zoneMatchesTicket = (zone = {}, ticket = {}) => {
+  const ticketZone = String(ticket.zone || ticket.zoneId || "").trim();
+  if (!ticketZone) return false;
+  return [zone.id, zone.name, zone.areaName, zone.building, zone.code].some((value) => String(value || "").trim() === ticketZone);
+};
+
+const ticketDepartments = (ticket = {}, fleet = [], zones = []) => {
   const direct = cleanStringList([
     ticket.reportedBy?.dept,
     ticket.createdBy?.dept,
     ticket.department,
     ticket.dept
   ]);
-  if (ticketTrack(ticket) !== "transport" || !ticket.forkliftId) return direct;
+  if (ticketTrack(ticket) !== "transport") {
+    const zoneDepartments = (zones || [])
+      .filter((zone) => zoneMatchesTicket(zone, ticket))
+      .flatMap((zone) => [zone.department, zone.dept]);
+    return cleanStringList([...direct, ...zoneDepartments]);
+  }
+  if (!ticket.forkliftId) return direct;
   const unit = (fleet || []).find((item) => item.id === ticket.forkliftId);
   return cleanStringList([...direct, ...fleetDepartments(unit)]);
 };
 
-export const ticketInDepartments = (ticket = {}, departments = [], fleet = []) => {
+export const ticketInDepartments = (ticket = {}, departments = [], fleet = [], zones = []) => {
   if (!departments.length) return false;
-  return overlaps(ticketDepartments(ticket, fleet), departments);
+  return overlaps(ticketDepartments(ticket, fleet, zones), departments);
 };
 
 const userInDepartments = (user = {}, departments = []) =>
@@ -45,6 +79,12 @@ const zoneInDepartments = (zone = {}, departments = []) => {
   if (zone.dept && departments.includes(zone.dept)) return true;
   return false;
 };
+
+const taskUserIds = (task = {}) =>
+  cleanStringList([task.ownerId, ...(task.responsibleIds || []), ...(task.participantIds || [])]);
+
+const meetingUserIds = (meeting = {}) =>
+  cleanStringList([meeting.ownerId, ...(meeting.participantIds || [])]);
 
 export function biScopeForSession(session, data = {}) {
   const empty = {
@@ -63,6 +103,8 @@ export function biScopeForSession(session, data = {}) {
     ppeItems: [],
     ppeReqs: [],
     ppeOrders: [],
+    tasks: [],
+    meetings: [],
     users: []
   };
   if (!session) return empty;
@@ -78,6 +120,8 @@ export function biScopeForSession(session, data = {}) {
     ppeItems = [],
     ppeReqs = [],
     ppeOrders = [],
+    tasks = [],
+    meetings = [],
     users = []
   } = data;
 
@@ -98,6 +142,8 @@ export function biScopeForSession(session, data = {}) {
       ppeItems,
       ppeReqs,
       ppeOrders,
+      tasks,
+      meetings,
       users
     };
   }
@@ -114,6 +160,7 @@ export function biScopeForSession(session, data = {}) {
   const scopedFleetIds = new Set(scopedFleet.map((unit) => unit.id));
   const scopedUsers = departments.length ? users.filter((user) => userInDepartments(user, departments)) : [];
   const scopedUserIds = new Set(scopedUsers.map((user) => user.id));
+  if (session.id) scopedUserIds.add(session.id);
   const scopedPpe = departments.length ? ppe.filter((item) => item.dept && departments.includes(item.dept)) : [];
   const scopedPpeReqs = departments.length
     ? ppeReqs.filter((request) => (request.workerId && scopedUserIds.has(request.workerId)) || (request.dept && departments.includes(request.dept)))
@@ -130,7 +177,7 @@ export function biScopeForSession(session, data = {}) {
     canViewCompanyBI: false,
     canViewFinancialBI: false,
     tickets: departments.length
-      ? tickets.filter((ticket) => ticketInDepartments(ticket, departments, fleet))
+      ? tickets.filter((ticket) => ticketInDepartments(ticket, departments, fleet, zones))
       : [],
     fleet: scopedFleet,
     pm: pm.filter((record) => {
@@ -144,6 +191,8 @@ export function biScopeForSession(session, data = {}) {
     ppeItems: ppeItems.filter((item) => scopedPpeItemIds.has(item.id)),
     ppeReqs: scopedPpeReqs,
     ppeOrders: [],
+    tasks: departments.length ? tasks.filter((task) => taskUserIds(task).some((id) => scopedUserIds.has(id))) : [],
+    meetings: departments.length ? meetings.filter((meeting) => meetingUserIds(meeting).some((id) => scopedUserIds.has(id))) : [],
     users: scopedUsers
   };
 }
@@ -193,7 +242,7 @@ export function biDepartmentRiskRows(data = {}, options = {}) {
   const zoneDeptById = new Map((zones || []).map((zone) => [zone.id, zone.department || zone.dept || ""]));
 
   (tickets || []).filter(isOpenTicket).forEach((ticket) => {
-    addTo(ticketDepartments(ticket, fleet), (row) => {
+    addTo(ticketDepartments(ticket, fleet, zones), (row) => {
       row.openTickets += 1;
       if (isOverdueTicket(ticket)) row.slaBreaches += 1;
       if (ticketTrack(ticket) === "transport" && ticket.downtimeType === "critical") row.criticalDowntime += 1;

@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: current commit, `Consolidate dashboard analytics into BI`.
+- Latest app/UI commit before this handoff: current commit, `Complete BI period and drilldown pass`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,7 +56,13 @@ The current strategy is:
 
 Recent commits on `main`:
 
-- `Consolidate dashboard analytics into BI` (current commit)
+- `Complete BI period and drilldown pass` (current commit)
+  - Finished the BI period selector with `עכשיו`, `30 ימים`, and `90 ימים`; trend, repeat, PM, cleaning, PPE, and finance summaries now follow the selected BI window instead of fixed hardcoded labels.
+  - Added explainable downtime rows under `למה זה תקוע`, showing critical transport downtime duration, likely cause, main lifecycle stage, and direct ticket drill-down.
+  - Added work-record signals for tasks and meetings into BI and wired task drill-downs through the existing `מטלות` module instead of adding BI-only actions.
+  - Tightened department BI scope so facility tickets tied to scoped zones are included, and tasks/meetings are scoped to department workers plus the manager.
+  - Verified with focused BI scope tests, role/profile/API tests, full test suite, lint, build, release check, demo UI smoke on desktop/mobile, and a targeted mobile Playwright check for the period switch and task navigation.
+- `Consolidate dashboard analytics into BI`
   - Made BI the unified first screen for `admin`, `executive`, and department managers.
   - Retired the old standalone `לוח בקרה` and `אנליטיקה` UI entry points and removed the stale dashboard widget-preference model.
   - Moved useful analytics into BI as compact drill-down/evidence panels: facility maintenance categories/zones, execution load, PM completion, cleaning compliance, PPE issue/cost/repeat signals, bottlenecks, repeat problems, department risk, and finance.
