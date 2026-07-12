@@ -1620,10 +1620,6 @@ export default function App() {
     store._onFail = (details = {}) => {
       const errorId = `client-${Date.now().toString(36)}`;
       const current = sessionRef.current || {};
-      const canToastStorageFailure = readyRef.current && !!current.id && !quietSharedFailureKeysRef.current.has(details.key);
-      if (canToastStorageFailure) {
-        setToast("השמירה לא הושלמה — בדקו חיבור ונסו שוב");
-      }
       reportClientError({
         kind: "storage_save_failed",
         message: "Shared storage operation failed",
