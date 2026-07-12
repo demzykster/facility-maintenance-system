@@ -88,7 +88,7 @@ import { priorityToken, statusTokenTone, taskStatusToken, ticketStatusToken } fr
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
 import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibleFleetForSession, visibleTicketsForSession } from "./ticketVisibilityModel.js";
-import { canConfirmTicketForSession, managerActionRequiredForTicket, requesterOwnsTicket } from "./ticketActionScopeModel.js";
+import { canConfirmTicketForSession, managerActionRequiredForTicket, managerScopedTicketNeedsFollowUp, requesterOwnsTicket } from "./ticketActionScopeModel.js";
 import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValueToMs, statusMsToHours } from "./adminTicketManualEditModel.js";
 import { normalizeScopedWorkerForActor, scopedUsersForActor, scopedWorkerDefaultsForActor, userDepartments, userShift } from "./userScopeModel.js";
 
@@ -1364,6 +1364,11 @@ const ownsPendingUserTicket = requesterOwnsTicket;
 // Заявка-обращение от работника (нижний канал). reportedBy остаётся на всю жизнь заявки — для «моих обращений» работника и для статистики.
 const isWorkerReport = (t) => !!t.reportedBy;
 const ticketRequiresManagerAction = (session, ticket) => managerActionRequiredForTicket(session, ticket, {
+  open: isOpen(ticket),
+  ball: ballIn(ticket),
+  workerReport: isWorkerReport(ticket)
+});
+const ticketNeedsManagerScopeFollowUp = (session, ticket) => managerScopedTicketNeedsFollowUp(session, ticket, {
   open: isOpen(ticket),
   ball: ballIn(ticket),
   workerReport: isWorkerReport(ticket)
@@ -4352,6 +4357,7 @@ function UserApp(p) {
                 const needEquip = openT.filter((t) => t.status === "waiting" && t.waitingReason === "no_equipment");
                 const workerReports = openT.filter((t) => isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework"));
                 const awaiting = openT.filter((t) => ticketRequiresManagerAction(session, t) && !needEquip.includes(t) && !workerReports.includes(t));
+                const deptFollowUp = openT.filter((t) => ticketNeedsManagerScopeFollowUp(session, t) && !needEquip.includes(t) && !workerReports.includes(t) && !awaiting.includes(t));
                 const atTech = openT.filter((t) => ballIn(t) === "tech");
                 const atAdmin = openT.filter((t) => ballIn(t) === "admin");
                 if (openT.length === 0) return <Empty text="אין קריאות פתוחות" Icon={ListChecks} sub="פתחו קריאה חדשה בלחיצה על הכפתור" />;
@@ -4359,6 +4365,7 @@ function UserApp(p) {
                   {workerReports.length > 0 && <><SectionTitle><UserPlus size={15} color="#EA580C" /> פעולה שלך — דיווחי עובדים לבדיקה ({workerReports.length})</SectionTitle><div className="cards">{sortByImportance(workerReports, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                   {needEquip.length > 0 && <><SectionTitle><Truck size={15} color="#DC2626" /> פעולה שלך — יש להעביר כלי לטכנאי ({needEquip.length})</SectionTitle><div className="cards">{sortByImportance(needEquip, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                   {awaiting.length > 0 && <><SectionTitle><CheckCircle2 size={15} color="#0D9488" /> פעולה שלך — ממתינות לאישורך ({awaiting.length})</SectionTitle><div className="cards">{sortByImportance(awaiting, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
+                  {deptFollowUp.length > 0 && <><SectionTitle><Users size={15} color="#64748B" /> מעקב מחלקתי — ממתינות לפעולת הפותח ({deptFollowUp.length})</SectionTitle><div className="cards">{sortByImportance(deptFollowUp, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}
                   <SectionTitle><Wrench size={15} /> מעקב — בטיפול הטכנאי ({atTech.length})</SectionTitle>
                   {atTech.length === 0 ? <div className="note">אין קריאות בטיפול.</div> : <div className="cards">{sortByImportance(atTech, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>}
                   {atAdmin.length > 0 && <><SectionTitle><ShieldCheck size={15} color="#1F4E8C" /> מעקב — אצל מנהל המערכת ({atAdmin.length})</SectionTitle><div className="cards">{sortByImportance(atAdmin, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div></>}

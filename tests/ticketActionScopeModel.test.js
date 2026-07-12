@@ -1,31 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { canConfirmTicketForSession, managerActionRequiredForTicket, requesterOwnsTicket } from "../src/ticketActionScopeModel.js";
+import {
+  canConfirmTicketForSession,
+  managerActionRequiredForTicket,
+  managerScopedTicketNeedsFollowUp
+} from "../src/ticketActionScopeModel.js";
 
-describe("ticket action scope model", () => {
-  const ticket = {
-    id: "facility-1",
-    status: "pending_user",
-    createdBy: { id: "manager-a", name: "Manager A", dept: "ops" }
-  };
+const context = { open: true, ball: "manager", workerReport: false };
 
-  it("keeps confirmation personal to the ticket creator, while admin can still intervene", () => {
-    expect(canConfirmTicketForSession({ id: "manager-a", role: "user", name: "Manager A" }, ticket)).toBe(true);
-    expect(canConfirmTicketForSession({ id: "manager-b", role: "user", name: "Manager B", depts: ["ops"] }, ticket)).toBe(false);
-    expect(canConfirmTicketForSession({ id: "admin", role: "admin", name: "Admin" }, ticket)).toBe(true);
+describe("ticketActionScopeModel", () => {
+  it("keeps opener approval personal even when another manager shares the department scope", () => {
+    const opener = { id: "mgr-a", name: "A", role: "user", dept: "נפחי" };
+    const colleague = { id: "mgr-b", name: "B", role: "user", dept: "נפחי" };
+    const ticket = {
+      id: "T-1",
+      status: "pending_user",
+      createdBy: { id: opener.id, name: opener.name, role: "user", dept: opener.dept }
+    };
+
+    expect(canConfirmTicketForSession(opener, ticket)).toBe(true);
+    expect(managerActionRequiredForTicket(opener, ticket, context)).toBe(true);
+    expect(managerScopedTicketNeedsFollowUp(opener, ticket, context)).toBe(false);
+
+    expect(canConfirmTicketForSession(colleague, ticket)).toBe(false);
+    expect(managerActionRequiredForTicket(colleague, ticket, context)).toBe(false);
+    expect(managerScopedTicketNeedsFollowUp(colleague, ticket, context)).toBe(true);
   });
 
-  it("does not mark peer-visible pending_user tickets as manager action", () => {
-    const creator = { id: "manager-a", role: "user", name: "Manager A" };
-    const peer = { id: "manager-b", role: "user", name: "Manager B", depts: ["ops"] };
+  it("keeps worker reports actionable for visible department managers", () => {
+    const manager = { id: "mgr-a", name: "Manager", role: "user", dept: "נפחי" };
+    const ticket = {
+      id: "T-2",
+      status: "pending_manager",
+      reportedBy: { id: "worker-a", name: "Worker", dept: "נפחי" },
+      createdBy: { id: "worker-a", name: "Worker", role: "worker", dept: "נפחי" }
+    };
+    const workerContext = { open: true, ball: "manager", workerReport: true };
 
-    expect(managerActionRequiredForTicket(creator, ticket, { open: true, ball: "manager" })).toBe(true);
-    expect(managerActionRequiredForTicket(peer, ticket, { open: true, ball: "manager" })).toBe(false);
-  });
-
-  it("supports worker report ownership for requester checks", () => {
-    const workerTicket = { id: "worker-1", reportedBy: { id: "worker-a", name: "Worker A" } };
-
-    expect(requesterOwnsTicket({ id: "worker-a", name: "Worker A" }, workerTicket)).toBe(true);
-    expect(requesterOwnsTicket({ id: "worker-b", name: "Worker B" }, workerTicket)).toBe(false);
+    expect(managerActionRequiredForTicket(manager, ticket, workerContext)).toBe(true);
+    expect(managerScopedTicketNeedsFollowUp(manager, ticket, workerContext)).toBe(false);
   });
 });
