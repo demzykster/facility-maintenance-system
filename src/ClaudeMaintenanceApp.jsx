@@ -9660,7 +9660,6 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
   const initialDept = user.role === "cleaner" ? "ניקיון" : (user.dept || lockDept || "");
   const [name, setName] = useState(user.name || ""), [position, setPosition] = useState(user.position || user.jobTitle || ""), [phone, setPhone] = useState(user.phone || ""), [role, setRole] = useState(initialRole), [pin, setPin] = useState(user.pin || ""), [workerNo, setWorkerNo] = useState(user.workerNo || ""), [email, setEmail] = useState(user.email || ""), [password, setPassword] = useState(user.password || ""), [dept, setDept] = useState(initialDept), [depts, setDepts] = useState(user.depts?.length ? user.depts : (initialDept ? [initialDept] : [])), [supplier, setSupplier] = useState(user.supplier || ""), [shiftStart, setShiftStart] = useState(user.shiftStart || config.defaultShiftStart || "07:30"), [shiftEnd, setShiftEnd] = useState(user.shiftEnd || config.defaultShiftEnd || "16:30"), [techGrace, setTechGrace] = useState(user.lateTolerance != null || user.earlyTolerance != null ? String(Math.max(Number(user.lateTolerance ?? 0) || 0, Number(user.earlyTolerance ?? 0) || 0)) : ""), [techScope, setTechScope] = useState(user.techScope || "transport"), [techCats, setTechCats] = useState(user.techCats || []), [perms, setPerms] = useState(initialPerms), [mgrZones, setMgrZones] = useState(user.mgrZones || []), [active, setActive] = useState(user.active !== false), [employmentType, setEmploymentType] = useState(user.employmentType || (user.role === "tech" ? "contractor" : "direct")), [contractorName, setContractorName] = useState(user.contractorName || ""), [err, setErr] = useState("");
   const [shift, setShift] = useState(user.shift || "");
-  const [reportsTo, setReportsTo] = useState(user.reportsTo || "");
   const [loginResetRequested, setLoginResetRequested] = useState(false);
   const toggleMgrDept = (d) => setDepts((s) => s.includes(d) ? s.filter((x) => x !== d) : [...s, d]);
   const toggleMgrZone = (zoneName) => setMgrZones((s) => s.includes(zoneName) ? s.filter((x) => x !== zoneName) : [...s, zoneName]);
@@ -9732,7 +9731,7 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
       mgrZones: role === "user" ? mgrZones : [], perms: Object.keys(nextPerms).length ? nextPerms : undefined,
       notificationPrefs: Object.keys(nextNotificationPrefs.enabled).length ? nextNotificationPrefs : undefined,
       shift: role !== "admin" && role !== "executive" && role !== "tech" ? shift : "",
-      reportsTo: role === "user" ? reportsTo : "",
+      reportsTo: role === "user" ? (user.reportsTo || "") : "",
       active,
       activationToken: "",
       activationStatus: roleUsesLogin && !loginResetRequested && (nextPin || nextPassword || user.authUserId || user.loginConfigured || user.loginState === "active") ? "activated" : "",
@@ -9769,7 +9768,6 @@ function UserForm({ user, config, users, zones, presence = [], canDelete, lockRo
         ? <label className="field"><span>מחלקות</span><input value={depts.join(", ")} disabled readOnly /></label>
         : <div className="field"><span>מחלקות אחריות (ניתן לבחור כמה)</span><div className="chk-grid">{config.departments.map((d) => <label key={d} className={"chk-pill" + (depts.includes(d) ? " on" : "")}><input type="checkbox" checked={depts.includes(d)} onChange={() => toggleMgrDept(d)} /> {d}</label>)}</div><div className="hint">המנהל יראה קריאות, טיפולים ועובדים של המחלקות שנבחרו בלבד.</div>
           <div className="field" style={{ marginTop: 12 }}><span>אזורי אחריות לאחזקה</span><div className="chk-grid">{(config.zones || []).map((z) => <label key={z} className={"chk-pill" + (mgrZones.includes(z) ? " on" : "")}><input type="checkbox" checked={mgrZones.includes(z)} onChange={() => toggleMgrZone(z)} /> {z}</label>)}</div><div className="hint">קריאות מבנה באזור שנבחר יהיו משותפות לכל המנהלים שאחראים לאותו אזור.</div></div>
-          <div className="field" style={{ marginTop: 12 }}><span>כפוף ל (מנהל בכיר)</span><select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)}><option value="">— ללא —</option>{(users || []).filter((u) => u.role === "user" && u.id !== (user.id || "")).map((u) => <option key={u.id} value={u.id}>{u.name}{(u.depts && u.depts.length) ? ` · ${u.depts.join(", ")}` : ""}</option>)}</select><div className="hint">מנהל בכיר שאליו כפוף מנהל זה — יוצג בעץ.</div></div>
         </div>)}
       {role === "worker" && (lockDept
         ? <label className="field"><span>מחלקה</span><input value={dept} disabled readOnly /></label>
