@@ -36,7 +36,7 @@ Provider names are normalized for operator-friendly setup: `claude` maps to the 
 - Production defaults to disabled AI when no AI mode is configured.
 - Browser AI buttons are hidden unless the frontend AI mode is `client` or saved app settings select server AI mode.
 - Demo/local can still use the existing browser AI path and local keyword fallback.
-- The `עוזר AI` panel is split into `src/AIPanel.jsx` and loads only when the AI UI is actually opened.
+- The `עוזר AI` panel is split into `src/AIPanel.jsx` and loads only when the AI UI is actually opened. Role-specific welcome text and quick workflow prompts live in `src/aiAssistQuickPromptModel.js`, so the UI shell stays thin while admin, executive, manager, technician, cleaner, and worker entry points can evolve independently.
 - In server mode, the panel calls `POST /api/ai/assist` instead of a browser provider URL. The browser/client provider path remains only a demo/development fallback.
 - The first server provider adapter lives in `server/ai/providerClient.js`. It supports Anthropic Messages and OpenAI Responses API request shapes with injected `fetch` and tests. `src/aiProviderModel.js` owns the safe provider options, labels, default models, and aliases used by the server status route and admin settings UI.
 - The first authenticated server assistant entrypoint lives at `POST /api/ai/assist` through `server/ai/assistHandler.js`. It verifies the current Supabase/CMMS session, builds the deterministic intake draft, filters any supplied UI context by the authenticated user's role/scope through `src/aiAssistContextModel.js`, applies explicit workflow instructions and role-specific guidance from `src/aiAssistWorkflowModel.js`, rate-limits per user in-process, calls the configured provider only when `CMMS_AI_MODE=server`, writes an audit-safe `system / ai_assist` event when an audit driver is configured, and returns read-only assistant text plus the draft. The same context filter can pass compact BI/heatmap summaries (`bi.heatmap`) to the provider after department/role filtering, so executive/admin answers can use risk concentration signals without exposing unrelated department detail to managers.
@@ -62,7 +62,7 @@ When AI is reopened as a product module, build it as a separate server-backed as
 
 Build the next AI product slice on top of the read-only assistant:
 
-- deepen the first workflow modes (`risk_summary`, `sla_explanation`, `next_actions`, `draft_preparation`) with richer UI entry points and workflow-specific summaries;
+- deepen the first workflow modes (`risk_summary`, `sla_explanation`, `next_actions`, `draft_preparation`) with richer workflow-specific summaries and dedicated screen-level entry points beyond the shared quick prompts;
 - expand the audit surface only if new workflow-specific AI actions need additional non-sensitive metadata;
 - keep financial and broad company analytics limited to `admin` / `executive`;
 - keep every future AI write behind a human-confirmed normal server operation with validation, authorization, and audit.

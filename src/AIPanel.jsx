@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Send, Sparkles, X } from "lucide-react";
 import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
+import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "./aiAssistQuickPromptModel.js";
 
 export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
-  const [msgs, setMsgs] = useState([{ role: "assistant", content: session.role === "admin" ? "שלום! אפשר לשאול על קריאות, השבתות, מסמכי כלי שינוע פגי-תוקף, עלויות ותחזוקה מונעת." : session.role === "tech" ? "שלום! אפשר לשאול על קריאות השינוע שבטיפולך." : "שלום! אפשר לשאול על הקריאות שלך." }]);
+  const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef(null);
+  const quick = useMemo(() => aiAssistQuickPrompts(session), [session]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,20 +38,6 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
       setBusy(false);
     }
   };
-
-  const quick = session.role === "admin" || session.role === "executive"
-    ? [
-      { text: "סכם לי את הסיכונים החשובים", workflow: AI_ASSIST_WORKFLOWS.riskSummary },
-      { text: "הסבר מה בחריגת SLA", workflow: AI_ASSIST_WORKFLOWS.slaExplanation },
-      { text: "מה הפעולות הבאות?", workflow: AI_ASSIST_WORKFLOWS.nextActions }
-    ]
-    : session.role === "tech" ? [
-      { text: "מה הכי דחוף לטיפול?", workflow: AI_ASSIST_WORKFLOWS.nextActions },
-      { text: "הכן לי טיוטת עדכון", workflow: AI_ASSIST_WORKFLOWS.draftPreparation }
-    ] : [
-      { text: "מה הסטטוס של הקריאות שלי?", workflow: AI_ASSIST_WORKFLOWS.general },
-      { text: "מה הפעולות הבאות?", workflow: AI_ASSIST_WORKFLOWS.nextActions }
-    ];
 
   return <div className="ovl-backdrop ai-back" onClick={onClose}>
     <div className="ai-panel" onClick={(e) => e.stopPropagation()}>
