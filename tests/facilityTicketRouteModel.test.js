@@ -9,7 +9,7 @@ import {
 const appSource = readFileSync(new URL("../src/ClaudeMaintenanceApp.jsx", import.meta.url), "utf8");
 
 describe("facility ticket route model", () => {
-  it("keeps supplier-handled facility tickets on the admin route", () => {
+  it("routes supplier-handled facility tickets into the supplier queue", () => {
     const patch = facilityOwnerPatch(
       { track: "facility", status: "new" },
       { name: "Vadim", role: "admin" },
@@ -18,20 +18,34 @@ describe("facility ticket route model", () => {
 
     expect(patch).toEqual({
       supplier: "מיזוג מרכזי",
-      assignee: "Vadim",
-      routedTech: false,
+      assignee: "",
+      routedTech: true,
       mgrExec: false,
       status: "new"
     });
   });
 
-  it("keeps department-manager facility tickets on the manager route", () => {
+  it("routes supplier-handled manager facility tickets into the supplier queue", () => {
     expect(facilityOwnerPatch(
       { track: "facility", status: "new" },
       { name: "Manager", role: "user" },
       { supplier: "חשמל" }
     )).toMatchObject({
       supplier: "חשמל",
+      assignee: "",
+      routedTech: true,
+      mgrExec: false,
+      status: "new"
+    });
+  });
+
+  it("keeps unassigned supplier-free facility tickets on the owner route", () => {
+    expect(facilityOwnerPatch(
+      { track: "facility", status: "new" },
+      { name: "Manager", role: "user" },
+      { supplier: "" }
+    )).toMatchObject({
+      supplier: "",
       assignee: "Manager",
       routedTech: false,
       mgrExec: true,
@@ -47,8 +61,8 @@ describe("facility ticket route model", () => {
       { name: "Vadim", role: "admin" }
     )).toMatchObject({
       supplier: "קבלן",
-      assignee: "Vadim",
-      routedTech: false,
+      assignee: "",
+      routedTech: true,
       mgrExec: false,
       status: "new"
     });

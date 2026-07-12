@@ -41,6 +41,33 @@ describe("ticket visibility model", () => {
     expect(visibleTicketsForSession({ role: "executive" }, tickets, fleet)).toEqual(tickets);
   });
 
+  it("lets technicians with both scope see transport and facility supplier queues", () => {
+    const mixedTickets = [
+      { id: "transport-linked", track: "transport", forkliftId: "fork-liftco", assignee: "", supplier: "LiftCo" },
+      { id: "facility-linked", track: "facility", category: "hvac", assignee: "", routedTech: true, supplier: "LiftCo" },
+      { id: "facility-other", track: "facility", category: "hvac", assignee: "", routedTech: true, supplier: "Other" }
+    ];
+    const mixedFleet = [{ id: "fork-liftco", supplier: "LiftCo" }];
+
+    expect(visibleTicketsForSession({
+      role: "tech",
+      name: "Tech",
+      techScope: "both",
+      supplier: "LiftCo"
+    }, mixedTickets, mixedFleet).map((ticket) => ticket.id)).toEqual(["transport-linked", "facility-linked"]);
+  });
+
+  it("keeps supplier facility tickets visible to matching supplier technicians before acceptance", () => {
+    const supplierTicket = { id: "facility-linked", track: "facility", category: "hvac", assignee: "", routedTech: true, supplier: "LiftCo" };
+
+    expect(visibleTicketsForSession({
+      role: "tech",
+      name: "Tech",
+      techScope: "facility",
+      supplier: "LiftCo"
+    }, [supplierTicket], []).map((ticket) => ticket.id)).toEqual(["facility-linked"]);
+  });
+
   it("limits transport choices to the actor departments", () => {
     const fleetList = [
       { id: "fork-a", depts: ["A"] },

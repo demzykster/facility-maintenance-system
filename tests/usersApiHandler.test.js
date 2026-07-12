@@ -734,6 +734,88 @@ describe("users API handler", () => {
     }));
   });
 
+  it("does not let scoped department managers overwrite existing non-worker profiles", async () => {
+    const appUserId = "550e8400-e29b-41d4-a716-446655440099";
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({
+        id: appUserId,
+        role: "admin",
+        name: "Admin",
+        active: true
+      }),
+      updateAppUserProfileById: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({
+        role: "user",
+        name: "Department Manager",
+        department: "Warehouse",
+        departments: ["Warehouse"],
+        shift: "morning",
+        permissions: {}
+      })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: {
+        user: {
+          id: appUserId,
+          name: "Admin overwritten",
+          role: "worker",
+          dept: "Warehouse",
+          depts: ["Warehouse"],
+          shift: "morning"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:users:manage" });
+    expect(profileClient.updateAppUserProfileById).not.toHaveBeenCalled();
+  });
+
+  it("does not let scoped department managers update Supabase Auth backed profiles", async () => {
+    const profileClient = {
+      updateAppUserProfile: vi.fn()
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({
+        role: "user",
+        name: "Department Manager",
+        department: "Warehouse",
+        departments: ["Warehouse"],
+        shift: "morning",
+        permissions: {}
+      })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: {
+        user: {
+          id: "worker-auth-backed",
+          authUserId: "auth-worker-1",
+          name: "Worker",
+          role: "worker",
+          dept: "Warehouse",
+          depts: ["Warehouse"],
+          shift: "morning"
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:users:manage" });
+    expect(profileClient.updateAppUserProfile).not.toHaveBeenCalled();
+  });
+
   it("creates new login-capable users directly in app_users and returns the created profile id", async () => {
     const profileClient = {
       createAppUserProfile: vi.fn().mockResolvedValue({
@@ -847,6 +929,39 @@ describe("users API handler", () => {
 
     expect(res.statusCode).toBe(200);
     expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-2", expect.objectContaining({
+      login_state: "reset_required",
+      must_change_password: true
+    }));
+  });
+
+  it("marks executive Supabase Auth users for password change when login reset is requested", async () => {
+    const profileClient = {
+      updateAuthEmail: vi.fn(),
+      updateAppUserProfile: vi.fn().mockResolvedValue({ id: "exec-1" })
+    };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: {
+        user: {
+          id: "exec-1",
+          authUserId: "auth-exec-1",
+          name: "Leadership",
+          role: "executive",
+          email: "leadership@example.com",
+          loginResetRequested: true
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledWith("auth-exec-1", expect.objectContaining({
       login_state: "reset_required",
       must_change_password: true
     }));

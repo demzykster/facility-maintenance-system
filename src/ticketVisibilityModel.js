@@ -57,8 +57,10 @@ const visibleToTechnician = (session = {}, ticket = {}, fleet = []) => {
   const cats = session.techCats || [];
   const track = ticketTrack(ticket);
   const mineOrFree = ticket.assignee === session.name || !ticket.assignee;
-  if (scope === "transport") {
-    if (track !== "transport") return false;
+  const canHandleTransport = scope === "transport" || scope === "both";
+  const canHandleFacility = scope === "facility" || scope === "both";
+  if (track === "transport") {
+    if (!canHandleTransport) return false;
     if (!mineOrFree) return false;
     if (session.supplier) {
       if (ticket.supplier) return ticket.supplier === session.supplier;
@@ -69,6 +71,7 @@ const visibleToTechnician = (session = {}, ticket = {}, fleet = []) => {
     }
     return true;
   }
+  if (!canHandleFacility) return false;
   if (track !== "facility") return false;
   if (session.supplier && ticket.supplier !== session.supplier) return false;
   if (!session.supplier && ticket.supplier) return false;

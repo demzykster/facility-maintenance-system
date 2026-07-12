@@ -9,9 +9,19 @@ export function facilityOwnerPatch(ticket = {}, session = {}, {
   status = ticket.status || "new"
 } = {}) {
   const ownerName = clean(session.name) || clean(ticket.assignee);
+  const supplierName = clean(supplier);
+  if (supplierName) {
+    return {
+      supplier: supplierName,
+      assignee: "",
+      routedTech: true,
+      mgrExec: false,
+      status: status === "in_progress" ? "new" : (status || "new")
+    };
+  }
   const ownerIsDepartmentManager = session.role === "user";
   return {
-    supplier: clean(supplier),
+    supplier: "",
     assignee: ownerName,
     routedTech: false,
     mgrExec: ownerIsDepartmentManager ? !!ownerName : false,

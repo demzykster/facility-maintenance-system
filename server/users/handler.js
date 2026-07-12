@@ -222,7 +222,7 @@ const userLoginResetPatch = (user = {}) => {
       must_change_password: false
     };
   }
-  if (role === "admin" || role === "user") {
+  if (role === "admin" || role === "executive" || role === "user") {
     return {
       login_state: "reset_required",
       must_change_password: true
@@ -292,6 +292,13 @@ const userKvMirrorRecord = (user = {}) => {
   delete clean.loginResetRequested;
   delete clean.loginConfigured;
   return clean;
+};
+
+const canUseScopedExistingWorkerWrite = (actor = {}, incomingUser = {}, existingProfile = null) => {
+  if (!canUseScopedWorkerWrite(actor, incomingUser)) return false;
+  if (!existingProfile) return true;
+  const existingUser = userRecordFromAppUserProfile(existingProfile, {});
+  return canUseScopedWorkerWrite(actor, existingUser);
 };
 
 const deleteKvMirror = async (driver, key) => {
@@ -413,7 +420,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       if (!id) return json(res, 400, { error: "user_id_required" });
       const key = `user:${id}`;
       const permissionError = kvWritePermissionError(auth.user, key);
-      if (permissionError && !canUseScopedWorkerWrite(auth.user, user)) return json(res, 403, { error: permissionError });
+      if (permissionError && (!canUseScopedWorkerWrite(auth.user, user) || user.authUserId)) return json(res, 403, { error: permissionError });
       const loginResetRequested = user.loginResetRequested === true;
       let savedUser = user;
       let appUsersHandled = false;
@@ -432,6 +439,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
         appUsersHandled = true;
       } else if (isUuid(id) && typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfileById === "function") {
         const existingProfile = await backendProfileClient.getAppUserProfileById(id);
+        if (permissionError && !canUseScopedExistingWorkerWrite(auth.user, user, existingProfile)) return json(res, 403, { error: permissionError });
         if (existingProfile) {
           const patch = {
             ...extendedAppUserPatchFromUserRecord(user),
