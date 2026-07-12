@@ -5,6 +5,12 @@ describe("AI assist context model", () => {
   it("keeps company and financial context for leadership roles", () => {
     const context = buildAiAssistContext({
       metrics: { openTickets: 2, totalCost: 900, estimatedCost: 1200 },
+      bi: {
+        heatmap: [
+          { department: "הפצה", total: 2, primaryRisk: { key: "sla", label: "SLA", value: 1 }, riskTags: [{ key: "sla", label: "SLA", value: 1 }] },
+          { department: "קבלה", total: 1, primaryRisk: { key: "waiting", label: "ממתין", value: 1 }, riskTags: [{ key: "waiting", label: "ממתין", value: 1 }] }
+        ]
+      },
       tickets: [
         { id: "t1", subject: "A", department: "הפצה", cost: 700 },
         { id: "t2", subject: "B", department: "קבלה", cost: 200 }
@@ -12,6 +18,7 @@ describe("AI assist context model", () => {
     }, { role: "executive", department: "הנהלה" });
 
     expect(context.metrics).toMatchObject({ openTickets: 2, totalCost: 900, estimatedCost: 1200 });
+    expect(context.bi.heatmap.map((row) => row.department)).toEqual(["הפצה", "קבלה"]);
     expect(context.tickets.map((ticket) => ticket.id)).toEqual(["t1", "t2"]);
     expect(context.tickets.map((ticket) => ticket.cost)).toEqual([700, 200]);
   });
@@ -19,6 +26,12 @@ describe("AI assist context model", () => {
   it("filters manager context to their departments and removes financial fields", () => {
     const context = buildAiAssistContext({
       metrics: { openTickets: 3, totalCost: 900 },
+      bi: {
+        heatmap: [
+          { department: "הפצה", total: 2, primaryRisk: { key: "sla", label: "SLA", value: 1 }, riskTags: [{ key: "sla", label: "SLA", value: 1 }] },
+          { department: "קבלה", total: 1, primaryRisk: { key: "critical", label: "השבתה", value: 1 }, riskTags: [{ key: "critical", label: "השבתה", value: 1 }] }
+        ]
+      },
       tickets: [
         { id: "own-dept", subject: "Allowed", department: "הפצה", cost: 500 },
         { id: "other-dept", subject: "Hidden", department: "קבלה", cost: 400 }
@@ -30,6 +43,14 @@ describe("AI assist context model", () => {
     }, { role: "user", departments: ["הפצה"] });
 
     expect(context.metrics).toEqual({ openTickets: 3 });
+    expect(context.bi.heatmap).toEqual([
+      expect.objectContaining({
+        department: "הפצה",
+        total: 2,
+        primaryRisk: { key: "sla", label: "SLA", value: 1 },
+        riskTags: [{ key: "sla", label: "SLA", value: 1 }]
+      })
+    ]);
     expect(context.tickets).toHaveLength(1);
     expect(context.tickets[0]).toMatchObject({ id: "own-dept", department: "הפצה" });
     expect(context.tickets[0]).not.toHaveProperty("cost");

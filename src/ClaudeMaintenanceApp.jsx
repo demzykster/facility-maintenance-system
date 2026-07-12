@@ -1479,6 +1479,26 @@ function buildAIContextSnapshot(session, tickets, pm, fleet, cfg) {
         status: item.active === false ? "inactive" : "active"
       };
     });
+  const heatmapRows = biTicketHeatmapRows({
+    departments: cfg.departments || [],
+    tickets: open,
+    fleet: fleet || [],
+    zones: cfg.zones || []
+  }, {
+    now,
+    isOpenTicket: isOpen,
+    isOverdueTicket: (ticket) => ticketMissedSla(ticket, cfg),
+    maxRows: 6
+  }).map((row) => ({
+    department: row.name,
+    total: row.total,
+    primaryRisk: row.primaryRisk ? {
+      key: row.primaryRisk.key,
+      label: row.primaryRisk.label,
+      value: row.primaryRisk.value
+    } : null,
+    riskTags: row.riskTags
+  }));
   return {
     metrics: {
       openTickets: open.length,
@@ -1489,6 +1509,9 @@ function buildAIContextSnapshot(session, tickets, pm, fleet, cfg) {
       fleetDocsDue: fleetNearDocs.length,
       pmDue: pmDue.length,
       totalCost: tickets.reduce((sum, t) => sum + (Number(t.closure?.costAmount || t.costAmount || t.cost || 0) || 0), 0)
+    },
+    bi: {
+      heatmap: heatmapRows
     },
     tickets: open.slice(0, 60).map(mapTicket),
     fleet: fleetNearDocs.slice(0, 30),

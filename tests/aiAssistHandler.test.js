@@ -215,6 +215,12 @@ describe("AI assist handler", () => {
         workflow: "sla_explanation",
         context: {
           metrics: { openTickets: 2, totalCost: 5000 },
+          bi: {
+            heatmap: [
+              { department: "הפצה", total: 1, primaryRisk: { key: "sla", label: "SLA", value: 1 } },
+              { department: "קבלה", total: 1, primaryRisk: { key: "critical", label: "השבתה", value: 1 } }
+            ]
+          },
           tickets: [
             { id: "visible", subject: "Allowed", department: "הפצה", cost: 1000 },
             { id: "hidden", subject: "Hidden", department: "קבלה", cost: 4000 }
@@ -231,6 +237,12 @@ describe("AI assist handler", () => {
       instruction: expect.stringContaining("SLA")
     });
     expect(prompt.roleGuidance).toContain("department manager");
+    expect(prompt.context.bi.heatmap).toEqual([
+      expect.objectContaining({
+        department: "הפצה",
+        primaryRisk: { key: "sla", label: "SLA", value: 1 }
+      })
+    ]);
     expect(prompt.context.tickets.map((ticket) => ticket.id)).toEqual(["visible"]);
     expect(prompt.context.tickets[0]).not.toHaveProperty("cost");
     expect(JSON.stringify(prompt)).not.toContain("Hidden");

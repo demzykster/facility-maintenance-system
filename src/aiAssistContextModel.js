@@ -1,6 +1,7 @@
 const MAX_TICKETS = 28;
 const MAX_FLEET = 18;
 const MAX_PM = 12;
+const MAX_HEATMAP_ROWS = 8;
 const MAX_TEXT = 160;
 
 const LEADERSHIP_ROLES = new Set(["admin", "executive"]);
@@ -148,6 +149,42 @@ function sanitizeMetrics(metrics = {}, profile) {
     .filter(([, value]) => value != null));
 }
 
+function sanitizeHeatmapRow(row = {}, profile) {
+  const department = compactText(row.department || row.name, 120);
+  const record = { department };
+  if (!departmentAllowed(record, profile)) return null;
+  const total = numberOrNull(row.total);
+  const primary = row.primaryRisk && typeof row.primaryRisk === "object" ? row.primaryRisk : null;
+  const tags = asArray(row.riskTags)
+    .slice(0, 3)
+    .map((tag) => ({
+      key: compactText(tag?.key, 50),
+      label: compactText(tag?.label, 80),
+      value: numberOrNull(tag?.value)
+    }))
+    .filter((tag) => tag.key && tag.label && tag.value != null);
+  const clean = {
+    department,
+    total,
+    primaryRisk: primary ? {
+      key: compactText(primary.key, 50),
+      label: compactText(primary.label, 80),
+      value: numberOrNull(primary.value)
+    } : null,
+    riskTags: tags
+  };
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null));
+}
+
+function sanitizeBiSummary(bi = {}, profile) {
+  const source = bi && typeof bi === "object" ? bi : {};
+  const heatmap = asArray(source.heatmap)
+    .map((row) => sanitizeHeatmapRow(row, profile))
+    .filter(Boolean)
+    .slice(0, MAX_HEATMAP_ROWS);
+  return heatmap.length ? { heatmap } : {};
+}
+
 export function buildAiAssistContext(rawContext = {}, user = {}) {
   const profile = aiRoleProfile(user);
   const source = rawContext && typeof rawContext === "object" ? rawContext : {};
@@ -172,13 +209,15 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
       canSeeFinancials: profile.canSeeFinancials
     },
     metrics: sanitizeMetrics(source.metrics || {}, profile),
+    bi: sanitizeBiSummary(source.bi || {}, profile),
     tickets,
     fleet,
     pm,
     limits: {
       tickets: MAX_TICKETS,
       fleet: MAX_FLEET,
-      pm: MAX_PM
+      pm: MAX_PM,
+      heatmap: MAX_HEATMAP_ROWS
     }
   };
 }
