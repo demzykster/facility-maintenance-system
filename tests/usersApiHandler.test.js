@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { appUserPatchFromUserRecord, createUsersApiHandler, extendedAppUserPatchFromUserRecord, userRecordFromAppUserProfile } from "../server/users/handler.js";
+import { appUserPatchFromUserRecord, createUsersApiHandler, extendedAppUserPatchFromUserRecord, stripOptionalAppUsersProfileFields, userRecordFromAppUserProfile } from "../server/users/handler.js";
 
 function createRes() {
   return {
@@ -165,6 +165,25 @@ describe("users API handler", () => {
       status: "active",
       exit_at: "2026-07-10T05:06:40.000Z",
       ppe_reset_at: "2026-07-10T05:08:20.000Z"
+    });
+  });
+
+  it("can strip optional profile columns for app_users schema compatibility", () => {
+    expect(stripOptionalAppUsersProfileFields({
+      name: "Manager",
+      role: "user",
+      email: "manager@example.com",
+      department: "Ops",
+      position: "Lead",
+      tech_cats: ["electric"],
+      cleaning_access: { enabled: true },
+      notification_prefs: { enabled: { cleaning: false } },
+      login_state: "reset_required"
+    })).toEqual({
+      name: "Manager",
+      role: "user",
+      email: "manager@example.com",
+      department: "Ops"
     });
   });
 
@@ -498,6 +517,69 @@ describe("users API handler", () => {
     }));
     expect(driver.set).not.toHaveBeenCalled();
     expect(order).toEqual(["auth-email", "app-users"]);
+  });
+
+  it("retries app_users saves with base profile fields when Supabase schema cache misses optional columns", async () => {
+    const profileClient = {
+      updateAuthEmail: vi.fn().mockResolvedValue({ id: "auth-2" }),
+      updateAppUserProfile: vi.fn()
+        .mockRejectedValueOnce(new Error("Could not find the 'notification_prefs' column of 'app_users' in the schema cache"))
+        .mockResolvedValueOnce({
+          id: "manager-2",
+          auth_user_id: "auth-2",
+          role: "user",
+          name: "Manager Two",
+          email: "manager2@example.com",
+          active: true
+        })
+    };
+    const handler = createUsersApiHandler({
+      driver: { set: vi.fn() },
+      profileClient,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: {
+        user: {
+          id: "manager-2",
+          authUserId: "auth-2",
+          name: "Manager Two",
+          role: "user",
+          email: "MANAGER2@EXAMPLE.COM",
+          position: "Ops lead",
+          perms: { users: "view" },
+          mgrZones: ["Packing"],
+          notificationPrefs: { enabled: { cleaning: false } },
+          cleaningAccess: { enabled: true, canPerformRounds: true }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfile).toHaveBeenCalledTimes(2);
+    expect(profileClient.updateAppUserProfile).toHaveBeenNthCalledWith(1, "auth-2", expect.objectContaining({
+      position: "Ops lead",
+      notification_prefs: { enabled: { cleaning: false } },
+      cleaning_access: { enabled: true, canPerformRounds: true }
+    }));
+    expect(profileClient.updateAppUserProfile).toHaveBeenNthCalledWith(2, "auth-2", {
+      name: "Manager Two",
+      role: "user",
+      active: true,
+      email: "manager2@example.com",
+      phone: null,
+      worker_no: null,
+      department: null,
+      departments: [],
+      permissions: { users: "view" },
+      manager_zones: ["Packing"],
+      tech_scope: null,
+      supplier: null
+    });
+    expect(res.json().user).toMatchObject({ role: "user", email: "manager2@example.com" });
   });
 
   it("syncs executive role changes to app_users", async () => {

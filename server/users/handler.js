@@ -48,6 +48,46 @@ const timestampOrNull = (value) => {
   return Number.isFinite(ts) && ts > 0 ? new Date(ts).toISOString() : null;
 };
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+const OPTIONAL_APP_USERS_PROFILE_FIELDS = new Set([
+  "position",
+  "tech_cats",
+  "shift",
+  "shift_start",
+  "shift_end",
+  "late_tolerance",
+  "early_tolerance",
+  "cleaning_access",
+  "notification_prefs",
+  "employment_type",
+  "contractor_name",
+  "reports_to",
+  "status",
+  "exit_at",
+  "ppe_reset_at",
+  "pin_hash",
+  "pin_updated_at",
+  "login_state"
+]);
+
+const supabaseMissingAppUsersColumn = (error) =>
+  /PGRST204|schema cache|could not find .*column|column .* does not exist/i.test(String(error?.message || error || ""));
+
+export function stripOptionalAppUsersProfileFields(patch = {}) {
+  return Object.fromEntries(
+    Object.entries(patch || {}).filter(([field]) => !OPTIONAL_APP_USERS_PROFILE_FIELDS.has(field))
+  );
+}
+
+async function writeAppUserProfileWithSchemaFallback(operation, patch) {
+  try {
+    return await operation(patch);
+  } catch (error) {
+    if (!supabaseMissingAppUsersColumn(error)) throw error;
+    const fallbackPatch = stripOptionalAppUsersProfileFields(patch);
+    if (Object.keys(fallbackPatch).length === Object.keys(patch || {}).length) throw error;
+    return operation(fallbackPatch);
+  }
+}
 
 export function appUserPatchFromUserRecord(user = {}) {
   return {
@@ -383,27 +423,42 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
           ...(loginResetRequested ? userLoginResetPatch(user) : {})
         };
         if (patch.email) await backendProfileClient.updateAuthEmail(user.authUserId, patch.email);
-        const profile = await backendProfileClient.updateAppUserProfile(user.authUserId, patch);
+        const profile = await writeAppUserProfileWithSchemaFallback(
+          (nextPatch) => backendProfileClient.updateAppUserProfile(user.authUserId, nextPatch),
+          patch
+        );
         savedUser = userRecordFromAppUserProfile(profile || {}, {});
         appUsersHandled = true;
       } else if (isUuid(id) && typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfileById === "function") {
         const existingProfile = await backendProfileClient.getAppUserProfileById(id);
         if (existingProfile) {
-          const profile = await backendProfileClient.updateAppUserProfileById(id, {
+          const patch = {
             ...extendedAppUserPatchFromUserRecord(user),
             ...(loginResetRequested ? userLoginResetPatch(user) : {})
-          });
+          };
+          const profile = await writeAppUserProfileWithSchemaFallback(
+            (nextPatch) => backendProfileClient.updateAppUserProfileById(id, nextPatch),
+            patch
+          );
           savedUser = userRecordFromAppUserProfile(profile || {}, {});
           appUsersHandled = true;
         } else if (typeof backendProfileClient?.createAppUserProfile === "function") {
-          const profile = await backendProfileClient.createAppUserProfile(appUserCreateProfileFromUserRecord(user));
+          const patch = appUserCreateProfileFromUserRecord(user);
+          const profile = await writeAppUserProfileWithSchemaFallback(
+            (nextPatch) => backendProfileClient.createAppUserProfile(nextPatch),
+            patch
+          );
           savedUser = userRecordFromAppUserProfile(profile || {}, {});
           appUsersHandled = true;
         } else if (typeof backendDriver?.set !== "function") {
           return json(res, 503, { error: "users_legacy_backend_not_configured" });
         }
       } else if (typeof backendProfileClient?.createAppUserProfile === "function") {
-        const profile = await backendProfileClient.createAppUserProfile(appUserCreateProfileFromUserRecord(user));
+        const patch = appUserCreateProfileFromUserRecord(user);
+        const profile = await writeAppUserProfileWithSchemaFallback(
+          (nextPatch) => backendProfileClient.createAppUserProfile(nextPatch),
+          patch
+        );
         savedUser = userRecordFromAppUserProfile(profile || {}, {});
         appUsersHandled = true;
       } else if (typeof backendDriver?.set !== "function") {
