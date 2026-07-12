@@ -1,5 +1,5 @@
 export const DEFAULT_COMPANY_NAME = "CMMS CDSL";
-export const DEFAULT_SITE_SUBTITLE = "ניהול תחזוקה, ציוד, משימות ותפעול";
+export const DEFAULT_SITE_SUBTITLE = "ניהול אחזקה, צי, ניקיון וביגוד";
 
 const cleanString = (value) => String(value == null ? "" : value).trim();
 
