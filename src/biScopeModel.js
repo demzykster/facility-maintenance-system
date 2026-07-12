@@ -1,5 +1,7 @@
 import { canViewCompanyBI, canViewFinancialBI } from "./permissionModel.js";
 
+export const BI_UNASSIGNED_DEPARTMENT = "ללא מחלקה";
+
 export const BI_PERIOD_OPTIONS = Object.freeze([
   { id: "now", label: "עכשיו", trendDays: 7, evidenceDays: 30 },
   { id: "30", label: "30 ימים", trendDays: 30, evidenceDays: 30 },
@@ -54,7 +56,7 @@ const zoneMatchesTicket = (zone = {}, ticket = {}) => {
   return [zone.id, zone.name, zone.areaName, zone.building, zone.code].some((value) => String(value || "").trim() === ticketZone);
 };
 
-const ticketDepartments = (ticket = {}, fleet = [], zones = []) => {
+export const ticketDepartments = (ticket = {}, fleet = [], zones = []) => {
   const direct = cleanStringList([
     ticket.reportedBy?.dept,
     ticket.createdBy?.dept,
@@ -240,13 +242,13 @@ export function biDepartmentRiskRows(data = {}, options = {}) {
   const ppeRequestNeedsAction = options.ppeRequestNeedsAction || ((request) => ["pending", "worker_sign"].includes(request?.status));
   const rows = new Map(cleanStringList(departments).map((name) => [name, riskRow(name)]));
   const ensure = (name) => {
-    const safeName = String(name || "").trim() || "ללא מחלקה";
+    const safeName = String(name || "").trim() || BI_UNASSIGNED_DEPARTMENT;
     if (!rows.has(safeName)) rows.set(safeName, riskRow(safeName));
     return rows.get(safeName);
   };
   const addTo = (names, update) => {
     const cleanNames = cleanStringList(names);
-    (cleanNames.length ? cleanNames : ["ללא מחלקה"]).forEach((name) => update(ensure(name)));
+    (cleanNames.length ? cleanNames : [BI_UNASSIGNED_DEPARTMENT]).forEach((name) => update(ensure(name)));
   };
   const fleetById = new Map((fleet || []).map((unit) => [unit.id, unit]));
   const zoneDeptById = new Map((zones || []).map((zone) => [zone.id, zone.department || zone.dept || ""]));

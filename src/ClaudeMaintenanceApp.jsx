@@ -13,6 +13,7 @@ import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPay
 import { productionAccessToken, store } from "./storageAdapter.js";
 import { DEFAULT_MANAGER_PERMS, USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
 import { BI_PERIOD_OPTIONS, biDepartmentRiskRows, biPeriodRange, biScopeForSession } from "./biScopeModel.js";
+import { biFocusDepartmentMatches, recurringFacilityZoneRows } from "./biTicketInsightModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
 import { ppeOpenOrderQty, ppeSmartReorderLines, ppeSmartReorderLinesForItem } from "./ppeReorderModel.js";
@@ -4286,7 +4287,7 @@ function UserApp(p) {
   const goNotif = (go, ev) => { setShowNotif(false); if (go === "tickets") { setView("tickets"); } else if (go === "tasks") { setView("tasks"); } else if (go === "team") { setView("dept"); setDeptTab("team"); } else if (go === "cleaning") { setView("dept"); setDeptTab("cleaning"); } else { setView("dept"); setDeptTab("equip"); setDeptNav(ev?.fleetId ? { fleetId: ev.fleetId, _t: Date.now() } : null); } };
   const notif = useNotifications(session, tickets, pm, fleet, config, presence, zones, rounds, complaints, users, [], p.tasks, p.meetings, p.ppeReqs);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
-  const ticketRows = useMemo(() => ticketNav ? mine.filter((ticket) => ticketMatchesBIFocus(ticket, ticketNav, { fleet, config })) : mine, [mine, ticketNav, fleet, config]);
+  const ticketRows = useMemo(() => ticketNav ? mine.filter((ticket) => ticketMatchesBIFocus(ticket, ticketNav, { fleet, zones, config })) : mine, [mine, ticketNav, fleet, zones, config]);
   const myPm = useMemo(() => pmVisible(session, pm, fleet), [pm, fleet, session]);
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
@@ -7441,7 +7442,8 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   const lifecycleBottlenecks = Object.values(lifecycleStageMap).sort((a, b) => b.n - a.n || b.ms - a.ms).slice(0, 4);
   const waitReasonRows = ticketLifecycleWaitReasonStats(openTickets, lifecycleOptions).slice(0, 4);
   const maxLifecycleN = Math.max(1, ...lifecycleBottlenecks.map((row) => row.n));
-  const maxWaitReasonN = Math.max(1, ...waitReasonRows.map((row) => row.n));
+  const visibleWaitReasonRows = waitReasonRows.filter((row) => !lifecycleBottlenecks.some((stage) => stage.key === `waiting:${row.reason}`));
+  const maxWaitReasonN = Math.max(1, ...visibleWaitReasonRows.map((row) => row.n));
   const ticketDomain = (ticket) => isTransportTicket(ticket) ? "שינוע" : "מבנה";
   const ticketCause = (ticket, fallback) => ticketWaitReasonLabel(ticket, config) || ballHolder(ticket)?.label || fallback || stOf(ticket.status).label;
   const ticketTitle = (ticket) => `${ticketNo(ticket)} · ${ticket.subject || ticket.asset || "קריאה"}`;
@@ -7519,14 +7521,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     acc[key] = row;
     return acc;
   }, {})).sort((a, b) => b.open - a.open || b.n - a.n).slice(0, 4);
-  const facilityZoneRows = Object.values(facilityInEvidence.filter((ticket) => ticket.zone).reduce((acc, ticket) => {
-    const key = ticket.zone;
-    const row = acc[key] || { key, label: ticket.zone, n: 0, open: 0 };
-    row.n += 1;
-    if (isOpen(ticket)) row.open += 1;
-    acc[key] = row;
-    return acc;
-  }, {})).sort((a, b) => b.open - a.open || b.n - a.n).slice(0, 3);
+  const facilityZoneRows = recurringFacilityZoneRows(facilityInEvidence, { isOpenTicket: isOpen }).slice(0, 3);
   const maxFacilityCategory = Math.max(1, ...facilityCategoryRows.map((row) => row.n));
   const maxFacilityZone = Math.max(1, ...facilityZoneRows.map((row) => row.n));
   const techLoadRows = Object.values(openTickets.filter((ticket) => ticket.assignee).reduce((acc, ticket) => {
@@ -7635,9 +7630,9 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
         <div className="bi-panel-head"><div><b>למה זה תקוע</b><span>צווארי בקבוק וסיבות המתנה מתוך הקריאות הפתוחות</span></div></div>
         {lifecycleBottlenecks.length > 0 && <div className="bi-subtitle">שלבים פעילים</div>}
         {lifecycleBottlenecks.length ? lifecycleBottlenecks.map((stage) => <Bar key={stage.key} label={stage.label} value={stage.n} max={maxLifecycleN} suffix={stage.ms ? ` · ${fmtDur(stage.ms)} · ${lifecycleOwnerLabel(stage.owner)}` : ` · ${lifecycleOwnerLabel(stage.owner)}`} color={stage.kind === "waiting" ? "#B45309" : stage.kind === "rework" ? "#B91C1C" : "var(--primary)"} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · שלב · ${stage.label}`, lifecycleKey: stage.key } })} />) : <div className="note">אין כרגע צווארי בקבוק פתוחים.</div>}
-        {waitReasonRows.length > 0 && <div className="bi-subdivider" />}
-        {waitReasonRows.length > 0 && <div className="bi-subtitle">סיבות המתנה</div>}
-        {waitReasonRows.map((row) => <Bar key={row.reason} label={row.label} value={row.n} max={maxWaitReasonN} suffix={row.ms ? ` · ${fmtDur(row.ms)}` : ""} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · סיבת המתנה · ${row.label}`, lifecycleKey: `waiting:${row.reason}` } })} />)}
+        {visibleWaitReasonRows.length > 0 && <div className="bi-subdivider" />}
+        {visibleWaitReasonRows.length > 0 && <div className="bi-subtitle">סיבות המתנה</div>}
+        {visibleWaitReasonRows.map((row) => <Bar key={row.reason} label={row.label} value={row.n} max={maxWaitReasonN} suffix={row.ms ? ` · ${fmtDur(row.ms)}` : ""} color="#B45309" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · סיבת המתנה · ${row.label}`, lifecycleKey: `waiting:${row.reason}` } })} />)}
         {downtimeRows.length > 0 && <div className="bi-subdivider" />}
         {downtimeRows.length > 0 && <div className="bi-subtitle">השבתות מוסברות</div>}
         {downtimeRows.map((row) => <button key={row.ticket.id} className="bi-doc-row bi-doc-action" onClick={() => onOpenTicket?.(row.ticket.id)}>
@@ -7762,7 +7757,7 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
   </div>;
 }
 
-function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], config = {} } = {}) {
+function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config = {} } = {}) {
   const focus = nav.focus || {};
   const currentTrack = trackOf(ticket);
   if (nav.track && nav.track !== "all" && currentTrack !== nav.track) return false;
@@ -7778,13 +7773,7 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], config = {} } = {}
   if (focus.assetKey && (ticket.asset || "") !== focus.assetKey) return false;
   if (focus.zoneKey && (ticket.zone || "") !== focus.zoneKey) return false;
   if (focus.categoryId && catOf(ticket).id !== focus.categoryId) return false;
-  if (focus.department) {
-    const unit = (fleet || []).find((item) => item.id === ticket.forkliftId);
-    const ticketDepts = currentTrack === "transport"
-      ? fleetDepts(unit)
-      : [ticket.reportedBy?.dept, ticket.createdBy?.dept, ticket.department, ticket.dept].filter(Boolean);
-    if (!ticketDepts.includes(focus.department)) return false;
-  }
+  if (!biFocusDepartmentMatches(ticket, focus, { fleet, zones })) return false;
   return true;
 }
 
@@ -7835,7 +7824,7 @@ function AdminApp(p) {
         <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} onGoTasks={isAdminRole ? (nav) => { setTaskNav(nav || null); setTab("tasks"); } : null} />}
-          {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
+          {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} zones={zones} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
           {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
@@ -7862,7 +7851,7 @@ function ReportView({ html, count, onClose }) {
   const ref = useRef(null);
   return (<Overlay onClose={onClose}><div className="rep-wrap"><div className="rep-head"><div className="rep-title">תצוגה מקדימה{count != null ? ` — ${count}` : ""}</div><div style={{ display: "flex", gap: 8 }}><button className="btn-ghost sm" onClick={() => { try { ref.current.contentWindow.focus(); ref.current.contentWindow.print(); } catch (e) {} }}><Printer size={14} /> הדפס</button><button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button></div></div><iframe ref={ref} title="report" srcDoc={html} className="rep-frame" /></div></Overlay>);
 }
-function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, users, config }) {
+function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, users, zones = [], config }) {
   const [q, setQ] = useState(""), [track, setTrack] = useState("all"), [st, setSt] = useState("open"), [pr, setPr] = useState("all"), [cat, setCat] = useState("all"), [costF, setCostF] = useState("all"), [period, setPeriod] = useState("all"), [report, setReport] = useState(null), [unitType, setUnitType] = useState("all"), [focus, setFocus] = useState(initial?.focus || null);
   const [drilldownLabel, setDrilldownLabel] = useState(initial ? (initial.focus?.label || "סינון BI") : "");
   const PERIODS = [["all", "כל הזמן"], ["week", "שבוע"], ["month", "חודש"], ["quarter", "רבעון"], ["year", "שנה"]];
@@ -7880,27 +7869,7 @@ function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, user
     if (costF === "with" && !t.closure?.costAmount) return false;
     if (costF === "none" && t.closure?.costAmount) return false;
     if (period !== "all" && t.createdAt < from) return false;
-    if (focus) {
-      if (focus.forkliftId && t.forkliftId !== focus.forkliftId) return false;
-      if (Array.isArray(focus.statuses) && focus.statuses.length && !focus.statuses.includes(t.status)) return false;
-      if (focus.supplier && (t.closure?.costSupplier || "") !== focus.supplier) return false;
-      if (focus.waitReason && t.waitingReason !== focus.waitReason) return false;
-      if (focus.lifecycleKey && !ticketHasLifecycleStage(t, focus.lifecycleKey, { isOpen })) return false;
-      if (focus.overdue && !ticketMissedSla(t, config)) return false;
-      if (focus.criticalEscalated && !isCriticalEscalated(t, config)) return false;
-      if (focus.activeCriticalTransport && !((t.track || (t.forkliftId ? "transport" : "facility")) === "transport" && t.downtimeType === "critical" && !isCriticalEscalated(t, config))) return false;
-      if (focus.assetKey && (t.asset || "") !== focus.assetKey) return false;
-      if (focus.zoneKey && (t.zone || "") !== focus.zoneKey) return false;
-      if (focus.categoryId && catOf(t).id !== focus.categoryId) return false;
-      if (focus.department) {
-        const ff = (fleet || []).find((x) => x.id === t.forkliftId);
-        const currentTrack = t.track || (t.forkliftId ? "transport" : "facility");
-        const ticketDepts = currentTrack === "transport"
-          ? fleetDepts(ff)
-          : [t.reportedBy?.dept, t.createdBy?.dept, t.department, t.dept].filter(Boolean);
-        if (!ticketDepts.includes(focus.department)) return false;
-      }
-    }
+    if (focus && !ticketMatchesBIFocus(t, { track, focus }, { fleet, zones, config })) return false;
     if (q.trim()) { const s = `${ticketNo(t)} ${t.subject} ${t.description} ${t.asset || ""} ${t.assignee || ""} ${t.createdBy?.name}`.toLowerCase(); if (!s.includes(q.toLowerCase())) return false; }
     return true;
   });
