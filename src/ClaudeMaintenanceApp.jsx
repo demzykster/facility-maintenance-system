@@ -10995,7 +10995,9 @@ function MobileBottomNav({ nav = [], primaryIds = [], label = "ניווט ראש
   );
 }
 function SectionTitle({ children }) { return <div className="sect">{children}</div>; }
-function Meta({ Icon, iconColor, label, value, action }) { return <div className="meta"><Icon size={15} color={iconColor || "var(--muted)"} /><div><div className="meta-lbl">{label}</div><div className="meta-val">{value}</div></div>{action && <button className="meta-edit" onClick={action} title="עריכה מהירה" aria-label={`עריכה מהירה: ${label}`}><PenLine size={12} /></button>}</div>; }
+function Meta({ Icon, iconColor, label, value, action }) {
+  return <div className="meta"><Icon size={15} color={iconColor || "var(--muted)"} /><div><div className="meta-lbl">{label}</div>{action ? <button type="button" className="meta-val meta-val-edit" onClick={action} title="עריכה מהירה" aria-label={`עריכה מהירה: ${label}`}>{value}</button> : <div className="meta-val">{value}</div>}</div></div>;
+}
 function Empty({ text, sub, Icon = CheckCircle2 }) { return <div className="empty"><Icon size={34} /><div className="empty-t">{text}</div>{sub && <div className="empty-s">{sub}</div>}</div>; }
 function ConfirmBtn({ onConfirm, label, className = "btn-danger full", style, icon = <Trash2 size={15} /> }) {
   const [armed, setArmed] = useState(false);
@@ -11384,8 +11386,9 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-top:8px;}
 .meta{display:flex;gap:9px;align-items:flex-start;position:relative;min-width:0;}.meta svg{margin-top:2px;flex-shrink:0;}.meta>div{min-width:0;flex:1;}
 .meta-lbl{font-size:11.5px;color:var(--muted);}.meta-val{font-size:13.5px;font-weight:600;margin-top:1px;}
-.meta-edit{position:absolute;inset-inline-start:0;top:0;width:24px;height:24px;border:0;border-radius:50%;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;opacity:.58;cursor:pointer;}
-.meta-edit:hover{color:var(--primary);background:var(--primary-soft);opacity:1;}
+.meta-val-edit{display:inline;max-width:100%;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13.5px;font-weight:600;line-height:inherit;text-align:inherit;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-decoration-thickness:1px;text-underline-offset:3px;}
+.meta-val-edit:hover{color:var(--primary);}
+.meta-val-edit:focus-visible{outline:2px solid rgba(31,78,140,.35);outline-offset:3px;border-radius:4px;}
 .admin-quick-edit{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:12px;box-shadow:var(--control-shadow);}
 .admin-quick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:13.5px;font-weight:650;color:var(--ink);}
 .icon-btn.tiny{width:30px;height:30px;min-width:30px;}
