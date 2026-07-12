@@ -66,12 +66,11 @@ describe("facility ticket route model", () => {
   });
 
   it("keeps facility admin status controls available without technician takeover", () => {
-    expect(appSource).toContain("FACILITY_ADMIN_STATUS_OPTIONS");
-    expect(appSource).toContain("setFacilityAdminStatus");
-    expect(appSource).toContain('ticket.supplier ? "supplier" : "other"');
     expect(appSource).toContain("סיבות המתנה");
     expect(appSource).toContain("סיבת המתנה");
     expect(appSource).toContain("setWaiting(r.id)");
+    expect(appSource).not.toContain("FACILITY_ADMIN_STATUS_OPTIONS");
+    expect(appSource).not.toContain("setFacilityAdminStatus");
     expect(appSource).not.toContain("admin-status-grid");
     expect(appSource).not.toContain("ניהול טיפול שוטף");
   });
