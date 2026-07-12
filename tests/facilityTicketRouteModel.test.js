@@ -64,4 +64,11 @@ describe("facility ticket route model", () => {
     expect(appSource).toContain("admin-ticket-manual-shell");
     expect(appSource).toContain("ניהול חריג של מנהל מערכת");
   });
+
+  it("keeps facility admin status controls available without technician takeover", () => {
+    expect(appSource).toContain("FACILITY_ADMIN_STATUS_OPTIONS");
+    expect(appSource).toContain("setFacilityAdminStatus");
+    expect(appSource).toContain('ticket.supplier ? "supplier" : "other"');
+    expect(appSource).toContain("סיבת המתנה");
+  });
 });

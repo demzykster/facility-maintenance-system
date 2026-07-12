@@ -455,6 +455,7 @@ const TRANSITIONS = {
   cancelled: [],
 };
 const canTransition = (from, to) => from === to || (TRANSITIONS[from] || []).includes(to);
+const FACILITY_ADMIN_STATUS_OPTIONS = ["new", "waiting", "pending_admin"];
 
 const DOWNTIME = [
   { id: "has_replacement", label: "יש תחליף", desc: "הכלי מושבת אך קיים תחליף זמין", color: "#16A34A", prio: "medium", oos: false },
@@ -10318,6 +10319,14 @@ function TicketDetail(p) {
     }
     upd({ supplier: supplierName, assignee: "", routedTech: true, mgrExec: false, status: ticket.status === "new" && supplierName ? "in_progress" : ticket.status }, supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
   };
+  const setFacilityAdminStatus = (statusId) => {
+    if (statusId === "waiting") {
+      const reason = ticket.waitingReason || (ticket.supplier ? "supplier" : "other");
+      setWaiting(reason);
+      return;
+    }
+    setStatus(statusId);
+  };
   const adminQuickSave = (label, patch) => {
     setAdminQuickEdit("");
     upd(normalizeFacilitySupplierPatch(ticket, patch, session), `עריכת מנהל: ${label}`, "admin_manual");
@@ -10478,7 +10487,8 @@ function TicketDetail(p) {
       {!isTech && ticket.status === "rework" && <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><AlertTriangle size={16} /> הוחזר לעובד לתיקון — ממתין לשליחה חוזרת.</div>}
 
       {role === "admin" && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework" && (<>
-        {track === "facility" && <><SectionTitle>סטטוס</SectionTitle><div className="status-static"><span className="badge sm" style={{ color: stOf(ticket.status).color, background: stOf(ticket.status).bg }}>{stOf(ticket.status).label}</span></div>
+        {track === "facility" && <><SectionTitle>סטטוס</SectionTitle><select className="ta" value={FACILITY_ADMIN_STATUS_OPTIONS.includes(ticket.status) ? ticket.status : "new"} onChange={(ev) => setFacilityAdminStatus(ev.target.value)}>{FACILITY_ADMIN_STATUS_OPTIONS.map((st) => <option key={st} value={st}>{stOf(st).label}</option>)}</select>
+          {ticket.status === "waiting" && <label className="field" style={{ marginTop: 10 }}><span>סיבת המתנה</span><select value={ticket.waitingReason || "supplier"} onChange={(ev) => setWaiting(ev.target.value)}>{wReasons(config).filter((r) => r.id !== "no_equipment").map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></label>}
           <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
         {track === "transport" && <><SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— מאגר שינוע / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">ברירת המחדל מגיעה מספק הכלי, ואפשר לשנות ידנית אם הטיפול עובר לקבלן אחר.</div></>}
         <SectionTitle>הערה</SectionTitle>
