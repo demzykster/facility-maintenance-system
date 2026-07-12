@@ -1040,7 +1040,7 @@ const isOpen = (t) => t.status !== "done" && t.status !== "cancelled";
 const ticketBlocks = (t, cfg) => t.track === "transport" && isOpen(t) && t.status !== "pending_manager" && t.status !== "rework" && !t.backInServiceAt && !!dtOf(t.downtimeType, cfg).oos;
 const unitBlock = (f, tickets, cfg) => { if (!f) return null; const bs = (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).sort((a, b) => b.createdAt - a.createdAt); if (!bs.length) return null; return { ticket: bs[0], level: dtOf(bs[0].downtimeType, cfg), count: bs.length }; };
 // השבתה ידנית = פתיחת קריאת שינוע ברמה חוסמת. החזרה לשירות = סימון backInServiceAt על כל הקריאות החוסמות (הטיפול בקריאה עצמה נמשך).
-const buildBlockTicket = (f, cfg, by, reason) => { const now = Date.now(); const lvl = dtLevels(cfg).find((d) => d.oos) || DOWNTIME[2]; const rsn = (reason || "").trim(); return { id: uid(), track: "transport", subject: `השבתת כלי · ${f.code}`, category: "transport", priority: lvl.prio || "high", zone: "רחבת מלגזות", asset: f.code, forkliftId: f.id, downtimeType: lvl.id, wearType: null, description: rsn || "הכלי הושבת ידנית — אין להשתמש בו עד לתיקון.", status: "new", assignee: "", routedTech: true, downtimeStart: now, downtimeEnd: null, createdBy: { name: by.name, role: by.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: f.id, priority: lvl.prio || "high" }, cfg, [f]) * 3600000, hasPhoto: false, closure: null, log: [{ at: now, by: by.name, byRole: by.role, text: `הכלי הושבת ידנית${rsn ? " · סיבה: " + rsn : ""}`, kind: "open" }] }; };
+const buildBlockTicket = (f, cfg, by, reason) => { const now = Date.now(); const lvl = dtLevels(cfg).find((d) => d.oos) || DOWNTIME[2]; const rsn = (reason || "").trim(); return { id: uid(), track: "transport", subject: `השבתת כלי · ${f.code}`, category: "transport", priority: lvl.prio || "high", zone: "רחבת מלגזות", asset: f.code, forkliftId: f.id, downtimeType: lvl.id, wearType: null, description: rsn || "הכלי הושבת ידנית — אין להשתמש בו עד לתיקון.", status: "new", assignee: "", routedTech: true, supplier: f.supplier || "", downtimeStart: now, downtimeEnd: null, createdBy: { name: by.name, role: by.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: f.id, priority: lvl.prio || "high" }, cfg, [f]) * 3600000, hasPhoto: false, closure: null, log: [{ at: now, by: by.name, byRole: by.role, text: `הכלי הושבת ידנית${f.supplier ? " · ספק: " + f.supplier : ""}${rsn ? " · סיבה: " + rsn : ""}`, kind: "open" }] }; };
 const clearBlockPatches = (f, tickets, cfg, by) => { const now = Date.now(); return (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).map((t) => ({ ...t, backInServiceAt: now, updatedAt: now, log: [...(t.log || []), { at: now, by: by.name, byRole: by.role, text: "הכלי הוחזר לשירות (ידנית) — הטיפול בקריאה נמשך", kind: "other" }] })); };
 // Жёсткая модель: чей сейчас «мяч» (кто должен действовать). Единый источник правды для всех экранов.
 const ballIn = (t) => {
@@ -1066,7 +1066,7 @@ const ballHolder = (t) => {
   const who = ballIn(t);
   if (who === "admin") return { key: "admin", label: "מנהל המערכת", Icon: ShieldCheck, color: "#1F4E8C" };
   if (who === "manager") return { key: "manager", label: (t.status === "waiting" && t.waitingReason === "no_equipment") ? "מנהל מחלקה · להעביר כלי" : (t.status === "pending_manager" ? "מנהל מחלקה · לאישור דיווח" : (t.status === "pending_user" ? "מנהל מחלקה · לאישור ביצוע" : "מנהל מחלקה")), Icon: User, color: "#0D9488" };
-  if (who === "tech") return { key: "tech", label: t.assignee ? (t.assignee === "טכנאי" ? "טכנאי מטפל" : "טכנאי · " + t.assignee) : "צוות טכני · ממתין לקבלה", Icon: Wrench, color: "#D97706" };
+  if (who === "tech") return { key: "tech", label: t.assignee ? (t.assignee === "טכנאי" ? "טכנאי מטפל" : "טכנאי · " + t.assignee) : (t.supplier ? "ספק · " + t.supplier : "צוות טכני · ממתין לקבלה"), Icon: Wrench, color: "#D97706" };
   return null; // none — סגורה/בוטלה/הוחזרה לעובד
 };
 // Есть ли активный техник, который МОЖЕТ принять заявку (по типу/поставщику/категории). Пусто → заявка «без принимающего».
@@ -1075,7 +1075,9 @@ const eligibleTechs = (t, users, fleet) => {
   return (users || []).filter((u) => {
     if (u.role !== "tech" || u.active === false) return false;
     const scope = u.techScope || "transport";
-    if (track === "transport") { if (scope === "facility") return false; if (u.supplier && t.forkliftId) { const f = (fleet || []).find((x) => x.id === t.forkliftId); if (f && f.supplier && f.supplier !== u.supplier) return false; } return true; }
+    if (t.supplier && u.supplier && t.supplier !== u.supplier) return false;
+    if (t.supplier && !u.supplier) return false;
+    if (track === "transport") { if (scope === "facility") return false; if (u.supplier && t.forkliftId && !t.supplier) { const f = (fleet || []).find((x) => x.id === t.forkliftId); if (f && f.supplier && f.supplier !== u.supplier) return false; } return true; }
     if (scope === "transport") return false;
     const cats = u.techCats || []; if (cats.length && t.category && !cats.includes(t.category)) return false; return true;
   });
@@ -1304,11 +1306,16 @@ const visibleTickets = (session, tickets, fleet) => {
       if (scope === "transport") {
         if (track !== "transport") return false;
         if (!mineOrFree) return false;
-        if (session.supplier && t.forkliftId) { const f = (fleet || []).find((x) => x.id === t.forkliftId); if (f && f.supplier && f.supplier !== session.supplier) return false; }
+        if (session.supplier) {
+          if (t.supplier) return t.supplier === session.supplier;
+          if (t.forkliftId) { const f = (fleet || []).find((x) => x.id === t.forkliftId); if (f && f.supplier && f.supplier !== session.supplier) return false; }
+        }
         return true;
       }
       // טכנאי מבנה: רק קריאות מבנה בקטגוריות שלו — שמשויכות אליו או חופשיות במאגר (routedTech)
       if (track !== "facility") return false;
+      if (session.supplier && t.supplier !== session.supplier) return false;
+      if (!session.supplier && t.supplier) return false;
       if (cats.length && t.category && !cats.includes(t.category)) return false;
       if (t.assignee) return t.assignee === session.name;
       return !!t.routedTech;
@@ -2264,6 +2271,7 @@ export default function App() {
     activeUserList().forEach((u) => {
       if (u.role === "admin") add(u.id);
       else if (u.role === "tech" && ticket.assignee && u.name === ticket.assignee) add(u.id);
+      else if (u.role === "tech" && !ticket.assignee && u.supplier && ticket.supplier === u.supplier) add(u.id);
       else if (u.role === "user" && visibleTickets(u, [ticket], fleet).length) add(u.id);
     });
     add(ticket.createdBy?.id);
@@ -6978,9 +6986,44 @@ const PPE_ORDER_ST = { draft: { label: "טיוטה", color: "#64748B" }, sent: {
 const ppeOrderQty = (o) => (o.lines || []).reduce((s, l) => s + (l.qty || 0), 0);
 const ppeOrderRecv = (o) => (o.lines || []).reduce((s, l) => s + (l.received || 0), 0);
 
-const SUP_INDUSTRIES = [{ id: "transport", label: "תחבורה / מלגזות" }, { id: "facility", label: "מבנה ותחזוקה" }, { id: "clothing", label: "ביגוד וציוד מגן" }];
-const supIndLabel = (id) => (SUP_INDUSTRIES.find((x) => x.id === id) || {}).label || id;
 const supMeta = (config, name) => (config && config.supplierMeta && config.supplierMeta[name]) || {};
+const SUP_BASE_SCOPES = [{ id: "transport", label: "תחבורה / מלגזות" }, { id: "clothing", label: "ביגוד וציוד מגן" }];
+const supplierFacilityScope = (id) => `facility:${id}`;
+const supplierScopeOptions = (config) => [
+  ...SUP_BASE_SCOPES,
+  ...((config?.categories || CATEGORIES).map((c) => ({ id: supplierFacilityScope(c.id), label: c.label, group: "facility" }))),
+];
+const supplierScopesFromMeta = (industries, config) => {
+  const raw = Array.isArray(industries) ? industries : [];
+  const out = new Set(raw.filter((id) => id && id !== "facility"));
+  if (raw.includes("facility")) (config?.categories || CATEGORIES).forEach((c) => out.add(supplierFacilityScope(c.id)));
+  return [...out];
+};
+const supIndLabel = (id, config) => {
+  const option = supplierScopeOptions(config).find((x) => x.id === id);
+  if (option) return option.group === "facility" ? `מבנה · ${option.label}` : option.label;
+  if (id === "facility") return "מבנה ותחזוקה";
+  return id;
+};
+const supplierHasTransportScope = (config, name) => supplierScopesFromMeta(supMeta(config, name).industries, config).includes("transport");
+const supplierHasPpeScope = (config, name) => supplierScopesFromMeta(supMeta(config, name).industries, config).includes("clothing");
+const supplierHasFacilityCategory = (config, name, category) => {
+  const scopes = supplierScopesFromMeta(supMeta(config, name).industries, config);
+  return scopes.includes("facility") || (!!category && scopes.includes(supplierFacilityScope(category)));
+};
+const supplierCandidatesForTicket = (config, ticket, fleet = []) => {
+  const names = config?.suppliers || [];
+  const track = ticket?.track || (ticket?.forkliftId ? "transport" : "facility");
+  const scored = names.map((name) => {
+    const f = track === "transport" && ticket?.forkliftId ? (fleet || []).find((x) => x.id === ticket.forkliftId) : null;
+    const exactFleet = !!(f && f.supplier === name);
+    const scoped = track === "transport" ? supplierHasTransportScope(config, name) : supplierHasFacilityCategory(config, name, ticket?.category);
+    return { name, exactFleet, scoped };
+  });
+  const preferred = scored.filter((x) => x.exactFleet || x.scoped).map((x) => x.name);
+  const fallback = scored.filter((x) => !preferred.includes(x.name)).map((x) => x.name);
+  return [...preferred, ...fallback];
+};
 function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config }) {
   const o = order || {};
   const active = (items || []).filter((x) => x.active !== false);
@@ -7001,7 +7044,7 @@ function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config 
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{o.id ? "עריכת הזמנה" : "הזמנת רכש חדשה"}</div></div>
     <div className="body">
       {err && <div className="note" style={{ color: "#DC2626", marginBottom: 8 }}>{err}</div>}
-      <label className="field"><span>ספק</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— בחר ספק —</option>{(((config && config.suppliers) || []).filter((n) => { const mi = supMeta(config, n).industries; return !mi || mi.length === 0 || mi.includes("clothing"); })).map((n) => <option key={n} value={n}>{n}</option>)}{supplier && !((config && config.suppliers) || []).includes(supplier) && <option value={supplier}>{supplier}</option>}</select></label>
+      <label className="field"><span>ספק</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— בחר ספק —</option>{(((config && config.suppliers) || []).filter((n) => { const scopes = supplierScopesFromMeta(supMeta(config, n).industries, config); return scopes.length === 0 || supplierHasPpeScope(config, n); })).map((n) => <option key={n} value={n}>{n}</option>)}{supplier && !((config && config.suppliers) || []).includes(supplier) && <option value={supplier}>{supplier}</option>}</select></label>
       <SectionTitle>פריטים בהזמנה</SectionTitle>
       {!o.id && (o.lines || []).length > 0 && <div className="hint" style={{ marginBottom: 8 }}>מולא אוטומטית לפי חוסרים — אפשר לערוך כמויות, להוסיף או למחוק.</div>}
       <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, marginBottom: 8 }}>
@@ -9175,10 +9218,10 @@ function UserTree({ list, departments, presence = [], onPick, shifts, mode = "wo
     {workers.length === 0 && !showEmptyGroups && <Empty text="לא נמצאו עובדים" />}
   </div>;
 }
-function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, users, onBack, onRename, onDelete, onOpenFleet, canManage }) {
+function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, users, onBack, onRename, onDelete, onOpenFleet, onOpenUser, canManage }) {
   const meta = supMeta(config, name);
   const [tab, setTab] = useState("details");
-  const [ind, setInd] = useState(meta.industries || []);
+  const [ind, setInd] = useState(() => supplierScopesFromMeta(meta.industries || [], config));
   const [hp, setHp] = useState(meta.hp || "");
   const [address, setAddress] = useState(meta.address || "");
   const [notes, setNotes] = useState(meta.notes || "");
@@ -9195,7 +9238,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
   const saveMeta = async () => {
     if (busy) return false;
     const m = { ...(config.supplierMeta || {}) };
-    m[name] = { industries: ind, hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) };
+    m[name] = { industries: supplierScopesFromMeta(ind, config), hp: hp.trim(), address: address.trim(), notes: notes.trim(), contacts: contacts.filter((c) => (c.name || "").trim() || (c.phone || "").trim()).map((c) => ({ id: c.id || uid(), name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim(), role: (c.role || "").trim() })) };
     setBusy(true); setErr("");
     const ok = await saveConfig({ ...config, supplierMeta: m });
     setBusy(false);
@@ -9210,15 +9253,33 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
   const relFleet = (fleet || []).filter((f) => f.supplier === name);
   const relTechs = (users || []).filter((u) => u.role === "tech" && (u.supplier || "") === name).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
   const stLbl = (st) => st === "draft" ? "טיוטה" : st === "sent" ? "נשלחה" : st === "received" ? "התקבלה" : st || "—";
+  const scopeOptions = supplierScopeOptions(config);
+  const baseScopeOptions = scopeOptions.filter((x) => !x.group);
+  const facilityScopeOptions = scopeOptions.filter((x) => x.group === "facility");
+  const displayScopes = ind.length > 4 ? ind.slice(0, 3) : ind;
   const Tab = ({ id, label, n }) => <button onClick={() => setTab(id)} className="btn-ghost sm" style={{ fontWeight: tab === id ? 800 : 500, borderBottom: tab === id ? "2px solid var(--primary)" : "2px solid transparent", borderRadius: 0 }}>{label}{n != null ? ` (${n})` : ""}</button>;
   return (<div>
     <button className="btn-ghost sm" onClick={onBack} style={{ marginBottom: 8 }}><ChevronLeft size={15} /> חזרה לרשימה</button>
     <SectionTitle><Building2 size={16} /> {name}</SectionTitle>
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 10px" }}>{ind.length === 0 ? <span className="hint">ללא תחום</span> : ind.map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id)}</span>)}</div>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 10px" }}>{ind.length === 0 ? <span className="hint">ללא תחום</span> : <>{displayScopes.map((id) => <span key={id} className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>{supIndLabel(id, config)}</span>)}{ind.length > displayScopes.length && <span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>+{ind.length - displayScopes.length}</span>}</>}</div>
     <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 14, flexWrap: "wrap" }}><Tab id="details" label="פרטים" /><Tab id="technicians" label="טכנאים" n={relTechs.length} /><Tab id="activity" label="הזמנות וכלים" n={relOrders.length + relFleet.length} /><Tab id="invoices" label="חשבוניות" /></div>
     {tab === "details" && <div>
       <label className="field"><span>שם הספק</span><div style={{ display: "flex", gap: 8 }}><input value={nm} onChange={(e) => setNm(e.target.value)} readOnly={!canManage} style={{ flex: 1 }} />{canManage && nm.trim() && nm.trim() !== name && onRename && <button className="btn-ghost sm" onClick={() => onRename(name, nm)}>שנה שם</button>}</div></label>
-      <div className="field"><span>תחום / מודול</span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>{SUP_INDUSTRIES.map((x) => <button key={x.id} type="button" onClick={() => toggleInd(x.id)} disabled={!canManage} className={"chip" + (ind.includes(x.id) ? " on" : "")}>{x.label}</button>)}</div></div>
+      <div className="field"><span>תחומי ספק</span>
+        <details className="supplier-scope-picker" open>
+          <summary><span>בחירת מודולים וקטגוריות</span><span>{ind.length ? countLabel(ind.length, "שיוך", "שיוכים") : "ללא שיוך"}</span></summary>
+          <div className="supplier-scope-body">
+            <div className="supplier-scope-block">
+              <div className="supplier-scope-title">מודולים</div>
+              <div className="chk-grid">{baseScopeOptions.map((x) => <label key={x.id} className={"chk-pill" + (ind.includes(x.id) ? " on" : "")}><input type="checkbox" disabled={!canManage} checked={ind.includes(x.id)} onChange={() => toggleInd(x.id)} /> {x.label}</label>)}</div>
+            </div>
+            <div className="supplier-scope-block">
+              <div className="supplier-scope-title">מבנה / אחזקה לפי קטגוריה קיימת</div>
+              <div className="chk-grid">{facilityScopeOptions.map((x) => <label key={x.id} className={"chk-pill" + (ind.includes(x.id) ? " on" : "")}><input type="checkbox" disabled={!canManage} checked={ind.includes(x.id)} onChange={() => toggleInd(x.id)} /> {x.label}</label>)}</div>
+            </div>
+          </div>
+        </details>
+      </div>
       <label className="field"><span>ח.פ. / מספר עוסק</span><input className="ltr-input" dir="ltr" value={hp} onChange={(e) => setHp(e.target.value)} readOnly={!canManage} placeholder="לדוגמה: 514123456" /></label>
       <label className="field"><span>כתובת</span><input value={address} onChange={(e) => setAddress(e.target.value)} readOnly={!canManage} placeholder="רחוב, עיר" /></label>
       <div className="field"><div className="row-between"><span>אנשי קשר</span>{canManage && <button className="btn-ghost sm" onClick={addContact}><Plus size={14} /> איש קשר</button>}</div>
@@ -9240,10 +9301,10 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
       {relTechs.length === 0 ? <div className="hint">אין עדיין טכנאים המשויכים לספק זה.</div> : <div className="task-list">{relTechs.map((u) => {
         const scope = u.techScope === "facility" ? "מבנה" : u.techScope === "both" ? "שינוע ומבנה" : "שינוע";
         const contact = [u.phone, u.email].filter(Boolean).join(" · ");
-        return <div key={u.id || u.name} className="task-row supplier-tech-row" style={{ cursor: "default" }}>
+        return <button key={u.id || u.name} type="button" className="task-row supplier-tech-row" onClick={() => onOpenUser && onOpenUser(u)}>
           <div className="task-row-main"><div className="task-row-t">{u.name || "ללא שם"}</div><div className="task-row-sub">{scope}{contact ? " · " + contact : ""}</div></div>
-          <div className="task-row-side"><span className="task-due">{u.active === false ? "מושבת" : "פעיל"}</span></div>
-        </div>;
+          <div className="task-row-side"><span className="task-due">{u.active === false ? "מושבת" : "פעיל"}</span><ChevronLeft size={16} /></div>
+        </button>;
       })}</div>}
     </div>}
     {tab === "invoices" && <div className="hint" style={{ padding: 18, textAlign: "center" }}>ניהול חשבוניות יתווסף עם מודול התקציב.</div>}
@@ -9253,6 +9314,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
 function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, canManage }) {
   const [sel, setSel] = useState(null);
   const [openFleetId, setOpenFleetId] = useState(null);
+  const [openUser, setOpenUser] = useState(null);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState("");
   const [err, setErr] = useState("");
@@ -9279,12 +9341,12 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
     setSel(null);
   };
   const add = async () => {
-    const n = adding.trim(); if (!n) return;
+    const n = adding.trim(); if (!n) return setErr("הזינו שם ספק ואז שמרו.");
     setErr("");
     if (!names.includes(n) && await saveConfig({ ...config, suppliers: [...names, n] }) === false) return setErr("הוספת הספק לא נשמרה. נסו שוב.");
     setAdding(""); setSel(n);
   };
-  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} users={users} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} canManage={canManage} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}</div>;
+  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} users={users} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} onOpenUser={setOpenUser} canManage={canManage} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}{openUser && <Overlay persistent onClose={() => setOpenUser(null)}><UserForm user={openUser} config={config} users={users} canDelete={false} canManageWorkerAccess={false} onCancel={() => setOpenUser(null)} onSave={async (u) => { if (!saveUser) return false; const ok = await saveUser(u); if (ok !== false) setOpenUser(null); return ok; }} /></Overlay>}</div>;
   const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
   return (<div className="supplier-shell">
     <div className="supplier-head">
@@ -9295,11 +9357,11 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
       <div className="search-wrap supplier-search"><Search size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש ספק או קבלן" placeholder="חיפוש ספק / קבלן…" /></div>
       {canManage && <div className="supplier-add">
         <input value={adding} onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void add(); } }} aria-label="שם ספק או קבלן חדש" placeholder="שם ספק חדש" />
-        <button className="btn-primary sm" type="button" onClick={() => void add()} disabled={!adding.trim()}><Plus size={15} /> הוסף</button>
+        <button className="btn-primary sm" type="button" onClick={() => void add()}><Plus size={15} /> הוסף</button>
       </div>}
     </div>
     {err && <div className="err" style={{ marginBottom: 10 }}>{err}</div>}
-    {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div className="supplier-grid">{shown.map((n) => { const m = supMeta(config, n); const activity = supplierActivityCounts({ supplier: n, orders, fleet, contacts: m.contacts || [] }); return <button key={n} className="supplier-card" onClick={() => setSel(n)}><div className="supplier-card-top"><div className="supplier-card-name">{n}</div><ChevronLeft size={16} /></div><div className="supplier-tags">{(m.industries || []).length === 0 ? <span className="supplier-tag muted">ללא תחום</span> : (m.industries || []).map((id) => <span key={id} className="supplier-tag">{supIndLabel(id)}</span>)}</div><div className="supplier-metrics"><span>{countLabel(activity.linked, "רשומה", "רשומות")}</span><span>{countLabel(activity.orders, "הזמנה", "הזמנות")}</span><span>{countLabel(activity.fleet, "כלי", "כלים")}</span>{activity.contacts ? <span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span> : null}</div></button>; })}</div>}
+    {shown.length === 0 ? <Empty text="אין ספקים" Icon={Building2} /> : <div className="supplier-grid">{shown.map((n) => { const m = supMeta(config, n); const scopes = supplierScopesFromMeta(m.industries || [], config); const shownScopes = scopes.slice(0, 3); const activity = supplierActivityCounts({ supplier: n, orders, fleet, contacts: m.contacts || [] }); return <button key={n} className="supplier-card" onClick={() => setSel(n)}><div className="supplier-card-top"><div className="supplier-card-name">{n}</div><ChevronLeft size={16} /></div><div className="supplier-tags">{scopes.length === 0 ? <span className="supplier-tag muted">ללא תחום</span> : <>{shownScopes.map((id) => <span key={id} className="supplier-tag">{supIndLabel(id, config)}</span>)}{scopes.length > shownScopes.length && <span className="supplier-tag muted">+{scopes.length - shownScopes.length}</span>}</>}</div><div className="supplier-metrics"><span>{countLabel(activity.linked, "רשומה", "רשומות")}</span><span>{countLabel(activity.orders, "הזמנה", "הזמנות")}</span><span>{countLabel(activity.fleet, "כלי", "כלים")}</span>{activity.contacts ? <span>{countLabel(activity.contacts, "איש קשר", "אנשי קשר")}</span> : null}</div></button>; })}</div>}
   </div>);
 }
 
@@ -9819,7 +9881,7 @@ function TicketForm(p) {
   const [driverInvId, setDriverInvId] = useState(prefill?.driverInvolvedId || "");
   const [description, setDescription] = useState(prefill?.description || "");
   const [assignTo, setAssignTo] = useState("self");
-  useEffect(() => { if (assignTo.startsWith("tech:")) { const id = assignTo.slice(5); const ok = (users || []).some((u) => u.id === id && u.role === "tech" && (u.techCats || []).includes(category)); if (!ok) setAssignTo("self"); } }, [category]);
+  const [supplierAssign, setSupplierAssign] = useState("");
   const [slaOn, setSlaOn] = useState(false), [slaH, setSlaH] = useState(8);
   const [dupeReview, setDupeReview] = useState(null), [pendingT, setPendingT] = useState(null);
   const [photo, setPhoto] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [aiBusy, setAiBusy] = useState(false), [aiNote, setAiNote] = useState("");
@@ -9854,19 +9916,21 @@ function TicketForm(p) {
     const id = uid(); const now = Date.now();
     const pr = track === "transport" ? dtOf(downtimeType, config).prio : priority;
     const hrs = (isAdmin && slaOn) ? (Number(slaH) || DEFAULT_SLA[pr]) : slaForTicket({ track, forkliftId, category, priority: pr }, config, fleet);
-    let assignee = "", routedTech = track === "transport" || undefined, mgrExec = undefined, routeText;
-    if (track === "transport") routeText = "הקריאה נפתחה והועברה לטכנאים";
+    const selectedFleet = track === "transport" ? fleet.find((f) => f.id === forkliftId) : null;
+    const routedSupplier = track === "transport" ? (selectedFleet?.supplier || "") : supplierAssign;
+    let assignee = "", routedTech = track === "transport" || !!routedSupplier || undefined, mgrExec = undefined, routeText;
+    if (track === "transport") routeText = routedSupplier ? `הקריאה נפתחה והועברה לספק ${routedSupplier}` : "הקריאה נפתחה והועברה למאגר שינוע";
     else if (!isAdmin) routeText = "הקריאה נפתחה";
-    else if (assignTo.startsWith("tech:")) { const u = (users || []).find((x) => x.id === assignTo.slice(5)); assignee = u?.name || ""; routedTech = true; routeText = assignee ? `נפתחה ע״י מנהל — שויכה לטכנאי ${assignee}` : "נפתחה ע״י מנהל"; }
+    else if (routedSupplier) { routedTech = true; routeText = `נפתחה ע״י מנהל — שויכה לספק ${routedSupplier}`; }
     else if (assignTo.startsWith("mgr:")) { const u = (users || []).find((x) => x.id === assignTo.slice(4)); assignee = u?.name || ""; mgrExec = assignee ? true : undefined; routeText = assignee ? `נפתחה ע״י מנהל — שויכה למנהל ${assignee}` : "נפתחה ע״י מנהל"; }
     else routeText = "נפתחה ע״י מנהל — נשארת לטיפולך";
     return {
       id, track, subject: subject.trim(), category: track === "transport" ? "transport" : category, categoryLabel: track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === category)?.label || ""), priority: pr, zone,
-      asset: track === "transport" ? (fleet.find((f) => f.id === forkliftId)?.code || "") : asset.trim(),
+      asset: track === "transport" ? (selectedFleet?.code || "") : asset.trim(),
       forkliftId: track === "transport" ? forkliftId : null, downtimeType: track === "transport" ? downtimeType : null,
       wearType: null, downtimeStart: track === "transport" ? now : null, downtimeEnd: null, driverInvolved: track === "transport" ? driverInv.trim() : "", driverInvolvedId: track === "transport" ? driverInvId : "", incidentShift: track === "transport" ? incShift : "",
       description: description.trim(), status: "new", assignee,
-      routedTech, mgrExec,
+      routedTech, mgrExec, supplier: routedSupplier || "",
       byAdmin: isAdmin || undefined, slaHoursOverride: (isAdmin && slaOn) ? Number(slaH) : undefined,
       createdBy: { id: session.id, name: session.name, role: session.role, dept: session.dept, phone: session.phone || "", email: session.email || "" }, createdAt: now, updatedAt: now,
       dueAt: now + hrs * 3600000, hasPhoto: !!photo, closure: null,
@@ -9919,19 +9983,19 @@ function TicketForm(p) {
         <label className="field"><span>ציוד (אופציונלי)</span><input value={asset} onChange={(e) => setAsset(e.target.value)} /></label>
       </>)}
       <label className="field"><span>תיאור התקלה *</span><textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
-      {track === "transport" && forkliftId && eligibleTechs({ track: "transport", forkliftId }, users, fleet).length === 0 && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2", marginTop: 0 }}><AlertTriangle size={13} /> אין כרגע טכנאי שינוע פעיל שיכול לקבל קריאה זו. אפשר להמשיך — הקריאה תסומן «ללא מטפל» ומנהל המערכת יקבל התראה לשיבוץ ידני.</div>}
+      {track === "transport" && forkliftId && (() => { const fk = fleet.find((f) => f.id === forkliftId); return eligibleTechs({ track: "transport", forkliftId, supplier: fk?.supplier || "" }, users, fleet).length === 0; })() && <div className="note" style={{ borderColor: "#FCA5A5", color: "#B91C1C", background: "#FEF2F2", marginTop: 0 }}><AlertTriangle size={13} /> אין כרגע טכנאי שינוע פעיל שיכול לקבל קריאה זו. אפשר להמשיך — הקריאה תסומן «ללא מטפל» ומנהל המערכת יקבל התראה לשיבוץ ידני.</div>}
       {isAdmin && <div className="admin-route">
         <div className="ar-title"><ShieldCheck size={14} /> פתיחה כמנהל</div>
         {track === "facility" && (() => {
           const managers = (users || []).filter((u) => u.role === "user" && u.active !== false);
-          const ftechs = (users || []).filter((u) => u.role === "tech" && u.active !== false && u.techScope === "facility" && (!category || (u.techCats || []).includes(category)));
+          const supplierOptions = supplierCandidatesForTicket(config, { track: "facility", category }, fleet);
           return <div className="field"><span>מי מטפל?</span>
-            <select className="ta" value={assignTo} onChange={(e) => setAssignTo(e.target.value)}>
+            <select className="ta" value={supplierAssign ? "supplier:" + supplierAssign : assignTo} onChange={(e) => { const v = e.target.value; if (v.startsWith("supplier:")) { setSupplierAssign(v.slice(9)); setAssignTo("self"); } else { setSupplierAssign(""); setAssignTo(v); } }}>
               <option value="self">— נשארת לטיפול/שיוך על ידי —</option>
-              {ftechs.length > 0 && <optgroup label="טכנאי מבנה (מתאים לקטגוריה)">{ftechs.map((u) => <option key={u.id} value={"tech:" + u.id}>{u.name}</option>)}</optgroup>}
+              {supplierOptions.length > 0 && <optgroup label="ספק / קבלן">{supplierOptions.map((n) => <option key={n} value={"supplier:" + n}>{n}</option>)}</optgroup>}
               {managers.length > 0 && <optgroup label="מנהל מחלקה">{managers.map((u) => <option key={u.id} value={"mgr:" + u.id}>{u.name}{u.dept ? " · " + u.dept : ""}</option>)}</optgroup>}
             </select>
-            <div className="hint">{!category ? "בחרו קטגוריה כדי לראות טכנאים מתאימים." : (ftechs.length === 0 ? "אין טכנאי מבנה לקטגוריה זו — ניתן לשייך למנהל או להשאיר אצלך." : "בחרו טכנאי מתאים, מנהל מחלקה, או השאירו לטיפולכם.")}</div>
+            <div className="hint">{!category ? "בחרו קטגוריה כדי לראות ספקים מתאימים." : "השיוך הוא לספק. הטכנאים המשויכים אליו יראו את הקריאה ויוכלו לקבל אותה לטיפול."}</div>
           </div>;
         })()}
         <label className="chk-line"><input type="checkbox" checked={slaOn} onChange={(e) => setSlaOn(e.target.checked)} /> הגדרת SLA ידני (שעות)</label>
@@ -10004,12 +10068,14 @@ function TicketDetail(p) {
     const catLabel = track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === catId)?.label || "");
     const hrs = slaForTicket({ track, forkliftId: ticket.forkliftId, category: catId, priority: rev.prio }, config, fleet0);
     const approver = { id: session.id, name: session.name, role: session.role, dept: session.dept, phone: session.phone || "", email: session.email || "" };
-    let assignee = "", routedTech = track === "transport" || undefined, mgrExec = undefined, routeText = "";
-    if (track === "transport") { routeText = "אושר ע״י המנהל — הועבר לטכנאי שינוע"; }
-    else if (rev.route.startsWith("tech:")) { const u = (p.users || []).find((x) => x.id === rev.route.slice(5)); assignee = u?.name || ""; routedTech = true; routeText = `אושר — שויך לטכנאי ${assignee}`; }
+    const supplierName = rev.route.startsWith("supplier:") ? rev.route.slice(9) : "";
+    const transportSupplier = track === "transport" ? ((fleet0 || []).find((x) => x.id === ticket.forkliftId)?.supplier || "") : "";
+    let assignee = "", routedTech = track === "transport" || !!supplierName || !!transportSupplier || undefined, mgrExec = undefined, routeText = "";
+    if (track === "transport") { routeText = transportSupplier ? `אושר ע״י המנהל — הועבר לספק ${transportSupplier}` : "אושר ע״י המנהל — הועבר למאגר שינוע"; }
+    else if (supplierName) { routedTech = true; routeText = `אושר — שויך לספק ${supplierName}`; }
     else if (rev.route === "admin") { routeText = "אושר — הועבר למנהל המערכת"; }
     else { assignee = session.role === "user" ? session.name : ""; mgrExec = session.role === "user" ? true : undefined; routeText = session.role === "user" ? "אושר — המנהל מטפל בעצמו" : "אושר — לטיפול מנהל המערכת"; }
-    onUpdate({ ...ticket, status: "new", category: catId, categoryLabel: catLabel, priority: rev.prio, assignee, routedTech, mgrExec, createdBy: approver, approvedAt: now, dueAt: now + hrs * 3600000, updatedAt: now, log: [...(ticket.log || []), e(`${routeText} (דיווח של ${ticket.reportedBy?.name || "עובד"})`)] });
+    onUpdate({ ...ticket, status: "new", category: catId, categoryLabel: catLabel, priority: rev.prio, assignee, routedTech, mgrExec, supplier: supplierName || transportSupplier || "", createdBy: approver, approvedAt: now, dueAt: now + hrs * 3600000, updatedAt: now, log: [...(ticket.log || []), e(`${routeText} (דיווח של ${ticket.reportedBy?.name || "עובד"})`)] });
   };
   const reworkReport = () => { if (!rev.comment.trim()) return; onUpdate({ ...ticket, status: "rework", updatedAt: Date.now(), log: [...(ticket.log || []), e(`הוחזר לעובד לתיקון: ${rev.comment.trim()}`, "reopen")] }); setRev((s) => ({ ...s, mode: "", comment: "" })); };
   const rejectReport = () => { onUpdate({ ...ticket, status: "cancelled", rejectReason: { code: rev.reason, comment: rev.comment.trim() }, updatedAt: Date.now(), log: [...(ticket.log || []), e(`הדיווח נדחה — ${rejectLabel(rev.reason)}${rev.comment.trim() ? `: ${rev.comment.trim()}` : ""}`, "reject")] }); };
@@ -10024,6 +10090,12 @@ function TicketDetail(p) {
     setClosing(false);
   };
   const repeat = () => onRepeat && onRepeat({ track: track, category: ticket.category, forkliftId: ticket.forkliftId, downtimeType: ticket.downtimeType, zone: ticket.zone, asset: ticket.asset, subject: ticket.subject, priority: ticket.priority });
+  const ticketSupplierOptions = supplierCandidatesForTicket(config, ticket, p.fleet || []);
+  const ticketSupplierSelectOptions = ticket.supplier && !ticketSupplierOptions.includes(ticket.supplier) ? [ticket.supplier, ...ticketSupplierOptions] : ticketSupplierOptions;
+  const setSupplierRoute = (name) => {
+    const supplierName = (name || "").trim();
+    upd({ supplier: supplierName, assignee: "", routedTech: supplierName ? true : (track === "transport" ? true : undefined), mgrExec: false, status: ticket.status === "new" && supplierName ? "in_progress" : ticket.status }, supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
+  };
 
   const isTech = role === "tech";
   const mine = !isTech && ownsTicket(session, ticket);
@@ -10069,7 +10141,7 @@ function TicketDetail(p) {
         <Meta Icon={User} label="פותח" value={ticket.createdBy?.name} />
         {requesterPhone && <Meta Icon={Phone} label="טלפון פותח" value={<a className="tel-link" href={`tel:${requesterTel || requesterPhone}`}>{requesterPhone}</a>} />}
         <Meta Icon={Clock} label="נפתח" value={`${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`} />
-        <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || "טרם שויך"} />
+        <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || ticket.supplier || "טרם שויך"} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
         {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
@@ -10158,7 +10230,7 @@ function TicketDetail(p) {
           <SectionTitle>לאחר אישור — מי מטפל?</SectionTitle>
           <select className="ta" value={rev.route} onChange={(ev) => setRev((s) => ({ ...s, route: ev.target.value }))}>
             <option value="self">{role === "user" ? "אטפל בעצמי" : "לטיפול מנהל המערכת"}</option>
-            {(p.users || []).filter((u) => u.role === "tech" && u.active !== false && u.techScope === "facility" && (!rev.cat || (u.techCats || []).includes(rev.cat))).map((u) => <option key={u.id} value={"tech:" + u.id}>טכנאי: {u.name}</option>)}
+            {supplierCandidatesForTicket(config, { track: "facility", category: rev.cat }, p.fleet || []).map((n) => <option key={n} value={"supplier:" + n}>ספק: {n}</option>)}
             {role === "user" && <option value="admin">העברה למנהל המערכת</option>}
           </select>
         </>)}
@@ -10175,8 +10247,8 @@ function TicketDetail(p) {
 
       {role === "admin" && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework" && (<>
         {track === "facility" && <><SectionTitle>סטטוס</SectionTitle><div className="status-seg">{["new", "in_progress"].map((st) => <button key={st} className={"seg" + (ticket.status === st ? " on" : "")} onClick={() => setStatus(st)} style={ticket.status === st ? { background: stOf(st).color, color: "#fff", borderColor: stOf(st).color } : {}}>{stOf(st).label}</button>)}</div>
-          <SectionTitle>שיוך טכנאי (אופציונלי)</SectionTitle><select className="ta" value={ticket.assignee || ""} onChange={(ev) => upd({ assignee: ev.target.value, routedTech: !!ev.target.value, mgrExec: false, status: ticket.status === "new" && ev.target.value ? "in_progress" : ticket.status }, ev.target.value ? `שויך לטכנאי: ${ev.target.value}` : "השיוך הוסר")}><option value="">— טיפול עצמי / קבלן —</option>{p.techNames.map((t) => <option key={t}>{t}</option>)}</select></>}
-        {track === "transport" && <><SectionTitle>שיוך טכנאי</SectionTitle><select className="ta" value={ticket.assignee || ""} onChange={(ev) => upd({ assignee: ev.target.value, status: ticket.status === "new" && ev.target.value ? "in_progress" : ticket.status }, ev.target.value ? `שויך: ${ev.target.value}` : "השיוך הוסר")}><option value="">— מאגר טכנאים —</option>{p.techNames.map((t) => <option key={t}>{t}</option>)}</select></>}
+          <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
+        {track === "transport" && <><SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— מאגר שינוע / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">ברירת המחדל מגיעה מספק הכלי, ואפשר לשנות ידנית אם הטיפול עובר לקבלן אחר.</div></>}
         <SectionTitle>הערה</SectionTitle>
         <div className="note-row"><input value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" onKeyDown={(ev) => ev.key === "Enter" && addNote()} /><button className="btn-primary" aria-label="שליחת עדכון לקריאה" onClick={addNote}><Send size={16} /></button></div>
         <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>
@@ -11499,8 +11571,18 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .supplier-tag.muted{background:var(--surface-2);color:var(--muted);border-color:var(--line);}
 .supplier-metrics{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;color:var(--muted);font-size:11px;font-weight:600;}
 .supplier-metrics span{min-width:0;border-radius:8px;background:rgba(100,116,139,.08);padding:3px 5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.supplier-scope-picker{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;margin-top:6px;}
+.supplier-scope-picker summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;cursor:pointer;font-weight:700;list-style:none;}
+.supplier-scope-picker summary::-webkit-details-marker{display:none;}
+.supplier-scope-picker summary span:last-child{font-size:12px;color:var(--muted);font-weight:600;}
+.supplier-scope-body{display:grid;gap:12px;padding:0 12px 12px;}
+.supplier-scope-block{border-top:1px solid var(--line);padding-top:12px;}
+.supplier-scope-title{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:8px;}
 .supplier-linked-row .task-row-side{flex-direction:row;align-items:center;gap:8px;color:var(--muted);}
 .supplier-linked-row:hover .task-row-side{color:var(--primary);}
+.supplier-tech-row{width:100%;text-align:start;cursor:pointer;}
+.supplier-tech-row .task-row-side{flex-direction:row;align-items:center;gap:8px;color:var(--muted);}
+.supplier-tech-row:hover .task-row-side{color:var(--primary);}
 
 .empty{text-align:center;padding:46px 20px;color:var(--muted);}.empty.sm{padding:32px;}
 .empty svg{color:var(--line);}

@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: current commit, `Revert fleet internal numbers`.
+- Latest app/UI commit before this handoff: current commit, `Route tickets through suppliers`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -65,6 +65,14 @@ Recent commits on `main`:
   - Added a `טכנאים` tab to supplier detail, listing technician users linked through the existing `supplier` profile field.
   - Technician profiles now keep `supplier` assignment for every technician scope, while transport ticket visibility continues to use the existing `fleet.supplier` / `session.supplier` contract.
   - Verified with focused supplier/user/session/profile tests, full Vitest suite, `npm run lint`, `npm run build`, `npm run release:check`, and a targeted Playwright supplier smoke.
+- `Route tickets through suppliers`
+  - Changed ticket routing from direct technician assignment to supplier/contractor queue assignment.
+  - Ticket creation and ticket detail now write `ticket.supplier`; `ticket.assignee` is set later only when a technician accepts the ticket.
+  - Transport tickets default to the selected fleet unit supplier; facility tickets can be routed to a supplier from the admin creation/detail flow.
+  - Supplier detail now has a live `תחומי ספק` picker: transport, PPE/clothing, and the existing facility maintenance categories (`facility:<categoryId>`).
+  - PPE supplier selection now respects the supplier PPE/clothing scope.
+  - Technicians listed inside supplier detail open the technician user card.
+  - Verified with `tests/supplierTechnicianWorkflow.test.js`, `npm run build`, `npm run release:check`, and local browser smoke for supplier add/detail plus facility ticket supplier routing.
 - `Complete BI period and drilldown pass`
   - Finished the BI period selector with `עכשיו`, `30 ימים`, and `90 ימים`; trend, repeat, PM, cleaning, PPE, and finance summaries now follow the selected BI window instead of fixed hardcoded labels.
   - Added explainable downtime rows under `למה זה תקוע`, showing critical transport downtime duration, likely cause, main lifecycle stage, and direct ticket drill-down.
