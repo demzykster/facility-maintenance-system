@@ -13,7 +13,7 @@ import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
 import { productionAccessToken, store } from "./storageAdapter.js";
 import { DEFAULT_MANAGER_PERMS, USER_PERMISSION_MODULES, canFull, canManage, canRequest, canView, cleanPerms, normalizePerms, permLevel, permRank } from "./permissionModel.js";
-import { BI_PERIOD_OPTIONS, biDepartmentRiskRows, biPeriodRange, biScopeForSession } from "./biScopeModel.js";
+import { BI_PERIOD_OPTIONS, biDepartmentRiskRows, biPeriodRange, biScopeForSession, biTicketHeatmapRows, ticketMatchesBiHeatmapMetric } from "./biScopeModel.js";
 import { biFocusDepartmentMatches, recurringFacilityZoneRows } from "./biTicketInsightModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
@@ -7463,6 +7463,18 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     pmIsOverdue: (task) => task.active !== false && daysLeft(task.nextDue) < 0,
     ppeRequestNeedsAction
   });
+  const ticketHeatmapRows = biTicketHeatmapRows({
+    departments: scope.kind === "company" ? (config.departments || []) : scope.departments,
+    tickets: scope.tickets,
+    fleet: scope.fleet,
+    zones: scope.zones
+  }, {
+    now: biNow,
+    isOpenTicket: isOpen,
+    isOverdueTicket: isOverdue,
+    maxRows: scope.kind === "company" ? 8 : 6
+  });
+  const ticketHeatmapMax = Math.max(1, ...ticketHeatmapRows.flatMap((row) => row.cells.map((cell) => cell.value)));
   const closedInEvidence = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && (ticket.closure.signedAt || 0) >= period.evidenceStart) : [];
   const periodCost = closedInEvidence.reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0);
   const avgClosedCost = closedInEvidence.length ? Math.round(periodCost / closedInEvidence.length) : 0;
@@ -7644,6 +7656,29 @@ function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, us
     </div>
 
     <div className="bi-grid">
+      <section className="panel bi-panel bi-heatmap-panel">
+        <div className="bi-panel-head"><div><b>מפת חום קריאות</b><span>איפה מצטבר עומס ומה סוג הסיכון בכל תחום</span></div><button className="btn-ghost sm" onClick={() => onGoTickets?.({ st: "open", focus: { label: "BI · מפת חום קריאות" } })}>לכל הפתוחות</button></div>
+        {ticketHeatmapRows.length ? <div className="bi-heatmap" role="table" aria-label="מפת חום קריאות פתוחות">
+          <div className="bi-heatmap-head" role="row">
+            <span role="columnheader">תחום</span>
+            {ticketHeatmapRows[0].cells.map((cell) => <span key={cell.key} role="columnheader">{cell.label}</span>)}
+          </div>
+          {ticketHeatmapRows.map((row) => <div key={row.name} className="bi-heatmap-row" role="row">
+            <button type="button" className="bi-heatmap-name" role="cell" onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · מפת חום · ${row.name}`, department: row.name } })}>
+              <b>{row.name}</b>
+              <small>{countLabel(row.total, "קריאה פתוחה", "קריאות פתוחות")}</small>
+            </button>
+            {row.cells.map((cell) => {
+              const heat = Math.min(1, cell.value / ticketHeatmapMax);
+              return <button key={cell.key} type="button" className={"bi-heatmap-cell" + (cell.value > 0 ? " hot" : "")} role="cell" disabled={!cell.value} style={{ "--heat": heat }} onClick={() => onGoTickets?.({ st: "open", focus: { label: `BI · ${row.name} · ${cell.label}`, department: row.name, heatmapMetric: cell.key } })}>
+                <b>{cell.value}</b>
+                <small>{cell.label}</small>
+              </button>;
+            })}
+          </div>)}
+        </div> : <div className="note">אין כרגע קריאות פתוחות לבניית מפת חום.</div>}
+      </section>
+
       {isAdminBI && <section className="panel bi-panel bi-command-panel">
         <div className="bi-panel-head"><div><b>דורש החלטה עכשיו</b><span>{commandQueue.length ? `${commandQueue.length} פריטים ראשונים מכל המודולים` : "אין כרגע פריטים דחופים"}</span></div></div>
         {commandDomainGroups.length ? <div className="bi-command-stack">
@@ -7836,6 +7871,7 @@ function ticketMatchesBIFocus(ticket, nav = {}, { fleet = [], zones = [], config
   if (focus.supplier && (ticket.closure?.costSupplier || "") !== focus.supplier) return false;
   if (focus.waitReason && ticket.waitingReason !== focus.waitReason) return false;
   if (focus.lifecycleKey && !ticketHasLifecycleStage(ticket, focus.lifecycleKey, { isOpen })) return false;
+  if (focus.heatmapMetric && !ticketMatchesBiHeatmapMetric(ticket, focus.heatmapMetric, { isOpenTicket: isOpen, isOverdueTicket: (item) => ticketMissedSla(item, config) })) return false;
   if (focus.assignee && ticket.assignee !== focus.assignee) return false;
   if (focus.minAgeDays != null || focus.maxAgeDays != null) {
     const ageDays = Math.max(0, (Date.now() - (ticket.createdAt || Date.now())) / 86400000);
@@ -11567,6 +11603,23 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-kpis .kpi-num{font-family:var(--bi-font);font-size:var(--bi-number);font-weight:var(--bi-weight);line-height:1;}
 .bi-kpis .kpi-lbl{font-size:var(--bi-caption);line-height:1.35;}
 .bi-command-panel{grid-column:1/-1;}
+.bi-heatmap-panel{grid-column:1/-1;}
+.bi-heatmap{display:flex;flex-direction:column;gap:6px;overflow-x:auto;padding-bottom:2px;}
+.bi-heatmap-head,.bi-heatmap-row{display:grid;grid-template-columns:minmax(150px,1.25fr) repeat(6,minmax(76px,1fr));gap:6px;min-width:720px;}
+.bi-heatmap-head span{font-size:var(--bi-caption);font-weight:var(--bi-weight);color:var(--muted);padding:0 6px;text-align:center;}
+.bi-heatmap-head span:first-child{text-align:start;}
+.bi-heatmap-name,.bi-heatmap-cell{min-height:48px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink);box-shadow:var(--control-shadow);transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),box-shadow 160ms var(--ease-out);}
+.bi-heatmap-name{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:start;padding:8px 10px;}
+.bi-heatmap-name b{font-size:var(--bi-row);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bi-heatmap-name small{color:var(--muted);font-size:var(--bi-caption);white-space:nowrap;}
+.bi-heatmap-cell{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;background:var(--surface);}
+.bi-heatmap-cell::before{content:"";position:absolute;inset:0;background:var(--primary);opacity:calc(.05 + var(--heat,0) * .18);pointer-events:none;}
+.bi-heatmap-cell.hot{border-color:rgba(31,78,140,.28);}
+.bi-heatmap-cell>*{position:relative;}
+.bi-heatmap-cell:hover:not(:disabled),.bi-heatmap-name:hover{border-color:rgba(31,78,140,.34);box-shadow:0 8px 20px rgba(31,78,140,.08);}
+.bi-heatmap-cell:disabled{cursor:default;color:var(--muted);background:var(--surface);opacity:.62;}
+.bi-heatmap-cell b{font-size:var(--bi-number);line-height:1;font-variant-numeric:tabular-nums;}
+.bi-heatmap-cell small{font-size:10.5px;color:var(--muted);line-height:1.2;white-space:nowrap;}
 .bi-panel{min-width:0;}
 .bi-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .bi-panel-head b{display:block;font-family:var(--bi-font);font-size:var(--bi-section);font-weight:var(--bi-weight);line-height:1.35;}
@@ -12509,6 +12562,12 @@ body *{visibility:hidden!important;}
   .bi-period-switch::-webkit-scrollbar{display:none;}
   .bi-period-switch button{flex:1;min-width:max-content;padding-inline:10px;}
   .bi-grid{grid-template-columns:1fr;}
+  .bi-heatmap{margin-inline:-2px;padding-inline:2px;}
+  .bi-heatmap-head,.bi-heatmap-row{grid-template-columns:minmax(116px,1.1fr) repeat(6,minmax(58px,1fr));gap:5px;min-width:500px;}
+  .bi-heatmap-name,.bi-heatmap-cell{min-height:42px;border-radius:10px;}
+  .bi-heatmap-name{padding:6px 8px;align-items:flex-start;flex-direction:column;gap:2px;}
+  .bi-heatmap-cell b{font-size:17px;}
+  .bi-heatmap-cell small{font-size:9.5px;}
   .bi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
   .bi-kpis .kpi{min-height:66px;padding:9px 8px;border-radius:12px;}
   .bi-kpis .kpi-num{font-size:18px;}

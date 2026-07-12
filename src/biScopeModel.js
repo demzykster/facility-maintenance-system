@@ -8,6 +8,15 @@ export const BI_PERIOD_OPTIONS = Object.freeze([
   { id: "90", label: "90 ימים", trendDays: 90, evidenceDays: 90 }
 ]);
 
+export const BI_HEATMAP_COLUMNS = Object.freeze([
+  { key: "open", label: "פתוחות", weight: 1 },
+  { key: "sla", label: "SLA", weight: 5 },
+  { key: "critical", label: "השבתה", weight: 5 },
+  { key: "waiting", label: "ממתין", weight: 3 },
+  { key: "aging", label: "מעל שבוע", weight: 2 },
+  { key: "idle", label: "ללא תנועה", weight: 3 }
+]);
+
 export const normalizeBiPeriod = (value) =>
   BI_PERIOD_OPTIONS.some((option) => option.id === String(value || "")) ? String(value || "") : "now";
 
@@ -213,6 +222,91 @@ const defaultIsOpenTicket = (ticket = {}) => {
   const status = ticket.status || "";
   return !["closed", "done", "resolved", "cancelled", "archived"].includes(status);
 };
+
+const isWaitingTicket = (ticket = {}) =>
+  ["waiting", "pending_user", "pending_admin"].includes(ticket.status || "");
+
+export function ticketMatchesBiHeatmapMetric(ticket = {}, metric = "open", options = {}) {
+  const {
+    now = Date.now(),
+    isOpenTicket = defaultIsOpenTicket,
+    isOverdueTicket = () => false,
+    agingDays = 7,
+    idleDays = 3
+  } = options;
+  if (!isOpenTicket(ticket)) return false;
+  const dayMs = 86400000;
+  const createdAt = ticket.createdAt || now;
+  const updatedAt = ticket.updatedAt || createdAt;
+  const ageDays = Math.max(0, (now - createdAt) / dayMs);
+  const idleAgeDays = Math.max(0, (now - updatedAt) / dayMs);
+  if (metric === "open") return true;
+  if (metric === "sla") return isOverdueTicket(ticket);
+  if (metric === "critical") return ticketTrack(ticket) === "transport" && ticket.downtimeType === "critical";
+  if (metric === "waiting") return isWaitingTicket(ticket);
+  if (metric === "aging") return ageDays >= agingDays;
+  if (metric === "idle") return idleAgeDays >= idleDays;
+  return true;
+}
+
+export function biTicketHeatmapRows(data = {}, options = {}) {
+  const {
+    departments = [],
+    tickets = [],
+    fleet = [],
+    zones = []
+  } = data;
+  const {
+    now = Date.now(),
+    isOpenTicket = defaultIsOpenTicket,
+    isOverdueTicket = () => false,
+    columns = BI_HEATMAP_COLUMNS,
+    maxRows = 8,
+    agingDays = 7,
+    idleDays = 3
+  } = options;
+  const rows = new Map(cleanStringList(departments).map((name) => [name, {
+    name,
+    total: 0,
+    score: 0,
+    values: Object.fromEntries(columns.map((column) => [column.key, 0]))
+  }]));
+  const ensure = (name) => {
+    const safeName = String(name || "").trim() || BI_UNASSIGNED_DEPARTMENT;
+    if (!rows.has(safeName)) rows.set(safeName, {
+      name: safeName,
+      total: 0,
+      score: 0,
+      values: Object.fromEntries(columns.map((column) => [column.key, 0]))
+    });
+    return rows.get(safeName);
+  };
+  (tickets || []).filter(isOpenTicket).forEach((ticket) => {
+    const names = ticketDepartments(ticket, fleet, zones);
+    (names.length ? names : [BI_UNASSIGNED_DEPARTMENT]).forEach((name) => {
+      const row = ensure(name);
+      row.total += 1;
+      columns.forEach((column) => {
+        if (!ticketMatchesBiHeatmapMetric(ticket, column.key, { now, isOpenTicket, isOverdueTicket, agingDays, idleDays })) return;
+        row.values[column.key] += 1;
+        row.score += column.weight || 1;
+      });
+    });
+  });
+  return [...rows.values()]
+    .filter((row) => row.total > 0)
+    .map((row) => ({
+      ...row,
+      cells: columns.map((column) => ({
+        key: column.key,
+        label: column.label,
+        value: row.values[column.key] || 0,
+        weight: column.weight || 1
+      }))
+    }))
+    .sort((a, b) => b.score - a.score || b.total - a.total || a.name.localeCompare(b.name, "he"))
+    .slice(0, maxRows);
+}
 
 const riskRow = (name) => ({
   name,

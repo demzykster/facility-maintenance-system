@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biDepartmentRiskRows, biPeriodRange, biScopeForSession, normalizeBiPeriod } from "../src/biScopeModel.js";
+import { biDepartmentRiskRows, biPeriodRange, biScopeForSession, biTicketHeatmapRows, normalizeBiPeriod, ticketMatchesBiHeatmapMetric } from "../src/biScopeModel.js";
 
 const data = {
   tickets: [
@@ -206,5 +206,59 @@ describe("BI scope model", () => {
       pmOverdue: 1,
       ppePending: 1
     });
+  });
+
+  it("builds a scoped ticket heatmap without mixing department rows", () => {
+    const now = Date.UTC(2026, 6, 12);
+    const rows = biTicketHeatmapRows({
+      departments: ["A", "B"],
+      tickets: [
+        { id: "fresh-a", track: "facility", status: "new", reportedBy: { dept: "A" }, createdAt: now - 2 * 86400000, updatedAt: now - 3600000 },
+        { id: "old-a", track: "facility", status: "waiting", reportedBy: { dept: "A" }, createdAt: now - 10 * 86400000, updatedAt: now - 5 * 86400000 },
+        { id: "fleet-b", status: "new", forkliftId: "f-b", downtimeType: "critical", createdAt: now - 9 * 86400000, updatedAt: now - 4 * 86400000 }
+      ],
+      fleet: data.fleet,
+      zones: []
+    }, {
+      now,
+      isOverdueTicket: (ticket) => ticket.id === "fleet-b"
+    });
+
+    expect(rows.map((row) => row.name)).toEqual(["B", "A"]);
+    expect(rows.find((row) => row.name === "A").values).toMatchObject({
+      open: 2,
+      waiting: 1,
+      aging: 1,
+      idle: 1,
+      critical: 0
+    });
+    expect(rows.find((row) => row.name === "B").values).toMatchObject({
+      open: 1,
+      sla: 1,
+      critical: 1,
+      aging: 1,
+      idle: 1
+    });
+  });
+
+  it("matches heatmap ticket metrics for drill-down filters", () => {
+    const now = Date.UTC(2026, 6, 12);
+    const oldIdleCritical = {
+      id: "critical",
+      forkliftId: "f-a",
+      status: "waiting",
+      downtimeType: "critical",
+      createdAt: now - 12 * 86400000,
+      updatedAt: now - 6 * 86400000
+    };
+    const closed = { id: "closed", status: "closed", createdAt: now - 12 * 86400000 };
+
+    expect(ticketMatchesBiHeatmapMetric(oldIdleCritical, "open", { now })).toBe(true);
+    expect(ticketMatchesBiHeatmapMetric(oldIdleCritical, "waiting", { now })).toBe(true);
+    expect(ticketMatchesBiHeatmapMetric(oldIdleCritical, "critical", { now })).toBe(true);
+    expect(ticketMatchesBiHeatmapMetric(oldIdleCritical, "aging", { now })).toBe(true);
+    expect(ticketMatchesBiHeatmapMetric(oldIdleCritical, "idle", { now })).toBe(true);
+    expect(ticketMatchesBiHeatmapMetric(oldIdleCritical, "sla", { now, isOverdueTicket: (ticket) => ticket.id === "critical" })).toBe(true);
+    expect(ticketMatchesBiHeatmapMetric(closed, "open", { now })).toBe(false);
   });
 });

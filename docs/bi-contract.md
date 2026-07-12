@@ -41,6 +41,7 @@ manager decision today:
 - repeated problems by fleet unit, facility asset, zone, or category;
 - downtime causes and current waiting owner;
 - top risk departments / areas;
+- ticket heatmap by department / area and operational risk type;
 - PM, fleet documents, cleaning, and PPE health signals;
 - financial signals only for `admin` and `executive`, such as 30-day cost,
   top supplier/category cost, or a clear anomaly.
@@ -52,6 +53,7 @@ Detailed Analytics content should be reachable from the related BI signal:
 - facility maintenance by category from facility-ticket risk;
 - repeat issues by area/asset/category from repeated-problem signals;
 - downtime and time-by-status from downtime / "why stuck" signals;
+- ticket heatmap cells into the existing filtered ticket list, not a separate BI-only screen;
 - supplier/category/asset costs from financial BI;
 - technician load from admin command-center execution bottlenecks;
 - PM planned versus completed from PM health;
@@ -218,6 +220,8 @@ Allowed:
 - open a filtered ticket list;
 - open a ticket detail;
 - open a fleet unit;
+- open a heatmap-filtered ticket list by department and risk metric such as SLA,
+  critical downtime, waiting state, aging backlog, or lack of recent movement;
 - open a PM task;
 - open cleaning/PPE/task details where the user already has access;
 - show lifecycle breakdowns and waiting reasons;
