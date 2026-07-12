@@ -10026,6 +10026,7 @@ function TicketDetail(p) {
   const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, tickets } = p;
   const role = session.role;
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
+  const [adminQuickEdit, setAdminQuickEdit] = useState("");
   const afterRef = useRef(null);
   useEffect(() => { let on = true; if (ticket?.hasPhoto) TICKET_PHOTOS.load(ticket, "before").then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto, ticket?.photoPath]);
   useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) TICKET_PHOTOS.load(ticket, "after").then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto, ticket?.afterPhotoPath]);
@@ -10097,8 +10098,16 @@ function TicketDetail(p) {
     const supplierName = (name || "").trim();
     upd({ supplier: supplierName, assignee: "", routedTech: supplierName ? true : (track === "transport" ? true : undefined), mgrExec: false, status: ticket.status === "new" && supplierName ? "in_progress" : ticket.status }, supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
   };
+  const adminQuickSave = (label, patch) => {
+    setAdminQuickEdit("");
+    upd(patch, `עריכת מנהל: ${label}`, "admin_manual");
+  };
 
   const isTech = role === "tech";
+  const isAdmin = role === "admin";
+  const executorRole = isTech ? "tech" : (isAdmin ? "tech" : role);
+  const canOperateAsExecutor = (isTech || isAdmin) && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework";
+  const canEditExecutorState = isAdmin || ticket.assignee === session.name;
   const mine = !isTech && ownsTicket(session, ticket);
   // Менеджер-исполнитель: заявка по зданию назначена ему лично — работает как техник
   const isMgrExec = role === "user" && ticket.mgrExec && ticket.assignee === session.name;
@@ -10136,18 +10145,19 @@ function TicketDetail(p) {
       {dtMeta && <div className="dt-banner" style={{ background: dtMeta.color + "16", color: dtMeta.color, borderColor: dtMeta.color + "44" }}><span className="dt-dot" style={{ background: dtMeta.color }} /> {dtMeta.label}{track === "transport" && <span className="dt-time"> · השבתה: {fmtDur(downtimeMs(ticket))}</span>}</div>}
       <SlaBar t={ticket} config={config} big />
       <div className="meta-grid">
-        <Meta Icon={c.Icon} iconColor={c.color} label="קטגוריה" value={c.label} />
-        {ticket.asset && <Meta Icon={track === "transport" ? Truck : Package} label={track === "transport" ? "כלי" : "ציוד"} value={ticket.asset} />}
-        {track === "facility" && <Meta Icon={MapPin} label="מיקום" value={ticket.zone} />}
+        <Meta Icon={c.Icon} iconColor={c.color} label="קטגוריה" value={c.label} action={isAdmin && track === "facility" ? () => setAdminQuickEdit("category") : null} />
+        {ticket.asset && <Meta Icon={track === "transport" ? Truck : Package} label={track === "transport" ? "כלי" : "ציוד"} value={ticket.asset} action={isAdmin ? () => setAdminQuickEdit("asset") : null} />}
+        {track === "facility" && <Meta Icon={MapPin} label="מיקום" value={ticket.zone} action={isAdmin ? () => setAdminQuickEdit("zone") : null} />}
         <Meta Icon={User} label="פותח" value={ticket.createdBy?.name} />
         {requesterPhone && <Meta Icon={Phone} label="טלפון פותח" value={<a className="tel-link" href={`tel:${requesterTel || requesterPhone}`}>{requesterPhone}</a>} />}
         <Meta Icon={Clock} label="נפתח" value={`${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`} />
-        <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || ticket.supplier || "טרם שויך"} />
+        <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || ticket.supplier || "טרם שויך"} action={isAdmin ? () => setAdminQuickEdit("assignee") : null} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
         {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
         {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <div className="meta"><AlertTriangle size={15} color={r.color} /><div><div className="meta-lbl">רמת סיכון</div><div className="meta-val" style={{ color: r.color, fontWeight: 700 }}>{r.label}</div></div></div> : null; })()}
       </div>
+      {isAdmin && adminQuickEdit && <AdminTicketQuickEdit key={adminQuickEdit} field={adminQuickEdit} ticket={ticket} config={config} fleet={p.fleet || []} onCancel={() => setAdminQuickEdit("")} onSave={adminQuickSave} />}
       <SectionTitle>תיאור</SectionTitle><div className="desc-box">{ticket.description}</div>
       {photo && <><SectionTitle>תמונה</SectionTitle><img className="detail-photo" src={photo} alt="" /></>}
       {afterPhoto && <><SectionTitle><CheckCircle2 size={15} /> תמונת ביצוע</SectionTitle><img className="detail-photo" src={afterPhoto} alt="" /></>}
@@ -10166,29 +10176,30 @@ function TicketDetail(p) {
         <div className="cb-sign"><PenLine size={14} /> נחתם ע״י {ticket.closure.signedBy} · {fmtDate(ticket.closure.signedAt)}</div>
       </div></>}
 
-      {isTech && (track === "transport" || ticket.routedTech) && isOpen(ticket) && (<>
+      {canOperateAsExecutor && (<>
         {ticket.status === "waiting" && ticket.waitingReason === "no_equipment" ? (
           <div className="equip-wait">
-            <div className="equip-wait-msg"><AlertTriangle size={16} /> דיווחת שהכלי לא התקבל. ההמתנה נרשמת ({fmtDur((ticket.equipWaitMs || 0) + (ticket.equipWaitSince ? Date.now() - ticket.equipWaitSince : 0))}).</div>
+            <div className="equip-wait-msg"><AlertTriangle size={16} /> הכלי מסומן כלא התקבל. ההמתנה נרשמת ({fmtDur((ticket.equipWaitMs || 0) + (ticket.equipWaitSince ? Date.now() - ticket.equipWaitSince : 0))}).</div>
             <label className="field" style={{ marginTop: 10 }}><span>מתי הכלי התקבל בפועל? (ריק = עכשיו)</span><input type="datetime-local" value={recvAt} onChange={(e) => setRecvAt(e.target.value)} /></label>
             <button className="btn-primary full" style={{ marginTop: 8 }} onClick={() => take(recvAt ? new Date(recvAt).getTime() : Date.now())}><HardHat size={16} /> הכלי התקבל — קבל לטיפול</button>
           </div>
         ) : !ticket.assignee ? (<>
           <button className="btn-primary full" style={{ marginTop: 14 }} onClick={() => take()}><HardHat size={16} /> קבל לטיפול</button>
           {track === "transport" && <button className="btn-ghost full" style={{ marginTop: 8 }} onClick={noEquipment}><Truck size={15} /> לא קיבלתי את הכלי</button>}
-        </>) : ticket.assignee === session.name && ticket.status !== "pending_user" && ticket.status !== "pending_admin" && (<>
+        </>) : canEditExecutorState && ticket.status !== "pending_user" && ticket.status !== "pending_admin" && (<>
+          {isAdmin && ticket.assignee && ticket.assignee !== session.name && <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><ShieldCheck size={16} /> מצב מנהל מערכת: ניתן לעדכן את מהלך הטיפול גם כשהקריאה משויכת ל-{ticket.assignee}.</div>}
           {track === "transport" && <><SectionTitle>סיווג מקור התקלה</SectionTitle>
           <div className="pr-row">{WEAR.map((wt) => <button key={wt.id} className={"pr-pick" + (ticket.wearType === wt.id ? " on" : "")} onClick={() => setWear(wt.id)} style={ticket.wearType === wt.id ? { background: "#16202E", color: "#fff", borderColor: "#16202E" } : {}}>{wt.label}</button>)}</div></>}
           <SectionTitle>סטטוס</SectionTitle>
           <div className="status-seg"><button className={"seg" + (ticket.status === "in_progress" ? " on" : "")} onClick={() => setStatus("in_progress")} style={ticket.status === "in_progress" ? { background: stOf("in_progress").color, color: "#fff", borderColor: stOf("in_progress").color } : {}}>בעבודה</button></div>
           <div className="hint" style={{ marginTop: 8 }}>תקוע? סמן מה חוסם:</div>
-          <div className="pr-row">{reasonsForRole(config, session.role).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <div className="pr-row">{reasonsForRole(config, executorRole).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
           <SectionTitle>תמונת ביצוע (אופציונלי)</SectionTitle>
           <input ref={afterRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(ev) => grabAfter(ev.target.files?.[0])} />
           {afterPhoto ? <div className="photo-prev"><img src={afterPhoto} alt="" /><button className="photo-x" onClick={() => setAfterPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => afterRef.current?.click()}><Camera size={20} /> צירוף תמונת ביצוע</button>}
           <button className="btn-close full" style={{ marginTop: 14 }} onClick={finishTech}><CheckCircle2 size={16} /> סיום טיפול — העבר לאישור הפותח</button>
         </>)}
-        {ticket.assignee === session.name && (ticket.status === "pending_user" || ticket.status === "pending_admin") && <div className="banner" style={{ marginTop: 14, background: "#CCFBF1", color: "#0F766E", borderColor: "#5EEAD4" }}><CheckCircle2 size={16} /> סיימת את הטיפול. הקריאה ממתינה {ticket.status === "pending_user" ? "לאישור הפותח" : "לסגירה ע״י המנהל"}. אין צורך בפעולה נוספת.</div>}
+        {canEditExecutorState && (ticket.status === "pending_user" || ticket.status === "pending_admin") && <div className="banner" style={{ marginTop: 14, background: "#CCFBF1", color: "#0F766E", borderColor: "#5EEAD4" }}><CheckCircle2 size={16} /> הטיפול סומן כהסתיים. הקריאה ממתינה {ticket.status === "pending_user" ? "לאישור הפותח" : "לסגירה ע״י המנהל"}.</div>}
       </>)}
 
       {isMgrExec && isOpen(ticket) && (<>
@@ -10380,6 +10391,55 @@ function AdminTicketManualPanel({ ticket, config, session, fleet, onSave }) {
     {err && <div className="err">{err}</div>}
     <button className="btn-primary full" style={{ marginTop: 12 }} onClick={save}><ShieldCheck size={16} /> שמירת עריכת מנהל</button>
   </details>;
+}
+
+function AdminTicketQuickEdit({ field, ticket, config, fleet, onCancel, onSave }) {
+  const track = ticket.track || (ticket.forkliftId ? "transport" : "facility");
+  const supplierOptions = supplierCandidatesForTicket(config, ticket, fleet || []);
+  const [value, setValue] = useState(() => {
+    if (field === "category") return ticket.category || "";
+    if (field === "priority") return ticket.priority || "medium";
+    if (field === "zone") return ticket.zone || "";
+    if (field === "asset") return ticket.asset || "";
+    if (field === "assignee") return ticket.assignee || "";
+    if (field === "supplier") return ticket.supplier || "";
+    return "";
+  });
+  const title = {
+    category: "עריכת קטגוריה",
+    priority: "עריכת עדיפות",
+    zone: "עריכת מיקום",
+    asset: track === "transport" ? "עריכת כלי" : "עריכת ציוד",
+    assignee: "עריכת אחראי",
+    supplier: "עריכת ספק"
+  }[field] || "עריכה מהירה";
+  const save = () => {
+    const clean = String(value || "").trim();
+    if (field === "category") {
+      const cat = (config.categories || CATEGORIES).find((item) => item.id === clean);
+      onSave("קטגוריה", { category: clean, categoryLabel: cat?.label || "" });
+      return;
+    }
+    if (field === "priority") return onSave("עדיפות", { priority: clean || "medium" });
+    if (field === "zone") return onSave("מיקום", { zone: clean });
+    if (field === "asset") return onSave(track === "transport" ? "כלי" : "ציוד", { asset: clean });
+    if (field === "assignee") return onSave("אחראי", { assignee: clean, mgrExec: false });
+    if (field === "supplier") return onSave("ספק", { supplier: clean, assignee: "", routedTech: clean ? true : ticket.routedTech });
+  };
+
+  return <div className="admin-quick-edit">
+    <div className="admin-quick-head"><span>{title}</span><button className="icon-btn tiny" onClick={onCancel} aria-label="ביטול עריכה מהירה"><X size={15} /></button></div>
+    {field === "category" ? (
+      <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{(config.categories || CATEGORIES).map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
+    ) : field === "priority" ? (
+      <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}>{PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+    ) : field === "supplier" ? (
+      <select className="ta" value={value} onChange={(e) => setValue(e.target.value)}><option value="">— ללא ספק —</option>{(ticket.supplier && !supplierOptions.includes(ticket.supplier) ? [ticket.supplier, ...supplierOptions] : supplierOptions).map((name) => <option key={name} value={name}>{name}</option>)}</select>
+    ) : (
+      <input className="ta" value={value} onChange={(e) => setValue(e.target.value)} autoFocus />
+    )}
+    <div className="row2" style={{ marginTop: 10 }}><button className="btn-ghost" onClick={onCancel}>ביטול</button><button className="btn-primary" onClick={save}><PenLine size={15} /> שמירה</button></div>
+  </div>;
 }
 
 function CloseModal({ ticket, config, session, onCancel, onClose }) {
@@ -10917,7 +10977,7 @@ function MobileBottomNav({ nav = [], primaryIds = [], label = "ניווט ראש
   );
 }
 function SectionTitle({ children }) { return <div className="sect">{children}</div>; }
-function Meta({ Icon, iconColor, label, value }) { return <div className="meta"><Icon size={15} color={iconColor || "var(--muted)"} /><div><div className="meta-lbl">{label}</div><div className="meta-val">{value}</div></div></div>; }
+function Meta({ Icon, iconColor, label, value, action }) { return <div className="meta"><Icon size={15} color={iconColor || "var(--muted)"} /><div><div className="meta-lbl">{label}</div><div className="meta-val">{value}</div></div>{action && <button className="meta-edit" onClick={action} title="עריכה מהירה" aria-label={`עריכה מהירה: ${label}`}><PenLine size={12} /></button>}</div>; }
 function Empty({ text, sub, Icon = CheckCircle2 }) { return <div className="empty"><Icon size={34} /><div className="empty-t">{text}</div>{sub && <div className="empty-s">{sub}</div>}</div>; }
 function ConfirmBtn({ onConfirm, label, className = "btn-danger full", style, icon = <Trash2 size={15} /> }) {
   const [armed, setArmed] = useState(false);
@@ -11304,8 +11364,13 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .detail-caption{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;margin-bottom:3px;}
 .detail-subline{font-size:13px;color:var(--muted);margin-top:5px;}.detail-subline b{color:var(--ink);font-weight:600;}
 .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-top:8px;}
-.meta{display:flex;gap:9px;align-items:flex-start;}.meta svg{margin-top:2px;flex-shrink:0;}
+.meta{display:flex;gap:9px;align-items:flex-start;position:relative;min-width:0;}.meta svg{margin-top:2px;flex-shrink:0;}.meta>div{min-width:0;flex:1;}
 .meta-lbl{font-size:11.5px;color:var(--muted);}.meta-val{font-size:13.5px;font-weight:600;margin-top:1px;}
+.meta-edit{width:28px;height:28px;border:1px solid var(--line);border-radius:9px;background:var(--surface-glow);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;margin-inline-start:auto;cursor:pointer;}
+.meta-edit:hover{border-color:rgba(31,78,140,.34);color:var(--primary);background:var(--primary-soft);}
+.admin-quick-edit{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:12px;box-shadow:var(--control-shadow);}
+.admin-quick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:13.5px;font-weight:650;color:var(--ink);}
+.icon-btn.tiny{width:30px;height:30px;min-width:30px;}
 .desc-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14.5px;line-height:1.6;white-space:pre-wrap;}
 .detail-photo{width:100%;border-radius:12px;border:1px solid var(--line);}
 .note-row{display:flex;gap:8px;}
