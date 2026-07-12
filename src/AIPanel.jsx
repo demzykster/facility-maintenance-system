@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Send, Sparkles, X } from "lucide-react";
 
-export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel }) {
+export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: session.role === "admin" ? "שלום! אפשר לשאול על קריאות, השבתות, מסמכי כלי שינוע פגי-תוקף, עלויות ותחזוקה מונעת." : session.role === "tech" ? "שלום! אפשר לשאול על קריאות השינוע שבטיפולך." : "שלום! אפשר לשאול על הקריאות שלך." }]);
   const [input, setInput] = useState("");
@@ -20,9 +20,14 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
     setInput("");
     setBusy(true);
     try {
-      const sys = `אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הנתונים בלבד.\n\n--- נתונים ---\n${buildContext(session, vis, pm, fleet, config)}`;
+      const context = buildContext(session, vis, pm, fleet, config);
+      const sys = typeof context === "string"
+        ? `אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הנתונים בלבד.\n\n--- נתונים ---\n${context}`
+        : "אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הקונטקסט המסונן בלבד.";
       const apiMsgs = history.filter((m, i) => !(i === 0 && m.role === "assistant")).map((m) => ({ role: m.role, content: m.content }));
-      const out = await callModel(apiMsgs, sys, 900);
+      const out = callAssistant
+        ? await callAssistant({ text: q, messages: apiMsgs, system: sys, context })
+        : await callModel(apiMsgs, sys, 900);
       setMsgs((s) => [...s, { role: "assistant", content: out || "לא התקבלה תשובה." }]);
     } catch {
       setMsgs((s) => [...s, { role: "assistant", content: "לא הצלחתי להתחבר לשירות ה-AI כרגע." }]);

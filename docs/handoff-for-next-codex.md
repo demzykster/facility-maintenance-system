@@ -50,7 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget is `19/24` after grouping AI URLs through one dynamic `api/ai/[action].js` route.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when browser AI is enabled and opened. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 305 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, and a small `AIPanel` chunk around 1.4 kB gzip.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 305 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, and a small `AIPanel` chunk around 1.4 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and the main app only wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
@@ -60,8 +60,8 @@ Recent commits on `main`:
 
 - `Lazy-load AI panel`
   - Extracts the browser AI chat panel from `src/ClaudeMaintenanceApp.jsx` into `src/AIPanel.jsx`.
-  - Uses `React.lazy` / `Suspense` so the panel is not part of the normal startup path; it loads only when `BROWSER_AI_ENABLED` allows the AI FAB and the user opens the panel.
-  - Leaves shared AI helpers (`callClaude`, `buildAIContext`) in the monolith for now because other AI entry points still call them.
+  - Uses `React.lazy` / `Suspense` so the panel is not part of the normal startup path; it loads only when the AI FAB is available and the user opens the panel.
+  - The panel now supports the server-backed assistant path; the old browser `callClaude` helper remains only for demo/client fallback and old form-level experiments.
   - Adds the first server AI provider boundary in `server/ai/providerClient.js`, with tested request shapes for Anthropic/Claude and OpenAI Responses API provider mode. This is intentionally not wired as a broad production assistant yet; provider keys stay server-side and the existing `/api/ai/intake` remains a read-only draft contract.
   - Local build evidence after the split: separate `AIPanel` chunk about 1.4 kB gzip; main app chunk about 305 kB gzip. This is a small monolith-reduction slice, not the final performance solution.
 - `Add authenticated AI assist endpoint`
@@ -74,7 +74,7 @@ Recent commits on `main`:
   - Adds authenticated `/api/ai/status` through `server/ai/statusHandler.js`; it returns public-safe mode/provider/model/readiness fields and never exposes provider keys.
   - Adds `config.ai` settings in the admin general settings screen for non-secret AI preferences: mode, provider, and model.
   - Route budget returns to `19/24`.
-  - Next AI slice should be permission-filtered context for admin, executive, and manager use cases, not write-capable AI.
+  - The follow-up context slice wires the panel to `/api/ai/assist` in server mode and filters supplied UI context by the authenticated user's role/scope before provider calls. This remains read-only, not write-capable AI.
 - `Add BI ticket heatmap`
   - Adds `מפת חום קריאות` to the unified BI screen.
   - Heatmap rows are scoped through the existing BI scope model, so admin/executive see company scope while department managers see only their permitted departments.

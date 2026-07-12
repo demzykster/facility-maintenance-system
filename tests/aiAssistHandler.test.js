@@ -189,6 +189,47 @@ describe("AI assist handler", () => {
     }));
   });
 
+  it("passes only role-filtered assistant context to the provider prompt", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "anthropic",
+      model: "claude-test",
+      text: "נמצאה קריאה אחת בתחום שלך."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "anthropic",
+        ANTHROPIC_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 321,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "מה פתוח אצלי?",
+        context: {
+          metrics: { openTickets: 2, totalCost: 5000 },
+          tickets: [
+            { id: "visible", subject: "Allowed", department: "הפצה", cost: 1000 },
+            { id: "hidden", subject: "Hidden", department: "קבלה", cost: 4000 }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.context.metrics).toEqual({ openTickets: 2 });
+    expect(prompt.context.tickets.map((ticket) => ticket.id)).toEqual(["visible"]);
+    expect(prompt.context.tickets[0]).not.toHaveProperty("cost");
+    expect(JSON.stringify(prompt)).not.toContain("Hidden");
+  });
+
   it("rate limits repeated assistant requests per authenticated user", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

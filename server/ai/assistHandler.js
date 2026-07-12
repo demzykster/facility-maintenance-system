@@ -1,4 +1,5 @@
 import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
+import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
 import { AI_MODES, aiServerConfigFromEnv } from "../../src/aiProviderModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { authorizeAiRequest } from "./auth.js";
@@ -76,18 +77,20 @@ function requestToDraftInput(body = {}, user = {}) {
   };
 }
 
-function providerPrompt({ draft, user }) {
+function providerPrompt({ draft, user, context }) {
   return JSON.stringify({
     contract: {
       writePolicy: "human_confirmation_required",
       allowedToWrite: false,
-      expectedOutput: "short user-facing assistant text with any missing questions"
+      expectedOutput: "short user-facing assistant text with any missing questions",
+      contextPolicy: "use only the role-filtered context below; never infer records that are not present"
     },
     actor: {
       role: user.role || "",
       department: user.department || user.dept || "",
       departments: user.departments || user.depts || []
     },
+    context,
     draft
   });
 }
@@ -130,6 +133,7 @@ export function createAiAssistHandler({
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
 
       const draft = buildAiIntakeDraft(normalized.input, currentTime);
+      const context = buildAiAssistContext(body.context, auth.user);
       const config = aiServerConfigFromEnv(env);
       if (config.mode !== AI_MODES.server) {
         return sendJson(res, 503, { error: "ai_server_disabled", draft });
@@ -138,7 +142,7 @@ export function createAiAssistHandler({
       const result = await providerCall({
         config,
         system: SYSTEM_PROMPT,
-        prompt: providerPrompt({ draft, user: auth.user }),
+        prompt: providerPrompt({ draft, user: auth.user, context }),
         fetchImpl,
         maxTokens: Number(env.CMMS_AI_ASSIST_MAX_TOKENS || 700) || 700
       });

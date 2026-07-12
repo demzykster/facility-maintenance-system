@@ -1429,6 +1429,97 @@ function buildAIContext(session, tickets, pm, fleet, cfg) {
   return L.join("\n");
 }
 
+function buildAIContextSnapshot(session, tickets, pm, fleet, cfg) {
+  const now = Date.now();
+  const open = tickets.filter(isOpen);
+  const mapTicket = (t) => ({
+    id: t.id,
+    number: ticketNo(t),
+    track: trackOf(t),
+    subject: t.subject,
+    status: stOf(t.status).label,
+    priority: prOf(t.priority).label,
+    department: t.dept || t.department || "",
+    zone: t.zone || "",
+    assignee: t.assignee || "",
+    supplier: t.supplier || "",
+    waitReason: ticketWaitReasonLabel(t, cfg),
+    ageDays: Math.max(0, Math.round((now - (t.createdAt || now)) / 86400000)),
+    idleDays: Math.max(0, Math.round((now - (t.updatedAt || t.createdAt || now)) / 86400000)),
+    overdue: ticketMissedSla(t, cfg),
+    updatedAt: t.updatedAt ? `${fmtDate(t.updatedAt)} ${fmtTime(t.updatedAt)}` : "",
+    cost: t.closure?.costAmount || t.costAmount || t.cost || null,
+    reportedBy: t.reportedBy || null,
+    reportedById: t.reportedById || t.requesterId || "",
+    reportedByName: t.reportedByName || t.requesterName || ""
+  });
+  const fleetNearDocs = (fleet || [])
+    .map((unit) => ({ unit, status: docStatus(unit, cfg) }))
+    .filter(({ status }) => status.d != null && status.d <= 45)
+    .map(({ unit, status }) => ({
+      id: unit.id,
+      code: unit.code,
+      type: unit.type || unit.model,
+      department: unit.department || unit.dept || "",
+      supplier: unit.supplier || "",
+      status: status.label,
+      docsDueDays: status.d
+    }));
+  const pmDue = (pm || [])
+    .filter((item) => item.active !== false && daysLeft(item.nextDue) <= 14)
+    .map((item) => {
+      const unit = pmFleet(item, fleet || []);
+      return {
+        id: item.id,
+        title: item.title,
+        asset: unit ? unit.code : item.forkliftId || item.equipmentId || "",
+        department: unit?.department || unit?.dept || "",
+        dueDays: daysLeft(item.nextDue),
+        status: item.active === false ? "inactive" : "active"
+      };
+    });
+  return {
+    metrics: {
+      openTickets: open.length,
+      overdueTickets: tickets.filter((t) => ticketMissedSla(t, cfg)).length,
+      waitingTickets: tickets.filter((t) => t.status === "waiting").length,
+      pendingApprovals: tickets.filter((t) => ticketRequiresManagerAction(session, t)).length,
+      assignedToMe: tickets.filter((t) => t.assignee === session.name).length,
+      fleetDocsDue: fleetNearDocs.length,
+      pmDue: pmDue.length,
+      totalCost: tickets.reduce((sum, t) => sum + (Number(t.closure?.costAmount || t.costAmount || t.cost || 0) || 0), 0)
+    },
+    tickets: open.slice(0, 60).map(mapTicket),
+    fleet: fleetNearDocs.slice(0, 30),
+    pm: pmDue.slice(0, 24)
+  };
+}
+
+function aiAssistantEnabled(cfg) {
+  return BROWSER_AI_ENABLED || normalizeAiSettings(cfg?.ai).mode === AI_MODES.server;
+}
+
+async function callAIAssistant({ text, messages, system, context }) {
+  if (BROWSER_AI_ENABLED) return callClaude(messages, system, 900);
+  const accessToken = await productionAccessToken();
+  const headers = { "content-type": "application/json" };
+  if (accessToken) headers.authorization = `Bearer ${accessToken}`;
+  const res = await fetch("/api/ai/assist", {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: JSON.stringify({
+      text,
+      language: "he",
+      source: "ui",
+      context
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `ai-assist-${res.status}`);
+  return data?.assistant?.text || "";
+}
+
 /* ---------- notifications ---------- */
 const NOTIF_KINDS = [
   { kind: "new", label: "קריאות חדשות" },
@@ -4403,7 +4494,7 @@ function UserApp(p) {
       </div>
       {activeView === "tickets" && <button className="fab" onClick={() => setOverlay({ type: "new" })}><Plus size={24} /><span>קריאה חדשה</span></button>}
       <MobileBottomNav nav={userNav} primaryIds={["bi", "tickets", "dept"]} />
-      {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
+      {aiAssistantEnabled(config) && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
@@ -4485,7 +4576,7 @@ function TechApp(p) {
         </div>
       </div>
       <nav className="bottom-nav"><NavBtn active={view === "tickets"} onClick={() => setView("tickets")} Icon={Truck} label="קריאות" /><NavBtn active={view === "pm"} onClick={() => setView("pm")} Icon={CalendarClock} label="טיפולים" /><NavBtn active={view === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" /></nav>
-      {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
+      {aiAssistantEnabled(config) && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} /></Overlay>}
       {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
@@ -7939,7 +8030,7 @@ function AdminApp(p) {
         </div>
       </div>
       <MobileBottomNav nav={nav} primaryIds={isAdminRole ? ["bi", "tickets", "tasks"] : ["bi", "tickets", "assets"]} />
-      {BROWSER_AI_ENABLED && <AIFab onClick={() => setShowAI(true)} />}
+      {aiAssistantEnabled(config) && <AIFab onClick={() => setShowAI(true)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "bi"); }} />}
@@ -11180,7 +11271,7 @@ function AIPanelFallback({ onClose }) {
 }
 function LazyAIPanel(props) {
   return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
-    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContext} callModel={callClaude} />
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} />
   </Suspense>;
 }
 function NotifPanel({ notif, onClose, onOpen, onGo, language }) {

@@ -46,7 +46,7 @@ The initial code contract lives in `src/aiIntakeModel.js`. It is deterministic a
 
 The first server entrypoint is `POST /api/ai/intake`. It returns the same read-only draft contract and does not call an AI provider, read/write KV, write Supabase rows, or mutate files. It exists so UI, mobile, public-report, and model-provider work can share one intake boundary.
 
-The first provider-backed server entrypoint is `POST /api/ai/assist`. It is authenticated, session-scoped, per-user rate-limited, and read-only. It calls the configured provider through `server/ai/providerClient.js` only when `CMMS_AI_MODE=server`, then returns assistant text plus the deterministic draft. It is a safe bridge toward Claude/OpenAI/Codex-style assistance, not a permission to mutate CMMS records.
+The first provider-backed server entrypoint is `POST /api/ai/assist`. It is authenticated, session-scoped, per-user rate-limited, and read-only. It filters any supplied UI context by authenticated user role/scope through `src/aiAssistContextModel.js`, calls the configured provider through `server/ai/providerClient.js` only when `CMMS_AI_MODE=server`, then returns assistant text plus the deterministic draft. It is a safe bridge toward Claude/OpenAI/Codex-style assistance, not a permission to mutate CMMS records.
 
 The AI route surface is grouped through `api/ai/[action].js` so the existing `/api/ai/intake`, `/api/ai/assist`, and `/api/ai/status` URLs share one Vercel function slot. `/api/ai/status` is authenticated and returns only public-safe readiness fields, such as mode, provider, model, and whether a provider key is configured. It never returns provider secrets.
 
