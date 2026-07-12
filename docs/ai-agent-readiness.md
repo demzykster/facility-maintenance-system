@@ -46,11 +46,14 @@ The initial code contract lives in `src/aiIntakeModel.js`. It is deterministic a
 
 The first server entrypoint is `POST /api/ai/intake`. It returns the same read-only draft contract and does not call an AI provider, read/write KV, write Supabase rows, or mutate files. It exists so UI, mobile, public-report, and model-provider work can share one intake boundary.
 
+The first provider-backed server entrypoint is `POST /api/ai/assist`. It is authenticated, session-scoped, per-user rate-limited, and read-only. It calls the configured provider through `server/ai/providerClient.js` only when `CMMS_AI_MODE=server`, then returns assistant text plus the deterministic draft. It is a safe bridge toward Claude/OpenAI/Codex-style assistance, not a permission to mutate CMMS records.
+
 ## V1 Boundary
 
 For the first pilot:
 
 - production AI remains disabled;
+- server AI can be enabled only through server-side provider configuration, not browser keys;
 - categories, routing, priority, SLA, departments, zones, and vehicle types stay data-driven;
 - public reports, tickets, files, cleaning rounds, and settings should keep moving toward shared server-side operations.
 

@@ -48,7 +48,7 @@ The current strategy is:
   - push subscriptions;
   - ticket photos / file metadata.
 - Staging residual KV report previously reached `cmms_kv_records=0`.
-- Route budget remains `19/24`.
+- Route budget is `20/24` after adding the authenticated AI assist endpoint.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
 - First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when browser AI is enabled and opened. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 305 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, and a small `AIPanel` chunk around 1.4 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and the main app only wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
@@ -64,6 +64,11 @@ Recent commits on `main`:
   - Leaves shared AI helpers (`callClaude`, `buildAIContext`) in the monolith for now because other AI entry points still call them.
   - Adds the first server AI provider boundary in `server/ai/providerClient.js`, with tested request shapes for Anthropic/Claude and OpenAI Responses API provider mode. This is intentionally not wired as a broad production assistant yet; provider keys stay server-side and the existing `/api/ai/intake` remains a read-only draft contract.
   - Local build evidence after the split: separate `AIPanel` chunk about 1.4 kB gzip; main app chunk about 305 kB gzip. This is a small monolith-reduction slice, not the final performance solution.
+- `Add authenticated AI assist endpoint`
+  - Adds `POST /api/ai/assist` through `server/ai/assistHandler.js`.
+  - The endpoint verifies Supabase/Auth-cookie or CMMS PIN sessions, rejects password-change-required users, rate-limits per user, builds the deterministic intake draft, and calls Anthropic/OpenAI only when `CMMS_AI_MODE=server`.
+  - The endpoint is read-only by design: it does not create, update, delete, assign, approve, or close any CMMS business record. It returns the deterministic draft plus assistant text so the UI can later ask a human to confirm any real operation through the normal server APIs.
+  - Next AI slice should be a settings/UI surface for provider/mode/model status and a permission-filtered context builder for admin, executive, and manager use cases. Keep provider secrets in deployment/server env; do not store raw keys in browser-managed app config.
 - `Add BI ticket heatmap`
   - Adds `מפת חום קריאות` to the unified BI screen.
   - Heatmap rows are scoped through the existing BI scope model, so admin/executive see company scope while department managers see only their permitted departments.
