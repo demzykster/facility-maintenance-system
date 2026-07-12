@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: current commit, `Route tickets through suppliers`.
+- Latest app/UI commit before this handoff: `b151d30 Stabilize user scope and supplier ticket routing`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,6 +56,13 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `b151d30 Stabilize user scope and supplier ticket routing`
+  - Hardened `/api/users` so a scoped manager cannot overwrite an existing non-worker profile or an `authUserId`-backed elevated profile by re-saving it as a worker.
+  - Preserved the scoped-manager ability to create/edit workers inside the manager's own department.
+  - Kept supplier routing supplier-first: facility and transport tickets can enter the supplier queue with `ticket.supplier`, `ticket.assignee` remains blank until a technician accepts the work, and technician scope `both` can see both supplier-routed transport and facility queues.
+  - Fixed leadership/executive login reset persistence so reset requests write the expected `reset_required` / `must_change_password` state.
+  - Updated live UI smoke coverage to follow the current BI navigation and modal shell behavior instead of retired Dashboard/Analytics assumptions.
+  - Verified with full local tests, lint, build, release check, live Vercel commit proof, live staging smoke, live UI smoke, users/tickets/PIN API smoke, and live negative-path checks for scoped-manager overwrite and executive reset.
 - `Refine supplier types and startup scope`
   - Changed supplier detail from a generic module/industry picker to first-level supplier types: `אחזקת מבנה`, `אחזקת כלי שינוע`, and `ספק ציוד`.
   - Supplier detail activity is now contextual: transport suppliers show linked tools, facility maintenance suppliers show linked tickets, and goods suppliers show purchase orders. Clothing/goods suppliers no longer show a technicians tab.
@@ -169,6 +176,7 @@ Shared models / tests recently touched:
 - `docs/controlled-rollout-baseline-2026-07-11.md`
 - `docs/active-work.md`
 - `docs/handoff-for-next-codex.md`
+- `tools/staging-ui-smoke.mjs`
 
 Important docs to read before broad decisions:
 

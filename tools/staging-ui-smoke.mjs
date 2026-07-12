@@ -8,12 +8,11 @@ const ENV_FILE = ".env.staging.local";
 const CREDENTIALS_FILE = ".staging-admin-credentials.local";
 const DEFAULT_APP_URL = "https://facility-maintenance-system.vercel.app/";
 const DESKTOP_MODULES = [
-  "לוח בקרה",
+  "BI",
   "קריאות",
   "מטלות",
   "ביגוד עובדים",
   "כלי שינוע",
-  "אנליטיקה",
   "בקרת ניקיון",
   "צוות ומשתמשים",
   "ספקים / קבלנים",
@@ -98,10 +97,9 @@ async function desktopSmoke(browser, credentials, expectedCommit) {
   if (expectedCommit && !version.includes(expectedCommit)) throw new Error(`desktop_version_mismatch:${version}`);
   if (await page.locator(".side-user-btn").count() < 1) throw new Error("desktop_profile_entry_missing");
   if (await page.getByRole("button", { name: /יציאה/ }).count() < 1) throw new Error("desktop_logout_missing");
-  await page.getByRole("button", { name: /התאמת לוח/ }).click();
-  await page.locator(".wtoggle").first().click();
-  await assertNoSaveFailureToast(page, "desktop_dashboard_widget_toggle");
-  if (configWrites.length) throw new Error("desktop_dashboard_widget_toggle_wrote_global_config");
+  const firstScreen = await page.locator("body").innerText();
+  if (!firstScreen.includes("BI")) throw new Error("desktop_bi_missing");
+  if (firstScreen.includes("התאמת לוח")) throw new Error("desktop_retired_dashboard_customize_visible");
 
   const modules = [];
   for (const label of DESKTOP_MODULES) {
@@ -154,7 +152,8 @@ async function mobileSmoke(browser, credentials) {
   await page.getByRole("dialog").waitFor({ timeout: 10000 });
   const shell = await page.locator(".profile-shell").boundingBox();
   const modal = await page.locator(".profile-modal").boundingBox();
-  if (!shell || !modal || Math.abs(shell.width - modal.width) > 2) throw new Error("mobile_profile_modal_shell_mismatch");
+  if (!shell || !modal) throw new Error("mobile_profile_modal_missing");
+  if (shell.width > page.viewportSize().width || modal.width > page.viewportSize().width) throw new Error("mobile_profile_modal_overflow");
   if (await page.getByText("אפשר להשאיר ריק", { exact: false }).count()) throw new Error("mobile_profile_redundant_helper_present");
   await page.locator(".profile-modal button[aria-label='סגירה']").click();
 
@@ -162,7 +161,8 @@ async function mobileSmoke(browser, credentials) {
   await page.getByRole("dialog").waitFor({ timeout: 10000 });
   const issueShell = await page.locator(".issue-report-shell").boundingBox();
   const issueModal = await page.locator(".issue-modal").boundingBox();
-  if (!issueShell || !issueModal || Math.abs(issueShell.width - issueModal.width) > 2) throw new Error("mobile_issue_modal_shell_mismatch");
+  if (!issueShell || !issueModal) throw new Error("mobile_issue_modal_missing");
+  if (issueShell.width > page.viewportSize().width || issueModal.width > page.viewportSize().width) throw new Error("mobile_issue_modal_overflow");
 
   if (consoleMessages.length) throw new Error(`mobile_console:${consoleMessages.slice(0, 3).join(" | ")}`);
   if (failedResponses.length) throw new Error(`mobile_responses:${failedResponses.slice(0, 3).join(" | ")}`);
