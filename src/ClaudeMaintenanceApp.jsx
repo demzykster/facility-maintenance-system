@@ -12823,7 +12823,7 @@ body *{visibility:hidden!important;}
   .ovl-inner>.form-head{position:relative;top:auto;flex:0 0 auto;padding-top:calc(12px + env(safe-area-inset-top));}
   .ovl-inner>.body{min-height:0;flex:1;overflow-y:auto;padding-bottom:calc(24px + env(safe-area-inset-bottom));}
 }
-@media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:34px 0.7fr 1.4fr 1fr 1fr;}}
+@media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:34px 0.7fr 1.4fr 1fr 1fr;}.manager-fleet-table .manager-fleet-row{grid-template-columns:minmax(140px,.85fr) minmax(320px,1.6fr) minmax(120px,.75fr) minmax(112px,.62fr);}}
 @media(max-width:1100px){
   .fleet-filters{grid-template-columns:repeat(2,minmax(0,1fr));}
   .supplier-command{grid-template-columns:1fr;}
