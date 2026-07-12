@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: current commit, `Link supplier technicians in supplier cards`.
+- Latest app/UI commit before this handoff: current commit, `Revert fleet internal numbers`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,19 +56,16 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Revert fleet internal numbers` (current commit)
+  - Safely reverted the separate fleet internal-number field, import support, tests, and Supabase migration at owner request.
+  - Fleet identification returns to the existing code, chassis number, and license number behavior.
 - `Link supplier technicians in supplier cards` (current commit)
   - Fixed supplier add flow by separating supplier creation from the search form submit path.
   - Softened supplier-card typography to match the calmer operational UI style.
   - Added a `טכנאים` tab to supplier detail, listing technician users linked through the existing `supplier` profile field.
   - Technician profiles now keep `supplier` assignment for every technician scope, while transport ticket visibility continues to use the existing `fleet.supplier` / `session.supplier` contract.
   - Verified with focused supplier/user/session/profile tests, full Vitest suite, `npm run lint`, `npm run build`, `npm run release:check`, and a targeted Playwright supplier smoke.
-- `Add fleet internal numbers`
-  - Added a separate fleet internal number field: `internalNo` in app records and `internal_no` in normalized Supabase `fleet_units`.
-  - Added migration `supabase/migrations/20260712103000_fleet_units_internal_no.sql`.
-  - Fleet create/edit forms now expose `מספר פנימי`; fleet cards show it; fleet search, unit picker, ticket opening, driver coverage/actions, PM follow-up tickets, notifications, supplier-linked fleet rows, and exports use it with fallback to the existing `code`.
-  - Optional fleet-license Excel import now recognizes `מספר פנימי` / `internal number`.
-  - Verified with focused fleet/API/import/migration tests, `npm run lint`, `npm run build`, `npm run release:check`, `npm run smoke:demo-ui`, and a targeted Playwright smoke for fleet form and transport ticket unit picker.
-- `Complete BI period and drilldown pass` (current commit)
+- `Complete BI period and drilldown pass`
   - Finished the BI period selector with `עכשיו`, `30 ימים`, and `90 ימים`; trend, repeat, PM, cleaning, PPE, and finance summaries now follow the selected BI window instead of fixed hardcoded labels.
   - Added explainable downtime rows under `למה זה תקוע`, showing critical transport downtime duration, likely cause, main lifecycle stage, and direct ticket drill-down.
   - Added work-record signals for tasks and meetings into BI and wired task drill-downs through the existing `מטלות` module instead of adding BI-only actions.

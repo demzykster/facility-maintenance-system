@@ -6,7 +6,6 @@ describe("fleetRecordModel", () => {
     const unit = {
       id: "fleet-1",
       code: "178039",
-      internalNo: "M-039",
       vehicleType: "מלגזת משקל נגדי",
       model: "8FBE15T",
       supplier: "טויוטה",
@@ -18,7 +17,6 @@ describe("fleetRecordModel", () => {
     expect(normalizeFleetRecord(unit)).toMatchObject({
       id: "fleet-1",
       code: "178039",
-      internalNo: "M-039",
       type: "מלגזת משקל נגדי",
       model: "8FBE15T",
       supplier: "טויוטה",
@@ -34,7 +32,6 @@ describe("fleetRecordModel", () => {
     expect(fleetRecordToSupabaseRow({
       id: "fleet-1",
       code: "178039",
-      internalNo: "M-039",
       type: "מלגזת משקל נגדי",
       model: "8FBE15T",
       status: "blocked",
@@ -42,7 +39,6 @@ describe("fleetRecordModel", () => {
     })).toMatchObject({
       id: "fleet-1",
       code: "178039",
-      internal_no: "M-039",
       vehicle_type: "מלגזת משקל נגדי",
       model: "8FBE15T",
       status: "blocked",
@@ -63,25 +59,6 @@ describe("fleetRecordModel", () => {
       source_kv_key: "fleet:fleet-1",
       legacy_payload: legacy
     })).toEqual(legacy);
-  });
-
-  it("hydrates internal numbers from normalized rows when legacy payloads are missing", () => {
-    expect(fleetRecordFromSupabaseRow({
-      id: "fleet-2",
-      code: "178040",
-      internal_no: "M-040",
-      vehicle_type: "מלגזה",
-      model: "8FBE15T",
-      status: "active",
-      source_kv_key: "fleet:fleet-2",
-      legacy_payload: {}
-    })).toMatchObject({
-      id: "fleet-2",
-      code: "178040",
-      internalNo: "M-040",
-      type: "מלגזה",
-      model: "8FBE15T"
-    });
   });
 
   it("requires a stable fleet id", () => {

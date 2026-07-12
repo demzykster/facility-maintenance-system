@@ -6,10 +6,6 @@ const migrationSql = readFileSync(
   new URL("../supabase/migrations/20260709211000_fleet_units_core.sql", import.meta.url),
   "utf8"
 );
-const internalNoMigrationSql = readFileSync(
-  new URL("../supabase/migrations/20260712103000_fleet_units_internal_no.sql", import.meta.url),
-  "utf8"
-);
 
 describe("Supabase fleet units core migration", () => {
   it("adds fleet_units to the staging schema gate", () => {
@@ -24,10 +20,5 @@ describe("Supabase fleet units core migration", () => {
     expect(migrationSql).toContain("create policy fleet_units_admin_all");
     expect(migrationSql).toContain("create policy fleet_units_user_read");
     expect(migrationSql).toContain("create policy fleet_units_manager_write");
-  });
-
-  it("adds a normalized internal number column for fleet units", () => {
-    expect(internalNoMigrationSql).toContain("add column if not exists internal_no text");
-    expect(internalNoMigrationSql).toContain("fleet_units_internal_no_idx");
   });
 });

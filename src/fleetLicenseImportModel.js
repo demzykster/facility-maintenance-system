@@ -1,6 +1,5 @@
 const HEADER_ALIASES = {
   supplier: ["ספק"],
-  internalNo: ["מספר פנימי", "מס' פנימי", "מס׳ פנימי", "מס פנימי", "internal no", "internal number"],
   chassis: ["מס' רכב", "מס׳ רכב", "מס רכב", ":מס' רכב", ":מס׳ רכב"],
   model: ["דגם"],
   regulated: ["ברגולציה"],
@@ -134,7 +133,6 @@ export function parseFleetLicenseSheet(aoa = [], options = {}) {
     .map((row, offset) => {
       const sourceRow = headerIndex + offset + 2;
       const supplier = cleanText(readCell(row, map, "supplier"));
-      const internalNo = cleanText(readCell(row, map, "internalNo"));
       const chassis = cleanText(readCell(row, map, "chassis"));
       const model = cleanText(readCell(row, map, "model"));
       const vehicleKind = cleanText(readCell(row, map, "vehicleKind"));
@@ -157,7 +155,6 @@ export function parseFleetLicenseSheet(aoa = [], options = {}) {
       if (leaseEnd) docs.lease = { date: leaseEnd, link: "" };
       const unit = {
         code: chassis,
-        internalNo,
         chassis,
         supplier,
         type: vehicleKind,

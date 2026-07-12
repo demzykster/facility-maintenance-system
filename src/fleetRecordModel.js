@@ -12,11 +12,9 @@ export function normalizeFleetRecord(unit = {}) {
   if (!id) throw new Error("fleet_id_required");
   const now = Date.now();
   const code = cleanString(unit.code || unit.num || unit.number || unit.licensePlate || id);
-  const internalNo = cleanString(unit.internalNo || unit.internalNumber || unit.internal_no);
   return {
     id,
     code,
-    internalNo,
     type: cleanString(unit.vehicleType || unit.kind || unit.type),
     model: cleanString(unit.model || unit.modelCode || unit.typeCode),
     supplier: cleanString(unit.supplier),
@@ -35,7 +33,6 @@ export function fleetRecordToSupabaseRow(unit = {}) {
   return {
     id: normalized.id,
     code: normalized.code,
-    internal_no: normalized.internalNo,
     vehicle_type: normalized.type,
     model: normalized.model,
     supplier: normalized.supplier,
@@ -51,12 +48,10 @@ export function fleetRecordToSupabaseRow(unit = {}) {
 
 export function fleetRecordFromSupabaseRow(row = {}) {
   const legacy = cleanObject(row.legacy_payload);
-  const internalNo = cleanString(row.internal_no);
-  if (legacy.id) return internalNo ? { ...legacy, internalNo } : legacy;
+  if (legacy.id) return legacy;
   const fallback = {
     id: row.id,
     code: row.code,
-    internalNo,
     vehicleType: row.vehicle_type,
     type: row.vehicle_type,
     model: row.model,
