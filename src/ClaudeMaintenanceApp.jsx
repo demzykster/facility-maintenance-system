@@ -4760,14 +4760,16 @@ function ManagerFleet(p) {
     if (deptNav.fleetId && scoped.some((f) => f.id === deptNav.fleetId)) { setTab("units"); setOpenId(deptNav.fleetId); }
   }, [deptNav?._t, scoped]);
   return (<>
-    <div className="seg-tabs s3" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
-    {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
-      : tab === "pm" ? <><div className="note" style={{ marginBottom: 10 }}>טיפולים תקופתיים לכלי המחלקה. יש להוציא את הכלי לטכנאי במועד; הטכנאי יעדכן ביצוע.</div><PMSchedule items={myPm} fleet={fleet} onOpen={(x) => setPmView(x)} config={config} /></>
-      : <>
-      <ProblemUnitsPanel fleet={scoped} tickets={tickets} config={config} onOpen={(id) => setOpenId(id)} />
-      <SectionTitle><Truck size={15} /> כלי השינוע של מחלקותיי ({scoped.length})</SectionTitle>
-      {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
-    </>}
+    <div className="manager-fleet-page">
+      <div className="seg-tabs s3 manager-fleet-tabs" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
+      {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
+        : tab === "pm" ? <><div className="note" style={{ marginBottom: 10 }}>טיפולים תקופתיים לכלי המחלקה. יש להוציא את הכלי לטכנאי במועד; הטכנאי יעדכן ביצוע.</div><PMSchedule items={myPm} fleet={fleet} onOpen={(x) => setPmView(x)} config={config} /></>
+        : <>
+        <ProblemUnitsPanel fleet={scoped} tickets={tickets} config={config} onOpen={(id) => setOpenId(id)} />
+        <SectionTitle><Truck size={15} /> כלי השינוע של מחלקותיי ({scoped.length})</SectionTitle>
+        {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
+      </>}
+    </div>
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
     {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
   </>);
@@ -11970,12 +11972,15 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .fleet-unit-table .ft-sup{grid-column:4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:600;}
 .fleet-unit-table .ft-doc{grid-column:5;text-align:center;}
 .fleet-unit-table .ft-select{grid-column:6;align-self:stretch;justify-self:center;}
-.manager-fleet-table{width:min(100%,1120px);margin-inline:auto;}
-.manager-fleet-table .manager-fleet-row{grid-template-columns:minmax(92px,132px) minmax(260px,1fr) minmax(96px,140px) minmax(86px,118px);gap:10px;}
-.manager-fleet-table .ft-code{min-width:0;direction:ltr;unicode-bidi:isolate;text-align:start;white-space:nowrap;font-variant-numeric:tabular-nums;}
-.manager-fleet-table .ft-model{min-width:0;line-height:1.3;}
+.manager-fleet-page{width:min(100%,1280px);margin-left:auto;margin-right:auto;}
+.manager-fleet-page>.seg-tabs{width:100%;max-width:none!important;margin-left:0;margin-right:0;}
+.manager-fleet-table{width:100%;margin:0;}
+.manager-fleet-table .manager-fleet-row{grid-template-columns:minmax(96px,126px) minmax(360px,1fr) minmax(116px,156px) minmax(96px,126px);gap:12px;}
+.manager-fleet-table .manager-fleet-row>span{min-width:0;text-align:center;justify-content:center;}
+.manager-fleet-table .ft-code{direction:ltr;unicode-bidi:isolate;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.manager-fleet-table .ft-model{line-height:1.3;}
 .manager-fleet-table .ft-model b{display:block;white-space:normal;overflow-wrap:anywhere;}
-.manager-fleet-table .ft-sup{min-width:0;overflow-wrap:anywhere;}
+.manager-fleet-table .ft-sup{overflow-wrap:anywhere;}
 .manager-fleet-table .ft-doc{white-space:nowrap;}
 .ftable-row:hover{background:rgba(31,78,140,.045);}
 .ftable-row.selected{background:rgba(31,78,140,0.08);}
@@ -12834,7 +12839,7 @@ body *{visibility:hidden!important;}
   .ovl-inner>.form-head{position:relative;top:auto;flex:0 0 auto;padding-top:calc(12px + env(safe-area-inset-top));}
   .ovl-inner>.body{min-height:0;flex:1;overflow-y:auto;padding-bottom:calc(24px + env(safe-area-inset-bottom));}
 }
-@media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:34px 0.7fr 1.4fr 1fr 1fr;}.manager-fleet-table .manager-fleet-row{grid-template-columns:minmax(92px,132px) minmax(260px,1fr) minmax(96px,140px) minmax(86px,118px);}}
+@media(min-width:1300px){.cards{grid-template-columns:1fr 1fr 1fr;}.ftable-head,.ftable-row{grid-template-columns:34px 0.7fr 1.4fr 1fr 1fr;}.manager-fleet-table .manager-fleet-row{grid-template-columns:minmax(96px,126px) minmax(360px,1fr) minmax(116px,156px) minmax(96px,126px);}}
 @media(max-width:1100px){
   .fleet-filters{grid-template-columns:repeat(2,minmax(0,1fr));}
   .supplier-command{grid-template-columns:1fr;}
