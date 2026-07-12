@@ -15,6 +15,7 @@ import { DEFAULT_MANAGER_PERMS, USER_PERMISSION_MODULES, canFull, canManage, can
 import { BI_PERIOD_OPTIONS, biDepartmentRiskRows, biPeriodRange, biScopeForSession } from "./biScopeModel.js";
 import { normalizeNotificationPrefs } from "./notificationAccessModel.js";
 import { buildPpeApprovedEvents, ppeRequestLineSummary, ppeRequestNeedsAction, ppeRequestStatusLabel } from "./ppeModel.js";
+import { ppeOpenOrderQty, ppeSmartReorderLines, ppeSmartReorderLinesForItem } from "./ppeReorderModel.js";
 import { isActivationLinkRole, isPasswordActivationRole, isPinActivationRole, isWorkerLoginRole, loginSetupPrompt, shouldKeepWorkerFormOpenForActivationLink, userHasLoginSecret, userNeedsInitialLoginSetup, workerLoginStateText } from "./workerAccessModel.js";
 import { transportDuplicateReview } from "./ticketDuplicateModel.js";
 import { applyTicketStatusTiming } from "./ticketTransitionModel.js";
@@ -6356,8 +6357,8 @@ const ppeLowSize = (it, sz) => { const m = ppeMinOf(it, sz); return m > 0 && ppe
 const ppeLow = (it) => ppeSizes(it).some((sz) => ppeLowSize(it, sz));
 const ppeMinTotal = (it) => ppeSizes(it).reduce((s, sz) => s + ppeMinOf(it, sz), 0);
 const ppeDeficits = (it) => ppeSizes(it).map((sz) => ({ size: sz, need: Math.max(0, ppeMinOf(it, sz) - ppeStockOf(it, sz)) })).filter((d) => d.need > 0);
-const ppeOnOrder = (it, sz, orders) => (orders || []).filter((o) => o.status === "draft" || o.status === "sent").reduce((s, o) => s + (o.lines || []).filter((l) => l.itemId === it.id && l.size === sz).reduce((s2, l) => s2 + Math.max(0, (l.qty || 0) - (l.received || 0)), 0), 0);
-const ppeNetDeficits = (it, orders) => ppeSizes(it).map((sz) => ({ size: sz, need: Math.max(0, ppeMinOf(it, sz) - ppeStockOf(it, sz) - ppeOnOrder(it, sz, orders)) })).filter((d) => d.need > 0);
+const ppeOnOrder = (it, sz, orders) => ppeOpenOrderQty(it, sz, orders);
+const ppeNetDeficits = (it, orders) => ppeSmartReorderLinesForItem(it, orders);
 const ppeRecipients = (users) => (users || []).filter((u) => (isWorkerLike(u) || u.role === "tech") && u.active !== false).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
 const employLabel = (t) => t === "contractor" ? "קבלן" : "ישיר";
 const empOf = (u) => u ? (u.employmentType || (u.role === "tech" ? "contractor" : "direct")) : "direct";
@@ -7186,9 +7187,11 @@ function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config 
   const [err, setErr] = useState("");
   const pickItem = active.find((x) => x.id === pid);
   const psizes = pickItem ? ppeSizes(pickItem) : [];
+  const smartLines = useMemo(() => ppeSmartReorderLines(items, orders), [items, orders]);
   const setSQ = (sz, v) => setSizeQty((s) => ({ ...s, [sz]: Math.max(0, parseInt(v || "0", 10) || 0) }));
   const pickAndSuggest = (id) => { setPid(id); const it2 = active.find((x) => x.id === id); const sq = {}; if (it2) ppeNetDeficits(it2, orders).forEach((d) => { sq[d.size] = d.need; }); setSizeQty(sq); };
   const addLines = () => { if (!pickItem) return; setLines((s) => { const c = [...s]; psizes.forEach((sz) => { const q = sizeQty[sz] || 0; if (q <= 0) return; const i = c.findIndex((l) => l.itemId === pickItem.id && l.size === sz); if (i >= 0) c[i] = { ...c[i], qty: (c[i].qty || 0) + q }; else c.push({ itemId: pickItem.id, itemName: pickItem.name, sku: pickItem.sku || "", category: pickItem.category, size: sz, qty: q, received: 0 }); }); return c; }); setPid(""); setSizeQty({}); };
+  const fillSmart = () => { setLines(smartLines.map((line) => ({ ...line }))); setPid(""); setSizeQty({}); };
   const rm = (i) => setLines((s) => s.filter((_, k) => k !== i));
   const setQty = (i, v) => setLines((s) => s.map((l, k) => k === i ? { ...l, qty: Math.max(1, parseInt(v || "1", 10) || 1) } : l));
   const save = async () => { if (!lines.length) return; setErr(""); const ok = await onSave({ id: o.id || uid(), status: o.status || "draft", supplier: supplier.trim(), note: note.trim(), lines, createdBy: o.createdBy || { id: session.id, name: session.name }, createdAt: o.createdAt || Date.now(), sentAt: o.sentAt || null, expectedAt: o.expectedAt || null, closedAt: o.closedAt || null }); if (ok === false) setErr(SAVE_FAILED_MESSAGE); };
@@ -7197,7 +7200,11 @@ function PpeOrderForm({ order, items, orders, session, onCancel, onSave, config 
       {err && <div className="note" style={{ color: "#DC2626", marginBottom: 8 }}>{err}</div>}
       <label className="field"><span>ספק</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— בחר ספק —</option>{(((config && config.suppliers) || []).filter((n) => supplierHasPpeScope(config, n) || !supplierTypeFromMeta(supMeta(config, n), config))).map((n) => <option key={n} value={n}>{n}</option>)}{supplier && !((config && config.suppliers) || []).includes(supplier) && <option value={supplier}>{supplier}</option>}</select></label>
       <SectionTitle>פריטים בהזמנה</SectionTitle>
-      {!o.id && (o.lines || []).length > 0 && <div className="hint" style={{ marginBottom: 8 }}>מולא אוטומטית לפי חוסרים — אפשר לערוך כמויות, להוסיף או למחוק.</div>}
+      <div className="row-between" style={{ alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div className="hint">{lines.length ? "אפשר לערוך כמויות, להוסיף או למחוק פריטים." : "אפשר למלא ידנית או להפעיל מילוי אוטומטי לפי חוסרים."}</div>
+        <button className="btn-ghost sm" type="button" onClick={fillSmart} disabled={!smartLines.length}><Sparkles size={14} /> מילוי אוטומטי</button>
+      </div>
+      {!smartLines.length && <div className="hint" style={{ marginBottom: 8 }}>אין כרגע חוסרים פתוחים לפי מינימום, מקסימום והזמנות פתוחות.</div>}
       <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, marginBottom: 8 }}>
         <label className="field"><span>בחרו פריט</span><select value={pid} onChange={(e) => pickAndSuggest(e.target.value)}><option value="">בחרו פריט…</option>{active.map((it) => <option key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ""}</option>)}</select></label>
         {pickItem && <><div className="hint" style={{ margin: "6px 0" }}>כמות לכל מידה (מוצע אוטומטית לפי חוסרים — ניתן לשנות)</div><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{psizes.map((sz) => { const lw = ppeLowSize(pickItem, sz); const m = ppeMinOf(pickItem, sz); return <div key={sz} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 86, border: "1px solid var(--border)", borderRadius: 8, padding: 7 }}><span style={{ fontSize: 12, fontWeight: 700, textAlign: "center", color: lw ? "#B91C1C" : "inherit" }}>{szLbl(sz)}</span><span style={{ fontSize: 10, color: "var(--muted)", textAlign: "center" }}>במלאי {ppeStockOf(pickItem, sz)}{m ? ` / מינ׳ ${m}` : ""}</span><input type="number" min="0" value={sizeQty[sz] ?? 0} onChange={(e) => setSQ(sz, e.target.value)} style={{ width: 76 }} /></div>; })}</div><button className="btn-ghost sm" style={{ marginTop: 8 }} onClick={addLines}><Plus size={14} /> הוסף לפריט</button></>}
@@ -7269,14 +7276,14 @@ function PpeOrders({ orders, items, config, session, savePpeOrder, delPpeOrder, 
   const all = (orders || []).slice();
   const live = all.filter((o) => o.status === "draft" || o.status === "sent").sort((a, b) => b.createdAt - a.createdAt);
   const done = all.filter((o) => o.status === "received" || o.status === "cancelled").sort((a, b) => (b.closedAt || b.createdAt) - (a.closedAt || a.createdAt));
-  const emptySub = embedded ? "יצירת הזמנה חדשה מתבצעת מלוח המלאי. כאן יופיעו הזמנות פתוחות לקליטה ומעקב." : "לחצו «צור הזמנת רכש» כדי ליצור טיוטה לפי חוסרים או ידנית.";
-  const fromDeficit = () => { const lines = []; (items || []).filter((x) => x.active !== false).forEach((it) => { ppeNetDeficits(it, orders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setForm({ lines }); };
+  const emptySub = embedded ? "יצירת הזמנה חדשה מתבצעת מלוח המלאי. כאן יופיעו הזמנות פתוחות לקליטה ומעקב." : "לחצו «צור הזמנת רכש» כדי ליצור טיוטה ידנית, ובתוכה ניתן להפעיל מילוי אוטומטי.";
+  const openOrderDraft = () => setForm({ lines: [] });
   const Card = ({ o }) => { const st = PPE_ORDER_ST[o.status] || PPE_ORDER_ST.draft; const q = ppeOrderQty(o), rr = ppeOrderRecv(o); return <button className="task-row" onClick={() => setOpenId(o.id)} style={{ borderInlineStartColor: st.color }}>
     <div className="task-row-main"><div className="task-row-t">{o.supplier || "ללא ספק"} · {countLabel((o.lines || []).length, "פריט", "פריטים")}</div><div className="task-row-sub">{q} יח׳{o.status === "sent" && rr > 0 ? ` · נקלטו ${rr}/${q}` : ""} · נוצר {fmtDate(o.createdAt)}{o.expectedAt ? ` · צפי ${fmtDate(o.expectedAt)}` : ""}</div></div>
     <div className="task-row-side"><span className="badge sm" style={{ background: st.color + "22", color: st.color }}>{st.label}</span></div>
   </button>; };
   return (<>
-    {!embedded && <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle><button className="btn-primary sm" onClick={fromDeficit}><Plus size={15} /> צור הזמנת רכש</button></div>}
+    {!embedded && <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle><button className="btn-primary sm" onClick={openOrderDraft}><Plus size={15} /> צור הזמנת רכש</button></div>}
     {live.length === 0 ? <Empty text="אין הזמנות פתוחות" Icon={Package} sub={emptySub} /> : <div className="task-list">{live.map((o) => <Card key={o.id} o={o} />)}</div>}
     {done.length > 0 && <div style={{ marginTop: 16 }}><SectionTitle>היסטוריית הזמנות</SectionTitle><div className="task-list">{done.slice(0, 30).map((o) => <Card key={o.id} o={o} />)}</div></div>}
     {form && <Overlay persistent onClose={() => setForm(null)}><PpeOrderForm order={form} items={items} orders={orders} session={session} config={config} onCancel={() => setForm(null)} onSave={async (o) => { const ok = await savePpeOrder(o); if (ok !== false) setForm(null); return ok; }} /></Overlay>}
@@ -7317,7 +7324,7 @@ function PpeHub(p) {
   const [mM, setMM] = useState(_nd.getMonth());
   const [mStart, mEnd] = monthRange(mY, mM);
   const mLabel = monthLabelOf(mY, mM);
-  const openOrder = () => { const activeItems = (ppeItems || []).filter((x) => x.active !== false); if (!activeItems.length) { setSub("catalog"); return; } const lines = []; activeItems.forEach((it) => { ppeNetDeficits(it, ppeOrders).forEach((d) => { lines.push({ itemId: it.id, itemName: it.name, sku: it.sku || "", category: it.category, size: d.size, qty: d.need, received: 0 }); }); }); setOrderForm({ lines }); };
+  const openOrder = () => { const activeItems = (ppeItems || []).filter((x) => x.active !== false); if (!activeItems.length) { setSub("catalog"); return; } setOrderForm({ lines: [] }); };
   useEffect(() => { if (["dash", "log", "catalog", "settings"].includes(ppeNav?.sub)) setSub(ppeNav.sub); }, [ppeNav?._t]);
   if (!canRequestPpe(session)) return <div className="note">אין הרשאה לבקשת או ניהול ביגוד עובדים.</div>;
   if (!isFull) return <PpeRequester ppe={ppe} items={ppeItems} norms={ppeNorms} reqs={ppeReqs} users={users} config={config} session={session} saveUser={saveUser} savePpeReq={savePpeReq} delPpeReq={delPpeReq} deptScope={deptScope} />;
