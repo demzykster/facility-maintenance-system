@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Zap, Droplets, Wind, Cog, ShieldAlert, Monitor, Building2, Sparkles, Wrench, Truck,
   Plus, LogOut, Camera, X, Clock, CheckCircle2, AlertTriangle, LayoutDashboard,
@@ -11042,7 +11043,8 @@ function Overlay({ children, onClose, persistent, panelClassName = "" }) {
     document.addEventListener("keydown", onKey, true);
     return () => { clearTimeout(t); document.removeEventListener("keydown", onKey, true); const left = (document.body._ovl = Math.max(0, (document.body._ovl || 1) - 1)); if (left === 0) document.body.classList.remove("modal-open"); try { prevFocus && prevFocus.focus && prevFocus.focus(); } catch {} };
   }, []);
-  return <div className="ovl-backdrop" onClick={persistent ? undefined : onClose} role="presentation"><div ref={ref} className={"ovl-panel" + (panelClassName ? ` ${panelClassName}` : "")} role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>{children}</div></div>;
+  const node = <div className="ovl-backdrop" onClick={persistent ? undefined : onClose} role="presentation"><div ref={ref} className={"ovl-panel" + (panelClassName ? ` ${panelClassName}` : "")} role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>{children}</div></div>;
+  return typeof document === "undefined" ? node : createPortal(node, document.body);
 }
 function AIFab({ onClick }) { return <button className="ai-fab" aria-label="עוזר AI" title="עוזר AI" onClick={onClick}><Sparkles size={22} /></button>; }
 function NotifPanel({ notif, onClose, onOpen, onGo, language }) {
