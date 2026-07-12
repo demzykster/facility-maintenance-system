@@ -88,6 +88,7 @@ import { priorityToken, statusTokenTone, taskStatusToken, ticketStatusToken } fr
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
 import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibleFleetForSession, visibleTicketsForSession } from "./ticketVisibilityModel.js";
+import { canConfirmTicketForSession, managerActionRequiredForTicket, requesterOwnsTicket } from "./ticketActionScopeModel.js";
 import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValueToMs, statusMsToHours } from "./adminTicketManualEditModel.js";
 import { normalizeScopedWorkerForActor, scopedUsersForActor, scopedWorkerDefaultsForActor, userDepartments, userShift } from "./userScopeModel.js";
 
@@ -1359,8 +1360,14 @@ const docDaysLabel = (days) => days == null ? "—" : days < 0 ? "פג תוקף"
 // Владелец заявки = тот, кто её открыл. Сверяем по id (имя ненадёжно при совпадениях).
 // На будущее: сюда же добавится логика «подчинённых менеджера», когда понадобится.
 const ownsTicket = ownsTicketRecord;
+const ownsPendingUserTicket = requesterOwnsTicket;
 // Заявка-обращение от работника (нижний канал). reportedBy остаётся на всю жизнь заявки — для «моих обращений» работника и для статистики.
 const isWorkerReport = (t) => !!t.reportedBy;
+const ticketRequiresManagerAction = (session, ticket) => managerActionRequiredForTicket(session, ticket, {
+  open: isOpen(ticket),
+  ball: ballIn(ticket),
+  workerReport: isWorkerReport(ticket)
+});
 
 const visibleTickets = visibleTicketsForSession;
 
@@ -1498,7 +1505,7 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
     (fleet || []).filter((f) => techCanSeeFleet(session, f)).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label}` }); });
   } else {
     vis.forEach((t) => {
-      if (t.status === "pending_user") ev.push({ key: t.id + "-pu", at: t.updatedAt, ticketId: t.id, kind: "confirm", title: "ממתינה לאישורך", body: t.subject });
+      if (t.status === "pending_user" && canConfirmTicketForSession(session, t)) ev.push({ key: t.id + "-pu", at: t.updatedAt, ticketId: t.id, kind: "confirm", title: "ממתינה לאישורך", body: t.subject });
       if (t.status === "waiting" && t.waitingReason === "no_equipment") ev.push({ key: t.id + "-noeq", at: t.updatedAt, ticketId: t.id, kind: "escalate", title: `הכלי לא הועבר לטכנאי · #${ticketNo(t)}`, body: `${t.asset || ""} · ${t.subject} — יש להעביר את הכלי לטכנאי` });
       (t.log || []).forEach((l, i) => { if (l.byRole !== "user") ev.push({ key: `${t.id}-${i}`, at: l.at, ticketId: t.id, kind: "upd", title: `עדכון · #${ticketNo(t)}`, body: `${t.subject} — ${l.text}` }); });
     });
@@ -2303,7 +2310,8 @@ export default function App() {
       if (u.role === "admin") add(u.id);
       else if (u.role === "tech" && ticket.assignee && u.name === ticket.assignee) add(u.id);
       else if (u.role === "tech" && !ticket.assignee && u.supplier && ticket.supplier === u.supplier) add(u.id);
-      else if (u.role === "user" && visibleTickets(u, [ticket], fleet).length) add(u.id);
+      else if (u.role === "user" && ticket.status === "pending_user" && canConfirmTicketForSession(u, ticket)) add(u.id);
+      else if (u.role === "user" && ticket.status !== "pending_user" && visibleTickets(u, [ticket], fleet).length) add(u.id);
     });
     add(ticket.createdBy?.id);
     add(ticket.reportedBy?.id);
@@ -4295,7 +4303,7 @@ function UserApp(p) {
   const deptWorkers = useMemo(() => { const md = userDepts(session); return (users || []).filter((u) => u.role === "worker" && md.includes(u.dept || "")).sort((a, b) => (a.name || "").localeCompare(b.name || "", "he")); }, [users, session]);
   const pmSoon = useMemo(() => myPm.filter((x) => daysLeft(x.nextDue) <= 7).sort((a, b) => a.nextDue - b.nextDue), [myPm]);
   const openTicket = (id) => setOverlay({ type: "detail", id });
-  const needAct = ticketRows.filter((t) => isOpen(t) && (ballIn(t) === "manager" || (isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework")))).length;
+  const needAct = ticketRows.filter((t) => ticketRequiresManagerAction(session, t)).length;
   const goUserTickets = (nav = {}) => { setTicketNav(nav.focus || nav.track ? { ...nav } : null); setFilter(nav.st || "open"); setView("tickets"); };
   const goUserDept = (tab = "equip", nav = null) => { setDeptTab(tab); setDeptNav(nav ? { ...nav, _t: Date.now() } : null); setView("dept"); };
   const mayViewUsers = canViewUsers(session);
@@ -4343,7 +4351,7 @@ function UserApp(p) {
                 const openT = ticketRows.filter(isOpen);
                 const needEquip = openT.filter((t) => t.status === "waiting" && t.waitingReason === "no_equipment");
                 const workerReports = openT.filter((t) => isWorkerReport(t) && (t.status === "pending_manager" || t.status === "rework"));
-                const awaiting = openT.filter((t) => ballIn(t) === "manager" && !needEquip.includes(t) && !workerReports.includes(t));
+                const awaiting = openT.filter((t) => ticketRequiresManagerAction(session, t) && !needEquip.includes(t) && !workerReports.includes(t));
                 const atTech = openT.filter((t) => ballIn(t) === "tech");
                 const atAdmin = openT.filter((t) => ballIn(t) === "admin");
                 if (openT.length === 0) return <Empty text="אין קריאות פתוחות" Icon={ListChecks} sub="פתחו קריאה חדשה בלחיצה על הכפתור" />;
@@ -10352,13 +10360,13 @@ function TicketDetail(p) {
   const executorRole = isTech ? "tech" : (isAdmin ? "tech" : role);
   const canOperateAsExecutor = (isTech || (isAdmin && track !== "facility")) && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework";
   const canEditExecutorState = isAdmin || ticket.assignee === session.name;
-  const mine = !isTech && ownsTicket(session, ticket);
+  const mine = !isTech && ownsPendingUserTicket(session, ticket);
   // Менеджер-исполнитель: заявка по зданию назначена ему лично — работает как техник
   const isMgrExec = role === "user" && ticket.mgrExec && ticket.assignee === session.name;
   const [rev, setRev] = useState({ cat: "", prio: "medium", route: "self", mode: "", reason: "duplicate", comment: "" });
   const isReview = !isTech && ticket.status === "pending_manager" && (role === "user" || role === "admin");
-  // Подтвердить «טופל» может менеджер (управляет всей площадкой) или админ. Техник — никогда.
-  const canConfirm = !isTech && (role === "user" || role === "admin");
+  // Подтвердить «טופל» может только открывший заявку менеджер или админ. Техник — никогда.
+  const canConfirm = !isTech && canConfirmTicketForSession(session, ticket);
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
   const detailLifecycleOptions = {
     now: Date.now(),
@@ -11400,7 +11408,7 @@ a{color:inherit;}
 .field textarea,.ta{resize:vertical;line-height:1.5;}
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),select,textarea{min-height:44px;border:1px solid rgba(148,163,184,.38);border-radius:12px;background:var(--input);color:var(--ink);font:inherit;box-shadow:var(--control-shadow);outline:none;transition:border-color 160ms var(--ease-out),box-shadow 160ms var(--ease-out),background-color 160ms var(--ease-out);}
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):focus,select:focus,textarea:focus{border-color:rgba(31,78,140,.72);box-shadow:0 0 0 3px rgba(31,78,140,.13),var(--control-shadow);}
-select{appearance:none;-webkit-appearance:none;padding:0 13px 0 38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236f7680' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-position:left 13px center;background-size:18px 18px;background-repeat:no-repeat;font-weight:750;}
+select{appearance:none;-webkit-appearance:none;padding:0 13px 0 38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236f7680' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-position:left 13px center;background-size:18px 18px;background-repeat:no-repeat;font-weight:500;}
 select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):hover,textarea:hover{border-color:rgba(100,116,139,.55);}
 .chk-line{min-height:44px;display:flex;align-items:center;gap:9px;font-size:14px;margin-bottom:15px;cursor:pointer;}
 .chk-line input{width:20px;height:20px;}
@@ -11579,7 +11587,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .fab:hover{background:var(--primary-d);}
 .ai-fab{position:fixed;bottom:calc(82px + env(safe-area-inset-bottom));inset-inline-end:18px;width:54px;height:54px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(31,78,140,.30);z-index:19;}
 .ai-fab:hover{transform:scale(1.05);}
-.sect{font-family:var(--font-head);font-weight:650;font-size:14px;color:var(--ink);margin:18px 0 9px;display:flex;align-items:center;gap:7px;}
+.sect{font-family:var(--font-body);font-weight:600;font-size:14px;color:var(--ink);margin:18px 0 9px;display:flex;align-items:center;gap:7px;}
 .sect svg{color:var(--muted);}
 .search-wrap{min-height:50px;display:flex;align-items:center;gap:9px;background:var(--surface-glow);border:1px solid rgba(148,163,184,.32);border-radius:14px;padding:0 14px;margin-bottom:11px;color:var(--muted);box-shadow:var(--control-shadow);}
 .search-wrap:focus-within{border-color:rgba(31,78,140,.68);box-shadow:0 0 0 3px rgba(31,78,140,.12),var(--control-shadow);}
@@ -11621,16 +11629,16 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .body{flex:1;padding:16px;overflow-y:auto;}
 .form-head{background:var(--primary);color:#fff;padding:12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5;box-shadow:0 2px 0 var(--accent);}
 .form-head .icon-btn{color:#fff;}
-.form-title{font-family:var(--font-head);font-weight:600;font-size:17px;}
-.track-q{font-family:var(--font-head);font-weight:600;font-size:16px;margin-bottom:14px;}
+.form-title{font-family:var(--font-body);font-weight:600;font-size:17px;}
+.track-q{font-family:var(--font-body);font-weight:600;font-size:16px;margin-bottom:14px;}
 .track-pick{display:flex;align-items:center;gap:13px;width:100%;text-align:right;background:var(--surface);border:1.5px solid var(--line);border-radius:15px;padding:16px;margin-bottom:12px;color:var(--ink);}
 .track-ic{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.track-name{font-weight:700;font-size:16px;}.track-desc{color:var(--muted);font-size:12.5px;margin-top:3px;}
+.track-name{font-weight:600;font-size:16px;}.track-desc{color:var(--muted);font-size:12.5px;margin-top:3px;}
 .cat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .cat-pick{display:flex;flex-direction:column;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);border-radius:11px;padding:11px 6px;font-size:12.5px;font-weight:500;color:var(--ink);}
 .pr-row,.status-seg{display:flex;gap:7px;flex-wrap:wrap;}
 .status-static{display:flex;align-items:center;min-height:32px;}
-.pr-pick{flex:1;min-height:44px;border:1px solid rgba(201,205,209,.86);background:var(--surface-glow);border-radius:12px;padding:10px 10px;font-size:13px;font-weight:650;color:var(--muted);min-width:80px;box-shadow:var(--control-shadow);}
+.pr-pick{flex:1;min-height:44px;border:1px solid rgba(201,205,209,.86);background:var(--surface-glow);border-radius:12px;padding:10px 10px;font-size:13px;font-weight:500;color:var(--muted);min-width:80px;box-shadow:var(--control-shadow);}
 .pr-pick:hover{border-color:rgba(100,116,139,.5);color:var(--ink);}
 .seg{border:1.5px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);}
 .dt-list{display:flex;flex-direction:column;gap:9px;}
@@ -11647,17 +11655,17 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .ai-note{font-size:12.5px;color:var(--primary);margin:-6px 0 12px;font-weight:600;}
 
 .detail-top{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
-.detail-subj{font-family:var(--font-head);font-weight:700;font-size:21px;line-height:1.3;margin:0;}
-.detail-caption{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;margin-bottom:3px;}
+.detail-subj{font-family:var(--font-body);font-weight:600;font-size:21px;line-height:1.3;margin:0;}
+.detail-caption{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:3px;}
 .detail-subline{font-size:13px;color:var(--muted);margin-top:5px;}.detail-subline b{color:var(--ink);font-weight:600;}
 .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-top:8px;}
 .meta{display:flex;gap:9px;align-items:flex-start;position:relative;min-width:0;}.meta svg{margin-top:2px;flex-shrink:0;}.meta>div{min-width:0;flex:1;}
-.meta-lbl{font-size:11.5px;color:var(--muted);}.meta-val{font-size:13.5px;font-weight:600;margin-top:1px;}
-.meta-val-edit{display:inline;max-width:100%;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13.5px;font-weight:600;line-height:inherit;text-align:inherit;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-decoration-thickness:1px;text-underline-offset:3px;}
+.meta-lbl{font-size:11.5px;color:var(--muted);}.meta-val{font-size:13.5px;font-weight:500;margin-top:1px;}
+.meta-val-edit{display:inline;max-width:100%;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13.5px;font-weight:500;line-height:inherit;text-align:inherit;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-decoration-thickness:1px;text-underline-offset:3px;}
 .meta-val-edit:hover{color:var(--primary);}
 .meta-val-edit:focus-visible{outline:2px solid rgba(31,78,140,.35);outline-offset:3px;border-radius:4px;}
 .admin-quick-edit{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:12px;box-shadow:var(--control-shadow);}
-.admin-quick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:13.5px;font-weight:650;color:var(--ink);}
+.admin-quick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:13.5px;font-weight:600;color:var(--ink);}
 .icon-btn.tiny{width:30px;height:30px;min-width:30px;}
 .desc-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14.5px;line-height:1.6;white-space:pre-wrap;}
 .detail-photo{width:100%;border-radius:12px;border:1px solid var(--line);}
