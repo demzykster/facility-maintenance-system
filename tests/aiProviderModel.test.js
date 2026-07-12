@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AI_MODES, AI_PROVIDERS, aiModeFromEnv, aiServerConfigFromEnv, normalizeAiProvider, productionAiPolicy } from "../src/aiProviderModel.js";
+import { AI_MODES, AI_PROVIDERS, aiModeFromEnv, aiServerConfigFromEnv, normalizeAiProvider, normalizeAiSettings, productionAiPolicy, publicAiServerStatusFromEnv } from "../src/aiProviderModel.js";
 
 describe("aiProviderModel", () => {
   it("disables browser AI by default and ignores the legacy client mode", () => {
@@ -67,5 +67,38 @@ describe("aiProviderModel", () => {
       model: "gpt-5.2",
       openaiApiKey: "sk-test"
     });
+  });
+
+  it("normalizes browser-safe AI settings and server readiness status", () => {
+    expect(normalizeAiSettings({ mode: "client", provider: "codex", model: "x" })).toEqual({
+      mode: AI_MODES.disabled,
+      provider: "",
+      model: ""
+    });
+    expect(normalizeAiSettings({ mode: "server", provider: "openai" })).toEqual({
+      mode: AI_MODES.server,
+      provider: AI_PROVIDERS.openai,
+      model: "gpt-5.2"
+    });
+
+    expect(publicAiServerStatusFromEnv({
+      CMMS_AI_MODE: "server",
+      CMMS_AI_PROVIDER: "anthropic",
+      ANTHROPIC_API_KEY: "server-secret"
+    })).toMatchObject({
+      mode: AI_MODES.server,
+      provider: AI_PROVIDERS.anthropic,
+      model: "claude-sonnet-4-20250514",
+      providerKeyConfigured: true,
+      serverReady: true,
+      errors: []
+    });
+    const disabled = publicAiServerStatusFromEnv({
+      CMMS_AI_MODE: "server",
+      CMMS_AI_PROVIDER: "openai"
+    });
+    expect(disabled.serverReady).toBe(false);
+    expect(disabled.errors).toContain("ai_provider_key_required");
+    expect(JSON.stringify(disabled)).not.toContain("server-secret");
   });
 });

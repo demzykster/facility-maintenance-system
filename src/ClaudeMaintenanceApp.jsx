@@ -29,7 +29,7 @@ import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionM
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { AI_MODES, aiModeFromEnv } from "./aiProviderModel.js";
+import { AI_MODES, DEFAULT_AI_MODELS, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
 import { changeProductionPassword, completeProductionInitialPassword, createProductionAuthStore, loginWithProductionPassword, loginWithProductionPin, logoutProductionSession, productionLoginConfigFromEnv, productionLoginReady, restoreProductionSession, updateProductionNotificationReadState, updateProductionProfile, validateProductionInitialPassword } from "./productionLoginAdapter.js";
@@ -9655,6 +9655,8 @@ function SettingsPanel(p) {
   const [tab, setTab] = useState(p.only === "users" ? "users" : "general"), [userSub, setUserSub] = useState("workers"), [uEdit, setUEdit] = useState(null), [saved, setSaved] = useState(false), [openCat, setOpenCat] = useState(null), [uArchive, setUArchive] = useState(null), [showArch, setShowArch] = useState(false), [arcView, setArcView] = useState(null), [userCfgMsg, setUserCfgMsg] = useState("");
   const [warn, setWarn] = useState({ ...config.docWarn }), [escH, setEscH] = useState(config.escalateCriticalHours ?? 2), [notify, setNotify] = useState({ ...(config.notify || {}) });
   const [coName, setCoName] = useState(config.companyName || ""), [siteName, setSiteName] = useState(config.siteName || ""), [brandLogo, setBrandLogo] = useState(config.brandLogo || ""), [brandDirty, setBrandDirty] = useState(false), [logoMsg, setLogoMsg] = useState(""), [shiftGrace, setShiftGrace] = useState(Math.max(Number(config.lateGraceMin ?? 10) || 0, Number(config.earlyGraceMin ?? 10) || 0)), [pmDailyCapacity, setPmDailyCapacity] = useState(clampPmDailyCapacity(config.pmDailyCapacity ?? 4)), [cleaningReminderMins, setCleaningReminderMins] = useState(clampCleaningReminderMins(config.cleaningReminderMins ?? 30));
+  const [aiCfg, setAiCfg] = useState(normalizeAiSettings(config.ai));
+  const [aiStatus, setAiStatus] = useState(null), [aiStatusBusy, setAiStatusBusy] = useState(false);
   const [wreasons, setWreasons] = useState((config.waitReasons?.length ? config.waitReasons : WAIT_REASONS).map((r) => ({ ...r })));
   const [dlevels, setDlevels] = useState((config.downtimeLevels?.length ? config.downtimeLevels : DOWNTIME).map((d) => ({ ...d })));
   const [wshifts, setWshifts] = useState(config.workShifts?.length ? config.workShifts.map((s) => ({ ...s })) : [{ id: "morning", label: "בוקר", color: "#CA8A04" }, { id: "night", label: "לילה", color: "#1F4E8C" }]);
@@ -9683,6 +9685,7 @@ function SettingsPanel(p) {
     siteName: config.siteName || "",
     brandLogo: config.brandLogo || ""
   });
+  const aiConfigSyncKey = JSON.stringify(config.ai || {});
   useEffect(() => {
     if (openCat !== null) return;
     setCats((config.categories || CATEGORIES).map((c) => ({ id: c.id, label: c.label, ...SLA3(config.catSla?.[c.id]) })));
@@ -9704,6 +9707,35 @@ function SettingsPanel(p) {
     setSiteName(config.siteName || "");
     setBrandLogo(config.brandLogo || "");
   }, [brandConfigSyncKey, brandDirty]);
+  useEffect(() => {
+    setAiCfg(normalizeAiSettings(config.ai));
+  }, [aiConfigSyncKey]);
+  useEffect(() => {
+    if (tab !== "general" || !mayFullSettings) return;
+    let cancelled = false;
+    const loadAiStatus = async () => {
+      setAiStatusBusy(true);
+      try {
+        const accessToken = await productionAccessToken();
+        const response = await fetch("/api/ai/status", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {})
+          }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (cancelled) return;
+        setAiStatus(response.ok ? payload.ai : { serverReady: false, errors: [payload?.error || `ai_status_http_${response.status}`] });
+      } catch {
+        if (!cancelled) setAiStatus({ serverReady: false, errors: ["ai_status_unavailable"] });
+      } finally {
+        if (!cancelled) setAiStatusBusy(false);
+      }
+    };
+    loadAiStatus();
+    return () => { cancelled = true; };
+  }, [tab, mayFullSettings]);
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
   const doExport = async () => { try { const data = await getBackup(); downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `backup_${new Date().toISOString().slice(0, 10)}.json`); } catch (e) {} };
   const onPickBackup = async (e) => {
@@ -9744,7 +9776,7 @@ function SettingsPanel(p) {
     if (userSub === "admins") return { role: "admin" };
     return { role: "worker" };
   };
-  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; setBrandDirty(false); flash(); };
+  const saveGeneral = async () => { const cleanWR = wreasons.filter((r) => (r.label || "").trim()).map((r) => ({ id: r.id, label: r.label.trim(), ball: r.ball || "executor", pauseSla: !!r.pauseSla, setters: r.setters || "both" })); const cleanDL = dlevels.filter((d) => (d.label || "").trim()).map((d) => ({ id: d.id, label: d.label.trim(), desc: (d.desc || "").trim(), color: d.color || "#6B7280", prio: d.prio || "medium", oos: !!d.oos })); if (await saveConfig({ ...config, docWarn: warn, escalateCriticalHours: Number(escH) || 2, notify, companyName: coName.trim(), siteName: siteName.trim(), brandLogo, ai: normalizeAiSettings(aiCfg), pmDailyCapacity: clampPmDailyCapacity(pmDailyCapacity), cleaningReminderMins: clampCleaningReminderMins(cleaningReminderMins), shifts: [], waitReasons: cleanWR.length ? cleanWR : WAIT_REASONS, downtimeLevels: cleanDL.length ? cleanDL : DOWNTIME }) === false) return; setBrandDirty(false); flash(); };
   const pickLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -9804,6 +9836,9 @@ function SettingsPanel(p) {
   const NOTIFY_DEFS = [["new", "קריאות חדשות"], ["confirm", "אישורים"], ["back", "החזרות לתיקון"], ["ready", "מוכן לאיסוף/סגירה"], ["escalate", "הסלמות"], ["sla", "חריגות SLA"], ["task", "מטלות ופגישות"], ["doc", "מסמכים ובקרת כלים"], ["pm", "טיפולים תקופתיים"], ["upd", "עדכונים"], ["driver", "נהגים ושיבוצים"], ["ppe", "ביגוד עובדים"], ["cleaning", "ניקיון וסבבים"]];
   const WAIT_BALL_OPTIONS = [["executor", "המבצע"], ["manager", "מנהל המחלקה"], ["admin", "מנהל מערכת"]];
   const WAIT_SETTER_OPTIONS = [["both", "טכנאי + מנהל"], ["tech", "טכנאי בלבד"], ["manager", "מנהל בלבד"]];
+  const AI_PROVIDER_OPTIONS = [["anthropic", "Claude / Anthropic"], ["openai", "OpenAI / Codex-compatible"]];
+  const aiStatusText = aiStatusBusy ? "בודק חיבור…" : (aiStatus?.serverReady ? "שרת AI מוכן" : "שרת AI לא פעיל");
+  const aiStatusErrors = (aiStatus?.errors || []).filter(Boolean).join(" · ");
   const slaRow = (obj, setObj) => <div className="sla-grid">{PRIORITIES.map((x) => <label key={x.id} className="sla-cell"><span style={{ color: x.color }}>{x.label}</span><input type="number" value={obj[x.id]} onChange={(e) => setObj(x.id, Number(e.target.value) || 1)} /></label>)}</div>;
   // редактор справочника с защитой от рассинхрона: используемые элементы заблокированы для правки/удаления
   const regEditor = (rows, setRows, usage, addLabel, oneLabel) => (<>
@@ -9846,6 +9881,24 @@ function SettingsPanel(p) {
       <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => { setCoName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: חברה לדוגמה בע״מ" /></label>
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => { setSiteName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
+      {mayFullSettings && <>
+      <SectionTitle><Sparkles size={15} /> חיבור AI</SectionTitle>
+      <div className="settings-table-card" style={{ display: "grid", gap: 12, padding: 14, marginBottom: 14 }}>
+        <div className="row-between" style={{ gap: 12, alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontWeight: 800, color: "var(--text)" }}>{aiStatusText}</div>
+            <div className="hint">הבחירה כאן שומרת רק מצב, ספק ומודל. מפתחות API נשארים רק בשרת / Vercel env ולא נשמרים בדפדפן.</div>
+          </div>
+          <span className={"badge sm " + (aiStatus?.serverReady ? "ok" : "warn")}>{aiStatus?.serverReady ? "מוכן" : "כבוי"}</span>
+        </div>
+        <div className="grid2">
+          <label className="field"><span>מצב</span><select value={aiCfg.mode} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, mode: e.target.value }))}><option value="disabled">כבוי</option><option value="server">שרת בלבד</option></select></label>
+          <label className="field"><span>ספק</span><select value={aiCfg.provider} onChange={(e) => { const provider = e.target.value; setAiCfg((s) => normalizeAiSettings({ ...s, provider, model: DEFAULT_AI_MODELS[provider] || "" })); }}><option value="">בחר ספק</option>{AI_PROVIDER_OPTIONS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+        </div>
+        <label className="field"><span>מודל</span><input value={aiCfg.model} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, model: e.target.value }))} placeholder={aiCfg.provider ? DEFAULT_AI_MODELS[aiCfg.provider] : "בחרו ספק כדי לקבל ברירת מחדל"} /></label>
+        <div className="hint">{aiStatus?.provider ? `שרת: ${aiStatus.provider} · ${aiStatus.model || "ללא מודל"} · מפתח ${aiStatus.providerKeyConfigured ? "מוגדר" : "חסר"}` : "השרת ידווח כאן אם הוגדר ספק ומפתח."}{aiStatusErrors ? ` · ${aiStatusErrors}` : ""}</div>
+      </div>
+      </>}
       <SectionTitle>סיבות המתנה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>סיבה נבחרת כאשר קריאה נעצרת באמצע טיפול. ההגדרה קובעת אצל מי האחריות להמשך, מי רשאי לבחור את הסיבה, והאם זמן ההמתנה נחשב ב-SLA התפעולי. בכל מקרה הזמן נשמר בהיסטוריה, בדוחות ובאנליטיקה.</div>
       <div className="settings-table-card wait-reasons-card">

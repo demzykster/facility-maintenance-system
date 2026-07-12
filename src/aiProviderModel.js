@@ -14,6 +14,11 @@ export const DEFAULT_AI_MODELS = Object.freeze({
   [AI_PROVIDERS.openai]: "gpt-5.2"
 });
 
+export const AI_SETTING_MODES = Object.freeze({
+  disabled: AI_MODES.disabled,
+  server: AI_MODES.server
+});
+
 export function aiModeFromEnv(env = {}, appMode = "demo") {
   const raw = String(env.VITE_CMMS_AI_MODE || env.CMMS_AI_MODE || "").trim().toLowerCase();
   if (raw === AI_MODES.client) return AI_MODES.disabled;
@@ -34,6 +39,41 @@ export function aiServerConfigFromEnv(env = {}) {
     model: String(env.CMMS_AI_MODEL || DEFAULT_AI_MODELS[provider] || "").trim(),
     anthropicApiKey: String(env.ANTHROPIC_API_KEY || "").trim(),
     openaiApiKey: String(env.OPENAI_API_KEY || "").trim()
+  };
+}
+
+export function normalizeAiSettings(value = {}) {
+  const input = value && typeof value === "object" ? value : {};
+  const mode = Object.values(AI_SETTING_MODES).includes(input.mode) ? input.mode : AI_MODES.disabled;
+  const provider = normalizeAiProvider(input.provider);
+  const model = provider ? String(input.model || DEFAULT_AI_MODELS[provider] || "").trim() : "";
+  return {
+    mode,
+    provider,
+    model
+  };
+}
+
+export function publicAiServerStatusFromEnv(env = {}) {
+  const config = aiServerConfigFromEnv(env);
+  const providerKeyConfigured = (
+    (config.provider === AI_PROVIDERS.anthropic && !!config.anthropicApiKey)
+    || (config.provider === AI_PROVIDERS.openai && !!config.openaiApiKey)
+  );
+  const errors = [];
+  if (config.mode !== AI_MODES.server) errors.push("ai_server_disabled");
+  if (config.mode === AI_MODES.server && !config.provider) errors.push("ai_provider_required");
+  if (config.mode === AI_MODES.server && config.provider && !providerKeyConfigured) errors.push("ai_provider_key_required");
+
+  return {
+    mode: config.mode,
+    provider: config.provider,
+    model: config.model,
+    providerKeyConfigured,
+    serverReady: config.mode === AI_MODES.server && !!config.provider && providerKeyConfigured,
+    supportedProviders: Object.values(AI_PROVIDERS),
+    defaultModels: DEFAULT_AI_MODELS,
+    errors
   };
 }
 

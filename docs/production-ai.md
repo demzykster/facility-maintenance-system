@@ -38,6 +38,8 @@ CMMS_AI_MODEL=gpt-5.2
 - The browser AI panel is now split into `src/AIPanel.jsx` and loads only when the AI UI is actually opened.
 - The first server provider adapter lives in `server/ai/providerClient.js`. It supports Anthropic Messages and OpenAI Responses API request shapes with injected `fetch` and tests.
 - The first authenticated server assistant entrypoint lives at `POST /api/ai/assist` through `server/ai/assistHandler.js`. It verifies the current Supabase/CMMS session, builds the deterministic intake draft, rate-limits per user in-process, calls the configured provider only when `CMMS_AI_MODE=server`, and returns read-only assistant text plus the draft.
+- AI API URLs are grouped through one Vercel route file, `api/ai/[action].js`, so `/api/ai/intake`, `/api/ai/assist`, and `/api/ai/status` do not consume one function each as the AI surface grows.
+- The admin settings surface can store non-secret AI preferences (`config.ai.mode`, `config.ai.provider`, and `config.ai.model`) and reads `/api/ai/status` for server readiness. Provider API keys stay in deployment/server environment variables only and are never displayed or stored in browser-managed app config.
 - `/api/ai/assist` is intentionally not a business-write endpoint. It does not create/update/delete tickets, KV records, Supabase rows, files, or status history. All AI-produced business actions still require a human-confirmed operation through the normal UI/API path.
 - Production can enable server AI only after the deployment has the provider env vars and the owner accepts the first read-only assistant scope.
 
@@ -56,10 +58,10 @@ When AI is reopened as a product module, build it as a separate server-backed as
 
 ## Next Implementation Step
 
-Connect the app settings/UI to the server AI boundary without exposing provider keys:
+Build the first permission-filtered AI context slice:
 
-- add an admin settings surface for provider/mode/model selection that never displays or stores raw provider secrets in browser state;
-- keep provider secrets in deployment/server environment only;
-- show clear disabled/unavailable/server-ready states in the UI;
-- pass only permission-filtered CMMS context to `/api/ai/assist`;
-- add audit-safe request logging for provider calls before any future write-capable agent operation.
+- pass only role-appropriate CMMS context to `/api/ai/assist` for admin, executive, manager, technician, worker, and public-report use cases;
+- keep financial and broad company analytics limited to `admin` / `executive`;
+- keep department managers inside their existing ticket/fleet/user scope;
+- add audit-safe request logging for provider calls before any future write-capable agent operation;
+- keep every future AI write behind a human-confirmed normal server operation with validation, authorization, and audit.

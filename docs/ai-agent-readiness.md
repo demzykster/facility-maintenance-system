@@ -48,12 +48,15 @@ The first server entrypoint is `POST /api/ai/intake`. It returns the same read-o
 
 The first provider-backed server entrypoint is `POST /api/ai/assist`. It is authenticated, session-scoped, per-user rate-limited, and read-only. It calls the configured provider through `server/ai/providerClient.js` only when `CMMS_AI_MODE=server`, then returns assistant text plus the deterministic draft. It is a safe bridge toward Claude/OpenAI/Codex-style assistance, not a permission to mutate CMMS records.
 
+The AI route surface is grouped through `api/ai/[action].js` so the existing `/api/ai/intake`, `/api/ai/assist`, and `/api/ai/status` URLs share one Vercel function slot. `/api/ai/status` is authenticated and returns only public-safe readiness fields, such as mode, provider, model, and whether a provider key is configured. It never returns provider secrets.
+
 ## V1 Boundary
 
 For the first pilot:
 
 - production AI remains disabled;
 - server AI can be enabled only through server-side provider configuration, not browser keys;
+- admin settings may store only non-secret AI preferences (`mode`, `provider`, `model`) and display server readiness from `/api/ai/status`;
 - categories, routing, priority, SLA, departments, zones, and vehicle types stay data-driven;
 - public reports, tickets, files, cleaning rounds, and settings should keep moving toward shared server-side operations.
 
