@@ -306,24 +306,21 @@ For docs-only changes:
 
 ## Recommended Next Steps
 
-1. Continue the BI consolidation carefully:
-   - keep admin command center operational;
-   - keep `executive` BI calmer and leadership-oriented;
-   - keep department BI strictly scoped before expanding the screen.
-2. Move useful Analytics concepts into BI without duplicating everything:
-   - SLA and lifecycle bottlenecks;
-   - downtime causes and time by status;
-   - repeated problems;
-   - supplier/cost views only where finance is allowed.
-3. Keep department-manager BI as the main entry point and deepen only the drill-downs that route through existing workflows:
-   - PM task context inside department fleet;
-   - cleaning zones/rounds in scope;
-   - PPE request details in scope;
-   - ticket lifecycle/stage reasons.
+1. Treat the current BI consolidation as the accepted v1 shell unless the owner
+   reports a concrete problem from live use. Do not reintroduce standalone
+   Dashboard/Analytics screens.
+2. If BI grows again, keep additions compact and evidence-led:
+   - add only active risk signals;
+   - route to existing workflows;
+   - keep financial details limited to `admin` / `executive`;
+   - preserve strict department scope for `user`.
+3. Separately investigate live user-role save failures if they recur. The local
+   `executive` role foundation, API mapping, Supabase profile whitelist,
+   migration, and tests are present, so a live failure is likely deploy/schema/API
+   state and should be debugged as a focused production/staging issue.
 4. Continue the same design-system polish on remaining old-looking screens:
    - settings first;
    - cleaning;
-   - analytics;
    - PPE;
    - suppliers/fleet details.
 5. Revisit notifications UI as an integrated side drawer, not as a centered modal.

@@ -327,6 +327,9 @@ The first implementation PRs should cover:
 - Short trend, repeat-problem, facility maintenance, execution-load, PM,
   cleaning, PPE, bottleneck, department-risk, and financial signals are now part
   of BI. Future additions should stay compact and route to existing workflows.
+- BI now includes selectable `now` / `30` / `90` day periods, task/meeting
+  signals from work records, department facility-zone scope coverage, and
+  explainable critical downtime rows that route back to ticket details.
 - `admin` and `executive` receive `company` BI scope.
 - `user` receives `department` BI scope only; missing departments produce empty operational slices, not company-wide fallback.
 - `tech`, `worker`, and `cleaner` are outside the first BI rollout.
