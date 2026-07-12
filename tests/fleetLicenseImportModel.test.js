@@ -3,6 +3,7 @@ import { detectFleetLicenseColumns, parseFleetLicenseSheet, parseFleetLicenseWor
 
 const headers = [
   "ספק",
+  "מספר פנימי",
   ":מס' רכב",
   "דגם",
   "ברגולציה",
@@ -28,16 +29,17 @@ describe("fleet license import model", () => {
 
     expect(detected.map).toMatchObject({
       supplier: 0,
-      chassis: 1,
-      model: 2,
-      regulated: 3,
-      tasrirDate: 4,
-      licenseDate: 8,
-      vehicleKind: 12,
-      classification: 13,
-      leaseStart: 14,
-      leaseEnd: 15,
-      leaseCost: 16
+      internalNo: 1,
+      chassis: 2,
+      model: 3,
+      regulated: 4,
+      tasrirDate: 5,
+      licenseDate: 9,
+      vehicleKind: 13,
+      classification: 14,
+      leaseStart: 15,
+      leaseEnd: 16,
+      leaseCost: 17
     });
     expect(detected.ignored).toEqual(expect.arrayContaining(["ימי לבדיקה תסקיר", "סטאטוס", "=TODAY()"]));
   });
@@ -47,6 +49,7 @@ describe("fleet license import model", () => {
       headers,
       [
         "טויוטה",
+        "M-335",
         "194335",
         "RRE200H",
         "כן",
@@ -74,6 +77,7 @@ describe("fleet license import model", () => {
       warnings: expect.arrayContaining(["code_uses_chassis_until_manual_code_review"]),
       unit: {
         code: "194335",
+        internalNo: "M-335",
         chassis: "194335",
         supplier: "טויוטה",
         type: "מלגזת היגש",
@@ -99,7 +103,7 @@ describe("fleet license import model", () => {
   it("marks existing matching chassis as a conflict instead of silently updating", () => {
     const result = parseFleetLicenseSheet([
       headers,
-      ["טויוטה", "194335", "RRE200H", "כן", "אין תסקיר", "", "", "", "אין רישוי", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "", "בבעלות", ""]
+      ["טויוטה", "M-335", "194335", "RRE200H", "כן", "אין תסקיר", "", "", "", "אין רישוי", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "", "בבעלות", ""]
     ], { existingFleet: [{ id: "fleet-1", code: "194335", chassis: "194335" }] });
 
     expect(result.summary).toMatchObject({ total: 1, ready: 0, conflicts: 1, invalid: 0 });
@@ -117,8 +121,8 @@ describe("fleet license import model", () => {
   it("marks duplicate chassis inside the workbook as invalid before import", () => {
     const result = parseFleetLicenseSheet([
       headers,
-      ["פסלטון", "פסולתון", "פסולתון", "לא", "2027-02-09", "", "", "", "אין רישוי", "", "", "", "פסלטון", "כלי", "", "", "בבעלות", ""],
-      ["פסלטון", "פסולתון", "פסולתון", "לא", "2027-02-10", "", "", "", "אין רישוי", "", "", "", "פסלטון", "כלי", "", "", "בבעלות", ""]
+      ["פסלטון", "", "פסולתון", "פסולתון", "לא", "2027-02-09", "", "", "", "אין רישוי", "", "", "", "פסלטון", "כלי", "", "", "בבעלות", ""],
+      ["פסלטון", "", "פסולתון", "פסולתון", "לא", "2027-02-10", "", "", "", "אין רישוי", "", "", "", "פסלטון", "כלי", "", "", "בבעלות", ""]
     ]);
 
     expect(result.summary).toMatchObject({ total: 2, ready: 0, conflicts: 0, invalid: 2 });
@@ -143,7 +147,7 @@ describe("fleet license import model", () => {
 
     expect(parseFleetLicenseWorkbook([
       { sheet: "DB", data: [["title"]] },
-      { sheet: "רישיונות", data: [headers, ["טויוטה", "194335", "RRE200H", "כן", "אין תסקיר", "", "", "", "אין רישוי", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "", "בבעלות", ""]] }
+      { sheet: "רישיונות", data: [headers, ["טויוטה", "M-335", "194335", "RRE200H", "כן", "אין תסקיר", "", "", "", "אין רישוי", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "", "בבעלות", ""]] }
     ])).toMatchObject({
       ok: true,
       summary: { total: 1, ready: 1, conflicts: 0, invalid: 0 }
@@ -153,9 +157,9 @@ describe("fleet license import model", () => {
   it("plans missing vehicle catalog entries for new imported models", () => {
     const parsed = parseFleetLicenseSheet([
       headers,
-      ["טויוטה", "194335", "RRE200H", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
-      ["טויוטה", "194336", "RRE200H", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-18", 2810, ""],
-      ["Still", "771", "KNOWN", "לא", "אין תסקיר", "", "", "", "אין רישוי", "", "", "", "עגלת אדם", "כלי", "", "", "בבעלות", ""]
+      ["טויוטה", "M-335", "194335", "RRE200H", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
+      ["טויוטה", "M-336", "194336", "RRE200H", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-18", 2810, ""],
+      ["Still", "", "771", "KNOWN", "לא", "אין תסקיר", "", "", "", "אין רישוי", "", "", "", "עגלת אדם", "כלי", "", "", "בבעלות", ""]
     ], { existingFleet: [] });
 
     expect(planFleetLicenseCatalogAdditions(parsed.rows, { forkliftTypes: ["KNOWN"], vehicleTypes: [] })).toEqual([
@@ -170,9 +174,9 @@ describe("fleet license import model", () => {
   it("does not let legacy model lists suppress a consciously empty structured catalog", () => {
     const parsed = parseFleetLicenseSheet([
       headers,
-      ["טויוטה", "6882002", "OSE250", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלקטת (כפולה)", "כלי שטח תפעולי", "", "", "בבעלות", ""],
-      ["טויוטה", "6882003", "OSE250", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלקטת (סינגל)", "כלי שטח תפעולי", "", "", "בבעלות", ""],
-      ["טויוטה", "178039", "8FBE15T", "כן", "2027-02-11", "", "", "", "2026-08-11", "", "", "", "מלגזת משקל נגדי", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""]
+      ["טויוטה", "", "6882002", "OSE250", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלקטת (כפולה)", "כלי שטח תפעולי", "", "", "בבעלות", ""],
+      ["טויוטה", "", "6882003", "OSE250", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלקטת (סינגל)", "כלי שטח תפעולי", "", "", "בבעלות", ""],
+      ["טויוטה", "", "178039", "8FBE15T", "כן", "2027-02-11", "", "", "", "2026-08-11", "", "", "", "מלגזת משקל נגדי", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""]
     ]);
 
     expect(planFleetLicenseCatalogAdditions(parsed.rows, {
@@ -201,8 +205,8 @@ describe("fleet license import model", () => {
   it("keeps vehicle type and model as separate catalog dimensions", () => {
     const parsed = parseFleetLicenseSheet([
       headers,
-      ["טויוטה", "178039", "8FBE15T", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת משקל נגדי", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
-      ["טויוטה", "213580", "8FBE15T", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלגזת משקל נגדי (דיזל)", "כלי שטח תפעולי", "", "2027-08-18", 2810, ""]
+      ["טויוטה", "", "178039", "8FBE15T", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת משקל נגדי", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
+      ["טויוטה", "", "213580", "8FBE15T", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלגזת משקל נגדי (דיזל)", "כלי שטח תפעולי", "", "2027-08-18", 2810, ""]
     ]);
 
     expect(planFleetLicenseCatalogAdditions(parsed.rows, { vehicleTypes: [] })).toEqual([
@@ -222,8 +226,8 @@ describe("fleet license import model", () => {
   it("plans catalog repair from conflict rows when fleet already exists", () => {
     const parsed = parseFleetLicenseSheet([
       headers,
-      ["טויוטה", "194335", "RRE200H", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
-      ["טויוטה", "6882002", "OSE250", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלקטת (כפולה)", "כלי שטח תפעולי", "", "", "בבעלות", ""]
+      ["טויוטה", "", "194335", "RRE200H", "כן", "2027-02-09", "", "", "", "2026-08-09", "", "", "", "מלגזת היגש", "כלי שטח תפעולי", "", "2027-08-17", 2810, ""],
+      ["טויוטה", "", "6882002", "OSE250", "כן", "2027-02-10", "", "", "", "2026-08-10", "", "", "", "מלקטת (כפולה)", "כלי שטח תפעולי", "", "", "בבעלות", ""]
     ], {
       existingFleet: [
         { id: "fleet-1", code: "194335", chassis: "194335" },

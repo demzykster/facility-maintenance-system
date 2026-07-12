@@ -6,7 +6,7 @@ import {
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
   FileText, ExternalLink, Gauge, SlidersHorizontal, Eye, EyeOff, Copy, Hexagon,
-  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History, Play} from "lucide-react";
+  FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History, Play, Hash} from "lucide-react";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -793,6 +793,8 @@ const modelTypeName = (model, cfg) => (cfg?.modelType?.[model]) || "";
 const modelSupplierOf = (model, cfg) => (cfg?.modelSupplier?.[model]) || "";
 // --- Единый фундамент идентификации юнита: внутр.№ · тип · модель ---
 const vehicleTypeExists = vehicleTypeExistsInConfig;
+const unitInternalNo = (f) => (f && (f.internalNo || f.internalNumber || f.internal_no) || "").trim();
+const unitDisplayNo = (f) => unitInternalNo(f) || ((f && f.code) || "");
 const unitModelCode = (f) => (f && (f.model || f.type)) || "";                         // модель (код производителя), legacy: f.type
 const unitTypeName = (f, cfg) => {
   if (!f) return "";
@@ -804,7 +806,8 @@ const unitTypeName = (f, cfg) => {
   return (f.notes || f.type || "").trim();
 }; // тип: новое vehicleKind/type, иначе legacy mapping/notes
 const unitDesc = (f, cfg) => { const t = unitTypeName(f, cfg), m = unitModelCode(f); const parts = (t && t !== m) ? [t, m] : [m || t]; return parts.filter(Boolean).join(" · "); }; // "тип · модель" без дубля если тип==модель
-const unitLabel = (f, cfg) => { if (!f) return ""; return [f.code, unitDesc(f, cfg)].filter(Boolean).join(" · "); }; // "№ · тип · модель"
+const unitLabel = (f, cfg) => { if (!f) return ""; return [unitDisplayNo(f), unitDesc(f, cfg)].filter(Boolean).join(" · "); }; // "№ · тип · модель"
+const unitSearchText = (f, cfg) => [unitInternalNo(f), f?.code, unitTypeName(f, cfg), unitModelCode(f), f?.chassis, f?.license, fleetDepts(f).join(" ")].filter(Boolean).join(" ");
 const unitNote = (f, cfg) => { const n = (f && f.notes) || ""; return n && n !== unitTypeName(f, cfg) ? n : ""; }; // заметка без дублирования типа
 // --- Классификация записей журнала (вывод типа действия по тексту) ---
 const LOG_KINDS = [
@@ -870,8 +873,8 @@ const crossSuggestions = (scoped) => {
   const freeMorning = scoped.filter((f) => !driverActive(driverOf(f, "morning")) && !driverPending(driverOf(f, "morning")) && !(driverActive(driverOf(f, "night")) && driverOf(f, "night").cross));
   scoped.forEach((f) => {
     const m = driverOf(f, "morning"), n = driverOf(f, "night");
-    if (driverActive(m) && m.cross && driverActive(n)) { const tgt = freeNight.find((u) => u.id !== f.id); if (tgt) out.push({ driver: n, shift: "night", fromCode: f.code, toCode: tgt.code, reason: `${m.name} (בוקר) חוצה לערב ותופס את ${f.code}` }); }
-    if (driverActive(n) && n.cross && driverActive(m)) { const tgt = freeMorning.find((u) => u.id !== f.id); if (tgt) out.push({ driver: m, shift: "morning", fromCode: f.code, toCode: tgt.code, reason: `${n.name} (לילה) חוצה לבוקר ותופס את ${f.code}` }); }
+    if (driverActive(m) && m.cross && driverActive(n)) { const tgt = freeNight.find((u) => u.id !== f.id); if (tgt) out.push({ driver: n, shift: "night", fromCode: unitDisplayNo(f), toCode: unitDisplayNo(tgt), reason: `${m.name} (בוקר) חוצה לערב ותופס את ${unitDisplayNo(f)}` }); }
+    if (driverActive(n) && n.cross && driverActive(m)) { const tgt = freeMorning.find((u) => u.id !== f.id); if (tgt) out.push({ driver: m, shift: "morning", fromCode: unitDisplayNo(f), toCode: unitDisplayNo(tgt), reason: `${n.name} (לילה) חוצה לבוקר ותופס את ${unitDisplayNo(f)}` }); }
   });
   return out;
 };
@@ -1040,7 +1043,7 @@ const isOpen = (t) => t.status !== "done" && t.status !== "cancelled";
 const ticketBlocks = (t, cfg) => t.track === "transport" && isOpen(t) && t.status !== "pending_manager" && t.status !== "rework" && !t.backInServiceAt && !!dtOf(t.downtimeType, cfg).oos;
 const unitBlock = (f, tickets, cfg) => { if (!f) return null; const bs = (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).sort((a, b) => b.createdAt - a.createdAt); if (!bs.length) return null; return { ticket: bs[0], level: dtOf(bs[0].downtimeType, cfg), count: bs.length }; };
 // השבתה ידנית = פתיחת קריאת שינוע ברמה חוסמת. החזרה לשירות = סימון backInServiceAt על כל הקריאות החוסמות (הטיפול בקריאה עצמה נמשך).
-const buildBlockTicket = (f, cfg, by, reason) => { const now = Date.now(); const lvl = dtLevels(cfg).find((d) => d.oos) || DOWNTIME[2]; const rsn = (reason || "").trim(); return { id: uid(), track: "transport", subject: `השבתת כלי · ${f.code}`, category: "transport", priority: lvl.prio || "high", zone: "רחבת מלגזות", asset: f.code, forkliftId: f.id, downtimeType: lvl.id, wearType: null, description: rsn || "הכלי הושבת ידנית — אין להשתמש בו עד לתיקון.", status: "new", assignee: "", routedTech: true, downtimeStart: now, downtimeEnd: null, createdBy: { name: by.name, role: by.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: f.id, priority: lvl.prio || "high" }, cfg, [f]) * 3600000, hasPhoto: false, closure: null, log: [{ at: now, by: by.name, byRole: by.role, text: `הכלי הושבת ידנית${rsn ? " · סיבה: " + rsn : ""}`, kind: "open" }] }; };
+const buildBlockTicket = (f, cfg, by, reason) => { const now = Date.now(); const lvl = dtLevels(cfg).find((d) => d.oos) || DOWNTIME[2]; const rsn = (reason || "").trim(); const no = unitDisplayNo(f); return { id: uid(), track: "transport", subject: `השבתת כלי · ${no}`, category: "transport", priority: lvl.prio || "high", zone: "רחבת מלגזות", asset: no, forkliftId: f.id, downtimeType: lvl.id, wearType: null, description: rsn || "הכלי הושבת ידנית — אין להשתמש בו עד לתיקון.", status: "new", assignee: "", routedTech: true, downtimeStart: now, downtimeEnd: null, createdBy: { name: by.name, role: by.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: f.id, priority: lvl.prio || "high" }, cfg, [f]) * 3600000, hasPhoto: false, closure: null, log: [{ at: now, by: by.name, byRole: by.role, text: `הכלי הושבת ידנית${rsn ? " · סיבה: " + rsn : ""}`, kind: "open" }] }; };
 const clearBlockPatches = (f, tickets, cfg, by) => { const now = Date.now(); return (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).map((t) => ({ ...t, backInServiceAt: now, updatedAt: now, log: [...(t.log || []), { at: now, by: by.name, byRole: by.role, text: "הכלי הוחזר לשירות (ידנית) — הטיפול בקריאה נמשך", kind: "other" }] })); };
 // Жёсткая модель: чей сейчас «мяч» (кто должен действовать). Единый источник правды для всех экранов.
 const ballIn = (t) => {
@@ -1375,7 +1378,7 @@ function buildAIContext(session, tickets, pm, fleet, cfg) {
     const exp = (fleet || []).map((f) => ({ f, s: docStatus(f, cfg) })).filter((x) => x.s.d != null && x.s.d <= 30);
     if (exp.length) { L.push("מסמכי כלי שינוע פגי-תוקף קרוב:"); exp.slice(0, 10).forEach((x) => L.push(`- ${unitLabel(x.f, cfg)}: ${x.s.label}`)); }
     const due = (pm || []).filter((p) => p.active && daysLeft(p.nextDue) <= 7);
-    if (due.length) { L.push("טיפולים תקופתיים קרובים:"); due.forEach((p) => { const f = pmFleet(p, fleet); L.push(`- ${f ? f.code : "כלי"} בעוד ${daysLeft(p.nextDue)} ימים`); }); }
+    if (due.length) { L.push("טיפולים תקופתיים קרובים:"); due.forEach((p) => { const f = pmFleet(p, fleet); L.push(`- ${f ? unitDisplayNo(f) : "כלי"} בעוד ${daysLeft(p.nextDue)} ימים`); }); }
     const cost = tickets.reduce((a, t) => a + (t.closure?.costAmount || 0), 0);
     L.push(`עלות מצטברת: ${ils(cost)}.`);
   }
@@ -1440,11 +1443,11 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
       if (ticketMissedSla(t, cfg)) ev.push({ key: t.id + "-sla", at: t.dueAt, ticketId: t.id, kind: "sla", title: `חריגת SLA · #${ticketNo(t)}`, body: t.subject });
       if (isCriticalEscalated(t, cfg)) ev.push({ key: t.id + "-esc", at: t.createdAt + (cfg?.escalateCriticalHours ?? 2) * 3600000, ticketId: t.id, kind: "escalate", title: `השבתה קריטית ללא טכנאי · #${ticketNo(t)}`, body: `${t.asset || ""} · ${t.subject} — אף טכנאי לא קיבל את הקריאה מעל ${cfg?.escalateCriticalHours ?? 2} שע׳` });
     });
-    (fleet || []).forEach((f) => { const s = docStatus(f, cfg); if (s.d != null && s.d <= (cfg?.docWarn?.yellow || 30)) ev.push({ key: "doc-" + f.id, at: docNotificationAt(f, cfg, s), kind: "doc", go: "fleet", fleetId: f.id, title: `מסמך פג-תוקף · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${s.label}` }); });
-    (fleet || []).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "fleet", fleetId: f.id, title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
+    (fleet || []).forEach((f) => { const s = docStatus(f, cfg); if (s.d != null && s.d <= (cfg?.docWarn?.yellow || 30)) ev.push({ key: "doc-" + f.id, at: docNotificationAt(f, cfg, s), kind: "doc", go: "fleet", fleetId: f.id, title: `מסמך פג-תוקף · ${unitDisplayNo(f)}`, body: `${unitTypeName(f, cfg)} · ${s.label}` }); });
+    (fleet || []).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "fleet", fleetId: f.id, title: `כלי מושבת · ${unitDisplayNo(f)}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
     tickets.filter((t) => needsHandler(t, users, fleet)).forEach((t) => ev.push({ key: "orphan-" + t.id, at: t.createdAt, ticketId: t.id, kind: "escalate", go: "tickets", title: `קריאה ללא מטפל · #${ticketNo(t)}`, body: `${t.subject} — ${t.assignee ? "המטפל אינו פעיל עוד" : "אין טכנאי פעיל לקבל"}. נדרש שיבוץ.` }));
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי קרוב", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
-    pendingDriverReqs(fleet).forEach(({ unit, cat, driver }) => ev.push({ key: "drvreq-" + unit.id + cat, at: driver.reqAt || Date.now(), kind: "driver", go: "fleet", fleetId: unit.id, title: driver.status === "pending_add" ? "בקשת הוספת נהג — ממתין לאישורך" : "בקשת העברת נהג — ממתין לאישורך", body: `${driver.name} · ${unit.code} (${driverShiftMeta(cat).label})${driver.status === "pending_move" && driver.moveTo ? ` → ${driver.moveTo.unitCode}` : ""}${driver.needsChip ? " · צריך להנפיק צ׳יפ" : ""} · מ-${driver.addedByName || "מנהל"}` }));
+    pendingDriverReqs(fleet).forEach(({ unit, cat, driver }) => ev.push({ key: "drvreq-" + unit.id + cat, at: driver.reqAt || Date.now(), kind: "driver", go: "fleet", fleetId: unit.id, title: driver.status === "pending_add" ? "בקשת הוספת נהג — ממתין לאישורך" : "בקשת העברת נהג — ממתין לאישורך", body: `${driver.name} · ${unitDisplayNo(unit)} (${driverShiftMeta(cat).label})${driver.status === "pending_move" && driver.moveTo ? ` → ${driver.moveTo.unitCode}` : ""}${driver.needsChip ? " · צריך להנפיק צ׳יפ" : ""} · מ-${driver.addedByName || "מנהל"}` }));
     { const pend = (ppeReqs || []).filter(ppeRequestNeedsAction);
       if (pend.length) ev.push({ key: "ppe-pending-admin", at: Math.max(...pend.map((r) => r.at || r.updatedAt || 0)), kind: "ppe", go: "ppe", ppeSub: "dash", title: "בקשות ביגוד ממתינות", body: `${countLabel(pend.length, "בקשה", "בקשות")} לאישור או חתימת עובד` }); }
     { const low = (ppeItems || []).filter((it) => it.active !== false && ppeLow(it));
@@ -1462,7 +1465,7 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
       (t.log || []).forEach((l, i) => { if (l.byRole === "user" && /הערות|הוחזר/.test(l.text)) ev.push({ key: `${t.id}-${i}`, at: l.at, ticketId: t.id, kind: "back", title: "הוחזר מהמשתמש", body: `${t.subject} — ${l.text}` }); });
     });
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "pm", title: "טיפול תקופתי לביצוע", body: `${f ? unitLabel(f, cfg) : "כלי"} · ${d < 0 ? "באיחור" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
-    (fleet || []).filter((f) => techCanSeeFleet(session, f)).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label}` }); });
+    (fleet || []).filter((f) => techCanSeeFleet(session, f)).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", title: `כלי מושבת · ${unitDisplayNo(f)}`, body: `${unitTypeName(f, cfg)} · ${b.level.label}` }); });
   } else {
     vis.forEach((t) => {
       if (t.status === "pending_user") ev.push({ key: t.id + "-pu", at: t.updatedAt, ticketId: t.id, kind: "confirm", title: "ממתינה לאישורך", body: t.subject });
@@ -1470,7 +1473,7 @@ function computeEvents(session, tickets, pm, fleet, cfg, presence, zones = [], r
       (t.log || []).forEach((l, i) => { if (l.byRole !== "user") ev.push({ key: `${t.id}-${i}`, at: l.at, ticketId: t.id, kind: "upd", title: `עדכון · #${ticketNo(t)}`, body: `${t.subject} — ${l.text}` }); });
     });
     (pm || []).filter((x) => x.active !== false && daysLeft(x.nextDue) <= 3).forEach((x) => { const f = pmFleet(x, fleet); if (!f || !fleetDepts(f).some((d) => userDepts(session).includes(d))) return; const d = daysLeft(x.nextDue); ev.push({ key: "pm-" + x.id, at: x.nextDue, kind: "pm", go: "dept", fleetId: f.id, title: "כלי מחלקתך לטיפול", body: `${unitLabel(f, cfg)} · ${d < 0 ? "באיחור — יש להוציא" : d === 0 ? "היום" : "בעוד " + d + " ימים"}` }); });
-    if (session.role === "user") fleetForSession(session, fleet).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "dept", title: `כלי מושבת · ${f.code}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
+    if (session.role === "user") fleetForSession(session, fleet).forEach((f) => { const b = unitBlock(f, tickets, cfg); if (b) ev.push({ key: "blk-" + f.id + b.ticket.id, at: b.ticket.createdAt, ticketId: b.ticket.id, kind: "escalate", go: "dept", title: `כלי מושבת · ${unitDisplayNo(f)}`, body: `${unitTypeName(f, cfg)} · ${b.level.label} — אין להשתמש בכלי` }); });
     if (session.role === "user") (cfg.driverEvents || []).filter((e) => (e.type === "approved" || e.type === "rejected") && e.reqByUid === session.id).slice(0, 20).forEach((e) => ev.push({ key: "drvout-" + e.id, at: e.at, kind: "driver", go: "dept", fleetId: e.unitId || null, title: e.type === "approved" ? "בקשת הנהג שלך אושרה" : "בקשת הנהג שלך נדחתה", body: `${e.sub === "move" ? "העברת" : "הוספת"} ${e.driverName} · ${e.unitCode}${e.toUnitCode ? ` → ${e.toUnitCode}` : ""}` }));
     if (session.role === "user") { const mz = session.mgrZones || []; (complaints || []).filter((c) => c.status === "open" && mz.includes(c.zoneId)).forEach((c) => ev.push({ key: "cmp-" + c.id, at: c.at, kind: "cleaning", go: "cleaning", title: c.kind === "broken" ? "תקלה באזור של מחלקתך" : "לכלוך באזור של מחלקתך", body: `${c.zoneName}${c.zoneLoc ? " · " + c.zoneLoc : ""}` }));
       (rounds || []).filter((r) => r.zoneId && Date.now() - r.at < 2 * 60 * 60 * 1000 && r.byUid !== session.id).forEach((r) => { const zone = (zones || []).find((z) => z.id === r.zoneId); if (!zone || !mz.includes(zone.id)) return; ev.push({ key: "zone-cleaned-" + r.id, at: r.at, kind: "cleaning", go: "cleaning", title: "האזור שלך נוקה", body: `${zone.name} · ${r.byName || "עובד ניקיון"}` }); }); }
@@ -3689,7 +3692,7 @@ function WorkerApp(p) {
     const t = {
       id, track, subject: subject.trim(),
       category: track === "transport" ? "transport" : "", categoryLabel: "", priority: "medium", zone: "",
-      asset: track === "transport" ? ((fleet.find((f) => f.id === forkliftId) || {}).code || "") : "",
+      asset: track === "transport" ? unitDisplayNo(fleet.find((f) => f.id === forkliftId)) : "",
       forkliftId: track === "transport" ? forkliftId : null, downtimeType: null, wearType: null, downtimeStart: null, downtimeEnd: null,
       description: description.trim(), status: "pending_manager", assignee: "", routedTech: undefined, mgrExec: undefined,
       reportedBy: { id: session.id, name: session.name, dept: session.dept || "", phone: session.phone || "" },
@@ -4536,7 +4539,7 @@ function DriverForm({ fixedCat, existing, isAdmin, dupCheck, onCancel, onSave, u
       <label className="field"><span>מספר עובד *</span><input value={workNo} onChange={(e) => setWorkNo(e.target.value)} inputMode="numeric" placeholder="1042" /></label></>
         : <UserPicker users={users} config={config} saveUser={saveUser} value={driverUserId} onChange={(u) => { setDriverUserId(u ? u.id : ""); setName(u ? u.name : ""); setWorkNo(u ? (u.workerNo || "") : ""); }} label="נהג (חיפוש לפי שם או מספר)" lockRole="worker" hint="חפשו עובד קיים או צרו חדש — כך הנהג מקושר לכרטיס משתמש." />}
       {!isEdit && <div className="field"><span>משמרת</span><div className="seg-tabs s2">{DRIVER_SHIFTS.map((s) => <button key={s.id} className={category === s.id ? "on" : ""} onClick={() => setCategory(s.id)}>{s.label}</button>)}</div></div>}
-      {dups.length > 0 && <div className="dup-block"><AlertTriangle size={14} /> חסום: עובד מס׳ {workNo} כבר משובץ ב-{dups.map((x) => `${x.unit.code} (${driverShiftMeta(x.shift).label})`).join(", ")}. לעובד מותר מקום ישיבה אחד בלבד. כדי לתת לו גישה לכלי נוסף — השתמשו בכפתור «גישה» על הנהג.</div>}
+      {dups.length > 0 && <div className="dup-block"><AlertTriangle size={14} /> חסום: עובד מס׳ {workNo} כבר משובץ ב-{dups.map((x) => `${unitDisplayNo(x.unit)} (${driverShiftMeta(x.shift).label})`).join(", ")}. לעובד מותר מקום ישיבה אחד בלבד. כדי לתת לו גישה לכלי נוסף — השתמשו בכפתור «גישה» על הנהג.</div>}
       <label className="chk-line" style={{ marginTop: 6 }}><input type="checkbox" checked={cross} onChange={(e) => setCross(e.target.checked)} /> חוצה משמרת — עובד גם במשמרת השנייה / תופס כלי של מחליפו</label>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" disabled={dups.length > 0} onClick={next}>{isEdit ? "שמירה" : "המשך"}</button><div style={{ height: 20 }} />
@@ -4548,8 +4551,8 @@ function MovePicker({ units, source, onCancel, onSave }) {
   const save = () => { const u = units.find((x) => x.id === unitId); if (!u) return setErr("בחרו כלי יעד"); onSave(u, category); };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">העברת נהג לכלי אחר</div></div>
     <div className="body">
-      <div className="hint" style={{ marginBottom: 10 }}>{source.driver.name} · {driverShiftMeta(source.cat).label} · מ-{source.unit.code}. ההעברה תישלח לאישור מנהל המערכת (שינוי הרשאות במערכת החיצונית).</div>
-      <label className="field"><span>כלי יעד</span><select value={unitId} onChange={(e) => setUnitId(e.target.value)}><option value="">— בחרו —</option>{opts.map((u) => { const occ = driverOf(u, category); return <option key={u.id} value={u.id}>{u.code}{driverActive(occ) || driverPending(occ) ? ` · תפוס (${occ.name})` : ""}</option>; })}</select></label>
+      <div className="hint" style={{ marginBottom: 10 }}>{source.driver.name} · {driverShiftMeta(source.cat).label} · מ-{unitDisplayNo(source.unit)}. ההעברה תישלח לאישור מנהל המערכת (שינוי הרשאות במערכת החיצונית).</div>
+      <label className="field"><span>כלי יעד</span><select value={unitId} onChange={(e) => setUnitId(e.target.value)}><option value="">— בחרו —</option>{opts.map((u) => { const occ = driverOf(u, category); return <option key={u.id} value={u.id}>{unitDisplayNo(u)}{driverActive(occ) || driverPending(occ) ? ` · תפוס (${occ.name})` : ""}</option>; })}</select></label>
       <div className="field"><span>משמרת ביעד</span><div className="seg-tabs s2">{DRIVER_SHIFTS.map((s) => <button key={s.id} className={category === s.id ? "on" : ""} onClick={() => setCategory(s.id)}>{s.label}</button>)}</div></div>
       {err && <div className="err">{err}</div>}
       <button className="btn-primary full" onClick={save}>המשך</button><div style={{ height: 20 }} />
@@ -4558,14 +4561,14 @@ function MovePicker({ units, source, onCancel, onSave }) {
 function AccessPicker({ allFleet, config, driver, seatUnitId, onCancel, onSave }) {
   const [sel, setSel] = useState(() => new Set((driver.access || []).map((a) => a.unitId)));
   const [q, setQ] = useState("");
-  const opts = (allFleet || []).filter((u) => u.id !== seatUnitId).filter((u) => !q.trim() || `${u.code} ${unitTypeName(u, config)}`.toLowerCase().includes(q.toLowerCase()));
+  const opts = (allFleet || []).filter((u) => u.id !== seatUnitId).filter((u) => !q.trim() || unitSearchText(u, config).toLowerCase().includes(q.toLowerCase()));
   const toggle = (id) => { const n = new Set(sel); n.has(id) ? n.delete(id) : n.add(id); setSel(n); };
-  const save = () => onSave((allFleet || []).filter((u) => sel.has(u.id)).map((u) => ({ unitId: u.id, unitCode: u.code, dept: fleetDepts(u)[0] || "" })));
+  const save = () => onSave((allFleet || []).filter((u) => sel.has(u.id)).map((u) => ({ unitId: u.id, unitCode: unitDisplayNo(u), dept: fleetDepts(u)[0] || "" })));
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">גישת {driver.name} לכלים</div></div>
     <div className="body">
       <div className="hint" style={{ marginBottom: 10 }}>סמנו כלים שהעובד מורשה לתפעל — מעבר לכלי הקבוע שלו, וגם ממחלקות אחרות. זו הרשאת גישה בלבד, אינה תופסת מקום במשמרת.</div>
       <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כלי להוספת הרשאת נהג" placeholder="חיפוש כלי…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-      <div className="cards" style={{ maxHeight: "46vh", overflowY: "auto", marginTop: 8 }}>{opts.map((u) => <label key={u.id} className={"acc-row" + (sel.has(u.id) ? " on" : "")}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggle(u.id)} /><span className="acc-code">{u.code}</span><span className="acc-desc">{unitDesc(u, config)}</span><span className="acc-dept">{fleetDepts(u)[0] || ""}</span></label>)}</div>
+      <div className="cards" style={{ maxHeight: "46vh", overflowY: "auto", marginTop: 8 }}>{opts.map((u) => <label key={u.id} className={"acc-row" + (sel.has(u.id) ? " on" : "")}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggle(u.id)} /><span className="acc-code">{unitDisplayNo(u)}</span><span className="acc-desc">{unitDesc(u, config)}</span><span className="acc-dept">{fleetDepts(u)[0] || ""}</span></label>)}</div>
       <button className="btn-primary full" onClick={save} style={{ marginTop: 10 }}>שמירת גישה ({sel.size})</button><div style={{ height: 20 }} />
     </div></div>);
 }
@@ -4589,27 +4592,27 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
   const submitForm = async (v) => {
     const { unit, existing } = form; const cat = existing ? form.cat : v.category;
     let ok = true;
-    if (existing) { ok = await writeDriver(unit, cat, { ...existing, name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || existing.userId || "" }, { type: "edited", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, byUid: session.id, byName: session.name, byDept: myDept }); }
+    if (existing) { ok = await writeDriver(unit, cat, { ...existing, name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || existing.userId || "" }, { type: "edited", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: v.name, workNo: v.workNo, byUid: session.id, byName: session.name, byDept: myDept }); }
     else { const base = { name: v.name, workNo: v.workNo, cross: !!v.cross, userId: v.userId || "", addedByUid: session.id, addedByName: session.name, addedByDept: isAdmin ? "הנהלה" : myDept, at: Date.now(), needsChip: !!v.needsChip };
       const immediate = isAdmin || !v.needsChip; // менеджер без чипа → сразу; с чипом → запрос
-      if (immediate) ok = await writeDriver(unit, cat, { ...base, status: "active" }, { type: "add", status: "active", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: !!v.needsChip, byUid: session.id, byName: session.name, byDept: isAdmin ? "הנהלה" : myDept });
-      else ok = await writeDriver(unit, cat, { ...base, status: "pending_add", reqAt: Date.now() }, { type: "add_req", unitId: unit.id, unitCode: unit.code, category: cat, driverName: v.name, workNo: v.workNo, needsChip: true, byUid: session.id, byName: session.name, byDept: myDept }); }
+      if (immediate) ok = await writeDriver(unit, cat, { ...base, status: "active" }, { type: "add", status: "active", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: v.name, workNo: v.workNo, needsChip: !!v.needsChip, byUid: session.id, byName: session.name, byDept: isAdmin ? "הנהלה" : myDept });
+      else ok = await writeDriver(unit, cat, { ...base, status: "pending_add", reqAt: Date.now() }, { type: "add_req", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: v.name, workNo: v.workNo, needsChip: true, byUid: session.id, byName: session.name, byDept: myDept }); }
     if (ok === false) return;
     setForm(null);
   };
-  const submitMove = async (b, toUnit, toCat) => { const { unit, cat, driver } = b; return writeDriver(unit, cat, { ...driver, status: "pending_move", moveTo: { unitId: toUnit.id, unitCode: toUnit.code, category: toCat }, reqAt: Date.now() }, { type: "move_req", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: toUnit.code, toCategory: toCat, driverName: driver.name, workNo: driver.workNo, needsChip: !!driver.needsChip, byUid: session.id, byName: session.name, byDept: myDept }); };
+  const submitMove = async (b, toUnit, toCat) => { const { unit, cat, driver } = b; return writeDriver(unit, cat, { ...driver, status: "pending_move", moveTo: { unitId: toUnit.id, unitCode: unitDisplayNo(toUnit), category: toCat }, reqAt: Date.now() }, { type: "move_req", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, toUnitCode: unitDisplayNo(toUnit), toCategory: toCat, driverName: driver.name, workNo: driver.workNo, needsChip: !!driver.needsChip, byUid: session.id, byName: session.name, byDept: myDept }); };
   const handleBTarget = async (toUnit, toCat) => { const b = move; const occ = driverOf(toUnit, toCat); if (driverActive(occ) || driverPending(occ)) { setConflict({ b, toUnit, toCat, occ }); setMove(null); } else if (await submitMove(b, toUnit, toCat) !== false) { setMove(null); } };
   const doDeletePrev = async () => { const c = conflict; if (await del(c.toUnit, c.toCat, c.occ) === false) return; if (await submitMove(c.b, c.toUnit, c.toCat) === false) return; setConflict(null); };
   const doSwap = async (zUnit, zCat) => { const r = relocateA; if (await submitMove(r.bMove.b, r.bMove.toUnit, r.bMove.toCat) === false) return; if (await submitMove({ unit: r.a.unit, cat: r.a.cat, driver: r.a.driver }, zUnit, zCat) === false) return; setRelocateA(null); };
-  const del = async (unit, cat, d) => dropDriver(unit, cat, { type: "deleted", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, workNo: d.workNo, byUid: session.id, byName: session.name, byDept: myDept });
-  const submitAccess = async (list) => { const { unit, cat, driver } = access; if (await writeDriver(unit, cat, { ...driver, access: list }, { type: "access", unitId: unit.id, unitCode: unit.code, category: cat, driverName: driver.name, workNo: driver.workNo, byUid: session.id, byName: session.name, byDept: myDept, sub: String(list.length) }) !== false) setAccess(null); };
+  const del = async (unit, cat, d) => dropDriver(unit, cat, { type: "deleted", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: d.name, workNo: d.workNo, byUid: session.id, byName: session.name, byDept: myDept });
+  const submitAccess = async (list) => { const { unit, cat, driver } = access; if (await writeDriver(unit, cat, { ...driver, access: list }, { type: "access", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: driver.name, workNo: driver.workNo, byUid: session.id, byName: session.name, byDept: myDept, sub: String(list.length) }) !== false) setAccess(null); };
   const approve = async (unit, cat) => {
     setMsg("");
     const d = driverOf(unit, cat); if (!d) return;
-    if (d.status === "pending_add") await writeDriver(unit, cat, { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }, { type: "approved", sub: "add", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName });
-    else if (d.status === "pending_move" && d.moveTo) { const tgt = fleet.find((x) => x.id === d.moveTo.unitId); const occ = tgt ? driverOf(tgt, d.moveTo.category) : null; if (occ && occ !== d && (driverActive(occ) || driverPending(occ))) { setMsg(`היעד תפוס (${tgt?.code} · ${driverShiftMeta(d.moveTo.category).label}) — יש לאשר/לטפל קודם בהעברת ${occ.name}`); return; } const src = { ...(unit.drivers || {}) }; delete src[cat]; if (await saveFleet({ ...unit, drivers: src }) === false) return setMsg(SAVE_FAILED_MESSAGE); if (tgt) { const nd = { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }; delete nd.moveTo; if (await saveFleet({ ...tgt, drivers: { ...(tgt.drivers || {}), [d.moveTo.category]: nd } }) === false) return setMsg(SAVE_FAILED_MESSAGE); } if (await saveConfig(pushDriverEvent(config, { type: "approved", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: d.moveTo.unitCode, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName })) === false) return setMsg(SAVE_FAILED_MESSAGE); }
+    if (d.status === "pending_add") await writeDriver(unit, cat, { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }, { type: "approved", sub: "add", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName });
+    else if (d.status === "pending_move" && d.moveTo) { const tgt = fleet.find((x) => x.id === d.moveTo.unitId); const occ = tgt ? driverOf(tgt, d.moveTo.category) : null; if (occ && occ !== d && (driverActive(occ) || driverPending(occ))) { setMsg(`היעד תפוס (${tgt ? unitDisplayNo(tgt) : ""} · ${driverShiftMeta(d.moveTo.category).label}) — יש לאשר/לטפל קודם בהעברת ${occ.name}`); return; } const src = { ...(unit.drivers || {}) }; delete src[cat]; if (await saveFleet({ ...unit, drivers: src }) === false) return setMsg(SAVE_FAILED_MESSAGE); if (tgt) { const nd = { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }; delete nd.moveTo; if (await saveFleet({ ...tgt, drivers: { ...(tgt.drivers || {}), [d.moveTo.category]: nd } }) === false) return setMsg(SAVE_FAILED_MESSAGE); } if (await saveConfig(pushDriverEvent(config, { type: "approved", sub: "move", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, toUnitCode: d.moveTo.unitCode, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName })) === false) return setMsg(SAVE_FAILED_MESSAGE); }
   };
-  const reject = async (unit, cat) => { const d = driverOf(unit, cat); if (!d) return; if (d.status === "pending_add") await dropDriver(unit, cat, { type: "rejected", sub: "add", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); else if (d.status === "pending_move") { const nd = { ...d, status: "active", decidedAt: Date.now() }; delete nd.moveTo; await writeDriver(unit, cat, nd, { type: "rejected", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); } };
+  const reject = async (unit, cat) => { const d = driverOf(unit, cat); if (!d) return; if (d.status === "pending_add") await dropDriver(unit, cat, { type: "rejected", sub: "add", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); else if (d.status === "pending_move") { const nd = { ...d, status: "active", decidedAt: Date.now() }; delete nd.moveTo; await writeDriver(unit, cat, nd, { type: "rejected", sub: "move", unitId: unit.id, unitCode: unitDisplayNo(unit), category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); } };
   const myShift = session.shift || "";
   const canEditCat = (cat) => isAdmin || !myShift || myShift === cat;
   const reqs = isAdmin ? pendingDriverReqs(fleet) : [];
@@ -4629,7 +4632,7 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
     if (focus === "conflict" && !ins.conflictIds.has(f.id)) return false;
     if (focus === "dups" && !ins.dupIds.has(f.id)) return false;
     if (catF !== "all" || presF !== "all") { const cats = catF === "all" ? DRIVER_SHIFTS.map((s) => s.id) : [catF]; const has = cats.some((c) => driverActive(driverOf(f, c)) || driverPending(driverOf(f, c))); if (presF === "has" && !has) return false; if (presF === "none" && has) return false; }
-    if (q.trim()) { const hay = `${f.code} ${unitTypeName(f, config)} ${DRIVER_SHIFTS.map((s) => { const d = driverOf(f, s.id); return d ? d.name + " " + (d.workNo || "") : ""; }).join(" ")}`.toLowerCase(); if (!hay.includes(q.toLowerCase())) return false; }
+    if (q.trim()) { const hay = `${unitSearchText(f, config)} ${DRIVER_SHIFTS.map((s) => { const d = driverOf(f, s.id); return d ? d.name + " " + (d.workNo || "") : ""; }).join(" ")}`.toLowerCase(); if (!hay.includes(q.toLowerCase())) return false; }
     return true;
   });
   const Sel = ({ label, value, onChange, children }) => (<label className="flt-field"><span className="flt-lbl">{label}</span><select value={value} onChange={(e) => onChange(e.target.value)}><option value="all">הכל</option>{children}</select></label>);
@@ -4640,7 +4643,7 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
       {pend ? <div className="drv-pend">{d.status === "pending_add" ? "ממתין לאישור הוספה" : `ממתין להעברה ל-${d.moveTo?.unitCode || ""}`}</div> : <div className="drv-by">{d.at ? "משובץ מ-" + fmtDate(d.at) : ""}</div>}
       {d.access && d.access.length > 0 ? <div className="drv-access"><ListChecks size={11} /> גישה: {d.access.map((a) => a.unitCode).join(", ")}</div> : null}
       <div className="drv-acts">
-        {isAdmin && pend ? <><button className="drv-ok" onClick={() => approve(unit, cat)} title="אישור בקשת נהג" aria-label={`אישור בקשת נהג ${d.name} עבור ${unit.code}`}><Check size={14} /></button><button className="drv-no2" onClick={() => reject(unit, cat)} title="דחיית בקשת נהג" aria-label={`דחיית בקשת נהג ${d.name} עבור ${unit.code}`}><X size={14} /></button></> : null}
+        {isAdmin && pend ? <><button className="drv-ok" onClick={() => approve(unit, cat)} title="אישור בקשת נהג" aria-label={`אישור בקשת נהג ${d.name} עבור ${unitDisplayNo(unit)}`}><Check size={14} /></button><button className="drv-no2" onClick={() => reject(unit, cat)} title="דחיית בקשת נהג" aria-label={`דחיית בקשת נהג ${d.name} עבור ${unitDisplayNo(unit)}`}><X size={14} /></button></> : null}
         {!pend && canEditCat(cat) ? <><button className="icon-btn sm" onClick={() => setForm({ unit, cat, existing: d })} title="עריכה" aria-label={`עריכת נהג ${d.name}`}><PenLine size={13} /></button><button className="icon-btn sm" onClick={() => setAccess({ unit, cat, driver: d })} title="גישה לכלים נוספים" aria-label={`ניהול גישה לכלים נוספים עבור ${d.name}`}><ListChecks size={13} /></button><button className="icon-btn sm" onClick={() => setMove({ unit, cat, driver: d })} title="החלפת כלי" aria-label={`החלפת כלי עבור ${d.name}`}><Truck size={13} /></button><button className="icon-btn sm danger" onClick={() => del(unit, cat, d)} title="מחיקה" aria-label={`מחיקת נהג ${d.name}`}><Trash2 size={13} /></button></> : null}
       </div>
     </div>;
@@ -4649,7 +4652,7 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
     <SectionTitle><Users size={15} /> נהגים וכיסוי משמרות</SectionTitle>
     {msg && <div className="banner" style={{ background: "#FEE2E2", color: "#991B1B", borderColor: "#FCA5A5" }}><AlertTriangle size={16} /> {msg}<button onClick={() => setMsg("")} aria-label="סגירת הודעה" title="סגירת הודעה" style={{ marginInlineStart: "auto", background: "none", border: "none", color: "inherit", cursor: "pointer" }}><X size={15} /></button></div>}
     {isAdmin && reqs.length > 0 && <><div className="banner" style={{ background: "#FEF3C7", color: "#92400E", borderColor: "#FCD34D" }}><AlertTriangle size={16} /> {reqs.length} בקשות נהגים ממתינות לאישורך</div>
-      <div className="cards" style={{ marginBottom: 8 }}>{reqs.map(({ unit, cat, driver }) => <div key={unit.id + cat} className="req-row"><div className="req-main"><div className="req-t">{driver.status === "pending_add" ? "הוספת נהג" : "העברת נהג"} · {driver.name} <span className="drv-no">#{driver.workNo}</span></div><div className="req-s">{unit.code} · {driverShiftMeta(cat).label}{driver.status === "pending_move" ? ` → ${driver.moveTo?.unitCode} (${driverShiftMeta(driver.moveTo?.category).label})` : ""}{driver.needsChip ? " · צריך צ׳יפ" : ""} · מ-{driver.addedByName || "—"}</div></div><div className="req-acts"><button className="btn-primary sm" onClick={() => approve(unit, cat)}><Check size={14} /> אישור</button><button className="btn-ghost sm" onClick={() => reject(unit, cat)}><X size={14} /> דחייה</button></div></div>)}</div></>}
+      <div className="cards" style={{ marginBottom: 8 }}>{reqs.map(({ unit, cat, driver }) => <div key={unit.id + cat} className="req-row"><div className="req-main"><div className="req-t">{driver.status === "pending_add" ? "הוספת נהג" : "העברת נהג"} · {driver.name} <span className="drv-no">#{driver.workNo}</span></div><div className="req-s">{unitDisplayNo(unit)} · {driverShiftMeta(cat).label}{driver.status === "pending_move" ? ` → ${driver.moveTo?.unitCode} (${driverShiftMeta(driver.moveTo?.category).label})` : ""}{driver.needsChip ? " · צריך צ׳יפ" : ""} · מ-{driver.addedByName || "—"}</div></div><div className="req-acts"><button className="btn-primary sm" onClick={() => approve(unit, cat)}><Check size={14} /> אישור</button><button className="btn-ghost sm" onClick={() => reject(unit, cat)}><X size={14} /> דחייה</button></div></div>)}</div></>}
     <div className="ins-grid">
       <button className={"ins-card clk" + (focus === "idle" ? " on" : "")} onClick={() => toggleFocus("idle")}><div className="ins-n" style={{ color: ins.idle.length ? "#DC2626" : "#16A34A" }}>{ins.idle.length}</div><div className="ins-l">כלים ללא נהג כלל</div></button>
       {ins.perCat.map(({ s, missing }) => <button key={s.id} className={"ins-card clk" + (focus === "miss-" + s.id ? " on" : "")} onClick={() => toggleFocus("miss-" + s.id)}><div className="ins-n" style={{ color: missing ? s.color : "#16A34A" }}>{missing}</div><div className="ins-l">ללא נהג · {s.label}</div></button>)}
@@ -4658,8 +4661,8 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
     </div>
     {focus && <div className="focus-bar"><span>מסונן: {focus === "idle" ? "ללא נהג כלל" : focus === "conflict" ? "התנגשות חוצת-משמרת" : focus === "dups" ? "עובד בכמה כלים" : focus === "miss-morning" ? "ללא נהג בבוקר" : "ללא נהג בלילה"} · {countLabel(rows.length, "כלי", "כלים")}</span><button onClick={() => setFocus(null)}><X size={13} /> ניקוי</button></div>}
     {ins.suggest.length > 0 && <div className="advice-box"><div className="advice-h"><Sparkles size={14} /> הצעות אופטימיזציה</div>{ins.suggest.map((s, i) => <div key={i} className="advice-row">העבירו את <b>{s.driver.name}</b> ({driverShiftMeta(s.shift).label}) מ-{s.fromCode} ל-<b>{s.toCode}</b> — פנוי במשמרת זו. <span className="advice-why">{s.reason}</span></div>)}</div>}
-    {ins.conflict.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>נהג חוצה-משמרת תופס כלי לצד מחליפו: {ins.conflict.map((f) => f.code).join(", ")}</div>}
-    {ins.dups.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>עובדים המשובצים ביותר מכלי אחד: {ins.dups.map((g) => `${g[0].driver.name} (${g.map((a) => a.unit.code).join("/")})`).join(" · ")}</div>}
+    {ins.conflict.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>נהג חוצה-משמרת תופס כלי לצד מחליפו: {ins.conflict.map((f) => unitDisplayNo(f)).join(", ")}</div>}
+    {ins.dups.length > 0 && <div className="hint" style={{ margin: "2px 2px 8px" }}>עובדים המשובצים ביותר מכלי אחד: {ins.dups.map((g) => `${g[0].driver.name} (${g.map((a) => unitDisplayNo(a.unit)).join("/")})`).join(" · ")}</div>}
     <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש כיסוי נהגים לפי כלי או שם נהג" placeholder="חיפוש לפי כלי או שם נהג…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="משמרת" value={catF} onChange={setCatF}>{DRIVER_SHIFTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</Sel>
@@ -4670,14 +4673,14 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
       const groups = new Map();
       rows.forEach((f) => { const dep = fleetDepts(f)[0] || "ללא מחלקה"; if (!groups.has(dep)) groups.set(dep, []); groups.get(dep).push(f); });
       const arr = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "he"));
-      const card = (f) => { const blk = unitBlock(f, tickets, config); return <div key={f.id} className={"drv-unit" + (blk ? " blocked" : "")} style={blk ? { borderColor: blk.level.color } : {}}><div className="drv-unit-head"><span className="drv-unit-code">{f.code}</span><span className="drv-unit-desc">{unitDesc(f, config)}</span>{blk && <span className="blk-chip" style={{ background: blk.level.color, marginInlineStart: "auto" }}><ShieldAlert size={11} /> מושבת</span>}</div><div className="drv-slots">{(catF === "all" ? DRIVER_SHIFTS : DRIVER_SHIFTS.filter((s) => s.id === catF)).map((s) => { const d = driverOf(f, s.id); return <div key={s.id} className="drv-slot"><span className="drv-cat" style={{ background: s.color + "1a", color: s.color }}>{s.label}</span>{d ? <Chip unit={f} cat={s.id} d={d} /> : (canEditCat(s.id) ? <button className="drv-add" onClick={() => setForm({ unit: f, cat: s.id, existing: null })}><Plus size={14} /> הוסף נהג</button> : <span className="drv-cat" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא שובץ נהג</span>)}</div>; })}</div></div>; };
+      const card = (f) => { const blk = unitBlock(f, tickets, config); return <div key={f.id} className={"drv-unit" + (blk ? " blocked" : "")} style={blk ? { borderColor: blk.level.color } : {}}><div className="drv-unit-head"><span className="drv-unit-code">{unitDisplayNo(f)}</span><span className="drv-unit-desc">{unitDesc(f, config)}</span>{blk && <span className="blk-chip" style={{ background: blk.level.color, marginInlineStart: "auto" }}><ShieldAlert size={11} /> מושבת</span>}</div><div className="drv-slots">{(catF === "all" ? DRIVER_SHIFTS : DRIVER_SHIFTS.filter((s) => s.id === catF)).map((s) => { const d = driverOf(f, s.id); return <div key={s.id} className="drv-slot"><span className="drv-cat" style={{ background: s.color + "1a", color: s.color }}>{s.label}</span>{d ? <Chip unit={f} cat={s.id} d={d} /> : (canEditCat(s.id) ? <button className="drv-add" onClick={() => setForm({ unit: f, cat: s.id, existing: null })}><Plus size={14} /> הוסף נהג</button> : <span className="drv-cat" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>לא שובץ נהג</span>)}</div>; })}</div></div>; };
       return arr.map(([dep, units]) => <div key={dep} className="dept-group"><div className="dept-head"><span className="dept-line" /><span className="dept-name">מחלקה · {dep}</span><span className="dept-count">{countLabel(units.length, "כלי", "כלים")}</span><span className="dept-line" /></div><div className="cards">{units.map(card)}</div></div>);
     })()}
     {form && <Overlay persistent onClose={() => setForm(null)}><DriverForm fixedCat={form.cat} existing={form.existing} isAdmin={isAdmin} users={users} saveUser={saveUser} config={config} dupCheck={(name, workNo) => (name.trim() || workNo.trim()) ? driverDupes(scoped, { name, workNo }, form.unit.id, form.existing ? form.cat : null) : []} onCancel={() => setForm(null)} onSave={submitForm} /></Overlay>}
     {move && <Overlay persistent onClose={() => setMove(null)}><MovePicker units={scoped} source={move} onCancel={() => setMove(null)} onSave={handleBTarget} /></Overlay>}
     {conflict && <Overlay persistent onClose={() => setConflict(null)}><div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={() => setConflict(null)} aria-label="סגירת הודעת כלי תפוס"><X size={22} /></button><div className="form-title">הכלי תפוס</div></div>
       <div className="body">
-        <div className="hint" style={{ marginBottom: 12 }}>ב-{conflict.toUnit.code} ({driverShiftMeta(conflict.toCat).label}) כבר משובץ <b>{conflict.occ.name}</b> (#{conflict.occ.workNo}). מה לעשות כדי לשבץ את {conflict.b.driver.name}?</div>
+        <div className="hint" style={{ marginBottom: 12 }}>ב-{unitDisplayNo(conflict.toUnit)} ({driverShiftMeta(conflict.toCat).label}) כבר משובץ <b>{conflict.occ.name}</b> (#{conflict.occ.workNo}). מה לעשות כדי לשבץ את {conflict.b.driver.name}?</div>
         <button className="choice-btn" onClick={doDeletePrev}><div className="choice-t">מחק את {conflict.occ.name} והעבר לכאן את {conflict.b.driver.name}</div><div className="choice-s">העובד הקודם יוסר מהמערכת (ללא אישור) · ההעברה תישלח לאישורך</div></button>
         <button className="choice-btn" onClick={() => { setRelocateA({ a: { unit: conflict.toUnit, cat: conflict.toCat, driver: conflict.occ }, bMove: { b: conflict.b, toUnit: conflict.toUnit, toCat: conflict.toCat } }); setConflict(null); }}><div className="choice-t">העבר גם את {conflict.occ.name} לכלי אחר</div><div className="choice-s">שתי בקשות העברה נפרדות יישלחו לאישורך (החלפה צולבת)</div></button>
         <button className="btn-ghost full" onClick={() => setConflict(null)}>ביטול</button><div style={{ height: 20 }} />
@@ -4694,7 +4697,7 @@ function ProblemUnitsPanel({ fleet, tickets, config, onOpen }) {
     <div className="hint" style={{ margin: "0 2px 8px" }}>כלים עם ריבוי קריאות ב-90 הימים האחרונים — כדאי לתת תשומת לב ולשקול טיפול שורש.</div>
     <div className="cards">{list.slice(0, 8).map(({ f, h, reasons }) => <button key={f.id} className="prob-row" onClick={() => onOpen && onOpen(f.id)}>
       <span className="prob-dot" style={{ background: h.color }} />
-      <span className="prob-main"><span className="prob-code">{f.code} · {unitDesc(f, config)}</span><span className="prob-reasons">{reasons.length ? reasons.map(([c, n]) => `${c} (${n})`).join(" · ") : "ללא פירוט סיבות"}</span></span>
+      <span className="prob-main"><span className="prob-code">{unitDisplayNo(f)} · {unitDesc(f, config)}</span><span className="prob-reasons">{reasons.length ? reasons.map(([c, n]) => `${c} (${n})`).join(" · ") : "ללא פירוט סיבות"}</span></span>
       <span className="prob-stat"><b style={{ color: h.color }}>{h.count90}</b> {h.count90 === 1 ? "קריאה" : "קריאות"} · {h.label}</span>
     </button>)}</div>
   </div>);
@@ -4719,7 +4722,7 @@ function ManagerFleet(p) {
       : <>
       <ProblemUnitsPanel fleet={scoped} tickets={tickets} config={config} onOpen={(id) => setOpenId(id)} />
       <SectionTitle><Truck size={15} /> כלי השינוע של מחלקותיי ({scoped.length})</SectionTitle>
-      {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
+      {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{unitDisplayNo(f)}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
     </>}
     {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
     {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
@@ -8047,7 +8050,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
           <label className="confirm-line"><input type="checkbox" checked={confirmCatalog} onChange={(ev) => setConfirmCatalog(ev.target.checked)} />צור/עדכן את קטלוג סוגי הכלים לפני הייבוא</label>
         </div>}
         {invalidRows.length > 0 && <div className="err">{invalidRows.length} שורות חסרות מספר/ספק/דגם ולא ייובאו.</div>}
-        <div className="imp-prev">{result.rows.slice(0, 45).map((row) => <div key={row.sourceRow} className="imp-row" style={row.action !== "new" ? { opacity: 0.62 } : {}}><div className="imp-t"><span className={"act-tag " + (row.action === "new" ? "new" : row.action === "conflict" ? "update" : "nochange")}>{row.action === "new" ? "חדשה" : row.action === "conflict" ? "קונפליקט" : "שגויה"}</span>{row.unit.code || "—"} · {row.unit.type || row.unit.vehicleKind || "—"}</div><div className="imp-meta">{row.unit.supplier || "—"} · דגם {row.unit.model || "—"} · שלדה {row.unit.chassis || "—"} · מסמכים {Object.keys(row.unit.docs || {}).length}</div></div>)}</div>
+        <div className="imp-prev">{result.rows.slice(0, 45).map((row) => <div key={row.sourceRow} className="imp-row" style={row.action !== "new" ? { opacity: 0.62 } : {}}><div className="imp-t"><span className={"act-tag " + (row.action === "new" ? "new" : row.action === "conflict" ? "update" : "nochange")}>{row.action === "new" ? "חדשה" : row.action === "conflict" ? "קונפליקט" : "שגויה"}</span>{row.unit.internalNo || row.unit.code || "—"} · {row.unit.type || row.unit.vehicleKind || "—"}</div><div className="imp-meta">{row.unit.supplier || "—"} · דגם {row.unit.model || "—"} · שלדה {row.unit.chassis || "—"} · מסמכים {Object.keys(row.unit.docs || {}).length}</div></div>)}</div>
         {result.rows.length > 45 && <div className="hint">…ועוד {result.rows.length - 45} שורות</div>}
         {importError && <div className="err">{importError}</div>}
         {done ? <div className="toast-ok"><CheckCircle2 size={16} /> {readyRows.length ? `יובאו ${readyRows.length} כלים חדשים` : "קטלוג סוגי הכלים עודכן"}</div> : <button className="btn-primary full" disabled={busy || !canImport} onClick={save}>{readyRows.length ? `ייבוא ${readyRows.length} כלים חדשים` : "עדכון קטלוג סוגי הכלים"}</button>}
@@ -8081,7 +8084,7 @@ function FleetModule(p) {
     if (dept !== "all" && !fleetInDept(f, dept)) return false;
     if (hyd !== "all" && (resolveHydraulics(f, config) ? "yes" : "no") !== hyd) return false;
     if (doc !== "all") { const s = docStatus(f, config); const lvl = s.d == null ? "none" : s.d < 0 ? "expired" : s.d <= 30 ? "soon" : "ok"; if (doc !== lvl) return false; }
-    if (q.trim() && !`${f.code} ${unitModelCode(f)} ${unitTypeName(f, config)} ${f.chassis} ${f.license}`.toLowerCase().includes(q.toLowerCase())) return false;
+    if (q.trim() && !unitSearchText(f, config).toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
   const rowIds = rows.map((f) => f.id);
@@ -8139,6 +8142,7 @@ function FleetModule(p) {
       const block = unitBlock(f, tickets, config);
       return {
         "מספר / קוד": f.code || "",
+        "מספר פנימי": unitInternalNo(f) || "",
         "סוג כלי": unitTypeName(f, config) || "",
         "דגם": unitModelCode(f) || "",
         "ספק": f.supplier || "",
@@ -8181,8 +8185,8 @@ function FleetModule(p) {
   );
   const docChip = (f, d) => { const ts = dateToTs(f.docs?.[d.id]?.date); const dl = ts == null ? null : daysLeft(ts); const missing = ts == null; const col = missing ? "#DC2626" : docWarnColor(dl, config); return <span key={d.id} className="doc-chip" title={d.label}><span className="doc-chip-dot" style={{ background: col }} /><span className="doc-chip-name">{compactDocLabel(d)}</span><span className="doc-chip-days" style={{ color: col }}>{missing ? "חסר" : docDaysLabel(dl)}</span></span>; };
   const renderRow = (f) => { const blk = unitBlock(f, tickets, config); const selected = selectedFleetIds.includes(f.id); return <div key={f.id} role="button" tabIndex={0} className={"ftable-row fleet-unit-row" + (blk ? " blocked" : "") + (selected ? " selected" : "")} onClick={() => setOpenId(f.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(f.id); } }} style={blk ? { borderInlineStartColor: blk.level.color } : {}}>
-    <label className="ft-select" aria-label={`בחר ${f.code}`} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleFleetSelection(f.id)} /></label>
-    <span className="ft-code">{f.code}</span>
+    <label className="ft-select" aria-label={`בחר ${unitDisplayNo(f)}`} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleFleetSelection(f.id)} /></label>
+    <span className="ft-code">{unitDisplayNo(f)}</span>
     <span className="ft-type"><b>{unitTypeName(f, config) || "—"}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span>
     <span className="ft-model">{unitModelCode(f) || "—"}</span>
     <span className="ft-sup">{f.supplier || "—"}</span>
@@ -8196,7 +8200,7 @@ function FleetModule(p) {
     <div className="seg-tabs s3" style={{ maxWidth: 460, marginBottom: 12 }}><button className={ftab === "units" ? "on" : ""} onClick={() => setFtab("units")}>כלים</button><button className={ftab === "drivers" ? "on" : ""} onClick={() => setFtab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button>{canEditSettings && <button className={ftab === "settings" ? "on" : ""} onClick={() => setFtab("settings")}>הגדרות</button>}</div>
     {ftab === "settings" && canEditSettings ? <FleetTypeSettings config={config} fleet={fleet} users={p.users} saveConfig={saveConfig} /> : ftab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} /> : <>
     <div className="fleet-topbar"><SectionTitle><Truck size={15} /> פארק כלי שינוע ({fleet.length})</SectionTitle><div className="fleet-actions"><button className="btn-ghost sm" onClick={exportFleet} disabled={!rows.length} title={!rows.length ? "אין נתונים לייצוא" : "ייצוא Excel"} aria-label="ייצוא Excel"><FileSpreadsheet size={15} /> ייצוא Excel</button>{canEditSettings && <button className="btn-ghost sm" onClick={() => setImp(true)} title="ייבוא Excel" aria-label="ייבוא Excel"><Download size={15} /> ייבוא Excel</button>}<button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> כלי</button></div></div>
-    <div className="search-wrap fleet-search"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר, דגם או שלדה" placeholder="חיפוש לפי מספר, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="search-wrap fleet-search"><Search size={18} /><input aria-label="חיפוש כלי שינוע לפי מספר פנימי, דגם או שלדה" placeholder="חיפוש לפי מספר פנימי, דגם, שלדה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="fleet-filters">
       <Sel label="סוג" value={type} onChange={setType}>{types.map((t) => <option key={t}>{t}</option>)}</Sel>
       <Sel label="מחלקה" value={dept} onChange={setDept}>{depts.map((d) => <option key={d}>{d}</option>)}</Sel>
@@ -8254,7 +8258,7 @@ function FleetForm({ item, config, onCancel, onSave }) {
   const currentTypeName = unitTypeName(item, config);
   const initType = vts ? (vts.find((v) => (v.name || "").trim() === currentTypeName || (v.models || []).includes(currentModel)) || vts[0]) : null;
   const [typeId, setTypeId] = useState(initType?.id || "");
-  const [f, setF] = useState({ code: item.code || "", supplier: item.supplier || "", type: vts ? (initType?.name || currentTypeName || "") : (item.type || FORKLIFT_TYPES[0]), model: currentModel || (vts ? ((initType?.models || []).filter(Boolean)[0] || "") : ""), vehicleKind: vts ? (initType?.name || currentTypeName || "") : (item.vehicleKind || ""), chassis: item.chassis || "", license: item.license || "", depts: item.depts || (item.dept ? [item.dept] : []), notes: item.notes || "", docs: item.docs || {} });
+  const [f, setF] = useState({ code: item.code || "", internalNo: unitInternalNo(item), supplier: item.supplier || "", type: vts ? (initType?.name || currentTypeName || "") : (item.type || FORKLIFT_TYPES[0]), model: currentModel || (vts ? ((initType?.models || []).filter(Boolean)[0] || "") : ""), vehicleKind: vts ? (initType?.name || currentTypeName || "") : (item.vehicleKind || ""), chassis: item.chassis || "", license: item.license || "", depts: item.depts || (item.dept ? [item.dept] : []), notes: item.notes || "", docs: item.docs || {} });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const curType = vts ? (vts.find((v) => v.id === typeId) || null) : null;
@@ -8268,13 +8272,14 @@ function FleetForm({ item, config, onCancel, onSave }) {
     const typeName = vts ? (curType?.name || f.vehicleKind || f.type) : (f.vehicleKind || modelTypeName(f.type, config) || f.notes || "");
     setErr("");
     setBusy(true);
-    const ok = await onSave({ id: item.id || uid(), ...f, type: vts ? typeName : f.type, model: vts ? f.model : (f.model || f.type), vehicleKind: typeName, dept: f.depts[0] || "", code: f.code.trim(), createdAt: item.createdAt || Date.now() });
+    const ok = await onSave({ id: item.id || uid(), ...f, type: vts ? typeName : f.type, model: vts ? f.model : (f.model || f.type), vehicleKind: typeName, dept: f.depts[0] || "", code: f.code.trim(), internalNo: f.internalNo.trim(), createdAt: item.createdAt || Date.now() });
     setBusy(false);
     if (ok === false) setErr(SAVE_FAILED_MESSAGE);
   };
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">{item.id ? "עריכת כלי" : "כלי שינוע חדש"}</div></div>
     <div className="body">
-      <label className="field"><span>מספר / מזהה פנימי *</span><input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="מלגזה 14" /></label>
+      <label className="field"><span>מספר / קוד כלי *</span><input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="מלגזה 14" /></label>
+      <label className="field"><span>מספר פנימי</span><input className="ltr-input" dir="ltr" value={f.internalNo} onChange={(e) => setF({ ...f, internalNo: e.target.value })} placeholder="לדוגמה: M-039" /></label>
       {vts ? <>
         <label className="field"><span>סוג</span><select value={typeId} onChange={(e) => pickType(e.target.value)}>{vts.map((v) => <option key={v.id} value={v.id}>{v.name || "ללא שם"}</option>)}</select></label>
         <label className="field"><span>דגם (יצרן)</span><select value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })}>{(curType?.models || []).filter(Boolean).length === 0 ? <option value="">— אין דגמים —</option> : (curType.models).filter(Boolean).map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
@@ -8298,13 +8303,14 @@ function FleetCard({ fleet, config, tickets, onClose, onEdit, onDelete, onReturn
   const blk = unitBlock(f, tickets, config);
   const related = tickets.filter((t) => t.forkliftId === f.id).sort((a, b) => b.createdAt - a.createdAt);
   const dt = related.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }} aria-label="עריכת כלי"><PenLine size={18} /></button>}</div>
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{unitDisplayNo(f)}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }} aria-label="עריכת כלי"><PenLine size={18} /></button>}</div>
     <div className="body">
       <div className="detail-top"><span className="badge" style={{ background: TRACKS.transport.color + "22", color: TRACKS.transport.color }}>{unitTypeName(f, config) || "כלי שינוע"}</span>{resolveHydraulics(f, config) && <span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>תסקיר</span>}</div>
       <h2 className="detail-subj">{unitDesc(f, config) || f.code}</h2>
       {blk && <div className="blk-banner" style={{ borderColor: blk.level.color, background: blk.level.color + "14", color: blk.level.color }}><ShieldAlert size={20} /><div className="blk-b-txt"><b>כלי מושבת — אין להשתמש</b><span>{blk.level.label}{blk.count > 1 ? ` · ${blk.count} קריאות חוסמות` : ""}</span></div>{onReturnService && <ConfirmBtn className="blk-return" icon={<RefreshCw size={14} />} label="החזר לשירות" onConfirm={onReturnService} />}</div>}
       <div className="meta-grid">
         <Meta Icon={Truck} label="סוג" value={unitTypeName(f, config) || "—"} />
+        <Meta Icon={Hash} label="מספר פנימי" value={unitInternalNo(f) || "—"} />
         <Meta Icon={Cog} label="דגם" value={unitModelCode(f) || "—"} />
         <Meta Icon={Package} label="ספק" value={f.supplier || "—"} />
         <Meta Icon={Wrench} label="שלדה" value={f.chassis || "—"} />
@@ -8529,7 +8535,7 @@ function PMHistory({ pm, fleet, onOpen, config }) {
   });
   filtered.sort((a, b) => sort === "date_asc" ? a.at - b.at : b.at - a.at);
   const exportXlsx = async () => {
-    const data = filtered.map((r) => ({ "תאריך": fmtDate(r.at), "כלי": r.f ? r.f.code : "", "רגולציה": r.ruleTitle || "", "סוג": r.f ? unitTypeName(r.f, config) : "", "דגם": r.f ? unitModelCode(r.f) : "", "תוצאה": r.type === "missed" ? "לא הגיע" : "בוצע", "עבודות המשך": r.hadPaid ? "כן" : "", "בוצע ע״י": r.by || "", "הערה": r.paidNote || "" }));
+    const data = filtered.map((r) => ({ "תאריך": fmtDate(r.at), "כלי": r.f ? unitDisplayNo(r.f) : "", "רגולציה": r.ruleTitle || "", "סוג": r.f ? unitTypeName(r.f, config) : "", "דגם": r.f ? unitModelCode(r.f) : "", "תוצאה": r.type === "missed" ? "לא הגיע" : "בוצע", "עבודות המשך": r.hadPaid ? "כן" : "", "בוצע ע״י": r.by || "", "הערה": r.paidNote || "" }));
     const ws = XLSX.utils.json_to_sheet(rowsSafe(data)); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "היסטוריית טיפולים"); downloadXlsx(wb, "pm-history.xlsx");
   };
   const exportPdf = () => {
@@ -8623,7 +8629,7 @@ function PMYearMatrix({ items, fleet, onOpen, config }) {
       <tbody>{grouped.map(([t, grp]) => [
         <tr key={"g-" + t} className="ymx-grp"><th className="ymx-grp-h" colSpan={13}>{t} <span className="ymx-grp-n">{grp.length}</span></th></tr>,
         ...grp.map((r) => <tr key={r.x.id}>
-        <th className="ymx-unit" onClick={() => onOpen(r.x)}>{r.f ? r.f.code : "—"}<span className="ymx-type">{r.f ? unitDesc(r.f, config) : ""}</span></th>
+        <th className="ymx-unit" onClick={() => onOpen(r.x)}>{r.f ? unitDisplayNo(r.f) : "—"}<span className="ymx-type">{r.f ? unitDesc(r.f, config) : ""}</span></th>
         {HE_MONTHS.map((_, m) => { const s = r.months[m]; const st = s ? PM_STAT[s] : null; const actual = s === "done" || s === "missed" || s === "overdue"; return <td key={m} className="ymx-c" onClick={() => st && onOpen(r.x)} title={st ? `${HE_MONTHS[m]} ${year} · ${st.lbl}` : ""}>{st && <span className="ymx-chip" style={{ background: st.c + "22", borderColor: st.c, color: st.c }}>{actual && <span className="ymx-dot" />}</span>}</td>; })}
       </tr>)])}</tbody>
     </table></div>}
@@ -8717,7 +8723,7 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
     <div className="cal-grid">{weeks.map((row, wi) => row.map((day, di) => { const inMonth = day.getMonth() === month; const k = startOfDay(day.getTime()); const list = byDay[k] || []; const isToday = k === todayK; return (
       <div key={wi + "-" + di} className={"cal-cell" + (inMonth ? "" : " out") + (isToday ? " today" : "")}>
         <div className="cal-daynum">{day.getDate()}</div>
-        {list.slice(0, 3).map(({ task: x, projected }) => { const f = pmFleet(x, fleet); const od = k < todayK; const type = unitTypeName(f, config) || unitModelCode(f) || "כלי"; return <button key={`${x.id}-${k}`} className={"cal-pill pm-cal-pill" + (projected ? " projected" : "")} style={{ background: od ? "#FEE2E2" : projected ? "var(--primary-soft)" : "#FFEDD5", color: od ? "#B91C1C" : projected ? "var(--primary)" : "#9A3412" }} onClick={() => onOpen(x)} title={f ? unitLabel(f, config) : "כלי"}><span className="pm-cal-type">{type}</span><span className="pm-cal-code">{f?.code || "—"}</span></button>; })}
+        {list.slice(0, 3).map(({ task: x, projected }) => { const f = pmFleet(x, fleet); const od = k < todayK; const type = unitTypeName(f, config) || unitModelCode(f) || "כלי"; return <button key={`${x.id}-${k}`} className={"cal-pill pm-cal-pill" + (projected ? " projected" : "")} style={{ background: od ? "#FEE2E2" : projected ? "var(--primary-soft)" : "#FFEDD5", color: od ? "#B91C1C" : projected ? "var(--primary)" : "#9A3412" }} onClick={() => onOpen(x)} title={f ? unitLabel(f, config) : "כלי"}><span className="pm-cal-type">{type}</span><span className="pm-cal-code">{f ? unitDisplayNo(f) : "—"}</span></button>; })}
         {list.length > 3 && <div className="cal-more">+{list.length - 3}</div>}
       </div>); }))}</div>
     {overdue.length > 0 && <><SectionTitle><AlertTriangle size={15} /> באיחור</SectionTitle><div className="cards">{overdue.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); return <div key={x.id} className="pm-card" onClick={() => onOpen(x)}><span className="pm-bar" style={{ background: "#DC2626" }} /><div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span></div><div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)} · באיחור {-d} ימים{fleetDepts(f).length ? <> · {fleetDepts(f).join(", ")}</> : null}</div></div></div>; })}</div></>}
@@ -8726,13 +8732,13 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
 function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "— בחרו כלי —" }) {
   const [open, setOpen] = useState(false), [uq, setUq] = useState("");
   const pool = (fleet || []).filter((f) => !filter || filter(f));
-  const groups = useMemo(() => { const m = new Map(); pool.filter((f) => { const hay = `${f.code} ${unitTypeName(f, config)} ${unitModelCode(f) || ""} ${fleetDepts(f).join(" ")}`.toLowerCase(); return !uq.trim() || hay.includes(uq.toLowerCase()); }).forEach((f) => { const t = unitTypeName(f, config) || "אחר"; if (!m.has(t)) m.set(t, []); m.get(t).push(f); }); return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "he")); }, [pool, config, uq]);
+  const groups = useMemo(() => { const m = new Map(); pool.filter((f) => { const hay = unitSearchText(f, config).toLowerCase(); return !uq.trim() || hay.includes(uq.toLowerCase()); }).forEach((f) => { const t = unitTypeName(f, config) || "אחר"; if (!m.has(t)) m.set(t, []); m.get(t).push(f); }); return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "he")); }, [pool, config, uq]);
   const sel = (fleet || []).find((f) => f.id === value);
   return (<>
-    <button type="button" className="unit-pick-btn" onClick={() => setOpen((o) => !o)}>{sel ? <span>{sel.code} · {unitDesc(sel, config)}</span> : <span className="muted-txt">{placeholder}</span>}<ChevronLeft size={16} style={{ transform: open ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
+    <button type="button" className="unit-pick-btn" onClick={() => setOpen((o) => !o)}>{sel ? <span>{unitDisplayNo(sel)} · {unitDesc(sel, config)}</span> : <span className="muted-txt">{placeholder}</span>}<ChevronLeft size={16} style={{ transform: open ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
     {open && <div className="unit-pick">
-      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus aria-label="חיפוש כלי לבחירה לפי מספר או סוג" placeholder="חיפוש לפי מספר / סוג…" value={uq} onChange={(e) => setUq(e.target.value)} /></div>
-      <div className="unit-pick-list">{groups.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו כלים</div> : groups.map(([t, units]) => <div key={t}><div className="unit-pick-grp">{t} <span className="upg-count">{units.length}</span></div>{units.map((f) => <button key={f.id} type="button" className={"unit-pick-row" + (f.id === value ? " on" : "")} onClick={() => { onChange(f.id); setOpen(false); setUq(""); }}><b>{f.code}</b><span className="upr-desc">{unitDesc(f, config)}{fleetDepts(f).length ? ` · ${fleetDepts(f).join(", ")}` : ""}</span></button>)}</div>)}</div>
+      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus aria-label="חיפוש כלי לבחירה לפי מספר פנימי או סוג" placeholder="חיפוש לפי מספר פנימי / סוג…" value={uq} onChange={(e) => setUq(e.target.value)} /></div>
+      <div className="unit-pick-list">{groups.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו כלים</div> : groups.map(([t, units]) => <div key={t}><div className="unit-pick-grp">{t} <span className="upg-count">{units.length}</span></div>{units.map((f) => <button key={f.id} type="button" className={"unit-pick-row" + (f.id === value ? " on" : "")} onClick={() => { onChange(f.id); setOpen(false); setUq(""); }}><b>{unitDisplayNo(f)}</b><span className="upr-desc">{unitDesc(f, config)}{fleetDepts(f).length ? ` · ${fleetDepts(f).join(", ")}` : ""}</span></button>)}</div>)}</div>
     </div>}
   </>);
 }
@@ -8912,8 +8918,8 @@ function PMEntry({ task, session, fleet, tickets = [], config, canManage, onTick
       ticketId = uid();
       const waiting = fuStatus === "waiting";
       onTicket({
-        id: ticketId, track: "transport", subject: `עבודות המשך מטיפול תקופתי · ${f ? f.code : ""}`,
-        category: "transport", priority: "medium", zone: "רחבת מלגזות", asset: f ? f.code : "",
+        id: ticketId, track: "transport", subject: `עבודות המשך מטיפול תקופתי · ${f ? unitDisplayNo(f) : ""}`,
+        category: "transport", priority: "medium", zone: "רחבת מלגזות", asset: f ? unitDisplayNo(f) : "",
         forkliftId: task.forkliftId || task.equipmentId || null, downtimeType: "minor", wearType: fuWear,
         downtimeStart: now, downtimeEnd: null, waitingReason: waiting ? (fuWaitReason || "parts") : null, waitBall: waiting ? reasonBall(config, fuWaitReason || "parts") : null, pauseSince: (waiting && reasonPauses(config, fuWaitReason || "parts")) ? now : null, pauseAccumMs: 0,
         description: "נפתח אוטומטית מטיפול תקופתי — נדרשות עבודות המשך." + (paidNote ? "\n" + paidNote : ""),
@@ -9232,7 +9238,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, onBa
       <SectionTitle><Package size={15} /> הזמנות רכש</SectionTitle>
       {relOrders.length === 0 ? <div className="hint" style={{ marginBottom: 12 }}>אין הזמנות לספק זה.</div> : <div className="task-list" style={{ marginBottom: 12 }}>{relOrders.map((o) => <div key={o.id} className="task-row" style={{ cursor: "default" }}><div className="task-row-main"><div className="task-row-t">{countLabel((o.lines || []).length, "פריט", "פריטים")} · {stLbl(o.status)}</div><div className="task-row-sub">{o.note || "—"}</div></div><div className="task-row-side"><span className="task-due">{fmtDate(o.createdAt)}</span></div></div>)}</div>}
       <SectionTitle><Truck size={15} /> כלים / ליסינג</SectionTitle>
-      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => { const note = unitNote(f, config); return <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{f.code} · {unitDesc(f, config)}</div>{note ? <div className="task-row-sub">{note}</div> : null}</div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>; })}</div>}
+      {relFleet.length === 0 ? <div className="hint">אין כלים מספק זה.</div> : <div className="task-list">{relFleet.map((f) => { const note = unitNote(f, config); return <button key={f.id} type="button" className="task-row supplier-linked-row" onClick={() => onOpenFleet && onOpenFleet(f.id)} style={{ borderInlineStartColor: "var(--primary)" }}><div className="task-row-main"><div className="task-row-t">{unitDisplayNo(f)} · {unitDesc(f, config)}</div>{note ? <div className="task-row-sub">{note}</div> : null}</div><div className="task-row-side">{f.leaseCost ? <span className="task-due">{ils(f.leaseCost)}</span> : null}<ChevronLeft size={16} /></div></button>; })}</div>}
     </div>}
     {tab === "invoices" && <div className="hint" style={{ padding: 18, textAlign: "center" }}>ניהול חשבוניות יתווסף עם מודול התקציב.</div>}
   </div>);
@@ -9850,7 +9856,7 @@ function TicketForm(p) {
     else routeText = "נפתחה ע״י מנהל — נשארת לטיפולך";
     return {
       id, track, subject: subject.trim(), category: track === "transport" ? "transport" : category, categoryLabel: track === "transport" ? "" : ((config.categories || CATEGORIES).find((c) => c.id === category)?.label || ""), priority: pr, zone,
-      asset: track === "transport" ? (fleet.find((f) => f.id === forkliftId)?.code || "") : asset.trim(),
+      asset: track === "transport" ? unitDisplayNo(fleet.find((f) => f.id === forkliftId)) : asset.trim(),
       forkliftId: track === "transport" ? forkliftId : null, downtimeType: track === "transport" ? downtimeType : null,
       wearType: null, downtimeStart: track === "transport" ? now : null, downtimeEnd: null, driverInvolved: track === "transport" ? driverInv.trim() : "", driverInvolvedId: track === "transport" ? driverInvId : "", incidentShift: track === "transport" ? incShift : "",
       description: description.trim(), status: "new", assignee,

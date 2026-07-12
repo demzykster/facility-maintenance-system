@@ -18,7 +18,8 @@ describe("Supabase fleet driver", () => {
           model: "8FBE15T",
           status: "active",
           source_kv_key: "fleet:fleet-1",
-          legacy_payload: { id: "fleet-1", code: "178039", type: "8FBE15T" }
+          internal_no: "M-039",
+          legacy_payload: { id: "fleet-1", code: "178039", internalNo: "M-039", type: "8FBE15T" }
         }]);
       }
     });
@@ -28,7 +29,7 @@ describe("Supabase fleet driver", () => {
       fetchImpl
     });
 
-    await expect(driver.list()).resolves.toEqual([{ id: "fleet-1", code: "178039", type: "8FBE15T" }]);
+    await expect(driver.list()).resolves.toEqual([{ id: "fleet-1", code: "178039", internalNo: "M-039", type: "8FBE15T" }]);
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/fleet_units?select=*&order=code.asc&limit=1000", expect.objectContaining({
       method: "GET"
     }));
@@ -47,7 +48,7 @@ describe("Supabase fleet driver", () => {
       fetchImpl
     });
 
-    await driver.upsert({ id: "fleet-1", code: "178039", vehicleType: "מלגזה", model: "8FBE15T", createdAt: 1000 });
+    await driver.upsert({ id: "fleet-1", code: "178039", internalNo: "M-039", vehicleType: "מלגזה", model: "8FBE15T", createdAt: 1000 });
 
     expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/fleet_units?on_conflict=id", expect.objectContaining({
       method: "POST",
@@ -61,6 +62,7 @@ describe("Supabase fleet driver", () => {
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
       id: "fleet-1",
       code: "178039",
+      internal_no: "M-039",
       vehicle_type: "מלגזה",
       model: "8FBE15T",
       supplier: "",
@@ -70,7 +72,7 @@ describe("Supabase fleet driver", () => {
       created_at: "1970-01-01T00:00:01.000Z",
       updated_at: expect.any(String),
       source_kv_key: "fleet:fleet-1",
-      legacy_payload: { id: "fleet-1", code: "178039", vehicleType: "מלגזה", model: "8FBE15T", createdAt: 1000 }
+      legacy_payload: { id: "fleet-1", code: "178039", internalNo: "M-039", vehicleType: "מלגזה", model: "8FBE15T", createdAt: 1000 }
     });
   });
 

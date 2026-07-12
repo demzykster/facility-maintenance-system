@@ -7,7 +7,7 @@ Updated: 2026-07-12
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: current commit, `Complete BI period and drilldown pass`.
+- Latest app/UI commit before this handoff: current commit, `Add fleet internal numbers`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -56,6 +56,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add fleet internal numbers` (current commit)
+  - Added a separate fleet internal number field: `internalNo` in app records and `internal_no` in normalized Supabase `fleet_units`.
+  - Added migration `supabase/migrations/20260712103000_fleet_units_internal_no.sql`.
+  - Fleet create/edit forms now expose `מספר פנימי`; fleet cards show it; fleet search, unit picker, ticket opening, driver coverage/actions, PM follow-up tickets, notifications, supplier-linked fleet rows, and exports use it with fallback to the existing `code`.
+  - Optional fleet-license Excel import now recognizes `מספר פנימי` / `internal number`.
+  - Verified with focused fleet/API/import/migration tests, `npm run lint`, `npm run build`, `npm run release:check`, `npm run smoke:demo-ui`, and a targeted Playwright smoke for fleet form and transport ticket unit picker.
 - `Complete BI period and drilldown pass` (current commit)
   - Finished the BI period selector with `עכשיו`, `30 ימים`, and `90 ימים`; trend, repeat, PM, cleaning, PPE, and finance summaries now follow the selected BI window instead of fixed hardcoded labels.
   - Added explainable downtime rows under `למה זה תקוע`, showing critical transport downtime duration, likely cause, main lifecycle stage, and direct ticket drill-down.
