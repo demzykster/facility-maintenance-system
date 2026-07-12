@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AI_ASSIST_WORKFLOWS, normalizeAiAssistWorkflow } from "../src/aiAssistWorkflowModel.js";
-import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "../src/aiAssistQuickPromptModel.js";
+import { aiAssistContextualPrompts, aiAssistQuickPrompts, aiAssistWelcomeMessage } from "../src/aiAssistQuickPromptModel.js";
 
 describe("AI assist quick prompt model", () => {
   it("keeps admin quick prompts focused on risks, heatmap load, SLA, and actions", () => {
@@ -48,5 +48,38 @@ describe("AI assist quick prompt model", () => {
         expect(normalizeAiAssistWorkflow(item.workflow)).toBe(item.workflow);
       }
     }
+  });
+
+  it("adds contextual admin prompts from heatmap, SLA, and approvals before generic prompts", () => {
+    const prompts = aiAssistQuickPrompts({ role: "admin" }, {
+      metrics: { overdueTickets: 2, pendingApprovals: 3, fleetDocsDue: 4, pmDue: 1 },
+      bi: { heatmap: [{ department: "הפצה", total: 5 }] }
+    });
+
+    expect(prompts.map((item) => item.text).slice(0, 3)).toEqual([
+      "נתח את העומס בהפצה",
+      "הסבר את 2 חריגות ה-SLA",
+      "מה לאשר קודם מתוך 3 ממתינות?"
+    ]);
+    expect(prompts.map((item) => item.workflow).slice(0, 3)).toEqual([
+      AI_ASSIST_WORKFLOWS.riskSummary,
+      AI_ASSIST_WORKFLOWS.slaExplanation,
+      AI_ASSIST_WORKFLOWS.nextActions
+    ]);
+  });
+
+  it("keeps contextual prompts role-limited for field users", () => {
+    const context = {
+      metrics: { openTickets: 8, overdueTickets: 2, pmDue: 1 },
+      bi: { heatmap: [{ department: "הפצה", total: 5 }] }
+    };
+
+    expect(aiAssistContextualPrompts({ role: "tech" }, context).map((item) => item.text)).toEqual([
+      "מה הכי מסכן SLA בטיפול שלי?",
+      "איזה טיפול תקופתי לבצע קודם?"
+    ]);
+    expect(aiAssistContextualPrompts({ role: "worker" }, context).map((item) => item.text)).toEqual([
+      "מה קורה עם הקריאות שלי?"
+    ]);
   });
 });

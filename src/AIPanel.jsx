@@ -5,11 +5,12 @@ import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "./aiAssistQuickPro
 
 export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
+  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config), [session, vis, pm, fleet, config, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef(null);
-  const quick = useMemo(() => aiAssistQuickPrompts(session), [session]);
+  const quick = useMemo(() => aiAssistQuickPrompts(session, contextPreview), [session, contextPreview]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -23,7 +24,7 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
     setInput("");
     setBusy(true);
     try {
-      const context = buildContext(session, vis, pm, fleet, config);
+      const context = contextPreview;
       const sys = typeof context === "string"
         ? `אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הנתונים בלבד.\n\n--- נתונים ---\n${context}`
         : "אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הקונטקסט המסונן בלבד.";
