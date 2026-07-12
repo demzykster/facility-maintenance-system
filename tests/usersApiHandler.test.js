@@ -408,6 +408,41 @@ describe("users API handler", () => {
     expect(driver.set).not.toHaveBeenCalled();
   });
 
+  it("allows managers to create workers only in their own department and shift", async () => {
+    const driver = { set: vi.fn().mockResolvedValue(undefined) };
+    const handler = createUsersApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { users: "view" }, department: "הפצה", departments: ["הפצה"], shift: "night" })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user: { id: "worker-1", name: "Worker", role: "worker", workerNo: "101", dept: "הפצה", depts: ["הפצה"], shift: "night" } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.set).toHaveBeenCalledWith("user:worker-1", expect.stringContaining("\"dept\":\"הפצה\""), true);
+  });
+
+  it("rejects manager worker writes outside their department or shift", async () => {
+    const driver = { set: vi.fn() };
+    const handler = createUsersApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { users: "view" }, department: "הפצה", departments: ["הפצה"], shift: "night" })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: { user: { id: "worker-1", name: "Worker", role: "worker", workerNo: "101", dept: "מחסן", depts: ["מחסן"], shift: "morning" } }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:users:manage" });
+    expect(driver.set).not.toHaveBeenCalled();
+  });
+
   it("upserts users for sessions with users manage permission and writes audit", async () => {
     const driver = { set: vi.fn().mockResolvedValue(undefined) };
     const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };

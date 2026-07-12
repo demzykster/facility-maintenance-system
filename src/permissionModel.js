@@ -28,7 +28,7 @@ export const USER_PERMISSION_MODULES = [
   { mod: "ppe", label: "ביגוד עובדים", levels: ["none", "request", "manage", "full"], hint: "בקשה — שליחת בקשות בלבד. ניהול — טיפול בבקשות. מלא — קטלוג, ניפוק, קיזוז ודוחות. גישת HR ניתנת דרך הרשאות, לא דרך תפקיד נפרד." },
   { mod: "workerAccess", label: "הפעלת כניסה לעובדים", levels: ["none", "manage"], hint: "ניהול הגדרת כניסה ואיפוס קוד/סיסמה לעובדי המחלקות שלו." },
   { mod: "users", label: "ניהול משתמשים ועובדים", levels: ["none", "view", "manage"], hint: "צפייה או ניהול משתמשים ועובדים במודול צוות ומשתמשים. הרשאת הפעלת כניסה לעובדים נשארת נפרדת." },
-  { mod: "analytics", label: "אנליטיקה ודוחות", levels: ["none", "view"], hint: "צפייה בלוחות אנליטיקה ותובנות מערכת." },
+  { mod: "analytics", label: "BI ואנליטיקה", levels: ["none", "view"], hint: "צפייה בלוח BI, תובנות ודוחות מערכת לפי תחום ההרשאה." },
   { mod: "suppliers", label: "ספקים וקבלנים", levels: ["none", "view", "manage"], hint: "צפייה או ניהול ספקים, אנשי קשר והקשרים לכלים/הזמנות." },
   { mod: "settings", label: "הגדרות מערכת", levels: ["none", "manage", "full"], hint: "ניהול הגדרות, רישומים, SLA וסוגי כלים. מלא שמור לפעולות מערכת רגישות יותר בעתיד." },
   { mod: "audit", label: "יומן פעילות", levels: ["none", "view"], hint: "צפייה ביומן הפעילות והיסטוריית פעולות." }

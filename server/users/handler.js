@@ -9,6 +9,7 @@ import { createSupabaseProfileUpdateClient } from "../session/profileHandler.js"
 import { buildSessionPayload, createSupabaseSessionClient } from "../session/sessionHandler.js";
 import { verifyCmmsSessionToken } from "../session/cmmsSessionToken.js";
 import { normalizeSupabaseAppUserProfile } from "../../src/supabaseProfileModel.js";
+import { canUseScopedWorkerWrite } from "../../src/userScopeModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -412,7 +413,7 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       if (!id) return json(res, 400, { error: "user_id_required" });
       const key = `user:${id}`;
       const permissionError = kvWritePermissionError(auth.user, key);
-      if (permissionError) return json(res, 403, { error: permissionError });
+      if (permissionError && !canUseScopedWorkerWrite(auth.user, user)) return json(res, 403, { error: permissionError });
       const loginResetRequested = user.loginResetRequested === true;
       let savedUser = user;
       let appUsersHandled = false;
