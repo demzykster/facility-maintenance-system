@@ -126,6 +126,89 @@ describe("AI assist action model", () => {
     })).toEqual([]);
   });
 
+  it("proposes supplier routing only when the supplier is visible and explicitly named", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעביר את הקריאה לספק Toyota",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", priority: "medium", status: "new", supplier: "" }],
+        suppliers: [
+          { name: "Toyota", type: "transport", scopes: ["transport"] },
+          { name: "BuildingCo", type: "facility", scopes: ["facility:hvac"] }
+        ]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_ticket_T-1",
+        type: "ticket.update",
+        label: "עדכון קריאה",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "תקלה במלגזה",
+          patch: { supplier: "Toyota" }
+        },
+        execute: {
+          method: "POST",
+          path: "/api/tickets",
+          bodyField: "ticket"
+        }
+      })
+    ]);
+  });
+
+  it("does not guess supplier routing from invisible, ambiguous, or unchanged suppliers", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעביר את הקריאה לספק Toyota",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const ambiguousDraft = buildAiIntakeDraft({
+      rawText: "תעביר את הקריאה לספק Toyota North",
+      actor,
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft: ambiguousDraft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", supplier: "" }],
+        suppliers: []
+      }
+    })).toEqual([]);
+
+    expect(buildAiAssistActionProposals({
+      draft: ambiguousDraft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", supplier: "" }],
+        suppliers: [{ name: "Toyota" }, { name: "Toyota North" }]
+      }
+    })).toEqual([]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", supplier: "Toyota" }],
+        suppliers: [{ name: "Toyota" }]
+      }
+    })).toEqual([]);
+  });
+
   it("proposes a ticket.comment only for explicit note commands with a single visible ticket", () => {
     const draft = buildAiIntakeDraft({
       rawText: "הוסף הערה: דיברתי עם הספק וממתינים לתשובה",

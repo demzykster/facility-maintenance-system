@@ -82,6 +82,21 @@ function requestedStatusFromText(text = "") {
   return "";
 }
 
+function requestedSupplierFromText(text = "", suppliers = []) {
+  const raw = cleanText(text, 800).toLowerCase();
+  if (!raw || !hasSupplierRoutingIntent(raw)) return "";
+  const matches = cleanArray(suppliers)
+    .map((supplier) => cleanText(supplier?.name, 160))
+    .filter(Boolean)
+    .filter((name) => raw.includes(name.toLowerCase()));
+  const uniqueMatches = [...new Set(matches)];
+  return uniqueMatches.length === 1 ? uniqueMatches[0] : "";
+}
+
+function hasSupplierRoutingIntent(text = "") {
+  return /(ספק|קבלן|contractor|supplier|vendor|העבר|תעביר|שייך|assign|route)/i.test(cleanText(text, 800));
+}
+
 function requestedCommentFromText(text = "") {
   const raw = cleanText(text, MAX_DESCRIPTION_CHARS);
   if (!raw) return "";
@@ -138,6 +153,8 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   if (requestedPriority && requestedPriority !== ticket.priority) patch.priority = requestedPriority;
   const requestedStatus = requestedStatusFromText(draft.rawText);
   if (requestedStatus && requestedStatus !== ticket.status) patch.status = requestedStatus;
+  const requestedSupplier = requestedSupplierFromText(draft.rawText, context.suppliers);
+  if (requestedSupplier && requestedSupplier !== ticket.supplier) patch.supplier = requestedSupplier;
   if (!Object.keys(patch).length) return null;
   return {
     id: `update_ticket_${cleanText(ticket.id, 80)}`,
@@ -228,6 +245,7 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   }
   const updateProposal = buildAiTicketUpdateProposal({ draft: safeDraft, context });
   if (updateProposal) return [updateProposal];
+  if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (safeDraft.action !== "draft_ticket") return [];
   const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now });
   const missingFields = missingFieldsForTicketPayload(payload, safeDraft);

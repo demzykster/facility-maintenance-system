@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after the latest push.
-- Latest app/UI commit before this handoff: supplier summaries in AI context, after AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
+- Latest app/UI commit before this handoff: deterministic AI supplier-routing proposals, after supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,11 +58,15 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add deterministic AI supplier routing proposals`
+  - `src/aiAssistActionModel.js` can now build a `ticket.update` proposal that sets `supplier` when the user explicitly asks to route a single visible ticket to a supplier.
+  - The supplier must be present in the already role-filtered `context.suppliers` list. If the supplier is invisible, ambiguous, missing, or already assigned, no proposal is generated.
+  - The proposal still does not write by itself. It uses the existing human-confirmed `ticket.update` execution path, `/api/tickets`, the allow-listed patch model, and the `ai_confirmed_update` log entry.
 - `Add supplier summaries to AI context`
   - `src/aiAssistSnapshotModel.js` now includes compact supplier summaries: supplier name, type, scopes, linked fleet count, and open-ticket count.
   - `src/aiAssistContextModel.js` passes those summaries only to leadership roles or users with supplier visibility.
   - Supplier contacts, addresses, and private notes are intentionally not included in AI context.
-  - This prepares a future supplier-routing action where AI can match an existing supplier from filtered context instead of guessing provider names from free text.
+  - This allows supplier-routing proposals to match an existing supplier from filtered context instead of guessing provider names from free text.
 - `Add AI provider connection check`
   - `/api/ai/status` still returns public-safe readiness fields and never returns provider secrets.
   - Admins with full settings access can call `/api/ai/status?check=1` to run a tiny server-side provider ping against the configured model.
