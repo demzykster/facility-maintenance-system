@@ -58,6 +58,10 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Improve AI update confirmation previews`
+  - `ticket.update` proposals now include a compact `payload.current` snapshot for the fields being changed.
+  - `src/AIPanel.jsx` renders update action cards as before/after rows instead of one compact text string, so supplier routing and priority/status changes are easier to review before confirmation.
+  - Execution is unchanged: the confirmed action still saves only the allow-listed patch through the existing `/api/tickets` path.
 - `Add deterministic AI supplier routing proposals`
   - `src/aiAssistActionModel.js` can now build a `ticket.update` proposal that sets `supplier` when the user explicitly asks to route a single visible ticket to a supplier.
   - The supplier must be present in the already role-filtered `context.suppliers` list. If the supplier is invisible, ambiguous, missing, or already assigned, no proposal is generated.

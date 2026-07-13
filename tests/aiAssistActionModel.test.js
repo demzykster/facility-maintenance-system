@@ -104,6 +104,7 @@ describe("AI assist action model", () => {
         payload: {
           ticketId: "T-1",
           ticketTitle: "דליפת מים",
+          current: { priority: "medium" },
           patch: { priority: "high" }
         },
         execute: {
@@ -157,6 +158,7 @@ describe("AI assist action model", () => {
         payload: {
           ticketId: "T-1",
           ticketTitle: "תקלה במלגזה",
+          current: { supplier: "" },
           patch: { supplier: "Toyota" }
         },
         execute: {

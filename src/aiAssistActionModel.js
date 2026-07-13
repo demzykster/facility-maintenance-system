@@ -156,6 +156,7 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   const requestedSupplier = requestedSupplierFromText(draft.rawText, context.suppliers);
   if (requestedSupplier && requestedSupplier !== ticket.supplier) patch.supplier = requestedSupplier;
   if (!Object.keys(patch).length) return null;
+  const current = Object.fromEntries(Object.keys(patch).map((field) => [field, ticket[field]]));
   return {
     id: `update_ticket_${cleanText(ticket.id, 80)}`,
     type: "ticket.update",
@@ -168,6 +169,7 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
     payload: {
       ticketId: cleanText(ticket.id, 160),
       ticketTitle: cleanText(ticket.subject || ticket.title || ticket.number || ticket.no, 160),
+      current,
       patch
     },
     execute: {

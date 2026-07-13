@@ -247,6 +247,7 @@ describe("AI assist handler", () => {
         payload: {
           ticketId: "T-1",
           ticketTitle: "דליפת מים",
+          current: { priority: "medium" },
           patch: { priority: "high" }
         }
       })

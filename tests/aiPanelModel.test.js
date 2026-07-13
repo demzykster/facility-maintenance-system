@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAiPanelAssistantOutput } from "../src/AIPanel.jsx";
+import { aiUpdatePreviewRows, normalizeAiPanelAssistantOutput } from "../src/AIPanel.jsx";
 
 describe("AI panel response model", () => {
   it("keeps legacy string assistant responses working", () => {
@@ -24,5 +24,18 @@ describe("AI panel response model", () => {
       text: "הכנתי טיוטה.",
       actions: [action]
     });
+  });
+
+  it("formats update action previews with before and after values", () => {
+    expect(aiUpdatePreviewRows({
+      type: "ticket.update",
+      payload: {
+        current: { supplier: "OldCo", priority: "medium" },
+        patch: { supplier: "Toyota", priority: "high", ignored: "x" }
+      }
+    })).toEqual([
+      { field: "supplier", label: "ספק", before: "OldCo", after: "Toyota" },
+      { field: "priority", label: "עדיפות", before: "medium", after: "high" }
+    ]);
   });
 });

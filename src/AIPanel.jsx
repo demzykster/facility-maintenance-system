@@ -67,13 +67,18 @@ function actionMeta(action = {}) {
   return `${payload.track === "transport" ? "כלי שינוע" : "מבנה"}${payload.zone ? ` · ${payload.zone}` : ""}${payload.priority ? ` · ${payload.priority}` : ""}`;
 }
 
-function updatePreview(action = {}) {
+export function aiUpdatePreviewRows(action = {}) {
   const patch = action?.payload?.patch && typeof action.payload.patch === "object" ? action.payload.patch : {};
+  const current = action?.payload?.current && typeof action.payload.current === "object" ? action.payload.current : {};
   return Object.keys(patch)
     .filter((field) => UPDATE_FIELD_LABELS[field])
     .slice(0, 4)
-    .map((field) => `${UPDATE_FIELD_LABELS[field]}: ${cleanText(patch[field], "—")}`)
-    .join(" · ");
+    .map((field) => ({
+      field,
+      label: UPDATE_FIELD_LABELS[field],
+      before: cleanText(current[field], "—"),
+      after: cleanText(patch[field], "—")
+    }));
 }
 
 function commentPreview(action = {}) {
@@ -87,7 +92,8 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
   const isCreate = action?.type === "ticket.create";
   const isUpdate = action?.type === "ticket.update";
   const isComment = action?.type === "ticket.comment";
-  const preview = isUpdate ? updatePreview(action) : isComment ? commentPreview(action) : "";
+  const previewRows = isUpdate ? aiUpdatePreviewRows(action) : [];
+  const preview = isComment ? commentPreview(action) : "";
   if (!isCreate && !isUpdate && !isComment) return null;
   return <div className="ai-action-card">
     <div className="ai-action-top">
@@ -96,6 +102,12 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
     </div>
     <div className="ai-action-title">{actionTitle(action)}</div>
     <div className="ai-action-meta">{actionMeta(action)}</div>
+    {previewRows.length > 0 && <div className="ai-action-diff ai-action-diff-grid">{previewRows.map((row) => <div key={row.field} className="ai-action-diff-row">
+      <span className="ai-action-diff-label">{row.label}</span>
+      <span className="ai-action-diff-before">{row.before}</span>
+      <span className="ai-action-diff-arrow">←</span>
+      <span className="ai-action-diff-after">{row.after}</span>
+    </div>)}</div>}
     {preview && <div className="ai-action-diff">{preview}</div>}
     {missing.length > 0
       ? <div className="ai-action-missing">להשלמה לפני אישור: {missing.map(missingLabel).join(" · ")}</div>
