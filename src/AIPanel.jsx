@@ -132,6 +132,7 @@ export function aiAssistantFailureMessage(error = {}) {
 
 function actionStatusLabel(action = {}) {
   if (action.status === "ready_for_confirmation") return "מוכן לאישור";
+  if (action.status === "needs_form_review") return "להשלמה בטופס";
   if (action.status === "needs_human_input") return "חסרים פרטים";
   return "טיוטה";
 }

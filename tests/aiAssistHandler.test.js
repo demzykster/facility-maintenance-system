@@ -651,10 +651,11 @@ describe("AI assist handler", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "needs_human_input",
+        status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
         missingFields: ["downtimeType"],
+        reviewMode: "ticket_form",
         payload: expect.objectContaining({
           track: "transport",
           forkliftId: "fleet-120823",
@@ -663,6 +664,16 @@ describe("AI assist handler", () => {
         })
       })
     ]);
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.actionGuidance).toMatchObject({
+      hasActionProposal: true,
+      readyActionCount: 0,
+      reviewInFormCount: 1,
+      actionTypes: ["ticket.create"],
+      missingFields: ["downtimeType"]
+    });
+    expect(prompt.actionGuidance.instruction).toContain("should be completed in the normal CMMS form");
+    expect(prompt.actionGuidance.instruction).toContain("Do not ask a chat follow-up");
   });
 
   it("prefills explicit downtime type after server role filtering", async () => {

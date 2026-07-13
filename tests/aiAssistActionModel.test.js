@@ -259,7 +259,7 @@ describe("AI assist action model", () => {
     ]);
   });
 
-  it("prefills a unique visible fleet unit in transport ticket drafts without writing", () => {
+  it("prefills a unique visible fleet unit and routes the last downtime detail to the normal ticket form", () => {
     const draft = buildAiIntakeDraft({
       rawText: "מלגזה 120823 תקועה באזור טעינה",
       actor,
@@ -282,10 +282,11 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "needs_human_input",
+        status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
         missingFields: ["downtimeType"],
+        reviewMode: "ticket_form",
         payload: expect.objectContaining({
           track: "transport",
           forkliftId: "fleet-120823",

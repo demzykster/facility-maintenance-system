@@ -70,6 +70,15 @@ function missingFieldsForTicketPayload(payload = {}, draft = {}) {
   return [...new Set(missing)];
 }
 
+function shouldReviewTicketCreateInForm(payload = {}, missingFields = []) {
+  const missing = Array.isArray(missingFields) ? missingFields : [];
+  if (payload.track === "transport"
+    && payload.forkliftId
+    && missing.length === 1
+    && missing[0] === "downtimeType") return true;
+  return false;
+}
+
 function requestedPriorityFromText(text = "") {
   const raw = cleanText(text, 500).toLowerCase();
   if (!raw) return "";
@@ -930,7 +939,8 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   if (safeDraft.action !== "draft_ticket") return [];
   const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now, context });
   const missingFields = missingFieldsForTicketPayload(payload, safeDraft);
-  const status = missingFields.length ? "needs_human_input" : "ready_for_confirmation";
+  const reviewInForm = shouldReviewTicketCreateInForm(payload, missingFields);
+  const status = missingFields.length ? (reviewInForm ? "needs_form_review" : "needs_human_input") : "ready_for_confirmation";
   return [{
     id: "create_ticket",
     type: "ticket.create",
@@ -940,6 +950,7 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
     writesData: false,
     writePolicy: "human_confirmation_required",
     missingFields,
+    reviewMode: reviewInForm ? "ticket_form" : "",
     payload,
     execute: {
       method: "POST",
