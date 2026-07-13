@@ -6,8 +6,8 @@ Updated: 2026-07-13
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
-- Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: `Lazy load fleet assets module`.
+- Current local state at handoff time: `main...origin/main`, clean after push after committing the ticket-detail render smoke.
+- Latest app/UI commit before this handoff: `Harden ticket detail lazy bridge` plus the follow-up ticket-detail render-smoke test.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Harden ticket detail lazy bridge`
+  - Fixed the white-screen regression when opening lazy-loaded ticket details after the `TicketDetail` split.
+  - Root cause: the lazy UI bridge still referenced stale helpers (`msFromInput`, then `normalizeTicketHistory`) and did not pass all active admin-edit helpers (`STATUSES`, `dtLevels`) required by the detail overlay.
+  - `tests/ticketDetailLazyWiring.test.js` now checks that the bridge has no stale helper names and includes the active admin-edit dependencies.
+  - `tests/ticketDetailRenderSmoke.test.js` renders both facility/building and transport ticket details with a mocked bridge, so the facility path is covered even when staging has no live facility ticket card to click.
+  - Live verification on Vercel served `4448c9e`; `npm run staging:smoke:live -- --expect-current-commit` and `npm run staging:smoke:ui -- --expect-current-commit` passed. A targeted browser check opened a live transport ticket detail without page errors or console errors; no clickable facility/building ticket existed in current staging data.
 - `Lazy load fleet assets module`
   - Extracts fleet/transport and periodic-maintenance UI from `src/ClaudeMaintenanceApp.jsx` into `src/FleetAssetsModule.jsx`.
   - Keeps the small `AssetsHub` tab switcher in the app shell, while fleet import, fleet list/detail/settings, PM calendar/list/history, PM rule scheduling, and PM execution overlays load only when the assets module is opened.
