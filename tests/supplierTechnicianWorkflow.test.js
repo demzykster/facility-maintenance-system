@@ -2,16 +2,16 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("../src/ClaudeMaintenanceApp.jsx", import.meta.url), "utf8");
+const supplierSource = readFileSync(new URL("../src/SuppliersPanel.jsx", import.meta.url), "utf8");
 const ticketVisibilitySource = readFileSync(new URL("../src/ticketVisibilityModel.js", import.meta.url), "utf8");
 
 describe("supplier technician workflow wiring", () => {
   it("keeps technicians connected to supplier cards", () => {
-    const detailStart = source.indexOf("function SupplierDetail(");
-    const detailEnd = source.indexOf("function SuppliersPanel(", detailStart);
-    const detailSource = source.slice(detailStart, detailEnd);
-    const panelStart = source.indexOf("function SuppliersPanel(");
-    const panelEnd = source.indexOf("function SettingsPanel(", panelStart);
-    const panelSource = source.slice(panelStart, panelEnd);
+    const detailStart = supplierSource.indexOf("function SupplierDetail(");
+    const detailSource = supplierSource.slice(detailStart);
+    const panelStart = supplierSource.indexOf("export function SuppliersPanel(");
+    const panelEnd = supplierSource.indexOf("function SupplierDetail(", panelStart);
+    const panelSource = supplierSource.slice(panelStart, panelEnd);
 
     expect(detailSource).toContain("users");
     expect(detailSource).toContain('u.role === "tech"');
@@ -19,7 +19,8 @@ describe("supplier technician workflow wiring", () => {
     expect(detailSource).toContain('label: "טכנאים"');
     expect(detailSource).toContain("onOpenUser");
     expect(detailSource).toContain("supplier-tech-row");
-    expect(panelSource).toContain("users={users}");
+    expect(source).toContain("<SuppliersPanelLazy");
+    expect(source).toContain("ui={{");
     expect(panelSource).toContain("<UserForm user={openUser}");
   });
 
@@ -58,9 +59,9 @@ describe("supplier technician workflow wiring", () => {
     expect(source).toContain("supplierTypeFromMeta");
     expect(source).toContain("supplierFacilityScope");
     expect(source).toContain("supplierFacilityScopeOptions");
-    expect(source).toContain("supplier-scope-picker");
+    expect(supplierSource).toContain("supplier-scope-picker");
     expect(source).toContain("supplierHasPpeScope");
     expect(source).toContain("supplierHasFacilityCategory");
-    expect(source).toContain("קטגוריות אחזקת מבנה");
+    expect(supplierSource).toContain("קטגוריות אחזקת מבנה");
   });
 });
