@@ -50,14 +50,18 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget is `19/24` after grouping AI URLs through one dynamic `api/ai/[action].js` route.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 305 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, and a small `AIPanel` chunk around 1.4 kB gzip.
-- BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and the main app only wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 251.28 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, and a `BIOverview` chunk around 9.13 kB gzip.
+- BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and `src/BIOverview.jsx` wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
 ## Recent Work Completed
 
 Recent commits on `main`:
 
+- `Lazy load BI overview`
+  - Extracts the unified BI overview from `src/ClaudeMaintenanceApp.jsx` into `src/BIOverview.jsx`.
+  - Keeps heatmap rendering and AI entry prompt wiring inside the lazy BI module while the app shell passes only a small `biOverviewUi()` bridge.
+  - Local build evidence after the split: separate `BIOverview` chunk about 9.13 kB gzip; main app chunk about 251.28 kB gzip. This is another scoped monolith-reduction slice, not the final performance solution.
 - `Lazy-load AI panel`
   - Extracts the browser AI chat panel from `src/ClaudeMaintenanceApp.jsx` into `src/AIPanel.jsx`.
   - Uses `React.lazy` / `Suspense` so the panel is not part of the normal startup path; it loads only when the AI FAB is available and the user opens the panel.
