@@ -15,6 +15,21 @@ const MISSING_LABELS = Object.freeze({
   module: "תחום"
 });
 
+const UPDATE_FIELD_LABELS = Object.freeze({
+  priority: "עדיפות",
+  status: "סטטוס",
+  assignee: "מבצע",
+  supplier: "ספק",
+  description: "תיאור",
+  zone: "אזור",
+  asset: "נכס",
+  forkliftId: "כלי שינוע",
+  downtimeType: "מצב כלי",
+  incidentShift: "משמרת",
+  driverInvolved: "נהג",
+  driverInvolvedId: "מספר עובד נהג"
+});
+
 export function normalizeAiPanelAssistantOutput(output) {
   if (typeof output === "string") return { text: output, actions: [] };
   const text = cleanText(output?.text || output?.assistant?.text || output?.draft?.userReply, "לא התקבלה תשובה.");
@@ -32,21 +47,51 @@ function missingLabel(field) {
   return MISSING_LABELS[field] || field;
 }
 
+function actionKindLabel(action = {}) {
+  if (action.type === "ticket.update") return "עדכון קריאה";
+  return "פתיחת קריאה";
+}
+
+function actionTitle(action = {}) {
+  const payload = action.payload || {};
+  if (action.type === "ticket.update") return payload.subject || payload.ticketTitle || payload.ticketId || "עדכון קריאה";
+  return payload.subject || "קריאה חדשה";
+}
+
+function actionMeta(action = {}) {
+  const payload = action.payload || {};
+  if (action.type === "ticket.update") return `קריאה קיימת${payload.ticketId ? ` · ${payload.ticketId}` : ""}`;
+  return `${payload.track === "transport" ? "כלי שינוע" : "מבנה"}${payload.zone ? ` · ${payload.zone}` : ""}${payload.priority ? ` · ${payload.priority}` : ""}`;
+}
+
+function updatePreview(action = {}) {
+  const patch = action?.payload?.patch && typeof action.payload.patch === "object" ? action.payload.patch : {};
+  return Object.keys(patch)
+    .filter((field) => UPDATE_FIELD_LABELS[field])
+    .slice(0, 4)
+    .map((field) => `${UPDATE_FIELD_LABELS[field]}: ${cleanText(patch[field], "—")}`)
+    .join(" · ");
+}
+
 function AiActionCard({ action, busy, result, onExecute, onEdit }) {
   const payload = action?.payload || {};
   const missing = Array.isArray(action?.missingFields) ? action.missingFields : [];
   const executable = canExecuteAiAssistAction(action);
-  if (action?.type !== "ticket.create") return null;
+  const isCreate = action?.type === "ticket.create";
+  const isUpdate = action?.type === "ticket.update";
+  const preview = isUpdate ? updatePreview(action) : "";
+  if (!isCreate && !isUpdate) return null;
   return <div className="ai-action-card">
     <div className="ai-action-top">
-      <span>{action.label || "פתיחת קריאה"}</span>
+      <span>{action.label || actionKindLabel(action)}</span>
       <span className={"ai-action-state " + (missing.length ? "wait" : "ready")}>{actionStatusLabel(action)}</span>
     </div>
-    <div className="ai-action-title">{payload.subject || "קריאה חדשה"}</div>
-    <div className="ai-action-meta">{payload.track === "transport" ? "כלי שינוע" : "מבנה"}{payload.zone ? ` · ${payload.zone}` : ""}{payload.priority ? ` · ${payload.priority}` : ""}</div>
+    <div className="ai-action-title">{actionTitle(action)}</div>
+    <div className="ai-action-meta">{actionMeta(action)}</div>
+    {preview && <div className="ai-action-diff">{preview}</div>}
     {missing.length > 0
       ? <div className="ai-action-missing">להשלמה לפני אישור: {missing.map(missingLabel).join(" · ")}</div>
-      : <div className="ai-action-ready">הפעולה תישלח לאישור לפני יצירת הקריאה.</div>}
+      : <div className="ai-action-ready">{isUpdate ? "השינוי יישמר רק אחרי אישור משתמש." : "הפעולה תישלח לאישור לפני יצירת הקריאה."}</div>}
     {result && <div className={"ai-action-result " + (result.ok ? "ok" : "err")}>{result.message}</div>}
     <button
       type="button"
@@ -54,9 +99,9 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
       disabled={!executable || busy || result?.ok}
       onClick={() => onExecute?.(action)}
     >
-      {missing.length ? "השלימו פרטים לפני יצירה" : busy ? "יוצר קריאה…" : result?.ok ? "הקריאה נוצרה" : "אישור ויצירת קריאה"}
+      {missing.length ? "השלימו פרטים לפני אישור" : busy ? "שומר…" : result?.ok ? "הפעולה בוצעה" : isUpdate ? "אישור ועדכון קריאה" : "אישור ויצירת קריאה"}
     </button>
-    {onEdit && <button type="button" className="ai-action-edit" disabled={busy || result?.ok} onClick={() => onEdit(action)}>
+    {isCreate && onEdit && <button type="button" className="ai-action-edit" disabled={busy || result?.ok} onClick={() => onEdit(action)}>
       {missing.length ? "השלמה בטופס קריאה" : "עריכה בטופס לפני יצירה"}
     </button>}
   </div>;

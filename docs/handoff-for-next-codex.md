@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after the latest push.
-- Latest app/UI commit before this handoff: AI ticket proposal form handoff, after the ticket-form `UnitPicker` stabilization and human-confirmed AI action-card UI.
+- Latest app/UI commit before this handoff: constrained AI ticket update execution foundation, after AI ticket proposal form handoff and the ticket-form `UnitPicker` stabilization.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add constrained AI ticket update execution`
+  - Extends `src/aiAssistActionExecutionModel.js` from `ticket.create` to a constrained `ticket.update` action foundation.
+  - `ticket.update` requires human confirmation, the normal `/api/tickets` execution contract, a matching existing ticket, no missing fields, and an allow-listed patch only.
+  - Allowed update fields are intentionally narrow: priority/status/assignment/supplier/description/location/transport operational fields. System fields such as `id`, `num`, `createdAt`, `log`, and arbitrary object replacement are ignored.
+  - Execution produces a field diff, appends an `ai_confirmed_update` log entry, preserves the original ticket id, and saves through the existing `saveTicket` path.
+  - `src/AIPanel.jsx` can render `ticket.update` action cards with a compact diff preview. This is only the execution/display foundation; future slices must add deterministic proposal generation for concrete update scenarios instead of trusting provider free text for mutation payloads.
 - `Add AI ticket proposal form handoff`
   - Adds `ticketPrefillFromAiAssistAction()` to `src/aiAssistActionExecutionModel.js`.
   - `src/AIPanel.jsx` now offers a secondary path on `ticket.create` action cards: open the normal ticket form for review/completion instead of creating immediately.

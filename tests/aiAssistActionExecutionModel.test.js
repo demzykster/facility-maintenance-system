@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiTicketCreateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -19,13 +19,44 @@ const readyAction = {
   execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
 };
 
+const updateAction = {
+  id: "update_ticket_priority",
+  type: "ticket.update",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    ticketId: "ticket-1",
+    patch: {
+      priority: "high",
+      status: "in_progress",
+      description: "עודכן לאחר בדיקה",
+      id: "evil-id"
+    }
+  },
+  execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
+};
+
+const existingTicket = {
+  id: "ticket-1",
+  subject: "דליפת מים",
+  priority: "medium",
+  status: "new",
+  description: "תיאור קודם",
+  createdAt: 1000,
+  updatedAt: 1500,
+  log: [{ at: 1500, by: "Dana", byRole: "user", text: "נוצרה", kind: "created" }]
+};
+
 describe("AI assist action execution model", () => {
   it("allows only complete human-confirmed ticket.create actions through the normal tickets API contract", () => {
     expect(canExecuteAiAssistAction(readyAction)).toBe(true);
+    expect(canExecuteAiAssistAction(updateAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, execute: { method: "POST", path: "/api/kv" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...readyAction, payload: null })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, type: "ticket.delete" })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...updateAction, payload: { ticketId: "ticket-1" } })).toBe(false);
   });
 
   it("prepares a confirmed AI ticket for the existing saveTicket path", () => {
@@ -61,6 +92,42 @@ describe("AI assist action execution model", () => {
   it("refuses to prepare incomplete or unsupported actions", () => {
     expect(() => prepareAiTicketCreateForSave({ ...readyAction, missingFields: ["forkliftId"] })).toThrow("ai_action_not_executable");
     expect(() => prepareAiTicketCreateForSave({ ...readyAction, execute: { method: "DELETE", path: "/api/tickets" } })).toThrow("ai_action_not_executable");
+  });
+
+  it("prepares a confirmed AI ticket update with an allow-listed patch and audit log", () => {
+    const { ticket, changes } = prepareAiTicketUpdateForSave(updateAction, existingTicket, { name: "Vadim", role: "admin" }, { now: 3000 });
+
+    expect(ticket).toMatchObject({
+      id: "ticket-1",
+      priority: "high",
+      status: "in_progress",
+      description: "עודכן לאחר בדיקה",
+      updatedAt: 3000,
+      ai: {
+        source: "ai_assist",
+        lastConfirmedAction: "update_ticket_priority",
+        lastConfirmedAt: 3000
+      }
+    });
+    expect(ticket.id).toBe("ticket-1");
+    expect(changes).toEqual([
+      { field: "priority", before: "medium", after: "high" },
+      { field: "status", before: "new", after: "in_progress" },
+      { field: "description", before: "תיאור קודם", after: "עודכן לאחר בדיקה" }
+    ]);
+    expect(ticket.log.at(-1)).toEqual({
+      at: 3000,
+      by: "Vadim",
+      byRole: "admin",
+      text: "משתמש אישר עדכון קריאה שהוכן על ידי AI: priority, status, description",
+      kind: "ai_confirmed_update"
+    });
+  });
+
+  it("refuses ticket updates without a real changed allow-listed field", () => {
+    expect(() => prepareAiTicketUpdateForSave({ ...updateAction, missingFields: ["status"] }, existingTicket)).toThrow("ai_action_not_executable");
+    expect(() => prepareAiTicketUpdateForSave({ ...updateAction, payload: { ticketId: "other", patch: { priority: "high" } } }, existingTicket)).toThrow("ai_action_ticket_mismatch");
+    expect(() => prepareAiTicketUpdateForSave({ ...updateAction, payload: { ticketId: "ticket-1", patch: { id: "evil-id" } } }, existingTicket)).toThrow("ai_action_no_allowed_changes");
   });
 
   it("builds a normal TicketForm prefill from incomplete ticket proposals", () => {

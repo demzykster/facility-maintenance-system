@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiTicketCreateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7896,8 +7896,16 @@ function AIPanelFallback({ onClose }) {
 }
 function LazyAIPanel(props) {
   const executeAction = async (action) => {
-    const ticket = prepareAiTicketCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
     if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
+    if (action?.type === "ticket.update") {
+      const existing = (props.tickets || []).find((ticket) => ticket.id === action?.payload?.ticketId);
+      if (!existing) throw new Error("הקריאה לעדכון לא נמצאה.");
+      const { ticket, changes } = prepareAiTicketUpdateForSave(action, existing, props.session, { now: Date.now() });
+      const ok = await props.saveTicket(ticket);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, ticketId: ticket.id, message: `הקריאה עודכנה (${changes.length} שינויים).` };
+    }
+    const ticket = prepareAiTicketCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
     const ok = await props.saveTicket(ticket);
     if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
     return { ok: true, ticketId: ticket.id, message: `הקריאה נוצרה: ${ticket.subject || ticket.id}` };
@@ -9252,6 +9260,7 @@ body *{visibility:hidden!important;}
 .ai-action-state.wait{background:rgba(180,83,9,.12);color:#92400E;}
 .ai-action-title{font-weight:700;color:var(--ink);margin-bottom:2px;}
 .ai-action-meta,.ai-action-missing,.ai-action-ready{color:var(--muted);font-size:12.5px;}
+.ai-action-diff{margin-top:7px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-soft);padding:7px 9px;color:var(--ink);font-size:12.5px;font-weight:650;}
 .ai-action-missing{margin-top:7px;color:#92400E;}
 .ai-action-ready{margin-top:7px;color:var(--primary);}
 .ai-action-confirm{margin-top:9px;width:100%;min-height:38px;border:1.5px solid var(--primary);border-radius:10px;background:var(--primary);color:#fff;font-weight:750;cursor:pointer;transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),opacity 160ms var(--ease-out);}
