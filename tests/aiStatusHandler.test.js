@@ -134,7 +134,7 @@ describe("AI status handler", () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       text: "OK"
     });
     const handler = createAiStatusHandler({
@@ -155,13 +155,13 @@ describe("AI status handler", () => {
       attempted: true,
       ok: true,
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       checkedAt: 3344
     });
     expect(providerCall).toHaveBeenCalledWith(expect.objectContaining({
       config: expect.objectContaining({
         provider: "google",
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         googleApiKey: "google-secret"
       }),
       maxTokens: 16

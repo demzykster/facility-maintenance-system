@@ -30,7 +30,7 @@ export const AI_PROVIDER_ALIASES = Object.freeze({
 
 export const DEFAULT_AI_MODELS = Object.freeze({
   [AI_PROVIDERS.anthropic]: "claude-sonnet-4-20250514",
-  [AI_PROVIDERS.google]: "gemini-2.0-flash",
+  [AI_PROVIDERS.google]: "gemini-2.5-flash",
   [AI_PROVIDERS.openai]: "gpt-5.2"
 });
 
@@ -39,6 +39,7 @@ export const AI_PROVIDER_MODEL_OPTIONS = Object.freeze({
     Object.freeze({ id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" })
   ]),
   [AI_PROVIDERS.google]: Object.freeze([
+    Object.freeze({ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }),
     Object.freeze({ id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" })
   ]),
   [AI_PROVIDERS.openai]: Object.freeze([
