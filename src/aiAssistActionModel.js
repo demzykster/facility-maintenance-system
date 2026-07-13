@@ -82,6 +82,53 @@ function requestedStatusFromText(text = "") {
   return "";
 }
 
+function requestedCommentFromText(text = "") {
+  const raw = cleanText(text, MAX_DESCRIPTION_CHARS);
+  if (!raw) return "";
+  const patterns = [
+    /(?:הוסף|תוסיף|להוסיף|כתוב|תרשום)\s+הערה[:\-\s]+(.+)/i,
+    /הערה[:\-\s]+(.+)/i,
+    /(?:add|write)\s+(?:a\s+)?(?:note|comment)[:\-\s]+(.+)/i,
+    /(?:note|comment)[:\-\s]+(.+)/i
+  ];
+  const match = patterns.map((pattern) => raw.match(pattern)).find(Boolean);
+  return match ? cleanText(match[1], 800) : "";
+}
+
+function buildAiTicketCommentProposal({ draft = {}, context = {} } = {}) {
+  const tickets = cleanArray(context.tickets).filter((ticket) => ticket && ticket.id);
+  if (tickets.length !== 1) return null;
+  const note = requestedCommentFromText(draft.rawText);
+  if (!note) return null;
+  const ticket = tickets[0];
+  return {
+    id: `comment_ticket_${cleanText(ticket.id, 80)}`,
+    type: "ticket.comment",
+    label: "הוספת הערה",
+    status: "ready_for_confirmation",
+    requiresConfirmation: true,
+    writesData: false,
+    writePolicy: "human_confirmation_required",
+    missingFields: [],
+    payload: {
+      ticketId: cleanText(ticket.id, 160),
+      ticketTitle: cleanText(ticket.subject || ticket.title || ticket.number || ticket.no, 160),
+      note
+    },
+    execute: {
+      method: "POST",
+      path: "/api/tickets",
+      bodyField: "ticket"
+    },
+    safety: {
+      deterministic: true,
+      providerTextTrusted: false,
+      serverMustRevalidate: true,
+      auditRequired: true
+    }
+  };
+}
+
 function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   const tickets = cleanArray(context.tickets).filter((ticket) => ticket && ticket.id);
   if (tickets.length !== 1) return null;
@@ -174,6 +221,11 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
 
 export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date.now(), context = {} } = {}) {
   const safeDraft = cleanObject(draft);
+  const requestedComment = requestedCommentFromText(safeDraft.rawText);
+  if (requestedComment) {
+    const commentProposal = buildAiTicketCommentProposal({ draft: safeDraft, context });
+    return commentProposal ? [commentProposal] : [];
+  }
   const updateProposal = buildAiTicketUpdateProposal({ draft: safeDraft, context });
   if (updateProposal) return [updateProposal];
   if (safeDraft.action !== "draft_ticket") return [];

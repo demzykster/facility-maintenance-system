@@ -253,6 +253,54 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("returns deterministic ticket.comment proposals from role-filtered single-ticket context", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר להוסיף את ההערה לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 445,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "הוסף הערה: דיברתי עם הספק וממתינים לתשובה",
+        context: {
+          tickets: [
+            { id: "T-1", subject: "דליפת מים", priority: "medium", status: "new", department: "הפצה" },
+            { id: "T-2", subject: "נסתר", priority: "medium", status: "new", department: "קבלה" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "comment_ticket_T-1",
+        type: "ticket.comment",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "דליפת מים",
+          note: "דיברתי עם הספק וממתינים לתשובה"
+        }
+      })
+    ]);
+  });
+
   it("passes only role-filtered assistant context to the provider prompt", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

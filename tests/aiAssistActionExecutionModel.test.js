@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -36,6 +36,18 @@ const updateAction = {
   execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
 };
 
+const commentAction = {
+  id: "comment_ticket",
+  type: "ticket.comment",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    ticketId: "ticket-1",
+    note: "בדקתי מול הספק — ממתינים לתשובה"
+  },
+  execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
+};
+
 const existingTicket = {
   id: "ticket-1",
   subject: "דליפת מים",
@@ -51,12 +63,14 @@ describe("AI assist action execution model", () => {
   it("allows only complete human-confirmed ticket.create actions through the normal tickets API contract", () => {
     expect(canExecuteAiAssistAction(readyAction)).toBe(true);
     expect(canExecuteAiAssistAction(updateAction)).toBe(true);
+    expect(canExecuteAiAssistAction(commentAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, execute: { method: "POST", path: "/api/kv" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, payload: null })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, type: "ticket.delete" })).toBe(false);
     expect(canExecuteAiAssistAction({ ...updateAction, payload: { ticketId: "ticket-1" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...commentAction, payload: { ticketId: "ticket-1", note: "" } })).toBe(false);
   });
 
   it("prepares a confirmed AI ticket for the existing saveTicket path", () => {
@@ -128,6 +142,34 @@ describe("AI assist action execution model", () => {
     expect(() => prepareAiTicketUpdateForSave({ ...updateAction, missingFields: ["status"] }, existingTicket)).toThrow("ai_action_not_executable");
     expect(() => prepareAiTicketUpdateForSave({ ...updateAction, payload: { ticketId: "other", patch: { priority: "high" } } }, existingTicket)).toThrow("ai_action_ticket_mismatch");
     expect(() => prepareAiTicketUpdateForSave({ ...updateAction, payload: { ticketId: "ticket-1", patch: { id: "evil-id" } } }, existingTicket)).toThrow("ai_action_no_allowed_changes");
+  });
+
+  it("prepares a confirmed AI ticket comment as a ticket log entry", () => {
+    const { ticket, note } = prepareAiTicketCommentForSave(commentAction, existingTicket, { name: "Vadim", role: "admin" }, { now: 4000 });
+
+    expect(note).toBe("בדקתי מול הספק — ממתינים לתשובה");
+    expect(ticket).toMatchObject({
+      id: "ticket-1",
+      updatedAt: 4000,
+      ai: {
+        source: "ai_assist",
+        lastConfirmedAction: "comment_ticket",
+        lastConfirmedAt: 4000
+      }
+    });
+    expect(ticket.log.at(-1)).toEqual({
+      at: 4000,
+      by: "Vadim",
+      byRole: "admin",
+      text: "משתמש אישר הערה שהוכנה על ידי AI: בדקתי מול הספק — ממתינים לתשובה",
+      kind: "ai_confirmed_comment"
+    });
+  });
+
+  it("refuses ticket comments without a matching ticket or note", () => {
+    expect(() => prepareAiTicketCommentForSave({ ...commentAction, missingFields: ["note"] }, existingTicket)).toThrow("ai_action_not_executable");
+    expect(() => prepareAiTicketCommentForSave({ ...commentAction, payload: { ticketId: "other", note: "בדיקה" } }, existingTicket)).toThrow("ai_action_ticket_mismatch");
+    expect(() => prepareAiTicketCommentForSave({ ...commentAction, payload: { ticketId: "ticket-1", note: "" } }, existingTicket)).toThrow("ai_action_not_executable");
   });
 
   it("builds a normal TicketForm prefill from incomplete ticket proposals", () => {

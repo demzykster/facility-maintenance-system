@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7897,6 +7897,14 @@ function AIPanelFallback({ onClose }) {
 function LazyAIPanel(props) {
   const executeAction = async (action) => {
     if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
+    if (action?.type === "ticket.comment") {
+      const existing = (props.tickets || []).find((ticket) => ticket.id === action?.payload?.ticketId);
+      if (!existing) throw new Error("הקריאה לעדכון לא נמצאה.");
+      const { ticket } = prepareAiTicketCommentForSave(action, existing, props.session, { now: Date.now() });
+      const ok = await props.saveTicket(ticket);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, ticketId: ticket.id, message: "ההערה נוספה לקריאה." };
+    }
     if (action?.type === "ticket.update") {
       const existing = (props.tickets || []).find((ticket) => ticket.id === action?.payload?.ticketId);
       if (!existing) throw new Error("הקריאה לעדכון לא נמצאה.");

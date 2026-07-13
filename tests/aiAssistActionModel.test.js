@@ -125,4 +125,52 @@ describe("AI assist action model", () => {
       }
     })).toEqual([]);
   });
+
+  it("proposes a ticket.comment only for explicit note commands with a single visible ticket", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "הוסף הערה: דיברתי עם הספק וממתינים לתשובה",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "דליפת מים", priority: "medium", status: "new" }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "comment_ticket_T-1",
+        type: "ticket.comment",
+        label: "הוספת הערה",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "דליפת מים",
+          note: "דיברתי עם הספק וממתינים לתשובה"
+        },
+        execute: {
+          method: "POST",
+          path: "/api/tickets",
+          bodyField: "ticket"
+        }
+      })
+    ]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [
+          { id: "T-1", subject: "דליפת מים" },
+          { id: "T-2", subject: "רעש במנוע" }
+        ]
+      }
+    })).toEqual([]);
+  });
 });

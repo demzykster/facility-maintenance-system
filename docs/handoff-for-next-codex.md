@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after the latest push.
-- Latest app/UI commit before this handoff: deterministic AI ticket update proposals, after constrained update execution and AI ticket proposal form handoff.
+- Latest app/UI commit before this handoff: deterministic AI ticket comment proposals, after deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add deterministic AI ticket comment proposals`
+  - Extends the human-confirmed AI action surface with `ticket.comment`.
+  - `/api/ai/assist` can propose a comment only when the user explicitly asks to add/write a note/comment and the role-filtered context leaves exactly one visible target ticket.
+  - The action remains non-writing until the user confirms it in `src/AIPanel.jsx`.
+  - Browser execution uses `prepareAiTicketCommentForSave()` and the existing `saveTicket` / `/api/tickets` path, appending an `ai_confirmed_comment` log entry to the ticket history instead of creating a parallel comment API.
+  - Provider text is not trusted for target selection; the target ticket comes from the already role-filtered context.
 - `Add deterministic AI ticket update proposals`
   - `src/aiAssistActionModel.js` now builds the first deterministic `ticket.update` proposal.
   - The server builds proposals only after `buildAiAssistContext()` filters the supplied UI context by the authenticated user's role/scope.
