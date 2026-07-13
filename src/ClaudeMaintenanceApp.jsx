@@ -6969,7 +6969,7 @@ function AdminApp(p) {
           {activeTab === "cleaning" && <CleaningAdmin {...p} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
           {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
-          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
+          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} onOpenFleet={(id) => goAsset({ tab: "fleet", fleetId: id })} canManage={mayManageSuppliers} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
@@ -7114,7 +7114,6 @@ function SuppliersPanel(props) {
       {...props}
       ui={{
         Empty,
-        FleetCard,
         Overlay,
         SectionTitle,
         SUPPLIER_TYPES,

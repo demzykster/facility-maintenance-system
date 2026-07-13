@@ -4,10 +4,9 @@ import { Building2, ChevronLeft, ClipboardList, HardHat, Package, Plus, Search, 
 import { supplierQueueAiPrompt } from "./aiAssistEntryPointModel.js";
 import { supplierActivityCounts } from "./supplierActivityModel.js";
 
-export function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, onOpenTicket, canManage, onAskAI, ui }) {
+export function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, onOpenTicket, onOpenFleet, canManage, onAskAI, ui }) {
   const {
     Empty,
-    FleetCard,
     Overlay,
     SectionTitle,
     SUPPLIER_TYPES,
@@ -31,13 +30,11 @@ export function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, use
     unitNote
   } = ui;
   const [sel, setSel] = useState(null);
-  const [openFleetId, setOpenFleetId] = useState(null);
   const [openUser, setOpenUser] = useState(null);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState("");
   const [err, setErr] = useState("");
   const names = config.suppliers || [];
-  const openFleet = openFleetId ? (fleet || []).find((f) => f.id === openFleetId) : null;
   const supplierRows = names.map((n) => {
     const meta = supMeta(config, n);
     const type = supplierTypeFromMeta(meta, config);
@@ -101,7 +98,7 @@ export function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, use
     if (!names.includes(n) && await saveConfig({ ...config, suppliers: [...names, n] }) === false) return setErr("הוספת הספק לא נשמרה. נסו שוב.");
     setAdding(""); setSel(n);
   };
-  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} users={users} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={setOpenFleetId} onOpenUser={setOpenUser} onOpenTicket={onOpenTicket} canManage={canManage} ui={ui} />{openFleet && <Overlay onClose={() => setOpenFleetId(null)}><FleetCard fleet={openFleet} config={config} tickets={tickets} onClose={() => setOpenFleetId(null)} /></Overlay>}{openUser && <Overlay persistent onClose={() => setOpenUser(null)}><UserForm user={openUser} config={config} users={users} canDelete={false} canManageWorkerAccess={false} onCancel={() => setOpenUser(null)} onSave={async (u) => { if (!saveUser) return false; const ok = await saveUser(u); if (ok !== false) setOpenUser(null); return ok; }} /></Overlay>}</div>;
+  if (sel && names.includes(sel)) return <div className="supplier-shell"><SupplierDetail name={sel} config={config} saveConfig={saveConfig} orders={orders} fleet={fleet} tickets={tickets} users={users} onBack={() => setSel(null)} onRename={canManage ? renameSup : undefined} onDelete={canManage ? delSup : undefined} onOpenFleet={onOpenFleet} onOpenUser={setOpenUser} onOpenTicket={onOpenTicket} canManage={canManage} ui={ui} />{openUser && <Overlay persistent onClose={() => setOpenUser(null)}><UserForm user={openUser} config={config} users={users} canDelete={false} canManageWorkerAccess={false} onCancel={() => setOpenUser(null)} onSave={async (u) => { if (!saveUser) return false; const ok = await saveUser(u); if (ok !== false) setOpenUser(null); return ok; }} /></Overlay>}</div>;
   const shown = names.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
   return (<div className="supplier-shell">
     <div className="supplier-head">
