@@ -6853,6 +6853,7 @@ function biOverviewUi() {
     isCleaningRoundActionableStatus,
     isOpen,
     isOverdue,
+    lifecycleOwnerLabel,
     needsHandler,
     normalizedTicketLifecycleStages,
     ppeIsIssue,

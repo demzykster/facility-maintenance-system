@@ -40,6 +40,7 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
     isCleaningRoundActionableStatus,
     isOpen,
     isOverdue,
+    lifecycleOwnerLabel,
     needsHandler,
     normalizedTicketLifecycleStages,
     ppeIsIssue,
