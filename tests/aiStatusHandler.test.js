@@ -240,6 +240,40 @@ describe("AI status handler", () => {
     expect(JSON.stringify(payload)).not.toContain("secret-value");
   });
 
+  it("normalizes temporary high-demand provider failures separately from model availability", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: false,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      error: "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later."
+    });
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        CMMS_AI_MODEL: "gemini-3.5-flash",
+        GOOGLE_GENERATIVE_AI_API_KEY: "google-secret"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 2235
+    });
+
+    const res = await call(handler, { query: { check: "1" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai.providerCheck).toMatchObject({
+      attempted: true,
+      ok: false,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      checkedAt: 2235,
+      error: "ai_provider_rate_limited",
+      detail: "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later."
+    });
+    expect(JSON.stringify(res.json())).not.toContain("google-secret");
+  });
+
   it("reports skipped provider checks when server AI is not ready", async () => {
     const providerCall = vi.fn();
     const handler = createAiStatusHandler({

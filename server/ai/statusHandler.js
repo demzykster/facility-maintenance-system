@@ -24,9 +24,9 @@ function aiProviderErrorCode(error = "") {
   const raw = String(error || "").replace(/\s+/g, " ").trim().slice(0, 800).toLowerCase();
   if (!raw) return "ai_provider_failed";
   if (/quota|billing|insufficient_quota|exceeded your current quota|plan and billing/i.test(raw)) return "ai_provider_quota_exceeded";
+  if (/high demand|try again later|temporar(?:y|ily)|overloaded|unavailable|rate.?limit|429/i.test(raw)) return "ai_provider_rate_limited";
   if (/model|not found|does not exist|unsupported/i.test(raw)) return "ai_provider_model_unavailable";
   if (/key|api.?key|unauthorized|permission|forbidden|401|403/i.test(raw)) return "ai_provider_auth_failed";
-  if (/rate.?limit|429/i.test(raw)) return "ai_provider_rate_limited";
   return "ai_provider_failed";
 }
 
