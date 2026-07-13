@@ -16,6 +16,7 @@ describe("AI assist provider plan model", () => {
           execute: { method: "POST", path: "/api/tickets" },
           writesData: true
         },
+        { type: "ppe.request.create", title: "פתח בקשת ביגוד", confidence: 0.7 },
         { type: "sql.delete", title: "drop users" },
         { type: "question", title: "איזה כלי?", confidence: -1 }
       ]
@@ -41,7 +42,19 @@ describe("AI assist provider plan model", () => {
           writePolicy: "human_confirmation_required"
         },
         {
-          id: "provider_plan_3",
+          id: "provider_plan_2",
+          type: "ppe.request.create",
+          title: "פתח בקשת ביגוד",
+          reason: "",
+          confidence: 0.7,
+          missingFields: [],
+          reviewNotes: [],
+          requiresConfirmation: true,
+          writesData: false,
+          writePolicy: "human_confirmation_required"
+        },
+        {
+          id: "provider_plan_4",
           type: "question",
           title: "איזה כלי?",
           reason: "",

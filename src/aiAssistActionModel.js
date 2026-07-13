@@ -172,6 +172,10 @@ function hasMeetingCreateIntent(text = "") {
   return /פגישה|ישיבה|meeting/i.test(cleanText(text, 800));
 }
 
+function hasPpeRequestIntent(text = "") {
+  return /(צריך|צריכ|בקשה|מבקש|אבקש|הזמן|תזמין|request|need|order|ביגוד|ציוד|נעליים|נעלי|קסדה|כפפות|אפוד|מידה|ppe|clothing|shoes|helmet|gloves|vest|size)/i.test(cleanText(text, 800));
+}
+
 function hasUpdateIntent(text = "") {
   return /תעדכן|עדכן|העבר|שנה|סיים|סגור|בטל|update|change|set|mark/i.test(cleanText(text, 800));
 }
@@ -255,6 +259,37 @@ function uniqueFleetUnitMentionFromText(text = "", fleet = []) {
 
 function draftFleetUnitFromText(text = "", fleet = []) {
   return uniqueFleetUnitMentionFromText(text, fleet);
+}
+
+function ppeItemMatchesText(item = {}, raw = "") {
+  const text = cleanText(raw, 800).toLowerCase();
+  const candidates = [
+    item.id,
+    item.name,
+    item.category,
+    ...(Array.isArray(item.aliases) ? item.aliases : [])
+  ].map((value) => cleanText(value, 160).toLowerCase()).filter((value) => value.length >= 2);
+  return candidates.some((value) => text.includes(value));
+}
+
+function requestedPpeItemFromText(text = "", items = []) {
+  const raw = cleanText(text, 800);
+  if (!raw || !hasPpeRequestIntent(raw)) return null;
+  const matches = cleanArray(items)
+    .filter((item) => item && item.id && item.active !== false)
+    .filter((item) => ppeItemMatchesText(item, raw));
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function requestedPpeSizeFromText(text = "", item = {}) {
+  const raw = cleanText(text, 800).toLowerCase();
+  const sizes = cleanArray(item.sizes).map((size) => cleanText(size, 40)).filter(Boolean);
+  if (sizes.length === 1) return sizes[0];
+  const match = sizes.find((size) => {
+    const escaped = size.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, "iu").test(raw);
+  });
+  return match || "";
 }
 
 const WAITING_REASON_BALLS = Object.freeze({
@@ -670,6 +705,55 @@ function missingFieldsForMeetingPayload(payload = {}) {
   return [...new Set(missing)];
 }
 
+function buildAiPpeRequestCreateProposal({ draft = {}, user = {}, context = {} } = {}) {
+  const item = requestedPpeItemFromText(draft.rawText, context?.ppe?.items);
+  if (!item) return null;
+  const size = requestedPpeSizeFromText(draft.rawText, item);
+  const missingFields = size ? [] : ["size"];
+  const actorId = cleanText(user.id || user.authUserId || user.workerNo, 120);
+  const workerName = cleanText(user.name, 120);
+  const workerNo = cleanText(user.workerNo, 80);
+  const dept = cleanText(user.dept || user.department, 120);
+  if (!actorId || !workerName) missingFields.push("worker");
+  const itemId = cleanText(item.id, 160);
+  return {
+    id: `create_ppe_request_${itemId}`,
+    type: "ppe.request.create",
+    label: "בקשת ביגוד",
+    status: missingFields.length ? "needs_human_input" : "ready_for_confirmation",
+    requiresConfirmation: true,
+    writesData: false,
+    writePolicy: "human_confirmation_required",
+    missingFields: [...new Set(missingFields)],
+    payload: {
+      workerId: actorId,
+      workerName,
+      workerNo,
+      dept,
+      lines: [{
+        itemId,
+        itemName: cleanText(item.name, 160),
+        category: cleanText(item.category, 80),
+        size,
+        qty: 1
+      }],
+      note: cleanText(draft.rawText, 800)
+    },
+    execute: {
+      method: "POST",
+      path: "/api/ppe",
+      resource: "requests",
+      bodyField: "request"
+    },
+    safety: {
+      deterministic: true,
+      providerTextTrusted: false,
+      serverMustRevalidate: true,
+      auditRequired: true
+    }
+  };
+}
+
 export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date.now(), context = {} } = {}) {
   const safeDraft = cleanObject(draft);
   const requestedComment = requestedCommentFromText(safeDraft.rawText);
@@ -688,6 +772,10 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length > 0) return [];
   if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.tasks).filter((task) => task && task.id).length > 0) return [];
   if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.meetings).filter((meeting) => meeting && meeting.id).length > 0) return [];
+  if (safeDraft.action === "draft_ppe_request") {
+    const ppeProposal = buildAiPpeRequestCreateProposal({ draft: safeDraft, user, context });
+    return ppeProposal ? [ppeProposal] : [];
+  }
   if (safeDraft.action === "draft_task") {
     if (hasMeetingCreateIntent(safeDraft.rawText)) {
       const payload = buildAiMeetingCreatePayload({ draft: safeDraft, user, now });

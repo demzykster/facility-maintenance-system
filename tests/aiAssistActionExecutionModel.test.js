@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiPpeRequestCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -136,6 +136,24 @@ const meetingUpdateAction = {
   execute: { method: "POST", path: "/api/work", resource: "meetings", bodyField: "meeting" }
 };
 
+const ppeRequestCreateAction = {
+  id: "create_ppe_request_vest",
+  type: "ppe.request.create",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    workerId: "u1",
+    workerName: "Vadim",
+    workerNo: "11032",
+    dept: "הפצה",
+    lines: [
+      { itemId: "vest", itemName: "אפוד זוהר", category: "hivis", size: "אחיד", qty: 1 }
+    ],
+    note: "אני צריך אפוד זוהר"
+  },
+  execute: { method: "POST", path: "/api/ppe", resource: "requests", bodyField: "request" }
+};
+
 const taskUpdateAction = {
   id: "update_task_priority",
   type: "task.update",
@@ -222,6 +240,7 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction(meetingCreateAction)).toBe(true);
     expect(canExecuteAiAssistAction(meetingUpdateAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskUpdateAction)).toBe(true);
+    expect(canExecuteAiAssistAction(ppeRequestCreateAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, execute: { method: "POST", path: "/api/kv" } })).toBe(false);
@@ -237,6 +256,9 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction({ ...meetingUpdateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "meeting" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskUpdateAction, payload: { taskId: "task-1" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskUpdateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "task" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...ppeRequestCreateAction, missingFields: ["size"] })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...ppeRequestCreateAction, payload: { ...ppeRequestCreateAction.payload, lines: [{ itemId: "vest", itemName: "אפוד זוהר", qty: 1 }] } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...ppeRequestCreateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "request" } })).toBe(false);
   });
 
   it("prepares a confirmed AI ticket for the existing saveTicket path", () => {
@@ -339,6 +361,54 @@ describe("AI assist action execution model", () => {
         kind: "ai_confirmed_meeting"
       }
     ]);
+  });
+
+  it("prepares a confirmed AI PPE request for the existing savePpeReq path", () => {
+    const request = prepareAiPpeRequestCreateForSave(ppeRequestCreateAction, { id: "u1", name: "Vadim", role: "admin" }, {
+      now: 2000,
+      makeId: () => "ai-ppe-1"
+    });
+
+    expect(request).toEqual({
+      id: "ai-ppe-1",
+      status: "pending",
+      awaitWorkerSign: false,
+      workerId: "u1",
+      workerName: "Vadim",
+      workerNo: "11032",
+      dept: "הפצה",
+      lines: [{
+        itemId: "vest",
+        itemName: "אפוד זוהר",
+        category: "hivis",
+        size: "אחיד",
+        qty: 1,
+        workerCharge: 0,
+        chargeReason: "",
+        clawbackEligible: false,
+        unitCost: 0,
+        retPrev: false,
+        returnRequested: false
+      }],
+      note: "אני צריך אפוד זוהר",
+      signature: "",
+      by: { id: "u1", name: "Vadim" },
+      at: 2000,
+      ai: {
+        drafted: true,
+        source: "ai_assist",
+        confirmedByHuman: true,
+        confirmedAt: 2000,
+        actionId: "create_ppe_request_vest"
+      },
+      log: [{
+        at: 2000,
+        by: "Vadim",
+        byRole: "admin",
+        text: "משתמש אישר בקשת ביגוד שהוכנה על ידי AI",
+        kind: "ai_confirmed_ppe_request"
+      }]
+    });
   });
 
   it("prepares a confirmed AI meeting update with an allow-listed patch and audit log", () => {

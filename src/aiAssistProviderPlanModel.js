@@ -9,6 +9,7 @@ const ALLOWED_TYPES = new Set([
   "task.update",
   "meeting.create",
   "meeting.update",
+  "ppe.request.create",
   "question",
   "handoff"
 ]);

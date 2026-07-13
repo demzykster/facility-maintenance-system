@@ -551,7 +551,9 @@ AI PPE context:
 - AI context now includes sanitized PPE catalog and open PPE requests.
 - PPE catalog excludes financial fields such as `unitCost`.
 - PPE requests are filtered server-side by role/user/department before reaching the provider.
-- This is context only. A future PPE request creation action should be a separate deterministic proposal with UI confirmation, not provider-controlled writing.
+- The assistant can now propose a deterministic `ppe.request.create` action for a user's own PPE request when exactly one visible catalog item matches the user's wording.
+- PPE request creation still does not trust provider-generated write fields. The app creates the request only after explicit UI confirmation and then uses the existing `savePpeReq` path.
+- If the matched PPE item has multiple sizes and the user did not specify one, the action remains `needs_human_input` and cannot be executed.
 
 ## Validation Expectations
 

@@ -54,6 +54,13 @@ function hasMeetingsApiExecuteContract(action = {}) {
     && action.execute?.bodyField === "meeting";
 }
 
+function hasPpeRequestsApiExecuteContract(action = {}) {
+  return action.execute?.method === "POST"
+    && action.execute?.path === "/api/ppe"
+    && action.execute?.resource === "requests"
+    && action.execute?.bodyField === "request";
+}
+
 export function canExecuteAiAssistAction(action = {}) {
   if (!action || typeof action !== "object") return false;
   if (action.requiresConfirmation !== true) return false;
@@ -81,6 +88,17 @@ export function canExecuteAiAssistAction(action = {}) {
       && !!payload.patch
       && typeof payload.patch === "object"
       && !Array.isArray(payload.patch);
+  }
+  if (action.type === "ppe.request.create") {
+    const lines = Array.isArray(payload.lines) ? payload.lines : [];
+    return hasPpeRequestsApiExecuteContract(action)
+      && !!cleanText(payload.workerId, 160)
+      && !!cleanText(payload.workerName, 160)
+      && lines.length > 0
+      && lines.every((line) => !!cleanText(line?.itemId, 160)
+        && !!cleanText(line?.itemName, 160)
+        && !!cleanText(line?.size, 80)
+        && Number(line?.qty || 0) > 0);
   }
   if (!hasTicketsApiExecuteContract(action)) return false;
   if (action.type === "ticket.create") return true;
@@ -291,6 +309,64 @@ export function prepareAiTaskCreateForSave(action = {}, actor = {}, options = {}
         kind: "ai_confirmed_task"
       }
     ]
+  };
+}
+
+export function prepareAiPpeRequestCreateForSave(action = {}, actor = {}, options = {}) {
+  if (!canExecuteAiAssistAction(action) || action.type !== "ppe.request.create") throw new Error("ai_action_not_executable");
+  const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+  const makeId = typeof options.makeId === "function" ? options.makeId : () => `ai-ppe-${now.toString(36)}`;
+  const payload = cleanObject(action.payload);
+  const id = cleanText(payload.id || makeId(), 160);
+  if (!id) throw new Error("ai_action_ppe_request_id_required");
+  const actorName = cleanText(actor.name, 120) || "AI";
+  const actorRole = cleanText(actor.role, 40);
+  const lines = Array.isArray(payload.lines) ? payload.lines : [];
+  return {
+    id,
+    status: "pending",
+    awaitWorkerSign: false,
+    workerId: cleanText(payload.workerId, 160),
+    workerName: cleanText(payload.workerName, 160),
+    workerNo: cleanText(payload.workerNo, 80),
+    dept: cleanText(payload.dept || payload.department, 120),
+    lines: lines.map((line) => {
+      const qty = Math.max(1, Number.parseInt(line?.qty || "1", 10) || 1);
+      return {
+        itemId: cleanText(line?.itemId, 160),
+        itemName: cleanText(line?.itemName, 160),
+        category: cleanText(line?.category, 80),
+        size: cleanText(line?.size, 80),
+        qty,
+        workerCharge: 0,
+        chargeReason: "",
+        clawbackEligible: false,
+        unitCost: 0,
+        retPrev: false,
+        returnRequested: false
+      };
+    }),
+    note: cleanText(payload.note, 1000),
+    signature: "",
+    by: {
+      id: cleanText(actor.id || actor.authUserId || actor.workerNo, 160),
+      name: actorName
+    },
+    at: now,
+    ai: {
+      drafted: true,
+      source: "ai_assist",
+      confirmedByHuman: true,
+      confirmedAt: now,
+      actionId: cleanText(action.id, 120)
+    },
+    log: [{
+      at: now,
+      by: actorName,
+      byRole: actorRole,
+      text: "משתמש אישר בקשת ביגוד שהוכנה על ידי AI",
+      kind: "ai_confirmed_ppe_request"
+    }]
   };
 }
 

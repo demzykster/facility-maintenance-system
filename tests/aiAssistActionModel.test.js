@@ -5,6 +5,90 @@ import { buildAiAssistActionProposals } from "../src/aiAssistActionModel.js";
 const actor = { id: "u1", role: "admin", name: "Vadim" };
 
 describe("AI assist action model", () => {
+  it("proposes a self-service PPE request only from a unique visible catalog item", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "אני צריך אפוד זוהר",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: { ...actor, workerNo: "11032", department: "הפצה" },
+      now: 2000,
+      context: {
+        ppe: {
+          items: [
+            { id: "vest", name: "אפוד זוהר", category: "hivis", sizes: ["אחיד"], totalStock: 4 },
+            { id: "shoes", name: "נעלי בטיחות", category: "shoes", sizes: ["42"] }
+          ]
+        }
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ppe_request_vest",
+        type: "ppe.request.create",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        execute: {
+          method: "POST",
+          path: "/api/ppe",
+          resource: "requests",
+          bodyField: "request"
+        },
+        payload: {
+          workerId: "u1",
+          workerName: "Vadim",
+          workerNo: "11032",
+          dept: "הפצה",
+          lines: [
+            { itemId: "vest", itemName: "אפוד זוהר", category: "hivis", size: "אחיד", qty: 1 }
+          ],
+          note: "אני צריך אפוד זוהר"
+        }
+      })
+    ]);
+  });
+
+  it("blocks PPE request confirmation when the catalog item needs an explicit size", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "אני צריך נעלי בטיחות",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: { ...actor, workerNo: "11032", department: "הפצה" },
+      now: 2000,
+      context: {
+        ppe: {
+          items: [
+            { id: "shoes", name: "נעלי בטיחות", category: "shoes", sizes: ["41", "42"] }
+          ]
+        }
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ppe_request_shoes",
+        type: "ppe.request.create",
+        status: "needs_human_input",
+        missingFields: ["size"],
+        payload: expect.objectContaining({
+          lines: [
+            { itemId: "shoes", itemName: "נעלי בטיחות", category: "shoes", size: "", qty: 1 }
+          ]
+        })
+      })
+    ]);
+  });
+
   it("turns a clear facility draft into a human-confirmed ticket proposal without writing", () => {
     const draft = buildAiIntakeDraft({
       rawText: "המזגן מטפטף באזור משרדים",

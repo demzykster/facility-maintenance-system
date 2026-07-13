@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiPpeRequestCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7936,6 +7936,13 @@ function LazyAIPanel(props) {
       const ok = await props.saveTask(task);
       if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
       return { ok: true, taskId: task.id, message: `המשימה עודכנה (${changes.length} שינויים).` };
+    }
+    if (action?.type === "ppe.request.create") {
+      if (typeof props.savePpeReq !== "function") throw new Error("שמירת בקשות ביגוד אינה זמינה במסך זה.");
+      const request = prepareAiPpeRequestCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
+      const ok = await props.savePpeReq(request);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, requestId: request.id, message: `בקשת הביגוד נשלחה: ${request.lines?.[0]?.itemName || request.id}` };
     }
     if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
     if (action?.type === "ticket.comment") {
