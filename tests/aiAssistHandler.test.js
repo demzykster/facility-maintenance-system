@@ -1480,6 +1480,14 @@ describe("AI assist handler", () => {
     });
     expect(prompt.latestMessageGuidance.instruction).toContain("Do not repeat an older assistant answer");
     expect(prompt.latestMessageGuidance.staleSummaryRule).toContain("Do not summarize fleet document alerts");
+    expect(prompt.assistantCapabilities.instruction).toContain("do not say you cannot create or update records");
+    expect(prompt.assistantCapabilities.instruction).toContain("for human confirmation");
+    expect(prompt.assistantCapabilities.canPrepare).toEqual(expect.arrayContaining([
+      "ticket.create",
+      "task.create",
+      "ppe.request.create",
+      "cleaning.complaint.create"
+    ]));
     expect(prompt.roleGuidance).toContain("answer the latest user request first");
     expect(prompt.roleGuidance).toContain("Only when the latest request asks for status");
   });
@@ -1524,9 +1532,12 @@ describe("AI assist handler", () => {
       source: "latest_user_message"
     });
     expect(prompt.contract.expectedOutput).toContain("Answer in Russian");
+    expect(prompt.contract.languagePolicy).toContain("Output language is locked to Russian");
+    expect(prompt.contract.languagePolicy).toContain("Never answer in English unless responseLanguage.code is \"en\"");
     expect(prompt.contract.formatPolicy).toContain("short paragraphs");
     expect(prompt.contract.tonePolicy).toContain("calm human colleague");
     expect(callArg.system).toContain("Reply in the latest user message language");
+    expect(callArg.system).toContain("Never switch to English unless the latest user message is English");
     expect(callArg.system).toContain("calm human colleague");
   });
 
@@ -1605,6 +1616,13 @@ describe("AI assist handler", () => {
         model: "gpt-5.2",
         providerStatus: "ok",
         workflow: "general",
+        requestedLanguage: "he",
+        requestedLanguageSource: "latest_user_message",
+        assistantLanguage: "he",
+        languageMismatch: false,
+        actionCount: 0,
+        readyActionCount: 0,
+        missingFieldCount: 0,
         contextCounts: { tickets: 1, fleet: 0, pm: 0, tasks: 0, meetings: 0, metrics: 2 }
       })
     }));
@@ -1640,7 +1658,10 @@ describe("AI assist handler", () => {
       metadata: expect.objectContaining({
         provider: "anthropic",
         providerStatus: "failed",
-        workflow: "general"
+        workflow: "general",
+        requestedLanguage: "he",
+        requestedLanguageSource: "latest_user_message",
+        actionCount: 1
       })
     }));
   });

@@ -149,7 +149,12 @@ describe("auditEventModel", () => {
       provider: "anthropic",
       model: "claude-test",
       providerStatus: "ok",
-      workflow: "risk_summary"
+      workflow: "risk_summary",
+      responseLanguage: { code: "ru", source: "latest_user_message" },
+      assistantLanguage: "he",
+      actionCount: 2,
+      readyActionCount: 1,
+      missingFieldCount: 3
     }, { id: "u1", name: "Manager", role: "user" }, { at: 700 });
 
     expect(event).toMatchObject({
@@ -170,6 +175,13 @@ describe("auditEventModel", () => {
         model: "claude-test",
         providerStatus: "ok",
         workflow: "risk_summary",
+        requestedLanguage: "ru",
+        requestedLanguageSource: "latest_user_message",
+        assistantLanguage: "he",
+        languageMismatch: true,
+        actionCount: 2,
+        readyActionCount: 1,
+        missingFieldCount: 3,
         contextCounts: { tickets: 1, fleet: 1, pm: 0, tasks: 1, meetings: 1, metrics: 1 }
       }
     });

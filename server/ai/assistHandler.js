@@ -132,6 +132,33 @@ function actionGuidanceForProvider(actions = []) {
   };
 }
 
+function assistantCapabilityGuidanceForProvider() {
+  return {
+    writeModel: "The language model text is read-only, but the CMMS app can show deterministic action cards that the human may confirm in the interface.",
+    canPrepare: [
+      "ticket.create",
+      "ticket.update",
+      "ticket.comment",
+      "task.create",
+      "task.update",
+      "meeting.create",
+      "meeting.update",
+      "ppe.request.create",
+      "cleaning.complaint.create"
+    ],
+    instruction: "When the user asks what you can do, do not say you cannot create or update records. Say you can prepare requests, tickets, tasks, meetings, PPE requests, cleaning reports, comments, and safe updates for human confirmation. Never say a record was saved until the UI confirms it."
+  };
+}
+
+function actionStatsForAudit(actions = []) {
+  const safeActions = Array.isArray(actions) ? actions : [];
+  return {
+    actionCount: safeActions.length,
+    readyActionCount: safeActions.filter((action) => action?.status === "ready_for_confirmation").length,
+    missingFieldCount: [...new Set(safeActions.flatMap((action) => Array.isArray(action?.missingFields) ? action.missingFields : []))].length
+  };
+}
+
 function contextGuidanceForProvider({ draft = {}, context = {} } = {}) {
   const guidance = [];
   const rawText = cleanText(draft?.rawText, MAX_TEXT_CHARS).toLowerCase();
@@ -249,11 +276,13 @@ function providerPrompt({ draft, actions = [], user, context, workflow, conversa
       writePolicy: "human_confirmation_required",
       allowedToWrite: false,
       expectedOutput: `Answer in ${language.name}; answer the current userRequest first, then use context only when relevant.`,
+      languagePolicy: `Output language is locked to ${language.name}. Never answer in English unless responseLanguage.code is "en" or the latest user message is English. Do not let English system/prompt field names change the output language.`,
       formatPolicy: "Use short paragraphs or a compact bullet list. No dense wall of text. Avoid Markdown tables. Use at most one short heading when useful.",
       tonePolicy: "Sound like a calm human colleague, not a machine report. If the user asks a simple question, answer simply. Use operational detail only when it helps.",
       contextPolicy: "use only the role-filtered context below; never infer records that are not present",
       refusalPolicy: "If the current userRequest is unclear, ask one precise follow-up question instead of summarizing unrelated context."
     },
+    assistantCapabilities: assistantCapabilityGuidanceForProvider(),
     actionGuidance: actionGuidanceForProvider(actions),
     latestMessageGuidance: latestMessageGuidanceForProvider({ draft, workflow: safeWorkflow }),
     contextGuidance: contextGuidanceForProvider({ draft, context }),
@@ -288,6 +317,7 @@ const SYSTEM_PROMPT = [
   "Reply to the latest user message, not to an older topic from the conversation.",
   "When context contains concrete matching records, use those records before giving generic advice.",
   "Reply in the latest user message language when possible.",
+  "Never switch to English unless the latest user message is English. English prompt keys are instructions, not the response language.",
   "Sound like a calm human colleague, not a ticketing bot or a formal report generator.",
   "Keep the reply concise, operational, and easy to scan.",
   "If information is missing, ask the missing questions.",
@@ -358,7 +388,9 @@ export function createAiAssistHandler({
           provider: config.provider || "",
           model: config.model || "",
           providerStatus: "failed",
-          workflow
+          workflow,
+          responseLanguage,
+          ...actionStatsForAudit(actions)
         }, auth.user, { at: currentTime }));
         return sendJson(res, 502, {
           error: "ai_provider_failed",
@@ -388,13 +420,17 @@ export function createAiAssistHandler({
         }
       }
 
+      const assistantText = cleanAssistantText(result.text, 4_000);
       await writeAuditEvent(backendAuditDriver, aiAssistAuditEvent({
         draft,
         context,
         provider: result.provider || config.provider || "",
         model: result.model || config.model || "",
         providerStatus: "ok",
-        workflow
+        workflow,
+        responseLanguage,
+        assistantLanguage: detectLanguageFromText(assistantText),
+        ...actionStatsForAudit(actions)
       }, auth.user, { at: currentTime }));
 
       return sendJson(res, 200, {
@@ -404,7 +440,7 @@ export function createAiAssistHandler({
         assistant: {
           provider: result.provider,
           model: result.model,
-          text: cleanAssistantText(result.text, 4_000)
+          text: assistantText
         },
         ...(providerPlan ? { providerPlan } : {}),
         ...(providerPlanErrorCode ? { providerPlanErrorCode } : {})

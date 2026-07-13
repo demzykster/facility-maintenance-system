@@ -129,7 +129,22 @@ export function fileAuditEvent(file = {}, action = AUDIT_ACTIONS.upload, actor =
 
 const countArray = (value) => Array.isArray(value) ? value.length : 0;
 
-export function aiAssistAuditEvent({ draft = {}, context = {}, provider = "", model = "", providerStatus = "ok", workflow = "general" } = {}, actor = {}, options = {}) {
+export function aiAssistAuditEvent({
+  draft = {},
+  context = {},
+  provider = "",
+  model = "",
+  providerStatus = "ok",
+  workflow = "general",
+  responseLanguage = {},
+  assistantLanguage = "",
+  actionCount = 0,
+  readyActionCount = 0,
+  missingFieldCount = 0
+} = {}, actor = {}, options = {}) {
+  const requestedLanguage = responseLanguage && typeof responseLanguage === "object" ? responseLanguage : {};
+  const requestedLanguageCode = requestedLanguage.code || draft.language || "";
+  const actualLanguageCode = assistantLanguage || "";
   return normalizeAuditEvent({
     at: options.at,
     actorId: actor.id,
@@ -146,9 +161,16 @@ export function aiAssistAuditEvent({ draft = {}, context = {}, provider = "", mo
     metadata: {
       source: draft.source || "",
       language: draft.language || "",
+      requestedLanguage: requestedLanguageCode,
+      requestedLanguageSource: requestedLanguage.source || "",
+      assistantLanguage: actualLanguageCode,
+      languageMismatch: !!requestedLanguageCode && !!actualLanguageCode && requestedLanguageCode !== actualLanguageCode,
       module: draft.module || "",
       severity: draft.severity || "",
       action: draft.action || "",
+      actionCount: Number(actionCount) || 0,
+      readyActionCount: Number(readyActionCount) || 0,
+      missingFieldCount: Number(missingFieldCount) || 0,
       provider: provider || "",
       model: model || "",
       providerStatus,
