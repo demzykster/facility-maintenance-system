@@ -20,6 +20,13 @@ const cleanText = (value, limit = MAX_TEXT_CHARS) => String(value || "")
   .trim()
   .slice(0, limit);
 
+const cleanAssistantText = (value, limit = 4_000) => String(value || "")
+  .replace(/\r\n?/g, "\n")
+  .replace(/[ \t\f\v]+/g, " ")
+  .replace(/\n{3,}/g, "\n\n")
+  .trim()
+  .slice(0, limit);
+
 const cleanConversationMessages = (value) => {
   if (!Array.isArray(value)) return [];
   const messages = value
@@ -50,6 +57,37 @@ const safeLanguage = (value) => {
   const language = String(value || "he").trim().toLowerCase().replace("_", "-").split("-")[0];
   return ["he", "en", "ru", "ar", "hi", "ti"].includes(language) ? language : "he";
 };
+
+const LANGUAGE_NAMES = Object.freeze({
+  he: "Hebrew",
+  en: "English",
+  ru: "Russian",
+  ar: "Arabic",
+  hi: "Hindi",
+  ti: "Tigrinya"
+});
+
+function detectLanguageFromText(text = "") {
+  const raw = String(text || "");
+  if (!raw.trim()) return "";
+  if (/[\u0400-\u04FF]/u.test(raw)) return "ru";
+  if (/[\u0590-\u05FF]/u.test(raw)) return "he";
+  if (/[\u0600-\u06FF]/u.test(raw)) return "ar";
+  if (/[\u0900-\u097F]/u.test(raw)) return "hi";
+  if (/[\u1200-\u137F]/u.test(raw)) return "ti";
+  if (/[A-Za-z]/.test(raw)) return "en";
+  return "";
+}
+
+function responseLanguageForRequest({ text = "", conversation = [], fallback = "he" } = {}) {
+  const latestUser = [...conversation].reverse().find((message) => message.role === "user")?.content || text;
+  const detected = safeLanguage(detectLanguageFromText(latestUser) || fallback);
+  return {
+    code: detected,
+    name: LANGUAGE_NAMES[detected] || LANGUAGE_NAMES.he,
+    source: detectLanguageFromText(latestUser) ? "latest_user_message" : "request_language"
+  };
+}
 
 const safeSource = (value) => {
   const source = String(value || "ui").trim();
@@ -108,15 +146,20 @@ function requestToDraftInput(body = {}, user = {}) {
   };
 }
 
-function providerPrompt({ draft, user, context, workflow, conversation = [] }) {
+function providerPrompt({ draft, user, context, workflow, conversation = [], responseLanguage }) {
   const safeWorkflow = normalizeAiAssistWorkflow(workflow);
+  const language = responseLanguage || responseLanguageForRequest({ text: draft?.rawText, conversation, fallback: draft?.language });
   return JSON.stringify({
     contract: {
       writePolicy: "human_confirmation_required",
       allowedToWrite: false,
-      expectedOutput: "short user-facing assistant text; answer the current userRequest first, then use context only when relevant",
-      contextPolicy: "use only the role-filtered context below; never infer records that are not present"
+      expectedOutput: `Answer in ${language.name}; answer the current userRequest first, then use context only when relevant.`,
+      formatPolicy: "Use short paragraphs or a compact bullet list. No dense wall of text. Avoid Markdown tables. Use at most one short heading when useful.",
+      tonePolicy: "Sound like a calm human colleague, not a machine report. If the user asks a simple question, answer simply. Use operational detail only when it helps.",
+      contextPolicy: "use only the role-filtered context below; never infer records that are not present",
+      refusalPolicy: "If the current userRequest is unclear, ask one precise follow-up question instead of summarizing unrelated context."
     },
+    responseLanguage: language,
     userRequest: cleanText(draft?.rawText, MAX_TEXT_CHARS),
     recentConversation: conversation,
     workflow: {
@@ -143,9 +186,12 @@ const SYSTEM_PROMPT = [
   "You are the server-side CMMS assistant.",
   "You must be read-only: do not claim that you created, updated, deleted, assigned, approved, or closed anything.",
   "Use the deterministic draft as the source of truth.",
-  "Keep the reply concise and operational.",
+  "Reply to the latest user message, not to an older topic from the conversation.",
+  "Reply in the latest user message language when possible.",
+  "Sound like a calm human colleague, not a ticketing bot or a formal report generator.",
+  "Keep the reply concise, operational, and easy to scan.",
   "If information is missing, ask the missing questions.",
-  "Reply in the draft language when possible."
+  "Prefer 2-4 short paragraphs or compact bullets over one dense paragraph."
 ].join(" ");
 
 export function createAiAssistHandler({
@@ -180,6 +226,11 @@ export function createAiAssistHandler({
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
       const workflow = normalizeAiAssistWorkflow(body.workflow);
       const conversation = cleanConversationMessages(body.messages);
+      const responseLanguage = responseLanguageForRequest({
+        text: normalized.input.rawText,
+        conversation,
+        fallback: normalized.input.language
+      });
 
       const context = buildAiAssistContext(body.context, auth.user);
       const draft = buildAiIntakeDraft(normalized.input, currentTime);
@@ -196,7 +247,7 @@ export function createAiAssistHandler({
       const result = await providerCall({
         config,
         system: SYSTEM_PROMPT,
-        prompt: providerPrompt({ draft, user: auth.user, context, workflow, conversation }),
+        prompt: providerPrompt({ draft, user: auth.user, context, workflow, conversation, responseLanguage }),
         fetchImpl,
         maxTokens: Number(env.CMMS_AI_ASSIST_MAX_TOKENS || 700) || 700
       });
@@ -253,7 +304,7 @@ export function createAiAssistHandler({
         assistant: {
           provider: result.provider,
           model: result.model,
-          text: cleanText(result.text, 4_000)
+          text: cleanAssistantText(result.text, 4_000)
         },
         ...(providerPlan ? { providerPlan } : {}),
         ...(providerPlanErrorCode ? { providerPlanErrorCode } : {})

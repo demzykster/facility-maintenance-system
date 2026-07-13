@@ -538,6 +538,14 @@ Technical/performance watch:
 - Next meaningful performance work should continue reducing initial JS and defer post-login work where safe, not start from visual rewrites.
 - Live controlled-rollout baseline exists, but headless Chromium does not prove native iOS/Safari push-banner behavior.
 
+AI assistant dialogue quality:
+
+- The assistant must answer the latest user message, not an older prominent risk from context.
+- Server prompt now carries `userRequest`, recent conversation, and `responseLanguage`.
+- `responseLanguage` is inferred from the latest user message first; UI language is only a fallback. This is important for Russian/Hebrew mixed operation.
+- Assistant text must preserve paragraph breaks. Do not run provider text through whitespace normalization that collapses newlines into one dense paragraph.
+- Provider text remains advisory/read-only. Write-capable actions still come only from deterministic proposals and require UI confirmation before any DB write.
+
 ## Validation Expectations
 
 For code/UI changes:

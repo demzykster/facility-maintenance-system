@@ -1300,6 +1300,83 @@ describe("AI assist handler", () => {
     expect(prompt.contract.expectedOutput).toContain("answer the current userRequest first");
   });
 
+  it("answers in the latest user message language instead of the UI fallback language", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.1-flash-lite",
+      text: "Понял вопрос."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 602,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Почему уведомления повторяются каждые несколько минут?",
+        language: "he",
+        messages: [
+          { role: "assistant", content: "שלום, איך אפשר לעזור?" },
+          { role: "user", content: "Почему уведомления повторяются каждые несколько минут?" }
+        ]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const callArg = providerCall.mock.calls[0][0];
+    const prompt = JSON.parse(callArg.prompt);
+    expect(prompt.responseLanguage).toEqual({
+      code: "ru",
+      name: "Russian",
+      source: "latest_user_message"
+    });
+    expect(prompt.contract.expectedOutput).toContain("Answer in Russian");
+    expect(prompt.contract.formatPolicy).toContain("short paragraphs");
+    expect(prompt.contract.tonePolicy).toContain("calm human colleague");
+    expect(callArg.system).toContain("Reply in the latest user message language");
+    expect(callArg.system).toContain("calm human colleague");
+  });
+
+  it("preserves assistant paragraph breaks for readable UI output", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.1-flash-lite",
+      text: "Короткий ответ.\n\nЧто важно:\n- пункт один\n- пункт два"
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 603,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Покажи кратко, что важно",
+        language: "ru"
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.text).toBe("Короткий ответ.\n\nЧто важно:\n- пункт один\n- пункт два");
+  });
+
   it("writes an audit-safe AI assist event for provider calls", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
