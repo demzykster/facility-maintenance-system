@@ -81,7 +81,6 @@ const fmtTime = uiFn("fmtTime");
 const ils = uiFn("ils");
 const inputDateTime = uiFn("inputDateTime");
 const isOpen = uiFn("isOpen");
-const msFromInput = uiFn("msFromInput");
 const normalizeFacilitySupplierPatch = uiFn("normalizeFacilitySupplierPatch");
 const normalizedTicketLifecycleStages = uiFn("normalizedTicketLifecycleStages");
 const normalizeTicketHistory = uiFn("normalizeTicketHistory");

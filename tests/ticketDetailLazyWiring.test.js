@@ -21,4 +21,9 @@ describe("ticket detail lazy wiring", () => {
     expect(ticketDetailSource).toContain("setSupplierRoute");
     expect(ticketDetailSource).toContain("שיוך ספק / קבלן");
   });
+
+  it("does not pass stale runtime helpers into the lazy ticket detail bridge", () => {
+    expect(ticketDetailSource).not.toContain('uiFn("msFromInput")');
+    expect(appSource).not.toContain("msFromInput,");
+  });
 });

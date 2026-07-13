@@ -7657,7 +7657,6 @@ function ticketDetailUi() {
     ils,
     inputDateTime,
     isOpen,
-    msFromInput,
     normalizeFacilitySupplierPatch,
     normalizedTicketLifecycleStages,
     normalizeTicketHistory,
