@@ -31,7 +31,7 @@ import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
-import { biHeatmapAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -4451,7 +4451,7 @@ function UserApp(p) {
                 <div className="note">העובדים מדווחים תקלות שמגיעות אליך לבדיקה. הם נכנסים עם מספר עובד + קוד שתגדירו כאן.</div>
                 {deptWorkers.length === 0 ? <Empty text="אין עובדים במחלקה" Icon={Users} sub="הוסיפו עובד בלחיצה על «הוסף עובד»" /> : <div className="cards">{deptWorkers.map((u) => <button key={u.id} className="tcard" onClick={() => setUEdit(u)} style={{ borderInlineStartColor: u.active ? "#16A34A" : "var(--muted)" }}><span className="avatar"><User size={18} /></span><div className="tcard-main"><div className="tcard-row1"><span className="tcard-subj">{u.name}</span><span className="badge sm" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>עובד</span></div><div className="tcard-sub">מס׳ עובד {u.workerNo || "—"} · {u.active ? "פעיל" : "מושבת"} · {userHasLoginSecret(u) ? userPresenceStatusText(presenceOf(presence, u.id)) : workerLoginStateText(u)}</div></div></button>)}</div>}
               </>
-              : <ManagerFleet {...p} deptNav={deptNav} />}
+              : <ManagerFleet {...p} deptNav={deptNav} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           </>)}
         </div>
       </div>
@@ -4822,7 +4822,7 @@ function ProblemUnitsPanel({ fleet, tickets, config, onOpen }) {
   </div>);
 }
 function ManagerFleet(p) {
-  const { session, fleet, config, tickets, saveFleet, saveConfig, deptNav } = p;
+  const { session, fleet, config, tickets, saveFleet, saveConfig, deptNav, onAskAI } = p;
   const [tab, setTab] = useState("units"), [openId, setOpenId] = useState(null), [pmView, setPmView] = useState(null);
   const scoped = useMemo(() => fleetForSession(session, fleet).slice().sort((a, b) => (a.code > b.code ? 1 : -1)), [session, fleet]);
   const myPm = useMemo(() => pmVisible(session, p.pm, fleet), [p.pm, fleet, session]);
@@ -4845,7 +4845,7 @@ function ManagerFleet(p) {
         {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
       </>}
     </div>
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onAskAI={onAskAI} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
     {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
   </>);
 }
@@ -7985,7 +7985,7 @@ function AdminApp(p) {
         <div className="content with-nav">
           {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} onGoTasks={isAdminRole ? (nav) => { setTaskNav(nav || null); setTab("tasks"); } : null} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} zones={zones} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
-          {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} />}
+          {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} />}
           {activeTab === "cleaning" && <CleaningAdmin {...p} />}
@@ -8416,7 +8416,7 @@ function FleetImportWizard({ fleet, config, onCancel, onImport, onImportMany, on
 }
 
 function FleetModule(p) {
-  const { fleet, config, tickets, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveTicket, session, saveConfig } = p;
+  const { fleet, config, tickets, saveFleet, saveFleetMany, saveFleetImportBatch, delFleet, saveTicket, session, saveConfig, onAskAI } = p;
   const [edit, setEdit] = useState(null), [openId, setOpenId] = useState(null), [ftab, setFtab] = useState("units"), [imp, setImp] = useState(false);
   const canEditSettings = canManageSettings(session);
   const driverReqCount = session.role === "admin" ? pendingDriverReqs(fleet).length : 0;
@@ -8605,7 +8605,7 @@ function FleetModule(p) {
     </>}
     {edit && <Overlay persistent onClose={() => setEdit(null)}><FleetForm item={edit} config={config} onCancel={() => setEdit(null)} onSave={async (x) => { const ok = await saveFleet(x); if (ok !== false) setEdit(null); return ok; }} /></Overlay>}
     {imp && <Overlay persistent onClose={() => setImp(false)}><FleetImportWizard fleet={fleet} config={config} onCancel={() => setImp(false)} onImport={(unit) => saveFleet(unit, { toastOnFail: false })} onImportMany={(units, adds) => saveFleetImportBatch(units, adds, { toastOnFail: false })} onDelete={(id) => delFleet(id, { toastOnFail: false })} onSaveCatalog={async (adds) => saveConfig(mergeFleetCatalogAdditions(config, fleet, adds), { toastOnFail: false })} /></Overlay>}
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} onClose={() => setOpenId(null)} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { if (await delFleet(openId) !== false) setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) if (await saveTicket(t) === false) return false; return true; }} onBlock={async (reason) => saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason))} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} onClose={() => setOpenId(null)} onAskAI={onAskAI} onEdit={() => { setEdit(fleet.find((x) => x.id === openId)); setOpenId(null); }} onDelete={async () => { if (await delFleet(openId) !== false) setOpenId(null); }} onReturnService={async () => { const ps = clearBlockPatches(fleet.find((x) => x.id === openId), tickets, config, { name: session.name, role: session.role }); for (const t of ps) if (await saveTicket(t) === false) return false; return true; }} onBlock={async (reason) => saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason))} /></Overlay>}
   </>);
 }
 function FleetForm({ item, config, onCancel, onSave }) {
@@ -8652,13 +8652,31 @@ function FleetForm({ item, config, onCancel, onSave }) {
       <button className="btn-primary full" disabled={busy} onClick={save}>{busy ? "שומר..." : "שמירה"}</button><div style={{ height: 24 }} />
     </div></div>);
 }
-function FleetCard({ fleet, config, tickets, onClose, onEdit, onDelete, onReturnService, onBlock, canDocs = true, canTickets = true }) {
+function FleetCard({ fleet, config, tickets, onClose, onAskAI, onEdit, onDelete, onReturnService, onBlock, canDocs = true, canTickets = true }) {
   const f = fleet; if (!f) return null;
   const [blocking, setBlocking] = useState(false), [blkReason, setBlkReason] = useState("");
   const blk = unitBlock(f, tickets, config);
   const related = tickets.filter((t) => t.forkliftId === f.id).sort((a, b) => b.createdAt - a.createdAt);
   const dt = related.filter((t) => t.track === "transport").reduce((a, t) => a + downtimeMs(t), 0);
-  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div>{onEdit && <button className="icon-btn" onClick={onEdit} style={{ marginInlineStart: "auto" }} aria-label="עריכת כלי"><PenLine size={18} /></button>}</div>
+  const health = assetHealth(f, tickets, config);
+  const docsState = docStatus(f, config);
+  const askFleetAI = onAskAI ? () => onAskAI(fleetAiPrompt({
+    unit: f,
+    labels: {
+      code: f.code,
+      description: unitDesc(f, config) || unitTypeName(f, config) || "",
+      supplier: f.supplier || "",
+      departments: fleetDepts(f).join(", "),
+      documentStatus: docsState.label || "לא ידוע",
+      serviceStatus: blk ? `מושבת · ${blk.level.label}` : "פעיל",
+      health: `${health.score}/100 · ${health.label}`,
+      openTickets: related.filter(isOpen).length,
+      totalTickets: related.length,
+      downtime: dt ? fmtDur(dt) : "",
+      recommendation: health.rec || ""
+    }
+  })) : null;
+  return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onClose}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">{f.code}</div><div className="form-head-actions">{askFleetAI && <button className="icon-btn" onClick={askFleetAI} title="שאל AI על הכלי" aria-label="שאל AI על הכלי"><Sparkles size={18} /></button>}{onEdit && <button className="icon-btn" onClick={onEdit} aria-label="עריכת כלי"><PenLine size={18} /></button>}</div></div>
     <div className="body">
       <div className="detail-top"><span className="badge" style={{ background: TRACKS.transport.color + "22", color: TRACKS.transport.color }}>{unitTypeName(f, config) || "כלי שינוע"}</span>{resolveHydraulics(f, config) && <span className="badge" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>תסקיר</span>}</div>
       <h2 className="detail-subj">{unitDesc(f, config) || f.code}</h2>
@@ -8672,7 +8690,7 @@ function FleetCard({ fleet, config, tickets, onClose, onEdit, onDelete, onReturn
         <Meta Icon={Users} label="מחלקה" value={fleetDepts(f).join(", ") || "—"} />
         <Meta Icon={Clock} label="השבתה מצטברת" value={dt ? fmtDur(dt) : "—"} />
       </div>
-      {canTickets && (() => { const h = assetHealth(f, tickets, config); return (<div className="health-panel" style={{ borderColor: h.color + "55" }}>
+      {canTickets && (() => { const h = health; return (<div className="health-panel" style={{ borderColor: h.color + "55" }}>
         <div className="health-top"><div className="health-score" style={{ color: h.color }}>{h.score}<span className="health-max">/100</span></div><div className="health-info"><div className="health-label" style={{ color: h.color }}>מצב הכלי · {h.label}</div><div className="health-stats">{countLabel(h.count90, "קריאה", "קריאות")} ב-90 ימים · MTTR {h.mttr ? fmtDur(h.mttr) : "—"} · עלות 90 ימים {ils(h.cost90)}</div></div></div>
         <div className="health-rec"><Sparkles size={13} /> {h.rec}</div>
       </div>); })()}

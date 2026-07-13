@@ -59,6 +59,42 @@ export function ticketAiPrompt({ ticket = {}, labels = {} } = {}) {
   });
 }
 
+export function fleetAiPrompt({ unit = {}, labels = {} } = {}) {
+  const code = safeLabel(labels.code, unit.code || unit.license || unit.id || "—");
+  const description = safeLabel(labels.description, unit.description || unit.type || unit.model || "כלי שינוע");
+  const supplier = safeLabel(labels.supplier, unit.supplier || "ללא ספק");
+  const departments = safeLabel(labels.departments, "");
+  const documentStatus = safeLabel(labels.documentStatus, "לא ידוע");
+  const serviceStatus = safeLabel(labels.serviceStatus, "לא ידוע");
+  const health = safeLabel(labels.health, "");
+  const downtime = safeLabel(labels.downtime, "");
+  const recommendation = safeLabel(labels.recommendation, "");
+  const openTickets = asNumber(labels.openTickets);
+  const totalTickets = asNumber(labels.totalTickets);
+  const hasDocumentRisk = /פג|חסר|קרוב|expired|missing|soon/i.test(documentStatus);
+  const hasServiceRisk = !/פעיל|תקין|ok/i.test(serviceStatus);
+  const hasRisk = openTickets > 0 || hasDocumentRisk || hasServiceRisk || !!downtime;
+  const ticketLine = openTickets > 0
+    ? `${compactCount(openTickets)} קריאות פתוחות${totalTickets > openTickets ? ` מתוך ${compactCount(totalTickets)} קריאות קשורות` : ""}`
+    : "אין קריאות פתוחות";
+  const contextParts = [
+    `תיאור: ${description}`,
+    `ספק: ${supplier}`,
+    departments ? `מחלקות: ${departments}` : "",
+    `מסמכים: ${documentStatus}`,
+    `מצב שירות: ${serviceStatus}`,
+    health ? `בריאות כלי: ${health}` : "",
+    ticketLine,
+    downtime ? `השבתה מצטברת: ${downtime}` : "",
+    recommendation ? `המלצת מערכת: ${recommendation}` : ""
+  ].filter(Boolean);
+
+  return Object.freeze({
+    workflow: hasRisk ? AI_ASSIST_WORKFLOWS.riskSummary : AI_ASSIST_WORKFLOWS.nextActions,
+    text: `נתח את כלי שינוע ${code}. ${contextParts.join("; ")}. הסבר מה הסיכון התפעולי, מה כדאי לבדוק במסמכים/קריאות/טיפול מונע, ומה 3 הפעולות הבטוחות הבאות.`
+  });
+}
+
 export function biHeatmapAiPrompt({ rows = [], row = null, cell = null } = {}) {
   const selectedRow = row || null;
   const selectedCell = cell || null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biHeatmapAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, fleetAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI assist entry point model", () => {
@@ -75,5 +75,41 @@ describe("AI assist entry point model", () => {
     expect(prompt.text).toContain("טרם שויך");
     expect(prompt.text).toContain("לא מסומנת חריגת SLA");
     expect(prompt.text).not.toContain("עדכנתי");
+  });
+
+  it("builds a fleet risk prompt from a concrete unit", () => {
+    const prompt = fleetAiPrompt({
+      unit: { code: "120823", supplier: "טויוטה" },
+      labels: {
+        description: "מלגזת היגש RRE250E",
+        departments: "שינוע",
+        documentStatus: "רישיון רכב פג תוקף",
+        serviceStatus: "פעיל",
+        health: "68/100 · מעקב",
+        openTickets: 2,
+        totalTickets: 8,
+        downtime: "4 שעות",
+        recommendation: "לחדש רישיון ולבדוק קריאות חוזרות"
+      }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.riskSummary);
+    expect(prompt.text).toContain("כלי שינוע 120823");
+    expect(prompt.text).toContain("טויוטה");
+    expect(prompt.text).toContain("רישיון רכב פג תוקף");
+    expect(prompt.text).toContain("2 קריאות פתוחות");
+    expect(prompt.text).toContain("3 הפעולות הבטוחות הבאות");
+  });
+
+  it("builds a fleet next-action prompt for a healthy unit without inventing work", () => {
+    const prompt = fleetAiPrompt({
+      unit: { code: "236", supplier: "" },
+      labels: { description: "מלגזת צריח MX-X", documentStatus: "תקין", serviceStatus: "פעיל", openTickets: 0 }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
+    expect(prompt.text).toContain("מלגזת צריח MX-X");
+    expect(prompt.text).toContain("אין קריאות פתוחות");
+    expect(prompt.text).not.toContain("השבתתי");
   });
 });
