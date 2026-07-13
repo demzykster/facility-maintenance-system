@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biHeatmapAiPrompt, fleetAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI assist entry point model", () => {
@@ -111,5 +111,41 @@ describe("AI assist entry point model", () => {
     expect(prompt.text).toContain("מלגזת צריח MX-X");
     expect(prompt.text).toContain("אין קריאות פתוחות");
     expect(prompt.text).not.toContain("השבתתי");
+  });
+
+  it("builds a PPE stock risk prompt from dashboard metrics", () => {
+    const prompt = ppeDashboardAiPrompt({
+      labels: {
+        activeItems: 36,
+        pendingRequests: 4,
+        lowItems: 7,
+        outItems: 2,
+        reorderItems: 5,
+        reorderUnits: 31,
+        openOrders: 3,
+        monthlyIssues: 42,
+        flaggedIssues: 2,
+        employeeCharge: "₪450",
+        topDeficits: ["נעלי בטיחות 43 חסר 4", "אוזניות מגן אחיד חסר 2"],
+        recommendations: ["להעלות מינימום לנעלי בטיחות", "לבדוק הזמנה פתוחה מול ספק"]
+      }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.riskSummary);
+    expect(prompt.text).toContain("ביגוד עובדים");
+    expect(prompt.text).toContain("7 פריטים בחוסר");
+    expect(prompt.text).toContain("2 פריטים אזלו");
+    expect(prompt.text).toContain("נעלי בטיחות 43 חסר 4");
+    expect(prompt.text).toContain("3 הפעולות הבטוחות הבאות");
+  });
+
+  it("builds a PPE next-action prompt for a stable dashboard", () => {
+    const prompt = ppeDashboardAiPrompt({
+      labels: { activeItems: 12, lowItems: 0, outItems: 0, pendingRequests: 0, reorderItems: 0, openOrders: 0, monthlyIssues: 8 }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
+    expect(prompt.text).toContain("אין כרגע חוסרים פתוחים");
+    expect(prompt.text).not.toContain("אישרתי");
   });
 });

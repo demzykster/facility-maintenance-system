@@ -95,6 +95,45 @@ export function fleetAiPrompt({ unit = {}, labels = {} } = {}) {
   });
 }
 
+export function ppeDashboardAiPrompt({ labels = {} } = {}) {
+  const activeItems = asNumber(labels.activeItems);
+  const pendingRequests = asNumber(labels.pendingRequests);
+  const lowItems = asNumber(labels.lowItems);
+  const outItems = asNumber(labels.outItems);
+  const reorderItems = asNumber(labels.reorderItems);
+  const reorderUnits = asNumber(labels.reorderUnits);
+  const openOrders = asNumber(labels.openOrders);
+  const monthlyIssues = asNumber(labels.monthlyIssues);
+  const flaggedIssues = asNumber(labels.flaggedIssues);
+  const employeeCharge = safeLabel(labels.employeeCharge, "");
+  const topDeficits = Array.isArray(labels.topDeficits) ? labels.topDeficits.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const recommendations = Array.isArray(labels.recommendations) ? labels.recommendations.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const hasRisk = pendingRequests > 0 || lowItems > 0 || outItems > 0 || reorderItems > 0 || flaggedIssues > 0;
+  const riskLine = hasRisk
+    ? [
+      lowItems ? `${compactCount(lowItems)} פריטים בחוסר` : "",
+      outItems ? `${compactCount(outItems)} פריטים אזלו` : "",
+      pendingRequests ? `${compactCount(pendingRequests)} בקשות ממתינות` : "",
+      reorderItems ? `${compactCount(reorderItems)} פריטים להזמנה (${compactCount(reorderUnits)} יחידות)` : "",
+      flaggedIssues ? `${compactCount(flaggedIssues)} חריגות הנפקה` : ""
+    ].filter(Boolean).join("; ")
+    : "אין כרגע חוסרים פתוחים או בקשות ממתינות.";
+  const contextParts = [
+    `${compactCount(activeItems)} פריטי קטלוג פעילים`,
+    riskLine,
+    openOrders ? `${compactCount(openOrders)} הזמנות רכש פתוחות` : "אין הזמנות רכש פתוחות",
+    `${compactCount(monthlyIssues)} הנפקות בתקופה`,
+    employeeCharge ? `חיוב עובדים בתקופה: ${employeeCharge}` : "",
+    topDeficits.length ? `חוסרים בולטים: ${topDeficits.join("; ")}` : "",
+    recommendations.length ? `המלצות מערכת: ${recommendations.join("; ")}` : ""
+  ].filter(Boolean);
+
+  return Object.freeze({
+    workflow: hasRisk ? AI_ASSIST_WORKFLOWS.riskSummary : AI_ASSIST_WORKFLOWS.nextActions,
+    text: `נתח את לוח ביגוד עובדים. ${contextParts.join("; ")}. הסבר מה הסיכון למלאי/הנפקות/הזמנות, מה צריך לבדוק לפני פעולה, ומה 3 הפעולות הבטוחות הבאות.`
+  });
+}
+
 export function biHeatmapAiPrompt({ rows = [], row = null, cell = null } = {}) {
   const selectedRow = row || null;
   const selectedCell = cell || null;
