@@ -15,6 +15,7 @@ const readJson = async (response) => {
 export async function fetchSystemErrorLogs({
   endpoint = "/api/system-errors",
   limit = 50,
+  type = "",
   fetchImpl = globalThis.fetch,
   getAccessToken = () => authStore.get()?.accessToken || ""
 } = {}) {
@@ -23,7 +24,9 @@ export async function fetchSystemErrorLogs({
   const hasCookieSession = authStore.get()?.cookieSession === true;
   if (!accessToken && !hasCookieSession) return { ok: false, error: "access_token_required", errors: [] };
 
-  const url = `${endpoint}?limit=${encodeURIComponent(String(limit))}`;
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (type) params.set("type", type);
+  const url = `${endpoint}?${params.toString()}`;
   const response = await fetchImpl(url, {
     method: "GET",
     credentials: "include",
@@ -33,7 +36,11 @@ export async function fetchSystemErrorLogs({
   if (!response.ok || data?.ok !== true) {
     return { ok: false, error: data?.error || "system_errors_failed", errors: [] };
   }
-  return { ok: true, errors: Array.isArray(data.errors) ? data.errors : [] };
+  return {
+    ok: true,
+    errors: Array.isArray(data.errors) ? data.errors : [],
+    aiAssist: Array.isArray(data.aiAssist) ? data.aiAssist : []
+  };
 }
 
 const cleanPart = (value, fallback = "unknown") => {
@@ -80,6 +87,59 @@ export function groupSystemErrorLogs(errors = []) {
       existing.focused = error.focused;
       existing.viewport = error.viewport || "";
       existing.summary = error.summary || "";
+    }
+    groupsByKey.set(key, existing);
+  });
+  return Array.from(groupsByKey.values())
+    .map((group) => ({
+      ...group,
+      items: group.items.sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
+    }))
+    .sort((a, b) => Number(b.latestAt || 0) - Number(a.latestAt || 0));
+}
+
+export function aiAssistGroupKey(event = {}) {
+  return [
+    cleanPart(event.providerStatus, "unknown_status"),
+    cleanPart(event.module, "unknown_module"),
+    cleanPart((event.actionTypes || [])[0] || event.action || "no_action"),
+    event.languageMismatch ? "language_mismatch" : "language_ok",
+    event.missingFieldCount > 0 ? "missing_fields" : "ready_or_readonly"
+  ].join("|");
+}
+
+export function groupAiAssistDiagnostics(events = []) {
+  const groupsByKey = new Map();
+  (Array.isArray(events) ? events : []).forEach((event) => {
+    const key = aiAssistGroupKey(event);
+    const existing = groupsByKey.get(key) || {
+      key,
+      providerStatus: event.providerStatus || "",
+      module: event.module || "",
+      actionType: (event.actionTypes || [])[0] || event.action || "",
+      languageMismatch: event.languageMismatch === true,
+      missingFieldCount: 0,
+      readyActionCount: 0,
+      mergedCount: 0,
+      latestAt: 0,
+      count: 0,
+      latest: null,
+      items: []
+    };
+    existing.count += 1;
+    existing.missingFieldCount += Number(event.missingFieldCount || 0);
+    existing.readyActionCount += Number(event.readyActionCount || 0);
+    if (event.intakeTelemetry?.mergedFromRecentConversation === true) existing.mergedCount += 1;
+    existing.items.push(event);
+    const at = Number(event.at || 0);
+    if (!existing.latest || at >= existing.latestAt) {
+      existing.latestAt = at;
+      existing.latest = event;
+      existing.actorName = event.actorName || "";
+      existing.actorRole = event.actorRole || "";
+      existing.provider = event.provider || "";
+      existing.model = event.model || "";
+      existing.missingFields = event.missingFields || [];
     }
     groupsByKey.set(key, existing);
   });

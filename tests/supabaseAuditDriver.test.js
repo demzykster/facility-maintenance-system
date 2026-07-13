@@ -149,4 +149,49 @@ describe("Supabase audit driver", () => {
       metadata: { kind: "storage_save_failed" }
     })]);
   });
+
+  it("lists AI assist events from audit_events", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify([
+          {
+            id: "audit-ai-1",
+            at: "1970-01-01T00:00:02.000Z",
+            actor_id: "app-user-1",
+            actor_name: "Owner",
+            actor_role: "admin",
+            entity_type: "system",
+            entity_id: "ai-assist",
+            action: "ai_assist",
+            summary: "AI assist ok: facility",
+            metadata: {
+              providerStatus: "ok",
+              actionTypes: ["ticket.create"],
+              intakeTelemetry: { mergedFromRecentConversation: true }
+            }
+          }
+        ]);
+      }
+    });
+    const driver = createSupabaseAuditDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service-key",
+      fetchImpl
+    });
+
+    const rows = await driver.listAiAssistEvents({ limit: 20 });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://supabase.example/rest/v1/audit_events?select=id,at,actor_id,actor_name,actor_role,entity_type,entity_id,action,summary,metadata&entity_type=eq.system&action=eq.ai_assist&order=at.desc&limit=20",
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(rows).toEqual([expect.objectContaining({
+      id: "audit-ai-1",
+      at: 2000,
+      actorName: "Owner",
+      action: "ai_assist",
+      metadata: expect.objectContaining({ actionTypes: ["ticket.create"] })
+    })]);
+  });
 });

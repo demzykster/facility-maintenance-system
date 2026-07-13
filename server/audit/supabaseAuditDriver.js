@@ -89,6 +89,23 @@ export function createSupabaseAuditDriver({ url, serviceRoleKey, table = "audit_
       const data = await readJsonOrText(response);
       if (!response.ok) throw new Error(errorMessage(data, `supabase_audit_list_${response.status}`));
       return Array.isArray(data) ? data.map(fromRow) : [];
+    },
+    async listAiAssistEvents({ limit = 50 } = {}) {
+      const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+      const query = [
+        "select=id,at,actor_id,actor_name,actor_role,entity_type,entity_id,action,summary,metadata",
+        "entity_type=eq.system",
+        "action=eq.ai_assist",
+        "order=at.desc",
+        `limit=${safeLimit}`
+      ].join("&");
+      const response = await fetchImpl(`${base}?${query}`, {
+        method: "GET",
+        headers: serviceHeaders(serviceRoleKey)
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_audit_list_${response.status}`));
+      return Array.isArray(data) ? data.map(fromRow) : [];
     }
   };
 }

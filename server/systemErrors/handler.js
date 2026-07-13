@@ -49,6 +49,41 @@ const normalizeSystemError = (event = {}) => ({
   errorId: text(event.metadata?.metadata?.errorId, 40)
 });
 
+const normalizeStringArray = (value, maxItems = 8) => (
+  Array.isArray(value) ? value.map((item) => text(item, 80)).filter(Boolean).slice(0, maxItems) : []
+);
+
+const normalizeAiAssistEvent = (event = {}) => {
+  const metadata = event.metadata || {};
+  const telemetry = metadata.intakeTelemetry || {};
+  return {
+    id: text(event.id, 120),
+    at: Number(event.at || Date.now()),
+    actorName: text(event.actorName, 80),
+    actorRole: text(event.actorRole, 40),
+    summary: text(event.summary, 180),
+    provider: text(metadata.provider, 40),
+    model: text(metadata.model, 80),
+    providerStatus: text(metadata.providerStatus, 32),
+    module: text(metadata.module, 60),
+    action: text(metadata.action, 60),
+    requestedLanguage: text(metadata.requestedLanguage, 12),
+    assistantLanguage: text(metadata.assistantLanguage, 12),
+    languageMismatch: metadata.languageMismatch === true,
+    actionCount: Number(metadata.actionCount) || 0,
+    readyActionCount: Number(metadata.readyActionCount) || 0,
+    missingFieldCount: Number(metadata.missingFieldCount) || 0,
+    actionTypes: normalizeStringArray(metadata.actionTypes, 8),
+    missingFields: normalizeStringArray(metadata.missingFields, 12),
+    intakeTelemetry: {
+      mergedFromRecentConversation: telemetry.mergedFromRecentConversation === true,
+      recentConversationCount: Number(telemetry.recentConversationCount) || 0,
+      latestUserMessageChars: Number(telemetry.latestUserMessageChars) || 0,
+      draftInputChars: Number(telemetry.draftInputChars) || 0
+    }
+  };
+};
+
 export function createSystemErrorsHandler({ auditDriver = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendAuditDriver = auditDriver
     || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
@@ -62,10 +97,18 @@ export function createSystemErrorsHandler({ auditDriver = null, env = process.en
 
     const auth = await authorize(req, env, fetchImpl, sessionClient);
     if (!auth.ok) return sendJson(res, auth.status, { error: auth.error });
-    if (!backendAuditDriver?.listClientErrors) return sendJson(res, 503, { error: "audit_backend_not_configured" });
 
     try {
-      const limit = Number(new URL(req.url || "/api/system-errors", "https://cmms.local").searchParams.get("limit") || 50);
+      const url = new URL(req.url || "/api/system-errors", "https://cmms.local");
+      const limit = Number(url.searchParams.get("limit") || 50);
+      const type = text(url.searchParams.get("type"), 40);
+      if (type === "ai-assist") {
+        if (!backendAuditDriver?.listAiAssistEvents) return sendJson(res, 503, { error: "audit_backend_not_configured" });
+        const events = await backendAuditDriver.listAiAssistEvents({ limit });
+        return sendJson(res, 200, { ok: true, aiAssist: events.map(normalizeAiAssistEvent) });
+      }
+
+      if (!backendAuditDriver?.listClientErrors) return sendJson(res, 503, { error: "audit_backend_not_configured" });
       const events = await backendAuditDriver.listClientErrors({ limit });
       return sendJson(res, 200, { ok: true, errors: events.map(normalizeSystemError) });
     } catch (error) {

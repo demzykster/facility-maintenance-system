@@ -265,6 +265,8 @@ Recent commits on `main`:
   - Adds `config.ai` settings in the admin general settings screen for non-secret AI preferences: mode, provider, and model.
   - Route budget returns to `19/24`.
   - The follow-up context/workflow slice wires the panel to `/api/ai/assist` in server mode, filters supplied UI context by the authenticated user's role/scope before provider calls, records non-sensitive `system / ai_assist` audit events when the audit driver is configured, and adds explicit workflow IDs for `risk_summary`, `sla_explanation`, `next_actions`, and `draft_preparation`.
+  - AI assist audit events now include safe learning telemetry for later improvement loops: action types, missing-field names, context-merge counts, language mismatch flags, and character counts only. Raw user messages, prompt text, context titles, and provider keys must stay out of audit events.
+  - Admin diagnostics can view those AI events through the existing protected diagnostics route: `/api/system-errors?type=ai-assist`. The settings screen shows this as `דיווחי בעיות במערכת` → `אבחון AI`, grouped by operational failure shape so repeated language/context/missing-field issues are visible without exposing dialogue content.
   - Next AI work should deepen those workflows with richer role-specific prompts, better UI entry points, and eventually human-confirmed normal operations for any AI-prepared business action.
 - `Add BI ticket heatmap`
   - Adds `מפת חום קריאות` to the unified BI screen.

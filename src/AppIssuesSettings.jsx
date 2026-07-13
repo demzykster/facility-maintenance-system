@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bug, CheckCircle2, RefreshCw, X } from "lucide-react";
 import { APP_ISSUE_STATUS, appIssueStatusLabel, updateAppIssueResponse } from "./appIssueModel.js";
-import { fetchSystemErrorLogs, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
+import { fetchSystemErrorLogs, groupAiAssistDiagnostics, groupSystemErrorLogs } from "./systemErrorLogAdapter.js";
 
 function SystemErrorsSettings({ ui }) {
   const { Empty, SectionTitle, fmtDate, fmtTime, roleLabel } = ui;
@@ -69,6 +69,66 @@ function SystemErrorsSettings({ ui }) {
   </>;
 }
 
+function AiAssistDiagnosticsSettings({ ui }) {
+  const { Empty, SectionTitle, fmtDate, fmtTime, roleLabel } = ui;
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [open, setOpen] = useState(null);
+  const load = async () => {
+    setBusy(true);
+    setErr("");
+    const result = await fetchSystemErrorLogs({ limit: 120, type: "ai-assist" });
+    setBusy(false);
+    if (!result.ok) {
+      setErr(result.error === "access_token_required" ? "אין חיבור פעיל ליומן ה-AI." : "טעינת אבחון ה-AI נכשלה.");
+      setItems([]);
+      return;
+    }
+    setItems(result.aiAssist || []);
+  };
+  useEffect(() => { load(); }, []);
+  const groups = useMemo(() => groupAiAssistDiagnostics(items), [items]);
+  const groupTitle = (group) => {
+    if (group.languageMismatch) return "החלפת שפה לא צפויה";
+    if (group.missingFieldCount > 0) return "חסרים פרטים לפני פעולה";
+    if (group.readyActionCount > 0) return "פעולה מוכנה לאישור";
+    if (group.providerStatus === "failed") return "כשל ספק AI";
+    return "שיחת AI לקריאה";
+  };
+  const eventSummary = (event) => {
+    const action = (event.actionTypes || [])[0] || event.action || "ללא פעולה";
+    const fields = (event.missingFields || []).join(", ");
+    return `${event.module || "כללי"} · ${action}${fields ? ` · חסר: ${fields}` : ""}`;
+  };
+  return <>
+    <SectionTitle><Bug size={15} /> אבחון עוזר AI</SectionTitle>
+    <div className="hint" style={{ marginBottom: 12 }}>אירועי AI מקובצים בלי תוכן השיחה. המטרה היא להבין איפה העוזר חוזר על עצמו, מחליף שפה, או נתקע לפני פעולה.</div>
+    <button className="btn-ghost sm" onClick={load} disabled={busy}><RefreshCw size={14} /> {busy ? "טוען…" : "רענון"}</button>
+    {err && <div className="err" style={{ marginTop: 10 }}>{err}</div>}
+    {!err && !busy && items.length === 0 ? <Empty text="אין אירועי AI" Icon={CheckCircle2} sub="כאשר העוזר יענה למשתמשים, האבחון הבטוח יופיע כאן" /> : <div className="issue-list" style={{ marginTop: 12 }}>
+      {groups.map((group) => { const item = group.latest || group; const rowKey = group.key; return <div key={rowKey} className="issue-card">
+        <div className="issue-main">
+          <div className="issue-top"><span className={"issue-status " + (group.languageMismatch || group.providerStatus === "failed" ? "open" : "resolved")}>{groupTitle(group)}</span><span className="issue-status">{group.count === 1 ? "אירוע אחד" : `${group.count} אירועים`}</span><span className="issue-date">אחרון: {fmtDate(group.latestAt)} {fmtTime(group.latestAt)}</span></div>
+          <div className="issue-desc">{eventSummary(item)}</div>
+          <div className="issue-meta">{item.actorName || "—"} · {roleLabel(item.actorRole)} · {item.provider || "—"} / {item.model || "—"}</div>
+          <div className="issue-response">
+            מוכן לאישור: {group.readyActionCount} · חסרים שדות: {group.missingFieldCount} · חיבור הקשר משיחה קודמת: {group.mergedCount}
+          </div>
+          {open === rowKey && <div className="issue-response">
+            סטטוס ספק: {item.providerStatus || "—"} · שפה מבוקשת/תשובה: {item.requestedLanguage || "—"} / {item.assistantLanguage || "—"}
+            <br />הודעות בהקשר: {item.intakeTelemetry?.recentConversationCount || 0} · תווי הודעה אחרונה: {item.intakeTelemetry?.latestUserMessageChars || 0} · תווי קלט לאחר חיבור: {item.intakeTelemetry?.draftInputChars || 0}
+            {group.items.length > 1 && <div className="system-error-samples">
+              {group.items.slice(0, 5).map((sample) => <div key={sample.id || sample.at}>{fmtDate(sample.at)} {fmtTime(sample.at)} · {eventSummary(sample)}</div>)}
+            </div>}
+          </div>}
+        </div>
+        <button className="btn-ghost sm" onClick={() => setOpen((x) => x === rowKey ? null : rowKey)}>{open === rowKey ? "הסתר פרטים" : "פרטים"}</button>
+      </div>; })}
+    </div>}
+  </>;
+}
+
 export function AppIssuesSettings({ issues, session, onSave, ui }) {
   const { Empty, Overlay, SectionTitle, fmtDate, fmtTime, roleLabel } = ui;
   const [view, setView] = useState("user");
@@ -82,8 +142,8 @@ export function AppIssuesSettings({ issues, session, onSave, ui }) {
   return <>
     <SectionTitle><Bug size={15} /> דיווחי בעיות במערכת</SectionTitle>
     <div className="hint" style={{ marginBottom: 12 }}>דיווחים ידניים ממשתמשים ושגיאות אוטומטיות שהמערכת תפסה. זהו יומן איכות פנימי, לא קריאות אחזקה.</div>
-    <div className="seg-tabs" style={{ maxWidth: 520, marginBottom: 14 }}><button className={view === "user" ? "on" : ""} onClick={() => setView("user")}>דיווחי משתמשים</button><button className={view === "system" ? "on" : ""} onClick={() => setView("system")}>שגיאות מערכת</button></div>
-    {view === "system" ? <SystemErrorsSettings ui={ui} /> : sorted.length === 0 ? <Empty text="אין דיווחי בעיות" Icon={Bug} sub="כאשר משתמש ידווח על בעיה היא תופיע כאן" /> : <div className="issue-list">
+    <div className="seg-tabs s3" style={{ maxWidth: 620, marginBottom: 14 }}><button className={view === "user" ? "on" : ""} onClick={() => setView("user")}>דיווחי משתמשים</button><button className={view === "system" ? "on" : ""} onClick={() => setView("system")}>שגיאות מערכת</button><button className={view === "ai" ? "on" : ""} onClick={() => setView("ai")}>אבחון AI</button></div>
+    {view === "system" ? <SystemErrorsSettings ui={ui} /> : view === "ai" ? <AiAssistDiagnosticsSettings ui={ui} /> : sorted.length === 0 ? <Empty text="אין דיווחי בעיות" Icon={Bug} sub="כאשר משתמש ידווח על בעיה היא תופיע כאן" /> : <div className="issue-list">
       {sorted.map((issue) => <div key={issue.id} className="issue-card">
         <div className="issue-main">
           <div className="issue-top"><span className={"issue-status " + (issue.status || "open")}>{appIssueStatusLabel(issue.status)}</span><span className="issue-date">{fmtDate(issue.at)} {fmtTime(issue.at)}</span></div>

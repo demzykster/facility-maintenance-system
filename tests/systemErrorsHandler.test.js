@@ -116,4 +116,79 @@ describe("system errors API handler", () => {
       }]
     });
   });
+
+  it("returns sanitized AI assist diagnostics for admins", async () => {
+    const auditDriver = {
+      listAiAssistEvents: vi.fn().mockResolvedValue([
+        {
+          id: "audit-ai-1",
+          at: 2000,
+          actorName: "Owner",
+          actorRole: "admin",
+          summary: "AI assist ok: facility",
+          metadata: {
+            provider: "google",
+            model: "gemini-3.5-flash",
+            providerStatus: "ok",
+            module: "facility",
+            action: "draft_ticket",
+            requestedLanguage: "ru",
+            assistantLanguage: "he",
+            languageMismatch: true,
+            actionCount: 1,
+            readyActionCount: 0,
+            missingFieldCount: 1,
+            actionTypes: ["ticket.create"],
+            missingFields: ["zone"],
+            intakeTelemetry: {
+              mergedFromRecentConversation: true,
+              recentConversationCount: 3,
+              latestUserMessageChars: 18,
+              draftInputChars: 72
+            },
+            rawPrompt: "must not leak"
+          }
+        }
+      ])
+    };
+    const handler = createSystemErrorsHandler({
+      auditDriver,
+      sessionClient: sessionClientFor({ role: "admin" })
+    });
+
+    const res = await call(handler, { headers: { authorization: "Bearer admin-token" }, url: "/api/system-errors?type=ai-assist&limit=10" });
+
+    expect(res.statusCode).toBe(200);
+    expect(auditDriver.listAiAssistEvents).toHaveBeenCalledWith({ limit: 10 });
+    expect(res.json()).toEqual({
+      ok: true,
+      aiAssist: [{
+        id: "audit-ai-1",
+        at: 2000,
+        actorName: "Owner",
+        actorRole: "admin",
+        summary: "AI assist ok: facility",
+        provider: "google",
+        model: "gemini-3.5-flash",
+        providerStatus: "ok",
+        module: "facility",
+        action: "draft_ticket",
+        requestedLanguage: "ru",
+        assistantLanguage: "he",
+        languageMismatch: true,
+        actionCount: 1,
+        readyActionCount: 0,
+        missingFieldCount: 1,
+        actionTypes: ["ticket.create"],
+        missingFields: ["zone"],
+        intakeTelemetry: {
+          mergedFromRecentConversation: true,
+          recentConversationCount: 3,
+          latestUserMessageChars: 18,
+          draftInputChars: 72
+        }
+      }]
+    });
+    expect(JSON.stringify(res.json())).not.toContain("must not leak");
+  });
 });
