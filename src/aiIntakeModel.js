@@ -42,6 +42,16 @@ const ENGLISH_KEYWORDS = {
   task: ["task", "meeting", "reminder", "check"]
 };
 
+const RUSSIAN_KEYWORDS = {
+  transport: ["техника", "техники", "транспорт", "транспорта", "погрузчик", "погрузчика", "машина", "машины", "документы техники", "документы транспорта"],
+  cleaning: ["уборка", "грязно", "грязный", "грязная", "мусор", "туалет", "запах"],
+  ppe: ["одежда", "спецодежда", "обувь", "каска", "перчатки", "жилет", "размер"],
+  safety: ["опасно", "опасность", "пожар", "дым", "искра", "травма", "аварийно"],
+  facility: ["дверь", "ворота", "свет", "электрика", "вода", "стена", "пол", "здание"],
+  supplier: ["поставщик", "подрядчик", "счёт", "счет", "заказ"],
+  task: ["задача", "встреча", "напоминание", "проверка"]
+};
+
 const CRITICAL_WORDS = ["סכנה", "מסוכן", "אש", "עשן", "ניצוץ", "פציעה", "חירום", "danger", "unsafe", "fire", "smoke", "spark", "injury", "emergency"];
 const HIGH_WORDS = ["תקוע", "מושבת", "לא עובד", "דחוף", "חוסם", "stuck", "down", "urgent", "blocked", "not working"];
 const LOCATION_PATTERNS = [
@@ -53,7 +63,8 @@ const KEYWORDS_BY_MODULE = Object.freeze(
   AI_INTAKE_MODULES.reduce((acc, module) => {
     acc[module] = [
       ...(HEBREW_KEYWORDS[module] || []),
-      ...(ENGLISH_KEYWORDS[module] || [])
+      ...(ENGLISH_KEYWORDS[module] || []),
+      ...(RUSSIAN_KEYWORDS[module] || [])
     ];
     return acc;
   }, {})
@@ -80,6 +91,17 @@ export function detectAiIntakeModule(text = "") {
     .filter(([module]) => module !== "unknown")
     .sort((a, b) => b[1] - a[1])[0];
   return best && best[1] > 0 ? best[0] : "unknown";
+}
+
+export function hasAiInformationalIntent(text = "") {
+  const normalized = normalizeAiIntakeText(text).toLowerCase();
+  if (!normalized) return false;
+  const asksQuestion = /[?？]/u.test(normalized)
+    || /\b(why|what|how|when|where|explain)\b/i.test(normalized)
+    || /(почему|зачем|что значит|что такое|как |когда|где|объясни|поясни)/iu.test(normalized)
+    || /(למה|מדוע|מה זה|מה המשמעות|איך|מתי|איפה|הסבר)/iu.test(normalized);
+  const asksWrite = /(создай|создать|открой|פתח|צור|תפתח|create|open|update|change|עדכן|תעדכן|закрой|סגור|close|delete|удали)/iu.test(normalized);
+  return asksQuestion && !asksWrite;
 }
 
 export function detectAiIntakeSeverity(text = "") {
@@ -145,6 +167,7 @@ export function buildAiIntakeDraft(input = {}, now = Date.now()) {
     ? input.severity
     : detectAiIntakeSeverity(rawText);
   const signals = extractAiIntakeSignals(rawText);
+  const informationalIntent = hasAiInformationalIntent(rawText);
   const base = {
     version: 1,
     createdAt: now,
@@ -156,11 +179,11 @@ export function buildAiIntakeDraft(input = {}, now = Date.now()) {
     severity,
     confidence: module === "unknown" ? "low" : "medium",
     signals,
-    action: aiIntakeActionForModule(module),
+    action: informationalIntent ? "no_action" : aiIntakeActionForModule(module),
     writePolicy: "human_confirmation_required",
     allowedToWrite: false
   };
-  const missingInfo = aiIntakeMissingInfo(base);
+  const missingInfo = informationalIntent ? [] : aiIntakeMissingInfo(base);
   const clarifyingQuestions = aiIntakeClarifyingQuestions({ ...base, missingInfo });
   return {
     ...base,
@@ -177,6 +200,7 @@ export function buildAiIntakeDraft(input = {}, now = Date.now()) {
 
 export function buildAiIntakeUserReply(draft = {}) {
   if (!draft.rawText) return "כתבו בקצרה מה קרה, איפה זה נמצא, ואם יש סכנה לאנשים.";
+  if (draft.action === "no_action") return "אענה לפי ההקשר הזמין בלי לבצע שינוי במערכת.";
   if (draft.severity === "critical") {
     return "זיהיתי חשד לאירוע דחוף/מסוכן. נא להתרחק מהאזור אם יש סכנה, ולענות על שאלות ההבהרה לפני פתיחת הקריאה.";
   }

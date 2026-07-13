@@ -4,7 +4,8 @@ import {
   buildAiIntakeDraft,
   detectAiIntakeModule,
   detectAiIntakeSeverity,
-  extractAiIntakeSignals
+  extractAiIntakeSignals,
+  hasAiInformationalIntent
 } from "../src/aiIntakeModel.js";
 
 describe("aiIntakeModel", () => {
@@ -15,6 +16,7 @@ describe("aiIntakeModel", () => {
     expect(detectAiIntakeModule("הרצפה מלוכלכת במטבחון קומה 2")).toBe("cleaning");
     expect(detectAiIntakeModule("צריך נעלי עבודה מידה 43")).toBe("ppe");
     expect(detectAiIntakeModule("צריך לתאם פגישה לבדיקה חודשית")).toBe("task");
+    expect(detectAiIntakeModule("почему много уведомлений по документам техники")).toBe("transport");
 
     const draft = buildAiIntakeDraft({ rawText: "מלגזה לא נטענת במחסן קומה 1", actor: { id: "u1", role: "user" } }, 100);
     expect(draft).toMatchObject({
@@ -26,6 +28,26 @@ describe("aiIntakeModel", () => {
       allowedToWrite: false,
       audit: { required: true, eventType: "ai_intake_draft", safe: true }
     });
+  });
+
+  it("treats explanation questions as read-only answers, not ticket drafts", () => {
+    expect(hasAiInformationalIntent("почему я вижу много уведомлений по документам техники?")).toBe(true);
+
+    const draft = buildAiIntakeDraft({
+      rawText: "почему я вижу много уведомлений по документам техники?",
+      actor: { id: "u1", role: "admin" }
+    }, 140);
+
+    expect(draft).toMatchObject({
+      createdAt: 140,
+      module: "transport",
+      action: "no_action",
+      missingInfo: [],
+      clarifyingQuestions: [],
+      allowedToWrite: false,
+      writePolicy: "human_confirmation_required"
+    });
+    expect(draft.userReply).toContain("בלי לבצע שינוי");
   });
 
   it("extracts risk and context signals for a smarter answer back to the user", () => {

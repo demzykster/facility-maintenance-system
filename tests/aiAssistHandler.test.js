@@ -285,6 +285,60 @@ describe("AI assist handler", () => {
     expect(prompt.actionGuidance.instruction).toContain("Do not ask for fields that are already resolved");
   });
 
+  it("keeps Russian explanation questions read-only and focused on the latest request", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.1-flash-lite",
+      text: "Вы видите эти уведомления, потому что есть документы техники с истёкшим или близким сроком."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "gemini",
+        GOOGLE_GENERATIVE_AI_API_KEY: "google-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 127,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "почему я вижу много уведомлений по документам техники?",
+        messages: [{ role: "user", content: "почему я вижу много уведомлений по документам техники?" }],
+        context: {
+          fleet: {
+            docs: [{ id: "doc-1", unitCode: "178040", title: "ביטוח", status: "expired", daysLeft: -1 }]
+          }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload).toMatchObject({
+      ok: true,
+      draft: {
+        module: "transport",
+        action: "no_action",
+        missingInfo: []
+      },
+      actions: [],
+      assistant: {
+        provider: "google",
+        model: "gemini-3.1-flash-lite"
+      }
+    });
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.responseLanguage).toMatchObject({ code: "ru", source: "latest_user_message" });
+    expect(prompt.userRequest).toBe("почему я вижу много уведомлений по документам техники?");
+    expect(prompt.contract.expectedOutput).toContain("Answer in Russian");
+    expect(JSON.stringify(payload)).not.toContain("google-secret");
+  });
+
   it("can request a provider structured plan but only returns sanitized non-writing suggestions", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
