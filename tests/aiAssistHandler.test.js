@@ -172,6 +172,22 @@ describe("AI assist handler", () => {
         severity: "critical",
         allowedToWrite: false
       },
+      actions: [
+        expect.objectContaining({
+          id: "create_ticket",
+          type: "ticket.create",
+          status: "needs_human_input",
+          requiresConfirmation: true,
+          writesData: false,
+          writePolicy: "human_confirmation_required",
+          missingFields: expect.arrayContaining(["forkliftId"]),
+          execute: {
+            method: "POST",
+            path: "/api/tickets",
+            bodyField: "ticket"
+          }
+        })
+      ],
       assistant: {
         provider: "openai",
         model: "gpt-5.2",

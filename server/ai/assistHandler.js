@@ -1,5 +1,6 @@
 import { aiAssistAuditEvent } from "../../src/auditEventModel.js";
 import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
+import { buildAiAssistActionProposals } from "../../src/aiAssistActionModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
 import { aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv } from "../../src/aiProviderModel.js";
@@ -150,10 +151,11 @@ export function createAiAssistHandler({
       const workflow = normalizeAiAssistWorkflow(body.workflow);
 
       const draft = buildAiIntakeDraft(normalized.input, currentTime);
+      const actions = buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime });
       const context = buildAiAssistContext(body.context, auth.user);
       const config = aiServerConfigFromEnv(env);
       if (config.mode !== AI_MODES.server) {
-        return sendJson(res, 503, { error: "ai_server_disabled", draft });
+        return sendJson(res, 503, { error: "ai_server_disabled", draft, actions });
       }
 
       const result = await providerCall({
@@ -191,6 +193,7 @@ export function createAiAssistHandler({
       return sendJson(res, 200, {
         ok: true,
         draft,
+        actions,
         assistant: {
           provider: result.provider,
           model: result.model,

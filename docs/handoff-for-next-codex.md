@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push after committing the ticket-detail render smoke.
-- Latest app/UI commit before this handoff: `Harden ticket detail lazy bridge` plus the follow-up ticket-detail render-smoke test.
+- Latest app/UI commit before this handoff: `Add AI ticket action proposals` after the ticket-detail bridge/render-smoke stabilization.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add AI ticket action proposals`
+  - Adds `src/aiAssistActionModel.js`, the first safe write-action foundation for the assistant.
+  - `/api/ai/assist` can now return deterministic `actions` next to the draft/assistant text. The current implemented proposal is `ticket.create`.
+  - Proposals are built from the deterministic intake draft, not from free-form provider text. They are marked `requiresConfirmation: true`, `writesData: false`, and point future execution at the existing validated `/api/tickets` endpoint.
+  - Missing operational fields keep the proposal in `needs_human_input` state; for example, transport tickets remain blocked until a human selects the exact fleet unit and downtime type.
+  - This is not write-capable AI yet. The next slice should add UI confirmation and then server execution through normal authenticated operations, with audit and permission checks preserved.
 - `Harden ticket detail lazy bridge`
   - Fixed the white-screen regression when opening lazy-loaded ticket details after the `TicketDetail` split.
   - Root cause: the lazy UI bridge still referenced stale helpers (`msFromInput`, then `normalizeTicketHistory`) and did not pass all active admin-edit helpers (`STATUSES`, `dtLevels`) required by the detail overlay.
