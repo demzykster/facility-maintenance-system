@@ -93,6 +93,18 @@ function latestUserTextFromConversation(conversation = [], fallback = "") {
   return cleanText([...conversation].reverse().find((message) => message.role === "user")?.content || fallback);
 }
 
+function providerSafeConversationMessages(conversation = []) {
+  const messages = Array.isArray(conversation) ? conversation : [];
+  return messages
+    .slice(-6)
+    .map((message) => {
+      if (message?.role === "user") return { role: "user", content: cleanText(message.content, 1_000) };
+      if (message?.role === "assistant") return { role: "assistant", content: "[previous assistant reply omitted; answer the current userRequest]" };
+      return null;
+    })
+    .filter((message) => message && message.content);
+}
+
 const ACTIONABLE_REQUEST_RE = /(создай|создать|открой|открыть|сделай|добавь|добавить|заявк|тикет|קריאה|פתח|תפתח|צור|create|open|draft|ticket|request|report)/iu;
 const ACTION_COMPLETION_HINT_RE = /(?:^|[\s,.;:])(?:в|на|у|около|возле)(?=[\s,.;:]|$)|комнат|склад|отдел|зона|корпус|f-\d+|\d{2,}|באזור|באיזור|במחלקת|במחסן|במבנה|בקו|zone|area|department|warehouse|building/iu;
 
@@ -312,6 +324,7 @@ function providerPrompt({ draft, actions = [], user, context, workflow, conversa
   const safeWorkflow = normalizeAiAssistWorkflow(workflow);
   const language = responseLanguage || responseLanguageForRequest({ text: draft?.rawText, conversation, fallback: draft?.language });
   const latestUserRequest = cleanText(userRequest || latestUserTextFromConversation(conversation, draft?.rawText), MAX_TEXT_CHARS);
+  const recentConversation = providerSafeConversationMessages(conversation);
   return JSON.stringify({
     contract: {
       writePolicy: "human_confirmation_required",
@@ -323,20 +336,20 @@ function providerPrompt({ draft, actions = [], user, context, workflow, conversa
       contextPolicy: "use only the role-filtered context below; never infer records that are not present",
       refusalPolicy: "If the current userRequest is unclear, ask one precise follow-up question instead of summarizing unrelated context."
     },
+    userRequest: latestUserRequest || cleanText(draft?.rawText, MAX_TEXT_CHARS),
+    responseLanguage: language,
     assistantCapabilities: assistantCapabilityGuidanceForProvider(),
     actionGuidance: actionGuidanceForProvider(actions),
     latestMessageGuidance: latestMessageGuidanceForProvider({
       draft: { ...draft, rawText: latestUserRequest || draft?.rawText },
       workflow: safeWorkflow
     }),
-    contextGuidance: contextGuidanceForProvider({ draft, context }),
-    responseLanguage: language,
-    userRequest: latestUserRequest || cleanText(draft?.rawText, MAX_TEXT_CHARS),
     draftInput: {
       rawText: cleanText(draft?.rawText, MAX_TEXT_CHARS),
       mergedFromRecentConversation: Boolean(latestUserRequest && draft?.rawText && latestUserRequest !== draft.rawText)
     },
-    recentConversation: conversation,
+    recentConversation,
+    contextGuidance: contextGuidanceForProvider({ draft, context }),
     workflow: {
       id: safeWorkflow,
       instruction: aiAssistWorkflowInstruction(safeWorkflow)

@@ -88,6 +88,22 @@ describe("ai provider client", () => {
     expect(__test.safeTokenLimit(8, 16)).toBe(16);
   });
 
+  it("keeps materially large prompts intact before sending them to the provider SDK", async () => {
+    const createOpenAI = sdkFactory("openai");
+    const generateTextImpl = vi.fn().mockResolvedValue({ text: "OK" });
+    const prompt = `${"context ".repeat(900)} CURRENT_USER_REQUEST: что ты умеешь?`;
+
+    await callAiProvider({
+      config: { provider: "openai", openaiApiKey: "openai-secret", model: "gpt-5.2" },
+      system: "system",
+      prompt,
+      generateTextImpl,
+      sdk: { createOpenAI }
+    });
+
+    expect(generateTextImpl.mock.calls[0][0].prompt).toContain("CURRENT_USER_REQUEST: что ты умеешь?");
+  });
+
   it("uses Google Gemini SDK models for Google provider mode", async () => {
     const createGoogleGenerativeAI = sdkFactory("google");
     const generateTextImpl = vi.fn().mockResolvedValue({ text: "gemini ready" });

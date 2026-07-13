@@ -1439,7 +1439,7 @@ describe("AI assist handler", () => {
     expect(prompt.userRequest).toBe("תענה רק על מצב הניקיון");
     expect(prompt.recentConversation).toEqual([
       { role: "user", content: "מה קורה במסמכי צי?" },
-      { role: "assistant", content: "יש התראות מסמכים." },
+      { role: "assistant", content: "[previous assistant reply omitted; answer the current userRequest]" },
       { role: "user", content: "תענה רק על מצב הניקיון" }
     ]);
     expect(prompt.contract.expectedOutput).toContain("answer the current userRequest first");
@@ -1489,6 +1489,10 @@ describe("AI assist handler", () => {
       priority: "latest_user_message",
       operationalDigestAllowed: false
     });
+    expect(JSON.stringify(prompt)).not.toContain(staleSummary);
+    expect(prompt.recentConversation).toEqual([
+      { role: "user", content: "что ты умеешь?" }
+    ]);
     expect(prompt.latestMessageGuidance.instruction).toContain("Do not repeat an older assistant answer");
     expect(prompt.latestMessageGuidance.staleSummaryRule).toContain("Do not summarize fleet document alerts");
     expect(prompt.assistantCapabilities.instruction).toContain("do not say you cannot create or update records");

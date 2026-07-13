@@ -86,4 +86,22 @@ describe("AI assist provider plan model", () => {
       { id: "create_ticket", type: "ticket.create", status: "needs_human_input", missingFields: ["forkliftId"] }
     ]);
   });
+
+  it("omits raw previous assistant replies from structured provider prompts", () => {
+    const staleSummary = "קיימות 15 התראות מסמכי צי רכב פתוחות";
+    const prompt = providerPlanPrompt({
+      draft: { rawText: "что ты умеешь?" },
+      conversation: [
+        { role: "assistant", content: staleSummary },
+        { role: "user", content: "что ты умеешь?" }
+      ]
+    });
+
+    const parsed = JSON.parse(prompt);
+    expect(JSON.stringify(parsed)).not.toContain(staleSummary);
+    expect(parsed.recentConversation).toEqual([
+      { role: "assistant", content: "[previous assistant reply omitted]" },
+      { role: "user", content: "что ты умеешь?" }
+    ]);
+  });
 });

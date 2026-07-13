@@ -29,6 +29,16 @@ const cleanStringList = (value, limit = 5) => Array.isArray(value)
   ? value.map((item) => cleanText(item, 160)).filter(Boolean).slice(0, limit)
   : [];
 
+function providerSafeConversationMessages(conversation = []) {
+  return Array.isArray(conversation)
+    ? conversation.slice(-6).map((message) => {
+      if (message?.role === "user") return { role: "user", content: cleanText(message.content, 500) };
+      if (message?.role === "assistant") return { role: "assistant", content: "[previous assistant reply omitted]" };
+      return null;
+    }).filter((message) => message && message.content)
+    : [];
+}
+
 export const AI_PROVIDER_PLAN_SCHEMA = Object.freeze({
   type: "object",
   additionalProperties: false,
@@ -111,7 +121,7 @@ export function providerPlanPrompt({ draft = {}, actions = [], context = {}, wor
       outputPolicy: "Only summarize reviewable next steps. The app will ignore any executable fields."
     },
     userRequest: cleanText(draft.rawText, 2_000),
-    recentConversation: Array.isArray(conversation) ? conversation.slice(-6) : [],
+    recentConversation: providerSafeConversationMessages(conversation),
     workflow,
     context,
     deterministicActions: actions.map((action) => ({
