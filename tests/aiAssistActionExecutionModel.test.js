@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiPpeRequestCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiCleaningComplaintCreateForSave, prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiPpeRequestCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -154,6 +154,25 @@ const ppeRequestCreateAction = {
   execute: { method: "POST", path: "/api/ppe", resource: "requests", bodyField: "request" }
 };
 
+const cleaningComplaintCreateAction = {
+  id: "create_cleaning_complaint_zone-kitchen",
+  type: "cleaning.complaint.create",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    zoneId: "zone-kitchen",
+    zoneName: "מטבחון",
+    zoneLoc: "בניין A",
+    kind: "dirty",
+    text: "הרצפה מלוכלכת",
+    reportedById: "u1",
+    reportedByName: "Vadim",
+    reportedByRole: "admin",
+    noPhotoReason: "דווח דרך עוזר AI ללא תמונה מצורפת"
+  },
+  execute: { method: "POST", path: "/api/cleaning/records", resource: "complaints", bodyField: "complaint" }
+};
+
 const taskUpdateAction = {
   id: "update_task_priority",
   type: "task.update",
@@ -241,6 +260,7 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction(meetingUpdateAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskUpdateAction)).toBe(true);
     expect(canExecuteAiAssistAction(ppeRequestCreateAction)).toBe(true);
+    expect(canExecuteAiAssistAction(cleaningComplaintCreateAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, execute: { method: "POST", path: "/api/kv" } })).toBe(false);
@@ -259,6 +279,9 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction({ ...ppeRequestCreateAction, missingFields: ["size"] })).toBe(false);
     expect(canExecuteAiAssistAction({ ...ppeRequestCreateAction, payload: { ...ppeRequestCreateAction.payload, lines: [{ itemId: "vest", itemName: "אפוד זוהר", qty: 1 }] } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...ppeRequestCreateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "request" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...cleaningComplaintCreateAction, missingFields: ["zoneId"] })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...cleaningComplaintCreateAction, payload: { ...cleaningComplaintCreateAction.payload, zoneId: "" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...cleaningComplaintCreateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "complaint" } })).toBe(false);
   });
 
   it("prepares a confirmed AI ticket for the existing saveTicket path", () => {
@@ -409,6 +432,43 @@ describe("AI assist action execution model", () => {
         kind: "ai_confirmed_ppe_request"
       }]
     });
+  });
+
+  it("prepares a confirmed AI cleaning complaint for the existing fileComplaint path", () => {
+    const complaint = prepareAiCleaningComplaintCreateForSave(cleaningComplaintCreateAction, { id: "u1", name: "Vadim", role: "admin" }, {
+      now: 4000,
+      makeId: () => "complaint-ai-1"
+    });
+
+    expect(complaint).toMatchObject({
+      id: "complaint-ai-1",
+      zoneId: "zone-kitchen",
+      zoneName: "מטבחון",
+      zoneLoc: "בניין A",
+      kind: "dirty",
+      text: "הרצפה מלוכלכת",
+      photo: null,
+      noPhotoReason: "דווח דרך עוזר AI ללא תמונה מצורפת",
+      reportedById: "u1",
+      reportedByName: "Vadim",
+      reportedByRole: "admin",
+      ai: {
+        drafted: true,
+        source: "ai_assist",
+        confirmedByHuman: true,
+        confirmedAt: 4000,
+        actionId: "create_cleaning_complaint_zone-kitchen"
+      }
+    });
+    expect(complaint.log).toEqual([
+      expect.objectContaining({
+        at: 4000,
+        by: "Vadim",
+        byRole: "admin",
+        text: "משתמש אישר דיווח ניקיון שהוכן על ידי AI",
+        kind: "ai_confirmed_cleaning_complaint"
+      })
+    ]);
   });
 
   it("prepares a confirmed AI meeting update with an allow-listed patch and audit log", () => {

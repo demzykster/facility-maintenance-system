@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiPpeRequestCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiCleaningComplaintCreateForSave, prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiPpeRequestCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -1383,7 +1383,7 @@ function buildAIContext(session, tickets, pm, fleet, cfg) {
   return L.join("\n");
 }
 
-function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [], users = [], ppeItems = [], ppeReqs = []) {
+function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [], users = [], ppeItems = [], ppeReqs = [], zones = []) {
   const now = Date.now();
   return buildAIContextSnapshotModel({
     session,
@@ -1395,6 +1395,7 @@ function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], me
     meetings,
     ppeItems,
     ppeReqs,
+    zones,
     config: cfg,
     now,
     isOpenTicket: isOpen,
@@ -7943,6 +7944,13 @@ function LazyAIPanel(props) {
       const ok = await props.savePpeReq(request);
       if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
       return { ok: true, requestId: request.id, message: `בקשת הביגוד נשלחה: ${request.lines?.[0]?.itemName || request.id}` };
+    }
+    if (action?.type === "cleaning.complaint.create") {
+      if (typeof props.fileComplaint !== "function") throw new Error("שמירת דיווחי ניקיון אינה זמינה במסך זה.");
+      const complaint = prepareAiCleaningComplaintCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
+      const ok = await props.fileComplaint(complaint);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, complaintId: complaint.id, message: `דיווח הניקיון נשלח: ${complaint.zoneName || complaint.id}` };
     }
     if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
     if (action?.type === "ticket.comment") {

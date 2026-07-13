@@ -177,6 +177,36 @@ function hasPpeRequestIntent(text = "") {
   return /(צריך|צריכ|בקשה|מבקש|אבקש|הזמן|תזמין|request|need|order|ביגוד|ציוד|נעליים|נעלי|קסדה|כפפות|אפוד|מידה|ppe|clothing|shoes|helmet|gloves|vest|size)/i.test(cleanText(text, 800));
 }
 
+function cleaningKindFromText(text = "") {
+  const raw = cleanText(text, 800).toLowerCase();
+  if (/תקלה|שבור|שבורה|שבר|דליפ|דולף|נוזל|סתימה|לא עובד|broken|leak|fault|clog/i.test(raw)) return "broken";
+  return "dirty";
+}
+
+function cleaningZoneMatchesText(zone = {}, raw = "") {
+  const text = cleanText(raw, 800).toLowerCase();
+  const candidates = [
+    zone.id,
+    zone.code,
+    zone.name,
+    zone.location,
+    zone.zoneLoc,
+    zone.area,
+    zone.building,
+    zone.floor
+  ].map((value) => cleanText(value, 160).toLowerCase()).filter((value) => value.length >= 2);
+  return candidates.some((value) => text.includes(value));
+}
+
+function requestedCleaningZoneFromText(text = "", zones = []) {
+  const raw = cleanText(text, 800);
+  if (!raw) return null;
+  const matches = cleanArray(zones)
+    .filter((zone) => zone && zone.active !== false && zone.id)
+    .filter((zone) => cleaningZoneMatchesText(zone, raw));
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function hasUpdateIntent(text = "") {
   return /תעדכן|עדכן|העבר|שנה|סיים|סגור|בטל|update|change|set|mark/i.test(cleanText(text, 800));
 }
@@ -759,6 +789,63 @@ function buildAiPpeRequestCreateProposal({ draft = {}, user = {}, context = {} }
   };
 }
 
+function buildAiCleaningComplaintCreateProposal({ draft = {}, user = {}, context = {}, now = Date.now() } = {}) {
+  const zones = cleanArray(context?.cleaning?.zones).filter((zone) => zone && zone.active !== false && zone.id);
+  const zone = requestedCleaningZoneFromText(draft.rawText, zones);
+  const actorId = cleanText(user.id || user.authUserId || user.workerNo, 120);
+  const actorName = cleanText(user.name, 120);
+  const actorRole = cleanText(user.role, 40);
+  const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const missingFields = zone ? [] : ["zoneId"];
+  return {
+    id: zone ? `create_cleaning_complaint_${cleanText(zone.id, 80)}` : "create_cleaning_complaint",
+    type: "cleaning.complaint.create",
+    label: "דיווח ניקיון",
+    status: missingFields.length ? "needs_human_input" : "ready_for_confirmation",
+    requiresConfirmation: true,
+    writesData: false,
+    writePolicy: "human_confirmation_required",
+    missingFields,
+    payload: {
+      zoneId: zone ? cleanText(zone.id, 160) : "",
+      zoneName: zone ? cleanText(zone.name, 160) : "",
+      zoneLoc: zone ? cleanText(zone.location || zone.zoneLoc, 160) : "",
+      kind: cleaningKindFromText(draft.rawText),
+      photo: null,
+      noPhotoReason: "דווח דרך עוזר AI ללא תמונה מצורפת",
+      text: cleanText(draft.rawText, MAX_DESCRIPTION_CHARS),
+      reportedById: actorId,
+      reportedByName: actorName,
+      reportedByRole: actorRole,
+      at: createdAt,
+      ai: {
+        drafted: true,
+        source: "ai_assist",
+        draftVersion: Number(draft.version || 1)
+      },
+      log: [{
+        at: createdAt,
+        by: actorName,
+        byRole: actorRole,
+        text: "טיוטת דיווח ניקיון הוכנה על ידי AI וממתינה לאישור משתמש",
+        kind: "ai_draft_cleaning_complaint"
+      }]
+    },
+    execute: {
+      method: "POST",
+      path: "/api/cleaning/records",
+      resource: "complaints",
+      bodyField: "complaint"
+    },
+    safety: {
+      deterministic: true,
+      providerTextTrusted: false,
+      serverMustRevalidate: true,
+      auditRequired: true
+    }
+  };
+}
+
 export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date.now(), context = {} } = {}) {
   const safeDraft = cleanObject(draft);
   const requestedComment = requestedCommentFromText(safeDraft.rawText);
@@ -780,6 +867,10 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   if (safeDraft.action === "draft_ppe_request") {
     const ppeProposal = buildAiPpeRequestCreateProposal({ draft: safeDraft, user, context });
     return ppeProposal ? [ppeProposal] : [];
+  }
+  if (safeDraft.action === "draft_cleaning_report") {
+    const cleaningProposal = buildAiCleaningComplaintCreateProposal({ draft: safeDraft, user, context, now });
+    return cleaningProposal ? [cleaningProposal] : [];
   }
   if (safeDraft.action === "draft_task") {
     if (hasMeetingCreateIntent(safeDraft.rawText)) {

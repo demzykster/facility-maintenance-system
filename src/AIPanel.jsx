@@ -32,7 +32,8 @@ const MISSING_LABELS = Object.freeze({
   at: "מועד",
   participantIds: "משתתפים",
   size: "מידה",
-  worker: "עובד"
+  worker: "עובד",
+  zoneId: "אזור ניקיון"
 });
 
 const UPDATE_FIELD_LABELS = Object.freeze({
@@ -99,6 +100,7 @@ function missingLabel(field) {
 }
 
 function actionKindLabel(action = {}) {
+  if (action.type === "cleaning.complaint.create") return "דיווח ניקיון";
   if (action.type === "ppe.request.create") return "בקשת ביגוד";
   if (action.type === "meeting.create") return "יצירת פגישה";
   if (action.type === "meeting.update") return "עדכון פגישה";
@@ -111,6 +113,7 @@ function actionKindLabel(action = {}) {
 
 function actionTitle(action = {}) {
   const payload = action.payload || {};
+  if (action.type === "cleaning.complaint.create") return payload.zoneName || "דיווח ניקיון חדש";
   if (action.type === "ppe.request.create") return payload.lines?.[0]?.itemName || "בקשת ביגוד חדשה";
   if (action.type === "meeting.create") return payload.title || "פגישה חדשה";
   if (action.type === "meeting.update") return payload.meetingTitle || payload.meetingId || "עדכון פגישה";
@@ -123,6 +126,7 @@ function actionTitle(action = {}) {
 
 function actionMeta(action = {}) {
   const payload = action.payload || {};
+  if (action.type === "cleaning.complaint.create") return `${payload.kind === "broken" ? "תקלה" : "לכלוך"}${payload.zoneLoc ? ` · ${payload.zoneLoc}` : ""}`;
   if (action.type === "ppe.request.create") {
     const line = payload.lines?.[0] || {};
     return `${payload.workerName || "עובד"}${payload.workerNo ? ` · ${payload.workerNo}` : ""}${line.size ? ` · מידה ${line.size}` : ""}`;
@@ -165,11 +169,12 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
   const isTaskCreate = action?.type === "task.create";
   const isTaskUpdate = action?.type === "task.update";
   const isPpeRequestCreate = action?.type === "ppe.request.create";
+  const isCleaningComplaintCreate = action?.type === "cleaning.complaint.create";
   const isUpdate = action?.type === "ticket.update";
   const isComment = action?.type === "ticket.comment";
   const previewRows = (isUpdate || isTaskUpdate || isMeetingUpdate) ? aiUpdatePreviewRows(action) : [];
   const preview = isComment ? commentPreview(action) : "";
-  if (!isCreate && !isMeetingCreate && !isMeetingUpdate && !isTaskCreate && !isTaskUpdate && !isPpeRequestCreate && !isUpdate && !isComment) return null;
+  if (!isCreate && !isMeetingCreate && !isMeetingUpdate && !isTaskCreate && !isTaskUpdate && !isPpeRequestCreate && !isCleaningComplaintCreate && !isUpdate && !isComment) return null;
   return <div className="ai-action-card">
     <div className="ai-action-top">
       <span>{action.label || actionKindLabel(action)}</span>
@@ -186,7 +191,7 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
     {preview && <div className="ai-action-diff">{preview}</div>}
     {missing.length > 0
       ? <div className="ai-action-missing">להשלמה לפני אישור: {missing.map(missingLabel).join(" · ")}</div>
-      : <div className="ai-action-ready">{isMeetingCreate ? "הפגישה תיווצר רק אחרי אישור משתמש." : isMeetingUpdate ? "השינוי בפגישה יישמר רק אחרי אישור משתמש." : isTaskCreate ? "המשימה תיווצר רק אחרי אישור משתמש." : isTaskUpdate ? "השינוי במשימה יישמר רק אחרי אישור משתמש." : isPpeRequestCreate ? "בקשת הביגוד תישלח רק אחרי אישור משתמש." : isComment ? "ההערה תתווסף רק אחרי אישור משתמש." : isUpdate ? "השינוי יישמר רק אחרי אישור משתמש." : "הפעולה תישלח לאישור לפני יצירת הקריאה."}</div>}
+      : <div className="ai-action-ready">{isMeetingCreate ? "הפגישה תיווצר רק אחרי אישור משתמש." : isMeetingUpdate ? "השינוי בפגישה יישמר רק אחרי אישור משתמש." : isTaskCreate ? "המשימה תיווצר רק אחרי אישור משתמש." : isTaskUpdate ? "השינוי במשימה יישמר רק אחרי אישור משתמש." : isPpeRequestCreate ? "בקשת הביגוד תישלח רק אחרי אישור משתמש." : isCleaningComplaintCreate ? "דיווח הניקיון יישלח רק אחרי אישור משתמש." : isComment ? "ההערה תתווסף רק אחרי אישור משתמש." : isUpdate ? "השינוי יישמר רק אחרי אישור משתמש." : "הפעולה תישלח לאישור לפני יצירת הקריאה."}</div>}
     {result && <div className={"ai-action-result " + (result.ok ? "ok" : "err")}>{result.message}</div>}
     <button
       type="button"
@@ -194,7 +199,7 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
       disabled={!executable || busy || result?.ok}
       onClick={() => onExecute?.(action)}
     >
-      {missing.length ? "השלימו פרטים לפני אישור" : busy ? "שומר…" : result?.ok ? "הפעולה בוצעה" : isMeetingCreate ? "אישור ויצירת פגישה" : isMeetingUpdate ? "אישור ועדכון פגישה" : isTaskCreate ? "אישור ויצירת משימה" : isTaskUpdate ? "אישור ועדכון משימה" : isPpeRequestCreate ? "אישור ושליחת בקשת ביגוד" : isComment ? "אישור והוספת הערה" : isUpdate ? "אישור ועדכון קריאה" : "אישור ויצירת קריאה"}
+      {missing.length ? "השלימו פרטים לפני אישור" : busy ? "שומר…" : result?.ok ? "הפעולה בוצעה" : isMeetingCreate ? "אישור ויצירת פגישה" : isMeetingUpdate ? "אישור ועדכון פגישה" : isTaskCreate ? "אישור ויצירת משימה" : isTaskUpdate ? "אישור ועדכון משימה" : isPpeRequestCreate ? "אישור ושליחת בקשת ביגוד" : isCleaningComplaintCreate ? "אישור ושליחת דיווח ניקיון" : isComment ? "אישור והוספת הערה" : isUpdate ? "אישור ועדכון קריאה" : "אישור ויצירת קריאה"}
     </button>
     {isCreate && onEdit && <button type="button" className="ai-action-edit" disabled={busy || result?.ok} onClick={() => onEdit(action)}>
       {missing.length ? "השלמה בטופס קריאה" : "עריכה בטופס לפני יצירה"}
@@ -219,9 +224,9 @@ function AiProviderPlanCard({ plan }) {
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
-  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs), [session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, buildContext]);
+  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones), [session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
   const [input, setInput] = useState(initialText || "");
   const [inputWorkflow, setInputWorkflow] = useState(initialWorkflow || AI_ASSIST_WORKFLOWS.general);

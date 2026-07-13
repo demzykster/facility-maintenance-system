@@ -46,6 +46,7 @@ export function buildAIContextSnapshot({
   meetings = [],
   ppeItems = [],
   ppeReqs = [],
+  zones = [],
   config = {},
   now = Date.now(),
   isOpenTicket = defaultIsOpenTicket,
@@ -70,6 +71,7 @@ export function buildAIContextSnapshot({
   maxSuppliers = 18,
   maxPpeItems = 24,
   maxPpeRequests = 16,
+  maxCleaningZones = 18,
   maxHeatmapRows = 6
 } = {}) {
   const ticketList = asArray(tickets);
@@ -80,6 +82,7 @@ export function buildAIContextSnapshot({
   const meetingList = asArray(meetings);
   const ppeItemList = asArray(ppeItems);
   const ppeRequestList = asArray(ppeReqs);
+  const zoneList = asArray(zones);
   const openTickets = ticketList.filter(isOpenTicket);
   const openTasks = taskList.filter(isOpenTask);
   const activePpeItems = ppeItemList.filter((item) => item && item.active !== false);
@@ -236,6 +239,22 @@ export function buildAIContextSnapshot({
     return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
   };
 
+  const mapCleaningZone = (zone) => {
+    const location = [zone.zoneLoc || zone.location || zone.area || zone.building || "", zone.floor || ""]
+      .filter(Boolean)
+      .join(" · ");
+    const clean = {
+      id: zone.id,
+      code: zone.code || "",
+      name: zone.name || "",
+      location,
+      active: zone.active !== false,
+      cleanerId: zone.cleanerId || "",
+      cleanerName: zone.cleanerName || ""
+    };
+    return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+  };
+
   const openTaskRows = openTasks
     .slice()
     .sort((a, b) => ((Number(a.dueAt || 9e15) || 9e15) - (Number(b.dueAt || 9e15) || 9e15)) || ((Number(b.updatedAt || 0) || 0) - (Number(a.updatedAt || 0) || 0)));
@@ -315,6 +334,13 @@ export function buildAIContextSnapshot({
     ppe: {
       items: activePpeItems.slice(0, maxPpeItems).map(mapPpeItem),
       requests: openPpeRequests.slice(0, maxPpeRequests).map(mapPpeRequest)
+    },
+    cleaning: {
+      zones: zoneList
+        .filter((zone) => zone && zone.active !== false)
+        .slice(0, maxCleaningZones)
+        .map(mapCleaningZone)
+        .filter((zone) => zone.id && zone.name)
     }
   };
 }

@@ -137,6 +137,10 @@ describe("AI assist snapshot model", () => {
         lines: [{ itemId: "ppe-vest", itemName: "אפוד זוהר", category: "hivis", size: "אחיד", qty: 1 }]
       }
     ];
+    const zones = [
+      { id: "zone-kitchen-2", name: "מטבחון קומה 2", zoneLoc: "בניין A", cleanerId: "u2", active: true },
+      { id: "zone-old", name: "לא פעיל", zoneLoc: "בניין B", active: false }
+    ];
 
     const snapshot = buildAIContextSnapshot({
       session,
@@ -148,6 +152,7 @@ describe("AI assist snapshot model", () => {
       meetings,
       ppeItems,
       ppeReqs,
+      zones,
       config: {
         departments: ["הפצה", "קבלה"],
         suppliers: ["Toyota", "BuildingCo"],
@@ -326,6 +331,15 @@ describe("AI assist snapshot model", () => {
       }
     ]);
     expect(JSON.stringify(snapshot.ppe)).not.toContain("unitCost");
+    expect(snapshot.cleaning.zones).toEqual([
+      {
+        id: "zone-kitchen-2",
+        name: "מטבחון קומה 2",
+        location: "בניין A",
+        active: true,
+        cleanerId: "u2"
+      }
+    ]);
     expect(snapshot.bi.heatmap.map((row) => row.department)).toEqual(["הפצה", "קבלה"]);
     expect(snapshot.bi.heatmap[0]).toMatchObject({
       total: 1,

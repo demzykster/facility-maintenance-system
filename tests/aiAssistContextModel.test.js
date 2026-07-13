@@ -169,6 +169,31 @@ describe("AI assist context model", () => {
     expect(JSON.stringify(context.ppe)).not.toContain("Hidden");
   });
 
+  it("passes cleaning zones only to users allowed to work with cleaning context", () => {
+    const raw = {
+      cleaning: {
+        zones: [
+          { id: "zone-a", name: "מטבחון", location: "בניין A", cleanerId: "cleaner-1", active: true },
+          { id: "zone-b", name: "שירותים", location: "בניין B", cleanerId: "cleaner-2", active: true },
+          { id: "zone-old", name: "ישן", location: "בניין C", active: false }
+        ]
+      }
+    };
+
+    const cleanerContext = buildAiAssistContext(raw, {
+      id: "cleaner-1",
+      role: "worker",
+      department: "ניקיון",
+      cleaningAccess: { enabled: true, zoneIds: ["zone-a"] }
+    });
+    const workerContext = buildAiAssistContext(raw, { id: "worker-1", role: "worker", department: "הפצה" });
+
+    expect(cleanerContext.profile.capabilities.cleaningComplaintCreate).toBe(true);
+    expect(cleanerContext.cleaning.zones.map((zone) => zone.id)).toEqual(["zone-a", "zone-b"]);
+    expect(workerContext.profile.capabilities.cleaningComplaintCreate).toBe(false);
+    expect(workerContext.cleaning.zones).toEqual([]);
+  });
+
   it("limits worker context to records reported by the same worker", () => {
     const context = buildAiAssistContext({
       tickets: [

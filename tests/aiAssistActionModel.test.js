@@ -5,6 +5,90 @@ import { buildAiAssistActionProposals } from "../src/aiAssistActionModel.js";
 const actor = { id: "u1", role: "admin", name: "Vadim" };
 
 describe("AI assist action model", () => {
+  it("proposes a cleaning complaint only when a single visible zone is clear", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "הרצפה מלוכלכת במטבחון קומה 2",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: { ...actor, department: "ניקיון" },
+      now: 2000,
+      context: {
+        cleaning: {
+          zones: [
+            { id: "zone-kitchen-2", name: "מטבחון קומה 2", location: "בניין A" },
+            { id: "zone-wc-main", name: "שירותים ראשי", location: "בניין A" }
+          ]
+        }
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_cleaning_complaint_zone-kitchen-2",
+        type: "cleaning.complaint.create",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        execute: {
+          method: "POST",
+          path: "/api/cleaning/records",
+          resource: "complaints",
+          bodyField: "complaint"
+        },
+        payload: expect.objectContaining({
+          zoneId: "zone-kitchen-2",
+          zoneName: "מטבחון קומה 2",
+          kind: "dirty",
+          text: "הרצפה מלוכלכת במטבחון קומה 2",
+          reportedById: "u1",
+          reportedByName: "Vadim",
+          reportedByRole: "admin",
+          noPhotoReason: expect.stringContaining("AI")
+        })
+      })
+    ]);
+  });
+
+  it("keeps ambiguous cleaning complaints blocked until a human chooses the zone", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "יש לכלוך באזור",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        cleaning: {
+          zones: [
+            { id: "zone-a", name: "מטבחון" },
+            { id: "zone-b", name: "שירותים" }
+          ]
+        }
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_cleaning_complaint",
+        type: "cleaning.complaint.create",
+        status: "needs_human_input",
+        missingFields: ["zoneId"],
+        payload: expect.objectContaining({
+          zoneId: "",
+          zoneName: ""
+        })
+      })
+    ]);
+  });
+
   it("proposes a self-service PPE request only from a unique visible catalog item", () => {
     const draft = buildAiIntakeDraft({
       rawText: "אני צריך אפוד זוהר",

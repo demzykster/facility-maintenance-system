@@ -12,6 +12,7 @@ describe("aiIntakeModel", () => {
     expect(detectAiIntakeModule("יש ניצוץ חשמל ליד קו אריזה")).toBe("safety");
     expect(detectAiIntakeModule("מלגזה לא נטענת במחסן")).toBe("transport");
     expect(detectAiIntakeModule("השירותים מלוכלכים ויש ריח")).toBe("cleaning");
+    expect(detectAiIntakeModule("הרצפה מלוכלכת במטבחון קומה 2")).toBe("cleaning");
     expect(detectAiIntakeModule("צריך נעלי עבודה מידה 43")).toBe("ppe");
     expect(detectAiIntakeModule("צריך לתאם פגישה לבדיקה חודשית")).toBe("task");
 

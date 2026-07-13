@@ -61,6 +61,13 @@ function hasPpeRequestsApiExecuteContract(action = {}) {
     && action.execute?.bodyField === "request";
 }
 
+function hasCleaningComplaintsApiExecuteContract(action = {}) {
+  return action.execute?.method === "POST"
+    && action.execute?.path === "/api/cleaning/records"
+    && action.execute?.resource === "complaints"
+    && action.execute?.bodyField === "complaint";
+}
+
 export function canExecuteAiAssistAction(action = {}) {
   if (!action || typeof action !== "object") return false;
   if (action.requiresConfirmation !== true) return false;
@@ -99,6 +106,13 @@ export function canExecuteAiAssistAction(action = {}) {
         && !!cleanText(line?.itemName, 160)
         && !!cleanText(line?.size, 80)
         && Number(line?.qty || 0) > 0);
+  }
+  if (action.type === "cleaning.complaint.create") {
+    return hasCleaningComplaintsApiExecuteContract(action)
+      && !!cleanText(payload.zoneId, 160)
+      && !!cleanText(payload.zoneName, 160)
+      && !!cleanText(payload.kind, 40)
+      && !!cleanText(payload.text || payload.noPhotoReason, 1000);
   }
   if (!hasTicketsApiExecuteContract(action)) return false;
   if (action.type === "ticket.create") return true;
@@ -367,6 +381,49 @@ export function prepareAiPpeRequestCreateForSave(action = {}, actor = {}, option
       text: "משתמש אישר בקשת ביגוד שהוכנה על ידי AI",
       kind: "ai_confirmed_ppe_request"
     }]
+  };
+}
+
+export function prepareAiCleaningComplaintCreateForSave(action = {}, actor = {}, options = {}) {
+  if (!canExecuteAiAssistAction(action) || action.type !== "cleaning.complaint.create") throw new Error("ai_action_not_executable");
+  const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+  const makeId = typeof options.makeId === "function" ? options.makeId : () => `ai-cleaning-${now.toString(36)}`;
+  const payload = cleanObject(action.payload);
+  const id = cleanText(payload.id || makeId(), 160);
+  if (!id) throw new Error("ai_action_cleaning_complaint_id_required");
+  const actorName = cleanText(actor.name, 120) || "AI";
+  const actorRole = cleanText(actor.role, 40);
+  return {
+    id,
+    zoneId: cleanText(payload.zoneId, 160),
+    zoneName: cleanText(payload.zoneName, 160),
+    zoneLoc: cleanText(payload.zoneLoc || payload.location, 160),
+    kind: cleanText(payload.kind, 40) || "dirty",
+    photo: null,
+    noPhotoReason: cleanText(payload.noPhotoReason, 500) || "דווח דרך עוזר AI ללא תמונה מצורפת",
+    text: cleanText(payload.text, 1000),
+    reportedById: cleanText(payload.reportedById || actor.id || actor.authUserId || actor.workerNo, 160),
+    reportedByName: cleanText(payload.reportedByName || actorName, 120),
+    reportedByRole: cleanText(payload.reportedByRole || actorRole, 40),
+    at: Number.isFinite(Number(payload.at)) ? Number(payload.at) : now,
+    ai: {
+      ...cleanObject(payload.ai),
+      drafted: true,
+      source: "ai_assist",
+      confirmedByHuman: true,
+      confirmedAt: now,
+      actionId: cleanText(action.id, 120)
+    },
+    log: [
+      ...(Array.isArray(payload.log) ? payload.log : []),
+      {
+        at: now,
+        by: actorName,
+        byRole: actorRole,
+        text: "משתמש אישר דיווח ניקיון שהוכן על ידי AI",
+        kind: "ai_confirmed_cleaning_complaint"
+      }
+    ]
   };
 }
 

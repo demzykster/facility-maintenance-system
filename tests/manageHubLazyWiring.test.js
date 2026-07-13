@@ -30,17 +30,18 @@ describe("management tasks and meetings lazy wiring", () => {
 
   it("passes management tasks and meetings into the shared AI context snapshot", () => {
     const aiPanelSource = readFileSync(new URL("../src/AIPanel.jsx", import.meta.url), "utf8");
-    expect(appSource).toContain("function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [], users = [], ppeItems = [], ppeReqs = [])");
+    expect(appSource).toContain("function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [], users = [], ppeItems = [], ppeReqs = [], zones = [])");
     expect(appSource).toContain("users,");
     expect(appSource).toContain("tasks,");
     expect(appSource).toContain("meetings,");
-    expect(aiPanelSource).toContain("users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = []");
-    expect(aiPanelSource).toContain("buildContext(session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs)");
+    expect(aiPanelSource).toContain("users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = []");
+    expect(aiPanelSource).toContain("buildContext(session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones)");
   });
 
   it("wires confirmed AI task and meeting creation through the normal save paths", () => {
     expect(appSource).toContain("prepareAiMeetingCreateForSave");
     expect(appSource).toContain("prepareAiMeetingUpdateForSave");
+    expect(appSource).toContain("prepareAiCleaningComplaintCreateForSave");
     expect(appSource).toContain("prepareAiPpeRequestCreateForSave");
     expect(appSource).toContain("prepareAiTaskCreateForSave");
     expect(appSource).toContain("prepareAiTaskUpdateForSave");
@@ -49,17 +50,21 @@ describe("management tasks and meetings lazy wiring", () => {
     expect(appSource).toContain('if (action?.type === "task.create")');
     expect(appSource).toContain('if (action?.type === "task.update")');
     expect(appSource).toContain('if (action?.type === "ppe.request.create")');
+    expect(appSource).toContain('if (action?.type === "cleaning.complaint.create")');
     expect(appSource).toContain('typeof props.saveMeeting !== "function"');
     expect(appSource).toContain('typeof props.saveTask !== "function"');
     expect(appSource).toContain('typeof props.savePpeReq !== "function"');
+    expect(appSource).toContain('typeof props.fileComplaint !== "function"');
     expect(appSource).toContain("const meeting = prepareAiMeetingCreateForSave(action, props.session");
     expect(appSource).toContain("prepareAiMeetingUpdateForSave(action, existing, props.session");
     expect(appSource).toContain("const task = prepareAiTaskCreateForSave(action, props.session");
     expect(appSource).toContain("prepareAiTaskUpdateForSave(action, existing, props.session");
     expect(appSource).toContain("const request = prepareAiPpeRequestCreateForSave(action, props.session");
+    expect(appSource).toContain("const complaint = prepareAiCleaningComplaintCreateForSave(action, props.session");
     expect(appSource).toContain("await props.saveMeeting(meeting)");
     expect(appSource).toContain("await props.saveTask(task)");
     expect(appSource).toContain("await props.savePpeReq(request)");
+    expect(appSource).toContain("await props.fileComplaint(complaint)");
     expect(appSource).toContain("executeAction={executeAction}");
   });
 });

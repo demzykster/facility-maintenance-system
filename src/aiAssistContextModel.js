@@ -1,4 +1,5 @@
 import { canManage, canView } from "./permissionModel.js";
+import { canPerformCleaning, canViewCleaningReports, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 
 const MAX_TICKETS = 28;
 const MAX_FLEET = 18;
@@ -9,6 +10,7 @@ const MAX_MEETINGS = 10;
 const MAX_SUPPLIERS = 12;
 const MAX_PPE_ITEMS = 24;
 const MAX_PPE_REQUESTS = 16;
+const MAX_CLEANING_ZONES = 18;
 const MAX_HEATMAP_ROWS = 8;
 const MAX_TEXT = 160;
 
@@ -42,6 +44,7 @@ const booleanOrFalse = (value) => value === true;
 export function aiRoleProfile(user = {}) {
   const role = compactText(user.role, 40);
   const departments = cleanStringArray(user.departments || user.depts || user.department || user.dept);
+  const cleaningAccess = normalizeCleaningAccess(user);
   return {
     id: compactId(user.id || user.authUserId || user.auth_user_id || user.workerNo),
     workerNo: compactId(user.workerNo || user.worker_no),
@@ -52,7 +55,10 @@ export function aiRoleProfile(user = {}) {
     canSeeCompany: LEADERSHIP_ROLES.has(role),
     canSeeFinancials: LEADERSHIP_ROLES.has(role),
     canSeeSuppliers: LEADERSHIP_ROLES.has(role) || canView(user, "suppliers"),
-    canManageSuppliers: canManage(user, "suppliers")
+    canManageSuppliers: canManage(user, "suppliers"),
+    canSeeCleaning: LEADERSHIP_ROLES.has(role) || canPerformCleaning(user) || canViewCleaningReports(user),
+    canCreateCleaningComplaint: role === "admin" || role === "user" || canPerformCleaning(user),
+    cleaningZoneIds: cleanStringArray(cleaningAccess.zoneIds, 24)
   };
 }
 
@@ -272,6 +278,12 @@ function ppeRequestAllowed(request = {}, profile) {
     || departmentAllowed(request, profile);
 }
 
+function cleaningZoneAllowed(zone = {}, profile) {
+  if (profile.canSeeCompany || profile.canSeeCleaning) return true;
+  if (profile.cleaningZoneIds.includes(compactId(zone.id))) return true;
+  return matchesUserIdentity(zone.cleanerId || zone.cleanerName, profile);
+}
+
 function sanitizePpeRequest(request = {}) {
   const ageDays = numberOrNull(request.ageDays);
   const clean = {
@@ -285,6 +297,17 @@ function sanitizePpeRequest(request = {}) {
   };
   if (ageDays != null) clean.ageDays = ageDays;
   return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+}
+
+function sanitizeCleaningZone(zone = {}) {
+  const clean = {
+    id: compactId(zone.id),
+    code: compactText(zone.code, 80),
+    name: compactText(zone.name, 120),
+    location: compactText(zone.location || zone.zoneLoc || zone.area || zone.building, 140),
+    active: zone.active !== false
+  };
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && value !== false));
 }
 
 function sanitizeMetrics(metrics = {}, profile) {
@@ -380,6 +403,13 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     .slice(0, MAX_PPE_REQUESTS)
     .map(sanitizePpeRequest)
     .filter((request) => request.id);
+  const cleaningSource = source.cleaning && typeof source.cleaning === "object" ? source.cleaning : {};
+  const cleaningZones = asArray(cleaningSource.zones)
+    .filter((zone) => zone && zone.active !== false)
+    .filter((zone) => cleaningZoneAllowed(zone, profile))
+    .slice(0, MAX_CLEANING_ZONES)
+    .map(sanitizeCleaningZone)
+    .filter((zone) => zone.id && zone.name);
   return {
     profile: {
       role: profile.role,
@@ -392,7 +422,8 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
         supplierRouting: profile.canManageSuppliers,
         supplierDirectory: profile.canSeeSuppliers,
         companyScope: profile.canSeeCompany,
-        financials: profile.canSeeFinancials
+        financials: profile.canSeeFinancials,
+        cleaningComplaintCreate: profile.canCreateCleaningComplaint
       }
     },
     metrics: sanitizeMetrics(source.metrics || {}, profile),
@@ -408,6 +439,9 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
       items: ppeItems,
       requests: ppeRequests
     },
+    cleaning: {
+      zones: cleaningZones
+    },
     limits: {
       tickets: MAX_TICKETS,
       fleet: MAX_FLEET,
@@ -418,6 +452,7 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
       suppliers: MAX_SUPPLIERS,
       ppeItems: MAX_PPE_ITEMS,
       ppeRequests: MAX_PPE_REQUESTS,
+      cleaningZones: MAX_CLEANING_ZONES,
       heatmap: MAX_HEATMAP_ROWS
     }
   };

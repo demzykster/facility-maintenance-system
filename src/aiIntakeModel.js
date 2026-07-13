@@ -24,7 +24,7 @@ export const AI_INTAKE_ACTIONS = Object.freeze([
 
 const HEBREW_KEYWORDS = {
   transport: ["מלגזה", "רכב", "משאית", "כלי", "שינוע", "מצבר", "טעינה", "פנצ'ר", "צמיג"],
-  cleaning: ["ניקיון", "לכלוך", "פסולת", "שירותים", "רטוב", "נזילה", "ריח"],
+  cleaning: ["ניקיון", "נקיון", "לכלוך", "מלוכלך", "מלוכלכת", "מלוכלכים", "פסולת", "אשפה", "זבל", "שירותים", "רטוב", "נזילה", "ריח"],
   ppe: ["ביגוד", "נעליים", "נעלי", "קסדה", "כפפות", "אפוד", "מידה"],
   safety: ["סכנה", "מסוכן", "אש", "עשן", "חשמל", "ניצוץ", "פציעה", "חירום"],
   facility: ["דלת", "שער", "מזגן", "תאורה", "חשמל", "מים", "קיר", "רצפה", "בניין"],
@@ -69,6 +69,7 @@ export function detectAiIntakeModule(text = "") {
   const normalized = normalizeAiIntakeText(text).toLowerCase();
   if (!normalized) return "unknown";
   if (STRONG_TASK_WORDS.some((word) => normalized.includes(word.toLowerCase()))) return "task";
+  if (/ניקיון|נקיון|לכלוך|מלוכלך|מלוכלכת|מלוכלכים|פסולת|אשפה|זבל|שירותים|ריח|dirty|trash|garbage|toilet|smell/i.test(normalized)) return "cleaning";
   const scores = Object.fromEntries(AI_INTAKE_MODULES.map((module) => [module, 0]));
   for (const [module, words] of Object.entries(KEYWORDS_BY_MODULE)) {
     for (const word of words) {
