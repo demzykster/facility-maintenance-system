@@ -76,4 +76,53 @@ describe("AI assist action model", () => {
 
     expect(buildAiAssistActionProposals({ draft, user: actor, now: 2000 })).toEqual([]);
   });
+
+  it("proposes a constrained ticket.update only when a single visible ticket target is clear", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה לעדיפות גבוהה",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        tickets: [{ id: "T-1", subject: "דליפת מים", priority: "medium", status: "new" }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_ticket_T-1",
+        type: "ticket.update",
+        label: "עדכון קריאה",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "דליפת מים",
+          patch: { priority: "high" }
+        },
+        execute: {
+          method: "POST",
+          path: "/api/tickets",
+          bodyField: "ticket"
+        }
+      })
+    ]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [
+          { id: "T-1", priority: "medium" },
+          { id: "T-2", priority: "medium" }
+        ]
+      }
+    })).toEqual([]);
+  });
 });

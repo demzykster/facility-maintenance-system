@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after the latest push.
-- Latest app/UI commit before this handoff: constrained AI ticket update execution foundation, after AI ticket proposal form handoff and the ticket-form `UnitPicker` stabilization.
+- Latest app/UI commit before this handoff: deterministic AI ticket update proposals, after constrained update execution and AI ticket proposal form handoff.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add deterministic AI ticket update proposals`
+  - `src/aiAssistActionModel.js` now builds the first deterministic `ticket.update` proposal.
+  - The server builds proposals only after `buildAiAssistContext()` filters the supplied UI context by the authenticated user's role/scope.
+  - Current update proposal scope is intentionally narrow: priority/status changes only, and only when the role-filtered context contains exactly one visible target ticket.
+  - If multiple tickets are visible, no update proposal is generated; the assistant should ask the user to narrow the target instead of guessing.
+  - Provider text is still not trusted for mutation payloads. The patch comes from deterministic text/intent parsing and the role-filtered context.
 - `Add constrained AI ticket update execution`
   - Extends `src/aiAssistActionExecutionModel.js` from `ticket.create` to a constrained `ticket.update` action foundation.
   - `ticket.update` requires human confirmation, the normal `/api/tickets` execution contract, a matching existing ticket, no missing fields, and an allow-listed patch only.

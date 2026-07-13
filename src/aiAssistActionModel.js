@@ -8,6 +8,7 @@ const cleanText = (value, limit = 240) => String(value || "")
   .slice(0, limit);
 
 const cleanObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+const cleanArray = (value) => Array.isArray(value) ? value : [];
 
 const LOCATION_PATTERNS = [
   /(?:באזור|באיזור|במחלקת|במחסן|במבנה|בקו)\s+([^\n,.]+)/i,
@@ -57,6 +58,66 @@ function missingFieldsForTicketPayload(payload = {}, draft = {}) {
   if (payload.track === "transport" && !payload.downtimeType) missing.push("downtimeType");
   if (draft.module === "unknown") missing.push("module");
   return [...new Set(missing)];
+}
+
+function requestedPriorityFromText(text = "") {
+  const raw = cleanText(text, 500).toLowerCase();
+  if (!raw) return "";
+  if (/עדיפות|priority|דחוף|גבוה|גבוהה|high|critical|urgent/i.test(raw)) {
+    if (/נמוך|נמוכה|low/i.test(raw)) return "low";
+    if (/בינוני|בינונית|medium|normal/i.test(raw)) return "medium";
+    if (/גבוה|גבוהה|דחוף|high|critical|urgent/i.test(raw)) return "high";
+  }
+  return "";
+}
+
+function requestedStatusFromText(text = "") {
+  const raw = cleanText(text, 500).toLowerCase();
+  if (!raw) return "";
+  if (/סטטוס|מצב|status|העבר|תעדכן|עדכן|change|update/i.test(raw)) {
+    if (/בטיפול|בעבודה|בתהליך|in.?progress/i.test(raw)) return "in_progress";
+    if (/חדשה|חדש|new/i.test(raw)) return "new";
+    if (/ממתינ|המתנה|waiting/i.test(raw)) return "waiting";
+  }
+  return "";
+}
+
+function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
+  const tickets = cleanArray(context.tickets).filter((ticket) => ticket && ticket.id);
+  if (tickets.length !== 1) return null;
+  const ticket = tickets[0];
+  const patch = {};
+  const requestedPriority = requestedPriorityFromText(draft.rawText);
+  if (requestedPriority && requestedPriority !== ticket.priority) patch.priority = requestedPriority;
+  const requestedStatus = requestedStatusFromText(draft.rawText);
+  if (requestedStatus && requestedStatus !== ticket.status) patch.status = requestedStatus;
+  if (!Object.keys(patch).length) return null;
+  return {
+    id: `update_ticket_${cleanText(ticket.id, 80)}`,
+    type: "ticket.update",
+    label: "עדכון קריאה",
+    status: "ready_for_confirmation",
+    requiresConfirmation: true,
+    writesData: false,
+    writePolicy: "human_confirmation_required",
+    missingFields: [],
+    payload: {
+      ticketId: cleanText(ticket.id, 160),
+      ticketTitle: cleanText(ticket.subject || ticket.title || ticket.number || ticket.no, 160),
+      patch
+    },
+    execute: {
+      method: "POST",
+      path: "/api/tickets",
+      bodyField: "ticket"
+    },
+    safety: {
+      deterministic: true,
+      providerTextTrusted: false,
+      serverMustRevalidate: true,
+      auditRequired: true
+    }
+  };
 }
 
 export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.now() } = {}) {
@@ -111,8 +172,10 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   return payload;
 }
 
-export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date.now() } = {}) {
+export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date.now(), context = {} } = {}) {
   const safeDraft = cleanObject(draft);
+  const updateProposal = buildAiTicketUpdateProposal({ draft: safeDraft, context });
+  if (updateProposal) return [updateProposal];
   if (safeDraft.action !== "draft_ticket") return [];
   const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now });
   const missingFields = missingFieldsForTicketPayload(payload, safeDraft);

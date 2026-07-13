@@ -150,9 +150,9 @@ export function createAiAssistHandler({
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
       const workflow = normalizeAiAssistWorkflow(body.workflow);
 
-      const draft = buildAiIntakeDraft(normalized.input, currentTime);
-      const actions = buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime });
       const context = buildAiAssistContext(body.context, auth.user);
+      const draft = buildAiIntakeDraft(normalized.input, currentTime);
+      const actions = buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context });
       const config = aiServerConfigFromEnv(env);
       if (config.mode !== AI_MODES.server) {
         return sendJson(res, 503, { error: "ai_server_disabled", draft, actions });
