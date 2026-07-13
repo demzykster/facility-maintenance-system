@@ -1,5 +1,8 @@
 # Current Status
 
+> Historical/reference snapshot. Current Codex entry point is `AGENTS.md`; current state is `docs/current-state.md`.
+> Do not treat this file as the authority when it conflicts with current code, Git state, or the project harness docs.
+
 This file is an archive/reference snapshot for Codex sessions. It must not compete with the live handoff point: `docs/active-work.md`.
 
 ## Source Of Truth

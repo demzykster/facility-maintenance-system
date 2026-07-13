@@ -59,6 +59,7 @@
     "staging:gate": "node tools/staging-gate.mjs",
     "smoke:demo-ui": "node tools/demo-ui-smoke.mjs",
     "fleet:import:preview": "node tools/fleet-license-import-preview.mjs",
+    "project:harness:check": "node tools/project-harness-check.mjs",
     "lint": "node tools/static-syntax-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

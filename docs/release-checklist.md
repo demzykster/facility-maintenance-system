@@ -1,5 +1,8 @@
 # CMMS Release Checklist
 
+> Release reference. Start new Codex sessions from `AGENTS.md` and verify current status in `docs/current-state.md`.
+> Historical package notes below must be rechecked against current code, Git, and CI before release claims.
+
 This is the closure checklist for the current stabilization phase. It replaces broad repeating labels with packages that can actually be closed.
 
 ## How To Use

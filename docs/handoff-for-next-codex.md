@@ -1,5 +1,8 @@
 # Handoff For Next Codex
 
+> Historical/detail handoff. For new Codex sessions, start with `AGENTS.md`, then `docs/current-state.md` and `docs/architecture-rules.md`.
+> Use this file for detailed recent context only after verifying current Git state.
+
 Updated: 2026-07-13
 
 ## Startup Checklist

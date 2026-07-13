@@ -54,10 +54,22 @@ The AI route surface is grouped through `api/ai/[action].js` so the existing `/a
 
 For the first pilot:
 
-- production AI remains disabled;
+- production AI remains disabled unless server-side provider configuration explicitly enables the current server-backed assistant path;
 - server AI can be enabled only through server-side provider configuration, not browser keys;
 - admin settings may store only non-secret AI preferences (`mode`, `provider`, `model`) and display server readiness from `/api/ai/status`;
 - categories, routing, priority, SLA, departments, zones, and vehicle types stay data-driven;
 - public reports, tickets, files, cleaning rounds, and settings should keep moving toward shared server-side operations.
 
 This keeps the product ready for server-backed AI assistance without delaying the empty staging pilot.
+
+## Current Implementation Versus Target Policy
+
+Current implementation uses deterministic proposals, human confirmation, and normal save paths. That universal confirmation is a transition-safe implementation choice, not the permanent product goal.
+
+Target policy is risk-based:
+
+- read actions execute immediately inside the current user's permission scope;
+- low-risk create actions and reversible single-record updates may execute immediately after the domain command provides validation, authorization, audit, idempotency, and an authoritative result;
+- ambiguity triggers one blocking question;
+- sensitive, mass, irreversible, delete, or permission-expanding actions require explicit confirmation;
+- AI never receives arbitrary SQL or direct service-role access.

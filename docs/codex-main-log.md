@@ -1,5 +1,8 @@
 # Codex Main Log
 
+> Historical session log and old guardrail record. The current repo-local Codex entry point is `AGENTS.md`.
+> Durable current rules now live in `docs/architecture-rules.md`; current state lives in `docs/current-state.md`.
+
 ## 2026-07-05
 
 - Verified `main` / v1 state before work.

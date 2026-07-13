@@ -1,5 +1,8 @@
 # Pre-Production Readiness Note
 
+> Reference note. Current deployment/status language is summarized in `docs/current-state.md`.
+> Use this file for production-readiness background, not as the first Codex entry point.
+
 This note names what is currently safe to assume before treating the staging/pilot app as close to production.
 
 ## Current Status

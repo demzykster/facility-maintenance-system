@@ -1,0 +1,82 @@
+{
+  "checks": [
+    {
+      "name": "UnitPicker shared extraction",
+      "why": "Prevents the prior white-screen class where shell ticket forms still needed UnitPicker after the fleet module was lazy-extracted.",
+      "requiredFiles": [
+        "src/UnitPicker.jsx",
+        "tests/fleetAssetsLazyWiring.test.js"
+      ],
+      "requiredText": [
+        {
+          "file": "src/ClaudeMaintenanceApp.jsx",
+          "text": "import { UnitPicker } from \"./UnitPicker.jsx\";"
+        },
+        {
+          "file": "src/FleetAssetsModule.jsx",
+          "text": "import { UnitPicker } from \"./UnitPicker.jsx\";"
+        },
+        {
+          "file": "tests/fleetAssetsLazyWiring.test.js",
+          "text": "keeps the shared unit picker available to both the shell ticket forms and the lazy fleet module"
+        }
+      ],
+      "forbiddenText": [
+        {
+          "file": "src/ClaudeMaintenanceApp.jsx",
+          "text": "function UnitPicker("
+        },
+        {
+          "file": "src/FleetAssetsModule.jsx",
+          "text": "function UnitPicker("
+        }
+      ]
+    },
+    {
+      "name": "TicketDetail lazy bridge dependencies",
+      "why": "Prevents the prior lazy ticket detail regression from stale helper dependencies and missing admin-edit bridge inputs.",
+      "requiredFiles": [
+        "src/TicketDetail.jsx",
+        "tests/ticketDetailLazyWiring.test.js",
+        "tests/ticketDetailRenderSmoke.test.js"
+      ],
+      "requiredText": [
+        {
+          "file": "src/ClaudeMaintenanceApp.jsx",
+          "text": "const TicketDetailLazy = lazy(() => import(\"./TicketDetail.jsx\")"
+        },
+        {
+          "file": "tests/ticketDetailLazyWiring.test.js",
+          "text": "does not pass stale runtime helpers into the lazy ticket detail bridge"
+        },
+        {
+          "file": "tests/ticketDetailLazyWiring.test.js",
+          "text": "passes ticket detail admin-edit dependencies through the lazy bridge"
+        },
+        {
+          "file": "tests/ticketDetailRenderSmoke.test.js",
+          "text": "renderToString"
+        }
+      ],
+      "forbiddenText": [
+        {
+          "file": "src/ClaudeMaintenanceApp.jsx",
+          "text": "msFromInput,"
+        },
+        {
+          "file": "src/TicketDetail.jsx",
+          "text": "uiFn(\"msFromInput\")"
+        },
+        {
+          "file": "src/ClaudeMaintenanceApp.jsx",
+          "text": "normalizeTicketHistory,"
+        },
+        {
+          "file": "src/TicketDetail.jsx",
+          "text": "uiFn(\"normalizeTicketHistory\")"
+        }
+      ]
+    }
+  ]
+}
+

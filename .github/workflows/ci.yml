@@ -26,6 +26,9 @@ jobs:
       - name: Run static syntax check
         run: npm run lint
 
+      - name: Run project harness check
+        run: npm run project:harness:check
+
       - name: Run unit tests
         run: npm test -- --run
 
