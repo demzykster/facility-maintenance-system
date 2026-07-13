@@ -47,7 +47,7 @@ describe("AI assist context model", () => {
         { id: "f2", code: "B", department: "קבלה" }
       ],
       tasks: [
-        { id: "task-own", title: "Allowed task", department: "הפצה", responsibleIds: ["manager-1"], status: "waiting", waitingFor: "CFO", dueDays: -2, overdue: true },
+        { id: "task-own", title: "Allowed task", department: "הפצה", responsibleIds: ["manager-1"], status: "waiting", waitingFor: "CFO", dueDays: -2, dueAt: 5000, overdue: true },
         { id: "task-other", title: "Hidden task", department: "קבלה", responsibleIds: ["manager-2"], status: "todo" }
       ],
       meetings: [
@@ -81,6 +81,7 @@ describe("AI assist context model", () => {
         responsibleIds: ["manager-1"],
         waitingFor: "CFO",
         dueDays: -2,
+        dueAt: 5000,
         overdue: true
       }
     ]);

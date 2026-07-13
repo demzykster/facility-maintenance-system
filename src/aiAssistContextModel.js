@@ -156,6 +156,8 @@ function sanitizePm(item = {}) {
 
 function sanitizeTask(item = {}) {
   const dueDays = numberOrNull(item.dueDays ?? item.daysLeft);
+  const hasDueAt = Object.prototype.hasOwnProperty.call(item, "dueAt") || Object.prototype.hasOwnProperty.call(item, "due_at");
+  const dueAt = numberOrNull(item.dueAt ?? item.due_at);
   const clean = {
     id: compactId(item.id),
     title: compactText(item.title || item.subject, 140),
@@ -173,7 +175,9 @@ function sanitizeTask(item = {}) {
     overdue: booleanOrFalse(item.overdue)
   };
   if (dueDays != null) clean.dueDays = dueDays;
-  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && value !== false && !(Array.isArray(value) && value.length === 0)));
+  if (dueAt != null) clean.dueAt = dueAt;
+  else if (hasDueAt) clean.dueAt = null;
+  return Object.fromEntries(Object.entries(clean).filter(([key, value]) => value !== "" && (key === "dueAt" ? value !== undefined : value != null) && value !== false && !(Array.isArray(value) && value.length === 0)));
 }
 
 function sanitizeMeeting(item = {}) {

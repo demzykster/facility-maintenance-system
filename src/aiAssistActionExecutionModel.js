@@ -22,7 +22,8 @@ const AI_TICKET_UPDATE_ALLOWED_FIELDS = Object.freeze([
 ]);
 const AI_TASK_UPDATE_ALLOWED_FIELDS = Object.freeze([
   "priority",
-  "status"
+  "status",
+  "dueAt"
 ]);
 
 const normalizeComparable = (value) => value == null ? "" : value;

@@ -178,6 +178,36 @@ describe("AI assist action model", () => {
     })).toEqual([]);
   });
 
+  it("proposes task due-date updates only from explicit relative dates", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את המשימה למחר",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        tasks: [{ id: "task-1", title: "בדיקת ספק", priority: "medium", status: "todo", dueAt: null }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-1",
+        type: "task.update",
+        payload: {
+          taskId: "task-1",
+          taskTitle: "בדיקת ספק",
+          current: { dueAt: null },
+          patch: { dueAt: 2000 + 86400000 }
+        }
+      })
+    ]);
+  });
+
   it("proposes a constrained ticket.update only when a single visible ticket target is clear", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעדכן את הקריאה לעדיפות גבוהה",

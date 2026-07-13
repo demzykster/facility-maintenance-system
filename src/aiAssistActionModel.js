@@ -1,6 +1,7 @@
 const MAX_SUBJECT_CHARS = 80;
 const MAX_DESCRIPTION_CHARS = 1200;
 const HOUR = 3600000;
+const DAY = 86400000;
 
 const cleanText = (value, limit = 240) => String(value || "")
   .replace(/\s+/g, " ")
@@ -93,6 +94,17 @@ function requestedTaskStatusFromText(text = "") {
     if (/חדש|פתוח|todo|open/i.test(raw)) return "todo";
   }
   return "";
+}
+
+function requestedTaskDueAtFromText(text = "", now = Date.now()) {
+  const raw = cleanText(text, 800).toLowerCase();
+  const base = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  if (!raw) return null;
+  const inDays = raw.match(/(?:בעוד|תוך|in)\s+(\d{1,2})\s*(?:ימים|יום|days?|d\b)/i);
+  if (inDays) return base + Number(inDays[1]) * DAY;
+  if (/מחר|tomorrow/i.test(raw)) return base + DAY;
+  if (/היום|today/i.test(raw)) return base;
+  return null;
 }
 
 function hasUpdateIntent(text = "") {
@@ -246,7 +258,7 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   };
 }
 
-function buildAiTaskUpdateProposal({ draft = {}, context = {} } = {}) {
+function buildAiTaskUpdateProposal({ draft = {}, context = {}, now = Date.now() } = {}) {
   const tasks = cleanArray(context.tasks).filter((task) => task && task.id);
   if (tasks.length !== 1 || !hasUpdateIntent(draft.rawText)) return null;
   const task = tasks[0];
@@ -255,6 +267,8 @@ function buildAiTaskUpdateProposal({ draft = {}, context = {} } = {}) {
   if (requestedPriority && requestedPriority !== task.priority) patch.priority = requestedPriority;
   const requestedStatus = requestedTaskStatusFromText(draft.rawText);
   if (requestedStatus && requestedStatus !== task.status) patch.status = requestedStatus;
+  const requestedDueAt = requestedTaskDueAtFromText(draft.rawText, now);
+  if (requestedDueAt !== null && requestedDueAt !== task.dueAt) patch.dueAt = requestedDueAt;
   if (!Object.keys(patch).length) return null;
   const current = Object.fromEntries(Object.keys(patch).map((field) => [field, task[field]]));
   return {
@@ -398,7 +412,7 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   }
   const updateProposal = buildAiTicketUpdateProposal({ draft: safeDraft, context });
   if (updateProposal) return [updateProposal];
-  const taskUpdateProposal = buildAiTaskUpdateProposal({ draft: safeDraft, context });
+  const taskUpdateProposal = buildAiTaskUpdateProposal({ draft: safeDraft, context, now });
   if (taskUpdateProposal) return [taskUpdateProposal];
   if (hasWaitingStatusIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];

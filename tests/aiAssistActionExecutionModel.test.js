@@ -101,6 +101,20 @@ const taskUpdateAction = {
   execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
 };
 
+const taskDueUpdateAction = {
+  id: "update_task_due",
+  type: "task.update",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    taskId: "task-1",
+    patch: {
+      dueAt: 86402000
+    }
+  },
+  execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
+};
+
 const existingTicket = {
   id: "ticket-1",
   subject: "דליפת מים",
@@ -233,6 +247,31 @@ describe("AI assist action execution model", () => {
       by: "Vadim",
       byRole: "admin",
       text: "משתמש אישר עדכון משימה שהוכן על ידי AI: priority, status",
+      kind: "ai_confirmed_task_update"
+    });
+  });
+
+  it("allows confirmed AI task due date updates through the same saveTask path", () => {
+    const { task, changes } = prepareAiTaskUpdateForSave(taskDueUpdateAction, { ...existingTask, dueAt: null }, { name: "Vadim", role: "admin" }, { now: 4000 });
+
+    expect(task).toMatchObject({
+      id: "task-1",
+      dueAt: 86402000,
+      updatedAt: 4000,
+      ai: {
+        source: "ai_assist",
+        lastConfirmedAction: "update_task_due",
+        lastConfirmedAt: 4000
+      }
+    });
+    expect(changes).toEqual([
+      { field: "dueAt", before: "", after: 86402000 }
+    ]);
+    expect(task.log.at(-1)).toEqual({
+      at: 4000,
+      by: "Vadim",
+      byRole: "admin",
+      text: "משתמש אישר עדכון משימה שהוכן על ידי AI: dueAt",
       kind: "ai_confirmed_task_update"
     });
   });

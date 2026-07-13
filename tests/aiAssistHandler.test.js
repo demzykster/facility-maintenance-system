@@ -415,6 +415,53 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("returns deterministic task due-date update proposals from explicit relative dates", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר לעדכן את תאריך היעד לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 5000,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תעדכן את המשימה למחר",
+        context: {
+          tasks: [
+            { id: "task-visible", title: "בדיקת ספק", department: "הפצה", responsibleIds: ["u1"], priority: "medium", status: "todo", dueAt: null },
+            { id: "task-hidden", title: "נסתר", department: "קבלה", responsibleIds: ["u2"], priority: "medium", status: "todo", dueAt: null }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-visible",
+        type: "task.update",
+        payload: {
+          taskId: "task-visible",
+          taskTitle: "בדיקת ספק",
+          current: { dueAt: null },
+          patch: { dueAt: 5000 + 86400000 }
+        }
+      })
+    ]);
+  });
+
   it("passes only role-filtered assistant context to the provider prompt", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
