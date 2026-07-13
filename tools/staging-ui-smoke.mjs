@@ -8,17 +8,17 @@ const ENV_FILE = ".env.staging.local";
 const CREDENTIALS_FILE = ".staging-admin-credentials.local";
 const DEFAULT_APP_URL = "https://facility-maintenance-system.vercel.app/";
 const DESKTOP_MODULES = [
-  "BI",
-  "קריאות",
-  "מטלות",
-  "ביגוד עובדים",
-  "כלי שינוע",
-  "בקרת ניקיון",
-  "צוות ומשתמשים",
-  "ספקים / קבלנים",
-  "יומן פעילות",
-  "הגדרות",
-  "התראות"
+  { name: "BI", labels: ["BI"] },
+  { name: "קריאות", labels: ["קריאות"] },
+  { name: "מטלות", labels: ["מטלות"] },
+  { name: "ביגוד עובדים", labels: ["ביגוד עובדים"] },
+  { name: "כלי שינוע", labels: ["כלי שינוע"] },
+  { name: "בקרת ניקיון", labels: ["בקרת ניקיון"] },
+  { name: "צוות ומשתמשים", labels: ["צוות ומשתמשים"] },
+  { name: "ספקים / קבלנים", labels: ["ספקים / קבלנים"] },
+  { name: "יומן פעילות", labels: ["יומן פעילות", "יומן"] },
+  { name: "הגדרות", labels: ["הגדרות"] },
+  { name: "התראות", labels: ["התראות"] }
 ];
 
 function loadEnvFile(file) {
@@ -156,9 +156,17 @@ async function desktopSmoke(browser, credentials, expectedCommit) {
   await assertBIHeatmap(page, "desktop");
 
   const modules = [];
-  for (const label of DESKTOP_MODULES) {
-    const button = page.locator(`button:has-text("${label}")`).first();
-    if (await button.count() < 1) throw new Error(`desktop_module_missing:${label}`);
+  for (const module of DESKTOP_MODULES) {
+    const label = module.name;
+    let button = null;
+    for (const candidate of module.labels) {
+      const found = page.locator(`button:has-text("${candidate}")`).first();
+      if (await found.count() >= 1) {
+        button = found;
+        break;
+      }
+    }
+    if (!button) throw new Error(`desktop_module_missing:${label}`);
     await button.click();
     await page.waitForTimeout(300);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
