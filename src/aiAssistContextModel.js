@@ -183,6 +183,7 @@ function sanitizeTask(item = {}) {
 function sanitizeMeeting(item = {}) {
   const meetingDays = numberOrNull(item.meetingDays ?? item.daysLeft);
   const openTaskCount = numberOrNull(item.openTaskCount);
+  const at = numberOrNull(item.at ?? item.meetingAt ?? item.meeting_at);
   const clean = {
     id: compactId(item.id),
     title: compactText(item.title || item.subject, 140),
@@ -193,6 +194,7 @@ function sanitizeMeeting(item = {}) {
     participantIds: cleanStringArray(item.participantIds || item.participant_ids, 10),
     needsSummary: booleanOrFalse(item.needsSummary)
   };
+  if (at != null) clean.at = at;
   if (meetingDays != null) clean.meetingDays = meetingDays;
   if (openTaskCount != null) clean.openTaskCount = openTaskCount;
   return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && value !== false && !(Array.isArray(value) && value.length === 0)));

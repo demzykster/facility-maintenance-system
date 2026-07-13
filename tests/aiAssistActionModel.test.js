@@ -254,6 +254,61 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("proposes a constrained meeting time update only when a single visible meeting target is clear", () => {
+    const now = new Date(2026, 6, 13, 12, 34).getTime();
+    const currentAt = new Date(2026, 6, 13, 15, 0).getTime();
+    const expectedAt = new Date(2026, 6, 14, 10, 30).getTime();
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הפגישה למחר ב-10:30",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now,
+      context: {
+        meetings: [{ id: "meeting-1", title: "ישיבת בטיחות", status: "planned", at: currentAt }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_meeting_meeting-1",
+        type: "meeting.update",
+        label: "עדכון פגישה",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          meetingId: "meeting-1",
+          meetingTitle: "ישיבת בטיחות",
+          current: { at: currentAt },
+          patch: { at: expectedAt }
+        },
+        execute: {
+          method: "POST",
+          path: "/api/work",
+          resource: "meetings",
+          bodyField: "meeting"
+        }
+      })
+    ]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now,
+      context: {
+        meetings: [
+          { id: "meeting-1", title: "ישיבת בטיחות", status: "planned", at: currentAt },
+          { id: "meeting-2", title: "ישיבה אחרת", status: "planned", at: currentAt }
+        ]
+      }
+    })).toEqual([]);
+  });
+
   it("proposes a constrained ticket.update only when a single visible ticket target is clear", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעדכן את הקריאה לעדיפות גבוהה",

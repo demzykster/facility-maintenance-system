@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiMeetingCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7904,6 +7904,15 @@ function LazyAIPanel(props) {
       const ok = await props.saveMeeting(meeting);
       if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
       return { ok: true, meetingId: meeting.id, message: `הפגישה נוצרה: ${meeting.title || meeting.id}` };
+    }
+    if (action?.type === "meeting.update") {
+      if (typeof props.saveMeeting !== "function") throw new Error("שמירת פגישות אינה זמינה במסך זה.");
+      const existing = (props.meetings || []).find((meeting) => meeting.id === action?.payload?.meetingId);
+      if (!existing) throw new Error("הפגישה לעדכון לא נמצאה.");
+      const { meeting, changes } = prepareAiMeetingUpdateForSave(action, existing, props.session, { now: Date.now() });
+      const ok = await props.saveMeeting(meeting);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, meetingId: meeting.id, message: `הפגישה עודכנה (${changes.length} שינויים).` };
     }
     if (action?.type === "task.create") {
       if (typeof props.saveTask !== "function") throw new Error("שמירת משימות אינה זמינה במסך זה.");

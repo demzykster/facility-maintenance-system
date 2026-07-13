@@ -25,6 +25,9 @@ const AI_TASK_UPDATE_ALLOWED_FIELDS = Object.freeze([
   "status",
   "dueAt"
 ]);
+const AI_MEETING_UPDATE_ALLOWED_FIELDS = Object.freeze([
+  "at"
+]);
 
 const normalizeComparable = (value) => value == null ? "" : value;
 
@@ -64,6 +67,13 @@ export function canExecuteAiAssistAction(action = {}) {
       && !!cleanText(payload.title, 200)
       && Number.isFinite(Number(payload.at));
   }
+  if (action.type === "meeting.update") {
+    return hasMeetingsApiExecuteContract(action)
+      && !!cleanText(payload.meetingId, 160)
+      && !!payload.patch
+      && typeof payload.patch === "object"
+      && !Array.isArray(payload.patch);
+  }
   if (action.type === "task.update") {
     return hasTasksApiExecuteContract(action)
       && !!cleanText(payload.taskId, 160)
@@ -83,6 +93,55 @@ export function canExecuteAiAssistAction(action = {}) {
     return !!cleanText(payload.ticketId, 160) && !!cleanText(payload.note, 1000);
   }
   return false;
+}
+
+export function prepareAiMeetingUpdateForSave(action = {}, existingMeeting = {}, actor = {}, options = {}) {
+  if (!canExecuteAiAssistAction(action) || action.type !== "meeting.update") throw new Error("ai_action_not_executable");
+  const payload = cleanObject(action.payload);
+  const patch = cleanObject(payload.patch);
+  const meetingId = cleanText(payload.meetingId, 160);
+  const existingId = cleanText(existingMeeting.id, 160);
+  if (!meetingId || !existingId || meetingId !== existingId) throw new Error("ai_action_meeting_mismatch");
+  const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+  const changes = [];
+  const nextPatch = {};
+  for (const field of AI_MEETING_UPDATE_ALLOWED_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(patch, field)) continue;
+    const before = normalizeComparable(existingMeeting[field]);
+    const after = normalizeComparable(patch[field]);
+    if (before === after) continue;
+    nextPatch[field] = patch[field];
+    changes.push({ field, before, after });
+  }
+  if (!changes.length) throw new Error("ai_action_no_allowed_changes");
+  const actorName = cleanText(actor.name, 120) || "AI";
+  const actorRole = cleanText(actor.role, 40);
+  const changedFields = changes.map((change) => change.field).join(", ");
+  return {
+    meeting: {
+      ...existingMeeting,
+      ...nextPatch,
+      id: existingMeeting.id,
+      updatedAt: now,
+      ai: {
+        ...cleanObject(existingMeeting.ai),
+        source: "ai_assist",
+        lastConfirmedAction: cleanText(action.id, 120),
+        lastConfirmedAt: now
+      },
+      log: [
+        ...(Array.isArray(existingMeeting.log) ? existingMeeting.log : []),
+        {
+          at: now,
+          by: actorName,
+          byRole: actorRole,
+          text: `משתמש אישר עדכון פגישה שהוכן על ידי AI: ${changedFields}`,
+          kind: "ai_confirmed_meeting_update"
+        }
+      ]
+    },
+    changes
+  };
 }
 
 export function prepareAiMeetingCreateForSave(action = {}, actor = {}, options = {}) {

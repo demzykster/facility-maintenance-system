@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiMeetingCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -106,6 +106,21 @@ const meetingCreateAction = {
   execute: { method: "POST", path: "/api/work", resource: "meetings", bodyField: "meeting" }
 };
 
+const meetingUpdateAction = {
+  id: "update_meeting_time",
+  type: "meeting.update",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    meetingId: "meeting-1",
+    patch: {
+      at: 86402000,
+      id: "evil-id"
+    }
+  },
+  execute: { method: "POST", path: "/api/work", resource: "meetings", bodyField: "meeting" }
+};
+
 const taskUpdateAction = {
   id: "update_task_priority",
   type: "task.update",
@@ -157,6 +172,16 @@ const existingTask = {
   log: [{ at: 1500, by: "Dana", byRole: "user", text: "נוצרה", kind: "created" }]
 };
 
+const existingMeeting = {
+  id: "meeting-1",
+  title: "ישיבת בטיחות",
+  at: 36002000,
+  status: "planned",
+  createdAt: 1000,
+  updatedAt: 1500,
+  log: [{ at: 1500, by: "Dana", byRole: "user", text: "נוצרה", kind: "created" }]
+};
+
 describe("AI assist action execution model", () => {
   it("allows only complete human-confirmed ticket.create actions through the normal tickets API contract", () => {
     expect(canExecuteAiAssistAction(readyAction)).toBe(true);
@@ -164,6 +189,7 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction(commentAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskCreateAction)).toBe(true);
     expect(canExecuteAiAssistAction(meetingCreateAction)).toBe(true);
+    expect(canExecuteAiAssistAction(meetingUpdateAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskUpdateAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
@@ -176,6 +202,8 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction({ ...taskCreateAction, payload: { desc: "missing title" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...meetingCreateAction, execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "meeting" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...meetingCreateAction, payload: { purpose: "missing title" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...meetingUpdateAction, payload: { meetingId: "meeting-1" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...meetingUpdateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "meeting" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskUpdateAction, payload: { taskId: "task-1" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskUpdateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "task" } })).toBe(false);
   });
@@ -280,6 +308,34 @@ describe("AI assist action execution model", () => {
         kind: "ai_confirmed_meeting"
       }
     ]);
+  });
+
+  it("prepares a confirmed AI meeting update with an allow-listed patch and audit log", () => {
+    const { meeting, changes } = prepareAiMeetingUpdateForSave(meetingUpdateAction, existingMeeting, { name: "Vadim", role: "admin" }, { now: 3000 });
+
+    expect(meeting).toMatchObject({
+      id: "meeting-1",
+      title: "ישיבת בטיחות",
+      at: 86402000,
+      status: "planned",
+      updatedAt: 3000,
+      ai: {
+        source: "ai_assist",
+        lastConfirmedAction: "update_meeting_time",
+        lastConfirmedAt: 3000
+      }
+    });
+    expect(meeting.id).toBe("meeting-1");
+    expect(changes).toEqual([
+      { field: "at", before: 36002000, after: 86402000 }
+    ]);
+    expect(meeting.log.at(-1)).toEqual({
+      at: 3000,
+      by: "Vadim",
+      byRole: "admin",
+      text: "משתמש אישר עדכון פגישה שהוכן על ידי AI: at",
+      kind: "ai_confirmed_meeting_update"
+    });
   });
 
   it("prepares a confirmed AI task update with an allow-listed patch and audit log", () => {

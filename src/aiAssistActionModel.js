@@ -322,6 +322,45 @@ function buildAiTaskUpdateProposal({ draft = {}, context = {}, now = Date.now() 
   };
 }
 
+function buildAiMeetingUpdateProposal({ draft = {}, context = {}, now = Date.now() } = {}) {
+  const meetings = cleanArray(context.meetings).filter((meeting) => meeting && meeting.id);
+  if (meetings.length !== 1 || !hasUpdateIntent(draft.rawText) || !hasMeetingCreateIntent(draft.rawText)) return null;
+  const meeting = meetings[0];
+  const patch = {};
+  const requestedAt = requestedMeetingAtFromText(draft.rawText, now);
+  if (requestedAt !== null && requestedAt !== meeting.at) patch.at = requestedAt;
+  if (!Object.keys(patch).length) return null;
+  const current = Object.fromEntries(Object.keys(patch).map((field) => [field, meeting[field]]));
+  return {
+    id: `update_meeting_${cleanText(meeting.id, 80)}`,
+    type: "meeting.update",
+    label: "עדכון פגישה",
+    status: "ready_for_confirmation",
+    requiresConfirmation: true,
+    writesData: false,
+    writePolicy: "human_confirmation_required",
+    missingFields: [],
+    payload: {
+      meetingId: cleanText(meeting.id, 160),
+      meetingTitle: cleanText(meeting.title || meeting.name, 160),
+      current,
+      patch
+    },
+    execute: {
+      method: "POST",
+      path: "/api/work",
+      resource: "meetings",
+      bodyField: "meeting"
+    },
+    safety: {
+      deterministic: true,
+      providerTextTrusted: false,
+      serverMustRevalidate: true,
+      auditRequired: true
+    }
+  };
+}
+
 export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.now() } = {}) {
   const module = cleanText(draft.module, 40);
   const track = ticketTrackForModule(module);
@@ -488,9 +527,12 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   if (updateProposal) return [updateProposal];
   const taskUpdateProposal = buildAiTaskUpdateProposal({ draft: safeDraft, context, now });
   if (taskUpdateProposal) return [taskUpdateProposal];
+  const meetingUpdateProposal = buildAiMeetingUpdateProposal({ draft: safeDraft, context, now });
+  if (meetingUpdateProposal) return [meetingUpdateProposal];
   if (hasWaitingStatusIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.tasks).filter((task) => task && task.id).length > 0) return [];
+  if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.meetings).filter((meeting) => meeting && meeting.id).length > 0) return [];
   if (safeDraft.action === "draft_task") {
     if (hasMeetingCreateIntent(safeDraft.rawText)) {
       const payload = buildAiMeetingCreatePayload({ draft: safeDraft, user, now });
