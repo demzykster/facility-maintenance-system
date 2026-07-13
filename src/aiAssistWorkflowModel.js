@@ -33,7 +33,7 @@ export function aiAssistWorkflowInstruction(workflow = AI_ASSIST_WORKFLOWS.gener
 export function aiAssistRoleGuidance(role = "") {
   const normalized = String(role || "").trim().toLowerCase();
   if (normalized === "admin") {
-    return "For a system administrator, prioritize cross-module operational risk, configuration gaps, stuck ownership, failed integrations, and what should be checked next. Mention affected modules and safe next steps, but do not claim to change settings or records.";
+    return "For a system administrator, answer the latest user request first. Only when the latest request asks for status, risks, SLA, next actions, or an operational overview, prioritize cross-module operational risk, configuration gaps, stuck ownership, failed integrations, and what should be checked next. Mention affected modules and safe next steps, but do not claim to change settings or records.";
   }
   if (normalized === "executive") {
     return "For executive leadership, summarize business impact, SLA exposure, blocked work, cost or downtime signals when present, and decisions that need management attention. Avoid implementation detail unless it changes the decision.";

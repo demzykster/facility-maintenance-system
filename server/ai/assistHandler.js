@@ -3,7 +3,7 @@ import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
 import { buildAiAssistActionProposals } from "../../src/aiAssistActionModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
 import { AI_PROVIDER_PLAN_SCHEMA, providerPlanPrompt, sanitizeAiProviderPlan } from "../../src/aiAssistProviderPlanModel.js";
-import { aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
+import { AI_ASSIST_WORKFLOWS, aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
@@ -169,6 +169,21 @@ function contextGuidanceForProvider({ draft = {}, context = {} } = {}) {
   return guidance;
 }
 
+function latestMessageGuidanceForProvider({ draft = {}, workflow = "" } = {}) {
+  const rawText = cleanText(draft?.rawText, MAX_TEXT_CHARS).toLowerCase();
+  const safeWorkflow = normalizeAiAssistWorkflow(workflow);
+  const asksForOperationalDigest = /(сводк|итог|статус|что.*происходит|что.*важн|что.*срочн|рис к|риск|dashboard|overview|summary|risk|status|מה.*חשוב|מה.*דחוף|סיכום|סטטוס|סיכון|תמונת מצב)/iu.test(rawText)
+    || [AI_ASSIST_WORKFLOWS.riskSummary, AI_ASSIST_WORKFLOWS.nextActions, AI_ASSIST_WORKFLOWS.slaExplanation].includes(safeWorkflow);
+  return {
+    priority: "latest_user_message",
+    instruction: "The latest userRequest is the task. Do not repeat an older assistant answer and do not reuse an older operational summary unless the latest userRequest asks for that exact topic.",
+    operationalDigestAllowed: asksForOperationalDigest,
+    staleSummaryRule: asksForOperationalDigest
+      ? "A compact operational summary is allowed because the current request/workflow asks for status, risks, SLA, or next actions."
+      : "Do not summarize fleet document alerts, SLA risks, or open tickets just because they exist in context. Use them only if the latest userRequest explicitly asks about them."
+  };
+}
+
 const safeSource = (value) => {
   const source = String(value || "ui").trim();
   return ["ui", "worker", "cleaner", "mobile", "test"].includes(source) ? source : "ui";
@@ -240,6 +255,7 @@ function providerPrompt({ draft, actions = [], user, context, workflow, conversa
       refusalPolicy: "If the current userRequest is unclear, ask one precise follow-up question instead of summarizing unrelated context."
     },
     actionGuidance: actionGuidanceForProvider(actions),
+    latestMessageGuidance: latestMessageGuidanceForProvider({ draft, workflow: safeWorkflow }),
     contextGuidance: contextGuidanceForProvider({ draft, context }),
     responseLanguage: language,
     userRequest: cleanText(draft?.rawText, MAX_TEXT_CHARS),

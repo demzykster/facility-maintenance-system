@@ -1434,6 +1434,56 @@ describe("AI assist handler", () => {
     expect(prompt.contract.expectedOutput).toContain("answer the current userRequest first");
   });
 
+  it("tells the provider not to repeat stale operational summaries for unrelated latest messages", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "Могу помочь с заявками, техникой, уборкой, одеждой, задачами и настройками."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "admin" }),
+      providerCall,
+      now: () => 655,
+      rateBuckets: new Map()
+    });
+
+    const staleSummary = "קיימות 15 התראות מסמכי צי רכב פתוחות. בנוסף, קיימת קריאת שירות אחת באיחור.";
+    const res = await call(handler, {
+      body: {
+        text: "что ты умеешь?",
+        workflow: "general",
+        messages: [
+          { role: "assistant", content: staleSummary },
+          { role: "user", content: "что ты умеешь?" }
+        ],
+        context: {
+          metrics: { fleetDocumentAlerts: 15, overdueTickets: 1 },
+          tickets: [{ id: "F-002", subject: "ידית דלת מקרר", overdue: true }],
+          fleet: { docs: [{ id: "doc-6954052", unitCode: "6954052", title: "חסר תוקף", daysLeft: -1 }] }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.userRequest).toBe("что ты умеешь?");
+    expect(prompt.latestMessageGuidance).toMatchObject({
+      priority: "latest_user_message",
+      operationalDigestAllowed: false
+    });
+    expect(prompt.latestMessageGuidance.instruction).toContain("Do not repeat an older assistant answer");
+    expect(prompt.latestMessageGuidance.staleSummaryRule).toContain("Do not summarize fleet document alerts");
+    expect(prompt.roleGuidance).toContain("answer the latest user request first");
+    expect(prompt.roleGuidance).toContain("Only when the latest request asks for status");
+  });
+
   it("answers in the latest user message language instead of the UI fallback language", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
