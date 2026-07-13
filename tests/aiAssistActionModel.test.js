@@ -128,6 +128,8 @@ describe("AI assist action model", () => {
   });
 
   it("turns a clear meeting draft into a human-confirmed meeting proposal without writing", () => {
+    const now = new Date(2026, 6, 13, 12, 34).getTime();
+    const expectedAt = new Date(2026, 6, 14, 9, 0).getTime();
     const draft = buildAiIntakeDraft({
       rawText: "פגישה מחר ב-09:00 לעבור על תקלות בטיחות",
       actor,
@@ -135,7 +137,7 @@ describe("AI assist action model", () => {
       source: "ui"
     }, 1000);
 
-    const actions = buildAiAssistActionProposals({ draft, user: actor, now: 2000 });
+    const actions = buildAiAssistActionProposals({ draft, user: actor, now });
 
     expect(actions).toEqual([
       expect.objectContaining({
@@ -159,9 +161,9 @@ describe("AI assist action model", () => {
           status: "planned",
           ownerId: "u1",
           participantIds: ["u1"],
-          at: 2000 + 86400000,
-          createdAt: 2000,
-          updatedAt: 2000,
+          at: expectedAt,
+          createdAt: now,
+          updatedAt: now,
           ai: expect.objectContaining({
             drafted: true,
             source: "ai_assist"

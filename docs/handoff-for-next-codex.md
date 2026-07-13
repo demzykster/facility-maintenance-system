@@ -63,7 +63,7 @@ Recent commits on `main`:
   - The action remains `writesData: false`, requires human confirmation, and targets the existing `/api/work` contract with `resource: "meetings"` / `bodyField: "meeting"`.
   - `src/aiAssistActionExecutionModel.js` prepares the confirmed meeting for the existing `saveMeeting` path and adds `ai.confirmedByHuman` plus an `ai_confirmed_meeting` log entry.
   - `src/AIPanel.jsx` renders the meeting action as a separate confirmation card, and `LazyAIPanel` executes it through `saveMeeting`, not through a parallel AI write path.
-  - This first slice intentionally defaults the current actor as owner/participant, requires deterministic relative date wording, and does not infer extra participants, rooms, recurring rules, meeting updates, or meeting deletes.
+  - This first slice intentionally defaults the current actor as owner/participant, requires deterministic relative date wording, applies explicit `HH:mm` time when present, and does not infer extra participants, rooms, recurring rules, meeting updates, or meeting deletes.
 - `Add human-confirmed AI task due-date updates`
   - `src/aiAssistActionModel.js` now extends constrained `task.update` proposals from status/priority to deterministic due-date updates.
   - Due dates are intentionally accepted only from explicit relative wording: `היום` / `today`, `מחר` / `tomorrow`, or `בעוד` / `תוך` / `in N days`.

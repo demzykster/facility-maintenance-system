@@ -107,6 +107,23 @@ function requestedTaskDueAtFromText(text = "", now = Date.now()) {
   return null;
 }
 
+function explicitClockTimeFromText(text = "") {
+  const raw = cleanText(text, 800);
+  const match = raw.match(/(?:ב-?|בשעה|at\s+)?([01]?\d|2[0-3]):([0-5]\d)/i);
+  if (!match) return null;
+  return { hours: Number(match[1]), minutes: Number(match[2]) };
+}
+
+function requestedMeetingAtFromText(text = "", now = Date.now()) {
+  const baseAt = requestedTaskDueAtFromText(text, now);
+  if (baseAt === null) return null;
+  const clock = explicitClockTimeFromText(text);
+  if (!clock) return baseAt;
+  const date = new Date(baseAt);
+  date.setHours(clock.hours, clock.minutes, 0, 0);
+  return date.getTime();
+}
+
 function hasMeetingCreateIntent(text = "") {
   return /פגישה|ישיבה|meeting/i.test(cleanText(text, 800));
 }
@@ -405,7 +422,7 @@ export function buildAiMeetingCreatePayload({ draft = {}, user = {}, now = Date.
   const actorName = cleanText(user.name, 120);
   const actorRole = cleanText(user.role, 40);
   const title = subjectFromDraft(draft);
-  const at = requestedTaskDueAtFromText(draft.rawText, createdAt);
+  const at = requestedMeetingAtFromText(draft.rawText, createdAt);
   return {
     title,
     type: "boss",
