@@ -1,6 +1,6 @@
 import React from "react";
 import { Sparkles } from "lucide-react";
-import { AI_PROVIDER_LABELS, AI_PROVIDER_OPTIONS, DEFAULT_AI_MODELS, normalizeAiSettings } from "./aiProviderModel.js";
+import { AI_PROVIDER_LABELS, AI_PROVIDER_MODEL_OPTIONS, AI_PROVIDER_OPTIONS, DEFAULT_AI_MODELS, normalizeAiSettings } from "./aiProviderModel.js";
 
 export const AI_STATUS_ERROR_LABELS = Object.freeze({
   access_token_required: "נדרשת התחברות כדי לבדוק את מצב ה-AI.",
@@ -34,6 +34,11 @@ export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy, onRefr
   const aiProviderOptions = Array.isArray(aiStatus?.supportedProviderOptions) && aiStatus.supportedProviderOptions.length
     ? aiStatus.supportedProviderOptions
     : AI_PROVIDER_OPTIONS;
+  const modelOptionsByProvider = aiStatus?.supportedModelOptions && typeof aiStatus.supportedModelOptions === "object"
+    ? aiStatus.supportedModelOptions
+    : AI_PROVIDER_MODEL_OPTIONS;
+  const aiModelOptions = Array.isArray(modelOptionsByProvider?.[aiCfg.provider]) ? modelOptionsByProvider[aiCfg.provider] : [];
+  const selectedModelKnown = !aiCfg.model || aiModelOptions.some((option) => option.id === aiCfg.model);
   const aiStatusProviderLabel = AI_PROVIDER_LABELS[aiStatus?.provider] || aiStatus?.provider || "";
   const statusSummary = aiStatusSummary(aiStatus, aiStatusBusy);
   const aiStatusErrors = (aiStatus?.errors || []).filter(Boolean).map(aiStatusErrorLabel).join(" · ");
@@ -63,7 +68,11 @@ export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy, onRefr
           setAiCfg((s) => normalizeAiSettings({ ...s, provider, model: DEFAULT_AI_MODELS[provider] || "" }));
         }}><option value="">בחר ספק</option>{aiProviderOptions.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
       </div>
-      <label className="field"><span>מודל</span><input value={aiCfg.model} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, model: e.target.value }))} placeholder={aiCfg.provider ? DEFAULT_AI_MODELS[aiCfg.provider] : "בחרו ספק כדי לקבל ברירת מחדל"} /></label>
+      <label className="field"><span>מודל</span><select value={aiCfg.model} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, model: e.target.value }))} disabled={!aiCfg.provider}>
+        <option value="">{aiCfg.provider ? `ברירת מחדל: ${DEFAULT_AI_MODELS[aiCfg.provider] || ""}` : "בחרו ספק כדי לקבל רשימת מודלים"}</option>
+        {aiModelOptions.map(({ id, label }) => <option key={id} value={id}>{label} · {id}</option>)}
+        {!selectedModelKnown && <option value={aiCfg.model}>מותאם אישית · {aiCfg.model}</option>}
+      </select></label>
       <div className="hint">{aiStatusProviderLabel ? `שרת: ${aiStatusProviderLabel} · ${aiStatus.model || "ללא מודל"} · מפתח ${aiStatus.providerKeyConfigured ? "מוגדר" : "חסר"}` : "השרת ידווח כאן אם הוגדר ספק ומפתח."}{aiStatusErrors ? ` · ${aiStatusErrors}` : ""}</div>
       {providerCheckText && <div className={"note " + (providerCheck?.ok ? "ok" : "warn")}>{providerCheckText}</div>}
     </div>

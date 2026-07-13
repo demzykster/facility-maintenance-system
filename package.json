@@ -66,6 +66,10 @@
     "serve": "node tools/static-server.cjs"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.12",
+    "@ai-sdk/google": "^4.0.12",
+    "@ai-sdk/openai": "^4.0.11",
+    "ai": "^7.0.22",
     "html2canvas": "^1.4.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.468.0",

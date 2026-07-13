@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AI_MODES, AI_PROVIDER_LABELS, AI_PROVIDER_OPTIONS, AI_PROVIDERS, aiModeFromEnv, aiServerConfigFromEnv, normalizeAiProvider, normalizeAiSettings, productionAiPolicy, publicAiServerStatusFromEnv } from "../src/aiProviderModel.js";
+import { AI_MODES, AI_PROVIDER_LABELS, AI_PROVIDER_MODEL_OPTIONS, AI_PROVIDER_OPTIONS, AI_PROVIDERS, aiModeFromEnv, aiServerConfigFromEnv, normalizeAiProvider, normalizeAiSettings, productionAiPolicy, publicAiServerStatusFromEnv } from "../src/aiProviderModel.js";
 
 describe("aiProviderModel", () => {
   it("disables browser AI by default and ignores the legacy client mode", () => {
@@ -113,9 +113,16 @@ describe("aiProviderModel", () => {
       providerKeyConfigured: true,
       serverReady: true,
       supportedProviderOptions: AI_PROVIDER_OPTIONS,
+      supportedModelOptions: AI_PROVIDER_MODEL_OPTIONS,
       errors: []
     });
     expect(AI_PROVIDER_LABELS[AI_PROVIDERS.openai]).toContain("Codex");
+    expect(AI_PROVIDER_OPTIONS.find((option) => option.id === AI_PROVIDERS.google)?.models).toEqual([
+      expect.objectContaining({ id: "gemini-2.0-flash", label: expect.stringContaining("Gemini") })
+    ]);
+    expect(AI_PROVIDER_MODEL_OPTIONS[AI_PROVIDERS.openai]).toEqual([
+      expect.objectContaining({ id: "gpt-5.2", label: expect.stringContaining("GPT") })
+    ]);
     expect(publicAiServerStatusFromEnv({
       CMMS_AI_MODE: "server",
       CMMS_AI_PROVIDER: "gemini",

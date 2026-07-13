@@ -1,119 +1,113 @@
 import { describe, expect, it, vi } from "vitest";
-import { callAiProvider } from "../server/ai/providerClient.js";
+import { callAiProvider, __test } from "../server/ai/providerClient.js";
 
-function jsonResponse(body, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    text: () => Promise.resolve(JSON.stringify(body))
-  };
+function sdkFactory(providerName) {
+  return vi.fn((options) => (modelId) => ({
+    modelId,
+    providerName,
+    options
+  }));
 }
 
 describe("ai provider client", () => {
-  it("builds Anthropic server-side message requests without browser secrets", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
-      content: [{ type: "text", text: "טיוטה מוכנה" }]
-    }));
+  it("uses the Vercel AI SDK seam for Anthropic without returning provider secrets", async () => {
+    const createAnthropic = sdkFactory("anthropic");
+    const generateTextImpl = vi.fn().mockResolvedValue({
+      text: "טיוטה מוכנה",
+      finishReason: "stop",
+      usage: { inputTokens: 3, outputTokens: 2 }
+    });
 
     const result = await callAiProvider({
       config: { provider: "anthropic", anthropicApiKey: "anthropic-secret", model: "claude-test" },
       system: "system",
       prompt: "prompt",
-      fetchImpl,
+      generateTextImpl,
+      sdk: { createAnthropic },
       maxTokens: 120
     });
 
-    expect(result).toMatchObject({ ok: true, provider: "anthropic", model: "claude-test", text: "טיוטה מוכנה" });
-    expect(fetchImpl).toHaveBeenCalledWith("https://api.anthropic.com/v1/messages", expect.objectContaining({
-      method: "POST",
-      headers: expect.objectContaining({
-        "x-api-key": "anthropic-secret",
-        "anthropic-version": "2023-06-01"
-      })
-    }));
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
+    expect(result).toEqual({
+      ok: true,
+      provider: "anthropic",
       model: "claude-test",
-      max_tokens: 120,
-      system: "system",
-      messages: [{ role: "user", content: "prompt" }]
+      text: "טיוטה מוכנה",
+      raw: {
+        finishReason: "stop",
+        usage: { inputTokens: 3, outputTokens: 2 }
+      }
     });
+    expect(createAnthropic).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "anthropic-secret" }));
+    expect(generateTextImpl).toHaveBeenCalledWith({
+      model: expect.objectContaining({ modelId: "claude-test", providerName: "anthropic" }),
+      system: "system",
+      prompt: "prompt",
+      maxOutputTokens: 120
+    });
+    expect(JSON.stringify(result)).not.toContain("anthropic-secret");
   });
 
-  it("builds OpenAI Responses API requests for Codex/OpenAI provider mode", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
-      output_text: "draft ready"
-    }));
+  it("uses OpenAI Responses-compatible SDK models for Codex/OpenAI provider mode", async () => {
+    const createOpenAI = sdkFactory("openai");
+    const generateTextImpl = vi.fn().mockResolvedValue({ text: "draft ready" });
 
     const result = await callAiProvider({
       config: { provider: "openai", openaiApiKey: "openai-secret", model: "gpt-5.2" },
       system: "system",
       prompt: "prompt",
-      fetchImpl,
+      generateTextImpl,
+      sdk: { createOpenAI },
       maxTokens: 200
     });
 
     expect(result).toMatchObject({ ok: true, provider: "openai", model: "gpt-5.2", text: "draft ready" });
-    expect(fetchImpl).toHaveBeenCalledWith("https://api.openai.com/v1/responses", expect.objectContaining({
-      method: "POST",
-      headers: expect.objectContaining({
-        authorization: "Bearer openai-secret"
-      })
+    expect(createOpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "openai-secret" }));
+    expect(generateTextImpl).toHaveBeenCalledWith(expect.objectContaining({
+      model: expect.objectContaining({ modelId: "gpt-5.2", providerName: "openai" }),
+      maxOutputTokens: 200
     }));
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
-      model: "gpt-5.2",
-      instructions: "system",
-      input: "prompt",
-      max_output_tokens: 200
-    });
+    expect(JSON.stringify(result)).not.toContain("openai-secret");
   });
 
-  it("clamps OpenAI Responses max output tokens to the provider minimum", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
-      output_text: "OK"
-    }));
+  it("clamps tiny provider checks to the provider-safe output token floor", async () => {
+    const createOpenAI = sdkFactory("openai");
+    const generateTextImpl = vi.fn().mockResolvedValue({ text: "OK" });
 
     await callAiProvider({
       config: { provider: "openai", openaiApiKey: "openai-secret", model: "gpt-5.2" },
       system: "system",
       prompt: "prompt",
-      fetchImpl,
+      generateTextImpl,
+      sdk: { createOpenAI },
       maxTokens: 8
     });
 
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
-      max_output_tokens: 16
-    });
+    expect(generateTextImpl).toHaveBeenCalledWith(expect.objectContaining({
+      maxOutputTokens: 16
+    }));
+    expect(__test.safeTokenLimit(8, 16)).toBe(16);
   });
 
-  it("builds Gemini generateContent requests for Google provider mode", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
-      candidates: [{
-        content: {
-          parts: [{ text: "gemini ready" }]
-        }
-      }]
-    }));
+  it("uses Google Gemini SDK models for Google provider mode", async () => {
+    const createGoogleGenerativeAI = sdkFactory("google");
+    const generateTextImpl = vi.fn().mockResolvedValue({ text: "gemini ready" });
 
     const result = await callAiProvider({
       config: { provider: "gemini", googleApiKey: "google-secret", model: "gemini-2.0-flash" },
       system: "system",
       prompt: "prompt",
-      fetchImpl,
+      generateTextImpl,
+      sdk: { createGoogleGenerativeAI },
       maxTokens: 120
     });
 
     expect(result).toMatchObject({ ok: true, provider: "google", model: "gemini-2.0-flash", text: "gemini ready" });
-    expect(fetchImpl).toHaveBeenCalledWith("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", expect.objectContaining({
-      method: "POST",
-      headers: expect.objectContaining({
-        "x-goog-api-key": "google-secret"
-      })
+    expect(createGoogleGenerativeAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "google-secret" }));
+    expect(generateTextImpl).toHaveBeenCalledWith(expect.objectContaining({
+      model: expect.objectContaining({ modelId: "gemini-2.0-flash", providerName: "google" }),
+      maxOutputTokens: 120
     }));
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
-      systemInstruction: { parts: [{ text: "system" }] },
-      contents: [{ role: "user", parts: [{ text: "prompt" }] }],
-      generationConfig: { maxOutputTokens: 120 }
-    });
+    expect(JSON.stringify(result)).not.toContain("google-secret");
   });
 
   it("fails closed when required provider keys are missing", async () => {
@@ -129,5 +123,24 @@ describe("ai provider client", () => {
       ok: false,
       error: "google_api_key_required"
     });
+  });
+
+  it("normalizes provider SDK failures into stable non-secret results", async () => {
+    const createGoogleGenerativeAI = sdkFactory("google");
+    const generateTextImpl = vi.fn().mockRejectedValue(new Error("quota exceeded for this project"));
+
+    const result = await callAiProvider({
+      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-2.0-flash" },
+      generateTextImpl,
+      sdk: { createGoogleGenerativeAI }
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      provider: "google",
+      model: "gemini-2.0-flash",
+      error: "quota exceeded for this project"
+    });
+    expect(JSON.stringify(result)).not.toContain("google-secret");
   });
 });

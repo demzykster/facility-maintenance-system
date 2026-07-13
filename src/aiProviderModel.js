@@ -34,10 +34,23 @@ export const DEFAULT_AI_MODELS = Object.freeze({
   [AI_PROVIDERS.openai]: "gpt-5.2"
 });
 
+export const AI_PROVIDER_MODEL_OPTIONS = Object.freeze({
+  [AI_PROVIDERS.anthropic]: Object.freeze([
+    Object.freeze({ id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" })
+  ]),
+  [AI_PROVIDERS.google]: Object.freeze([
+    Object.freeze({ id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" })
+  ]),
+  [AI_PROVIDERS.openai]: Object.freeze([
+    Object.freeze({ id: "gpt-5.2", label: "GPT-5.2" })
+  ])
+});
+
 export const AI_PROVIDER_OPTIONS = Object.freeze(Object.values(AI_PROVIDERS).map((id) => Object.freeze({
   id,
   label: AI_PROVIDER_LABELS[id],
-  defaultModel: DEFAULT_AI_MODELS[id]
+  defaultModel: DEFAULT_AI_MODELS[id],
+  models: AI_PROVIDER_MODEL_OPTIONS[id] || Object.freeze([])
 })));
 
 export const AI_SETTING_MODES = Object.freeze({
@@ -101,6 +114,7 @@ export function publicAiServerStatusFromEnv(env = {}) {
     serverReady: config.mode === AI_MODES.server && !!config.provider && providerKeyConfigured,
     supportedProviders: Object.values(AI_PROVIDERS),
     supportedProviderOptions: AI_PROVIDER_OPTIONS,
+    supportedModelOptions: AI_PROVIDER_MODEL_OPTIONS,
     defaultModels: DEFAULT_AI_MODELS,
     errors
   };

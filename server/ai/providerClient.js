@@ -1,62 +1,35 @@
+import { generateText } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { AI_PROVIDERS, DEFAULT_AI_MODELS, normalizeAiProvider } from "../../src/aiProviderModel.js";
-
-const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
-const GEMINI_GENERATE_CONTENT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-
-const readJsonOrText = async (response) => {
-  const text = await response.text();
-  if (!text) return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { text };
-  }
-};
 
 const compactText = (value, limit = 6_000) => String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
 const safeTokenLimit = (value, minimum) => Math.max(minimum, Number.isFinite(Number(value)) ? Number(value) : minimum);
 
 function providerError(data, fallback) {
-  return data?.error?.message || data?.message || data?.text || fallback;
+  return data?.error?.message || data?.message || data?.cause?.message || data?.text || fallback;
 }
 
-function extractOpenAiText(data = {}) {
-  if (typeof data.output_text === "string") return data.output_text;
-  const chunks = [];
-  for (const item of data.output || []) {
-    for (const content of item.content || []) {
-      if (typeof content.text === "string") chunks.push(content.text);
-    }
+function createSdkModel({ provider, model, config, fetchImpl, sdk = {} } = {}) {
+  if (provider === AI_PROVIDERS.anthropic) {
+    const factory = sdk.createAnthropic || createAnthropic;
+    return factory({ apiKey: config.anthropicApiKey, fetch: fetchImpl })(model);
   }
-  return chunks.join("\n").trim();
+  if (provider === AI_PROVIDERS.google) {
+    const factory = sdk.createGoogleGenerativeAI || createGoogleGenerativeAI;
+    return factory({ apiKey: config.googleApiKey, fetch: fetchImpl })(model);
+  }
+  if (provider === AI_PROVIDERS.openai) {
+    const factory = sdk.createOpenAI || createOpenAI;
+    return factory({ apiKey: config.openaiApiKey, fetch: fetchImpl })(model);
+  }
+  return null;
 }
 
-function extractAnthropicText(data = {}) {
-  return (data.content || [])
-    .map((part) => part?.text || "")
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-}
-
-function extractGeminiText(data = {}) {
-  return (data.candidates || [])
-    .flatMap((candidate) => candidate?.content?.parts || [])
-    .map((part) => part?.text || "")
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-}
-
-function geminiModelUrl(model = "") {
-  return `${GEMINI_GENERATE_CONTENT_BASE_URL}/${encodeURIComponent(model)}:generateContent`;
-}
-
-export async function callAiProvider({ config = {}, system = "", prompt = "", fetchImpl = globalThis.fetch, maxTokens = 900 } = {}) {
+export async function callAiProvider({ config = {}, system = "", prompt = "", fetchImpl = globalThis.fetch, maxTokens = 900, generateTextImpl = generateText, sdk = {} } = {}) {
   const provider = normalizeAiProvider(config.provider);
   if (!provider) return { ok: false, error: "ai_provider_required" };
-  if (!fetchImpl) return { ok: false, error: "fetch_unavailable" };
 
   const model = String(config.model || DEFAULT_AI_MODELS[provider] || "").trim();
   const safeSystem = compactText(system);
@@ -64,65 +37,45 @@ export async function callAiProvider({ config = {}, system = "", prompt = "", fe
 
   if (provider === AI_PROVIDERS.anthropic) {
     if (!config.anthropicApiKey) return { ok: false, error: "anthropic_api_key_required" };
-    const response = await fetchImpl(ANTHROPIC_MESSAGES_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "anthropic-version": "2023-06-01",
-        "x-api-key": config.anthropicApiKey
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        system: safeSystem,
-        messages: [{ role: "user", content: safePrompt }]
-      })
-    });
-    const data = await readJsonOrText(response);
-    if (!response.ok) return { ok: false, error: providerError(data, `anthropic_http_${response.status}`) };
-    return { ok: true, provider, model, text: extractAnthropicText(data), raw: data };
   }
-
   if (provider === AI_PROVIDERS.google) {
     if (!config.googleApiKey) return { ok: false, error: "google_api_key_required" };
-    const response = await fetchImpl(geminiModelUrl(model), {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": config.googleApiKey
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: safeSystem }] },
-        contents: [{ role: "user", parts: [{ text: safePrompt }] }],
-        generationConfig: {
-          maxOutputTokens: safeTokenLimit(maxTokens, 16)
-        }
-      })
-    });
-    const data = await readJsonOrText(response);
-    if (!response.ok) return { ok: false, error: providerError(data, `google_http_${response.status}`) };
-    return { ok: true, provider, model, text: extractGeminiText(data), raw: data };
   }
-
   if (provider === AI_PROVIDERS.openai) {
     if (!config.openaiApiKey) return { ok: false, error: "openai_api_key_required" };
-    const response = await fetchImpl(OPENAI_RESPONSES_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${config.openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        instructions: safeSystem,
-        input: safePrompt,
-        max_output_tokens: safeTokenLimit(maxTokens, 16)
-      })
-    });
-    const data = await readJsonOrText(response);
-    if (!response.ok) return { ok: false, error: providerError(data, `openai_http_${response.status}`) };
-    return { ok: true, provider, model, text: extractOpenAiText(data), raw: data };
   }
 
-  return { ok: false, error: "ai_provider_unsupported" };
+  const sdkModel = createSdkModel({ provider, model, config, fetchImpl, sdk });
+  if (!sdkModel) return { ok: false, error: "ai_provider_unsupported" };
+
+  try {
+    const result = await generateTextImpl({
+      model: sdkModel,
+      system: safeSystem,
+      prompt: safePrompt,
+      maxOutputTokens: safeTokenLimit(maxTokens, 16)
+    });
+    return {
+      ok: true,
+      provider,
+      model,
+      text: String(result?.text || "").trim(),
+      raw: {
+        finishReason: result?.finishReason || "",
+        usage: result?.usage || null
+      }
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      provider,
+      model,
+      error: providerError(error, `${provider}_provider_failed`)
+    };
+  }
 }
+
+export const __test = {
+  createSdkModel,
+  safeTokenLimit
+};

@@ -50,7 +50,7 @@ Provider names are normalized for operator-friendly setup: `claude` maps to the 
 - Dedicated screen-level AI entry points now exist in the BI ticket heatmap, ticket detail, fleet unit detail, PPE stock dashboard, cleaning control dashboard, and supplier/contractor queue. `src/aiAssistEntryPointModel.js` builds human-reviewable heatmap, ticket, fleet, PPE, cleaning, and supplier questions; `src/BIHeatmapPanel.jsx` exposes the heatmap entry point; `TicketDetail` exposes the ticket entry point; `FleetCard` exposes the fleet entry point; `PpeDashboard` exposes the PPE entry point; `CleaningAdmin` exposes the cleaning entry point; `SuppliersPanel` exposes the supplier queue entry point; and `src/AIPanel.jsx` opens with the suggested question prefilled.
 - In server mode, the panel calls `POST /api/ai/assist` instead of a browser provider URL. The browser/client provider path remains only a demo/development fallback.
 - The browser-side AI context snapshot shape lives in `src/aiAssistSnapshotModel.js`. `src/ClaudeMaintenanceApp.jsx` now only adapts existing ticket/SLA/document helpers into that model before the server route applies authenticated role filtering. The snapshot can include compact supplier summaries (`name`, `type`, `scopes`, linked fleet/open-ticket counts) without supplier contacts, addresses, or private notes; the server passes those summaries through only for roles/users with supplier visibility.
-- The first server provider adapter lives in `server/ai/providerClient.js`. It supports Anthropic Messages, Google Gemini `generateContent`, and OpenAI Responses API request shapes with injected `fetch` and tests. `src/aiProviderModel.js` owns the safe provider options, labels, default models, aliases, and env-key readiness checks used by the server status route and admin settings UI.
+- The server provider adapter lives in `server/ai/providerClient.js` and now uses Vercel AI SDK Core (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, `@ai-sdk/openai`) behind the existing project boundary. `src/aiProviderModel.js` owns the safe provider options, labels, model options, default models, aliases, and env-key readiness checks used by the server status route and admin settings UI. Current supported model options exposed to settings are `claude-sonnet-4-20250514`, `gemini-2.0-flash`, and `gpt-5.2`.
 - The first authenticated server assistant entrypoint lives at `POST /api/ai/assist` through `server/ai/assistHandler.js`. It verifies the current Supabase/CMMS session, builds the deterministic intake draft, filters any supplied UI context by the authenticated user's role/scope through `src/aiAssistContextModel.js`, applies explicit workflow instructions and role-specific guidance from `src/aiAssistWorkflowModel.js`, rate-limits per user in-process, calls the configured provider only when `CMMS_AI_MODE=server`, writes an audit-safe `system / ai_assist` event when an audit driver is configured, and returns read-only assistant text plus the draft. The same context filter can pass compact BI/heatmap summaries (`bi.heatmap`) to the provider after department/role filtering, so executive/admin answers can use risk concentration signals without exposing unrelated department detail to managers.
 - AI API URLs are grouped through one Vercel route file, `api/ai/[action].js`, so `/api/ai/intake`, `/api/ai/assist`, and `/api/ai/status` do not consume one function each as the AI surface grows.
 - The admin settings surface can store non-secret AI preferences (`config.ai.mode`, `config.ai.provider`, and `config.ai.model`) and reads `/api/ai/status` for server readiness. It can also request `/api/ai/status?check=1` to run an admin-only live provider ping from the server. Provider API keys stay in deployment/server environment variables only and are never displayed or stored in browser-managed app config.
@@ -87,14 +87,16 @@ Build the next AI product slice on top of the human-confirmed assistant:
 
 ## Architecture Audit: Provider And Tooling
 
-Current implementation does not use Vercel AI SDK or LangChain yet. It uses a small server-only adapter in `server/ai/providerClient.js` plus deterministic CMMS action builders in `src/aiAssistActionModel.js`.
+Current implementation uses Vercel AI SDK Core behind `server/ai/providerClient.js` plus deterministic CMMS action builders in `src/aiAssistActionModel.js`. LangChain is not used.
 
 This is acceptable for the current controlled rollout because model text is not trusted for database writes. The provider returns assistant text only; executable actions are built by deterministic server-side code from role-filtered context and explicit user wording, remain `writesData: false`, and execute only through existing app operations after a human confirms them in the UI.
 
-The limitation is that provider integration and future native tool/function calling are custom. The recommended migration path is:
+The important safety decision is that provider-native tool/function calling must not be allowed to write directly to CMMS storage. Future SDK-native tools may be used for planning, extraction, or structured proposals, but every business mutation must still become a reviewable app action and run only after user confirmation through the existing authenticated API paths.
+
+The recommended next path is:
 
 1. Keep the current deterministic action layer as the safety boundary.
-2. Introduce Vercel AI SDK Core behind `server/ai/providerClient.js` as an internal implementation detail, not as a UI rewrite.
-3. Map OpenAI, Anthropic, and Google models through one SDK-backed `generateText` / tool-calling interface.
-4. Keep CMMS mutations as proposed actions requiring human confirmation; do not let provider-native tools write directly to the database.
-5. Add one provider at a time under the same tests before enabling SDK-native multi-step/tool loops.
+2. Add SDK-native structured output/tool calls only for non-writing proposal generation.
+3. Keep CMMS mutations as proposed actions requiring human confirmation; do not let provider-native tools write directly to the database.
+4. Add one operation at a time under the same tests before enabling any multi-step agent loop.
+5. Continue exposing only explicit provider/model options in settings; secrets remain server/Vercel-only.
