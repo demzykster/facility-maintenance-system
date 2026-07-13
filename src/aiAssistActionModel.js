@@ -36,6 +36,13 @@ function priorityFromSeverity(severity = "normal") {
   return "medium";
 }
 
+function priorityFromDowntimeType(downtimeType = "") {
+  if (downtimeType === "critical") return "high";
+  if (downtimeType === "minor") return "low";
+  if (downtimeType === "has_replacement") return "medium";
+  return "";
+}
+
 function ticketTrackForModule(module = "") {
   if (module === "transport") return "transport";
   if (["facility", "safety"].includes(module)) return "facility";
@@ -93,6 +100,15 @@ function requestedTaskStatusFromText(text = "") {
     if (/בוטל|בטל|cancel/i.test(raw)) return "cancelled";
     if (/חדש|פתוח|todo|open/i.test(raw)) return "todo";
   }
+  return "";
+}
+
+function requestedDowntimeTypeFromText(text = "") {
+  const raw = cleanText(text, 800).toLowerCase();
+  if (!raw) return "";
+  if (/יש\s+תחליף|קיים\s+תחליף|תחליף\s+זמין|with\s+replacement|replacement\s+available|backup\s+available|spare\s+available/i.test(raw)) return "has_replacement";
+  if (/אין\s+תחליף|ללא\s+תחליף|מושבת(?:ת)?\s+ואין|הכלי\s+מושבת|מוציא(?:ה)?\s+מכלל\s+שימוש|השבתה\s+קריטית|out\s+of\s+service|no\s+replacement|no\s+spare|critical\s+downtime/i.test(raw)) return "critical";
+  if (/ניתן\s+להמשיך\s+לעבוד|אפשר\s+להמשיך\s+לעבוד|לא\s+מוציא(?:ה)?\s+מכלל\s+שימוש|לא\s+מושבת|minor\s+downtime|minor|can\s+continue/i.test(raw)) return "minor";
   return "";
 }
 
@@ -455,7 +471,8 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   const location = locationFromDraft(draft);
   const subject = subjectFromDraft(draft);
   const description = cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
-  const priority = priorityFromSeverity(draft.severity);
+  const downtimeType = track === "transport" ? requestedDowntimeTypeFromText(draft.rawText) : "";
+  const priority = priorityFromDowntimeType(downtimeType) || priorityFromSeverity(draft.severity);
   const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   const fleetUnit = track === "transport" ? draftFleetUnitFromText(draft.rawText, context.fleet) : null;
   const fleetAsset = fleetUnit ? cleanText(fleetUnit.code || fleetUnit.number || fleetUnit.asset || fleetUnit.id, 160) : "";
@@ -468,7 +485,7 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
     zone: location,
     asset: fleetAsset,
     forkliftId: fleetUnit ? cleanText(fleetUnit.id, 160) : "",
-    downtimeType: "",
+    downtimeType,
     description,
     status: "new",
     assignee: "",

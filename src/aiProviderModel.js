@@ -6,17 +6,22 @@ export const AI_MODES = Object.freeze({
 
 export const AI_PROVIDERS = Object.freeze({
   anthropic: "anthropic",
+  google: "google",
   openai: "openai"
 });
 
 export const AI_PROVIDER_LABELS = Object.freeze({
   [AI_PROVIDERS.anthropic]: "Claude / Anthropic",
+  [AI_PROVIDERS.google]: "Google / Gemini",
   [AI_PROVIDERS.openai]: "OpenAI / Codex-compatible"
 });
 
 export const AI_PROVIDER_ALIASES = Object.freeze({
   anthropic: AI_PROVIDERS.anthropic,
   claude: AI_PROVIDERS.anthropic,
+  gemini: AI_PROVIDERS.google,
+  google: AI_PROVIDERS.google,
+  googleai: AI_PROVIDERS.google,
   openai: AI_PROVIDERS.openai,
   codex: AI_PROVIDERS.openai,
   chatgpt: AI_PROVIDERS.openai,
@@ -25,6 +30,7 @@ export const AI_PROVIDER_ALIASES = Object.freeze({
 
 export const DEFAULT_AI_MODELS = Object.freeze({
   [AI_PROVIDERS.anthropic]: "claude-sonnet-4-20250514",
+  [AI_PROVIDERS.google]: "gemini-2.5-flash",
   [AI_PROVIDERS.openai]: "gpt-5.2"
 });
 
@@ -58,6 +64,7 @@ export function aiServerConfigFromEnv(env = {}) {
     provider,
     model: String(env.CMMS_AI_MODEL || DEFAULT_AI_MODELS[provider] || "").trim(),
     anthropicApiKey: String(env.ANTHROPIC_API_KEY || "").trim(),
+    googleApiKey: String(env.GOOGLE_GENERATIVE_AI_API_KEY || env.GOOGLE_API_KEY || "").trim(),
     openaiApiKey: String(env.OPENAI_API_KEY || "").trim()
   };
 }
@@ -78,6 +85,7 @@ export function publicAiServerStatusFromEnv(env = {}) {
   const config = aiServerConfigFromEnv(env);
   const providerKeyConfigured = (
     (config.provider === AI_PROVIDERS.anthropic && !!config.anthropicApiKey)
+    || (config.provider === AI_PROVIDERS.google && !!config.googleApiKey)
     || (config.provider === AI_PROVIDERS.openai && !!config.openaiApiKey)
   );
   const errors = [];
@@ -110,6 +118,7 @@ export function productionAiPolicy({ appMode = "demo", ai = {} } = {}) {
   if (production && mode === AI_MODES.server) {
     if (!provider) errors.push("production_requires_ai_provider");
     if (provider === AI_PROVIDERS.anthropic && !ai.anthropicApiKey) errors.push("production_requires_anthropic_api_key");
+    if (provider === AI_PROVIDERS.google && !ai.googleApiKey) errors.push("production_requires_google_api_key");
     if (provider === AI_PROVIDERS.openai && !ai.openaiApiKey) errors.push("production_requires_openai_api_key");
   }
 

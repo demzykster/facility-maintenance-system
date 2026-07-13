@@ -80,6 +80,7 @@ describe("AI status handler", () => {
         serverReady: true,
         supportedProviderOptions: [
           expect.objectContaining({ id: "anthropic", label: expect.stringContaining("Claude") }),
+          expect.objectContaining({ id: "google", label: expect.stringContaining("Gemini") }),
           expect.objectContaining({ id: "openai", label: expect.stringContaining("Codex") })
         ],
         errors: []
@@ -127,6 +128,45 @@ describe("AI status handler", () => {
       maxTokens: 16
     }));
     expect(JSON.stringify(payload)).not.toContain("server-secret");
+  });
+
+  it("can run a Google Gemini provider connection check without leaking keys", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-2.5-flash",
+      text: "OK"
+    });
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "gemini",
+        GOOGLE_GENERATIVE_AI_API_KEY: "google-secret"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 3344
+    });
+
+    const res = await call(handler, { query: { check: "1" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai.providerCheck).toEqual({
+      attempted: true,
+      ok: true,
+      provider: "google",
+      model: "gemini-2.5-flash",
+      checkedAt: 3344
+    });
+    expect(providerCall).toHaveBeenCalledWith(expect.objectContaining({
+      config: expect.objectContaining({
+        provider: "google",
+        model: "gemini-2.5-flash",
+        googleApiKey: "google-secret"
+      }),
+      maxTokens: 16
+    }));
+    expect(JSON.stringify(res.json())).not.toContain("google-secret");
   });
 
   it("normalizes provider quota failures during live connection checks", async () => {

@@ -104,6 +104,76 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("prefills explicit critical downtime in complete transport ticket drafts", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "מלגזה 120823 מושבתת באזור טעינה ואין תחליף",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        fleet: [
+          { id: "fleet-120823", code: "120823", type: "מלגזת היגש", department: "הפצה" }
+        ]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        missingFields: [],
+        payload: expect.objectContaining({
+          track: "transport",
+          forkliftId: "fleet-120823",
+          asset: "120823",
+          downtimeType: "critical",
+          priority: "high"
+        })
+      })
+    ]);
+  });
+
+  it("prefills explicit replacement downtime without treating it as critical", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "מלגזה 120823 מושבתת אבל יש תחליף באזור טעינה",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        fleet: [
+          { id: "fleet-120823", code: "120823", type: "מלגזת היגש", department: "הפצה" }
+        ]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "ready_for_confirmation",
+        missingFields: [],
+        payload: expect.objectContaining({
+          forkliftId: "fleet-120823",
+          downtimeType: "has_replacement",
+          priority: "medium"
+        })
+      })
+    ]);
+  });
+
   it("does not guess a transport fleet unit when the mentioned code is ambiguous", () => {
     const draft = buildAiIntakeDraft({
       rawText: "מלגזה 120823 תקועה באזור טעינה",

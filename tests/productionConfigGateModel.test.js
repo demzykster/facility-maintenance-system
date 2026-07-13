@@ -252,4 +252,35 @@ describe("productionConfigGateModel", () => {
       }
     });
   });
+
+  it("accepts server-side Google Gemini provider configuration in production", () => {
+    expect(productionConfigGate({
+      appMode: "production",
+      storageProvider: "api",
+      storageApiBaseUrl: "https://cmms.example/api",
+      kvServer: {
+        auth: "supabase",
+        driver: "supabase",
+        dataAuthority: "normalized",
+        allowKvBridgeProduction: true,
+        supabaseUrl: "https://supabase.example",
+        supabaseAnonKey: "anon",
+        supabaseServiceRoleKey: "service"
+      },
+      fileStorage: {
+        driver: "supabase",
+        bucket: "cmms-files",
+        metadataDriver: "supabase"
+      },
+      audit: { driver: "supabase" },
+      ai: { mode: "server", provider: "gemini", googleApiKey: "secret" }
+    })).toMatchObject({
+      ok: true,
+      ai: {
+        mode: "server",
+        provider: "google",
+        errors: []
+      }
+    });
+  });
 });

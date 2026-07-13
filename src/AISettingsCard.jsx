@@ -5,7 +5,7 @@ import { AI_PROVIDER_LABELS, AI_PROVIDER_OPTIONS, DEFAULT_AI_MODELS, normalizeAi
 export const AI_STATUS_ERROR_LABELS = Object.freeze({
   access_token_required: "נדרשת התחברות כדי לבדוק את מצב ה-AI.",
   ai_provider_key_required: "חסר מפתח API ב-Vercel env עבור ספק ה-AI שנבחר.",
-  ai_provider_quota_exceeded: "החיבור מוגדר, אבל מכסת OpenAI / החיוב בחשבון לא מאפשרים כרגע להריץ את המודל.",
+  ai_provider_quota_exceeded: "החיבור מוגדר, אבל מכסת ספק ה-AI / החיוב בחשבון לא מאפשרים כרגע להריץ את המודל.",
   ai_provider_model_unavailable: "החיבור מוגדר, אבל המודל שהוגדר אינו זמין לחשבון הזה.",
   ai_provider_auth_failed: "החיבור מוגדר, אבל מפתח הספק נדחה. בדקו את המפתח ב-Vercel.",
   ai_provider_rate_limited: "ספק ה-AI מגביל כרגע את קצב הבקשות.",

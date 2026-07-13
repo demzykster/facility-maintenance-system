@@ -68,6 +68,7 @@ export function createAiStatusHandler({
               provider: ai.provider,
               model: ai.model,
               anthropicApiKey: env.ANTHROPIC_API_KEY,
+              googleApiKey: env.GOOGLE_GENERATIVE_AI_API_KEY || env.GOOGLE_API_KEY,
               openaiApiKey: env.OPENAI_API_KEY
             },
             system: "You are a CMMS AI connection check. Reply with exactly: OK",

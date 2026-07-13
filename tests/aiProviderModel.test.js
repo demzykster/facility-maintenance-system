@@ -51,6 +51,22 @@ describe("aiProviderModel", () => {
       provider: AI_PROVIDERS.openai,
       errors: []
     });
+    expect(productionAiPolicy({
+      appMode: "production",
+      ai: { mode: "server", provider: "gemini" }
+    })).toMatchObject({
+      ok: false,
+      provider: AI_PROVIDERS.google,
+      errors: ["production_requires_google_api_key"]
+    });
+    expect(productionAiPolicy({
+      appMode: "production",
+      ai: { mode: "server", provider: "google", googleApiKey: "secret" }
+    })).toMatchObject({
+      ok: true,
+      provider: AI_PROVIDERS.google,
+      errors: []
+    });
   });
 
   it("normalizes server provider configuration without exposing browser AI", () => {
@@ -58,6 +74,8 @@ describe("aiProviderModel", () => {
     expect(normalizeAiProvider("codex")).toBe(AI_PROVIDERS.openai);
     expect(normalizeAiProvider("chatgpt")).toBe(AI_PROVIDERS.openai);
     expect(normalizeAiProvider("claude")).toBe(AI_PROVIDERS.anthropic);
+    expect(normalizeAiProvider("gemini")).toBe(AI_PROVIDERS.google);
+    expect(normalizeAiProvider("google")).toBe(AI_PROVIDERS.google);
     expect(normalizeAiProvider("unknown")).toBe("");
     expect(aiServerConfigFromEnv({
       VITE_CMMS_APP_MODE: "production",
@@ -98,6 +116,18 @@ describe("aiProviderModel", () => {
       errors: []
     });
     expect(AI_PROVIDER_LABELS[AI_PROVIDERS.openai]).toContain("Codex");
+    expect(publicAiServerStatusFromEnv({
+      CMMS_AI_MODE: "server",
+      CMMS_AI_PROVIDER: "gemini",
+      GOOGLE_GENERATIVE_AI_API_KEY: "google-secret"
+    })).toMatchObject({
+      mode: AI_MODES.server,
+      provider: AI_PROVIDERS.google,
+      model: "gemini-2.5-flash",
+      providerKeyConfigured: true,
+      serverReady: true,
+      errors: []
+    });
     const disabled = publicAiServerStatusFromEnv({
       CMMS_AI_MODE: "server",
       CMMS_AI_PROVIDER: "openai"

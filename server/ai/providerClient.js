@@ -1,6 +1,7 @@
 import { AI_PROVIDERS, DEFAULT_AI_MODELS, normalizeAiProvider } from "../../src/aiProviderModel.js";
 
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
+const GEMINI_GENERATE_CONTENT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
 const readJsonOrText = async (response) => {
@@ -39,6 +40,19 @@ function extractAnthropicText(data = {}) {
     .trim();
 }
 
+function extractGeminiText(data = {}) {
+  return (data.candidates || [])
+    .flatMap((candidate) => candidate?.content?.parts || [])
+    .map((part) => part?.text || "")
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function geminiModelUrl(model = "") {
+  return `${GEMINI_GENERATE_CONTENT_BASE_URL}/${encodeURIComponent(model)}:generateContent`;
+}
+
 export async function callAiProvider({ config = {}, system = "", prompt = "", fetchImpl = globalThis.fetch, maxTokens = 900 } = {}) {
   const provider = normalizeAiProvider(config.provider);
   if (!provider) return { ok: false, error: "ai_provider_required" };
@@ -67,6 +81,27 @@ export async function callAiProvider({ config = {}, system = "", prompt = "", fe
     const data = await readJsonOrText(response);
     if (!response.ok) return { ok: false, error: providerError(data, `anthropic_http_${response.status}`) };
     return { ok: true, provider, model, text: extractAnthropicText(data), raw: data };
+  }
+
+  if (provider === AI_PROVIDERS.google) {
+    if (!config.googleApiKey) return { ok: false, error: "google_api_key_required" };
+    const response = await fetchImpl(geminiModelUrl(model), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": config.googleApiKey
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: safeSystem }] },
+        contents: [{ role: "user", parts: [{ text: safePrompt }] }],
+        generationConfig: {
+          maxOutputTokens: safeTokenLimit(maxTokens, 16)
+        }
+      })
+    });
+    const data = await readJsonOrText(response);
+    if (!response.ok) return { ok: false, error: providerError(data, `google_http_${response.status}`) };
+    return { ok: true, provider, model, text: extractGeminiText(data), raw: data };
   }
 
   if (provider === AI_PROVIDERS.openai) {

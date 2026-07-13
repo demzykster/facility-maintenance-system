@@ -85,6 +85,37 @@ describe("ai provider client", () => {
     });
   });
 
+  it("builds Gemini generateContent requests for Google provider mode", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
+      candidates: [{
+        content: {
+          parts: [{ text: "gemini ready" }]
+        }
+      }]
+    }));
+
+    const result = await callAiProvider({
+      config: { provider: "gemini", googleApiKey: "google-secret", model: "gemini-2.5-flash" },
+      system: "system",
+      prompt: "prompt",
+      fetchImpl,
+      maxTokens: 120
+    });
+
+    expect(result).toMatchObject({ ok: true, provider: "google", model: "gemini-2.5-flash", text: "gemini ready" });
+    expect(fetchImpl).toHaveBeenCalledWith("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({
+        "x-goog-api-key": "google-secret"
+      })
+    }));
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
+      systemInstruction: { parts: [{ text: "system" }] },
+      contents: [{ role: "user", parts: [{ text: "prompt" }] }],
+      generationConfig: { maxOutputTokens: 120 }
+    });
+  });
+
   it("fails closed when required provider keys are missing", async () => {
     await expect(callAiProvider({ config: { provider: "anthropic" } })).resolves.toMatchObject({
       ok: false,
@@ -93,6 +124,10 @@ describe("ai provider client", () => {
     await expect(callAiProvider({ config: { provider: "openai" } })).resolves.toMatchObject({
       ok: false,
       error: "openai_api_key_required"
+    });
+    await expect(callAiProvider({ config: { provider: "gemini" } })).resolves.toMatchObject({
+      ok: false,
+      error: "google_api_key_required"
     });
   });
 });

@@ -232,6 +232,55 @@ describe("AI assist handler", () => {
     }));
   });
 
+  it("can call the Gemini server provider without returning provider secrets", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-2.5-flash",
+      text: "צריך לציין מספר כלי ומצב כלי."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "gemini",
+        GOOGLE_GENERATIVE_AI_API_KEY: "google-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 124,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "באזור טעינה מלגזה תקועה",
+        language: "he",
+        source: "mobile"
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload).toMatchObject({
+      ok: true,
+      assistant: {
+        provider: "google",
+        model: "gemini-2.5-flash",
+        text: "צריך לציין מספר כלי ומצב כלי."
+      }
+    });
+    expect(JSON.stringify(payload)).not.toContain("google-secret");
+    expect(providerCall).toHaveBeenCalledWith(expect.objectContaining({
+      config: expect.objectContaining({
+        provider: "google",
+        googleApiKey: "google-secret"
+      }),
+      system: expect.stringContaining("read-only"),
+      maxTokens: 700
+    }));
+  });
+
   it("returns a safe provider error code when the OpenAI account has no quota", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: false,
@@ -362,6 +411,58 @@ describe("AI assist handler", () => {
           forkliftId: "fleet-120823",
           asset: "120823",
           zone: "טעינה"
+        })
+      })
+    ]);
+  });
+
+  it("prefills explicit downtime type after server role filtering", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר להכין קריאה קריטית לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 448,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "מלגזה 120823 מושבתת ואין תחליף באזור טעינה",
+        context: {
+          fleet: [
+            { id: "fleet-120823", code: "120823", type: "מלגזת היגש", department: "הפצה" },
+            { id: "fleet-hidden", code: "120823", type: "מלגזת היגש", department: "קבלה" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        missingFields: [],
+        payload: expect.objectContaining({
+          track: "transport",
+          forkliftId: "fleet-120823",
+          asset: "120823",
+          downtimeType: "critical",
+          priority: "high"
         })
       })
     ]);
