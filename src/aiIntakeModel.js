@@ -59,6 +59,8 @@ const KEYWORDS_BY_MODULE = Object.freeze(
   }, {})
 );
 
+const STRONG_TASK_WORDS = Object.freeze(["משימה", "פגישה", "תזכורת", "task", "meeting", "reminder"]);
+
 export function normalizeAiIntakeText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
@@ -66,6 +68,7 @@ export function normalizeAiIntakeText(value) {
 export function detectAiIntakeModule(text = "") {
   const normalized = normalizeAiIntakeText(text).toLowerCase();
   if (!normalized) return "unknown";
+  if (STRONG_TASK_WORDS.some((word) => normalized.includes(word.toLowerCase()))) return "task";
   const scores = Object.fromEntries(AI_INTAKE_MODULES.map((module) => [module, 0]));
   for (const [module, words] of Object.entries(KEYWORDS_BY_MODULE)) {
     for (const word of words) {

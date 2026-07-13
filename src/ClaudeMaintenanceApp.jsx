@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiTaskCreateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7898,6 +7898,13 @@ function AIPanelFallback({ onClose }) {
 }
 function LazyAIPanel(props) {
   const executeAction = async (action) => {
+    if (action?.type === "task.create") {
+      if (typeof props.saveTask !== "function") throw new Error("שמירת משימות אינה זמינה במסך זה.");
+      const task = prepareAiTaskCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
+      const ok = await props.saveTask(task);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, taskId: task.id, message: `המשימה נוצרה: ${task.title || task.id}` };
+    }
     if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
     if (action?.type === "ticket.comment") {
       const existing = (props.tickets || []).find((ticket) => ticket.id === action?.payload?.ticketId);

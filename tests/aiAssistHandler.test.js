@@ -302,6 +302,64 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("returns deterministic task.create proposals through the assist endpoint without writing", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר ליצור את המשימה לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 446,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "משימה לבדוק הצעת מחיר למלגזה"
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      draft: {
+        module: "task",
+        action: "draft_task",
+        allowedToWrite: false,
+        writePolicy: "human_confirmation_required"
+      },
+      actions: [
+        expect.objectContaining({
+          id: "create_task",
+          type: "task.create",
+          requiresConfirmation: true,
+          writesData: false,
+          execute: {
+            method: "POST",
+            path: "/api/work",
+            resource: "tasks",
+            bodyField: "task"
+          },
+          payload: expect.objectContaining({
+            title: "משימה לבדוק הצעת מחיר למלגזה",
+            status: "todo",
+            ownerId: "u1",
+            responsibleIds: ["u1"]
+          })
+        })
+      ]
+    });
+  });
+
   it("passes only role-filtered assistant context to the provider prompt", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

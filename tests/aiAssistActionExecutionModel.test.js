@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiTaskCreateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -64,6 +64,27 @@ const commentAction = {
   execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
 };
 
+const taskCreateAction = {
+  id: "create_task",
+  type: "task.create",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    title: "בדיקת הצעת מחיר",
+    desc: "בדיקת הצעת מחיר למלגזה",
+    status: "todo",
+    priority: "medium",
+    ownerId: "u1",
+    responsibleIds: ["u1"],
+    sourceModule: "ai_assist",
+    createdAt: 1000,
+    updatedAt: 1000,
+    log: [{ at: 1000, by: "AI", byRole: "system", text: "draft", kind: "ai_draft" }],
+    ai: { drafted: true, source: "ai_assist" }
+  },
+  execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
+};
+
 const existingTicket = {
   id: "ticket-1",
   subject: "דליפת מים",
@@ -80,6 +101,7 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction(readyAction)).toBe(true);
     expect(canExecuteAiAssistAction(updateAction)).toBe(true);
     expect(canExecuteAiAssistAction(commentAction)).toBe(true);
+    expect(canExecuteAiAssistAction(taskCreateAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, execute: { method: "POST", path: "/api/kv" } })).toBe(false);
@@ -87,6 +109,8 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction({ ...readyAction, type: "ticket.delete" })).toBe(false);
     expect(canExecuteAiAssistAction({ ...updateAction, payload: { ticketId: "ticket-1" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...commentAction, payload: { ticketId: "ticket-1", note: "" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...taskCreateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "task" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...taskCreateAction, payload: { desc: "missing title" } })).toBe(false);
   });
 
   it("prepares a confirmed AI ticket for the existing saveTicket path", () => {
@@ -115,6 +139,42 @@ describe("AI assist action execution model", () => {
         byRole: "admin",
         text: "משתמש אישר יצירת קריאה שהוכנה על ידי AI",
         kind: "ai_confirmed"
+      }
+    ]);
+  });
+
+  it("prepares a confirmed AI task for the existing saveTask path", () => {
+    const task = prepareAiTaskCreateForSave(taskCreateAction, { id: "u1", name: "Vadim", role: "admin" }, {
+      now: 2000,
+      makeId: () => "ai-task-1"
+    });
+
+    expect(task).toMatchObject({
+      id: "ai-task-1",
+      title: "בדיקת הצעת מחיר",
+      desc: "בדיקת הצעת מחיר למלגזה",
+      status: "todo",
+      priority: "medium",
+      sourceModule: "ai_assist",
+      ownerId: "u1",
+      responsibleIds: ["u1"],
+      updatedAt: 2000,
+      ai: {
+        drafted: true,
+        source: "ai_assist",
+        confirmedByHuman: true,
+        confirmedAt: 2000,
+        actionId: "create_task"
+      }
+    });
+    expect(task.log).toEqual([
+      { at: 1000, by: "AI", byRole: "system", text: "draft", kind: "ai_draft" },
+      {
+        at: 2000,
+        by: "Vadim",
+        byRole: "admin",
+        text: "משתמש אישר יצירת משימה שהוכנה על ידי AI",
+        kind: "ai_confirmed_task"
       }
     ]);
   });

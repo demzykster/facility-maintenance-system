@@ -36,4 +36,13 @@ describe("management tasks and meetings lazy wiring", () => {
     expect(aiPanelSource).toContain("tasks = [], meetings = []");
     expect(aiPanelSource).toContain("buildContext(session, vis, pm, fleet, config, tasks, meetings)");
   });
+
+  it("wires confirmed AI task creation through the normal saveTask path", () => {
+    expect(appSource).toContain("prepareAiTaskCreateForSave");
+    expect(appSource).toContain('if (action?.type === "task.create")');
+    expect(appSource).toContain('typeof props.saveTask !== "function"');
+    expect(appSource).toContain("const task = prepareAiTaskCreateForSave(action, props.session");
+    expect(appSource).toContain("await props.saveTask(task)");
+    expect(appSource).toContain("executeAction={executeAction}");
+  });
 });

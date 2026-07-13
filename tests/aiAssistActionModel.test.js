@@ -77,6 +77,56 @@ describe("AI assist action model", () => {
     expect(buildAiAssistActionProposals({ draft, user: actor, now: 2000 })).toEqual([]);
   });
 
+  it("turns a clear task draft into a human-confirmed task proposal without writing", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "משימה לבדוק הצעת מחיר למלגזה",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({ draft, user: actor, now: 2000 });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_task",
+        type: "task.create",
+        label: "יצירת משימה",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        writePolicy: "human_confirmation_required",
+        missingFields: [],
+        execute: {
+          method: "POST",
+          path: "/api/work",
+          resource: "tasks",
+          bodyField: "task"
+        },
+        payload: expect.objectContaining({
+          title: "משימה לבדוק הצעת מחיר למלגזה",
+          desc: "משימה לבדוק הצעת מחיר למלגזה",
+          status: "todo",
+          priority: "medium",
+          sourceModule: "ai_assist",
+          ownerId: "u1",
+          responsibleIds: ["u1"],
+          createdAt: 2000,
+          updatedAt: 2000,
+          createdBy: expect.objectContaining({
+            id: "u1",
+            name: "Vadim",
+            role: "admin"
+          }),
+          ai: expect.objectContaining({
+            drafted: true,
+            source: "ai_assist"
+          })
+        })
+      })
+    ]);
+  });
+
   it("proposes a constrained ticket.update only when a single visible ticket target is clear", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעדכן את הקריאה לעדיפות גבוהה",

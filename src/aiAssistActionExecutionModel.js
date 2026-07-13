@@ -31,13 +31,23 @@ function hasTicketsApiExecuteContract(action = {}) {
   return action.execute?.method === "POST" && action.execute?.path === "/api/tickets";
 }
 
+function hasTasksApiExecuteContract(action = {}) {
+  return action.execute?.method === "POST"
+    && action.execute?.path === "/api/work"
+    && action.execute?.resource === "tasks"
+    && action.execute?.bodyField === "task";
+}
+
 export function canExecuteAiAssistAction(action = {}) {
   if (!action || typeof action !== "object") return false;
   if (action.requiresConfirmation !== true) return false;
-  if (!hasTicketsApiExecuteContract(action)) return false;
   if (hasMissingFields(action)) return false;
   if (!action.payload || typeof action.payload !== "object" || Array.isArray(action.payload)) return false;
   const payload = cleanObject(action.payload);
+  if (action.type === "task.create") {
+    return hasTasksApiExecuteContract(action) && !!cleanText(payload.title, 200);
+  }
+  if (!hasTicketsApiExecuteContract(action)) return false;
   if (action.type === "ticket.create") return true;
   if (action.type === "ticket.update") {
     return !!cleanText(payload.ticketId, 160)
@@ -49,6 +59,53 @@ export function canExecuteAiAssistAction(action = {}) {
     return !!cleanText(payload.ticketId, 160) && !!cleanText(payload.note, 1000);
   }
   return false;
+}
+
+export function prepareAiTaskCreateForSave(action = {}, actor = {}, options = {}) {
+  if (!canExecuteAiAssistAction(action) || action.type !== "task.create") throw new Error("ai_action_not_executable");
+  const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+  const makeId = typeof options.makeId === "function" ? options.makeId : () => `ai-task-${now.toString(36)}`;
+  const payload = cleanObject(action.payload);
+  const actorId = cleanText(actor.id || actor.authUserId || actor.workerNo, 120);
+  const actorName = cleanText(actor.name, 120) || "AI";
+  const actorRole = cleanText(actor.role, 40);
+  const id = cleanText(payload.id || makeId(), 160);
+  if (!id) throw new Error("ai_action_task_id_required");
+  const responsibleIds = Array.isArray(payload.responsibleIds)
+    ? payload.responsibleIds.map((value) => cleanText(value, 160)).filter(Boolean)
+    : [];
+  return {
+    ...payload,
+    id,
+    title: cleanText(payload.title, 200),
+    desc: cleanText(payload.desc, 1600),
+    status: cleanText(payload.status, 40) || "todo",
+    priority: cleanText(payload.priority, 40) || "medium",
+    sourceModule: cleanText(payload.sourceModule, 80) || "ai_assist",
+    ownerId: cleanText(payload.ownerId, 160) || actorId,
+    responsibleIds: responsibleIds.length ? responsibleIds : (actorId ? [actorId] : []),
+    participantIds: Array.isArray(payload.participantIds) ? payload.participantIds.map((value) => cleanText(value, 160)).filter(Boolean) : [],
+    createdAt: Number.isFinite(Number(payload.createdAt)) ? Number(payload.createdAt) : now,
+    updatedAt: now,
+    ai: {
+      ...cleanObject(payload.ai),
+      drafted: true,
+      source: "ai_assist",
+      confirmedByHuman: true,
+      confirmedAt: now,
+      actionId: cleanText(action.id, 120)
+    },
+    log: [
+      ...(Array.isArray(payload.log) ? payload.log : []),
+      {
+        at: now,
+        by: actorName,
+        byRole: actorRole,
+        text: "משתמש אישר יצירת משימה שהוכנה על ידי AI",
+        kind: "ai_confirmed_task"
+      }
+    ]
+  };
 }
 
 export function prepareAiTicketCreateForSave(action = {}, actor = {}, options = {}) {

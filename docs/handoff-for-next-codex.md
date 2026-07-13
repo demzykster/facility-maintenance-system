@@ -58,12 +58,18 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add human-confirmed AI task creation` (current local slice)
+  - `src/aiIntakeModel.js` now treats strong task words such as `משימה`, `פגישה`, `תזכורת`, `task`, `meeting`, and `reminder` as task intent even when the task mentions an object like a forklift.
+  - `src/aiAssistActionModel.js` can now return a deterministic `task.create` proposal from `draft_task` intake. The action is `writesData: false`, requires human confirmation, and targets the existing `/api/work` contract with `resource: "tasks"` / `bodyField: "task"`.
+  - `src/aiAssistActionExecutionModel.js` allows `task.create` only through that work API contract and prepares the confirmed record for the existing `saveTask` path, adding `ai.confirmedByHuman` metadata and an `ai_confirmed_task` log entry.
+  - `src/AIPanel.jsx` renders task action cards separately from ticket action cards, and `LazyAIPanel` executes confirmed `task.create` actions via `saveTask`, not via a parallel AI write path.
+  - This does not add task update/delete or meeting writes yet. Those should be added as separate deterministic slices with confirmation, allow-lists, and tests.
 - `Add task and meeting records to AI context`
   - `src/AIPanel.jsx` now passes tasks and meetings into the shared `buildAIContextSnapshot()` call instead of sending only tickets/fleet/PM/config.
   - `src/aiAssistSnapshotModel.js` now includes compact task and meeting records for AI: open tasks, overdue/waiting counts, due days, responsible ids, waiting reason, linked meeting id, planned meetings, needs-summary meetings, and open task counts per meeting.
   - `src/aiAssistContextModel.js` role-filters and sanitizes those task/meeting records before `/api/ai/assist` sends context to a provider. Leadership can see company scope; managers get only their department/assigned/participating work.
   - `src/auditEventModel.js` counts task/meeting context in `ai_assist` metadata without storing raw task or meeting titles.
-  - This is read-only AI context work. It does not add AI task/meeting create/update execution yet; future task/meeting write actions must use normal validated work APIs, human confirmation, and audit.
+  - This introduced read-only AI context. The follow-up `task.create` slice above is the first task write action and still uses normal validated work APIs, human confirmation, and audit-friendly metadata.
 - `Stabilize first login and task AI entry`
   - First-password completion through `POST /api/session/initial-password` now returns a full normalized `app_users` profile from `createSupabaseInitialPasswordClient.completePasswordUser()` instead of only `authUserId/appUserId`.
   - The returned first-login session now carries the same important fields as ordinary production login/session restore: id, auth user id, name, role, email, department/departments, and permissions.

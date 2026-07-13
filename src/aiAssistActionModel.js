@@ -281,6 +281,56 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   return payload;
 }
 
+export function buildAiTaskCreatePayload({ draft = {}, user = {}, now = Date.now() } = {}) {
+  const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const actorId = cleanText(user.id || user.authUserId || user.workerNo, 120);
+  const actorName = cleanText(user.name, 120);
+  const actorRole = cleanText(user.role, 40);
+  const title = subjectFromDraft(draft);
+  const desc = cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
+  return {
+    title,
+    desc,
+    status: "todo",
+    priority: priorityFromSeverity(draft.severity),
+    sourceModule: "ai_assist",
+    ownerId: actorId,
+    responsibleIds: actorId ? [actorId] : [],
+    participantIds: [],
+    dueAt: null,
+    createdAt,
+    updatedAt: createdAt,
+    createdBy: {
+      id: actorId,
+      name: actorName,
+      role: actorRole,
+      dept: cleanText(user.dept || user.department, 120),
+      phone: cleanText(user.phone, 80),
+      email: cleanText(user.email, 160)
+    },
+    log: [{
+      at: createdAt,
+      by: actorName,
+      byRole: actorRole,
+      text: "טיוטת משימה הוכנה על ידי AI וממתינה לאישור משתמש",
+      kind: "ai_draft"
+    }],
+    ai: {
+      drafted: true,
+      source: "ai_assist",
+      draftVersion: Number(draft.version || 1)
+    }
+  };
+}
+
+function missingFieldsForTaskPayload(payload = {}) {
+  const missing = [];
+  if (!payload.title) missing.push("title");
+  if (!payload.desc) missing.push("desc");
+  if (!cleanArray(payload.responsibleIds).length) missing.push("responsibleIds");
+  return [...new Set(missing)];
+}
+
 export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date.now(), context = {} } = {}) {
   const safeDraft = cleanObject(draft);
   const requestedComment = requestedCommentFromText(safeDraft.rawText);
@@ -292,6 +342,33 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   if (updateProposal) return [updateProposal];
   if (hasWaitingStatusIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
+  if (safeDraft.action === "draft_task") {
+    const payload = buildAiTaskCreatePayload({ draft: safeDraft, user, now });
+    const missingFields = missingFieldsForTaskPayload(payload);
+    return [{
+      id: "create_task",
+      type: "task.create",
+      label: "יצירת משימה",
+      status: missingFields.length ? "needs_human_input" : "ready_for_confirmation",
+      requiresConfirmation: true,
+      writesData: false,
+      writePolicy: "human_confirmation_required",
+      missingFields,
+      payload,
+      execute: {
+        method: "POST",
+        path: "/api/work",
+        resource: "tasks",
+        bodyField: "task"
+      },
+      safety: {
+        deterministic: true,
+        providerTextTrusted: false,
+        serverMustRevalidate: true,
+        auditRequired: true
+      }
+    }];
+  }
   if (safeDraft.action !== "draft_ticket") return [];
   const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now });
   const missingFields = missingFieldsForTicketPayload(payload, safeDraft);
