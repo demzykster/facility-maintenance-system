@@ -5,6 +5,7 @@ import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatal
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
+import { UnitPicker } from "./UnitPicker.jsx";
 
 let AlertTriangle;
 let BarChart3;
@@ -106,6 +107,10 @@ function applyFleetAssetsUi(ui = {}) {
   ({
     AlertTriangle, BarChart3, CalendarClock, Check, CheckCircle2, ChevronLeft, ClipboardList, Cog, ConfirmBtn, DateInput, Download, DriversBoard, Empty, ExternalLink, FileSpreadsheet, FileText, ListChecks, Meta, Overlay, PenLine, Plus, Printer, RefreshCw, ReportView, Search, SectionTitle, ShieldAlert, Sparkles, Trash2, Truck, Users, Wrench, X, DOC_DEFS, FORKLIFT_TYPES, FREQS, HE_DOW, HE_MONTHS, PRIORITIES, SAVE_FAILED_MESSAGE, SEED_POLICY, TRACKS, WEAR, XLSX, assetHealth, buildBlockTicket, buildVehicleTypes, canManageSettings, clearBlockPatches, compactDocLabel, countLabel, dateToTs, daysLeft, docDaysLabel, docStatus, docWarnColor, downloadXlsx, downtimeMs, esc, fleetDepts, fleetInDept, flattenVehicleTypes, fmtDate, fmtDur, freqOf, ils, isOpen, loadReadExcelFile, machineDocs, mergeFleetCatalogAdditions, modelTypeName, nextWorkdayFrom, notifyUser, pendingDriverReqs, reasonBall, reasonPauses, reasonsForRole, resolveHydraulics, rowsSafe, slaForTicket, stOf, startOfDay, techCanSeeFleetForSession, ticketNo, ticketWaitReasonLabel, toWorkday, tsToDate, uid, unitBlock, unitDesc, unitLabel, unitModelCode, unitNote, unitTypeName, waitReasonLabel
   } = ui);
+}
+
+function unitPickerUi() {
+  return { ChevronLeft, Search, fleetDepts, unitDesc, unitModelCode, unitTypeName };
 }
 
 export function FleetAssetsModule({ mode = "fleet", assetNav, ui = {}, ...props }) {
@@ -1095,19 +1100,6 @@ function PMCalendar({ items, fleet, onOpen, overdue, config }) {
     {overdue.length > 0 && <><SectionTitle><AlertTriangle size={15} /> באיחור</SectionTitle><div className="cards">{overdue.map((x) => { const f = pmFleet(x, fleet); const d = daysLeft(x.nextDue); return <div key={x.id} className="pm-card" onClick={() => onOpen(x)}><span className="pm-bar" style={{ background: "#DC2626" }} /><div className="pm-body"><div className="tcard-row1"><span className="tcard-subj">{f ? `${unitLabel(f, config)}` : "כלי"}</span></div><div className="tcard-sub"><CalendarClock size={12} /> {fmtDate(x.nextDue)} · באיחור {-d} ימים{fleetDepts(f).length ? <> · {fleetDepts(f).join(", ")}</> : null}</div></div></div>; })}</div></>}
   </div>);
 }
-function UnitPicker({ fleet, config, value, onChange, filter, placeholder = "— בחרו כלי —" }) {
-  const [open, setOpen] = useState(false), [uq, setUq] = useState("");
-  const pool = (fleet || []).filter((f) => !filter || filter(f));
-  const groups = useMemo(() => { const m = new Map(); pool.filter((f) => { const hay = `${f.code} ${unitTypeName(f, config)} ${unitModelCode(f) || ""} ${fleetDepts(f).join(" ")}`.toLowerCase(); return !uq.trim() || hay.includes(uq.toLowerCase()); }).forEach((f) => { const t = unitTypeName(f, config) || "אחר"; if (!m.has(t)) m.set(t, []); m.get(t).push(f); }); return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "he")); }, [pool, config, uq]);
-  const sel = (fleet || []).find((f) => f.id === value);
-  return (<>
-    <button type="button" className="unit-pick-btn" onClick={() => setOpen((o) => !o)}>{sel ? <span>{sel.code} · {unitDesc(sel, config)}</span> : <span className="muted-txt">{placeholder}</span>}<ChevronLeft size={16} style={{ transform: open ? "rotate(90deg)" : "rotate(-90deg)", flexShrink: 0 }} /></button>
-    {open && <div className="unit-pick">
-      <div className="search-wrap sm" style={{ margin: 6 }}><Search size={16} /><input autoFocus aria-label="חיפוש כלי לבחירה לפי מספר או סוג" placeholder="חיפוש לפי מספר / סוג…" value={uq} onChange={(e) => setUq(e.target.value)} /></div>
-      <div className="unit-pick-list">{groups.length === 0 ? <div className="note" style={{ padding: 10 }}>לא נמצאו כלים</div> : groups.map(([t, units]) => <div key={t}><div className="unit-pick-grp">{t} <span className="upg-count">{units.length}</span></div>{units.map((f) => <button key={f.id} type="button" className={"unit-pick-row" + (f.id === value ? " on" : "")} onClick={() => { onChange(f.id); setOpen(false); setUq(""); }}><b>{f.code}</b><span className="upr-desc">{unitDesc(f, config)}{fleetDepts(f).length ? ` · ${fleetDepts(f).join(", ")}` : ""}</span></button>)}</div>)}</div>
-    </div>}
-  </>);
-}
 function PMRuleBulkScheduleForm({ pm, fleet, config, onCancel, onSave }) {
   const MAX_PM_PLAN_WINDOW_DAYS = 370;
   const [date, setDate] = useState(tsToDate(toWorkday(Date.now())));
@@ -1252,7 +1244,7 @@ function PMForm({ task, fleet, config, onCancel, onSave }) {
     <div className="body">
       <div className="note">בחרו כלי, רגולציית טיפול ומועד ראשון. המועדים הבאים יחושבו לפי חודשים מתוך הגדרות כלי השינוע.</div>
       <div className="field" style={{ marginTop: 12 }}><span>כלי *</span>
-        <UnitPicker fleet={fleet} config={config} value={forkliftId} onChange={(id) => { setFork(id); setErr(""); }} />
+        <UnitPicker fleet={fleet} config={config} value={forkliftId} onChange={(id) => { setFork(id); setErr(""); }} ui={unitPickerUi()} />
       </div>
       {selFleet && applicableRules.length > 0 && <label className="field"><span>רגולציית טיפול *</span><select value={ruleId} onChange={(e) => setRuleId(e.target.value)}>{applicableRules.map((rule) => <option key={rule.id} value={rule.id}>{rule.name} · כל {rule.intervalMonths} חודשים</option>)}</select></label>}
       <label className="field"><span>מועד הטיפול הבא *</span><DateInput value={date} onChange={setDate} /><div className="hint">ימי עבודה: ראשון–חמישי. תאריך שיחול בשישי/שבת יוזז ליום העבודה הקרוב.</div></label>

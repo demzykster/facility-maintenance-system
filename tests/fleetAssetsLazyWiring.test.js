@@ -23,4 +23,17 @@ describe("fleet assets lazy wiring", () => {
     expect(fleetAssetsSource).toContain("function PMEntry(");
     expect(fleetAssetsSource).toContain("fleetAiPrompt");
   });
+
+  it("keeps the shared unit picker available to both the shell ticket forms and the lazy fleet module", () => {
+    expect(appSource).toContain('import { UnitPicker } from "./UnitPicker.jsx";');
+    expect(appSource).toContain("function unitPickerUi()");
+    expect((appSource.match(/<UnitPicker\b/g) || []).length).toBe(2);
+    expect((appSource.match(/ui=\{unitPickerUi\(\)\}/g) || []).length).toBe(2);
+    expect(appSource).not.toContain("function UnitPicker(");
+
+    expect(fleetAssetsSource).toContain('import { UnitPicker } from "./UnitPicker.jsx";');
+    expect(fleetAssetsSource).toContain("function unitPickerUi()");
+    expect(fleetAssetsSource).toContain("ui={unitPickerUi()}");
+    expect(fleetAssetsSource).not.toContain("function UnitPicker(");
+  });
 });

@@ -3,6 +3,51 @@ import { Send, Sparkles, X } from "lucide-react";
 import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
 import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "./aiAssistQuickPromptModel.js";
 
+const cleanText = (value, fallback = "") => String(value || fallback || "").trim();
+const MISSING_LABELS = Object.freeze({
+  track: "סוג קריאה",
+  subject: "נושא",
+  description: "תיאור",
+  zone: "אזור",
+  forkliftId: "כלי שינוע",
+  downtimeType: "מצב הכלי",
+  module: "תחום"
+});
+
+export function normalizeAiPanelAssistantOutput(output) {
+  if (typeof output === "string") return { text: output, actions: [] };
+  const text = cleanText(output?.text || output?.assistant?.text || output?.draft?.userReply, "לא התקבלה תשובה.");
+  const actions = Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : [];
+  return { text, actions };
+}
+
+function actionStatusLabel(action = {}) {
+  if (action.status === "ready_for_confirmation") return "מוכן לאישור";
+  if (action.status === "needs_human_input") return "חסרים פרטים";
+  return "טיוטה";
+}
+
+function missingLabel(field) {
+  return MISSING_LABELS[field] || field;
+}
+
+function AiActionCard({ action }) {
+  const payload = action?.payload || {};
+  const missing = Array.isArray(action?.missingFields) ? action.missingFields : [];
+  if (action?.type !== "ticket.create") return null;
+  return <div className="ai-action-card">
+    <div className="ai-action-top">
+      <span>{action.label || "פתיחת קריאה"}</span>
+      <span className={"ai-action-state " + (missing.length ? "wait" : "ready")}>{actionStatusLabel(action)}</span>
+    </div>
+    <div className="ai-action-title">{payload.subject || "קריאה חדשה"}</div>
+    <div className="ai-action-meta">{payload.track === "transport" ? "כלי שינוע" : "מבנה"}{payload.zone ? ` · ${payload.zone}` : ""}{payload.priority ? ` · ${payload.priority}` : ""}</div>
+    {missing.length > 0
+      ? <div className="ai-action-missing">להשלמה לפני אישור: {missing.map(missingLabel).join(" · ")}</div>
+      : <div className="ai-action-ready">הפעולה תישלח לאישור לפני יצירת הקריאה.</div>}
+  </div>;
+}
+
 export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
   const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config), [session, vis, pm, fleet, config, buildContext]);
@@ -40,7 +85,8 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
       const out = callAssistant
         ? await callAssistant({ text: q, messages: apiMsgs, system: sys, context, workflow })
         : await callModel(apiMsgs, sys, 900);
-      setMsgs((s) => [...s, { role: "assistant", content: out || "לא התקבלה תשובה." }]);
+      const normalized = normalizeAiPanelAssistantOutput(out);
+      setMsgs((s) => [...s, { role: "assistant", content: normalized.text, actions: normalized.actions }]);
     } catch {
       setMsgs((s) => [...s, { role: "assistant", content: "לא הצלחתי להתחבר לשירות ה-AI כרגע." }]);
     } finally {
@@ -55,7 +101,10 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
         <button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
       </div>
       <div className="ai-msgs">
-        {msgs.map((m, i) => <div key={i} className={"ai-msg " + m.role}>{m.content}</div>)}
+        {msgs.map((m, i) => <div key={i} className={"ai-msg-wrap " + m.role}>
+          <div className={"ai-msg " + m.role}>{m.content}</div>
+          {m.role === "assistant" && Array.isArray(m.actions) && m.actions.length > 0 && <div className="ai-actions">{m.actions.map((action) => <AiActionCard key={action.id || action.type} action={action} />)}</div>}
+        </div>)}
         {busy && <div className="ai-msg assistant"><span className="spinner sm dark" /> חושב…</div>}
         <div ref={endRef} />
       </div>

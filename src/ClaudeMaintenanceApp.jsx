@@ -9,6 +9,7 @@ import {
   FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon,
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
 import { AISettingsCard } from "./AISettingsCard.jsx";
+import { UnitPicker } from "./UnitPicker.jsx";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
 import { analyzeBackupPayload, BACKUP_APP_ID, BACKUP_COLLECTIONS, buildBackupPayload, shouldExportLegacyTicketPhoto } from "./backupModel.js";
@@ -1428,7 +1429,10 @@ async function callAIAssistant({ text, messages, system, context, workflow }) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `ai-assist-${res.status}`);
-  return data?.assistant?.text || "";
+  return {
+    text: data?.assistant?.text || data?.draft?.userReply || "",
+    actions: Array.isArray(data?.actions) ? data.actions : []
+  };
 }
 
 /* ---------- notifications ---------- */
@@ -3772,7 +3776,7 @@ function WorkerApp(p) {
           <button className={"wk-track" + (track === "transport" ? " on" : "")} onClick={() => setTrack("transport")}><Truck size={22} /><span>{t("worker.transport")}</span></button>
         </div></div>
         {track === "transport" && (myFleet.length > 0
-          ? <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={myFleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} /></div>
+          ? <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={myFleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} ui={unitPickerUi()} /></div>
           : <div className="note">אין כלי שינוע המשויכים למחלקה שלך. ניתן לדווח על מבנה, או לפנות למנהל המחלקה.</div>)}
         {track && <>
           <label className="field"><span>{t("worker.subject")}</span><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="לדוגמה: דליפת מים ליד המחסן" /></label>
@@ -5815,6 +5819,10 @@ function fleetAssetsUi() {
   };
 }
 
+function unitPickerUi() {
+  return { ChevronLeft, Search, fleetDepts, unitDesc, unitModelCode, unitTypeName };
+}
+
 function manageHubUi() {
   return {
     CalendarClock,
@@ -7528,7 +7536,7 @@ function TicketForm(p) {
     <div className="body">
       <label className="field"><span>נושא *</span><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={track === "transport" ? "לדוגמה: רעש חריג בהרמה" : "לדוגמה: תאורה לא עובדת ברציף 3"} /></label>
       {track === "transport" ? (<>
-        <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={ticketFleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} /></div>
+        <div className="field"><span>כלי שינוע *</span><UnitPicker fleet={ticketFleet} config={config} value={forkliftId} onChange={(id) => setForkliftId(id)} ui={unitPickerUi()} /></div>
         {forkliftId && (<>
         <div className="field"><span>משמרת האירוע</span><select value={incShift} onChange={(e) => setIncShift(e.target.value)}><option value="">— בחר —</option>{workShiftsOf(config).map((sh) => <option key={sh.id} value={sh.id}>{sh.label}</option>)}</select></div>
         <UserPicker users={users} config={config} saveUser={saveUser} session={session} canManageUsers={canManageUsers(session)} value={driverInvId} onChange={(u) => { setDriverInvId(u ? u.id : ""); setDriverInv(u ? u.name : ""); }} label="נהג מעורב (לדו״ח נזקים)" lockRole="worker" suggestName={(() => { const fk = ticketFleet.find((f) => f.id === forkliftId); return (incShift && fk && fk.drivers && fk.drivers[incShift] && fk.drivers[incShift].name) || ""; })()} hint="חפשו לפי שם או מספר. לא קיים? אפשר ליצור כאן." />
@@ -9217,9 +9225,22 @@ body *{visibility:hidden!important;}
 .ai-title{font-family:var(--font-head);font-weight:700;font-size:16px;display:flex;align-items:center;gap:9px;}
 .ai-orb{width:30px;height:30px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;}
 .ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.ai-msg-wrap{display:flex;flex-direction:column;gap:8px;max-width:88%;}
+.ai-msg-wrap.assistant{align-self:flex-start;align-items:flex-start;}
+.ai-msg-wrap.user{align-self:flex-end;align-items:flex-end;}
 .ai-msg{max-width:84%;padding:11px 14px;border-radius:15px;font-size:14px;line-height:1.55;white-space:pre-wrap;}
+.ai-msg-wrap .ai-msg{max-width:100%;}
 .ai-msg.assistant{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-right-radius:5px;}
 .ai-msg.user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-left-radius:5px;}
+.ai-actions{display:flex;flex-direction:column;gap:8px;width:min(360px,100%);}
+.ai-action-card{background:var(--surface);border:1.5px solid var(--line);border-inline-start:3px solid var(--primary);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow-sm);font-size:13px;line-height:1.45;color:var(--ink);}
+.ai-action-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:700;margin-bottom:5px;}
+.ai-action-state{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 8px;background:rgba(31,78,140,.1);color:var(--primary);}
+.ai-action-state.wait{background:rgba(180,83,9,.12);color:#92400E;}
+.ai-action-title{font-weight:700;color:var(--ink);margin-bottom:2px;}
+.ai-action-meta,.ai-action-missing,.ai-action-ready{color:var(--muted);font-size:12.5px;}
+.ai-action-missing{margin-top:7px;color:#92400E;}
+.ai-action-ready{margin-top:7px;color:var(--primary);}
 .ai-quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 10px;}
 .ai-quick button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;font-size:12.5px;color:var(--muted);font-weight:500;}
 .ai-input{display:flex;gap:8px;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);}

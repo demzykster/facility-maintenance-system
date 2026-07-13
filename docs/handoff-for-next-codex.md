@@ -6,8 +6,8 @@ Updated: 2026-07-13
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
-- Current local state at handoff time: `main...origin/main`, clean after push after committing the ticket-detail render smoke.
-- Latest app/UI commit before this handoff: `Add AI ticket action proposals` after the ticket-detail bridge/render-smoke stabilization.
+- Current local state at handoff time: `main...origin/main`, clean after the latest push.
+- Latest app/UI commit before this handoff: the ticket-form `UnitPicker` stabilization plus AI action-card UI, after `Add AI ticket action proposals`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,13 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Fix transport ticket forms and AI action cards`
+  - Fixed the white-screen regression when opening a new transport ticket from `פתיחת קריאה`.
+  - Root cause: after the fleet/PM lazy split, `TicketForm` and the worker report form still rendered `UnitPicker`, but the component only existed inside `src/FleetAssetsModule.jsx`. Facility/building ticket creation still worked; transport creation crashed with `UnitPicker is not defined`.
+  - Added shared `src/UnitPicker.jsx`, wired it into the app shell and the lazy fleet module, and removed the duplicate local picker from `src/FleetAssetsModule.jsx`.
+  - `tests/fleetAssetsLazyWiring.test.js` now checks that the shell ticket forms and the lazy fleet module both use the shared picker and that the picker does not drift back into the lazy module only.
+  - `src/AIPanel.jsx` now renders structured assistant action proposals as small action cards while preserving old string responses.
+  - Local verification: targeted tests passed, full Vitest passed, lint passed, build passed, release-check passed, and a targeted Playwright preview smoke opened both `קריאה · מבנה` and `קריאה · שינוע` without page errors.
 - `Add AI ticket action proposals`
   - Adds `src/aiAssistActionModel.js`, the first safe write-action foundation for the assistant.
   - `/api/ai/assist` can now return deterministic `actions` next to the draft/assistant text. The current implemented proposal is `ticket.create`.
