@@ -14,6 +14,9 @@ describe("AI assist context model", () => {
       tickets: [
         { id: "t1", subject: "A", department: "הפצה", cost: 700 },
         { id: "t2", subject: "B", department: "קבלה", cost: 200 }
+      ],
+      suppliers: [
+        { name: "Toyota", type: "transport", scopes: ["transport"], fleetCount: 2, openTicketCount: 1 }
       ]
     }, { role: "executive", department: "הנהלה" });
 
@@ -21,6 +24,9 @@ describe("AI assist context model", () => {
     expect(context.bi.heatmap.map((row) => row.department)).toEqual(["הפצה", "קבלה"]);
     expect(context.tickets.map((ticket) => ticket.id)).toEqual(["t1", "t2"]);
     expect(context.tickets.map((ticket) => ticket.cost)).toEqual([700, 200]);
+    expect(context.suppliers).toEqual([
+      { name: "Toyota", type: "transport", scopes: ["transport"], fleetCount: 2, openTicketCount: 1 }
+    ]);
   });
 
   it("filters manager context to their departments and removes financial fields", () => {
@@ -39,6 +45,9 @@ describe("AI assist context model", () => {
       fleet: [
         { id: "f1", code: "A", department: "הפצה" },
         { id: "f2", code: "B", department: "קבלה" }
+      ],
+      suppliers: [
+        { name: "Toyota", type: "transport", scopes: ["transport"], fleetCount: 2, openTicketCount: 1 }
       ]
     }, { role: "user", departments: ["הפצה"] });
 
@@ -55,6 +64,25 @@ describe("AI assist context model", () => {
     expect(context.tickets[0]).toMatchObject({ id: "own-dept", department: "הפצה" });
     expect(context.tickets[0]).not.toHaveProperty("cost");
     expect(context.fleet.map((unit) => unit.id)).toEqual(["f1"]);
+    expect(context.suppliers).toEqual([]);
+  });
+
+  it("passes compact supplier context only to users with supplier visibility", () => {
+    const raw = {
+      suppliers: [
+        { name: "Toyota", type: "transport", scopes: ["transport"], fleetCount: 2, openTicketCount: 1, contacts: [{ phone: "secret" }] },
+        { name: "BuildingCo", type: "facility", scopes: ["facility:hvac"], fleetCount: 0, openTicketCount: 3 }
+      ]
+    };
+
+    const context = buildAiAssistContext(raw, { role: "user", departments: ["הפצה"], perms: { suppliers: "view" } });
+
+    expect(context.profile.canSeeSuppliers).toBe(true);
+    expect(context.suppliers).toEqual([
+      { name: "Toyota", type: "transport", scopes: ["transport"], fleetCount: 2, openTicketCount: 1 },
+      { name: "BuildingCo", type: "facility", scopes: ["facility:hvac"], fleetCount: 0, openTicketCount: 3 }
+    ]);
+    expect(JSON.stringify(context.suppliers)).not.toContain("secret");
   });
 
   it("limits worker context to records reported by the same worker", () => {

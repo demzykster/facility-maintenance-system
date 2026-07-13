@@ -19,6 +19,15 @@ const defaultDaysLeft = (timestamp, now) => Math.ceil((timestamp - now) / dayMs)
 const defaultPmFleet = (task = {}, fleet = []) => fleet.find((unit) => unit.id === task.forkliftId || unit.id === task.equipmentId);
 const defaultDocStatus = () => ({ d: null, label: "" });
 
+function supplierTypeFromMeta(meta = {}) {
+  if (meta.type) return String(meta.type);
+  const industries = Array.isArray(meta.industries) ? meta.industries : [];
+  if (industries.includes("transport")) return "transport";
+  if (industries.includes("clothing")) return "goods";
+  if (industries.some((item) => String(item || "").startsWith("facility:"))) return "facility";
+  return "";
+}
+
 export function buildAIContextSnapshot({
   session = {},
   tickets = [],
@@ -41,6 +50,7 @@ export function buildAIContextSnapshot({
   maxTickets = 60,
   maxFleet = 30,
   maxPm = 24,
+  maxSuppliers = 18,
   maxHeatmapRows = 6
 } = {}) {
   const ticketList = asArray(tickets);
@@ -97,6 +107,21 @@ export function buildAIContextSnapshot({
       };
     });
 
+  const suppliers = asArray(config.suppliers)
+    .filter(Boolean)
+    .slice(0, maxSuppliers)
+    .map((name) => {
+      const supplierName = String(name || "");
+      const meta = config.supplierMeta?.[supplierName] || {};
+      return {
+        name: supplierName,
+        type: supplierTypeFromMeta(meta),
+        scopes: asArray(meta.industries).slice(0, 8),
+        fleetCount: fleetList.filter((unit) => unit.supplier === supplierName).length,
+        openTicketCount: openTickets.filter((ticket) => ticket.supplier === supplierName).length
+      };
+    });
+
   const heatmapRows = biTicketHeatmapRows({
     departments: config.departments || [],
     tickets: openTickets,
@@ -134,6 +159,7 @@ export function buildAIContextSnapshot({
     },
     tickets: openTickets.slice(0, maxTickets).map(mapTicket),
     fleet: fleetNearDocs.slice(0, maxFleet),
-    pm: pmDue.slice(0, maxPm)
+    pm: pmDue.slice(0, maxPm),
+    suppliers
   };
 }

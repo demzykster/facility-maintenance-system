@@ -57,7 +57,14 @@ describe("AI assist snapshot model", () => {
       tickets,
       pm,
       fleet,
-      config: { departments: ["הפצה", "קבלה"] },
+      config: {
+        departments: ["הפצה", "קבלה"],
+        suppliers: ["Toyota", "BuildingCo"],
+        supplierMeta: {
+          Toyota: { type: "transport", industries: ["transport"], contacts: [{ name: "Secret" }] },
+          BuildingCo: { industries: ["facility:hvac"] }
+        }
+      },
       now,
       isOpenTicket: (ticket) => ticket.status !== "done",
       isOverdueTicket: (ticket) => ticket.id === "ticket-1",
@@ -115,6 +122,23 @@ describe("AI assist snapshot model", () => {
         status: "active"
       }
     ]);
+    expect(snapshot.suppliers).toEqual([
+      {
+        name: "Toyota",
+        type: "transport",
+        scopes: ["transport"],
+        fleetCount: 1,
+        openTicketCount: 1
+      },
+      {
+        name: "BuildingCo",
+        type: "facility",
+        scopes: ["facility:hvac"],
+        fleetCount: 0,
+        openTicketCount: 0
+      }
+    ]);
+    expect(JSON.stringify(snapshot.suppliers)).not.toContain("Secret");
     expect(snapshot.bi.heatmap.map((row) => row.department)).toEqual(["הפצה", "קבלה"]);
     expect(snapshot.bi.heatmap[0]).toMatchObject({
       total: 1,

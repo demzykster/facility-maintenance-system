@@ -1,6 +1,9 @@
+import { canView } from "./permissionModel.js";
+
 const MAX_TICKETS = 28;
 const MAX_FLEET = 18;
 const MAX_PM = 12;
+const MAX_SUPPLIERS = 12;
 const MAX_HEATMAP_ROWS = 8;
 const MAX_TEXT = 160;
 
@@ -42,7 +45,8 @@ export function aiRoleProfile(user = {}) {
     department: departments[0] || "",
     departments,
     canSeeCompany: LEADERSHIP_ROLES.has(role),
-    canSeeFinancials: LEADERSHIP_ROLES.has(role)
+    canSeeFinancials: LEADERSHIP_ROLES.has(role),
+    canSeeSuppliers: LEADERSHIP_ROLES.has(role) || canView(user, "suppliers")
   };
 }
 
@@ -138,6 +142,19 @@ function sanitizePm(item = {}) {
   return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null));
 }
 
+function sanitizeSupplier(item = {}) {
+  const fleetCount = numberOrNull(item.fleetCount);
+  const openTicketCount = numberOrNull(item.openTicketCount);
+  const clean = {
+    name: compactText(item.name, 120),
+    type: compactText(item.type, 50),
+    scopes: cleanStringArray(item.scopes || item.industries, 8)
+  };
+  if (fleetCount != null) clean.fleetCount = fleetCount;
+  if (openTicketCount != null) clean.openTicketCount = openTicketCount;
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+}
+
 function sanitizeMetrics(metrics = {}, profile) {
   const allowed = [
     "openTickets", "overdueTickets", "waitingTickets", "pendingApprovals", "assignedToMe",
@@ -200,23 +217,32 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     .filter((item) => profile.canSeeCompany || departmentAllowed(item, profile) || isAssignedToUser(item, profile))
     .slice(0, MAX_PM)
     .map(sanitizePm);
+  const suppliers = profile.canSeeSuppliers
+    ? asArray(source.suppliers)
+      .slice(0, MAX_SUPPLIERS)
+      .map(sanitizeSupplier)
+      .filter((supplier) => supplier.name)
+    : [];
   return {
     profile: {
       role: profile.role,
       department: profile.department,
       departments: profile.departments,
       canSeeCompany: profile.canSeeCompany,
-      canSeeFinancials: profile.canSeeFinancials
+      canSeeFinancials: profile.canSeeFinancials,
+      canSeeSuppliers: profile.canSeeSuppliers
     },
     metrics: sanitizeMetrics(source.metrics || {}, profile),
     bi: sanitizeBiSummary(source.bi || {}, profile),
     tickets,
     fleet,
     pm,
+    suppliers,
     limits: {
       tickets: MAX_TICKETS,
       fleet: MAX_FLEET,
       pm: MAX_PM,
+      suppliers: MAX_SUPPLIERS,
       heatmap: MAX_HEATMAP_ROWS
     }
   };
