@@ -14,7 +14,8 @@ const hasCapability = (context = {}, key = "") => context?.profile?.capabilities
 
 const LOCATION_PATTERNS = [
   /(?:באזור|באיזור|במחלקת|במחסן|במבנה|בקו)\s+([^\n,.]+)/i,
-  /(?:zone|area|department|warehouse|building)\s+([^\n,.]+)/i
+  /(?:zone|area|department|warehouse|building)\s+([^\n,.]+)/i,
+  /(?:в\s+зоне|в\s+отделе|на\s+складе|в\s+складе|в\s+здании|в\s+корпусе|в\s+комнате|в|на|у|около|возле)\s+([^\n,.]+)/iu
 ];
 
 function locationFromDraft(draft = {}) {

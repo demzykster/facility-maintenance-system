@@ -1,5 +1,5 @@
 import { aiAssistAuditEvent } from "../../src/auditEventModel.js";
-import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
+import { buildAiIntakeDraft, hasAiInformationalIntent } from "../../src/aiIntakeModel.js";
 import { buildAiAssistActionProposals } from "../../src/aiAssistActionModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
 import { AI_PROVIDER_PLAN_SCHEMA, providerPlanPrompt, sanitizeAiProviderPlan } from "../../src/aiAssistProviderPlanModel.js";
@@ -87,6 +87,36 @@ function responseLanguageForRequest({ text = "", conversation = [], fallback = "
     name: LANGUAGE_NAMES[detected] || LANGUAGE_NAMES.he,
     source: detectLanguageFromText(latestUser) ? "latest_user_message" : "request_language"
   };
+}
+
+function latestUserTextFromConversation(conversation = [], fallback = "") {
+  return cleanText([...conversation].reverse().find((message) => message.role === "user")?.content || fallback);
+}
+
+const ACTIONABLE_REQUEST_RE = /(создай|создать|открой|открыть|сделай|добавь|добавить|заявк|тикет|קריאה|פתח|תפתח|צור|create|open|draft|ticket|request|report)/iu;
+const ACTION_COMPLETION_HINT_RE = /(?:^|[\s,.;:])(?:в|на|у|около|возле)(?=[\s,.;:]|$)|комнат|склад|отдел|зона|корпус|f-\d+|\d{2,}|באזור|באיזור|במחלקת|במחסן|במבנה|בקו|zone|area|department|warehouse|building/iu;
+
+function previousActionableUserText(conversation = [], latestText = "") {
+  const users = conversation
+    .filter((message) => message.role === "user")
+    .map((message) => cleanText(message.content))
+    .filter(Boolean);
+  const latest = cleanText(latestText);
+  return users
+    .slice(0, -1)
+    .reverse()
+    .find((content) => content !== latest && ACTIONABLE_REQUEST_RE.test(content)) || "";
+}
+
+function conversationAwareDraftText({ rawText = "", conversation = [] } = {}) {
+  const latestText = latestUserTextFromConversation(conversation, rawText);
+  if (!latestText) return cleanText(rawText);
+  if (hasAiInformationalIntent(latestText)) return latestText;
+  if (ACTIONABLE_REQUEST_RE.test(latestText)) return latestText;
+  const previousText = previousActionableUserText(conversation, latestText);
+  if (!previousText) return latestText;
+  const looksLikeCompletion = latestText.length <= 180 && ACTION_COMPLETION_HINT_RE.test(latestText);
+  return looksLikeCompletion ? `${previousText}. ${latestText}` : latestText;
 }
 
 function capabilityGuidanceForContext(context = {}) {
@@ -268,9 +298,10 @@ function requestToDraftInput(body = {}, user = {}) {
   };
 }
 
-function providerPrompt({ draft, actions = [], user, context, workflow, conversation = [], responseLanguage }) {
+function providerPrompt({ draft, actions = [], user, context, workflow, conversation = [], responseLanguage, userRequest = "" }) {
   const safeWorkflow = normalizeAiAssistWorkflow(workflow);
   const language = responseLanguage || responseLanguageForRequest({ text: draft?.rawText, conversation, fallback: draft?.language });
+  const latestUserRequest = cleanText(userRequest || latestUserTextFromConversation(conversation, draft?.rawText), MAX_TEXT_CHARS);
   return JSON.stringify({
     contract: {
       writePolicy: "human_confirmation_required",
@@ -284,10 +315,17 @@ function providerPrompt({ draft, actions = [], user, context, workflow, conversa
     },
     assistantCapabilities: assistantCapabilityGuidanceForProvider(),
     actionGuidance: actionGuidanceForProvider(actions),
-    latestMessageGuidance: latestMessageGuidanceForProvider({ draft, workflow: safeWorkflow }),
+    latestMessageGuidance: latestMessageGuidanceForProvider({
+      draft: { ...draft, rawText: latestUserRequest || draft?.rawText },
+      workflow: safeWorkflow
+    }),
     contextGuidance: contextGuidanceForProvider({ draft, context }),
     responseLanguage: language,
-    userRequest: cleanText(draft?.rawText, MAX_TEXT_CHARS),
+    userRequest: latestUserRequest || cleanText(draft?.rawText, MAX_TEXT_CHARS),
+    draftInput: {
+      rawText: cleanText(draft?.rawText, MAX_TEXT_CHARS),
+      mergedFromRecentConversation: Boolean(latestUserRequest && draft?.rawText && latestUserRequest !== draft.rawText)
+    },
     recentConversation: conversation,
     workflow: {
       id: safeWorkflow,
@@ -356,6 +394,11 @@ export function createAiAssistHandler({
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
       const workflow = normalizeAiAssistWorkflow(body.workflow);
       const conversation = cleanConversationMessages(body.messages);
+      const latestUserRequest = latestUserTextFromConversation(conversation, normalized.input.rawText);
+      const draftInput = {
+        ...normalized.input,
+        rawText: conversationAwareDraftText({ rawText: normalized.input.rawText, conversation })
+      };
       const responseLanguage = responseLanguageForRequest({
         text: normalized.input.rawText,
         conversation,
@@ -363,7 +406,7 @@ export function createAiAssistHandler({
       });
 
       const context = buildAiAssistContext(body.context, auth.user);
-      const draft = buildAiIntakeDraft(normalized.input, currentTime);
+      const draft = buildAiIntakeDraft(draftInput, currentTime);
       const actions = buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context });
       const config = aiServerConfigFromEnv(env);
       if (config.mode !== AI_MODES.server) {
@@ -377,7 +420,16 @@ export function createAiAssistHandler({
       const result = await providerCall({
         config,
         system: SYSTEM_PROMPT,
-        prompt: providerPrompt({ draft, actions, user: auth.user, context, workflow, conversation, responseLanguage }),
+        prompt: providerPrompt({
+          draft,
+          actions,
+          user: auth.user,
+          context,
+          workflow,
+          conversation,
+          responseLanguage,
+          userRequest: latestUserRequest
+        }),
         fetchImpl,
         maxTokens: Number(env.CMMS_AI_ASSIST_MAX_TOKENS || 700) || 700
       });

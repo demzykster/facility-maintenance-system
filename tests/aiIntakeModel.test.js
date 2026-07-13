@@ -66,6 +66,25 @@ describe("aiIntakeModel", () => {
     expect(draft.userReply).toContain("דחוף");
   });
 
+  it("extracts Russian location hints as exact CMMS locations", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "сломалась ручка двери холодильника в холодильной комнате F-002",
+      actor: { id: "u1", role: "admin" },
+      language: "ru"
+    }, 160);
+
+    expect(draft).toMatchObject({
+      createdAt: 160,
+      module: "facility",
+      action: "draft_ticket",
+      signals: {
+        hasExactLocation: true,
+        locationHint: "холодильной комнате F-002"
+      }
+    });
+    expect(draft.missingInfo).not.toContain("location");
+  });
+
   it("asks for missing details instead of pretending it can open a complete request", () => {
     const draft = buildAiIntakeDraft({ rawText: "משהו לא תקין" });
 

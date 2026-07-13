@@ -209,6 +209,30 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("uses Russian location hints to complete facility ticket proposals", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "сломалась ручка двери холодильника в холодильной комнате F-002",
+      actor,
+      language: "ru"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({ draft, user: actor, now: 2000 });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "ready_for_confirmation",
+        missingFields: [],
+        payload: expect.objectContaining({
+          track: "facility",
+          zone: "холодильной комнате F-002",
+          description: "сломалась ручка двери холодильника в холодильной комнате F-002"
+        })
+      })
+    ]);
+  });
+
   it("keeps transport ticket proposals blocked until a human selects the asset", () => {
     const draft = buildAiIntakeDraft({
       rawText: "מלגזה תקועה באזור טעינה",

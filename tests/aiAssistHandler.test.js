@@ -1492,6 +1492,118 @@ describe("AI assist handler", () => {
     expect(prompt.roleGuidance).toContain("Only when the latest request asks for status");
   });
 
+  it("uses a short latest clarification with the previous actionable request for deterministic draft actions", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "Подготовил карточку заявки для подтверждения."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "admin" }),
+      providerCall,
+      now: () => 656,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "в холодильной комнате F-002",
+        language: "ru",
+        workflow: "general",
+        messages: [
+          { role: "user", content: "создай заявку: сломалась ручка двери холодильника" },
+          { role: "assistant", content: "Где именно это находится?" },
+          { role: "user", content: "в холодильной комнате F-002" }
+        ]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload.draft.rawText).toBe("создай заявку: сломалась ручка двери холодильника. в холодильной комнате F-002");
+    expect(payload.draft.signals).toMatchObject({
+      hasExactLocation: true,
+      locationHint: "холодильной комнате F-002"
+    });
+    expect(payload.actions).toEqual([
+      expect.objectContaining({
+        type: "ticket.create",
+        status: "ready_for_confirmation",
+        missingFields: [],
+        payload: expect.objectContaining({
+          track: "facility",
+          zone: "холодильной комнате F-002",
+          description: "создай заявку: сломалась ручка двери холодильника. в холодильной комнате F-002"
+        })
+      })
+    ]);
+
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.userRequest).toBe("в холодильной комнате F-002");
+    expect(prompt.draftInput).toEqual({
+      rawText: "создай заявку: сломалась ручка двери холодильника. в холодильной комнате F-002",
+      mergedFromRecentConversation: true
+    });
+    expect(prompt.latestMessageGuidance.operationalDigestAllowed).toBe(false);
+    expect(prompt.actionGuidance).toMatchObject({
+      hasActionProposal: true,
+      readyActionCount: 1,
+      missingFields: []
+    });
+  });
+
+  it("does not merge a short non-operational latest message into an older action request", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "Пожалуйста."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "admin" }),
+      providerCall,
+      now: () => 657,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "спасибо",
+        language: "ru",
+        messages: [
+          { role: "user", content: "создай заявку: сломалась ручка двери холодильника" },
+          { role: "assistant", content: "Где именно это находится?" },
+          { role: "user", content: "спасибо" }
+        ]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload.draft.rawText).toBe("спасибо");
+    expect(payload.actions).toEqual([]);
+
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.userRequest).toBe("спасибо");
+    expect(prompt.draftInput).toEqual({
+      rawText: "спасибо",
+      mergedFromRecentConversation: false
+    });
+  });
+
   it("answers in the latest user message language instead of the UI fallback language", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
