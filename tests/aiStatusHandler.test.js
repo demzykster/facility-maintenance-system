@@ -129,6 +129,39 @@ describe("AI status handler", () => {
     expect(JSON.stringify(payload)).not.toContain("server-secret");
   });
 
+  it("normalizes provider quota failures during live connection checks", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: false,
+      provider: "openai",
+      model: "gpt-5.2",
+      error: "You exceeded your current quota, please check your plan and billing details."
+    });
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        CMMS_AI_MODEL: "gpt-5.2",
+        OPENAI_API_KEY: "server-secret"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 2233
+    });
+
+    const res = await call(handler, { query: { check: "1" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai.providerCheck).toMatchObject({
+      attempted: true,
+      ok: false,
+      provider: "openai",
+      model: "gpt-5.2",
+      checkedAt: 2233,
+      error: "ai_provider_quota_exceeded"
+    });
+    expect(JSON.stringify(res.json())).not.toContain("server-secret");
+  });
+
   it("reports skipped provider checks when server AI is not ready", async () => {
     const providerCall = vi.fn();
     const handler = createAiStatusHandler({

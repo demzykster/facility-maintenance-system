@@ -66,6 +66,10 @@ export function aiAssistantFailureMessage(error = {}) {
   if (code === "ai_provider_required") return "חסר ספק AI בשרת. יש לבחור ספק ולהגדיר CMMS_AI_PROVIDER.";
   if (code === "ai_provider_key_required") return "חסר מפתח API לספק ה-AI בשרת / Vercel env.";
   if (code === "ai_provider_failed") return "השרת מחובר ל-AI, אבל ספק המודל החזיר שגיאה. בדקו את המפתח או המודל.";
+  if (code === "ai_provider_quota_exceeded") return "השרת מחובר ל-AI, אבל מכסת OpenAI / החיוב בחשבון לא מאפשרים כרגע להריץ את המודל.";
+  if (code === "ai_provider_model_unavailable") return "השרת מחובר ל-AI, אבל המודל שהוגדר אינו זמין לחשבון הזה.";
+  if (code === "ai_provider_auth_failed") return "השרת מחובר ל-AI, אבל מפתח הספק נדחה. בדקו את המפתח ב-Vercel.";
+  if (code === "ai_provider_rate_limited") return "ספק ה-AI מגביל כרגע את קצב הבקשות. נסו שוב בעוד רגע.";
   if (code === "ai_assist_rate_limited") return "נשלחו יותר מדי בקשות AI ברצף. נסו שוב בעוד רגע.";
   if (code === "access_token_required") return "נדרשת התחברות מחדש לפני שימוש ב-AI.";
   return "לא הצלחתי להתחבר לשירות ה-AI כרגע.";

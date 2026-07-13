@@ -56,6 +56,7 @@ describe("AI panel response model", () => {
   it("explains server AI configuration failures instead of reporting a generic network issue", () => {
     expect(aiAssistantFailureMessage(new Error("ai_server_disabled"))).toContain("CMMS_AI_MODE=server");
     expect(aiAssistantFailureMessage(new Error("ai_provider_key_required"))).toContain("מפתח API");
+    expect(aiAssistantFailureMessage(new Error("ai_provider_quota_exceeded"))).toContain("מכסת OpenAI");
     expect(aiAssistantFailureMessage(new Error("ai_assist_rate_limited"))).toContain("בעוד רגע");
   });
 });

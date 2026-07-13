@@ -20,6 +20,16 @@ function wantsConnectionCheck(req) {
   return ["1", "true", "live"].includes(String(queryValue(req, "check") || "").trim().toLowerCase());
 }
 
+function aiProviderErrorCode(error = "") {
+  const raw = String(error || "").replace(/\s+/g, " ").trim().slice(0, 800).toLowerCase();
+  if (!raw) return "ai_provider_failed";
+  if (/quota|billing|insufficient_quota|exceeded your current quota|plan and billing/i.test(raw)) return "ai_provider_quota_exceeded";
+  if (/model|not found|does not exist|unsupported/i.test(raw)) return "ai_provider_model_unavailable";
+  if (/key|api.?key|unauthorized|permission|forbidden|401|403/i.test(raw)) return "ai_provider_auth_failed";
+  if (/rate.?limit|429/i.test(raw)) return "ai_provider_rate_limited";
+  return "ai_provider_failed";
+}
+
 export function createAiStatusHandler({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -66,7 +76,7 @@ export function createAiStatusHandler({
             maxTokens: 16
           });
           ai.providerCheck.ok = !!result?.ok;
-          if (!result?.ok) ai.providerCheck.error = result?.error || "ai_provider_check_failed";
+          if (!result?.ok) ai.providerCheck.error = aiProviderErrorCode(result?.error);
         }
       }
       return sendJson(res, 200, {

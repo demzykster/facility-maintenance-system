@@ -23,6 +23,7 @@ describe("AI settings status labels", () => {
   it("keeps the concrete env/key problem visible to admins", () => {
     expect(aiStatusErrorLabel("ai_server_disabled")).toContain("CMMS_AI_MODE=server");
     expect(aiStatusErrorLabel("ai_provider_key_required")).toContain("Vercel env");
+    expect(aiStatusErrorLabel("ai_provider_quota_exceeded")).toContain("מכסת OpenAI");
     expect(aiStatusErrorLabel("unknown_error")).toBe("unknown_error");
   });
 });

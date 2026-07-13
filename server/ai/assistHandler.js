@@ -19,6 +19,16 @@ const cleanText = (value, limit = MAX_TEXT_CHARS) => String(value || "")
   .trim()
   .slice(0, limit);
 
+function aiProviderErrorCode(error = "") {
+  const raw = cleanText(error, 800).toLowerCase();
+  if (!raw) return "ai_provider_failed";
+  if (/quota|billing|insufficient_quota|exceeded your current quota|plan and billing/i.test(raw)) return "ai_provider_quota_exceeded";
+  if (/model|not found|does not exist|unsupported/i.test(raw)) return "ai_provider_model_unavailable";
+  if (/key|api.?key|unauthorized|permission|forbidden|401|403/i.test(raw)) return "ai_provider_auth_failed";
+  if (/rate.?limit|429/i.test(raw)) return "ai_provider_rate_limited";
+  return "ai_provider_failed";
+}
+
 const safeLanguage = (value) => {
   const language = String(value || "he").trim().toLowerCase().replace("_", "-").split("-")[0];
   return ["he", "en", "ru", "ar", "hi", "ti"].includes(language) ? language : "he";
@@ -181,6 +191,7 @@ export function createAiAssistHandler({
         return sendJson(res, 502, {
           error: "ai_provider_failed",
           provider: config.provider || "",
+          providerErrorCode: aiProviderErrorCode(result.error),
           draft
         });
       }

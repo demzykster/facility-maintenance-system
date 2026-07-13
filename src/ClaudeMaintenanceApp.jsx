@@ -1431,7 +1431,7 @@ async function callAIAssistant({ text, messages, system, context, workflow }) {
     })
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `ai-assist-${res.status}`);
+  if (!res.ok) throw new Error(data.providerErrorCode || data.error || `ai-assist-${res.status}`);
   return {
     text: data?.assistant?.text || data?.draft?.userReply || "",
     actions: Array.isArray(data?.actions) ? data.actions : []

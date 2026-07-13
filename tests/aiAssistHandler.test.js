@@ -232,6 +232,41 @@ describe("AI assist handler", () => {
     }));
   });
 
+  it("returns a safe provider error code when the OpenAI account has no quota", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: false,
+      provider: "openai",
+      model: "gpt-5.2",
+      error: "You exceeded your current quota, please check your plan and billing details."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 130,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toMatchObject({
+      error: "ai_provider_failed",
+      provider: "openai",
+      providerErrorCode: "ai_provider_quota_exceeded",
+      draft: {
+        createdAt: 130,
+        allowedToWrite: false
+      }
+    });
+    expect(JSON.stringify(res.json())).not.toContain("server-secret");
+  });
+
   it("returns deterministic ticket.update proposals from role-filtered single-ticket context", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
