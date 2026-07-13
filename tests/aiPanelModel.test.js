@@ -38,4 +38,18 @@ describe("AI panel response model", () => {
       { field: "priority", label: "עדיפות", before: "medium", after: "high" }
     ]);
   });
+
+  it("formats task due-date previews as readable local dates", () => {
+    const due = new Date(2026, 6, 13, 9, 30).getTime();
+
+    expect(aiUpdatePreviewRows({
+      type: "task.update",
+      payload: {
+        current: { dueAt: null },
+        patch: { dueAt: due }
+      }
+    })).toEqual([
+      { field: "dueAt", label: "תאריך יעד", before: "—", after: "13.07.26 09:30" }
+    ]);
+  });
 });

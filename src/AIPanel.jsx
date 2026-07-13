@@ -5,6 +5,18 @@ import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
 import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "./aiAssistQuickPromptModel.js";
 
 const cleanText = (value, fallback = "") => String(value || fallback || "").trim();
+const pad2 = (value) => String(value).padStart(2, "0");
+
+function formatAiUpdateValue(field, value) {
+  if (value == null || value === "") return "—";
+  if (field === "dueAt") {
+    const date = new Date(Number(value));
+    if (!Number.isFinite(date.getTime())) return cleanText(value, "—");
+    return `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${String(date.getFullYear()).slice(-2)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  }
+  return cleanText(value, "—");
+}
+
 const MISSING_LABELS = Object.freeze({
   track: "סוג קריאה",
   subject: "נושא",
@@ -90,8 +102,8 @@ export function aiUpdatePreviewRows(action = {}) {
     .map((field) => ({
       field,
       label: UPDATE_FIELD_LABELS[field],
-      before: cleanText(current[field], "—"),
-      after: cleanText(patch[field], "—")
+      before: formatAiUpdateValue(field, current[field]),
+      after: formatAiUpdateValue(field, patch[field])
     }));
 }
 

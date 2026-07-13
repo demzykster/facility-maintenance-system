@@ -50,7 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget is `19/24` after grouping AI URLs through one dynamic `api/ai/[action].js` route.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 232.49 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `ManageHub` around 19.81 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 232.50 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `ManageHub` around 19.82 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and `src/BIOverview.jsx` wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
@@ -64,6 +64,7 @@ Recent commits on `main`:
   - The proposal still requires exactly one role-visible task in the filtered context. If more than one task is visible, or if the user gives a free-form calendar date, the assistant does not guess.
   - `src/aiAssistContextModel.js` preserves `dueAt: null` as a meaningful visible task state instead of dropping it as an empty field, so confirmation previews can show "no due date -> new due date".
   - `src/aiAssistActionExecutionModel.js` allows `dueAt` only through the existing human-confirmed `task.update` path and the normal `saveTask` / `/api/work` `resource: "tasks"` operation.
+  - `src/AIPanel.jsx` formats `dueAt` update previews as readable local dates instead of raw timestamps.
 - `Add human-confirmed AI task create/update`
   - `src/aiIntakeModel.js` now treats strong task words such as `משימה`, `פגישה`, `תזכורת`, `task`, `meeting`, and `reminder` as task intent even when the task mentions an object like a forklift.
   - `src/aiAssistActionModel.js` can now return a deterministic `task.create` proposal from `draft_task` intake. The action is `writesData: false`, requires human confirmation, and targets the existing `/api/work` contract with `resource: "tasks"` / `bodyField: "task"`.
@@ -453,7 +454,7 @@ Visual polish still likely needed:
 
 Technical/performance watch:
 
-- Main bundle still triggers Vite's raw-size warning. Latest local build after the AI due-date update slice produced the main app chunk at about 926.11 kB raw / 232.49 kB gzip, plus separate lazy screen chunks and stable vendor chunks.
+- Main bundle still triggers Vite's raw-size warning. Latest local build after the AI due-date update slice produced the main app chunk at about 926.11 kB raw / 232.50 kB gzip, plus separate lazy screen chunks and stable vendor chunks.
 - Next meaningful performance work should continue reducing initial JS and defer post-login work where safe, not start from visual rewrites.
 - Live controlled-rollout baseline exists, but headless Chromium does not prove native iOS/Safari push-banner behavior.
 
