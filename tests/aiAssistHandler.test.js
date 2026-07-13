@@ -915,6 +915,68 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("returns deterministic task responsible update proposals only from role-filtered visible users", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר להחליף אחראי לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 447,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תעדכן את אחראי המשימה לדנה כהן",
+        context: {
+          users: [
+            { id: "u1", name: "Vadim", workerNo: "1", department: "הפצה" },
+            { id: "u2", name: "דנה כהן", workerNo: "11032", department: "הפצה", pinHash: "secret" },
+            { id: "u3", name: "Hidden", workerNo: "22000", department: "קבלה" }
+          ],
+          tasks: [
+            { id: "task-visible", title: "בדיקת ספק", department: "הפצה", responsibleIds: ["u1"], priority: "medium", status: "todo" },
+            { id: "task-hidden", title: "נסתר", department: "קבלה", responsibleIds: ["u3"], priority: "medium", status: "todo" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(providerCall.mock.calls[0][0].prompt).not.toContain("secret");
+    expect(providerCall.mock.calls[0][0].prompt).not.toContain("Hidden");
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-visible",
+        type: "task.update",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          taskId: "task-visible",
+          taskTitle: "בדיקת ספק",
+          current: { responsibleIds: ["u1"] },
+          patch: { responsibleIds: ["u2"] },
+          display: {
+            responsibleIds: {
+              before: ["Vadim"],
+              after: ["דנה כהן"]
+            }
+          }
+        }
+      })
+    ]);
+  });
+
   it("returns deterministic task due-date update proposals from explicit relative dates", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

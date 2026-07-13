@@ -30,11 +30,12 @@ describe("management tasks and meetings lazy wiring", () => {
 
   it("passes management tasks and meetings into the shared AI context snapshot", () => {
     const aiPanelSource = readFileSync(new URL("../src/AIPanel.jsx", import.meta.url), "utf8");
-    expect(appSource).toContain("function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [])");
+    expect(appSource).toContain("function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [], users = [])");
+    expect(appSource).toContain("users,");
     expect(appSource).toContain("tasks,");
     expect(appSource).toContain("meetings,");
-    expect(aiPanelSource).toContain("tasks = [], meetings = []");
-    expect(aiPanelSource).toContain("buildContext(session, vis, pm, fleet, config, tasks, meetings)");
+    expect(aiPanelSource).toContain("users = [], tasks = [], meetings = []");
+    expect(aiPanelSource).toContain("buildContext(session, vis, pm, fleet, config, tasks, meetings, users)");
   });
 
   it("wires confirmed AI task and meeting creation through the normal save paths", () => {

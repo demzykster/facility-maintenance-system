@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, expected clean after the latest push.
-- Latest app/UI commit before this handoff: first-login password session stabilization and structured AI context for management tasks/meetings, after explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, human-confirmed task creation/update, human-confirmed meeting creation/time updates, AI ticket proposal form handoff, Google Gemini server-provider support, Vercel AI SDK Core provider migration, and the first optional non-writing structured provider-plan seam.
+- Latest app/UI commit before this handoff: first-login password session stabilization and structured AI context for management tasks/meetings, after explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, human-confirmed task creation/update, human-confirmed meeting creation/time updates, AI ticket proposal form handoff, Google Gemini server-provider support, Vercel AI SDK Core provider migration, the first optional non-writing structured provider-plan seam, and deterministic human-confirmed task responsible updates from role-filtered user context.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -66,6 +66,14 @@ Recent commits on `main`:
   - `src/AIPanel.jsx` requests `includeProviderPlan` only for action-oriented workflows (`risk_summary`, `next_actions`, `draft_preparation`) and renders the sanitized plan as a separate suggested-plan card.
   - Sanitized provider plans are review artifacts only: unsupported operation types are dropped, executable fields are stripped, and every item is forced to `requiresConfirmation: true`, `writesData: false`, and `writePolicy: "human_confirmation_required"`.
   - This is deliberately not provider-native direct tool execution and not database write access.
+- `Add AI task responsible update proposals` (current local slice)
+  - `src/aiAssistSnapshotModel.js` now includes compact active-user summaries in AI context: id, worker number, name, role, and department/departments only.
+  - `src/aiAssistContextModel.js` role-filters and sanitizes that user list before it reaches `/api/ai/assist`, excluding inactive users and private login/PIN/password fields.
+  - `src/aiAssistActionModel.js` can now propose a constrained `task.update` that changes `responsibleIds` only when the filtered context has exactly one visible task and the user's text names exactly one visible user.
+  - The proposal includes display names for the confirmation diff, but the executable patch remains only the allow-listed `responsibleIds` field.
+  - `src/aiAssistActionExecutionModel.js` allows `responsibleIds` through the existing human-confirmed task update path and ignores unrelated fields such as `participantIds`.
+  - `src/AIPanel.jsx` passes users into the shared context builder and formats array/display values in update previews.
+  - This still does not give the provider write access: confirmation executes through `saveTask` / `/api/work` and appends the existing `ai_confirmed_task_update` audit log.
 - `Migrate AI provider boundary to Vercel AI SDK Core` (current local slice)
   - `package.json` / `package-lock.json` now include `ai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, and `@ai-sdk/openai`.
   - `server/ai/providerClient.js` now builds provider models through Vercel AI SDK Core and calls `generateText` through one internal seam for Anthropic, Google Gemini, and OpenAI-compatible providers.

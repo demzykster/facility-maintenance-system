@@ -25,6 +25,8 @@ const cleanStringList = (values = [], limit = 12) => (Array.isArray(values) ? va
   .filter(Boolean)
   .slice(0, limit);
 
+const cleanStringValues = (values = [], limit = 12) => cleanStringList(Array.isArray(values) ? values : (values ? [values] : []), limit);
+
 function supplierTypeFromMeta(meta = {}) {
   if (meta.type) return String(meta.type);
   const industries = Array.isArray(meta.industries) ? meta.industries : [];
@@ -39,6 +41,7 @@ export function buildAIContextSnapshot({
   tickets = [],
   pm = [],
   fleet = [],
+  users = [],
   tasks = [],
   meetings = [],
   config = {},
@@ -58,6 +61,7 @@ export function buildAIContextSnapshot({
   docStatus = defaultDocStatus,
   maxTickets = 60,
   maxFleet = 30,
+  maxUsers = 24,
   maxPm = 24,
   maxTasks = 24,
   maxMeetings = 12,
@@ -66,6 +70,7 @@ export function buildAIContextSnapshot({
 } = {}) {
   const ticketList = asArray(tickets);
   const fleetList = asArray(fleet);
+  const userList = asArray(users);
   const pmList = asArray(pm);
   const taskList = asArray(tasks);
   const meetingList = asArray(meetings);
@@ -144,6 +149,19 @@ export function buildAIContextSnapshot({
     };
     if (dueDays != null) clean.dueDays = dueDays;
     if (nextActionAt) clean.nextActionAt = formatDateTime(nextActionAt);
+    return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+  };
+
+  const mapUser = (user) => {
+    const clean = {
+      id: user.id || user.authUserId || user.workerNo || "",
+      workerNo: user.workerNo || user.worker_no || "",
+      name: user.name || "",
+      role: user.role || "",
+      department: user.department || user.dept || "",
+      departments: cleanStringValues(user.departments || user.depts || user.department || user.dept, 8),
+      active: user.active !== false
+    };
     return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
   };
 
@@ -231,6 +249,7 @@ export function buildAIContextSnapshot({
     },
     tickets: openTickets.slice(0, maxTickets).map(mapTicket),
     fleet: fleetNearDocs.slice(0, maxFleet),
+    users: userList.filter((user) => user && user.active !== false).slice(0, maxUsers).map(mapUser),
     pm: pmDue.slice(0, maxPm),
     tasks: openTaskRows.slice(0, maxTasks).map(mapTask),
     meetings: plannedMeetings.slice(0, maxMeetings).map(mapMeeting),

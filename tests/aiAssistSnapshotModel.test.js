@@ -11,6 +11,11 @@ describe("AI assist snapshot model", () => {
       { id: "fork-1", code: "178040", type: "Toyota", department: "הפצה", supplier: "Toyota" },
       { id: "fork-2", code: "120823", type: "Reach", department: "קבלה" }
     ];
+    const users = [
+      { id: "admin-1", workerNo: "1", name: "Vadim", role: "admin", department: "הנהלה" },
+      { id: "u2", workerNo: "11032", name: "Dana", role: "user", department: "הפצה", passwordHash: "secret" },
+      { id: "inactive", workerNo: "999", name: "Inactive", role: "worker", department: "הפצה", active: false }
+    ];
     const tickets = [
       {
         id: "ticket-1",
@@ -98,6 +103,7 @@ describe("AI assist snapshot model", () => {
       tickets,
       pm,
       fleet,
+      users,
       tasks,
       meetings,
       config: {
@@ -162,6 +168,27 @@ describe("AI assist snapshot model", () => {
         docsDueDays: 12
       }
     ]);
+    expect(snapshot.users).toEqual([
+      {
+        id: "admin-1",
+        workerNo: "1",
+        name: "Vadim",
+        role: "admin",
+        department: "הנהלה",
+        departments: ["הנהלה"],
+        active: true
+      },
+      {
+        id: "u2",
+        workerNo: "11032",
+        name: "Dana",
+        role: "user",
+        department: "הפצה",
+        departments: ["הפצה"],
+        active: true
+      }
+    ]);
+    expect(JSON.stringify(snapshot.users)).not.toContain("secret");
     expect(snapshot.pm).toEqual([
       {
         id: "pm-1",

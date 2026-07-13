@@ -1383,13 +1383,14 @@ function buildAIContext(session, tickets, pm, fleet, cfg) {
   return L.join("\n");
 }
 
-function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = []) {
+function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [], users = []) {
   const now = Date.now();
   return buildAIContextSnapshotModel({
     session,
     tickets,
     pm,
     fleet,
+    users,
     tasks,
     meetings,
     config: cfg,

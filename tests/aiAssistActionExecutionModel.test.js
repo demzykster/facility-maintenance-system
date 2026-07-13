@@ -166,6 +166,21 @@ const taskDueUpdateAction = {
   execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
 };
 
+const taskResponsibleUpdateAction = {
+  id: "update_task_responsible",
+  type: "task.update",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    taskId: "task-1",
+    patch: {
+      responsibleIds: ["u2"],
+      participantIds: ["evil"]
+    }
+  },
+  execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
+};
+
 const existingTicket = {
   id: "ticket-1",
   subject: "דליפת מים",
@@ -404,6 +419,32 @@ describe("AI assist action execution model", () => {
       by: "Vadim",
       byRole: "admin",
       text: "משתמש אישר עדכון משימה שהוכן על ידי AI: dueAt",
+      kind: "ai_confirmed_task_update"
+    });
+  });
+
+  it("allows confirmed AI task responsible updates through the same saveTask path", () => {
+    const { task, changes } = prepareAiTaskUpdateForSave(taskResponsibleUpdateAction, { ...existingTask, responsibleIds: ["u1"] }, { name: "Vadim", role: "admin" }, { now: 5000 });
+
+    expect(task).toMatchObject({
+      id: "task-1",
+      responsibleIds: ["u2"],
+      updatedAt: 5000,
+      ai: {
+        source: "ai_assist",
+        lastConfirmedAction: "update_task_responsible",
+        lastConfirmedAt: 5000
+      }
+    });
+    expect(task).not.toHaveProperty("participantIds", ["evil"]);
+    expect(changes).toEqual([
+      { field: "responsibleIds", before: ["u1"], after: ["u2"] }
+    ]);
+    expect(task.log.at(-1)).toEqual({
+      at: 5000,
+      by: "Vadim",
+      byRole: "admin",
+      text: "משתמש אישר עדכון משימה שהוכן על ידי AI: responsibleIds",
       kind: "ai_confirmed_task_update"
     });
   });

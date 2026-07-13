@@ -174,6 +174,34 @@ function hasUpdateIntent(text = "") {
   return /תעדכן|עדכן|העבר|שנה|סיים|סגור|בטל|update|change|set|mark/i.test(cleanText(text, 800));
 }
 
+function hasTaskResponsibleUpdateIntent(text = "") {
+  return hasUpdateIntent(text) && /(אחראי|אחראים|responsible|assign|assigned|owner|אל|to\s+)/i.test(cleanText(text, 800));
+}
+
+function userMatchesText(user = {}, raw = "") {
+  const text = cleanText(raw, 800).toLowerCase();
+  const identifiers = [
+    cleanText(user.id, 120),
+    cleanText(user.workerNo, 120)
+  ].filter((value) => value.length >= 2);
+  const identifierMatch = identifiers.some((value) => {
+    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, "iu").test(text);
+  });
+  if (identifierMatch) return true;
+  const name = cleanText(user.name, 120).toLowerCase();
+  return name.length >= 2 && text.includes(name);
+}
+
+function requestedTaskResponsibleUserFromText(text = "", users = []) {
+  const raw = cleanText(text, 800);
+  if (!raw || !hasTaskResponsibleUpdateIntent(raw)) return null;
+  const matches = cleanArray(users)
+    .filter((user) => user && user.id)
+    .filter((user) => userMatchesText(user, raw));
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function requestedZoneFromText(text = "") {
   const raw = cleanText(text, 800);
   if (!raw || !hasUpdateIntent(raw)) return "";
@@ -394,8 +422,24 @@ function buildAiTaskUpdateProposal({ draft = {}, context = {}, now = Date.now() 
   if (requestedStatus && requestedStatus !== task.status) patch.status = requestedStatus;
   const requestedDueAt = requestedTaskDueAtFromText(draft.rawText, now);
   if (requestedDueAt !== null && requestedDueAt !== task.dueAt) patch.dueAt = requestedDueAt;
+  const requestedResponsible = requestedTaskResponsibleUserFromText(draft.rawText, context.users);
+  if (requestedResponsible) {
+    const nextResponsibleIds = [cleanText(requestedResponsible.id, 160)].filter(Boolean);
+    const currentResponsibleIds = cleanArray(task.responsibleIds).map((value) => cleanText(value, 160)).filter(Boolean);
+    if (nextResponsibleIds.length && currentResponsibleIds.join("|") !== nextResponsibleIds.join("|")) {
+      patch.responsibleIds = nextResponsibleIds;
+    }
+  }
   if (!Object.keys(patch).length) return null;
   const current = Object.fromEntries(Object.keys(patch).map((field) => [field, task[field]]));
+  const display = patch.responsibleIds ? {
+    responsibleIds: {
+      before: cleanArray(task.responsibleIds)
+        .map((id) => cleanText(cleanArray(context.users).find((user) => user.id === id)?.name || id, 120))
+        .filter(Boolean),
+      after: [cleanText(requestedResponsible?.name || patch.responsibleIds[0], 120)].filter(Boolean)
+    }
+  } : null;
   return {
     id: `update_task_${cleanText(task.id, 80)}`,
     type: "task.update",
@@ -409,7 +453,8 @@ function buildAiTaskUpdateProposal({ draft = {}, context = {}, now = Date.now() 
       taskId: cleanText(task.id, 160),
       taskTitle: cleanText(task.title || task.name, 160),
       current,
-      patch
+      patch,
+      ...(display ? { display } : {})
     },
     execute: {
       method: "POST",

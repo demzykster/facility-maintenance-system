@@ -2,6 +2,7 @@ import { canView } from "./permissionModel.js";
 
 const MAX_TICKETS = 28;
 const MAX_FLEET = 18;
+const MAX_USERS = 24;
 const MAX_PM = 12;
 const MAX_TASKS = 16;
 const MAX_MEETINGS = 10;
@@ -103,6 +104,12 @@ function fleetAllowed(unit, profile) {
   return profile.canSeeCompany || departmentAllowed(unit, profile) || isAssignedToUser(unit, profile);
 }
 
+function userAllowed(user, profile) {
+  return profile.canSeeCompany
+    || matchesUserIdentity(user.id || user.authUserId || user.workerNo || user.name, profile)
+    || departmentAllowed(user, profile);
+}
+
 function sanitizeTicket(ticket = {}, profile) {
   const clean = {
     id: compactId(ticket.id),
@@ -154,6 +161,19 @@ function sanitizePm(item = {}) {
   };
   if (dueDays != null) clean.dueDays = dueDays;
   return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null));
+}
+
+function sanitizeUser(item = {}) {
+  const clean = {
+    id: compactId(item.id || item.authUserId || item.auth_user_id || item.workerNo),
+    workerNo: compactId(item.workerNo || item.worker_no),
+    name: compactText(item.name, 120),
+    role: compactText(item.role, 40),
+    department: recordDepartments(item)[0] || "",
+    departments: cleanStringArray(item.departments || item.depts || item.department || item.dept, 8),
+    active: item.active !== false
+  };
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
 }
 
 function sanitizeTask(item = {}) {
@@ -278,6 +298,11 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     .filter((item) => profile.canSeeCompany || departmentAllowed(item, profile) || isAssignedToUser(item, profile))
     .slice(0, MAX_PM)
     .map(sanitizePm);
+  const users = asArray(source.users)
+    .filter((item) => item && item.active !== false)
+    .filter((item) => userAllowed(item, profile))
+    .slice(0, MAX_USERS)
+    .map(sanitizeUser);
   const tasks = asArray(source.tasks)
     .filter((item) => profile.canSeeCompany || departmentAllowed(item, profile) || isAssignedToUser(item, profile) || isReportedByUser(item, profile))
     .slice(0, MAX_TASKS)
@@ -305,6 +330,7 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     bi: sanitizeBiSummary(source.bi || {}, profile),
     tickets,
     fleet,
+    users,
     pm,
     tasks,
     meetings,
@@ -312,6 +338,7 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     limits: {
       tickets: MAX_TICKETS,
       fleet: MAX_FLEET,
+      users: MAX_USERS,
       pm: MAX_PM,
       tasks: MAX_TASKS,
       meetings: MAX_MEETINGS,

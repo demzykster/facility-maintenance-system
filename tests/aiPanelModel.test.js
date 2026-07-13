@@ -85,6 +85,19 @@ describe("AI panel response model", () => {
     ]);
   });
 
+  it("formats responsible previews with display names instead of raw ids", () => {
+    expect(aiUpdatePreviewRows({
+      type: "task.update",
+      payload: {
+        current: { responsibleIds: ["u1"] },
+        patch: { responsibleIds: ["u2"] },
+        display: { responsibleIds: { before: ["Vadim"], after: ["דנה כהן"] } }
+      }
+    })).toEqual([
+      { field: "responsibleIds", label: "אחראים", before: "Vadim", after: "דנה כהן" }
+    ]);
+  });
+
   it("explains server AI configuration failures instead of reporting a generic network issue", () => {
     expect(aiAssistantFailureMessage(new Error("ai_server_disabled"))).toContain("CMMS_AI_MODE=server");
     expect(aiAssistantFailureMessage(new Error("ai_provider_key_required"))).toContain("מפתח API");

@@ -9,6 +9,7 @@ const pad2 = (value) => String(value).padStart(2, "0");
 
 function formatAiUpdateValue(field, value) {
   if (value == null || value === "") return "—";
+  if (Array.isArray(value)) return value.length ? value.map((item) => cleanText(item)).filter(Boolean).join(" · ") : "—";
   if (field === "dueAt" || field === "at") {
     const date = new Date(Number(value));
     if (!Number.isFinite(date.getTime())) return cleanText(value, "—");
@@ -130,14 +131,15 @@ function actionMeta(action = {}) {
 export function aiUpdatePreviewRows(action = {}) {
   const patch = action?.payload?.patch && typeof action.payload.patch === "object" ? action.payload.patch : {};
   const current = action?.payload?.current && typeof action.payload.current === "object" ? action.payload.current : {};
+  const display = action?.payload?.display && typeof action.payload.display === "object" ? action.payload.display : {};
   return Object.keys(patch)
     .filter((field) => UPDATE_FIELD_LABELS[field])
     .slice(0, 4)
     .map((field) => ({
       field,
       label: UPDATE_FIELD_LABELS[field],
-      before: formatAiUpdateValue(field, current[field]),
-      after: formatAiUpdateValue(field, patch[field])
+      before: formatAiUpdateValue(field, display[field]?.before ?? current[field]),
+      after: formatAiUpdateValue(field, display[field]?.after ?? patch[field])
     }));
 }
 
@@ -208,9 +210,9 @@ function AiProviderPlanCard({ plan }) {
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, tasks = [], meetings = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
-  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings), [session, vis, pm, fleet, config, tasks, meetings, buildContext]);
+  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings, users), [session, vis, pm, fleet, config, tasks, meetings, users, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
   const [input, setInput] = useState(initialText || "");
   const [inputWorkflow, setInputWorkflow] = useState(initialWorkflow || AI_ASSIST_WORKFLOWS.general);

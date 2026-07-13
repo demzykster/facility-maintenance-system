@@ -46,6 +46,12 @@ describe("AI assist context model", () => {
         { id: "f1", code: "A", department: "הפצה" },
         { id: "f2", code: "B", department: "קבלה" }
       ],
+      users: [
+        { id: "manager-1", workerNo: "1", name: "Manager", role: "user", department: "הפצה" },
+        { id: "worker-1", workerNo: "11032", name: "Worker", role: "worker", department: "הפצה", pinHash: "secret" },
+        { id: "other-user", workerNo: "22000", name: "Hidden", role: "worker", department: "קבלה" },
+        { id: "inactive-user", workerNo: "33000", name: "Inactive", role: "worker", department: "הפצה", active: false }
+      ],
       tasks: [
         { id: "task-own", title: "Allowed task", department: "הפצה", responsibleIds: ["manager-1"], status: "waiting", waitingFor: "CFO", dueDays: -2, dueAt: 5000, overdue: true },
         { id: "task-other", title: "Hidden task", department: "קבלה", responsibleIds: ["manager-2"], status: "todo" }
@@ -72,6 +78,11 @@ describe("AI assist context model", () => {
     expect(context.tickets[0]).toMatchObject({ id: "own-dept", department: "הפצה", forkliftId: "fleet-120823", asset: "120823" });
     expect(context.tickets[0]).not.toHaveProperty("cost");
     expect(context.fleet.map((unit) => unit.id)).toEqual(["f1"]);
+    expect(context.users).toEqual([
+      { id: "manager-1", workerNo: "1", name: "Manager", role: "user", department: "הפצה", departments: ["הפצה"], active: true },
+      { id: "worker-1", workerNo: "11032", name: "Worker", role: "worker", department: "הפצה", departments: ["הפצה"], active: true }
+    ]);
+    expect(JSON.stringify(context.users)).not.toContain("secret");
     expect(context.tasks).toEqual([
       {
         id: "task-own",

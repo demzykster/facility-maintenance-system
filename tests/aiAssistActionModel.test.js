@@ -442,6 +442,58 @@ describe("AI assist action model", () => {
     })).toEqual([]);
   });
 
+  it("proposes task responsible updates only for a unique visible user", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את אחראי המשימה לדנה כהן",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        users: [
+          { id: "u1", name: "Vadim", workerNo: "1" },
+          { id: "u2", name: "דנה כהן", workerNo: "11032" }
+        ],
+        tasks: [{ id: "task-1", title: "בדיקת ספק", priority: "medium", status: "todo", responsibleIds: ["u1"] }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-1",
+        type: "task.update",
+        payload: {
+          taskId: "task-1",
+          taskTitle: "בדיקת ספק",
+          current: { responsibleIds: ["u1"] },
+          patch: { responsibleIds: ["u2"] },
+          display: {
+            responsibleIds: {
+              before: ["Vadim"],
+              after: ["דנה כהן"]
+            }
+          }
+        }
+      })
+    ]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        users: [
+          { id: "u2", name: "דנה כהן", workerNo: "11032" },
+          { id: "u3", name: "דנה כהן", workerNo: "11033" }
+        ],
+        tasks: [{ id: "task-1", title: "בדיקת ספק", responsibleIds: ["u1"] }]
+      }
+    })).toEqual([]);
+  });
+
   it("proposes a constrained meeting time update only when a single visible meeting target is clear", () => {
     const now = new Date(2026, 6, 13, 12, 34).getTime();
     const currentAt = new Date(2026, 6, 13, 15, 0).getTime();
