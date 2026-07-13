@@ -158,6 +158,22 @@ function hasUpdateIntent(text = "") {
   return /תעדכן|עדכן|העבר|שנה|סיים|סגור|בטל|update|change|set|mark/i.test(cleanText(text, 800));
 }
 
+function requestedZoneFromText(text = "") {
+  const raw = cleanText(text, 800);
+  if (!raw || !hasUpdateIntent(raw)) return "";
+  const patterns = [
+    /(?:אזור|איזור|מיקום)\s*(?:ל|אל|=|:|-)\s*([^\n,.]+)/i,
+    /(?:לאזור|לאיזור|למיקום)\s+([^\n,.]+)/i,
+    /(?:zone|area|location)\s*(?:to|=|:|-)\s*([^\n,.]+)/i
+  ];
+  const match = patterns.map((pattern) => raw.match(pattern)).find(Boolean);
+  if (!match) return "";
+  return cleanText(match[1], 120)
+    .replace(/^(?:של|את)\s+/i, "")
+    .replace(/\s+(?:בבקשה|please)$/i, "")
+    .trim();
+}
+
 const WAITING_REASON_BALLS = Object.freeze({
   no_equipment: "manager",
   parts: "executor",
@@ -274,6 +290,8 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   }
   const requestedSupplier = requestedSupplierFromText(draft.rawText, context.suppliers);
   if (requestedSupplier && requestedSupplier !== ticket.supplier) patch.supplier = requestedSupplier;
+  const requestedZone = requestedZoneFromText(draft.rawText);
+  if (requestedZone && requestedZone !== ticket.zone) patch.zone = requestedZone;
   if (!Object.keys(patch).length) return null;
   const current = Object.fromEntries(Object.keys(patch).map((field) => [field, ticket[field]]));
   return {

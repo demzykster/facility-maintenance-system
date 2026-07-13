@@ -452,6 +452,57 @@ describe("AI assist action model", () => {
     })).toEqual([]);
   });
 
+  it("proposes explicit ticket zone updates without guessing from free text", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה לאזור משרדים",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        tickets: [{ id: "T-1", subject: "דליפת מים", priority: "medium", status: "new", zone: "קבלה" }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_ticket_T-1",
+        type: "ticket.update",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "דליפת מים",
+          current: { zone: "קבלה" },
+          patch: { zone: "משרדים" }
+        },
+        execute: {
+          method: "POST",
+          path: "/api/tickets",
+          bodyField: "ticket"
+        }
+      })
+    ]);
+
+    const unchangedDraft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה לאזור קבלה",
+      actor,
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft: unchangedDraft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "דליפת מים", zone: "קבלה" }]
+      }
+    })).toEqual([]);
+  });
+
   it("proposes supplier routing only when the supplier is visible and explicitly named", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעביר את הקריאה לספק Toyota",

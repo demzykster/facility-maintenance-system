@@ -316,6 +316,55 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("returns deterministic ticket zone updates from role-filtered single-ticket context", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר לעדכן את האזור לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 446,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תעדכן את הקריאה לאזור משרדים",
+        context: {
+          tickets: [
+            { id: "T-1", subject: "דליפת מים", priority: "medium", status: "new", zone: "קבלה", department: "הפצה" },
+            { id: "T-2", subject: "נסתר", priority: "medium", status: "new", zone: "מחסן", department: "קבלה" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "update_ticket_T-1",
+        type: "ticket.update",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "דליפת מים",
+          current: { zone: "קבלה" },
+          patch: { zone: "משרדים" }
+        }
+      })
+    ]);
+  });
+
   it("returns deterministic ticket.comment proposals from role-filtered single-ticket context", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

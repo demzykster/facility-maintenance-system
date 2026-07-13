@@ -52,6 +52,21 @@ const waitingUpdateAction = {
   execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
 };
 
+const zoneUpdateAction = {
+  id: "update_ticket_zone",
+  type: "ticket.update",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    ticketId: "ticket-1",
+    patch: {
+      zone: "משרדים",
+      log: [{ text: "evil" }]
+    }
+  },
+  execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
+};
+
 const commentAction = {
   id: "comment_ticket",
   type: "ticket.comment",
@@ -157,6 +172,7 @@ const existingTicket = {
   priority: "medium",
   status: "new",
   description: "תיאור קודם",
+  zone: "קבלה",
   createdAt: 1000,
   updatedAt: 1500,
   log: [{ at: 1500, by: "Dana", byRole: "user", text: "נוצרה", kind: "created" }]
@@ -441,6 +457,34 @@ describe("AI assist action execution model", () => {
       { field: "status", before: "new", after: "waiting" },
       { field: "waitingReason", before: "", after: "parts" },
       { field: "waitBall", before: "", after: "executor" }
+    ]);
+  });
+
+  it("allows confirmed zone updates without accepting unsafe patch fields", () => {
+    const { ticket, changes } = prepareAiTicketUpdateForSave(zoneUpdateAction, existingTicket, { name: "Vadim", role: "admin" }, { now: 3600 });
+
+    expect(ticket).toMatchObject({
+      id: "ticket-1",
+      zone: "משרדים",
+      updatedAt: 3600,
+      ai: {
+        source: "ai_assist",
+        lastConfirmedAction: "update_ticket_zone",
+        lastConfirmedAt: 3600
+      }
+    });
+    expect(ticket.log).toEqual([
+      { at: 1500, by: "Dana", byRole: "user", text: "נוצרה", kind: "created" },
+      {
+        at: 3600,
+        by: "Vadim",
+        byRole: "admin",
+        text: "משתמש אישר עדכון קריאה שהוכן על ידי AI: zone",
+        kind: "ai_confirmed_update"
+      }
+    ]);
+    expect(changes).toEqual([
+      { field: "zone", before: "קבלה", after: "משרדים" }
     ]);
   });
 
