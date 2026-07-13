@@ -50,14 +50,21 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget is `19/24` after grouping AI URLs through one dynamic `api/ai/[action].js` route.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 232.85 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `ManageHub` around 19.81 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 233.17 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `AIPanel` around 5.01 kB gzip, `ManageHub` around 19.82 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and `src/BIOverview.jsx` wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
+- Live AI connection note: on 2026-07-13, authenticated `/api/ai/status` on Vercel reported `mode: "disabled"`, `serverReady: false`, and `errors: ["ai_server_disabled"]`; `vercel env ls` showed no production `CMMS_AI_MODE`, `CMMS_AI_PROVIDER`, `CMMS_AI_MODEL`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`. The assistant/status UI now explains these setup failures explicitly, but the provider cannot become connected until a real server-side provider key is added to Vercel and the app is redeployed.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
 ## Recent Work Completed
 
 Recent commits on `main`:
 
+- `Clarify AI server setup failures` (current local slice)
+  - Verified live Vercel AI status as an authenticated admin: the server currently reports `ai_server_disabled` because AI env is absent.
+  - `src/AISettingsCard.jsx` now translates setup errors such as `ai_server_disabled`, `ai_provider_required`, and `ai_provider_key_required` into operator-facing setup messages instead of a vague inactive state.
+  - `src/AIPanel.jsx` now shows precise assistant failure messages for disabled server AI, missing provider, missing provider key, provider failure, rate limit, and auth failures instead of always saying the AI service could not be reached.
+  - `server/ai/assistHandler.js` now checks server readiness before calling a provider, so a missing key returns `ai_provider_key_required` without attempting a model request.
+  - This does not add a provider key to Vercel. Live AI still needs production env setup before `/api/ai/status?check=1` can pass.
 - `Add human-confirmed AI meeting time updates` (current local slice)
   - `src/aiAssistContextModel.js` now preserves the safe numeric meeting `at` timestamp in role-filtered AI context so confirmation cards can show the old and new meeting time.
   - `src/aiAssistActionModel.js` can return a deterministic `meeting.update` proposal when the user explicitly asks to move/update a meeting time and the filtered context contains exactly one visible meeting.
@@ -467,7 +474,7 @@ Visual polish still likely needed:
 
 Technical/performance watch:
 
-- Main bundle still triggers Vite's raw-size warning. Latest local build after the AI meeting-time-update slice produced the main app chunk at about 929.40 kB raw / 232.85 kB gzip, plus separate lazy screen chunks and stable vendor chunks.
+- Main bundle still triggers Vite's raw-size warning. Latest local build after the AI setup-diagnostics slice produced the main app chunk at about 930.52 kB raw / 233.17 kB gzip, plus separate lazy screen chunks and stable vendor chunks.
 - Next meaningful performance work should continue reducing initial JS and defer post-login work where safe, not start from visual rewrites.
 - Live controlled-rollout baseline exists, but headless Chromium does not prove native iOS/Safari push-banner behavior.
 

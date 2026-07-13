@@ -83,6 +83,33 @@ describe("AI assist handler", () => {
     expect(providerCall).not.toHaveBeenCalled();
   });
 
+  it("returns a precise setup error when server AI has no provider key", async () => {
+    const providerCall = vi.fn();
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 120,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "ai_provider_key_required",
+      draft: {
+        createdAt: 120,
+        allowedToWrite: false
+      }
+    });
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
   it("accepts a valid CMMS PIN session before using the server provider", async () => {
     const secret = "cmms-secret";
     const signed = signCmmsSessionToken("worker-7", "worker", "11032", secret, Date.now(), 60_000);

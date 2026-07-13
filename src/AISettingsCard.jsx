@@ -2,16 +2,40 @@ import React from "react";
 import { Sparkles } from "lucide-react";
 import { AI_PROVIDER_LABELS, AI_PROVIDER_OPTIONS, DEFAULT_AI_MODELS, normalizeAiSettings } from "./aiProviderModel.js";
 
+export const AI_STATUS_ERROR_LABELS = Object.freeze({
+  access_token_required: "נדרשת התחברות כדי לבדוק את מצב ה-AI.",
+  ai_provider_key_required: "חסר מפתח API ב-Vercel env עבור ספק ה-AI שנבחר.",
+  ai_provider_required: "חסר ספק AI ב-Vercel env.",
+  ai_server_disabled: "שרת ה-AI כבוי ב-Vercel env. נדרש CMMS_AI_MODE=server.",
+  ai_status_unavailable: "לא ניתן לקרוא את מצב שרת ה-AI כרגע.",
+  settings_full_required: "רק מנהל עם הרשאת הגדרות מלאה יכול לבדוק חיבור למודל."
+});
+
+export function aiStatusErrorLabel(error = "") {
+  const key = String(error || "").trim();
+  return AI_STATUS_ERROR_LABELS[key] || key || "שגיאת AI לא ידועה.";
+}
+
+export function aiStatusSummary(aiStatus = null, busy = false) {
+  if (busy) return { text: "בודק חיבור…", badge: "בודק", ready: false };
+  if (aiStatus?.serverReady) return { text: "שרת AI מוכן", badge: "מוכן", ready: true };
+  const errors = Array.isArray(aiStatus?.errors) ? aiStatus.errors.filter(Boolean) : [];
+  if (errors.includes("ai_server_disabled")) return { text: "שרת AI כבוי ב-Vercel", badge: "כבוי", ready: false };
+  if (errors.includes("ai_provider_key_required")) return { text: "חסר מפתח API ל-AI", badge: "חסר מפתח", ready: false };
+  if (errors.includes("ai_provider_required")) return { text: "חסר ספק AI", badge: "חסר ספק", ready: false };
+  return { text: "שרת AI לא פעיל", badge: "לא פעיל", ready: false };
+}
+
 export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy, onRefresh, onCheckConnection }) {
   const aiProviderOptions = Array.isArray(aiStatus?.supportedProviderOptions) && aiStatus.supportedProviderOptions.length
     ? aiStatus.supportedProviderOptions
     : AI_PROVIDER_OPTIONS;
   const aiStatusProviderLabel = AI_PROVIDER_LABELS[aiStatus?.provider] || aiStatus?.provider || "";
-  const aiStatusText = aiStatusBusy ? "בודק חיבור…" : (aiStatus?.serverReady ? "שרת AI מוכן" : "שרת AI לא פעיל");
-  const aiStatusErrors = (aiStatus?.errors || []).filter(Boolean).join(" · ");
+  const statusSummary = aiStatusSummary(aiStatus, aiStatusBusy);
+  const aiStatusErrors = (aiStatus?.errors || []).filter(Boolean).map(aiStatusErrorLabel).join(" · ");
   const providerCheck = aiStatus?.providerCheck || null;
   const providerCheckText = providerCheck
-    ? providerCheck.ok ? "בדיקת חיבור עברה בהצלחה" : `בדיקת חיבור נכשלה: ${providerCheck.error || "לא ידוע"}`
+    ? providerCheck.ok ? "בדיקת חיבור עברה בהצלחה" : `בדיקת חיבור נכשלה: ${aiStatusErrorLabel(providerCheck.error)}`
     : "";
 
   return <>
@@ -19,10 +43,10 @@ export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy, onRefr
     <div className="settings-table-card" style={{ display: "grid", gap: 12, padding: 14, marginBottom: 14 }}>
       <div className="row-between" style={{ gap: 12, alignItems: "flex-start" }}>
         <div>
-          <div style={{ fontWeight: 800, color: "var(--text)" }}>{aiStatusText}</div>
+          <div style={{ fontWeight: 800, color: "var(--text)" }}>{statusSummary.text}</div>
           <div className="hint">הבחירה כאן שומרת רק מצב, ספק ומודל. מפתחות API נשארים רק בשרת / Vercel env ולא נשמרים בדפדפן.</div>
         </div>
-        <span className={"badge sm " + (aiStatus?.serverReady ? "ok" : "warn")}>{aiStatus?.serverReady ? "מוכן" : "כבוי"}</span>
+        <span className={"badge sm " + (statusSummary.ready ? "ok" : "warn")}>{statusSummary.badge}</span>
       </div>
       <div className="row-between" style={{ gap: 8, flexWrap: "wrap" }}>
         <button type="button" className="btn-ghost sm" onClick={onRefresh} disabled={aiStatusBusy}>רענון מצב</button>

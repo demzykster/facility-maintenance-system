@@ -60,6 +60,17 @@ export function normalizeAiPanelAssistantOutput(output) {
   return { text, actions };
 }
 
+export function aiAssistantFailureMessage(error = {}) {
+  const code = cleanText(error?.message || error, "");
+  if (code === "ai_server_disabled") return "שרת ה-AI כבוי כרגע. יש להגדיר ב-Vercel את CMMS_AI_MODE=server, ספק ומפתח API.";
+  if (code === "ai_provider_required") return "חסר ספק AI בשרת. יש לבחור ספק ולהגדיר CMMS_AI_PROVIDER.";
+  if (code === "ai_provider_key_required") return "חסר מפתח API לספק ה-AI בשרת / Vercel env.";
+  if (code === "ai_provider_failed") return "השרת מחובר ל-AI, אבל ספק המודל החזיר שגיאה. בדקו את המפתח או המודל.";
+  if (code === "ai_assist_rate_limited") return "נשלחו יותר מדי בקשות AI ברצף. נסו שוב בעוד רגע.";
+  if (code === "access_token_required") return "נדרשת התחברות מחדש לפני שימוש ב-AI.";
+  return "לא הצלחתי להתחבר לשירות ה-AI כרגע.";
+}
+
 function actionStatusLabel(action = {}) {
   if (action.status === "ready_for_confirmation") return "מוכן לאישור";
   if (action.status === "needs_human_input") return "חסרים פרטים";
@@ -207,8 +218,8 @@ export function AIPanel({ session, tickets, pm, fleet, tasks = [], meetings = []
         : await callModel(apiMsgs, sys, 900);
       const normalized = normalizeAiPanelAssistantOutput(out);
       setMsgs((s) => [...s, { role: "assistant", content: normalized.text, actions: normalized.actions }]);
-    } catch {
-      setMsgs((s) => [...s, { role: "assistant", content: "לא הצלחתי להתחבר לשירות ה-AI כרגע." }]);
+    } catch (error) {
+      setMsgs((s) => [...s, { role: "assistant", content: aiAssistantFailureMessage(error) }]);
     } finally {
       setBusy(false);
     }

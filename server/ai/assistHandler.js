@@ -3,7 +3,7 @@ import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
 import { buildAiAssistActionProposals } from "../../src/aiAssistActionModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
 import { aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
-import { AI_MODES, aiServerConfigFromEnv } from "../../src/aiProviderModel.js";
+import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { authorizeAiRequest } from "./auth.js";
@@ -156,6 +156,10 @@ export function createAiAssistHandler({
       const config = aiServerConfigFromEnv(env);
       if (config.mode !== AI_MODES.server) {
         return sendJson(res, 503, { error: "ai_server_disabled", draft, actions });
+      }
+      const readiness = publicAiServerStatusFromEnv(env);
+      if (!readiness.serverReady) {
+        return sendJson(res, 503, { error: readiness.errors[0] || "ai_server_not_ready", draft, actions });
       }
 
       const result = await providerCall({

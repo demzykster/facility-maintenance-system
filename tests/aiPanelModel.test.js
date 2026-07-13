@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aiUpdatePreviewRows, normalizeAiPanelAssistantOutput } from "../src/AIPanel.jsx";
+import { aiAssistantFailureMessage, aiUpdatePreviewRows, normalizeAiPanelAssistantOutput } from "../src/AIPanel.jsx";
 
 describe("AI panel response model", () => {
   it("keeps legacy string assistant responses working", () => {
@@ -51,5 +51,11 @@ describe("AI panel response model", () => {
     })).toEqual([
       { field: "dueAt", label: "תאריך יעד", before: "—", after: "13.07.26 09:30" }
     ]);
+  });
+
+  it("explains server AI configuration failures instead of reporting a generic network issue", () => {
+    expect(aiAssistantFailureMessage(new Error("ai_server_disabled"))).toContain("CMMS_AI_MODE=server");
+    expect(aiAssistantFailureMessage(new Error("ai_provider_key_required"))).toContain("מפתח API");
+    expect(aiAssistantFailureMessage(new Error("ai_assist_rate_limited"))).toContain("בעוד רגע");
   });
 });
