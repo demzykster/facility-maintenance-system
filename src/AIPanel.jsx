@@ -210,9 +210,9 @@ function AiProviderPlanCard({ plan }) {
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
-  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings, users), [session, vis, pm, fleet, config, tasks, meetings, users, buildContext]);
+  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs), [session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
   const [input, setInput] = useState(initialText || "");
   const [inputWorkflow, setInputWorkflow] = useState(initialWorkflow || AI_ASSIST_WORKFLOWS.general);

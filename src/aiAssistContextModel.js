@@ -7,6 +7,8 @@ const MAX_PM = 12;
 const MAX_TASKS = 16;
 const MAX_MEETINGS = 10;
 const MAX_SUPPLIERS = 12;
+const MAX_PPE_ITEMS = 24;
+const MAX_PPE_REQUESTS = 16;
 const MAX_HEATMAP_ROWS = 8;
 const MAX_TEXT = 160;
 
@@ -235,11 +237,61 @@ function sanitizeSupplier(item = {}) {
   return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
 }
 
+function sanitizePpeItem(item = {}) {
+  const totalStock = numberOrNull(item.totalStock ?? item.stock);
+  const minStock = numberOrNull(item.minStock);
+  const clean = {
+    id: compactId(item.id || item.itemId),
+    name: compactText(item.name || item.itemName, 120),
+    category: compactText(item.category, 60),
+    sizes: cleanStringArray(item.sizes || item.sizeOptions, 12),
+    lowStock: booleanOrFalse(item.lowStock)
+  };
+  if (totalStock != null) clean.totalStock = totalStock;
+  if (minStock != null) clean.minStock = minStock;
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && value !== false && !(Array.isArray(value) && value.length === 0)));
+}
+
+function sanitizePpeLine(line = {}) {
+  const qty = numberOrNull(line.qty);
+  const clean = {
+    itemId: compactId(line.itemId || line.id),
+    itemName: compactText(line.itemName || line.name, 120),
+    category: compactText(line.category, 60),
+    size: compactText(line.size, 60)
+  };
+  if (qty != null) clean.qty = qty;
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null));
+}
+
+function ppeRequestAllowed(request = {}, profile) {
+  if (profile.canSeeCompany) return true;
+  return matchesUserIdentity(request.workerId || request.workerNo || request.workerName, profile)
+    || matchesUserIdentity(request.by?.id || request.by?.workerNo || request.by?.name, profile)
+    || departmentAllowed(request, profile);
+}
+
+function sanitizePpeRequest(request = {}) {
+  const ageDays = numberOrNull(request.ageDays);
+  const clean = {
+    id: compactId(request.id),
+    status: compactText(request.status, 50),
+    workerId: compactId(request.workerId),
+    workerName: compactText(request.workerName, 120),
+    workerNo: compactId(request.workerNo),
+    department: compactText(request.department || request.dept, 120),
+    lines: asArray(request.lines).slice(0, 6).map(sanitizePpeLine).filter((line) => line.itemId || line.itemName)
+  };
+  if (ageDays != null) clean.ageDays = ageDays;
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+}
+
 function sanitizeMetrics(metrics = {}, profile) {
   const allowed = [
     "openTickets", "overdueTickets", "waitingTickets", "pendingApprovals", "assignedToMe",
     "fleetDocsDue", "pmDue", "ppeOpen", "cleaningOpen", "tasksOpen", "openTasks", "overdueTasks",
-    "waitingTasks", "plannedMeetings", "meetingsToSummarize", "unreadNotifications"
+    "waitingTasks", "plannedMeetings", "meetingsToSummarize", "unreadNotifications",
+    "ppeCatalogActive", "ppeLowStock"
   ];
   if (profile.canSeeFinancials) allowed.push("totalCost", "monthlyCost", "estimatedCost");
   return Object.fromEntries(allowed
@@ -317,6 +369,16 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
       .map(sanitizeSupplier)
       .filter((supplier) => supplier.name)
     : [];
+  const ppeSource = source.ppe && typeof source.ppe === "object" ? source.ppe : {};
+  const ppeItems = asArray(ppeSource.items)
+    .slice(0, MAX_PPE_ITEMS)
+    .map(sanitizePpeItem)
+    .filter((item) => item.id && item.name);
+  const ppeRequests = asArray(ppeSource.requests)
+    .filter((request) => ppeRequestAllowed(request, profile))
+    .slice(0, MAX_PPE_REQUESTS)
+    .map(sanitizePpeRequest)
+    .filter((request) => request.id);
   return {
     profile: {
       role: profile.role,
@@ -335,6 +397,10 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     tasks,
     meetings,
     suppliers,
+    ppe: {
+      items: ppeItems,
+      requests: ppeRequests
+    },
     limits: {
       tickets: MAX_TICKETS,
       fleet: MAX_FLEET,
@@ -343,6 +409,8 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
       tasks: MAX_TASKS,
       meetings: MAX_MEETINGS,
       suppliers: MAX_SUPPLIERS,
+      ppeItems: MAX_PPE_ITEMS,
+      ppeRequests: MAX_PPE_REQUESTS,
       heatmap: MAX_HEATMAP_ROWS
     }
   };

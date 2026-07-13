@@ -44,6 +44,8 @@ export function buildAIContextSnapshot({
   users = [],
   tasks = [],
   meetings = [],
+  ppeItems = [],
+  ppeReqs = [],
   config = {},
   now = Date.now(),
   isOpenTicket = defaultIsOpenTicket,
@@ -66,6 +68,8 @@ export function buildAIContextSnapshot({
   maxTasks = 24,
   maxMeetings = 12,
   maxSuppliers = 18,
+  maxPpeItems = 24,
+  maxPpeRequests = 16,
   maxHeatmapRows = 6
 } = {}) {
   const ticketList = asArray(tickets);
@@ -74,8 +78,27 @@ export function buildAIContextSnapshot({
   const pmList = asArray(pm);
   const taskList = asArray(tasks);
   const meetingList = asArray(meetings);
+  const ppeItemList = asArray(ppeItems);
+  const ppeRequestList = asArray(ppeReqs);
   const openTickets = ticketList.filter(isOpenTicket);
   const openTasks = taskList.filter(isOpenTask);
+  const activePpeItems = ppeItemList.filter((item) => item && item.active !== false);
+  const openPpeRequests = ppeRequestList.filter((request) => ["pending", "worker_sign"].includes(String(request?.status || "pending")));
+
+  const ppeSizesForItem = (item = {}) => {
+    const explicit = cleanStringList(item.sizes || item.sizeOptions || Object.keys(item.stockBySize || {}), 12);
+    return explicit.length ? explicit : ["אחיד"];
+  };
+  const ppeTotalStock = (item = {}) => Object.values(item.stockBySize || {})
+    .reduce((sum, value) => sum + (Number(value) || 0), Number(item.stock || item.qty || 0) || 0);
+  const ppeMinStock = (item = {}) => Number(item.minStock || item.min || item.minimum || 0) || 0;
+  const ppeLine = (line = {}) => ({
+    itemId: line.itemId || "",
+    itemName: line.itemName || "",
+    category: line.category || "",
+    size: line.size || "",
+    qty: Number(line.qty || 1) || 1
+  });
 
   const mapTicket = (ticket) => ({
     id: ticket.id,
@@ -184,6 +207,35 @@ export function buildAIContextSnapshot({
     return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
   };
 
+  const mapPpeItem = (item) => {
+    const totalStock = ppeTotalStock(item);
+    const minStock = ppeMinStock(item);
+    const clean = {
+      id: item.id,
+      name: item.name || item.itemName || "",
+      category: item.category || "",
+      sizes: ppeSizesForItem(item),
+      totalStock,
+      minStock,
+      lowStock: minStock > 0 ? totalStock < minStock : false
+    };
+    return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+  };
+
+  const mapPpeRequest = (request) => {
+    const clean = {
+      id: request.id,
+      status: request.status || "pending",
+      workerId: request.workerId || "",
+      workerName: request.workerName || "",
+      workerNo: request.workerNo || "",
+      department: request.dept || request.department || "",
+      ageDays: Math.max(0, Math.round((now - (request.at || now)) / dayMs)),
+      lines: asArray(request.lines).map(ppeLine).filter((line) => line.itemId || line.itemName).slice(0, 6)
+    };
+    return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+  };
+
   const openTaskRows = openTasks
     .slice()
     .sort((a, b) => ((Number(a.dueAt || 9e15) || 9e15) - (Number(b.dueAt || 9e15) || 9e15)) || ((Number(b.updatedAt || 0) || 0) - (Number(a.updatedAt || 0) || 0)));
@@ -242,7 +294,13 @@ export function buildAIContextSnapshot({
       overdueTasks: openTasks.filter((task) => Number(task.dueAt || 0) && Number(task.dueAt) < now).length,
       waitingTasks: openTasks.filter((task) => task.status === "waiting").length,
       plannedMeetings: plannedMeetings.length,
-      meetingsToSummarize: plannedMeetings.filter((meeting) => Number(meeting.at || meeting.meetingAt || 0) && Number(meeting.at || meeting.meetingAt) < now).length
+      meetingsToSummarize: plannedMeetings.filter((meeting) => Number(meeting.at || meeting.meetingAt || 0) && Number(meeting.at || meeting.meetingAt) < now).length,
+      ppeOpen: openPpeRequests.length,
+      ppeCatalogActive: activePpeItems.length,
+      ppeLowStock: activePpeItems.filter((item) => {
+        const minStock = ppeMinStock(item);
+        return minStock > 0 && ppeTotalStock(item) < minStock;
+      }).length
     },
     bi: {
       heatmap: heatmapRows
@@ -253,6 +311,10 @@ export function buildAIContextSnapshot({
     pm: pmDue.slice(0, maxPm),
     tasks: openTaskRows.slice(0, maxTasks).map(mapTask),
     meetings: plannedMeetings.slice(0, maxMeetings).map(mapMeeting),
-    suppliers
+    suppliers,
+    ppe: {
+      items: activePpeItems.slice(0, maxPpeItems).map(mapPpeItem),
+      requests: openPpeRequests.slice(0, maxPpeRequests).map(mapPpeRequest)
+    }
   };
 }

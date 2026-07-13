@@ -97,6 +97,46 @@ describe("AI assist snapshot model", () => {
         participantIds: ["admin-1"]
       }
     ];
+    const ppeItems = [
+      {
+        id: "ppe-vest",
+        name: "אפוד זוהר",
+        category: "hivis",
+        sizes: ["אחיד"],
+        stockBySize: { "אחיד": 4 },
+        minStock: 2,
+        active: true,
+        unitCost: 25
+      },
+      {
+        id: "ppe-old",
+        name: "ישן",
+        category: "other",
+        stockBySize: { "אחיד": 1 },
+        active: false
+      }
+    ];
+    const ppeReqs = [
+      {
+        id: "ppe-req-1",
+        status: "pending",
+        workerId: "u2",
+        workerName: "Dana",
+        workerNo: "11032",
+        dept: "הפצה",
+        at: now - day,
+        lines: [{ itemId: "ppe-vest", itemName: "אפוד זוהר", category: "hivis", size: "אחיד", qty: 1, unitCost: 25 }]
+      },
+      {
+        id: "ppe-req-2",
+        status: "approved",
+        workerId: "u2",
+        workerName: "Dana",
+        dept: "הפצה",
+        at: now - 2 * day,
+        lines: [{ itemId: "ppe-vest", itemName: "אפוד זוהר", category: "hivis", size: "אחיד", qty: 1 }]
+      }
+    ];
 
     const snapshot = buildAIContextSnapshot({
       session,
@@ -106,6 +146,8 @@ describe("AI assist snapshot model", () => {
       users,
       tasks,
       meetings,
+      ppeItems,
+      ppeReqs,
       config: {
         departments: ["הפצה", "קבלה"],
         suppliers: ["Toyota", "BuildingCo"],
@@ -145,6 +187,11 @@ describe("AI assist snapshot model", () => {
       waitingTasks: 1,
       plannedMeetings: 2,
       meetingsToSummarize: 1
+    });
+    expect(snapshot.metrics).toMatchObject({
+      ppeOpen: 1,
+      ppeCatalogActive: 1,
+      ppeLowStock: 0
     });
     expect(snapshot.tickets).toHaveLength(2);
     expect(snapshot.tickets[0]).toMatchObject({
@@ -255,6 +302,30 @@ describe("AI assist snapshot model", () => {
       }
     ]);
     expect(JSON.stringify(snapshot.suppliers)).not.toContain("Secret");
+    expect(snapshot.ppe.items).toEqual([
+      {
+        id: "ppe-vest",
+        name: "אפוד זוהר",
+        category: "hivis",
+        sizes: ["אחיד"],
+        totalStock: 4,
+        minStock: 2,
+        lowStock: false
+      }
+    ]);
+    expect(snapshot.ppe.requests).toEqual([
+      {
+        id: "ppe-req-1",
+        status: "pending",
+        workerId: "u2",
+        workerName: "Dana",
+        workerNo: "11032",
+        department: "הפצה",
+        ageDays: 1,
+        lines: [{ itemId: "ppe-vest", itemName: "אפוד זוהר", category: "hivis", size: "אחיד", qty: 1 }]
+      }
+    ]);
+    expect(JSON.stringify(snapshot.ppe)).not.toContain("unitCost");
     expect(snapshot.bi.heatmap.map((row) => row.department)).toEqual(["הפצה", "קבלה"]);
     expect(snapshot.bi.heatmap[0]).toMatchObject({
       total: 1,

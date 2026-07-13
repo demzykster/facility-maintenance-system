@@ -546,6 +546,13 @@ AI assistant dialogue quality:
 - Assistant text must preserve paragraph breaks. Do not run provider text through whitespace normalization that collapses newlines into one dense paragraph.
 - Provider text remains advisory/read-only. Write-capable actions still come only from deterministic proposals and require UI confirmation before any DB write.
 
+AI PPE context:
+
+- AI context now includes sanitized PPE catalog and open PPE requests.
+- PPE catalog excludes financial fields such as `unitCost`.
+- PPE requests are filtered server-side by role/user/department before reaching the provider.
+- This is context only. A future PPE request creation action should be a separate deterministic proposal with UI confirmation, not provider-controlled writing.
+
 ## Validation Expectations
 
 For code/UI changes:
