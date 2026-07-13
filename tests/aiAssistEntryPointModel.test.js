@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biHeatmapAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI assist entry point model", () => {
@@ -147,5 +147,40 @@ describe("AI assist entry point model", () => {
     expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
     expect(prompt.text).toContain("אין כרגע חוסרים פתוחים");
     expect(prompt.text).not.toContain("אישרתי");
+  });
+
+  it("builds a cleaning risk prompt from today's operational state", () => {
+    const prompt = cleaningDashboardAiPrompt({
+      labels: {
+        zones: 11,
+        doneRounds: 18,
+        totalRounds: 24,
+        actionableRounds: 3,
+        missedRounds: 2,
+        pendingComplaints: 1,
+        openComplaints: 4,
+        escalatedComplaints: 1,
+        absentCleaners: ["מאיה", "רונן"],
+        unassignedZones: ["שירותים ראשי"],
+        riskZones: ["לובי כניסה · סבב 14:00", "שירותים ראשי · פוספס"]
+      }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.riskSummary);
+    expect(prompt.text).toContain("בקרת ניקיון");
+    expect(prompt.text).toContain("18/24 סבבים בוצעו");
+    expect(prompt.text).toContain("3 סבבים דורשים פעולה");
+    expect(prompt.text).toContain("מאיה");
+    expect(prompt.text).toContain("3 הפעולות הבטוחות הבאות");
+  });
+
+  it("builds a cleaning next-action prompt for a clean day without claiming work was done", () => {
+    const prompt = cleaningDashboardAiPrompt({
+      labels: { zones: 5, doneRounds: 10, totalRounds: 10, actionableRounds: 0, missedRounds: 0, pendingComplaints: 0, openComplaints: 0 }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
+    expect(prompt.text).toContain("אין כרגע סבבים באיחור");
+    expect(prompt.text).not.toContain("סגרתי");
   });
 });

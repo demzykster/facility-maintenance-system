@@ -31,7 +31,7 @@ import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
-import { biHeatmapAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -5196,7 +5196,7 @@ function ZoneTag({ zone, onClose }) {
 }
 
 function CleaningAdmin(p) {
-  const { zones, rounds, users, absences, saveZone, delZone, saveUser, saveRound, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, delComplaint } = p;
+  const { zones, rounds, users, absences, saveZone, delZone, saveUser, saveRound, complaints, fileComplaint, resolveComplaint, progressComplaint, approveComplaint, rejectComplaint, delComplaint, onAskAI } = p;
   const cleaners = useMemo(() => (users || []).filter(isActiveCleaningWorker), [users]);
   const managers = useMemo(() => (users || []).filter((u) => u.role === "user" && u.active !== false), [users]);
   const [tab, setTab] = useState("today"), [edit, setEdit] = useState(null), [tag, setTag] = useState(null), [rep, setRep] = useState(null), [showClosed, setShowClosed] = useState(false);
@@ -5363,10 +5363,37 @@ function CleaningAdmin(p) {
       </div>)}
     </section>;
   });
+  const askCleaningAI = onAskAI ? () => {
+    const tk = todayKey();
+    const away = (absences || []).filter((a) => a.from <= tk && (a.to || a.from) >= tk).map((a) => a.name || a.userId || "—");
+    const unassigned = list.filter((z) => z.active !== false && zoneCleanerIds(z).length === 0).map((z) => z.name);
+    const riskZones = [
+      ...today.action.slice(0, 3).map(({ z, sts }) => {
+        const activeWin = sts.find((s) => isCleaningRoundActionableStatus(s.status));
+        return `${z.name}${activeWin?.win?.time ? ` · ${activeWin.win.time}` : ""}`;
+      }),
+      ...today.missed.slice(0, 2).map(({ z }) => `${z.name} · פוספס`)
+    ];
+    onAskAI(cleaningDashboardAiPrompt({
+      labels: {
+        zones: list.filter((z) => z.active !== false).length,
+        doneRounds: today.done,
+        totalRounds: today.tot,
+        actionableRounds: today.actionN,
+        missedRounds: today.missedN,
+        pendingComplaints: pending.length,
+        openComplaints: openC.length,
+        escalatedComplaints: escC.length,
+        absentCleaners: away,
+        unassignedZones: unassigned,
+        riskZones
+      }
+    }));
+  } : null;
   return (<>
     <div className="seg-tabs s4" style={{ maxWidth: 560, marginBottom: 14 }}><button className={tab === "today" ? "on" : ""} onClick={() => setTab("today")}>היום</button><button className={tab === "zones" ? "on" : ""} onClick={() => setTab("zones")}>אזורים</button><button className={tab === "complaints" ? "on" : ""} onClick={() => setTab("complaints")}>דיווחים{needAttn ? ` (${needAttn})` : ""}</button><button className={tab === "rounds" ? "on" : ""} onClick={() => setTab("rounds")}>סבבים</button></div>
     {tab === "today" ? (list.length === 0 ? <Empty text="אין אזורים עדיין" Icon={Sparkles} sub="הוסיפו אזור בלשונית «אזורים»" /> : <>
-      <div className="comp-card"><div className="comp-big">{today.done}/{today.tot}</div><div className="comp-lbl">סבבים בוצעו היום</div><div className="comp-bar"><span style={{ width: (today.tot ? Math.round(today.done / today.tot * 100) : 0) + "%" }} /></div></div>
+      <div className="comp-card"><div className="comp-big">{today.done}/{today.tot}</div><div className="comp-lbl">סבבים בוצעו היום</div><div className="comp-bar"><span style={{ width: (today.tot ? Math.round(today.done / today.tot * 100) : 0) + "%" }} /></div>{askCleaningAI && <button className="btn-ghost sm" style={{ marginTop: 10 }} onClick={askCleaningAI}><Sparkles size={15} /> שאל AI</button>}</div>
       {(() => { const tk = todayKey(); const away = (absences || []).filter((a) => a.from <= tk && (a.to || a.from) >= tk); if (!away.length) return null; const zonesOf = (uid) => (zones || []).filter((z) => isZoneCleaner(z, uid) && z.active !== false).map((z) => z.name); return <div className="note" style={{ borderColor: "#FDE68A", marginBottom: 8 }}><CalendarClock size={13} /> בחופשה היום — נדרש כיסוי: {away.map((a) => `${a.name}${zonesOf(a.userId).length ? " (" + zonesOf(a.userId).join(", ") + ")" : ""}`).join(" · ")}</div>; })()}
       {today.action.length > 0 && <><SectionTitle><AlertTriangle size={15} /> דורש פעולה ({today.actionN})</SectionTitle>{renderAreaSections(today.action, ({ z, sts }) => { const actionable = sts.filter((s) => isCleaningRoundActionableStatus(s.status)); const activeWin = actionable[0]; return <div key={z.id} className="tcard" style={{ borderInlineStartColor: activeWin?.status === "overdue" ? "#EA580C" : "#B45309" }}><div className="tcard-main"><div className="tcard-row1 clean-tcard-head"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "#FEF3C7", color: "#B45309" }}>{activeWin ? `${roundOrdinal(sts, activeWin.win)} · ${activeWin.win.time}` : `${actionable.length} לביצוע`}</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{zoneCleanerLabel(z, users)}</div>{zoneTodayStatButtons(z, sts)}{winChips(sts)}</div></div>; }, (x) => x.z)}</>}
       {today.missed.length > 0 && <><SectionTitle><Clock size={15} /> פוספסו היום ({today.missedN})</SectionTitle><div className="note" style={{ marginBottom: 8 }}>חלונות שכבר עברו נשמרים להיסטוריה ולניתוח, אבל לא מוצגים לעובד כמשימה לביצוע.</div>{renderAreaSections(today.missed, ({ z, sts }) => <div key={z.id} className="tcard" style={{ borderInlineStartColor: "#DC2626" }}><div className="tcard-main"><div className="tcard-row1 clean-tcard-head"><span className="tcard-subj">{z.name}</span><span className="badge sm" style={{ background: "#FEE2E2", color: "#DC2626" }}>{sts.filter((s) => s.status === "missed").length} פוספסו</span></div><div className="tcard-sub">{zoneLoc(z) ? zoneLoc(z) + " · " : ""}{zoneCleanerLabel(z, users)}</div>{zoneTodayStatButtons(z, sts)}{winChips(sts)}</div></div>, (x) => x.z)}</>}
@@ -8005,7 +8032,7 @@ function AdminApp(p) {
           {activeTab === "assets" && <AssetsHub {...p} assetNav={assetNav} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "tasks" && <ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />}
           {activeTab === "ppe" && <PpeHub {...p} ppeNav={ppeNav} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
-          {activeTab === "cleaning" && <CleaningAdmin {...p} />}
+          {activeTab === "cleaning" && <CleaningAdmin {...p} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
           {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
           {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} />}

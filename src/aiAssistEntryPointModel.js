@@ -134,6 +134,43 @@ export function ppeDashboardAiPrompt({ labels = {} } = {}) {
   });
 }
 
+export function cleaningDashboardAiPrompt({ labels = {} } = {}) {
+  const zones = asNumber(labels.zones);
+  const doneRounds = asNumber(labels.doneRounds);
+  const totalRounds = asNumber(labels.totalRounds);
+  const actionableRounds = asNumber(labels.actionableRounds);
+  const missedRounds = asNumber(labels.missedRounds);
+  const pendingComplaints = asNumber(labels.pendingComplaints);
+  const openComplaints = asNumber(labels.openComplaints);
+  const escalatedComplaints = asNumber(labels.escalatedComplaints);
+  const absentCleaners = Array.isArray(labels.absentCleaners) ? labels.absentCleaners.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const unassignedZones = Array.isArray(labels.unassignedZones) ? labels.unassignedZones.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const riskZones = Array.isArray(labels.riskZones) ? labels.riskZones.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const hasRisk = actionableRounds > 0 || missedRounds > 0 || pendingComplaints > 0 || openComplaints > 0 || absentCleaners.length > 0 || unassignedZones.length > 0;
+  const statusLine = hasRisk
+    ? [
+      actionableRounds ? `${compactCount(actionableRounds)} סבבים דורשים פעולה` : "",
+      missedRounds ? `${compactCount(missedRounds)} סבבים פוספסו` : "",
+      pendingComplaints ? `${compactCount(pendingComplaints)} דיווחים ממתינים לאישור` : "",
+      openComplaints ? `${compactCount(openComplaints)} דיווחים פתוחים` : "",
+      escalatedComplaints ? `${compactCount(escalatedComplaints)} דיווחים הועברו להנהלה` : ""
+    ].filter(Boolean).join("; ")
+    : "אין כרגע סבבים באיחור או דיווחים פתוחים.";
+  const contextParts = [
+    `${compactCount(zones)} אזורי ניקיון`,
+    `${compactCount(doneRounds)}/${compactCount(totalRounds)} סבבים בוצעו היום`,
+    statusLine,
+    absentCleaners.length ? `עובדים בחופשה/חסרים: ${absentCleaners.join(", ")}` : "",
+    unassignedZones.length ? `אזורים ללא אחראי: ${unassignedZones.join(", ")}` : "",
+    riskZones.length ? `אזורים לבדיקה ראשונה: ${riskZones.join("; ")}` : ""
+  ].filter(Boolean);
+
+  return Object.freeze({
+    workflow: hasRisk ? AI_ASSIST_WORKFLOWS.riskSummary : AI_ASSIST_WORKFLOWS.nextActions,
+    text: `נתח את בקרת ניקיון להיום. ${contextParts.join("; ")}. הסבר מה הסיכון התפעולי, מי/מה כדאי לבדוק לפני פעולה, ומה 3 הפעולות הבטוחות הבאות.`
+  });
+}
+
 export function biHeatmapAiPrompt({ rows = [], row = null, cell = null } = {}) {
   const selectedRow = row || null;
   const selectedCell = cell || null;
