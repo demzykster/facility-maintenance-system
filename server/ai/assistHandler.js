@@ -182,10 +182,16 @@ function assistantCapabilityGuidanceForProvider() {
 
 function actionStatsForAudit(actions = []) {
   const safeActions = Array.isArray(actions) ? actions : [];
+  const actionTypes = [...new Set(safeActions.map((action) => cleanText(action?.type, 80)).filter(Boolean))].slice(0, 8);
+  const missingFields = [...new Set(safeActions.flatMap((action) => Array.isArray(action?.missingFields) ? action.missingFields : [])
+    .map((field) => cleanText(field, 80))
+    .filter(Boolean))].slice(0, 12);
   return {
     actionCount: safeActions.length,
     readyActionCount: safeActions.filter((action) => action?.status === "ready_for_confirmation").length,
-    missingFieldCount: [...new Set(safeActions.flatMap((action) => Array.isArray(action?.missingFields) ? action.missingFields : []))].length
+    missingFieldCount: missingFields.length,
+    actionTypes,
+    missingFields
   };
 }
 
@@ -395,9 +401,16 @@ export function createAiAssistHandler({
       const workflow = normalizeAiAssistWorkflow(body.workflow);
       const conversation = cleanConversationMessages(body.messages);
       const latestUserRequest = latestUserTextFromConversation(conversation, normalized.input.rawText);
+      const draftRawText = conversationAwareDraftText({ rawText: normalized.input.rawText, conversation });
       const draftInput = {
         ...normalized.input,
-        rawText: conversationAwareDraftText({ rawText: normalized.input.rawText, conversation })
+        rawText: draftRawText
+      };
+      const draftTelemetry = {
+        mergedFromRecentConversation: Boolean(latestUserRequest && draftRawText && latestUserRequest !== draftRawText),
+        recentConversationCount: conversation.length,
+        latestUserMessageChars: latestUserRequest.length,
+        draftInputChars: draftRawText.length
       };
       const responseLanguage = responseLanguageForRequest({
         text: normalized.input.rawText,
@@ -442,6 +455,7 @@ export function createAiAssistHandler({
           providerStatus: "failed",
           workflow,
           responseLanguage,
+          draftTelemetry,
           ...actionStatsForAudit(actions)
         }, auth.user, { at: currentTime }));
         return sendJson(res, 502, {
@@ -482,6 +496,7 @@ export function createAiAssistHandler({
         workflow,
         responseLanguage,
         assistantLanguage: detectLanguageFromText(assistantText),
+        draftTelemetry,
         ...actionStatsForAudit(actions)
       }, auth.user, { at: currentTime }));
 

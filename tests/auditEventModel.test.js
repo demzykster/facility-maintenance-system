@@ -154,7 +154,15 @@ describe("auditEventModel", () => {
       assistantLanguage: "he",
       actionCount: 2,
       readyActionCount: 1,
-      missingFieldCount: 3
+      missingFieldCount: 3,
+      actionTypes: ["ticket.create", "ppe.request.create"],
+      missingFields: ["zone", "size"],
+      draftTelemetry: {
+        mergedFromRecentConversation: true,
+        recentConversationCount: 3,
+        latestUserMessageChars: 18,
+        draftInputChars: 72
+      }
     }, { id: "u1", name: "Manager", role: "user" }, { at: 700 });
 
     expect(event).toMatchObject({
@@ -182,6 +190,14 @@ describe("auditEventModel", () => {
         actionCount: 2,
         readyActionCount: 1,
         missingFieldCount: 3,
+        actionTypes: ["ticket.create", "ppe.request.create"],
+        missingFields: ["zone", "size"],
+        intakeTelemetry: {
+          mergedFromRecentConversation: true,
+          recentConversationCount: 3,
+          latestUserMessageChars: 18,
+          draftInputChars: 72
+        },
         contextCounts: { tickets: 1, fleet: 1, pm: 0, tasks: 1, meetings: 1, metrics: 1 }
       }
     });

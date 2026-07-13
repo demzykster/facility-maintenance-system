@@ -1604,6 +1604,71 @@ describe("AI assist handler", () => {
     });
   });
 
+  it("writes safe learning telemetry for conversation-merged assistant actions", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "Подготовил карточку заявки для подтверждения."
+    });
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "admin" }),
+      providerCall,
+      auditDriver,
+      now: () => 658,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "в холодильной комнате F-002",
+        language: "ru",
+        messages: [
+          { role: "user", content: "создай заявку: сломалась ручка двери холодильника" },
+          { role: "assistant", content: "Где именно это находится?" },
+          { role: "user", content: "в холодильной комнате F-002" }
+        ]
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      at: 658,
+      action: "ai_assist",
+      metadata: expect.objectContaining({
+        provider: "google",
+        model: "gemini-3.5-flash",
+        providerStatus: "ok",
+        requestedLanguage: "ru",
+        requestedLanguageSource: "latest_user_message",
+        assistantLanguage: "ru",
+        languageMismatch: false,
+        actionCount: 1,
+        readyActionCount: 1,
+        missingFieldCount: 0,
+        actionTypes: ["ticket.create"],
+        missingFields: [],
+        intakeTelemetry: {
+          mergedFromRecentConversation: true,
+          recentConversationCount: 3,
+          latestUserMessageChars: "в холодильной комнате F-002".length,
+          draftInputChars: "создай заявку: сломалась ручка двери холодильника. в холодильной комнате F-002".length
+        }
+      })
+    }));
+    const auditPayload = JSON.stringify(auditDriver.write.mock.calls[0][0]);
+    expect(auditPayload).not.toContain("сломалась ручка");
+    expect(auditPayload).not.toContain("холодильной комнате");
+    expect(auditPayload).not.toContain("server-secret");
+  });
+
   it("answers in the latest user message language instead of the UI fallback language", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

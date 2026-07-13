@@ -140,11 +140,17 @@ export function aiAssistAuditEvent({
   assistantLanguage = "",
   actionCount = 0,
   readyActionCount = 0,
-  missingFieldCount = 0
+  missingFieldCount = 0,
+  actionTypes = [],
+  missingFields = [],
+  draftTelemetry = {}
 } = {}, actor = {}, options = {}) {
   const requestedLanguage = responseLanguage && typeof responseLanguage === "object" ? responseLanguage : {};
   const requestedLanguageCode = requestedLanguage.code || draft.language || "";
   const actualLanguageCode = assistantLanguage || "";
+  const safeActionTypes = Array.isArray(actionTypes) ? actionTypes.map((value) => cleanString(value)).filter(Boolean).slice(0, 8) : [];
+  const safeMissingFields = Array.isArray(missingFields) ? missingFields.map((value) => cleanString(value)).filter(Boolean).slice(0, 12) : [];
+  const telemetry = cleanObject(draftTelemetry);
   return normalizeAuditEvent({
     at: options.at,
     actorId: actor.id,
@@ -171,6 +177,14 @@ export function aiAssistAuditEvent({
       actionCount: Number(actionCount) || 0,
       readyActionCount: Number(readyActionCount) || 0,
       missingFieldCount: Number(missingFieldCount) || 0,
+      actionTypes: safeActionTypes,
+      missingFields: safeMissingFields,
+      intakeTelemetry: {
+        mergedFromRecentConversation: telemetry.mergedFromRecentConversation === true,
+        recentConversationCount: Number(telemetry.recentConversationCount) || 0,
+        latestUserMessageChars: Number(telemetry.latestUserMessageChars) || 0,
+        draftInputChars: Number(telemetry.draftInputChars) || 0
+      },
       provider: provider || "",
       model: model || "",
       providerStatus,
