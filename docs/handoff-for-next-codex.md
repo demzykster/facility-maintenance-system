@@ -1,13 +1,13 @@
 # Handoff For Next Codex
 
-Updated: 2026-07-12
+Updated: 2026-07-13
 
 ## Startup Checklist
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after push.
-- Latest app/UI commit before this handoff: `Lazy-load AI panel and provider boundary`.
+- Latest app/UI commit before this handoff: `Lazy load fleet assets module`.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -50,7 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget is `19/24` after grouping AI URLs through one dynamic `api/ai/[action].js` route.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 251.28 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, and a `BIOverview` chunk around 9.13 kB gzip.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 227.65 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.13 kB gzip, and a `FleetAssetsModule` chunk around 26.39 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and `src/BIOverview.jsx` wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
@@ -58,6 +58,11 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Lazy load fleet assets module`
+  - Extracts fleet/transport and periodic-maintenance UI from `src/ClaudeMaintenanceApp.jsx` into `src/FleetAssetsModule.jsx`.
+  - Keeps the small `AssetsHub` tab switcher in the app shell, while fleet import, fleet list/detail/settings, PM calendar/list/history, PM rule scheduling, and PM execution overlays load only when the assets module is opened.
+  - Adds `tests/fleetAssetsLazyWiring.test.js` so Fleet/PM do not silently drift back into the startup monolith.
+  - Local build evidence after the split: separate `FleetAssetsModule` chunk about 26.39 kB gzip; main app chunk about 227.65 kB gzip. Targeted browser smoke opened `כלי שינוע` and `לוח טיפולים` without console/page/runtime errors and with no horizontal overflow.
 - `Lazy load BI overview`
   - Extracts the unified BI overview from `src/ClaudeMaintenanceApp.jsx` into `src/BIOverview.jsx`.
   - Keeps heatmap rendering and AI entry prompt wiring inside the lazy BI module while the app shell passes only a small `biOverviewUi()` bridge.
@@ -348,8 +353,8 @@ Visual polish still likely needed:
 
 Technical/performance watch:
 
-- Main bundle is still too large. Latest local build after recent UI changes produced a large chunk warning around 2 MB raw / about 503 kB gzip.
-- Next meaningful performance work should reduce initial JS and defer post-login domain fetches, not start from visual rewrites.
+- Main bundle still triggers Vite's raw-size warning. Latest local build after the fleet/PM lazy split produced the main app chunk at about 906.85 kB raw / 227.65 kB gzip, plus separate lazy screen chunks and stable vendor chunks.
+- Next meaningful performance work should continue reducing initial JS and defer post-login work where safe, not start from visual rewrites.
 - Live controlled-rollout baseline exists, but headless Chromium does not prove native iOS/Safari push-banner behavior.
 
 ## Validation Expectations
