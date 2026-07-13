@@ -873,6 +873,57 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("proposes explicit ticket close and cancel status updates for one visible ticket", () => {
+    const closeDraft = buildAiIntakeDraft({
+      rawText: "סגור את הקריאה, הטיפול הושלם",
+      actor,
+      language: "he"
+    }, 1000);
+    const cancelDraft = buildAiIntakeDraft({
+      rawText: "בטל את הקריאה הזאת",
+      actor,
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft: closeDraft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "דליפת מים", status: "in_progress", waitingReason: "", waitBall: "" }]
+      }
+    })).toEqual([
+      expect.objectContaining({
+        type: "ticket.update",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "דליפת מים",
+          current: { status: "in_progress" },
+          patch: { status: "done" }
+        }
+      })
+    ]);
+
+    expect(buildAiAssistActionProposals({
+      draft: cancelDraft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "דליפת מים", status: "new" }]
+      }
+    })).toEqual([
+      expect.objectContaining({
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "דליפת מים",
+          current: { status: "new" },
+          patch: { status: "cancelled" }
+        }
+      })
+    ]);
+  });
+
   it("does not guess supplier routing from invisible, ambiguous, or unchanged suppliers", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעביר את הקריאה לספק Toyota",

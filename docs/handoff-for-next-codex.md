@@ -101,6 +101,10 @@ Recent commits on `main`:
   - `src/aiAssistActionModel.js` can now propose a constrained `ticket.update` for explicit ticket zone/location wording, such as `תעדכן את הקריאה לאזור משרדים`.
   - The proposal still requires exactly one role-visible target ticket, stays `writesData: false`, includes a `current.zone -> patch.zone` review payload, and executes only after human confirmation through the existing `saveTicket` / `/api/tickets` path.
   - Free-text location mentions are not treated as mutation intent. The user must use explicit update wording and an explicit `אזור` / `איזור` / `מיקום` / `zone` / `location` target.
+- `Add AI ticket close/cancel update proposals` (current local slice)
+  - `src/aiAssistActionModel.js` can now propose constrained `ticket.update` status patches for explicit close/done/cancel wording, such as `סגור את הקריאה` or `בטל את הקריאה`.
+  - The proposal still requires exactly one role-visible target ticket, stays `writesData: false`, includes a before/after review payload, and executes only after human confirmation through the existing `saveTicket` / `/api/tickets` path.
+  - This does not add provider-native write access; provider text remains advisory and deterministic server-side parsing decides whether a reviewable action is available.
 - `Add AI calendar date parsing` (current local slice)
   - `src/aiAssistActionModel.js` now accepts explicit calendar dates for safe work-record actions: `DD.MM.YY`, `DD.MM.YYYY`, `DD/MM/YY`, and `DD/MM/YYYY`.
   - `task.update` can now propose a due-date patch from those explicit formats, still only when exactly one role-visible task is in context and still only after human confirmation through `saveTask` / `/api/work`.

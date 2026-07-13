@@ -79,13 +79,15 @@ function requestedPriorityFromText(text = "") {
   return "";
 }
 
-function requestedStatusFromText(text = "") {
+function requestedTicketStatusFromText(text = "") {
   const raw = cleanText(text, 500).toLowerCase();
   if (!raw) return "";
-  if (/סטטוס|מצב|status|העבר|תעדכן|עדכן|change|update/i.test(raw)) {
+  if (/סטטוס|מצב|status|העבר|תעדכן|עדכן|change|update|סיים|סגור|בטל/i.test(raw)) {
+    if (/בוצע|סגור|סיים|הושלם|done|completed|closed/i.test(raw)) return "done";
     if (/בטיפול|בעבודה|בתהליך|in.?progress/i.test(raw)) return "in_progress";
     if (/חדשה|חדש|new/i.test(raw)) return "new";
     if (/ממתינ|המתנה|waiting/i.test(raw)) return "waiting";
+    if (/בוטל|בטל|cancel/i.test(raw)) return "cancelled";
   }
   return "";
 }
@@ -353,7 +355,7 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   const patch = {};
   const requestedPriority = requestedPriorityFromText(draft.rawText);
   if (requestedPriority && requestedPriority !== ticket.priority) patch.priority = requestedPriority;
-  const requestedStatus = requestedStatusFromText(draft.rawText);
+  const requestedStatus = requestedTicketStatusFromText(draft.rawText);
   if (requestedStatus === "waiting") {
     const requestedWaitingReason = requestedWaitingReasonFromText(draft.rawText);
     if (requestedWaitingReason) {
