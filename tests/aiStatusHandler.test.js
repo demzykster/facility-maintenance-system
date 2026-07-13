@@ -197,9 +197,47 @@ describe("AI status handler", () => {
       provider: "openai",
       model: "gpt-5.2",
       checkedAt: 2233,
-      error: "ai_provider_quota_exceeded"
+      error: "ai_provider_quota_exceeded",
+      detail: "You exceeded your current quota, please check your plan and billing details."
     });
     expect(JSON.stringify(res.json())).not.toContain("server-secret");
+  });
+
+  it("keeps provider failure detail short and redacted during live checks", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: false,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      error: "API key AIza_FAKE_TEST_KEY is invalid for models/gemini-3.5-flash and token=secret-value"
+    });
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        CMMS_AI_MODEL: "gemini-3.5-flash",
+        GOOGLE_GENERATIVE_AI_API_KEY: "google-secret"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 2234
+    });
+
+    const res = await call(handler, { query: { check: "1" } });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload.ai.providerCheck).toMatchObject({
+      attempted: true,
+      ok: false,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      checkedAt: 2234,
+      error: "ai_provider_model_unavailable"
+    });
+    expect(payload.ai.providerCheck.detail).toContain("AIza_FAKE_TEST_KEY");
+    expect(payload.ai.providerCheck.detail).toContain("token=[redacted]");
+    expect(JSON.stringify(payload)).not.toContain("google-secret");
+    expect(JSON.stringify(payload)).not.toContain("secret-value");
   });
 
   it("reports skipped provider checks when server AI is not ready", async () => {

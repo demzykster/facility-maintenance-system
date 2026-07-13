@@ -30,6 +30,16 @@ function aiProviderErrorCode(error = "") {
   return "ai_provider_failed";
 }
 
+function safeProviderErrorDetail(error = "") {
+  return String(error || "")
+    .replace(/\s+/g, " ")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted-google-key]")
+    .replace(/\bsk-[0-9A-Za-z_-]{16,}/g, "[redacted-key]")
+    .replace(/\b(authorization|apikey|api[_-]?key|secret|token|password)(["':=\s-]+)[^\s,;]+/gi, "$1$2[redacted]")
+    .trim()
+    .slice(0, 320);
+}
+
 export function createAiStatusHandler({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -77,7 +87,11 @@ export function createAiStatusHandler({
             maxTokens: 16
           });
           ai.providerCheck.ok = !!result?.ok;
-          if (!result?.ok) ai.providerCheck.error = aiProviderErrorCode(result?.error);
+          if (!result?.ok) {
+            ai.providerCheck.error = aiProviderErrorCode(result?.error);
+            const detail = safeProviderErrorDetail(result?.error);
+            if (detail) ai.providerCheck.detail = detail;
+          }
         }
       }
       return sendJson(res, 200, {
