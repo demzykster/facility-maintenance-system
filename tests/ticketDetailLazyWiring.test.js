@@ -25,5 +25,14 @@ describe("ticket detail lazy wiring", () => {
   it("does not pass stale runtime helpers into the lazy ticket detail bridge", () => {
     expect(ticketDetailSource).not.toContain('uiFn("msFromInput")');
     expect(appSource).not.toContain("msFromInput,");
+    expect(ticketDetailSource).not.toContain('uiFn("normalizeTicketHistory")');
+    expect(appSource).not.toContain("normalizeTicketHistory,");
+  });
+
+  it("passes ticket detail admin-edit dependencies through the lazy bridge", () => {
+    for (const required of ["STATUSES", "dtLevels", "datetimeValueToMs", "applyAdminTicketManualEdit"]) {
+      expect(ticketDetailSource).toContain(required);
+      expect(appSource).toContain(`${required},`);
+    }
   });
 });
