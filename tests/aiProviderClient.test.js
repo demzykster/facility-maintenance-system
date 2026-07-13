@@ -67,6 +67,24 @@ describe("ai provider client", () => {
     });
   });
 
+  it("clamps OpenAI Responses max output tokens to the provider minimum", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
+      output_text: "OK"
+    }));
+
+    await callAiProvider({
+      config: { provider: "openai", openaiApiKey: "openai-secret", model: "gpt-5.2" },
+      system: "system",
+      prompt: "prompt",
+      fetchImpl,
+      maxTokens: 8
+    });
+
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
+      max_output_tokens: 16
+    });
+  });
+
   it("fails closed when required provider keys are missing", async () => {
     await expect(callAiProvider({ config: { provider: "anthropic" } })).resolves.toMatchObject({
       ok: false,

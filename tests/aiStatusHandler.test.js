@@ -124,7 +124,7 @@ describe("AI status handler", () => {
         model: "gpt-5.2",
         openaiApiKey: "server-secret"
       }),
-      maxTokens: 8
+      maxTokens: 16
     }));
     expect(JSON.stringify(payload)).not.toContain("server-secret");
   });

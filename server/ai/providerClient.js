@@ -14,6 +14,7 @@ const readJsonOrText = async (response) => {
 };
 
 const compactText = (value, limit = 6_000) => String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
+const safeTokenLimit = (value, minimum) => Math.max(minimum, Number.isFinite(Number(value)) ? Number(value) : minimum);
 
 function providerError(data, fallback) {
   return data?.error?.message || data?.message || data?.text || fallback;
@@ -80,7 +81,7 @@ export async function callAiProvider({ config = {}, system = "", prompt = "", fe
         model,
         instructions: safeSystem,
         input: safePrompt,
-        max_output_tokens: maxTokens
+        max_output_tokens: safeTokenLimit(maxTokens, 16)
       })
     });
     const data = await readJsonOrText(response);

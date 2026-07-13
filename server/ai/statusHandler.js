@@ -63,7 +63,7 @@ export function createAiStatusHandler({
             system: "You are a CMMS AI connection check. Reply with exactly: OK",
             prompt: "Reply with OK only.",
             fetchImpl,
-            maxTokens: 8
+            maxTokens: 16
           });
           ai.providerCheck.ok = !!result?.ok;
           if (!result?.ok) ai.providerCheck.error = result?.error || "ai_provider_check_failed";
