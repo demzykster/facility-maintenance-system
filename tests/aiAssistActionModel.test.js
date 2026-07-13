@@ -503,6 +503,67 @@ describe("AI assist action model", () => {
     })).toEqual([]);
   });
 
+  it("proposes explicit transport unit updates only from a unique visible fleet code", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה לכלי 120823",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", track: "transport", forkliftId: "", asset: "" }],
+        fleet: [
+          { id: "fleet-120823", code: "120823", type: "מלגזת היגש" },
+          { id: "fleet-178040", code: "178040", type: "מלגזת משקל נגדי" }
+        ]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_ticket_T-1",
+        type: "ticket.update",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "תקלה במלגזה",
+          current: { forkliftId: "", asset: "" },
+          patch: { forkliftId: "fleet-120823", asset: "120823" }
+        },
+        execute: {
+          method: "POST",
+          path: "/api/tickets",
+          bodyField: "ticket"
+        }
+      })
+    ]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", track: "transport", forkliftId: "fleet-120823", asset: "120823" }],
+        fleet: [{ id: "fleet-120823", code: "120823", type: "מלגזת היגש" }]
+      }
+    })).toEqual([]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", track: "transport", forkliftId: "", asset: "" }],
+        fleet: [
+          { id: "fleet-a", code: "120823", type: "מלגזת היגש" },
+          { id: "fleet-b", code: "120823", type: "מלגזת היגש" }
+        ]
+      }
+    })).toEqual([]);
+  });
+
   it("proposes supplier routing only when the supplier is visible and explicitly named", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעביר את הקריאה לספק Toyota",

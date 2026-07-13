@@ -59,6 +59,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add AI transport unit update proposals` (current local slice)
+  - `src/aiAssistActionModel.js` can now propose a constrained `ticket.update` for explicit transport-unit wording, such as `תעדכן את הקריאה לכלי 120823`.
+  - The proposal requires exactly one role-visible target ticket and exactly one matching fleet unit code/id in the already role-filtered `context.fleet`; hidden, ambiguous, unchanged, or absent fleet codes produce no action.
+  - The patch sets `forkliftId` and `asset` together, stays `writesData: false`, includes a before/after review payload, and executes only after human confirmation through the existing `saveTicket` / `/api/tickets` path.
+  - `src/aiAssistContextModel.js` now keeps ticket `forkliftId` and `asset` in sanitized AI context so confirmation previews can show the current transport assignment.
+  - Explicit update wording over an existing ticket now returns no action instead of falling back to `ticket.create` when no deterministic ticket update can be built.
 - `Add AI ticket zone update proposals` (current local slice)
   - `src/aiAssistActionModel.js` can now propose a constrained `ticket.update` for explicit ticket zone/location wording, such as `תעדכן את הקריאה לאזור משרדים`.
   - The proposal still requires exactly one role-visible target ticket, stays `writesData: false`, includes a `current.zone -> patch.zone` review payload, and executes only after human confirmation through the existing `saveTicket` / `/api/tickets` path.

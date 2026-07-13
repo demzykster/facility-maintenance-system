@@ -113,6 +113,8 @@ function sanitizeTicket(ticket = {}, profile) {
     priority: compactText(ticket.priority, 50),
     department: recordDepartments(ticket)[0] || "",
     zone: compactText(ticket.zone || ticket.area || ticket.location, 80),
+    asset: compactText(ticket.asset, 120),
+    forkliftId: compactId(ticket.forkliftId || ticket.forklift_id),
     assignee: compactText(ticket.assignee || ticket.assignedTo || ticket.techName, 120),
     supplier: compactText(ticket.supplier, 120),
     waitReason: compactText(ticket.waitReason || ticket.waitingReason, 80),

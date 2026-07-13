@@ -365,6 +365,59 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("returns deterministic transport unit updates from role-filtered fleet context", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר לשייך את הקריאה לכלי לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 447,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תעדכן את הקריאה לכלי 120823",
+        context: {
+          tickets: [
+            { id: "T-1", subject: "תקלה במלגזה", track: "transport", forkliftId: "", asset: "", department: "הפצה" },
+            { id: "T-2", subject: "נסתר", track: "transport", forkliftId: "", asset: "", department: "קבלה" }
+          ],
+          fleet: [
+            { id: "fleet-120823", code: "120823", type: "מלגזת היגש", department: "הפצה" },
+            { id: "fleet-hidden", code: "120823", type: "מלגזת היגש", department: "קבלה" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "update_ticket_T-1",
+        type: "ticket.update",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "תקלה במלגזה",
+          current: { forkliftId: "", asset: "" },
+          patch: { forkliftId: "fleet-120823", asset: "120823" }
+        }
+      })
+    ]);
+  });
+
   it("returns deterministic ticket.comment proposals from role-filtered single-ticket context", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

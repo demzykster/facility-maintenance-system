@@ -174,6 +174,33 @@ function requestedZoneFromText(text = "") {
     .trim();
 }
 
+function hasFleetUnitUpdateIntent(text = "") {
+  return hasUpdateIntent(text) && /(כלי|מלגזה|ציוד|forklift|vehicle|unit|asset)/i.test(cleanText(text, 800));
+}
+
+function fleetUnitMatchesText(unit = {}, raw = "") {
+  const text = cleanText(raw, 800).toLowerCase();
+  const identifiers = [
+    cleanText(unit.id, 120),
+    cleanText(unit.code, 120),
+    cleanText(unit.number, 120),
+    cleanText(unit.asset, 120)
+  ].filter((value) => value.length >= 2);
+  return identifiers.some((value) => {
+    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, "iu").test(text);
+  });
+}
+
+function requestedFleetUnitFromText(text = "", fleet = []) {
+  const raw = cleanText(text, 800);
+  if (!raw || !hasFleetUnitUpdateIntent(raw)) return null;
+  const matches = cleanArray(fleet)
+    .filter((unit) => unit && unit.id)
+    .filter((unit) => fleetUnitMatchesText(unit, raw));
+  return matches.length === 1 ? matches[0] : null;
+}
+
 const WAITING_REASON_BALLS = Object.freeze({
   no_equipment: "manager",
   parts: "executor",
@@ -292,8 +319,15 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   if (requestedSupplier && requestedSupplier !== ticket.supplier) patch.supplier = requestedSupplier;
   const requestedZone = requestedZoneFromText(draft.rawText);
   if (requestedZone && requestedZone !== ticket.zone) patch.zone = requestedZone;
+  const requestedFleetUnit = requestedFleetUnitFromText(draft.rawText, context.fleet);
+  if (requestedFleetUnit) {
+    const nextForkliftId = cleanText(requestedFleetUnit.id, 160);
+    const nextAsset = cleanText(requestedFleetUnit.code || requestedFleetUnit.number || requestedFleetUnit.asset || requestedFleetUnit.id, 160);
+    if (nextForkliftId && nextForkliftId !== ticket.forkliftId) patch.forkliftId = nextForkliftId;
+    if (nextAsset && nextAsset !== ticket.asset) patch.asset = nextAsset;
+  }
   if (!Object.keys(patch).length) return null;
-  const current = Object.fromEntries(Object.keys(patch).map((field) => [field, ticket[field]]));
+  const current = Object.fromEntries(Object.keys(patch).map((field) => [field, ticket[field] ?? ""]));
   return {
     id: `update_ticket_${cleanText(ticket.id, 80)}`,
     type: "ticket.update",
@@ -575,6 +609,7 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   if (meetingUpdateProposal) return [meetingUpdateProposal];
   if (hasWaitingStatusIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
+  if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length > 0) return [];
   if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.tasks).filter((task) => task && task.id).length > 0) return [];
   if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.meetings).filter((meeting) => meeting && meeting.id).length > 0) return [];
   if (safeDraft.action === "draft_task") {

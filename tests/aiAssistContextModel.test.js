@@ -39,7 +39,7 @@ describe("AI assist context model", () => {
         ]
       },
       tickets: [
-        { id: "own-dept", subject: "Allowed", department: "הפצה", cost: 500 },
+        { id: "own-dept", subject: "Allowed", department: "הפצה", cost: 500, track: "transport", forkliftId: "fleet-120823", asset: "120823" },
         { id: "other-dept", subject: "Hidden", department: "קבלה", cost: 400 }
       ],
       fleet: [
@@ -69,7 +69,7 @@ describe("AI assist context model", () => {
       })
     ]);
     expect(context.tickets).toHaveLength(1);
-    expect(context.tickets[0]).toMatchObject({ id: "own-dept", department: "הפצה" });
+    expect(context.tickets[0]).toMatchObject({ id: "own-dept", department: "הפצה", forkliftId: "fleet-120823", asset: "120823" });
     expect(context.tickets[0]).not.toHaveProperty("cost");
     expect(context.fleet.map((unit) => unit.id)).toEqual(["f1"]);
     expect(context.tasks).toEqual([
