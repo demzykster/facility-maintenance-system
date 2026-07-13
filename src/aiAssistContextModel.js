@@ -1,4 +1,4 @@
-import { canView } from "./permissionModel.js";
+import { canManage, canView } from "./permissionModel.js";
 
 const MAX_TICKETS = 28;
 const MAX_FLEET = 18;
@@ -51,7 +51,8 @@ export function aiRoleProfile(user = {}) {
     departments,
     canSeeCompany: LEADERSHIP_ROLES.has(role),
     canSeeFinancials: LEADERSHIP_ROLES.has(role),
-    canSeeSuppliers: LEADERSHIP_ROLES.has(role) || canView(user, "suppliers")
+    canSeeSuppliers: LEADERSHIP_ROLES.has(role) || canView(user, "suppliers"),
+    canManageSuppliers: canManage(user, "suppliers")
   };
 }
 
@@ -386,7 +387,13 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
       departments: profile.departments,
       canSeeCompany: profile.canSeeCompany,
       canSeeFinancials: profile.canSeeFinancials,
-      canSeeSuppliers: profile.canSeeSuppliers
+      canSeeSuppliers: profile.canSeeSuppliers,
+      capabilities: {
+        supplierRouting: profile.canManageSuppliers,
+        supplierDirectory: profile.canSeeSuppliers,
+        companyScope: profile.canSeeCompany,
+        financials: profile.canSeeFinancials
+      }
     },
     metrics: sanitizeMetrics(source.metrics || {}, profile),
     bi: sanitizeBiSummary(source.bi || {}, profile),

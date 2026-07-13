@@ -10,6 +10,7 @@ const cleanText = (value, limit = 240) => String(value || "")
 
 const cleanObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const cleanArray = (value) => Array.isArray(value) ? value : [];
+const hasCapability = (context = {}, key = "") => context?.profile?.capabilities?.[key] === true;
 
 const LOCATION_PATTERNS = [
   /(?:באזור|באיזור|במחלקת|במחסן|במבנה|בקו)\s+([^\n,.]+)/i,
@@ -332,6 +333,10 @@ function requestedSupplierFromText(text = "", suppliers = []) {
   return uniqueMatches.length === 1 ? uniqueMatches[0] : "";
 }
 
+function canProposeSupplierRouting(context = {}) {
+  return hasCapability(context, "supplierRouting");
+}
+
 function hasSupplierRoutingIntent(text = "") {
   return /(ספק|קבלן|contractor|supplier|vendor|העבר|תעביר|שייך|assign|route)/i.test(cleanText(text, 800));
 }
@@ -406,7 +411,7 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
       patch.waitBall = null;
     }
   }
-  const requestedSupplier = requestedSupplierFromText(draft.rawText, context.suppliers);
+  const requestedSupplier = canProposeSupplierRouting(context) ? requestedSupplierFromText(draft.rawText, context.suppliers) : "";
   if (requestedSupplier && requestedSupplier !== ticket.supplier) patch.supplier = requestedSupplier;
   const requestedZone = requestedZoneFromText(draft.rawText);
   if (requestedZone && requestedZone !== ticket.zone) patch.zone = requestedZone;

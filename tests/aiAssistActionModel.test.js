@@ -853,6 +853,7 @@ describe("AI assist action model", () => {
       user: actor,
       now: 2000,
       context: {
+        profile: { capabilities: { supplierRouting: true } },
         tickets: [{ id: "T-1", subject: "תקלה במלגזה", priority: "medium", status: "new", supplier: "" }],
         suppliers: [
           { name: "Toyota", type: "transport", scopes: ["transport"] },
@@ -882,6 +883,25 @@ describe("AI assist action model", () => {
         }
       })
     ]);
+  });
+
+  it("does not propose supplier routing without supplier management permission", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעביר את הקריאה לספק Toyota",
+      actor: { id: "manager-1", role: "user", name: "Manager" },
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: { id: "manager-1", role: "user", name: "Manager", permissions: { suppliers: "view" } },
+      now: 2000,
+      context: {
+        profile: { capabilities: { supplierRouting: false, supplierDirectory: true } },
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", priority: "medium", status: "new", supplier: "" }],
+        suppliers: [{ name: "Toyota", type: "transport", scopes: ["transport"] }]
+      }
+    })).toEqual([]);
   });
 
   it("proposes waiting status updates only with an explicit waiting reason", () => {
@@ -1035,6 +1055,7 @@ describe("AI assist action model", () => {
       user: actor,
       context: {
         tickets: [{ id: "T-1", subject: "תקלה במלגזה", supplier: "" }],
+        profile: { capabilities: { supplierRouting: true } },
         suppliers: [{ name: "Toyota" }, { name: "Toyota North" }]
       }
     })).toEqual([]);
@@ -1044,6 +1065,7 @@ describe("AI assist action model", () => {
       user: actor,
       context: {
         tickets: [{ id: "T-1", subject: "תקלה במלגזה", supplier: "Toyota" }],
+        profile: { capabilities: { supplierRouting: true } },
         suppliers: [{ name: "Toyota" }]
       }
     })).toEqual([]);

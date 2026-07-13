@@ -1237,6 +1237,15 @@ describe("AI assist handler", () => {
       instruction: expect.stringContaining("SLA")
     });
     expect(prompt.roleGuidance).toContain("department manager");
+    expect(prompt.context.profile.capabilities).toMatchObject({
+      supplierRouting: false,
+      companyScope: false,
+      financials: false
+    });
+    expect(prompt.capabilityGuidance).toEqual(expect.arrayContaining([
+      expect.stringContaining("cannot choose or change the supplier"),
+      expect.stringContaining("inside their visible department/user scope")
+    ]));
     expect(prompt.context.bi.heatmap).toEqual([
       expect.objectContaining({
         department: "הפצה",

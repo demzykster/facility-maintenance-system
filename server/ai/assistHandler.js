@@ -89,6 +89,26 @@ function responseLanguageForRequest({ text = "", conversation = [], fallback = "
   };
 }
 
+function capabilityGuidanceForContext(context = {}) {
+  const capabilities = context?.profile?.capabilities && typeof context.profile.capabilities === "object"
+    ? context.profile.capabilities
+    : {};
+  const rules = [];
+  if (capabilities.supplierRouting === false) {
+    rules.push("The actor cannot choose or change the supplier for a ticket. Do not ask them which supplier to assign and do not suggest supplier-routing decisions as their next step.");
+  }
+  if (capabilities.supplierDirectory === false) {
+    rules.push("The actor cannot view supplier directory details. Do not expose or ask about suppliers unless the supplied context already contains a safe visible record.");
+  }
+  if (capabilities.financials === false) {
+    rules.push("The actor cannot view financial data. Do not discuss costs, prices, invoices, or budget impact unless explicitly present in the role-filtered context.");
+  }
+  if (capabilities.companyScope === false) {
+    rules.push("The actor is not company-wide leadership. Keep recommendations inside their visible department/user scope.");
+  }
+  return rules;
+}
+
 const safeSource = (value) => {
   const source = String(value || "ui").trim();
   return ["ui", "worker", "cleaner", "mobile", "test"].includes(source) ? source : "ui";
@@ -167,6 +187,7 @@ function providerPrompt({ draft, user, context, workflow, conversation = [], res
       instruction: aiAssistWorkflowInstruction(safeWorkflow)
     },
     roleGuidance: aiAssistRoleGuidance(user.role),
+    capabilityGuidance: capabilityGuidanceForContext(context),
     actor: {
       role: user.role || "",
       department: user.department || user.dept || "",
