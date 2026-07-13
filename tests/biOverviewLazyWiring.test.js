@@ -9,6 +9,7 @@ describe("BI overview lazy wiring", () => {
     expect(appSource).toContain('const BIOverviewLazy = lazy(() => import("./BIOverview.jsx")');
     expect(appSource).toContain("<BIOverviewLazy");
     expect(appSource).toContain("biOverviewUi");
+    expect(appSource).toMatch(/biOverviewUi\(\) \{[\s\S]*countLabel/);
     expect(appSource).toMatch(/biOverviewUi\(\) \{[\s\S]*dayCompliance/);
     expect(appSource).toMatch(/biOverviewUi\(\) \{[\s\S]*lifecycleOwnerLabel/);
     expect(appSource).not.toContain("function BIOverview({ session");

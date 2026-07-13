@@ -6842,6 +6842,7 @@ function biOverviewUi() {
     biTicketHeatmapRows,
     ballHolder,
     catOf,
+    countLabel,
     dayCompliance,
     daysLeft,
     docStatus,

@@ -29,6 +29,7 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
     biTicketHeatmapRows,
     ballHolder,
     catOf,
+    countLabel,
     dayCompliance,
     daysLeft,
     docStatus,
