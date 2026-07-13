@@ -58,6 +58,11 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add AI provider connection check`
+  - `/api/ai/status` still returns public-safe readiness fields and never returns provider secrets.
+  - Admins with full settings access can call `/api/ai/status?check=1` to run a tiny server-side provider ping against the configured model.
+  - `src/AISettingsCard.jsx` exposes refresh and live connection-check actions in settings, so admins can distinguish "env configured" from "model actually responds".
+  - Provider keys remain server/Vercel environment variables only; browser-managed `config.ai` still stores only non-secret mode/provider/model preferences.
 - `Add deterministic AI ticket comment proposals`
   - Extends the human-confirmed AI action surface with `ticket.comment`.
   - `/api/ai/assist` can propose a comment only when the user explicitly asks to add/write a note/comment and the role-filtered context leaves exactly one visible target ticket.

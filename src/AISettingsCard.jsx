@@ -2,13 +2,17 @@ import React from "react";
 import { Sparkles } from "lucide-react";
 import { AI_PROVIDER_LABELS, AI_PROVIDER_OPTIONS, DEFAULT_AI_MODELS, normalizeAiSettings } from "./aiProviderModel.js";
 
-export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy }) {
+export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy, onRefresh, onCheckConnection }) {
   const aiProviderOptions = Array.isArray(aiStatus?.supportedProviderOptions) && aiStatus.supportedProviderOptions.length
     ? aiStatus.supportedProviderOptions
     : AI_PROVIDER_OPTIONS;
   const aiStatusProviderLabel = AI_PROVIDER_LABELS[aiStatus?.provider] || aiStatus?.provider || "";
   const aiStatusText = aiStatusBusy ? "בודק חיבור…" : (aiStatus?.serverReady ? "שרת AI מוכן" : "שרת AI לא פעיל");
   const aiStatusErrors = (aiStatus?.errors || []).filter(Boolean).join(" · ");
+  const providerCheck = aiStatus?.providerCheck || null;
+  const providerCheckText = providerCheck
+    ? providerCheck.ok ? "בדיקת חיבור עברה בהצלחה" : `בדיקת חיבור נכשלה: ${providerCheck.error || "לא ידוע"}`
+    : "";
 
   return <>
     <div className="sect"><Sparkles size={15} /> חיבור AI</div>
@@ -20,6 +24,10 @@ export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy }) {
         </div>
         <span className={"badge sm " + (aiStatus?.serverReady ? "ok" : "warn")}>{aiStatus?.serverReady ? "מוכן" : "כבוי"}</span>
       </div>
+      <div className="row-between" style={{ gap: 8, flexWrap: "wrap" }}>
+        <button type="button" className="btn-ghost sm" onClick={onRefresh} disabled={aiStatusBusy}>רענון מצב</button>
+        <button type="button" className="btn-primary sm" onClick={onCheckConnection} disabled={aiStatusBusy || !aiStatus?.serverReady}>בדיקת חיבור למודל</button>
+      </div>
       <div className="grid2">
         <label className="field"><span>מצב</span><select value={aiCfg.mode} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, mode: e.target.value }))}><option value="disabled">כבוי</option><option value="server">שרת בלבד</option></select></label>
         <label className="field"><span>ספק</span><select value={aiCfg.provider} onChange={(e) => {
@@ -29,6 +37,7 @@ export function AISettingsCard({ aiCfg, setAiCfg, aiStatus, aiStatusBusy }) {
       </div>
       <label className="field"><span>מודל</span><input value={aiCfg.model} onChange={(e) => setAiCfg((s) => normalizeAiSettings({ ...s, model: e.target.value }))} placeholder={aiCfg.provider ? DEFAULT_AI_MODELS[aiCfg.provider] : "בחרו ספק כדי לקבל ברירת מחדל"} /></label>
       <div className="hint">{aiStatusProviderLabel ? `שרת: ${aiStatusProviderLabel} · ${aiStatus.model || "ללא מודל"} · מפתח ${aiStatus.providerKeyConfigured ? "מוגדר" : "חסר"}` : "השרת ידווח כאן אם הוגדר ספק ומפתח."}{aiStatusErrors ? ` · ${aiStatusErrors}` : ""}</div>
+      {providerCheckText && <div className={"note " + (providerCheck?.ok ? "ok" : "warn")}>{providerCheckText}</div>}
     </div>
   </>;
 }

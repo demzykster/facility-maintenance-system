@@ -293,10 +293,29 @@ export function SettingsPanel(p) {
   useEffect(() => {
     setAiCfg(normalizeAiSettings(config.ai));
   }, [aiConfigSyncKey]);
+  const loadAiStatus = async ({ check = false } = {}) => {
+    setAiStatusBusy(true);
+    try {
+      const accessToken = await productionAccessToken();
+      const response = await fetch(`/api/ai/status${check ? "?check=1" : ""}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {})
+        }
+      });
+      const payload = await response.json().catch(() => ({}));
+      setAiStatus(response.ok ? payload.ai : { serverReady: false, errors: [payload?.error || `ai_status_http_${response.status}`] });
+    } catch {
+      setAiStatus({ serverReady: false, errors: ["ai_status_unavailable"] });
+    } finally {
+      setAiStatusBusy(false);
+    }
+  };
   useEffect(() => {
     if (tab !== "general" || !mayFullSettings) return;
     let cancelled = false;
-    const loadAiStatus = async () => {
+    const run = async () => {
       setAiStatusBusy(true);
       try {
         const accessToken = await productionAccessToken();
@@ -316,7 +335,7 @@ export function SettingsPanel(p) {
         if (!cancelled) setAiStatusBusy(false);
       }
     };
-    loadAiStatus();
+    run();
     return () => { cancelled = true; };
   }, [tab, mayFullSettings]);
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
@@ -461,7 +480,7 @@ export function SettingsPanel(p) {
       <label className="field"><span>שם החברה</span><input value={coName} onChange={(e) => { setCoName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: חברה לדוגמה בע״מ" /></label>
       <label className="field"><span>אתר / סניף</span><input value={siteName} onChange={(e) => { setSiteName(e.target.value); setBrandDirty(true); }} placeholder="לדוגמה: מרכז לוגיסטי" /></label>
       <div className="hint" style={{ marginBottom: 4 }}>שם החברה מופיע במסך הכניסה, בתפריט ובכותרת הדוחות.</div>
-      {mayFullSettings && <AISettingsCard aiCfg={aiCfg} setAiCfg={setAiCfg} aiStatus={aiStatus} aiStatusBusy={aiStatusBusy} />}
+      {mayFullSettings && <AISettingsCard aiCfg={aiCfg} setAiCfg={setAiCfg} aiStatus={aiStatus} aiStatusBusy={aiStatusBusy} onRefresh={() => loadAiStatus()} onCheckConnection={() => loadAiStatus({ check: true })} />}
       <SectionTitle>סיבות המתנה</SectionTitle>
       <div className="hint" style={{ marginBottom: 8 }}>סיבה נבחרת כאשר קריאה נעצרת באמצע טיפול. ההגדרה קובעת אצל מי האחריות להמשך, מי רשאי לבחור את הסיבה, והאם זמן ההמתנה נחשב ב-SLA התפעולי. בכל מקרה הזמן נשמר בהיסטוריה, בדוחות ובאנליטיקה.</div>
       <div className="settings-table-card wait-reasons-card">

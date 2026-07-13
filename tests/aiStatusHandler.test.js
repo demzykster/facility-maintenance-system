@@ -87,4 +87,90 @@ describe("AI status handler", () => {
     });
     expect(JSON.stringify(payload)).not.toContain("server-secret");
   });
+
+  it("can run an admin-only live provider connection check without leaking keys", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "OK"
+    });
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        CMMS_AI_MODEL: "gpt-5.2",
+        OPENAI_API_KEY: "server-secret"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 1234
+    });
+
+    const res = await call(handler, { query: { check: "1" } });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload.ai.providerCheck).toEqual({
+      attempted: true,
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      checkedAt: 1234
+    });
+    expect(providerCall).toHaveBeenCalledWith(expect.objectContaining({
+      config: expect.objectContaining({
+        provider: "openai",
+        model: "gpt-5.2",
+        openaiApiKey: "server-secret"
+      }),
+      maxTokens: 8
+    }));
+    expect(JSON.stringify(payload)).not.toContain("server-secret");
+  });
+
+  it("reports skipped provider checks when server AI is not ready", async () => {
+    const providerCall = vi.fn();
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 2000
+    });
+
+    const res = await call(handler, { query: { check: "1" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai.providerCheck).toMatchObject({
+      attempted: true,
+      ok: false,
+      provider: "openai",
+      model: "gpt-5.2",
+      checkedAt: 2000,
+      error: "ai_provider_key_required"
+    });
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
+  it("rejects live provider checks for users without full settings access", async () => {
+    const providerCall = vi.fn();
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret"
+      },
+      sessionClient: sessionClient({ role: "user", perms: { settings: "manage" } }),
+      providerCall
+    });
+
+    const res = await call(handler, { query: { check: "1" } });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "settings_full_required" });
+    expect(providerCall).not.toHaveBeenCalled();
+  });
 });
