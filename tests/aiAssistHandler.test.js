@@ -1252,6 +1252,54 @@ describe("AI assist handler", () => {
     expect(JSON.stringify(prompt)).not.toContain("Hidden meeting");
   });
 
+  it("passes the current user request and recent conversation explicitly to the provider prompt", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "אענה לפי השאלה הנוכחית."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 654,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תענה רק על מצב הניקיון",
+        workflow: "general",
+        messages: [
+          { role: "assistant", content: "ברוך הבא" },
+          { role: "user", content: "מה קורה במסמכי צי?" },
+          { role: "assistant", content: "יש התראות מסמכים." },
+          { role: "user", content: "תענה רק על מצב הניקיון" }
+        ],
+        context: {
+          metrics: { cleaningOpenComplaints: 3, fleetDocumentAlerts: 15 },
+          tickets: []
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.userRequest).toBe("תענה רק על מצב הניקיון");
+    expect(prompt.recentConversation).toEqual([
+      { role: "user", content: "מה קורה במסמכי צי?" },
+      { role: "assistant", content: "יש התראות מסמכים." },
+      { role: "user", content: "תענה רק על מצב הניקיון" }
+    ]);
+    expect(prompt.contract.expectedOutput).toContain("answer the current userRequest first");
+  });
+
   it("writes an audit-safe AI assist event for provider calls", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

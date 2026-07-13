@@ -96,7 +96,7 @@ export function sanitizeAiProviderPlan(value = {}) {
   };
 }
 
-export function providerPlanPrompt({ draft = {}, actions = [], context = {}, workflow = "" } = {}) {
+export function providerPlanPrompt({ draft = {}, actions = [], context = {}, workflow = "", conversation = [] } = {}) {
   return JSON.stringify({
     contract: {
       purpose: "Return a non-writing structured plan for a CMMS operator.",
@@ -109,6 +109,8 @@ export function providerPlanPrompt({ draft = {}, actions = [], context = {}, wor
       ],
       outputPolicy: "Only summarize reviewable next steps. The app will ignore any executable fields."
     },
+    userRequest: cleanText(draft.rawText, 2_000),
+    recentConversation: Array.isArray(conversation) ? conversation.slice(-6) : [],
     workflow,
     context,
     deterministicActions: actions.map((action) => ({

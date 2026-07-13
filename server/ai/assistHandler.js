@@ -20,6 +20,22 @@ const cleanText = (value, limit = MAX_TEXT_CHARS) => String(value || "")
   .trim()
   .slice(0, limit);
 
+const cleanConversationMessages = (value) => {
+  if (!Array.isArray(value)) return [];
+  const messages = value
+    .map((message) => {
+      const role = String(message?.role || "").trim();
+      if (!["user", "assistant"].includes(role)) return null;
+      const content = cleanText(message?.content, 1_000);
+      if (!content) return null;
+      return { role, content };
+    })
+    .filter(Boolean);
+  const firstUserIndex = messages.findIndex((message) => message.role === "user");
+  if (firstUserIndex < 0) return [];
+  return messages.slice(firstUserIndex).slice(-6);
+};
+
 function aiProviderErrorCode(error = "") {
   const raw = cleanText(error, 800).toLowerCase();
   if (!raw) return "ai_provider_failed";
@@ -92,15 +108,17 @@ function requestToDraftInput(body = {}, user = {}) {
   };
 }
 
-function providerPrompt({ draft, user, context, workflow }) {
+function providerPrompt({ draft, user, context, workflow, conversation = [] }) {
   const safeWorkflow = normalizeAiAssistWorkflow(workflow);
   return JSON.stringify({
     contract: {
       writePolicy: "human_confirmation_required",
       allowedToWrite: false,
-      expectedOutput: "short user-facing assistant text with any missing questions",
+      expectedOutput: "short user-facing assistant text; answer the current userRequest first, then use context only when relevant",
       contextPolicy: "use only the role-filtered context below; never infer records that are not present"
     },
+    userRequest: cleanText(draft?.rawText, MAX_TEXT_CHARS),
+    recentConversation: conversation,
     workflow: {
       id: safeWorkflow,
       instruction: aiAssistWorkflowInstruction(safeWorkflow)
@@ -161,6 +179,7 @@ export function createAiAssistHandler({
       const normalized = requestToDraftInput(body, auth.user);
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
       const workflow = normalizeAiAssistWorkflow(body.workflow);
+      const conversation = cleanConversationMessages(body.messages);
 
       const context = buildAiAssistContext(body.context, auth.user);
       const draft = buildAiIntakeDraft(normalized.input, currentTime);
@@ -177,7 +196,7 @@ export function createAiAssistHandler({
       const result = await providerCall({
         config,
         system: SYSTEM_PROMPT,
-        prompt: providerPrompt({ draft, user: auth.user, context, workflow }),
+        prompt: providerPrompt({ draft, user: auth.user, context, workflow, conversation }),
         fetchImpl,
         maxTokens: Number(env.CMMS_AI_ASSIST_MAX_TOKENS || 700) || 700
       });
@@ -204,7 +223,7 @@ export function createAiAssistHandler({
         const planResult = await providerObjectCall({
           config,
           system: SYSTEM_PROMPT,
-          prompt: providerPlanPrompt({ draft, actions, context, workflow }),
+          prompt: providerPlanPrompt({ draft, actions, context, workflow, conversation }),
           schema: AI_PROVIDER_PLAN_SCHEMA,
           schemaName: "cmms_ai_non_writing_action_plan",
           schemaDescription: "Non-writing CMMS assistant plan. It must never execute or persist changes.",

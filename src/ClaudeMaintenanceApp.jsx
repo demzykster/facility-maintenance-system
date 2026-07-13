@@ -1425,6 +1425,7 @@ async function callAIAssistant({ text, messages, system, context, workflow, incl
     headers,
     body: JSON.stringify({
       text,
+      messages,
       language: "he",
       source: "ui",
       workflow,
