@@ -129,9 +129,9 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, tasks = [], meetings = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
-  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config), [session, vis, pm, fleet, config, buildContext]);
+  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings), [session, vis, pm, fleet, config, tasks, meetings, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
   const [input, setInput] = useState(initialText || "");
   const [inputWorkflow, setInputWorkflow] = useState(initialWorkflow || AI_ASSIST_WORKFLOWS.general);

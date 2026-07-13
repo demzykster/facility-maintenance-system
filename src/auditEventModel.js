@@ -163,6 +163,8 @@ export function aiAssistAuditEvent({ draft = {}, context = {}, provider = "", mo
         tickets: countArray(context.tickets),
         fleet: countArray(context.fleet),
         pm: countArray(context.pm),
+        tasks: countArray(context.tasks),
+        meetings: countArray(context.meetings),
         metrics: context.metrics && typeof context.metrics === "object" ? Object.keys(context.metrics).length : 0
       }
     }

@@ -18,6 +18,12 @@ const defaultFormatDateTime = (timestamp) => timestamp ? new Date(timestamp).toI
 const defaultDaysLeft = (timestamp, now) => Math.ceil((timestamp - now) / dayMs);
 const defaultPmFleet = (task = {}, fleet = []) => fleet.find((unit) => unit.id === task.forkliftId || unit.id === task.equipmentId);
 const defaultDocStatus = () => ({ d: null, label: "" });
+const defaultTaskOpen = (task = {}) => !["done", "cancelled", "closed", "archived"].includes(String(task.status || ""));
+
+const cleanStringList = (values = [], limit = 12) => (Array.isArray(values) ? values : [])
+  .map((value) => String(value || "").trim())
+  .filter(Boolean)
+  .slice(0, limit);
 
 function supplierTypeFromMeta(meta = {}) {
   if (meta.type) return String(meta.type);
@@ -33,10 +39,13 @@ export function buildAIContextSnapshot({
   tickets = [],
   pm = [],
   fleet = [],
+  tasks = [],
+  meetings = [],
   config = {},
   now = Date.now(),
   isOpenTicket = defaultIsOpenTicket,
   isOverdueTicket = () => false,
+  isOpenTask = defaultTaskOpen,
   requiresManagerAction = () => false,
   ticketNumber = defaultTicketNumber,
   statusLabel = defaultStatusLabel,
@@ -50,13 +59,18 @@ export function buildAIContextSnapshot({
   maxTickets = 60,
   maxFleet = 30,
   maxPm = 24,
+  maxTasks = 24,
+  maxMeetings = 12,
   maxSuppliers = 18,
   maxHeatmapRows = 6
 } = {}) {
   const ticketList = asArray(tickets);
   const fleetList = asArray(fleet);
   const pmList = asArray(pm);
+  const taskList = asArray(tasks);
+  const meetingList = asArray(meetings);
   const openTickets = ticketList.filter(isOpenTicket);
+  const openTasks = taskList.filter(isOpenTask);
 
   const mapTicket = (ticket) => ({
     id: ticket.id,
@@ -107,6 +121,59 @@ export function buildAIContextSnapshot({
       };
     });
 
+  const mapTask = (task) => {
+    const dueAt = Number(task.dueAt || task.due_at || 0) || null;
+    const nextActionAt = Number(task.nextActionAt || task.next_action_at || 0) || null;
+    const dueDays = dueAt ? daysLeft(dueAt, now) : null;
+    const clean = {
+      id: task.id,
+      title: task.title || task.subject || "",
+      status: task.status || "",
+      priority: task.priority || "",
+      department: task.department || task.dept || "",
+      responsibleIds: cleanStringList(task.responsibleIds || task.responsible_ids),
+      participantIds: cleanStringList(task.participantIds || task.participant_ids),
+      ownerId: String(task.ownerId || task.owner_id || ""),
+      waitingFor: task.waitingFor || task.waiting_for || "",
+      category: task.category || "",
+      locationText: task.locationText || task.location_text || "",
+      sourceModule: task.sourceModule || task.source_module || task.origin || "",
+      meetingId: task.meetingId || task.meeting_id || "",
+      overdue: dueAt ? dueAt < now && isOpenTask(task) : false,
+      updatedAt: task.updatedAt ? formatDateTime(task.updatedAt) : ""
+    };
+    if (dueDays != null) clean.dueDays = dueDays;
+    if (nextActionAt) clean.nextActionAt = formatDateTime(nextActionAt);
+    return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+  };
+
+  const mapMeeting = (meeting) => {
+    const at = Number(meeting.at || meeting.meetingAt || meeting.meeting_at || 0) || null;
+    const meetingDays = at ? daysLeft(at, now) : null;
+    const status = String(meeting.status || "");
+    const clean = {
+      id: meeting.id,
+      title: meeting.title || meeting.subject || "",
+      type: meeting.type || "",
+      status,
+      department: meeting.department || meeting.dept || "",
+      ownerId: String(meeting.ownerId || meeting.owner_id || ""),
+      participantIds: cleanStringList(meeting.participantIds || meeting.participant_ids),
+      openTaskCount: openTasks.filter((task) => task.meetingId === meeting.id || asArray(task.linkedMeetingIds).includes(meeting.id)).length,
+      needsSummary: status === "planned" && at ? at < now : false
+    };
+    if (meetingDays != null) clean.meetingDays = meetingDays;
+    return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && !(Array.isArray(value) && value.length === 0)));
+  };
+
+  const openTaskRows = openTasks
+    .slice()
+    .sort((a, b) => ((Number(a.dueAt || 9e15) || 9e15) - (Number(b.dueAt || 9e15) || 9e15)) || ((Number(b.updatedAt || 0) || 0) - (Number(a.updatedAt || 0) || 0)));
+  const plannedMeetings = meetingList
+    .filter((meeting) => String(meeting.status || "planned") === "planned")
+    .slice()
+    .sort((a, b) => (Number(a.at || a.meetingAt || 0) || 0) - (Number(b.at || b.meetingAt || 0) || 0));
+
   const suppliers = asArray(config.suppliers)
     .filter(Boolean)
     .slice(0, maxSuppliers)
@@ -152,7 +219,12 @@ export function buildAIContextSnapshot({
       assignedToMe: ticketList.filter((ticket) => ticket.assignee === session.name).length,
       fleetDocsDue: fleetNearDocs.length,
       pmDue: pmDue.length,
-      totalCost: ticketList.reduce((sum, ticket) => sum + (Number(ticket.closure?.costAmount || ticket.costAmount || ticket.cost || 0) || 0), 0)
+      totalCost: ticketList.reduce((sum, ticket) => sum + (Number(ticket.closure?.costAmount || ticket.costAmount || ticket.cost || 0) || 0), 0),
+      openTasks: openTasks.length,
+      overdueTasks: openTasks.filter((task) => Number(task.dueAt || 0) && Number(task.dueAt) < now).length,
+      waitingTasks: openTasks.filter((task) => task.status === "waiting").length,
+      plannedMeetings: plannedMeetings.length,
+      meetingsToSummarize: plannedMeetings.filter((meeting) => Number(meeting.at || meeting.meetingAt || 0) && Number(meeting.at || meeting.meetingAt) < now).length
     },
     bi: {
       heatmap: heatmapRows
@@ -160,6 +232,8 @@ export function buildAIContextSnapshot({
     tickets: openTickets.slice(0, maxTickets).map(mapTicket),
     fleet: fleetNearDocs.slice(0, maxFleet),
     pm: pmDue.slice(0, maxPm),
+    tasks: openTaskRows.slice(0, maxTasks).map(mapTask),
+    meetings: plannedMeetings.slice(0, maxMeetings).map(mapMeeting),
     suppliers
   };
 }

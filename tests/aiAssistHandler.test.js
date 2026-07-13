@@ -337,6 +337,14 @@ describe("AI assist handler", () => {
           tickets: [
             { id: "visible", subject: "Allowed", department: "הפצה", cost: 1000 },
             { id: "hidden", subject: "Hidden", department: "קבלה", cost: 4000 }
+          ],
+          tasks: [
+            { id: "task-visible", title: "Allowed task", department: "הפצה", responsibleIds: ["u1"], dueDays: -1, overdue: true },
+            { id: "task-hidden", title: "Hidden task", department: "קבלה", responsibleIds: ["u2"] }
+          ],
+          meetings: [
+            { id: "meeting-visible", title: "Allowed meeting", department: "הפצה", participantIds: ["u1"], needsSummary: true },
+            { id: "meeting-hidden", title: "Hidden meeting", department: "קבלה", participantIds: ["u2"] }
           ]
         }
       }
@@ -358,7 +366,11 @@ describe("AI assist handler", () => {
     ]);
     expect(prompt.context.tickets.map((ticket) => ticket.id)).toEqual(["visible"]);
     expect(prompt.context.tickets[0]).not.toHaveProperty("cost");
+    expect(prompt.context.tasks.map((task) => task.id)).toEqual(["task-visible"]);
+    expect(prompt.context.meetings.map((meeting) => meeting.id)).toEqual(["meeting-visible"]);
     expect(JSON.stringify(prompt)).not.toContain("Hidden");
+    expect(JSON.stringify(prompt)).not.toContain("Hidden task");
+    expect(JSON.stringify(prompt)).not.toContain("Hidden meeting");
   });
 
   it("writes an audit-safe AI assist event for provider calls", async () => {
@@ -405,7 +417,7 @@ describe("AI assist handler", () => {
         model: "gpt-5.2",
         providerStatus: "ok",
         workflow: "general",
-        contextCounts: { tickets: 1, fleet: 0, pm: 0, metrics: 2 }
+        contextCounts: { tickets: 1, fleet: 0, pm: 0, tasks: 0, meetings: 0, metrics: 2 }
       })
     }));
     const auditPayload = JSON.stringify(auditDriver.write.mock.calls[0][0]);

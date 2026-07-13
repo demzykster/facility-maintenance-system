@@ -142,6 +142,8 @@ describe("auditEventModel", () => {
         tickets: [{ id: "t1", subject: "hidden subject" }],
         fleet: [{ id: "f1" }],
         pm: [],
+        tasks: [{ id: "task-1", title: "hidden task" }],
+        meetings: [{ id: "meet-1", title: "hidden meeting" }],
         metrics: { openTickets: 1 }
       },
       provider: "anthropic",
@@ -168,12 +170,14 @@ describe("auditEventModel", () => {
         model: "claude-test",
         providerStatus: "ok",
         workflow: "risk_summary",
-        contextCounts: { tickets: 1, fleet: 1, pm: 0, metrics: 1 }
+        contextCounts: { tickets: 1, fleet: 1, pm: 0, tasks: 1, meetings: 1, metrics: 1 }
       }
     });
     const serialized = JSON.stringify(event);
     expect(serialized).not.toContain("secret user prompt");
     expect(serialized).not.toContain("hidden subject");
+    expect(serialized).not.toContain("hidden task");
+    expect(serialized).not.toContain("hidden meeting");
   });
 
   it("documents the audit table fields in one contract", () => {

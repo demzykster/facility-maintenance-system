@@ -3,6 +3,8 @@ import { canView } from "./permissionModel.js";
 const MAX_TICKETS = 28;
 const MAX_FLEET = 18;
 const MAX_PM = 12;
+const MAX_TASKS = 16;
+const MAX_MEETINGS = 10;
 const MAX_SUPPLIERS = 12;
 const MAX_HEATMAP_ROWS = 8;
 const MAX_TEXT = 160;
@@ -66,10 +68,20 @@ function matchesUserIdentity(value, profile) {
   return !!candidate && [profile.id, profile.workerNo, profile.name].filter(Boolean).includes(candidate);
 }
 
+function listIncludesUser(values = [], profile) {
+  return asArray(values).some((value) => matchesUserIdentity(value, profile));
+}
+
 function isAssignedToUser(record = {}, profile) {
   return matchesUserIdentity(record.assigneeId || record.assignedToId || record.techId || record.ownerId, profile)
     || matchesUserIdentity(record.assigneeWorkerNo || record.workerNo, profile)
-    || matchesUserIdentity(record.assignee || record.assignedTo || record.techName || record.ownerName, profile);
+    || matchesUserIdentity(record.assignee || record.assignedTo || record.techName || record.ownerName, profile)
+    || listIncludesUser([
+      ...asArray(record.responsibleIds),
+      ...asArray(record.responsible_ids),
+      ...asArray(record.participantIds),
+      ...asArray(record.participant_ids)
+    ], profile);
 }
 
 function isReportedByUser(record = {}, profile) {
@@ -142,6 +154,46 @@ function sanitizePm(item = {}) {
   return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null));
 }
 
+function sanitizeTask(item = {}) {
+  const dueDays = numberOrNull(item.dueDays ?? item.daysLeft);
+  const clean = {
+    id: compactId(item.id),
+    title: compactText(item.title || item.subject, 140),
+    status: compactText(item.status, 50),
+    priority: compactText(item.priority, 50),
+    department: recordDepartments(item)[0] || "",
+    responsibleIds: cleanStringArray(item.responsibleIds || item.responsible_ids, 8),
+    ownerId: compactId(item.ownerId || item.owner_id),
+    waitingFor: compactText(item.waitingFor || item.waiting_for, 120),
+    category: compactText(item.category, 80),
+    locationText: compactText(item.locationText || item.location_text, 120),
+    sourceModule: compactText(item.sourceModule || item.source_module, 60),
+    meetingId: compactId(item.meetingId || item.meeting_id),
+    updatedAt: compactText(item.updatedAt || item.updated_at, 80),
+    overdue: booleanOrFalse(item.overdue)
+  };
+  if (dueDays != null) clean.dueDays = dueDays;
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && value !== false && !(Array.isArray(value) && value.length === 0)));
+}
+
+function sanitizeMeeting(item = {}) {
+  const meetingDays = numberOrNull(item.meetingDays ?? item.daysLeft);
+  const openTaskCount = numberOrNull(item.openTaskCount);
+  const clean = {
+    id: compactId(item.id),
+    title: compactText(item.title || item.subject, 140),
+    type: compactText(item.type, 60),
+    status: compactText(item.status, 50),
+    department: recordDepartments(item)[0] || "",
+    ownerId: compactId(item.ownerId || item.owner_id),
+    participantIds: cleanStringArray(item.participantIds || item.participant_ids, 10),
+    needsSummary: booleanOrFalse(item.needsSummary)
+  };
+  if (meetingDays != null) clean.meetingDays = meetingDays;
+  if (openTaskCount != null) clean.openTaskCount = openTaskCount;
+  return Object.fromEntries(Object.entries(clean).filter(([, value]) => value !== "" && value != null && value !== false && !(Array.isArray(value) && value.length === 0)));
+}
+
 function sanitizeSupplier(item = {}) {
   const fleetCount = numberOrNull(item.fleetCount);
   const openTicketCount = numberOrNull(item.openTicketCount);
@@ -158,7 +210,8 @@ function sanitizeSupplier(item = {}) {
 function sanitizeMetrics(metrics = {}, profile) {
   const allowed = [
     "openTickets", "overdueTickets", "waitingTickets", "pendingApprovals", "assignedToMe",
-    "fleetDocsDue", "pmDue", "ppeOpen", "cleaningOpen", "tasksOpen", "unreadNotifications"
+    "fleetDocsDue", "pmDue", "ppeOpen", "cleaningOpen", "tasksOpen", "openTasks", "overdueTasks",
+    "waitingTasks", "plannedMeetings", "meetingsToSummarize", "unreadNotifications"
   ];
   if (profile.canSeeFinancials) allowed.push("totalCost", "monthlyCost", "estimatedCost");
   return Object.fromEntries(allowed
@@ -217,6 +270,14 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     .filter((item) => profile.canSeeCompany || departmentAllowed(item, profile) || isAssignedToUser(item, profile))
     .slice(0, MAX_PM)
     .map(sanitizePm);
+  const tasks = asArray(source.tasks)
+    .filter((item) => profile.canSeeCompany || departmentAllowed(item, profile) || isAssignedToUser(item, profile) || isReportedByUser(item, profile))
+    .slice(0, MAX_TASKS)
+    .map(sanitizeTask);
+  const meetings = asArray(source.meetings)
+    .filter((item) => profile.canSeeCompany || departmentAllowed(item, profile) || isAssignedToUser(item, profile))
+    .slice(0, MAX_MEETINGS)
+    .map(sanitizeMeeting);
   const suppliers = profile.canSeeSuppliers
     ? asArray(source.suppliers)
       .slice(0, MAX_SUPPLIERS)
@@ -237,11 +298,15 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     tickets,
     fleet,
     pm,
+    tasks,
+    meetings,
     suppliers,
     limits: {
       tickets: MAX_TICKETS,
       fleet: MAX_FLEET,
       pm: MAX_PM,
+      tasks: MAX_TASKS,
+      meetings: MAX_MEETINGS,
       suppliers: MAX_SUPPLIERS,
       heatmap: MAX_HEATMAP_ROWS
     }

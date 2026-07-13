@@ -4,7 +4,7 @@ import { buildAIContextSnapshot } from "../src/aiAssistSnapshotModel.js";
 const day = 86400000;
 
 describe("AI assist snapshot model", () => {
-  it("builds compact operational context with metrics, tickets, fleet docs, PM, and heatmap", () => {
+  it("builds compact operational context with metrics, tickets, fleet docs, PM, tasks, meetings, and heatmap", () => {
     const now = Date.UTC(2026, 6, 13, 8, 0, 0);
     const session = { id: "admin-1", name: "Vadim", role: "admin" };
     const fleet = [
@@ -51,12 +51,55 @@ describe("AI assist snapshot model", () => {
       { id: "pm-1", title: "Monthly PM", forkliftId: "fork-1", nextDue: now + 3 * day, active: true },
       { id: "pm-2", title: "Later PM", forkliftId: "fork-2", nextDue: now + 30 * day, active: true }
     ];
+    const tasks = [
+      {
+        id: "task-1",
+        title: "Approve supplier quote",
+        status: "waiting",
+        priority: "high",
+        dueAt: now - day,
+        updatedAt: now - day,
+        responsibleIds: ["admin-1"],
+        ownerId: "admin-1",
+        waitingFor: "CFO",
+        category: "budget",
+        meetingId: "meet-1"
+      },
+      {
+        id: "task-2",
+        title: "Completed",
+        status: "done",
+        priority: "low",
+        updatedAt: now - 2 * day
+      }
+    ];
+    const meetings = [
+      {
+        id: "meet-1",
+        title: "Ops weekly",
+        type: "ops",
+        status: "planned",
+        at: now - day,
+        ownerId: "admin-1",
+        participantIds: ["admin-1"]
+      },
+      {
+        id: "meet-2",
+        title: "Next planning",
+        type: "boss",
+        status: "planned",
+        at: now + 2 * day,
+        participantIds: ["admin-1"]
+      }
+    ];
 
     const snapshot = buildAIContextSnapshot({
       session,
       tickets,
       pm,
       fleet,
+      tasks,
+      meetings,
       config: {
         departments: ["הפצה", "קבלה"],
         suppliers: ["Toyota", "BuildingCo"],
@@ -90,6 +133,13 @@ describe("AI assist snapshot model", () => {
       pmDue: 1,
       totalCost: 200
     });
+    expect(snapshot.metrics).toMatchObject({
+      openTasks: 1,
+      overdueTasks: 1,
+      waitingTasks: 1,
+      plannedMeetings: 2,
+      meetingsToSummarize: 1
+    });
     expect(snapshot.tickets).toHaveLength(2);
     expect(snapshot.tickets[0]).toMatchObject({
       number: "F-035",
@@ -120,6 +170,45 @@ describe("AI assist snapshot model", () => {
         department: "הפצה",
         dueDays: 3,
         status: "active"
+      }
+    ]);
+    expect(snapshot.tasks).toEqual([
+      {
+        id: "task-1",
+        title: "Approve supplier quote",
+        status: "waiting",
+        priority: "high",
+        responsibleIds: ["admin-1"],
+        ownerId: "admin-1",
+        waitingFor: "CFO",
+        category: "budget",
+        meetingId: "meet-1",
+        dueDays: -1,
+        overdue: true,
+        updatedAt: "13.07.26 08:00"
+      }
+    ]);
+    expect(snapshot.meetings).toEqual([
+      {
+        id: "meet-1",
+        title: "Ops weekly",
+        type: "ops",
+        status: "planned",
+        ownerId: "admin-1",
+        participantIds: ["admin-1"],
+        openTaskCount: 1,
+        meetingDays: -1,
+        needsSummary: true
+      },
+      {
+        id: "meet-2",
+        title: "Next planning",
+        type: "boss",
+        status: "planned",
+        participantIds: ["admin-1"],
+        openTaskCount: 0,
+        meetingDays: 2,
+        needsSummary: false
       }
     ]);
     expect(snapshot.suppliers).toEqual([

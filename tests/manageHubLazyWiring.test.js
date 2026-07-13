@@ -27,4 +27,13 @@ describe("management tasks and meetings lazy wiring", () => {
     expect(manageHubSource).toContain("const askTasksAI = p.onAskAI");
     expect(manageHubSource).toContain("const askMeetingsAI = p.onAskAI");
   });
+
+  it("passes management tasks and meetings into the shared AI context snapshot", () => {
+    const aiPanelSource = readFileSync(new URL("../src/AIPanel.jsx", import.meta.url), "utf8");
+    expect(appSource).toContain("function buildAIContextSnapshot(session, tickets, pm, fleet, cfg, tasks = [], meetings = [])");
+    expect(appSource).toContain("tasks,");
+    expect(appSource).toContain("meetings,");
+    expect(aiPanelSource).toContain("tasks = [], meetings = []");
+    expect(aiPanelSource).toContain("buildContext(session, vis, pm, fleet, config, tasks, meetings)");
+  });
 });

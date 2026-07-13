@@ -46,10 +46,18 @@ describe("AI assist context model", () => {
         { id: "f1", code: "A", department: "הפצה" },
         { id: "f2", code: "B", department: "קבלה" }
       ],
+      tasks: [
+        { id: "task-own", title: "Allowed task", department: "הפצה", responsibleIds: ["manager-1"], status: "waiting", waitingFor: "CFO", dueDays: -2, overdue: true },
+        { id: "task-other", title: "Hidden task", department: "קבלה", responsibleIds: ["manager-2"], status: "todo" }
+      ],
+      meetings: [
+        { id: "meeting-own", title: "Allowed meeting", department: "הפצה", participantIds: ["manager-1"], meetingDays: -1, needsSummary: true },
+        { id: "meeting-other", title: "Hidden meeting", department: "קבלה", participantIds: ["manager-2"] }
+      ],
       suppliers: [
         { name: "Toyota", type: "transport", scopes: ["transport"], fleetCount: 2, openTicketCount: 1 }
       ]
-    }, { role: "user", departments: ["הפצה"] });
+    }, { id: "manager-1", role: "user", departments: ["הפצה"] });
 
     expect(context.metrics).toEqual({ openTickets: 3 });
     expect(context.bi.heatmap).toEqual([
@@ -64,6 +72,28 @@ describe("AI assist context model", () => {
     expect(context.tickets[0]).toMatchObject({ id: "own-dept", department: "הפצה" });
     expect(context.tickets[0]).not.toHaveProperty("cost");
     expect(context.fleet.map((unit) => unit.id)).toEqual(["f1"]);
+    expect(context.tasks).toEqual([
+      {
+        id: "task-own",
+        title: "Allowed task",
+        status: "waiting",
+        department: "הפצה",
+        responsibleIds: ["manager-1"],
+        waitingFor: "CFO",
+        dueDays: -2,
+        overdue: true
+      }
+    ]);
+    expect(context.meetings).toEqual([
+      {
+        id: "meeting-own",
+        title: "Allowed meeting",
+        department: "הפצה",
+        participantIds: ["manager-1"],
+        meetingDays: -1,
+        needsSummary: true
+      }
+    ]);
     expect(context.suppliers).toEqual([]);
   });
 

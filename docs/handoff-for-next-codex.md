@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, expected clean after the latest push.
-- Latest app/UI commit before this handoff: first-login password session stabilization and AI entry points for management tasks/meetings, after explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
+- Latest app/UI commit before this handoff: first-login password session stabilization and structured AI context for management tasks/meetings, after explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add task and meeting records to AI context`
+  - `src/AIPanel.jsx` now passes tasks and meetings into the shared `buildAIContextSnapshot()` call instead of sending only tickets/fleet/PM/config.
+  - `src/aiAssistSnapshotModel.js` now includes compact task and meeting records for AI: open tasks, overdue/waiting counts, due days, responsible ids, waiting reason, linked meeting id, planned meetings, needs-summary meetings, and open task counts per meeting.
+  - `src/aiAssistContextModel.js` role-filters and sanitizes those task/meeting records before `/api/ai/assist` sends context to a provider. Leadership can see company scope; managers get only their department/assigned/participating work.
+  - `src/auditEventModel.js` counts task/meeting context in `ai_assist` metadata without storing raw task or meeting titles.
+  - This is read-only AI context work. It does not add AI task/meeting create/update execution yet; future task/meeting write actions must use normal validated work APIs, human confirmation, and audit.
 - `Stabilize first login and task AI entry`
   - First-password completion through `POST /api/session/initial-password` now returns a full normalized `app_users` profile from `createSupabaseInitialPasswordClient.completePasswordUser()` instead of only `authUserId/appUserId`.
   - The returned first-login session now carries the same important fields as ordinary production login/session restore: id, auth user id, name, role, email, department/departments, and permissions.
