@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { aiAssistantFailureMessage, aiUpdatePreviewRows, normalizeAiPanelAssistantOutput } from "../src/AIPanel.jsx";
+import { aiAssistantFailureMessage, aiUpdatePreviewRows, normalizeAiPanelAssistantOutput, shouldRequestProviderPlan } from "../src/AIPanel.jsx";
+import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI panel response model", () => {
   it("keeps legacy string assistant responses working", () => {
     expect(normalizeAiPanelAssistantOutput("תשובה קצרה")).toEqual({
       text: "תשובה קצרה",
-      actions: []
+      actions: [],
+      providerPlan: null,
+      providerPlanErrorCode: ""
     });
   });
 
@@ -22,8 +25,37 @@ describe("AI panel response model", () => {
       actions: [action, null, "bad"]
     })).toEqual({
       text: "הכנתי טיוטה.",
-      actions: [action]
+      actions: [action],
+      providerPlan: null,
+      providerPlanErrorCode: ""
     });
+  });
+
+  it("preserves sanitized provider plans from the server assistant", () => {
+    const providerPlan = {
+      summary: "תוכנית מוצעת",
+      writesData: false,
+      items: [{ id: "provider_plan_1", type: "ticket.update", title: "בדיקת קריאה" }]
+    };
+
+    expect(normalizeAiPanelAssistantOutput({
+      text: "יש תוכנית.",
+      providerPlan,
+      providerPlanErrorCode: "ai_provider_quota_exceeded"
+    })).toEqual({
+      text: "יש תוכנית.",
+      actions: [],
+      providerPlan,
+      providerPlanErrorCode: "ai_provider_quota_exceeded"
+    });
+  });
+
+  it("requests provider plans only for action-oriented workflows", () => {
+    expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.nextActions)).toBe(true);
+    expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.riskSummary)).toBe(true);
+    expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.draftPreparation)).toBe(true);
+    expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.slaExplanation)).toBe(false);
+    expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.general)).toBe(false);
   });
 
   it("formats update action previews with before and after values", () => {

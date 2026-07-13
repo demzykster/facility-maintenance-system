@@ -54,10 +54,20 @@ const UPDATE_FIELD_LABELS = Object.freeze({
 });
 
 export function normalizeAiPanelAssistantOutput(output) {
-  if (typeof output === "string") return { text: output, actions: [] };
+  if (typeof output === "string") return { text: output, actions: [], providerPlan: null, providerPlanErrorCode: "" };
   const text = cleanText(output?.text || output?.assistant?.text || output?.draft?.userReply, "לא התקבלה תשובה.");
   const actions = Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : [];
-  return { text, actions };
+  const providerPlan = output?.providerPlan && typeof output.providerPlan === "object" ? output.providerPlan : null;
+  const providerPlanErrorCode = cleanText(output?.providerPlanErrorCode, "");
+  return { text, actions, providerPlan, providerPlanErrorCode };
+}
+
+export function shouldRequestProviderPlan(workflow = AI_ASSIST_WORKFLOWS.general) {
+  return [
+    AI_ASSIST_WORKFLOWS.riskSummary,
+    AI_ASSIST_WORKFLOWS.nextActions,
+    AI_ASSIST_WORKFLOWS.draftPreparation
+  ].includes(workflow);
 }
 
 export function aiAssistantFailureMessage(error = {}) {
@@ -181,6 +191,23 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
   </div>;
 }
 
+function AiProviderPlanCard({ plan }) {
+  const items = Array.isArray(plan?.items) ? plan.items : [];
+  if (!plan || items.length === 0) return null;
+  return <div className="ai-provider-plan">
+    <div className="ai-provider-plan-head">
+      <span>תוכנית מוצעת</span>
+      <span>לא מבצע לבד</span>
+    </div>
+    {plan.summary && <div className="ai-provider-plan-summary">{plan.summary}</div>}
+    <div className="ai-provider-plan-items">{items.map((item) => <div key={item.id || `${item.type}-${item.title}`} className="ai-provider-plan-item">
+      <div className="ai-provider-plan-title">{item.title}</div>
+      {item.reason && <div className="ai-provider-plan-reason">{item.reason}</div>}
+      {Array.isArray(item.missingFields) && item.missingFields.length > 0 && <div className="ai-provider-plan-missing">חסר: {item.missingFields.join(" · ")}</div>}
+    </div>)}</div>
+  </div>;
+}
+
 export function AIPanel({ session, tickets, pm, fleet, tasks = [], meetings = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
   const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings), [session, vis, pm, fleet, config, tasks, meetings, buildContext]);
@@ -218,10 +245,16 @@ export function AIPanel({ session, tickets, pm, fleet, tasks = [], meetings = []
         : "אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הקונטקסט המסונן בלבד.";
       const apiMsgs = history.filter((m, i) => !(i === 0 && m.role === "assistant")).map((m) => ({ role: m.role, content: m.content }));
       const out = callAssistant
-        ? await callAssistant({ text: q, messages: apiMsgs, system: sys, context, workflow })
+        ? await callAssistant({ text: q, messages: apiMsgs, system: sys, context, workflow, includeProviderPlan: shouldRequestProviderPlan(workflow) })
         : await callModel(apiMsgs, sys, 900);
       const normalized = normalizeAiPanelAssistantOutput(out);
-      setMsgs((s) => [...s, { role: "assistant", content: normalized.text, actions: normalized.actions }]);
+      setMsgs((s) => [...s, {
+        role: "assistant",
+        content: normalized.text,
+        actions: normalized.actions,
+        providerPlan: normalized.providerPlan,
+        providerPlanErrorCode: normalized.providerPlanErrorCode
+      }]);
     } catch (error) {
       setMsgs((s) => [...s, { role: "assistant", content: aiAssistantFailureMessage(error) }]);
     } finally {
@@ -259,6 +292,7 @@ export function AIPanel({ session, tickets, pm, fleet, tasks = [], meetings = []
       <div className="ai-msgs">
         {msgs.map((m, i) => <div key={i} className={"ai-msg-wrap " + m.role}>
           <div className={"ai-msg " + m.role}>{m.content}</div>
+          {m.role === "assistant" && m.providerPlan && <AiProviderPlanCard plan={m.providerPlan} />}
           {m.role === "assistant" && Array.isArray(m.actions) && m.actions.length > 0 && <div className="ai-actions">{m.actions.map((action) => {
             const key = action.id || action.type;
             return <AiActionCard key={key} action={action} busy={actionBusy === key} result={actionResults[key]} onExecute={runAction} onEdit={editAction} />;

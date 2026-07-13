@@ -63,6 +63,7 @@ Recent commits on `main`:
   - `server/ai/providerClient.js` now exposes `callAiProviderObject()` over the existing Vercel AI SDK provider factories for optional structured output.
   - `src/aiAssistProviderPlanModel.js` defines `AI_PROVIDER_PLAN_SCHEMA`, `providerPlanPrompt()`, and `sanitizeAiProviderPlan()`.
   - `/api/ai/assist` can request `includeProviderPlan` / `structuredPlan`; the response may include a sanitized `providerPlan` or fail-soft `providerPlanErrorCode` while the main assistant response still succeeds.
+  - `src/AIPanel.jsx` requests `includeProviderPlan` only for action-oriented workflows (`risk_summary`, `next_actions`, `draft_preparation`) and renders the sanitized plan as a separate suggested-plan card.
   - Sanitized provider plans are review artifacts only: unsupported operation types are dropped, executable fields are stripped, and every item is forced to `requiresConfirmation: true`, `writesData: false`, and `writePolicy: "human_confirmation_required"`.
   - This is deliberately not provider-native direct tool execution and not database write access.
 - `Migrate AI provider boundary to Vercel AI SDK Core` (current local slice)
