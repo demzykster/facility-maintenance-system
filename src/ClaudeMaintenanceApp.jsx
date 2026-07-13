@@ -11224,6 +11224,11 @@ function LazyAIPanel(props) {
   </Suspense>;
 }
 function NotifPanelFallback({ onClose }) {
+  useEffect(() => {
+    const onKey = (event) => { if (event.key === "Escape") onClose && onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return <div className="ovl-backdrop notif-back" onClick={onClose}>
     <div className="notif-panel" role="dialog" aria-modal="true" aria-label="התראות" onClick={(e) => e.stopPropagation()}>
       <div className="notif-head">
