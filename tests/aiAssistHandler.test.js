@@ -236,7 +236,7 @@ describe("AI assist handler", () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
       provider: "google",
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       text: "צריך לציין מספר כלי ומצב כלי."
     });
     const handler = createAiAssistHandler({
@@ -266,7 +266,7 @@ describe("AI assist handler", () => {
       ok: true,
       assistant: {
         provider: "google",
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         text: "צריך לציין מספר כלי ומצב כלי."
       }
     });

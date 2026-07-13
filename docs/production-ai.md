@@ -24,7 +24,7 @@ or:
 CMMS_AI_MODE=server
 CMMS_AI_PROVIDER=google
 GOOGLE_GENERATIVE_AI_API_KEY=...
-CMMS_AI_MODEL=gemini-2.5-flash
+CMMS_AI_MODEL=gemini-2.0-flash
 ```
 
 or:
@@ -43,7 +43,7 @@ Provider names are normalized for operator-friendly setup: `claude` maps to the 
 ## Current State
 
 - Production defaults to disabled AI when no AI mode is configured.
-- Live Vercel status checked on 2026-07-13 initially reported `mode: "disabled"`, `serverReady: false`, and `ai_server_disabled` because no production AI env existed. Production Vercel env was then configured with `CMMS_AI_MODE=server`, `CMMS_AI_PROVIDER=openai`, `CMMS_AI_MODEL`, and a sensitive `OPENAI_API_KEY`. The first post-env provider check exposed a real OpenAI Responses API issue in our status route: `max_output_tokens=8` is below the provider minimum. The code now requests/clamps provider checks to at least 16 output tokens. After that fix deployed, `/api/ai/status?check=1` reached the provider but OpenAI returned a quota/billing failure. The app normalizes that state as `ai_provider_quota_exceeded` in settings and in the AI panel. The server provider boundary now also supports Google Gemini through `GOOGLE_GENERATIVE_AI_API_KEY`, so deployment can switch provider via `CMMS_AI_PROVIDER=gemini` / `google` without browser secrets or UI rewrites.
+- Live Vercel status checked on 2026-07-13 initially reported `mode: "disabled"`, `serverReady: false`, and `ai_server_disabled` because no production AI env existed. Production Vercel env was then configured with `CMMS_AI_MODE=server`, `CMMS_AI_PROVIDER=openai`, `CMMS_AI_MODEL`, and a sensitive `OPENAI_API_KEY`. The first post-env provider check exposed a real OpenAI Responses API issue in our status route: `max_output_tokens=8` is below the provider minimum. The code now requests/clamps provider checks to at least 16 output tokens. After that fix deployed, `/api/ai/status?check=1` reached the provider but OpenAI returned a quota/billing failure. The app normalizes that state as `ai_provider_quota_exceeded` in settings and in the AI panel. The server provider boundary now also supports Google Gemini through `GOOGLE_GENERATIVE_AI_API_KEY`, so deployment can switch provider via `CMMS_AI_PROVIDER=gemini` / `google` without browser secrets or UI rewrites. In live production testing, `gemini-2.5-flash` was unavailable for the configured key, while `gemini-2.0-flash` reached the provider and then returned a quota/billing failure; that means the remaining live blocker is provider quota/billing, not missing env wiring.
 - Browser AI buttons are hidden unless the frontend AI mode is `client` or saved app settings select server AI mode.
 - Demo/local can still use the existing browser AI path and local keyword fallback.
 - The `עוזר AI` panel is split into `src/AIPanel.jsx` and loads only when the AI UI is actually opened. Role-specific welcome text and quick workflow prompts live in `src/aiAssistQuickPromptModel.js`, so the UI shell stays thin while admin, executive, manager, technician, cleaner, and worker entry points can evolve independently. The same prompt model also reads the current snapshot metrics to surface contextual prompts such as heatmap load, SLA exposure, pending approvals, PM due items, or field-work urgency before the generic role prompts.

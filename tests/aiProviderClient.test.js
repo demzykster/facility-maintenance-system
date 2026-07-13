@@ -95,15 +95,15 @@ describe("ai provider client", () => {
     }));
 
     const result = await callAiProvider({
-      config: { provider: "gemini", googleApiKey: "google-secret", model: "gemini-2.5-flash" },
+      config: { provider: "gemini", googleApiKey: "google-secret", model: "gemini-2.0-flash" },
       system: "system",
       prompt: "prompt",
       fetchImpl,
       maxTokens: 120
     });
 
-    expect(result).toMatchObject({ ok: true, provider: "google", model: "gemini-2.5-flash", text: "gemini ready" });
-    expect(fetchImpl).toHaveBeenCalledWith("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", expect.objectContaining({
+    expect(result).toMatchObject({ ok: true, provider: "google", model: "gemini-2.0-flash", text: "gemini ready" });
+    expect(fetchImpl).toHaveBeenCalledWith("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", expect.objectContaining({
       method: "POST",
       headers: expect.objectContaining({
         "x-goog-api-key": "google-secret"

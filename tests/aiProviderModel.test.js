@@ -123,7 +123,7 @@ describe("aiProviderModel", () => {
     })).toMatchObject({
       mode: AI_MODES.server,
       provider: AI_PROVIDERS.google,
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       providerKeyConfigured: true,
       serverReady: true,
       errors: []
