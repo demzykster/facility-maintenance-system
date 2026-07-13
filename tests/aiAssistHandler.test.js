@@ -232,6 +232,59 @@ describe("AI assist handler", () => {
     }));
   });
 
+  it("tells the provider when a deterministic action is ready so it does not ask stale questions", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "הכנתי דיווח ניקיון לאישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      now: () => 123,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "הרצפה מלוכלכת במטבחון קומה 2",
+        language: "he",
+        context: {
+          cleaning: {
+            zones: [
+              { id: "zone-kitchen-2", name: "מטבחון קומה 2", location: "בניין A", active: true }
+            ]
+          }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions[0]).toMatchObject({
+      type: "cleaning.complaint.create",
+      status: "ready_for_confirmation",
+      payload: {
+        zoneId: "zone-kitchen-2",
+        zoneName: "מטבחון קומה 2"
+      }
+    });
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.actionGuidance).toMatchObject({
+      hasActionProposal: true,
+      readyActionCount: 1,
+      actionTypes: ["cleaning.complaint.create"],
+      missingFields: []
+    });
+    expect(prompt.actionGuidance.instruction).toContain("Do not ask for fields that are already resolved");
+  });
+
   it("can request a provider structured plan but only returns sanitized non-writing suggestions", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

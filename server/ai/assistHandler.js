@@ -109,6 +109,29 @@ function capabilityGuidanceForContext(context = {}) {
   return rules;
 }
 
+function actionGuidanceForProvider(actions = []) {
+  const safeActions = Array.isArray(actions) ? actions : [];
+  if (!safeActions.length) {
+    return {
+      hasActionProposal: false,
+      readyActionCount: 0,
+      missingFields: [],
+      instruction: "No deterministic action proposal is ready. If the user asked to create or change something, explain what is missing in one concise follow-up."
+    };
+  }
+  const ready = safeActions.filter((action) => action?.status === "ready_for_confirmation");
+  const missingFields = [...new Set(safeActions.flatMap((action) => Array.isArray(action?.missingFields) ? action.missingFields : []))];
+  return {
+    hasActionProposal: true,
+    readyActionCount: ready.length,
+    actionTypes: safeActions.map((action) => cleanText(action?.type, 80)).filter(Boolean).slice(0, 6),
+    missingFields,
+    instruction: ready.length
+      ? "A deterministic action card is ready for human confirmation. Do not ask for fields that are already resolved by the action payload. Tell the user briefly what is ready and that they can confirm or edit it in the UI. Do not claim it was already saved."
+      : "A deterministic action card exists but is blocked by missingFields. Ask only for those missing fields, not for unrelated optional details."
+  };
+}
+
 const safeSource = (value) => {
   const source = String(value || "ui").trim();
   return ["ui", "worker", "cleaner", "mobile", "test"].includes(source) ? source : "ui";
@@ -166,7 +189,7 @@ function requestToDraftInput(body = {}, user = {}) {
   };
 }
 
-function providerPrompt({ draft, user, context, workflow, conversation = [], responseLanguage }) {
+function providerPrompt({ draft, actions = [], user, context, workflow, conversation = [], responseLanguage }) {
   const safeWorkflow = normalizeAiAssistWorkflow(workflow);
   const language = responseLanguage || responseLanguageForRequest({ text: draft?.rawText, conversation, fallback: draft?.language });
   return JSON.stringify({
@@ -179,6 +202,7 @@ function providerPrompt({ draft, user, context, workflow, conversation = [], res
       contextPolicy: "use only the role-filtered context below; never infer records that are not present",
       refusalPolicy: "If the current userRequest is unclear, ask one precise follow-up question instead of summarizing unrelated context."
     },
+    actionGuidance: actionGuidanceForProvider(actions),
     responseLanguage: language,
     userRequest: cleanText(draft?.rawText, MAX_TEXT_CHARS),
     recentConversation: conversation,
@@ -268,7 +292,7 @@ export function createAiAssistHandler({
       const result = await providerCall({
         config,
         system: SYSTEM_PROMPT,
-        prompt: providerPrompt({ draft, user: auth.user, context, workflow, conversation, responseLanguage }),
+        prompt: providerPrompt({ draft, actions, user: auth.user, context, workflow, conversation, responseLanguage }),
         fetchImpl,
         maxTokens: Number(env.CMMS_AI_ASSIST_MAX_TOKENS || 700) || 700
       });
