@@ -52,13 +52,19 @@ The current strategy is:
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
 - First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 233.17 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `AIPanel` around 5.01 kB gzip, `ManageHub` around 19.82 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and `src/BIOverview.jsx` wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
-- Live AI connection note: on 2026-07-13, authenticated `/api/ai/status` on Vercel reported `mode: "disabled"`, `serverReady: false`, and `errors: ["ai_server_disabled"]`; `vercel env ls` showed no production `CMMS_AI_MODE`, `CMMS_AI_PROVIDER`, `CMMS_AI_MODEL`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`. The assistant/status UI now explains these setup failures explicitly, but the provider cannot become connected until a real server-side provider key is added to Vercel and the app is redeployed.
+- Live AI connection note: on 2026-07-13, authenticated `/api/ai/status` on Vercel initially reported `mode: "disabled"`, `serverReady: false`, and `errors: ["ai_server_disabled"]` because no production AI env existed. Production env was then configured with `CMMS_AI_MODE=server`, `CMMS_AI_PROVIDER=openai`, `CMMS_AI_MODEL`, and a sensitive `OPENAI_API_KEY`; do not store or print the key in repo/docs. A fresh production deployment is required before those env values affect the live app. After deploy, verify with authenticated `/api/ai/status?check=1` and a normal AI prompt smoke.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
 ## Recent Work Completed
 
 Recent commits on `main`:
 
+- `Add AI calendar date parsing` (current local slice)
+  - `src/aiAssistActionModel.js` now accepts explicit calendar dates for safe work-record actions: `DD.MM.YY`, `DD.MM.YYYY`, `DD/MM/YY`, and `DD/MM/YYYY`.
+  - `task.update` can now propose a due-date patch from those explicit formats, still only when exactly one role-visible task is in context and still only after human confirmation through `saveTask` / `/api/work`.
+  - `meeting.create` and `meeting.update` use the same explicit calendar date parser; `HH:mm` still sets the meeting clock time.
+  - Invalid dates such as `32/07/2026` are rejected instead of guessed or rolled over by JavaScript `Date`.
+  - Tests cover both the action model and `/api/ai/assist` handler seams.
 - `Clarify AI server setup failures` (current local slice)
   - Verified live Vercel AI status as an authenticated admin: the server currently reports `ai_server_disabled` because AI env is absent.
   - `src/AISettingsCard.jsx` now translates setup errors such as `ai_server_disabled`, `ai_provider_required`, and `ai_provider_key_required` into operator-facing setup messages instead of a vague inactive state.
@@ -77,11 +83,11 @@ Recent commits on `main`:
   - The action remains `writesData: false`, requires human confirmation, and targets the existing `/api/work` contract with `resource: "meetings"` / `bodyField: "meeting"`.
   - `src/aiAssistActionExecutionModel.js` prepares the confirmed meeting for the existing `saveMeeting` path and adds `ai.confirmedByHuman` plus an `ai_confirmed_meeting` log entry.
   - `src/AIPanel.jsx` renders the meeting action as a separate confirmation card, and `LazyAIPanel` executes it through `saveMeeting`, not through a parallel AI write path.
-  - This first slice intentionally defaults the current actor as owner/participant, requires deterministic relative date wording, applies explicit `HH:mm` time when present, and does not infer extra participants, rooms, recurring rules, or meeting deletes.
+  - This first slice intentionally defaults the current actor as owner/participant, requires deterministic relative/calendar date wording, applies explicit `HH:mm` time when present, and does not infer extra participants, rooms, recurring rules, or meeting deletes.
 - `Add human-confirmed AI task due-date updates`
   - `src/aiAssistActionModel.js` now extends constrained `task.update` proposals from status/priority to deterministic due-date updates.
-  - Due dates are intentionally accepted only from explicit relative wording: `היום` / `today`, `מחר` / `tomorrow`, or `בעוד` / `תוך` / `in N days`.
-  - The proposal still requires exactly one role-visible task in the filtered context. If more than one task is visible, or if the user gives a free-form calendar date, the assistant does not guess.
+  - Due dates are intentionally accepted only from explicit wording: `היום` / `today`, `מחר` / `tomorrow`, `בעוד` / `תוך` / `in N days`, or explicit calendar dates such as `15.07.26` / `15/07/2026`.
+  - The proposal still requires exactly one role-visible task in the filtered context. If more than one task is visible, or if the user gives an invalid/ambiguous date, the assistant does not guess.
   - `src/aiAssistContextModel.js` preserves `dueAt: null` as a meaningful visible task state instead of dropping it as an empty field, so confirmation previews can show "no due date -> new due date".
   - `src/aiAssistActionExecutionModel.js` allows `dueAt` only through the existing human-confirmed `task.update` path and the normal `saveTask` / `/api/work` `resource: "tasks"` operation.
   - `src/AIPanel.jsx` formats `dueAt` update previews as readable local dates instead of raw timestamps.
@@ -91,7 +97,7 @@ Recent commits on `main`:
   - `src/aiAssistActionModel.js` can also return a constrained `task.update` proposal when the role-filtered context has exactly one visible task and the user asks for a deterministic status/priority change. The later due-date slice above adds explicit relative due dates to the same confirmed path. If there are multiple tasks, the assistant does not guess and does not create a new task as a fallback.
   - `src/aiAssistActionExecutionModel.js` allows `task.create` and constrained `task.update` only through that work API contract and prepares the confirmed records for the existing `saveTask` path, adding `ai.confirmedByHuman` / `ai_confirmed_task` or `ai_confirmed_task_update` metadata.
   - `src/AIPanel.jsx` renders task action cards separately from ticket action cards, and `LazyAIPanel` executes confirmed task create/update actions via `saveTask`, not via a parallel AI write path.
-  - This does not add responsible changes, task delete, free-form date parsing, meeting deletes, or richer participant/room inference yet. Those should be added as separate deterministic slices with confirmation, allow-lists, and tests.
+  - This does not add responsible changes, task delete, meeting deletes, or richer participant/room inference yet. Those should be added as separate deterministic slices with confirmation, allow-lists, and tests.
 - `Add task and meeting records to AI context`
   - `src/AIPanel.jsx` now passes tasks and meetings into the shared `buildAIContextSnapshot()` call instead of sending only tickets/fleet/PM/config.
   - `src/aiAssistSnapshotModel.js` now includes compact task and meeting records for AI: open tasks, overdue/waiting counts, due days, responsible ids, waiting reason, linked meeting id, planned meetings, needs-summary meetings, and open task counts per meeting.

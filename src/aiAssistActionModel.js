@@ -96,10 +96,36 @@ function requestedTaskStatusFromText(text = "") {
   return "";
 }
 
+function requestedCalendarDateFromText(text = "", now = Date.now()) {
+  const raw = cleanText(text, 800);
+  if (!raw) return null;
+  const match = raw.match(/(?:^|[^\d])([0-3]?\d)[./]([01]?\d)[./](\d{2}|\d{4})(?=$|[^\d])/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const yearPart = Number(match[3]);
+  const year = match[3].length === 2 ? 2000 + yearPart : yearPart;
+  if (year < 2000 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const base = new Date(Number.isFinite(Number(now)) ? Number(now) : Date.now());
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    base.getHours(),
+    base.getMinutes(),
+    base.getSeconds(),
+    base.getMilliseconds()
+  );
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return date.getTime();
+}
+
 function requestedTaskDueAtFromText(text = "", now = Date.now()) {
   const raw = cleanText(text, 800).toLowerCase();
   const base = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   if (!raw) return null;
+  const calendarDate = requestedCalendarDateFromText(raw, base);
+  if (calendarDate !== null) return calendarDate;
   const inDays = raw.match(/(?:בעוד|תוך|in)\s+(\d{1,2})\s*(?:ימים|יום|days?|d\b)/i);
   if (inDays) return base + Number(inDays[1]) * DAY;
   if (/מחר|tomorrow/i.test(raw)) return base + DAY;

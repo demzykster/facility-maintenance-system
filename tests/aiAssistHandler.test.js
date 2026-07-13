@@ -549,6 +549,55 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("returns deterministic task due-date update proposals from explicit calendar dates", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר לעדכן את תאריך היעד לאחר אישור."
+    });
+    const now = new Date(2026, 6, 13, 12, 34).getTime();
+    const expectedDueAt = new Date(2026, 6, 15, 12, 34).getTime();
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => now,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תעדכן את המשימה ל-15.07.26",
+        context: {
+          tasks: [
+            { id: "task-visible", title: "בדיקת ספק", department: "הפצה", responsibleIds: ["u1"], priority: "medium", status: "todo", dueAt: null },
+            { id: "task-hidden", title: "נסתר", department: "קבלה", responsibleIds: ["u2"], priority: "medium", status: "todo", dueAt: null }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-visible",
+        type: "task.update",
+        payload: {
+          taskId: "task-visible",
+          taskTitle: "בדיקת ספק",
+          current: { dueAt: null },
+          patch: { dueAt: expectedDueAt }
+        }
+      })
+    ]);
+  });
+
   it("returns deterministic meeting.update proposals from a single role-filtered meeting context", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
@@ -597,6 +646,56 @@ describe("AI assist handler", () => {
           resource: "meetings",
           bodyField: "meeting"
         },
+        payload: {
+          meetingId: "meeting-visible",
+          meetingTitle: "ישיבת בטיחות",
+          current: { at: currentAt },
+          patch: { at: expectedAt }
+        }
+      })
+    ]);
+  });
+
+  it("returns deterministic meeting.update proposals from explicit calendar dates", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר לעדכן את מועד הפגישה לאחר אישור."
+    });
+    const now = new Date(2026, 6, 13, 12, 34).getTime();
+    const currentAt = new Date(2026, 6, 13, 15, 0).getTime();
+    const expectedAt = new Date(2026, 6, 16, 9, 15).getTime();
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => now,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תעדכן את הפגישה ל-16/07/2026 בשעה 09:15",
+        context: {
+          meetings: [
+            { id: "meeting-visible", title: "ישיבת בטיחות", department: "הפצה", participantIds: ["u1"], status: "planned", at: currentAt },
+            { id: "meeting-hidden", title: "נסתר", department: "קבלה", participantIds: ["u2"], status: "planned", at: currentAt }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "update_meeting_meeting-visible",
+        type: "meeting.update",
         payload: {
           meetingId: "meeting-visible",
           meetingTitle: "ישיבת בטיחות",

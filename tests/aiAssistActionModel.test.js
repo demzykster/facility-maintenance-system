@@ -224,7 +224,7 @@ describe("AI assist action model", () => {
     })).toEqual([]);
   });
 
-  it("proposes task due-date updates only from explicit relative dates", () => {
+  it("proposes task due-date updates from explicit relative dates", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעדכן את המשימה למחר",
       actor,
@@ -252,6 +252,53 @@ describe("AI assist action model", () => {
         }
       })
     ]);
+  });
+
+  it("proposes task due-date updates from explicit calendar dates without guessing invalid dates", () => {
+    const now = new Date(2026, 6, 13, 12, 34, 56, 789).getTime();
+    const expectedDueAt = new Date(2026, 6, 15, 12, 34, 56, 789).getTime();
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את המשימה ל-15/07/2026",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now,
+      context: {
+        tasks: [{ id: "task-1", title: "בדיקת ספק", priority: "medium", status: "todo", dueAt: null }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-1",
+        type: "task.update",
+        payload: {
+          taskId: "task-1",
+          taskTitle: "בדיקת ספק",
+          current: { dueAt: null },
+          patch: { dueAt: expectedDueAt }
+        }
+      })
+    ]);
+
+    const invalidDraft = buildAiIntakeDraft({
+      rawText: "תעדכן את המשימה ל-32/07/2026",
+      actor,
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft: invalidDraft,
+      user: actor,
+      now,
+      context: {
+        tasks: [{ id: "task-1", title: "בדיקת ספק", priority: "medium", status: "todo", dueAt: null }]
+      }
+    })).toEqual([]);
   });
 
   it("proposes a constrained meeting time update only when a single visible meeting target is clear", () => {
@@ -307,6 +354,52 @@ describe("AI assist action model", () => {
         ]
       }
     })).toEqual([]);
+  });
+
+  it("proposes meeting creation and updates from explicit calendar dates with clock time", () => {
+    const now = new Date(2026, 6, 13, 12, 34).getTime();
+    const expectedAt = new Date(2026, 6, 16, 9, 15).getTime();
+    const createDraft = buildAiIntakeDraft({
+      rawText: "פגישה ב-16.07.26 בשעה 09:15 לעבור על תקלות בטיחות",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({ draft: createDraft, user: actor, now })).toEqual([
+      expect.objectContaining({
+        id: "create_meeting",
+        type: "meeting.create",
+        status: "ready_for_confirmation",
+        payload: expect.objectContaining({ at: expectedAt })
+      })
+    ]);
+
+    const updateDraft = buildAiIntakeDraft({
+      rawText: "תעדכן את הפגישה ל-16/07/2026 בשעה 09:15",
+      actor,
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft: updateDraft,
+      user: actor,
+      now,
+      context: {
+        meetings: [{ id: "meeting-1", title: "ישיבת בטיחות", status: "planned", at: now }]
+      }
+    })).toEqual([
+      expect.objectContaining({
+        id: "update_meeting_meeting-1",
+        type: "meeting.update",
+        payload: {
+          meetingId: "meeting-1",
+          meetingTitle: "ישיבת בטיחות",
+          current: { at: now },
+          patch: { at: expectedAt }
+        }
+      })
+    ]);
   });
 
   it("proposes a constrained ticket.update only when a single visible ticket target is clear", () => {
