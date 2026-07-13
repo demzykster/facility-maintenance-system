@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiTaskCreateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7904,6 +7904,15 @@ function LazyAIPanel(props) {
       const ok = await props.saveTask(task);
       if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
       return { ok: true, taskId: task.id, message: `המשימה נוצרה: ${task.title || task.id}` };
+    }
+    if (action?.type === "task.update") {
+      if (typeof props.saveTask !== "function") throw new Error("שמירת משימות אינה זמינה במסך זה.");
+      const existing = (props.tasks || []).find((task) => task.id === action?.payload?.taskId);
+      if (!existing) throw new Error("המשימה לעדכון לא נמצאה.");
+      const { task, changes } = prepareAiTaskUpdateForSave(action, existing, props.session, { now: Date.now() });
+      const ok = await props.saveTask(task);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, taskId: task.id, message: `המשימה עודכנה (${changes.length} שינויים).` };
     }
     if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
     if (action?.type === "ticket.comment") {

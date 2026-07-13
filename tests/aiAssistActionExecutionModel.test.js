@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiTaskCreateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -85,6 +85,22 @@ const taskCreateAction = {
   execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
 };
 
+const taskUpdateAction = {
+  id: "update_task_priority",
+  type: "task.update",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    taskId: "task-1",
+    patch: {
+      priority: "high",
+      status: "in_progress",
+      id: "evil-id"
+    }
+  },
+  execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
+};
+
 const existingTicket = {
   id: "ticket-1",
   subject: "דליפת מים",
@@ -96,12 +112,23 @@ const existingTicket = {
   log: [{ at: 1500, by: "Dana", byRole: "user", text: "נוצרה", kind: "created" }]
 };
 
+const existingTask = {
+  id: "task-1",
+  title: "בדיקת ספק",
+  priority: "medium",
+  status: "todo",
+  createdAt: 1000,
+  updatedAt: 1500,
+  log: [{ at: 1500, by: "Dana", byRole: "user", text: "נוצרה", kind: "created" }]
+};
+
 describe("AI assist action execution model", () => {
   it("allows only complete human-confirmed ticket.create actions through the normal tickets API contract", () => {
     expect(canExecuteAiAssistAction(readyAction)).toBe(true);
     expect(canExecuteAiAssistAction(updateAction)).toBe(true);
     expect(canExecuteAiAssistAction(commentAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskCreateAction)).toBe(true);
+    expect(canExecuteAiAssistAction(taskUpdateAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, execute: { method: "POST", path: "/api/kv" } })).toBe(false);
@@ -111,6 +138,8 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction({ ...commentAction, payload: { ticketId: "ticket-1", note: "" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskCreateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "task" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskCreateAction, payload: { desc: "missing title" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...taskUpdateAction, payload: { taskId: "task-1" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...taskUpdateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "task" } })).toBe(false);
   });
 
   it("prepares a confirmed AI ticket for the existing saveTicket path", () => {
@@ -177,6 +206,35 @@ describe("AI assist action execution model", () => {
         kind: "ai_confirmed_task"
       }
     ]);
+  });
+
+  it("prepares a confirmed AI task update with an allow-listed patch and audit log", () => {
+    const { task, changes } = prepareAiTaskUpdateForSave(taskUpdateAction, existingTask, { name: "Vadim", role: "admin" }, { now: 3000 });
+
+    expect(task).toMatchObject({
+      id: "task-1",
+      title: "בדיקת ספק",
+      priority: "high",
+      status: "in_progress",
+      updatedAt: 3000,
+      ai: {
+        source: "ai_assist",
+        lastConfirmedAction: "update_task_priority",
+        lastConfirmedAt: 3000
+      }
+    });
+    expect(task.id).toBe("task-1");
+    expect(changes).toEqual([
+      { field: "priority", before: "medium", after: "high" },
+      { field: "status", before: "todo", after: "in_progress" }
+    ]);
+    expect(task.log.at(-1)).toEqual({
+      at: 3000,
+      by: "Vadim",
+      byRole: "admin",
+      text: "משתמש אישר עדכון משימה שהוכן על ידי AI: priority, status",
+      kind: "ai_confirmed_task_update"
+    });
   });
 
   it("refuses to prepare incomplete or unsupported actions", () => {

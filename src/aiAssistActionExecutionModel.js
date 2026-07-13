@@ -20,6 +20,10 @@ const AI_TICKET_UPDATE_ALLOWED_FIELDS = Object.freeze([
   "driverInvolved",
   "driverInvolvedId"
 ]);
+const AI_TASK_UPDATE_ALLOWED_FIELDS = Object.freeze([
+  "priority",
+  "status"
+]);
 
 const normalizeComparable = (value) => value == null ? "" : value;
 
@@ -47,6 +51,13 @@ export function canExecuteAiAssistAction(action = {}) {
   if (action.type === "task.create") {
     return hasTasksApiExecuteContract(action) && !!cleanText(payload.title, 200);
   }
+  if (action.type === "task.update") {
+    return hasTasksApiExecuteContract(action)
+      && !!cleanText(payload.taskId, 160)
+      && !!payload.patch
+      && typeof payload.patch === "object"
+      && !Array.isArray(payload.patch);
+  }
   if (!hasTicketsApiExecuteContract(action)) return false;
   if (action.type === "ticket.create") return true;
   if (action.type === "ticket.update") {
@@ -59,6 +70,57 @@ export function canExecuteAiAssistAction(action = {}) {
     return !!cleanText(payload.ticketId, 160) && !!cleanText(payload.note, 1000);
   }
   return false;
+}
+
+export function prepareAiTaskUpdateForSave(action = {}, existingTask = {}, actor = {}, options = {}) {
+  if (!canExecuteAiAssistAction(action) || action.type !== "task.update") throw new Error("ai_action_not_executable");
+  const payload = cleanObject(action.payload);
+  const patch = cleanObject(payload.patch);
+  const taskId = cleanText(payload.taskId, 160);
+  const existingId = cleanText(existingTask.id, 160);
+  if (!taskId || !existingId || taskId !== existingId) throw new Error("ai_action_task_mismatch");
+  const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+  const changes = [];
+  const nextPatch = {};
+  for (const field of AI_TASK_UPDATE_ALLOWED_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(patch, field)) continue;
+    const before = normalizeComparable(existingTask[field]);
+    const after = Array.isArray(patch[field]) ? patch[field].map((value) => cleanText(value, 160)).filter(Boolean) : normalizeComparable(patch[field]);
+    const beforeComparable = Array.isArray(before) ? before.join("|") : before;
+    const afterComparable = Array.isArray(after) ? after.join("|") : after;
+    if (beforeComparable === afterComparable) continue;
+    nextPatch[field] = after;
+    changes.push({ field, before, after });
+  }
+  if (!changes.length) throw new Error("ai_action_no_allowed_changes");
+  const actorName = cleanText(actor.name, 120) || "AI";
+  const actorRole = cleanText(actor.role, 40);
+  const changedFields = changes.map((change) => change.field).join(", ");
+  return {
+    task: {
+      ...existingTask,
+      ...nextPatch,
+      id: existingTask.id,
+      updatedAt: now,
+      ai: {
+        ...cleanObject(existingTask.ai),
+        source: "ai_assist",
+        lastConfirmedAction: cleanText(action.id, 120),
+        lastConfirmedAt: now
+      },
+      log: [
+        ...(Array.isArray(existingTask.log) ? existingTask.log : []),
+        {
+          at: now,
+          by: actorName,
+          byRole: actorRole,
+          text: `משתמש אישר עדכון משימה שהוכן על ידי AI: ${changedFields}`,
+          kind: "ai_confirmed_task_update"
+        }
+      ]
+    },
+    changes
+  };
 }
 
 export function prepareAiTaskCreateForSave(action = {}, actor = {}, options = {}) {

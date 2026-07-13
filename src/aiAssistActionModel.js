@@ -82,6 +82,23 @@ function requestedStatusFromText(text = "") {
   return "";
 }
 
+function requestedTaskStatusFromText(text = "") {
+  const raw = cleanText(text, 500).toLowerCase();
+  if (!raw) return "";
+  if (/סטטוס|מצב|status|העבר|תעדכן|עדכן|change|update|סיים|סגור|בטל/i.test(raw)) {
+    if (/בוצע|סגור|סיים|הושלם|done|completed|closed/i.test(raw)) return "done";
+    if (/בטיפול|בעבודה|בתהליך|in.?progress/i.test(raw)) return "in_progress";
+    if (/ממתינ|המתנה|waiting/i.test(raw)) return "waiting";
+    if (/בוטל|בטל|cancel/i.test(raw)) return "cancelled";
+    if (/חדש|פתוח|todo|open/i.test(raw)) return "todo";
+  }
+  return "";
+}
+
+function hasUpdateIntent(text = "") {
+  return /תעדכן|עדכן|העבר|שנה|סיים|סגור|בטל|update|change|set|mark/i.test(cleanText(text, 800));
+}
+
 const WAITING_REASON_BALLS = Object.freeze({
   no_equipment: "manager",
   parts: "executor",
@@ -229,6 +246,47 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   };
 }
 
+function buildAiTaskUpdateProposal({ draft = {}, context = {} } = {}) {
+  const tasks = cleanArray(context.tasks).filter((task) => task && task.id);
+  if (tasks.length !== 1 || !hasUpdateIntent(draft.rawText)) return null;
+  const task = tasks[0];
+  const patch = {};
+  const requestedPriority = requestedPriorityFromText(draft.rawText);
+  if (requestedPriority && requestedPriority !== task.priority) patch.priority = requestedPriority;
+  const requestedStatus = requestedTaskStatusFromText(draft.rawText);
+  if (requestedStatus && requestedStatus !== task.status) patch.status = requestedStatus;
+  if (!Object.keys(patch).length) return null;
+  const current = Object.fromEntries(Object.keys(patch).map((field) => [field, task[field]]));
+  return {
+    id: `update_task_${cleanText(task.id, 80)}`,
+    type: "task.update",
+    label: "עדכון משימה",
+    status: "ready_for_confirmation",
+    requiresConfirmation: true,
+    writesData: false,
+    writePolicy: "human_confirmation_required",
+    missingFields: [],
+    payload: {
+      taskId: cleanText(task.id, 160),
+      taskTitle: cleanText(task.title || task.name, 160),
+      current,
+      patch
+    },
+    execute: {
+      method: "POST",
+      path: "/api/work",
+      resource: "tasks",
+      bodyField: "task"
+    },
+    safety: {
+      deterministic: true,
+      providerTextTrusted: false,
+      serverMustRevalidate: true,
+      auditRequired: true
+    }
+  };
+}
+
 export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.now() } = {}) {
   const module = cleanText(draft.module, 40);
   const track = ticketTrackForModule(module);
@@ -340,8 +398,11 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   }
   const updateProposal = buildAiTicketUpdateProposal({ draft: safeDraft, context });
   if (updateProposal) return [updateProposal];
+  const taskUpdateProposal = buildAiTaskUpdateProposal({ draft: safeDraft, context });
+  if (taskUpdateProposal) return [taskUpdateProposal];
   if (hasWaitingStatusIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
+  if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.tasks).filter((task) => task && task.id).length > 0) return [];
   if (safeDraft.action === "draft_task") {
     const payload = buildAiTaskCreatePayload({ draft: safeDraft, user, now });
     const missingFields = missingFieldsForTaskPayload(payload);

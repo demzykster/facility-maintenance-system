@@ -127,6 +127,57 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("proposes a constrained task.update only when a single visible task target is clear", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את המשימה לעדיפות גבוהה וסטטוס בטיפול",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        tasks: [{ id: "task-1", title: "בדיקת ספק", priority: "medium", status: "todo" }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-1",
+        type: "task.update",
+        label: "עדכון משימה",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        payload: {
+          taskId: "task-1",
+          taskTitle: "בדיקת ספק",
+          current: { priority: "medium", status: "todo" },
+          patch: { priority: "high", status: "in_progress" }
+        },
+        execute: {
+          method: "POST",
+          path: "/api/work",
+          resource: "tasks",
+          bodyField: "task"
+        }
+      })
+    ]);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tasks: [
+          { id: "task-1", title: "בדיקת ספק", priority: "medium", status: "todo" },
+          { id: "task-2", title: "משימה אחרת", priority: "medium", status: "todo" }
+        ]
+      }
+    })).toEqual([]);
+  });
+
   it("proposes a constrained ticket.update only when a single visible ticket target is clear", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעדכן את הקריאה לעדיפות גבוהה",

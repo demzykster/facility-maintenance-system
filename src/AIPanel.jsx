@@ -32,7 +32,10 @@ const UPDATE_FIELD_LABELS = Object.freeze({
   downtimeType: "מצב כלי",
   incidentShift: "משמרת",
   driverInvolved: "נהג",
-  driverInvolvedId: "מספר עובד נהג"
+  driverInvolvedId: "מספר עובד נהג",
+  responsibleIds: "אחראים",
+  dueAt: "תאריך יעד",
+  waitingFor: "ממתין ל"
 });
 
 export function normalizeAiPanelAssistantOutput(output) {
@@ -54,6 +57,7 @@ function missingLabel(field) {
 
 function actionKindLabel(action = {}) {
   if (action.type === "task.create") return "יצירת משימה";
+  if (action.type === "task.update") return "עדכון משימה";
   if (action.type === "ticket.comment") return "הוספת הערה";
   if (action.type === "ticket.update") return "עדכון קריאה";
   return "פתיחת קריאה";
@@ -62,6 +66,7 @@ function actionKindLabel(action = {}) {
 function actionTitle(action = {}) {
   const payload = action.payload || {};
   if (action.type === "task.create") return payload.title || "משימה חדשה";
+  if (action.type === "task.update") return payload.taskTitle || payload.taskId || "עדכון משימה";
   if (action.type === "ticket.comment") return payload.ticketTitle || payload.ticketId || "הערה לקריאה";
   if (action.type === "ticket.update") return payload.subject || payload.ticketTitle || payload.ticketId || "עדכון קריאה";
   return payload.subject || "קריאה חדשה";
@@ -70,6 +75,7 @@ function actionTitle(action = {}) {
 function actionMeta(action = {}) {
   const payload = action.payload || {};
   if (action.type === "task.create") return `מטלה${payload.priority ? ` · ${payload.priority}` : ""}`;
+  if (action.type === "task.update") return `משימה קיימת${payload.taskId ? ` · ${payload.taskId}` : ""}`;
   if (action.type === "ticket.comment") return `קריאה קיימת${payload.ticketId ? ` · ${payload.ticketId}` : ""}`;
   if (action.type === "ticket.update") return `קריאה קיימת${payload.ticketId ? ` · ${payload.ticketId}` : ""}`;
   return `${payload.track === "transport" ? "כלי שינוע" : "מבנה"}${payload.zone ? ` · ${payload.zone}` : ""}${payload.priority ? ` · ${payload.priority}` : ""}`;
@@ -99,11 +105,12 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
   const executable = canExecuteAiAssistAction(action);
   const isCreate = action?.type === "ticket.create";
   const isTaskCreate = action?.type === "task.create";
+  const isTaskUpdate = action?.type === "task.update";
   const isUpdate = action?.type === "ticket.update";
   const isComment = action?.type === "ticket.comment";
-  const previewRows = isUpdate ? aiUpdatePreviewRows(action) : [];
+  const previewRows = (isUpdate || isTaskUpdate) ? aiUpdatePreviewRows(action) : [];
   const preview = isComment ? commentPreview(action) : "";
-  if (!isCreate && !isTaskCreate && !isUpdate && !isComment) return null;
+  if (!isCreate && !isTaskCreate && !isTaskUpdate && !isUpdate && !isComment) return null;
   return <div className="ai-action-card">
     <div className="ai-action-top">
       <span>{action.label || actionKindLabel(action)}</span>
@@ -120,7 +127,7 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
     {preview && <div className="ai-action-diff">{preview}</div>}
     {missing.length > 0
       ? <div className="ai-action-missing">להשלמה לפני אישור: {missing.map(missingLabel).join(" · ")}</div>
-      : <div className="ai-action-ready">{isTaskCreate ? "המשימה תיווצר רק אחרי אישור משתמש." : isComment ? "ההערה תתווסף רק אחרי אישור משתמש." : isUpdate ? "השינוי יישמר רק אחרי אישור משתמש." : "הפעולה תישלח לאישור לפני יצירת הקריאה."}</div>}
+      : <div className="ai-action-ready">{isTaskCreate ? "המשימה תיווצר רק אחרי אישור משתמש." : isTaskUpdate ? "השינוי במשימה יישמר רק אחרי אישור משתמש." : isComment ? "ההערה תתווסף רק אחרי אישור משתמש." : isUpdate ? "השינוי יישמר רק אחרי אישור משתמש." : "הפעולה תישלח לאישור לפני יצירת הקריאה."}</div>}
     {result && <div className={"ai-action-result " + (result.ok ? "ok" : "err")}>{result.message}</div>}
     <button
       type="button"
@@ -128,7 +135,7 @@ function AiActionCard({ action, busy, result, onExecute, onEdit }) {
       disabled={!executable || busy || result?.ok}
       onClick={() => onExecute?.(action)}
     >
-      {missing.length ? "השלימו פרטים לפני אישור" : busy ? "שומר…" : result?.ok ? "הפעולה בוצעה" : isTaskCreate ? "אישור ויצירת משימה" : isComment ? "אישור והוספת הערה" : isUpdate ? "אישור ועדכון קריאה" : "אישור ויצירת קריאה"}
+      {missing.length ? "השלימו פרטים לפני אישור" : busy ? "שומר…" : result?.ok ? "הפעולה בוצעה" : isTaskCreate ? "אישור ויצירת משימה" : isTaskUpdate ? "אישור ועדכון משימה" : isComment ? "אישור והוספת הערה" : isUpdate ? "אישור ועדכון קריאה" : "אישור ויצירת קריאה"}
     </button>
     {isCreate && onEdit && <button type="button" className="ai-action-edit" disabled={busy || result?.ok} onClick={() => onEdit(action)}>
       {missing.length ? "השלמה בטופס קריאה" : "עריכה בטופס לפני יצירה"}

@@ -58,12 +58,13 @@ The current strategy is:
 
 Recent commits on `main`:
 
-- `Add human-confirmed AI task creation` (current local slice)
+- `Add human-confirmed AI task create/update` (current local slice)
   - `src/aiIntakeModel.js` now treats strong task words such as `משימה`, `פגישה`, `תזכורת`, `task`, `meeting`, and `reminder` as task intent even when the task mentions an object like a forklift.
   - `src/aiAssistActionModel.js` can now return a deterministic `task.create` proposal from `draft_task` intake. The action is `writesData: false`, requires human confirmation, and targets the existing `/api/work` contract with `resource: "tasks"` / `bodyField: "task"`.
-  - `src/aiAssistActionExecutionModel.js` allows `task.create` only through that work API contract and prepares the confirmed record for the existing `saveTask` path, adding `ai.confirmedByHuman` metadata and an `ai_confirmed_task` log entry.
-  - `src/AIPanel.jsx` renders task action cards separately from ticket action cards, and `LazyAIPanel` executes confirmed `task.create` actions via `saveTask`, not via a parallel AI write path.
-  - This does not add task update/delete or meeting writes yet. Those should be added as separate deterministic slices with confirmation, allow-lists, and tests.
+  - `src/aiAssistActionModel.js` can also return a constrained `task.update` proposal when the role-filtered context has exactly one visible task and the user asks for a deterministic status/priority change. If there are multiple tasks, the assistant does not guess and does not create a new task as a fallback.
+  - `src/aiAssistActionExecutionModel.js` allows `task.create` and constrained `task.update` only through that work API contract and prepares the confirmed records for the existing `saveTask` path, adding `ai.confirmedByHuman` / `ai_confirmed_task` or `ai_confirmed_task_update` metadata.
+  - `src/AIPanel.jsx` renders task action cards separately from ticket action cards, and `LazyAIPanel` executes confirmed task create/update actions via `saveTask`, not via a parallel AI write path.
+  - This does not add responsible/date task changes, task delete, or meeting writes yet. Those should be added as separate deterministic slices with confirmation, allow-lists, and tests.
 - `Add task and meeting records to AI context`
   - `src/AIPanel.jsx` now passes tasks and meetings into the shared `buildAIContextSnapshot()` call instead of sending only tickets/fleet/PM/config.
   - `src/aiAssistSnapshotModel.js` now includes compact task and meeting records for AI: open tasks, overdue/waiting counts, due days, responsible ids, waiting reason, linked meeting id, planned meetings, needs-summary meetings, and open task counts per meeting.

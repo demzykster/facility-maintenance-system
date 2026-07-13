@@ -360,6 +360,61 @@ describe("AI assist handler", () => {
     });
   });
 
+  it("returns deterministic task.update proposals from role-filtered single-task context", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר לעדכן את המשימה לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 447,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תעדכן את המשימה לעדיפות גבוהה",
+        context: {
+          tasks: [
+            { id: "task-visible", title: "בדיקת ספק", department: "הפצה", responsibleIds: ["u1"], priority: "medium", status: "todo" },
+            { id: "task-hidden", title: "נסתר", department: "קבלה", responsibleIds: ["u2"], priority: "medium", status: "todo" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "update_task_task-visible",
+        type: "task.update",
+        requiresConfirmation: true,
+        writesData: false,
+        execute: {
+          method: "POST",
+          path: "/api/work",
+          resource: "tasks",
+          bodyField: "task"
+        },
+        payload: {
+          taskId: "task-visible",
+          taskTitle: "בדיקת ספק",
+          current: { priority: "medium" },
+          patch: { priority: "high" }
+        }
+      })
+    ]);
+  });
+
   it("passes only role-filtered assistant context to the provider prompt", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
