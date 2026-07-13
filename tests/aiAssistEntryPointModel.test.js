@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, supplierQueueAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI assist entry point model", () => {
@@ -182,5 +182,40 @@ describe("AI assist entry point model", () => {
     expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
     expect(prompt.text).toContain("אין כרגע סבבים באיחור");
     expect(prompt.text).not.toContain("סגרתי");
+  });
+
+  it("builds a supplier queue risk prompt from supplier summary rows", () => {
+    const prompt = supplierQueueAiPrompt({
+      labels: {
+        totalSuppliers: 8,
+        transportSuppliers: 3,
+        facilitySuppliers: 2,
+        goodsSuppliers: 1,
+        untypedSuppliers: 2,
+        openTickets: 6,
+        openOrders: 2,
+        linkedFleet: 123,
+        linkedTechnicians: 4,
+        missingContacts: 2,
+        topSuppliers: ["טויוטה: 4 קריאות פתוחות", "ספק חלקים: 2 הזמנות פתוחות"]
+      }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.riskSummary);
+    expect(prompt.text).toContain("ספקים וקבלנים");
+    expect(prompt.text).toContain("6 קריאות פתוחות");
+    expect(prompt.text).toContain("2 הזמנות פתוחות");
+    expect(prompt.text).toContain("טויוטה");
+    expect(prompt.text).toContain("3 הפעולות הבטוחות הבאות");
+  });
+
+  it("builds a supplier queue next-action prompt when no supplier work is open", () => {
+    const prompt = supplierQueueAiPrompt({
+      labels: { totalSuppliers: 4, openTickets: 0, openOrders: 0, linkedFleet: 0, linkedTechnicians: 0, missingContacts: 0 }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
+    expect(prompt.text).toContain("אין כרגע קריאות או הזמנות פתוחות אצל ספקים");
+    expect(prompt.text).not.toContain("שייכתי");
   });
 });

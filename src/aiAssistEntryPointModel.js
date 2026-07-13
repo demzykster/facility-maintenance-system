@@ -171,6 +171,42 @@ export function cleaningDashboardAiPrompt({ labels = {} } = {}) {
   });
 }
 
+export function supplierQueueAiPrompt({ labels = {} } = {}) {
+  const totalSuppliers = asNumber(labels.totalSuppliers);
+  const transportSuppliers = asNumber(labels.transportSuppliers);
+  const facilitySuppliers = asNumber(labels.facilitySuppliers);
+  const goodsSuppliers = asNumber(labels.goodsSuppliers);
+  const untypedSuppliers = asNumber(labels.untypedSuppliers);
+  const openTickets = asNumber(labels.openTickets);
+  const openOrders = asNumber(labels.openOrders);
+  const linkedFleet = asNumber(labels.linkedFleet);
+  const linkedTechnicians = asNumber(labels.linkedTechnicians);
+  const missingContacts = asNumber(labels.missingContacts);
+  const topSuppliers = Array.isArray(labels.topSuppliers) ? labels.topSuppliers.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const hasRisk = openTickets > 0 || openOrders > 0 || missingContacts > 0 || untypedSuppliers > 0;
+  const riskLine = hasRisk
+    ? [
+      openTickets ? `${compactCount(openTickets)} קריאות פתוחות` : "",
+      openOrders ? `${compactCount(openOrders)} הזמנות פתוחות` : "",
+      missingContacts ? `${compactCount(missingContacts)} ספקים ללא אנשי קשר` : "",
+      untypedSuppliers ? `${compactCount(untypedSuppliers)} ספקים ללא סיווג` : ""
+    ].filter(Boolean).join("; ")
+    : "אין כרגע קריאות או הזמנות פתוחות אצל ספקים.";
+  const contextParts = [
+    `${compactCount(totalSuppliers)} ספקים וקבלנים`,
+    `${compactCount(transportSuppliers)} שינוע, ${compactCount(facilitySuppliers)} אחזקה, ${compactCount(goodsSuppliers)} ציוד/רכש`,
+    riskLine,
+    linkedFleet ? `${compactCount(linkedFleet)} כלי שינוע מקושרים` : "",
+    linkedTechnicians ? `${compactCount(linkedTechnicians)} טכנאים משויכים` : "",
+    topSuppliers.length ? `מוקדי עומס: ${topSuppliers.join("; ")}` : ""
+  ].filter(Boolean);
+
+  return Object.freeze({
+    workflow: hasRisk ? AI_ASSIST_WORKFLOWS.riskSummary : AI_ASSIST_WORKFLOWS.nextActions,
+    text: `נתח את ספקים וקבלנים. ${contextParts.join("; ")}. הסבר איפה יש עומס או סיכון תפעולי, מה צריך לבדוק לפני שינוי שיוך/הזמנה/קריאה, ומה 3 הפעולות הבטוחות הבאות.`
+  });
+}
+
 export function biHeatmapAiPrompt({ rows = [], row = null, cell = null } = {}) {
   const selectedRow = row || null;
   const selectedCell = cell || null;

@@ -31,7 +31,7 @@ import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationDisplayEvents, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
-import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, supplierQueueAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -4441,7 +4441,7 @@ function UserApp(p) {
               const list = filter === "closed" ? ticketRows.filter((t) => !isOpen(t)) : ticketRows;
               return list.length === 0 ? <Empty text="אין קריאות להצגה" Icon={ListChecks} /> : <div className="cards">{sortByImportance(list, config).map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => openTicket(t.id)} />)}</div>;
             })()}
-          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} onAskAI={aiAssistantEnabled(config) ? askAI : null} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} />) : (<>
+          </>) : activeView === "activity" ? (<AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />) : activeView === "ppe" && mayManagePpe ? (<PpeHub {...p} onAskAI={aiAssistantEnabled(config) ? askAI : null} />) : activeView === "settings" && mayManageSettings ? (<SettingsPanel {...p} />) : activeView === "tasks" ? (<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} />) : activeView === "teamAdmin" && mayViewUsers ? (<SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />) : activeView === "suppliers" && mayViewSuppliers ? (<SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} onAskAI={aiAssistantEnabled(config) ? askAI : null} />) : (<>
             <div className="seg-tabs s5" style={{ maxWidth: 760, marginBottom: 14 }}><button className={deptTab === "equip" ? "on" : ""} onClick={() => setDeptTab("equip")}>כלי שינוע</button><button className={deptTab === "ppe" ? "on" : ""} onClick={() => setDeptTab("ppe")}>ביגוד עובדים</button><button className={deptTab === "reports" ? "on" : ""} onClick={() => setDeptTab("reports")}>דיווחי עובדים</button><button className={deptTab === "cleaning" ? "on" : ""} onClick={() => setDeptTab("cleaning")}>ניקיון</button><button className={deptTab === "team" ? "on" : ""} onClick={() => setDeptTab("team")}>עובדי המחלקה</button></div>
             {deptTab === "ppe" ? <PpeHub {...p} onAskAI={aiAssistantEnabled(config) ? askAI : null} />
               : deptTab === "reports" ? <WorkerReportsAnalytics tickets={tickets} depts={userDepts(session)} />
@@ -8035,7 +8035,7 @@ function AdminApp(p) {
           {activeTab === "cleaning" && <CleaningAdmin {...p} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "team" && <SettingsPanel {...p} only="users" canManageUsers={mayManageUsers} />}
           {activeTab === "activity" && <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} rounds={rounds} onOpenTicket={openTicket} />}
-          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} />}
+          {activeTab === "suppliers" && <SuppliersPanel config={config} saveConfig={p.saveConfig} orders={p.ppeOrders} fleet={fleet} tickets={tickets} users={users} saveFleet={p.saveFleet} saveUser={p.saveUser} savePpeOrder={p.savePpeOrder} onOpenTicket={openTicket} canManage={mayManageSuppliers} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "settings" && <SettingsPanel {...p} />}
         </div>
       </div>
@@ -9706,7 +9706,7 @@ function SupplierDetail({ name, config, saveConfig, orders, fleet, tickets, user
   </div>);
 }
 
-function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, onOpenTicket, canManage }) {
+function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, onOpenTicket, canManage, onAskAI }) {
   const [sel, setSel] = useState(null);
   const [openFleetId, setOpenFleetId] = useState(null);
   const [openUser, setOpenUser] = useState(null);
@@ -9715,6 +9715,43 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
   const [err, setErr] = useState("");
   const names = config.suppliers || [];
   const openFleet = openFleetId ? (fleet || []).find((f) => f.id === openFleetId) : null;
+  const supplierRows = names.map((n) => {
+    const meta = supMeta(config, n);
+    const type = supplierTypeFromMeta(meta, config);
+    const openTicketCount = (tickets || []).filter((ticket) => (ticket.supplier === n || ticket.closure?.costSupplier === n) && isOpen(ticket)).length;
+    const openOrderCount = (orders || []).filter((order) => order.supplier === n && ["draft", "sent"].includes(order.status || "draft")).length;
+    const fleetCount = (fleet || []).filter((unit) => unit.supplier === n).length;
+    const technicianCount = (users || []).filter((user) => user.role === "tech" && user.active !== false && (user.supplier || "") === n).length;
+    const contactCount = (meta.contacts || []).length;
+    return { name: n, type, openTicketCount, openOrderCount, fleetCount, technicianCount, contactCount };
+  });
+  const loadedSupplierRows = supplierRows
+    .map((row) => ({ ...row, load: row.openTicketCount + row.openOrderCount }))
+    .filter((row) => row.load > 0)
+    .sort((a, b) => b.load - a.load)
+    .slice(0, 5);
+  const supplierLoadLabels = loadedSupplierRows.map((row) => {
+    const label = [
+      row.openTicketCount ? countLabel(row.openTicketCount, "קריאה פתוחה", "קריאות פתוחות") : "",
+      row.openOrderCount ? countLabel(row.openOrderCount, "הזמנה פתוחה", "הזמנות פתוחות") : ""
+    ].filter(Boolean).join(" · ");
+    return `${row.name}: ${label}`;
+  });
+  const askSupplierAI = onAskAI ? () => onAskAI(supplierQueueAiPrompt({
+    labels: {
+      totalSuppliers: names.length,
+      transportSuppliers: supplierRows.filter((row) => row.type === "transport").length,
+      facilitySuppliers: supplierRows.filter((row) => row.type === "facility").length,
+      goodsSuppliers: supplierRows.filter((row) => row.type === "goods").length,
+      untypedSuppliers: supplierRows.filter((row) => !row.type).length,
+      openTickets: supplierRows.reduce((sum, row) => sum + row.openTicketCount, 0),
+      openOrders: supplierRows.reduce((sum, row) => sum + row.openOrderCount, 0),
+      linkedFleet: supplierRows.reduce((sum, row) => sum + row.fleetCount, 0),
+      linkedTechnicians: supplierRows.reduce((sum, row) => sum + row.technicianCount, 0),
+      missingContacts: supplierRows.filter((row) => row.contactCount === 0).length,
+      topSuppliers: supplierLoadLabels
+    }
+  })) : null;
   const renameSup = async (oldN, newN) => {
     newN = (newN || "").trim(); if (!newN || newN === oldN) return;
     setErr("");
@@ -9746,7 +9783,10 @@ function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, sav
   return (<div className="supplier-shell">
     <div className="supplier-head">
       <SectionTitle><Building2 size={16} /> ספקים / קבלנים</SectionTitle>
-      <span className="supplier-total">{countLabel(names.length, "ספק", "ספקים")}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span className="supplier-total">{countLabel(names.length, "ספק", "ספקים")}</span>
+        {askSupplierAI && <button className="btn-ghost sm" type="button" onClick={askSupplierAI}><Sparkles size={15} /> שאל AI</button>}
+      </div>
     </div>
     <div className="supplier-command">
       <div className="search-wrap supplier-search"><Search size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש ספק או קבלן" placeholder="חיפוש ספק / קבלן…" /></div>
