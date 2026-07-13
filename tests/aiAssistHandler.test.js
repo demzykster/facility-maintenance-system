@@ -311,7 +311,10 @@ describe("AI assist handler", () => {
         messages: [{ role: "user", content: "почему я вижу много уведомлений по документам техники?" }],
         context: {
           fleet: {
-            docs: [{ id: "doc-1", unitCode: "178040", title: "ביטוח", status: "expired", daysLeft: -1 }]
+            docs: [
+              { id: "doc-1", unitCode: "178040", title: "ביטוח", status: "expired", daysLeft: -1, department: "הפצה" },
+              { id: "doc-2", unitCode: "120823", title: "רישיון", status: "soon", daysLeft: 8, department: "הפצה" }
+            ]
           }
         }
       }
@@ -336,6 +339,21 @@ describe("AI assist handler", () => {
     expect(prompt.responseLanguage).toMatchObject({ code: "ru", source: "latest_user_message" });
     expect(prompt.userRequest).toBe("почему я вижу много уведомлений по документам техники?");
     expect(prompt.contract.expectedOutput).toContain("Answer in Russian");
+    expect(prompt.context.fleet).toEqual([
+      { id: "doc-1", code: "178040", type: "ביטוח", department: "הפצה", status: "expired", docsDueDays: -1 },
+      { id: "doc-2", code: "120823", type: "רישיון", department: "הפצה", status: "soon", docsDueDays: 8 }
+    ]);
+    expect(prompt.contextGuidance[0]).toMatchObject({
+      topic: "fleet_document_notifications",
+      visibleDocCount: 2,
+      expiredCount: 1,
+      upcomingCount: 1,
+      examples: [
+        { code: "178040", type: "ביטוח", daysLeft: -1 },
+        { code: "120823", type: "רישיון", daysLeft: 8 }
+      ]
+    });
+    expect(prompt.contextGuidance[0].instruction).toContain("Do not give generic settings advice");
     expect(JSON.stringify(payload)).not.toContain("google-secret");
   });
 

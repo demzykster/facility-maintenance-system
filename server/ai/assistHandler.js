@@ -132,6 +132,43 @@ function actionGuidanceForProvider(actions = []) {
   };
 }
 
+function contextGuidanceForProvider({ draft = {}, context = {} } = {}) {
+  const guidance = [];
+  const rawText = cleanText(draft?.rawText, MAX_TEXT_CHARS).toLowerCase();
+  const fleetDocs = Array.isArray(context?.fleet) ? context.fleet.filter((unit) => unit && unit.docsDueDays != null) : [];
+  const asksAboutNotifications = /(уведомлен|התרא|notification|alert|оповещ)/iu.test(rawText);
+  const asksAboutDocuments = /(документ|מסמכ|document|license|insurance|תוקף)/iu.test(rawText);
+  if (draft?.action === "no_action" && draft?.module === "transport" && asksAboutDocuments && fleetDocs.length) {
+    const expired = fleetDocs.filter((unit) => Number(unit.docsDueDays) <= 0);
+    const upcoming = fleetDocs.filter((unit) => Number(unit.docsDueDays) > 0);
+    guidance.push({
+      topic: "fleet_document_notifications",
+      instruction: [
+        "Answer from the fleet document rows in context.fleet.",
+        "State that these notifications come from expired or soon-expiring vehicle/fleet documents visible to the actor.",
+        "Mention concrete examples by code/type/days when available.",
+        "Do not give generic settings advice unless the user explicitly asks how to change notification preferences.",
+        asksAboutNotifications ? "Explain why the user sees notifications now." : "Explain the document status directly."
+      ].join(" "),
+      visibleDocCount: fleetDocs.length,
+      expiredCount: expired.length,
+      upcomingCount: upcoming.length,
+      examples: fleetDocs.slice(0, 4).map((unit) => ({
+        code: cleanText(unit.code, 80),
+        type: cleanText(unit.type || unit.status, 80),
+        daysLeft: Number(unit.docsDueDays)
+      }))
+    });
+  }
+  if (draft?.action === "no_action" && !guidance.length) {
+    guidance.push({
+      topic: "read_only_answer",
+      instruction: "This is a read-only question. Answer the user's latest question directly from context. Do not propose creating a ticket unless the user asks to create one."
+    });
+  }
+  return guidance;
+}
+
 const safeSource = (value) => {
   const source = String(value || "ui").trim();
   return ["ui", "worker", "cleaner", "mobile", "test"].includes(source) ? source : "ui";
@@ -203,6 +240,7 @@ function providerPrompt({ draft, actions = [], user, context, workflow, conversa
       refusalPolicy: "If the current userRequest is unclear, ask one precise follow-up question instead of summarizing unrelated context."
     },
     actionGuidance: actionGuidanceForProvider(actions),
+    contextGuidance: contextGuidanceForProvider({ draft, context }),
     responseLanguage: language,
     userRequest: cleanText(draft?.rawText, MAX_TEXT_CHARS),
     recentConversation: conversation,
@@ -232,6 +270,7 @@ const SYSTEM_PROMPT = [
   "You must be read-only: do not claim that you created, updated, deleted, assigned, approved, or closed anything.",
   "Use the deterministic draft as the source of truth.",
   "Reply to the latest user message, not to an older topic from the conversation.",
+  "When context contains concrete matching records, use those records before giving generic advice.",
   "Reply in the latest user message language when possible.",
   "Sound like a calm human colleague, not a ticketing bot or a formal report generator.",
   "Keep the reply concise, operational, and easy to scan.",

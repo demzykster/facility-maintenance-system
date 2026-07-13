@@ -147,11 +147,11 @@ function sanitizeTicket(ticket = {}, profile) {
 }
 
 function sanitizeFleet(unit = {}) {
-  const docsDueDays = numberOrNull(unit.docsDueDays ?? unit.documentsDueDays ?? unit.docDays);
+  const docsDueDays = numberOrNull(unit.docsDueDays ?? unit.documentsDueDays ?? unit.docDays ?? unit.daysLeft);
   const clean = {
     id: compactId(unit.id),
-    code: compactText(unit.code || unit.number || unit.asset, 80),
-    type: compactText(unit.type || unit.model, 80),
+    code: compactText(unit.code || unit.number || unit.asset || unit.unitCode, 80),
+    type: compactText(unit.type || unit.model || unit.title, 80),
     department: recordDepartments(unit)[0] || "",
     supplier: compactText(unit.supplier, 120),
     status: compactText(unit.status, 60)
@@ -362,11 +362,14 @@ function sanitizeBiSummary(bi = {}, profile) {
 export function buildAiAssistContext(rawContext = {}, user = {}) {
   const profile = aiRoleProfile(user);
   const source = rawContext && typeof rawContext === "object" ? rawContext : {};
+  const fleetSource = Array.isArray(source.fleet)
+    ? source.fleet
+    : asArray(source.fleet?.docs || source.fleet?.units || source.fleet?.items);
   const tickets = asArray(source.tickets)
     .filter((ticket) => ticketAllowed(ticket, profile))
     .slice(0, MAX_TICKETS)
     .map((ticket) => sanitizeTicket(ticket, profile));
-  const fleet = asArray(source.fleet)
+  const fleet = fleetSource
     .filter((unit) => fleetAllowed(unit, profile))
     .slice(0, MAX_FLEET)
     .map(sanitizeFleet);

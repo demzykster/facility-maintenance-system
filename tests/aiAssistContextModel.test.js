@@ -109,6 +109,25 @@ describe("AI assist context model", () => {
     expect(context.suppliers).toEqual([]);
   });
 
+  it("keeps compact fleet document context when callers send fleet.docs", () => {
+    const context = buildAiAssistContext({
+      metrics: { fleetDocsDue: 2 },
+      fleet: {
+        docs: [
+          { id: "doc-expired", unitCode: "178040", title: "ביטוח", status: "expired", daysLeft: -1, department: "הפצה" },
+          { id: "doc-soon", unitCode: "120823", title: "רישיון", status: "soon", daysLeft: 7, department: "הפצה" },
+          { id: "doc-hidden", unitCode: "999", title: "ביטוח", status: "expired", daysLeft: -2, department: "קבלה" }
+        ]
+      }
+    }, { id: "manager-1", role: "user", departments: ["הפצה"] });
+
+    expect(context.metrics).toEqual({ fleetDocsDue: 2 });
+    expect(context.fleet).toEqual([
+      { id: "doc-expired", code: "178040", type: "ביטוח", department: "הפצה", status: "expired", docsDueDays: -1 },
+      { id: "doc-soon", code: "120823", type: "רישיון", department: "הפצה", status: "soon", docsDueDays: 7 }
+    ]);
+  });
+
   it("passes compact supplier context only to users with supplier visibility", () => {
     const raw = {
       suppliers: [
