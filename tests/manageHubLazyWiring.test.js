@@ -19,4 +19,12 @@ describe("management tasks and meetings lazy wiring", () => {
     expect(manageHubSource).toContain("function MeetingsModule(");
     expect(manageHubSource).toContain("function TaskImportWizard(");
   });
+
+  it("wires the management hub to the shared AI panel entry point", () => {
+    expect(appSource).toContain("onAskAI={aiAssistantEnabled(config) ? askAI : null} />) : activeView === \"teamAdmin\"");
+    expect(appSource).toContain("<ManageHub {...p} focusTaskId={taskNav} onTaskFocusConsumed={() => setTaskNav(null)} onAskAI={aiAssistantEnabled(config) ? askAI : null} />");
+    expect(manageHubSource).toContain("managementTasksAiPrompt");
+    expect(manageHubSource).toContain("const askTasksAI = p.onAskAI");
+    expect(manageHubSource).toContain("const askMeetingsAI = p.onAskAI");
+  });
 });

@@ -335,12 +335,15 @@ export function createSupabaseInitialPasswordClient(env, fetchImpl) {
       const authUserId = await createOrUpdateAuthUser(user, password);
       const profile = await upsertAppUser(user, authUserId);
       const auth = await signIn(user.email, password);
+      const appUser = userRecordFromAppUserProfile(profile || {});
       return {
         auth,
         user: {
+          ...appUser,
           authUserId,
-          appUserId: profile?.id || "",
-          mustChangePassword: profile?.must_change_password === true
+          appUserId: appUser.id || profile?.id || "",
+          permissions: appUser.perms || {},
+          mustChangePassword: appUser.mustChangePassword === true
         }
       };
     }

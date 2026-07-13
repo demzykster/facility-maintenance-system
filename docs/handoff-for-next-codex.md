@@ -6,8 +6,8 @@ Updated: 2026-07-13
 
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
-- Current local state at handoff time: `main...origin/main`, clean after the latest push.
-- Latest app/UI commit before this handoff: explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, after supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
+- Current local state at handoff time: `main...origin/main`, expected clean after the latest push.
+- Latest app/UI commit before this handoff: first-login password session stabilization and AI entry points for management tasks/meetings, after explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -50,7 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget is `19/24` after grouping AI URLs through one dynamic `api/ai/[action].js` route.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 227.65 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.13 kB gzip, and a `FleetAssetsModule` chunk around 26.39 kB gzip.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 231.45 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `ManageHub` around 19.81 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and `src/BIOverview.jsx` wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
@@ -58,6 +58,14 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Stabilize first login and task AI entry`
+  - First-password completion through `POST /api/session/initial-password` now returns a full normalized `app_users` profile from `createSupabaseInitialPasswordClient.completePasswordUser()` instead of only `authUserId/appUserId`.
+  - The returned first-login session now carries the same important fields as ordinary production login/session restore: id, auth user id, name, role, email, department/departments, and permissions.
+  - This addresses the owner-reported white-screen risk immediately after a new user creates their first password, where the app could proceed with an incomplete production session shape.
+  - `tests/initialPasswordHandler.test.js` covers the full profile contract after first-password completion.
+  - `src/aiAssistEntryPointModel.js` now includes `managementTasksAiPrompt()` for task/meeting management risk summaries and next-action prompts.
+  - `src/ManageHub.jsx` wires task and meeting AI buttons into the shared `LazyAIPanel` through `onAskAI`; this is read-only prompt entry, not a data-writing operation.
+  - `tests/aiAssistEntryPointModel.test.js` and `tests/manageHubLazyWiring.test.js` cover the prompt and wiring.
 - `Add explicit AI waiting reason proposals`
   - `src/aiAssistActionModel.js` now proposes `ticket.update` waiting changes only when the user names a concrete waiting reason such as parts, supplier, access, budget approval, safety hold, or missing equipment.
   - The proposal adds both `waitingReason` and a deterministic `waitBall`; generic "put it on hold" wording produces no action proposal instead of guessing an unsafe partial status change.

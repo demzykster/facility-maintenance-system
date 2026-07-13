@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ppeDashboardAiPrompt, supplierQueueAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
+import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, managementTasksAiPrompt, ppeDashboardAiPrompt, supplierQueueAiPrompt, ticketAiPrompt } from "../src/aiAssistEntryPointModel.js";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI assist entry point model", () => {
@@ -217,5 +217,39 @@ describe("AI assist entry point model", () => {
     expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
     expect(prompt.text).toContain("אין כרגע קריאות או הזמנות פתוחות אצל ספקים");
     expect(prompt.text).not.toContain("שייכתי");
+  });
+
+  it("builds a management tasks risk prompt from task and meeting signals", () => {
+    const prompt = managementTasksAiPrompt({
+      labels: {
+        openTasks: 12,
+        overdueTasks: 3,
+        waitingTasks: 2,
+        dueToday: 4,
+        dueWeek: 8,
+        completedMonth: 15,
+        plannedMeetings: 5,
+        meetingsToSummarize: 1,
+        topOverdue: ["בדיקת מעלית · יוסי · 12.07.26"],
+        waitingReasons: ["ממתין לאישור מנהל: 2"]
+      }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.riskSummary);
+    expect(prompt.text).toContain("מטלות ופגישות הניהול");
+    expect(prompt.text).toContain("3 מטלות באיחור");
+    expect(prompt.text).toContain("1 פגישות להשלמה");
+    expect(prompt.text).toContain("בדיקת מעלית");
+    expect(prompt.text).toContain("3 הפעולות הבטוחות הבאות");
+  });
+
+  it("builds a management next-action prompt without claiming changes", () => {
+    const prompt = managementTasksAiPrompt({
+      labels: { openTasks: 2, overdueTasks: 0, waitingTasks: 0, dueToday: 0, meetingsToSummarize: 0, completedMonth: 6, plannedMeetings: 1 }
+    });
+
+    expect(prompt.workflow).toBe(AI_ASSIST_WORKFLOWS.nextActions);
+    expect(prompt.text).toContain("אין כרגע מטלות באיחור");
+    expect(prompt.text).not.toContain("עדכנתי");
   });
 });

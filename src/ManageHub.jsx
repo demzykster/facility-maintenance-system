@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { managementTasksAiPrompt } from "./aiAssistEntryPointModel.js";
 
 let manageHubRuntimeUi = {};
 
@@ -103,6 +104,7 @@ const XL_DATE = (v) => { if (v == null || v === "") return null; if (v instanceo
 const XL_PRIO = (v) => { const s = String(v || "").toLowerCase(); if (/high|גבוה|דחוף|urgent|1/.test(s)) return "high"; if (/low|נמוך/.test(s)) return "low"; return "medium"; };
 const XL_STATUS = (v) => { const s = String(v || "").toLowerCase(); if (/done|הושלם|בוצע|complete|סגור/.test(s)) return "done"; if (/progress|בתהליך|בעבוד/.test(s)) return "in_progress"; if (/wait|ממתין|המתנה/.test(s)) return "waiting"; if (/cancel|בוטל/.test(s)) return "cancelled"; return "todo"; };
 const COL_HINTS = { title: ["נושא", "כותרת", "משימה", "מטלה", "task", "title", "subject", "item", "פעולה"], responsible: ["אחרא", "responsible", "owner", "assignee", "מבצע", "מי "], due: ["תאריך יעד", "יעד", "deadline", "due", "target", "מועד"], priority: ["עדיפות", "priority", "דחיפות"], status: ["מצב משימה", "סטטוס", "status", "מצב"], category: ["קטגוריה", "תחום", "category", "area"], desc: ["פירוט", "תיאור", "description", "details", "משימה"], note: ["הערה", "הערות", "note", "remark", "comment"] };
+const taskDueLabel = (t) => t.mode === "permanent" ? "שוטפת" : t.mode === "deferred" ? "ללא תאריך" : (t.dueAt ? fmtDate(t.dueAt) : "—");
 const detectCol = (field, headers) => headers.find((x) => COL_HINTS[field].some((k) => String(x).toLowerCase().includes(k))) || "";
 const matchUserByName = (name, users) => { const n = String(name || "").trim().toLowerCase(); if (!n) return null; return (users || []).find((u) => u.name && (u.name.toLowerCase() === n || u.name.toLowerCase().includes(n) || n.includes(u.name.toLowerCase())))?.id || null; };
 const HEADER_KEYS = ["נושא", "משימה", "פירוט", "תיאור", "יעד", "תאריך", "מצב", "סטטוס", "אחרא", "הערה", "עדיפות", "priority", "status", "title", "task", "due", "date", "כותרת"];
@@ -425,7 +427,7 @@ function TasksModule(p) {
     return true;
   }).sort((a, b) => quick === "done" ? ((b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)) : ((taskOverdue(b) - taskOverdue(a)) || ((PRANK[PRIO_ALIAS[a.priority] || a.priority] ?? 1) - (PRANK[PRIO_ALIAS[b.priority] || b.priority] ?? 1)) || ((a.dueAt || 9e15) - (b.dueAt || 9e15)) || (b.createdAt - a.createdAt)));
   const mtgOf = (id) => (meetings || []).find((m) => m.id === id);
-  const dueLabel = (t) => t.mode === "permanent" ? "שוטפת" : t.mode === "deferred" ? "ללא תאריך" : (t.dueAt ? fmtDate(t.dueAt) : "—");
+  const dueLabel = taskDueLabel;
   const owners = [...new Set(scope.flatMap((t) => t.responsibleIds || []))];
   const rowIds = new Set(rows.map((t) => t.id));
   const visibleSelectedIds = selectedIds.filter((id) => rowIds.has(id));
@@ -474,8 +476,28 @@ function TasksModule(p) {
   const moAgo = Date.now() - 30 * 86400000;
   const doneTotal = scope.filter((t) => t.status === "done" || t.status === "cancelled").length;
   const doneMonth = scope.filter((t) => (t.status === "done" || t.status === "cancelled") && (t.updatedAt || t.createdAt) >= moAgo).length;
+  const todayStart = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); })();
+  const dueTodayN = scope.filter((t) => taskOpen(t) && t.dueAt >= todayStart && t.dueAt < todayStart + 864e5).length;
+  const dueWeekN = scope.filter((t) => taskOpen(t) && t.dueAt >= todayStart && t.dueAt < todayStart + 7 * 864e5).length;
+  const waitingN = scope.filter((t) => taskOpen(t) && t.status === "waiting").length;
+  const topOverdue = scope.filter(taskOverdue).slice(0, 5).map((t) => `${t.title} · ${(t.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "ללא אחראי"} · ${dueLabel(t)}`);
+  const waitingReasons = scope.filter((t) => taskOpen(t) && t.status === "waiting" && t.waitingFor).slice(0, 5).map((t) => `${t.waitingFor}: ${t.title}`);
+  const askTasksAI = p.onAskAI ? () => p.onAskAI(managementTasksAiPrompt({
+    labels: {
+      openTasks: openN,
+      overdueTasks: overdueN,
+      waitingTasks: waitingN,
+      dueToday: dueTodayN,
+      dueWeek: dueWeekN,
+      completedMonth: doneMonth,
+      plannedMeetings: (meetings || []).filter((m) => meetingVisible(m, session, tasks) && m.status === "planned").length,
+      meetingsToSummarize: (meetings || []).filter((m) => meetingVisible(m, session, tasks) && m.status === "planned" && m.at < todayStart).length,
+      topOverdue,
+      waitingReasons
+    }
+  })) : null;
   return (<>
-    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> מטלות {isAdmin ? "" : "שלי"} · {countLabel(openN, "מטלה פתוחה", "מטלות פתוחות")}{overdueN ? ` · ${overdueN} באיחור` : ""}</SectionTitle><div className="hdr-btns"><div className="more-wrap"><button className="btn-ghost sm" aria-label="עוד פעולות" onClick={() => setMoreOpen((v) => !v)}><SlidersHorizontal size={14} /> עוד</button>{moreOpen && <><div className="more-back" onClick={() => setMoreOpen(false)} /><div className="more-menu">{browserAiEnabled() && <button onClick={() => { setMoreOpen(false); setAi(true); }}><Sparkles size={14} /> ניתוח פגישה (AI)</button>}<button onClick={() => { setMoreOpen(false); setImp(true); }}><FileSpreadsheet size={14} /> ייבוא מ-Excel</button><button onClick={() => { setMoreOpen(false); exportTasksXlsx(rows, users); }}><FileSpreadsheet size={14} /> ייצוא ל-Excel</button></div></>}</div><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> מטלה</button></div></div>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><ClipboardList size={15} /> מטלות {isAdmin ? "" : "שלי"} · {countLabel(openN, "מטלה פתוחה", "מטלות פתוחות")}{overdueN ? ` · ${overdueN} באיחור` : ""}</SectionTitle><div className="hdr-btns">{askTasksAI && <button className="btn-ghost sm" onClick={askTasksAI} title="ניתוח מטלות ופגישות עם AI"><Sparkles size={14} /> AI</button>}<div className="more-wrap"><button className="btn-ghost sm" aria-label="עוד פעולות" onClick={() => setMoreOpen((v) => !v)}><SlidersHorizontal size={14} /> עוד</button>{moreOpen && <><div className="more-back" onClick={() => setMoreOpen(false)} /><div className="more-menu">{browserAiEnabled() && <button onClick={() => { setMoreOpen(false); setAi(true); }}><Sparkles size={14} /> ניתוח פגישה (AI)</button>}<button onClick={() => { setMoreOpen(false); setImp(true); }}><FileSpreadsheet size={14} /> ייבוא מ-Excel</button><button onClick={() => { setMoreOpen(false); exportTasksXlsx(rows, users); }}><FileSpreadsheet size={14} /> ייצוא ל-Excel</button></div></>}</div><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> מטלה</button></div></div>
     <div className="search-wrap"><Search size={18} /><input aria-label="חיפוש מטלות לפי כותרת, תוכן או הקשר" placeholder="חיפוש מטלה…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{openN}</span><span className="kpi-mini-l">פתוחות</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={overdueN ? { color: "#DC2626" } : {}}>{overdueN}</span><span className="kpi-mini-l">באיחור</span></div><div className="kpi-mini"><span className="kpi-mini-v">{doneMonth}</span><span className="kpi-mini-l">הושלמו (30 ימים)</span></div><div className="kpi-mini"><span className="kpi-mini-v">{doneTotal}</span><span className="kpi-mini-l">הושלמו סה״כ</span></div></div>
     <div className="qchips">{[["all", "הכל"], ["mine", "שלי"], ["overdue", "באיחור"], ["today", "היום"], ["week", "השבוע"], ["waiting", "ממתין"], ["done", "הושלמו"]].map(([id, lbl]) => <button key={id} className={"qchip" + (quick === id ? " on" : "") + (id === "overdue" ? " danger" : "")} onClick={() => setQuick(id)}>{lbl}</button>)}</div>
@@ -644,12 +666,31 @@ function MeetingsModule(p) {
   const mo = now - 30 * 86400000;
   const held = scope.filter((m) => m.status === "done" && m.at >= mo).length;
   const cancelled = scope.filter((m) => m.status === "cancelled" && m.at >= mo).length;
+  const openTasks = (tasks || []).filter((t) => taskVisible(t, session, meetings) && taskOpen(t));
+  const overdueTasks = openTasks.filter(taskOverdue);
+  const waitingTasks = openTasks.filter((t) => t.status === "waiting");
+  const dueToday = openTasks.filter((t) => t.dueAt >= startToday && t.dueAt < startToday + 864e5);
+  const dueWeek = openTasks.filter((t) => t.dueAt >= startToday && t.dueAt < startToday + 7 * 864e5);
+  const askMeetingsAI = p.onAskAI ? () => p.onAskAI(managementTasksAiPrompt({
+    labels: {
+      openTasks: openTasks.length,
+      overdueTasks: overdueTasks.length,
+      waitingTasks: waitingTasks.length,
+      dueToday: dueToday.length,
+      dueWeek: dueWeek.length,
+      completedMonth: (tasks || []).filter((t) => taskVisible(t, session, meetings) && (t.status === "done" || t.status === "cancelled") && (t.updatedAt || t.createdAt) >= mo).length,
+      plannedMeetings: upcoming.length,
+      meetingsToSummarize: toSummarize.length,
+      topOverdue: overdueTasks.slice(0, 5).map((t) => `${t.title} · ${(t.responsibleIds || []).map((id) => uName(id, users)).join(", ") || "ללא אחראי"} · ${taskDueLabel(t)}`),
+      waitingReasons: waitingTasks.filter((t) => t.waitingFor).slice(0, 5).map((t) => `${t.waitingFor}: ${t.title}`)
+    }
+  })) : null;
   const row = (m, late) => { const ty = mtgType(m.type); const soon = !!late || (m.status === "planned" && m.at - now < 2 * 86400000 && m.at > now - 86400000); const openN = (tasks || []).filter((t) => t.meetingId === m.id && taskOpen(t)).length; return <button key={m.id} className={"task-row" + (soon ? " ovd" : "")} onClick={() => setOpenId(m.id)} style={{ borderInlineStartColor: ty.color }}>
     <div className="task-row-main"><div className="task-row-t">{m.title}</div><div className="task-row-sub">{ty.label} · {countLabel((m.participantIds || []).length, "משתתף", "משתתפים")}{openN ? ` · ${countLabel(openN, "מטלה פתוחה", "מטלות פתוחות")}` : ""}{m.recur ? ` · ${RECUR_LABEL[m.recur]}` : ""}{late ? " · עברה — להשלמה" : ""}</div></div>
     <div className="task-row-side"><span className="task-due" style={soon ? { color: "#DC2626", fontWeight: 700 } : {}}>{fmtDate(m.at)}</span><span className="task-due">{fmtTime(m.at)}</span></div>
   </button>; };
   return (<>
-    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><CalendarClock size={15} /> פגישות</SectionTitle><div className="hdr-btns"><button className="btn-ghost sm" onClick={() => exportMeetingsXlsx(scope, tasks, users)} title="ייצוא ל-Excel"><FileSpreadsheet size={14} /> ייצוא</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> פגישה</button></div></div>
+    <div className="row-between" style={{ marginBottom: 10 }}><SectionTitle><CalendarClock size={15} /> פגישות</SectionTitle><div className="hdr-btns">{askMeetingsAI && <button className="btn-ghost sm" onClick={askMeetingsAI} title="ניתוח פגישות ומטלות עם AI"><Sparkles size={14} /> AI</button>}<button className="btn-ghost sm" onClick={() => exportMeetingsXlsx(scope, tasks, users)} title="ייצוא ל-Excel"><FileSpreadsheet size={14} /> ייצוא</button><button className="btn-primary sm" onClick={() => setEdit({})}><Plus size={15} /> פגישה</button></div></div>
     <div className="kpi-strip"><div className="kpi-mini"><span className="kpi-mini-v">{upcoming.length}</span><span className="kpi-mini-l">מתוכננות</span></div><div className="kpi-mini"><span className="kpi-mini-v">{held}</span><span className="kpi-mini-l">בוצעו (30 ימים)</span></div><div className="kpi-mini"><span className="kpi-mini-v" style={cancelled ? { color: "#DC2626" } : {}}>{cancelled}</span><span className="kpi-mini-l">בוטלו (30 ימים)</span></div></div>
     <SectionTitle>קרובות ({upcoming.length})</SectionTitle>
     {upcoming.length === 0 ? <Empty text="אין פגישות מתוכננות" Icon={CalendarClock} sub="לחצו «פגישה» כדי לקבוע" /> : <div className="task-list">{upcoming.map((m) => row(m))}</div>}

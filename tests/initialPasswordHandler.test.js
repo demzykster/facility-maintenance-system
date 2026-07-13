@@ -360,13 +360,27 @@ describe("initial password handler", () => {
       name: "Manager One",
       role: "user",
       email: "manager@example.com",
+      dept: "נפחי",
+      depts: ["נפחי"],
+      permissions: { tickets: "manage" },
       active: true,
       loginState: "pending_setup"
     }, "secret1");
 
     expect(result).toMatchObject({
       auth: { access_token: "access" },
-      user: { authUserId, appUserId, mustChangePassword: false }
+      user: {
+        id: appUserId,
+        authUserId,
+        appUserId,
+        name: "Manager One",
+        role: "user",
+        email: "manager@example.com",
+        dept: "נפחי",
+        depts: ["נפחי"],
+        permissions: { tickets: "manage" },
+        mustChangePassword: false
+      }
     });
     expect(calls.some((call) => String(call.url).includes("/rest/v1/app_users?on_conflict=auth_user_id"))).toBe(false);
   });

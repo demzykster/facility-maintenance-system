@@ -207,6 +207,42 @@ export function supplierQueueAiPrompt({ labels = {} } = {}) {
   });
 }
 
+export function managementTasksAiPrompt({ labels = {} } = {}) {
+  const openTasks = asNumber(labels.openTasks);
+  const overdueTasks = asNumber(labels.overdueTasks);
+  const waitingTasks = asNumber(labels.waitingTasks);
+  const dueToday = asNumber(labels.dueToday);
+  const dueWeek = asNumber(labels.dueWeek);
+  const completedMonth = asNumber(labels.completedMonth);
+  const plannedMeetings = asNumber(labels.plannedMeetings);
+  const meetingsToSummarize = asNumber(labels.meetingsToSummarize);
+  const topOverdue = Array.isArray(labels.topOverdue) ? labels.topOverdue.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const waitingReasons = Array.isArray(labels.waitingReasons) ? labels.waitingReasons.map((x) => safeLabel(x)).filter(Boolean).slice(0, 5) : [];
+  const hasRisk = overdueTasks > 0 || waitingTasks > 0 || dueToday > 0 || meetingsToSummarize > 0;
+  const statusLine = hasRisk
+    ? [
+      overdueTasks ? `${compactCount(overdueTasks)} מטלות באיחור` : "",
+      waitingTasks ? `${compactCount(waitingTasks)} מטלות ממתינות` : "",
+      dueToday ? `${compactCount(dueToday)} מטלות להיום` : "",
+      meetingsToSummarize ? `${compactCount(meetingsToSummarize)} פגישות להשלמה/סיכום` : ""
+    ].filter(Boolean).join("; ")
+    : "אין כרגע מטלות באיחור או פגישות שמחכות לסיכום.";
+  const contextParts = [
+    `${compactCount(openTasks)} מטלות פתוחות`,
+    statusLine,
+    dueWeek ? `${compactCount(dueWeek)} מטלות לשבוע הקרוב` : "",
+    `${compactCount(completedMonth)} מטלות הושלמו ב-30 ימים`,
+    plannedMeetings ? `${compactCount(plannedMeetings)} פגישות מתוכננות` : "",
+    topOverdue.length ? `איחורים בולטים: ${topOverdue.join("; ")}` : "",
+    waitingReasons.length ? `סיבות המתנה בולטות: ${waitingReasons.join("; ")}` : ""
+  ].filter(Boolean);
+
+  return Object.freeze({
+    workflow: hasRisk ? AI_ASSIST_WORKFLOWS.riskSummary : AI_ASSIST_WORKFLOWS.nextActions,
+    text: `נתח את מטלות ופגישות הניהול. ${contextParts.join("; ")}. הסבר איפה צוואר הבקבוק, מה צריך לבדוק לפני שינוי סטטוס או שיוך, ומה 3 הפעולות הבטוחות הבאות.`
+  });
+}
+
 export function biHeatmapAiPrompt({ rows = [], row = null, cell = null } = {}) {
   const selectedRow = row || null;
   const selectedCell = cell || null;
