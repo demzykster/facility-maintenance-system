@@ -32,7 +32,7 @@ function missingLabel(field) {
   return MISSING_LABELS[field] || field;
 }
 
-function AiActionCard({ action, busy, result, onExecute }) {
+function AiActionCard({ action, busy, result, onExecute, onEdit }) {
   const payload = action?.payload || {};
   const missing = Array.isArray(action?.missingFields) ? action.missingFields : [];
   const executable = canExecuteAiAssistAction(action);
@@ -56,10 +56,13 @@ function AiActionCard({ action, busy, result, onExecute }) {
     >
       {missing.length ? "השלימו פרטים לפני יצירה" : busy ? "יוצר קריאה…" : result?.ok ? "הקריאה נוצרה" : "אישור ויצירת קריאה"}
     </button>
+    {onEdit && <button type="button" className="ai-action-edit" disabled={busy || result?.ok} onClick={() => onEdit(action)}>
+      {missing.length ? "השלמה בטופס קריאה" : "עריכה בטופס לפני יצירה"}
+    </button>}
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
   const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config), [session, vis, pm, fleet, config, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
@@ -139,7 +142,7 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
           <div className={"ai-msg " + m.role}>{m.content}</div>
           {m.role === "assistant" && Array.isArray(m.actions) && m.actions.length > 0 && <div className="ai-actions">{m.actions.map((action) => {
             const key = action.id || action.type;
-            return <AiActionCard key={key} action={action} busy={actionBusy === key} result={actionResults[key]} onExecute={runAction} />;
+            return <AiActionCard key={key} action={action} busy={actionBusy === key} result={actionResults[key]} onExecute={runAction} onEdit={editAction} />;
           })}</div>}
         </div>)}
         {busy && <div className="ai-msg assistant"><span className="spinner sm dark" /> חושב…</div>}

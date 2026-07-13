@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after the latest push.
-- Latest app/UI commit before this handoff: the ticket-form `UnitPicker` stabilization plus AI action-card UI, after `Add AI ticket action proposals`.
+- Latest app/UI commit before this handoff: AI ticket proposal form handoff, after the ticket-form `UnitPicker` stabilization and human-confirmed AI action-card UI.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,12 +58,18 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add AI ticket proposal form handoff`
+  - Adds `ticketPrefillFromAiAssistAction()` to `src/aiAssistActionExecutionModel.js`.
+  - `src/AIPanel.jsx` now offers a secondary path on `ticket.create` action cards: open the normal ticket form for review/completion instead of creating immediately.
+  - `UserApp` and `AdminApp` pass `openAiTicketDraft` into the lazy AI panel, so incomplete or review-first AI proposals can open the existing `TicketForm` with a safe prefill.
+  - This is not a new write path. No data is written until the user manually submits the normal ticket form, and complete proposals still require explicit human confirmation before the existing `saveTicket` / `/api/tickets` path runs.
+  - Technician AI panels intentionally do not receive the form-handoff prop because that shell does not own the normal new-ticket overlay.
 - `Add human-confirmed AI ticket creation`
   - Adds `src/aiAssistActionExecutionModel.js`, the first browser-side execution guard for AI-produced actions.
   - `ticket.create` proposals can now be executed only when complete, only after a human presses the confirmation button, and only through the existing `saveTicket` / `/api/tickets` path.
   - `/api/ai/assist` remains read-only by itself. Provider text still does not write data and does not control payload execution.
   - `src/AIPanel.jsx` now shows disabled/ready/created/error states for action cards.
-  - The next AI action slice should add guided completion for incomplete proposals, especially transport tickets that need a specific fleet unit and downtime type before creation.
+  - The follow-up form handoff now covers the first guided-completion step for incomplete proposals; future work should add richer field-specific guidance, especially for transport tickets that need a specific fleet unit and downtime type before creation.
 - `Fix transport ticket forms and AI action cards`
   - Fixed the white-screen regression when opening a new transport ticket from `פתיחת קריאה`.
   - Root cause: after the fleet/PM lazy split, `TicketForm` and the worker report form still rendered `UnitPicker`, but the component only existed inside `src/FleetAssetsModule.jsx`. Facility/building ticket creation still worked; transport creation crashed with `UnitPicker is not defined`.

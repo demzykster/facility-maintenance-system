@@ -49,3 +49,23 @@ export function prepareAiTicketCreateForSave(action = {}, actor = {}, options = 
     ]
   };
 }
+
+export function ticketPrefillFromAiAssistAction(action = {}) {
+  if (!action || action.type !== "ticket.create") return null;
+  const payload = cleanObject(action.payload);
+  if (!payload || typeof payload !== "object") return null;
+  return {
+    track: cleanText(payload.track, 40) || null,
+    subject: cleanText(payload.subject, 160),
+    category: cleanText(payload.category, 80),
+    priority: cleanText(payload.priority, 40) || "medium",
+    zone: cleanText(payload.zone || payload.location, 160),
+    asset: cleanText(payload.asset, 160),
+    forkliftId: cleanText(payload.forkliftId, 160),
+    downtimeType: cleanText(payload.downtimeType, 80),
+    incidentShift: cleanText(payload.incidentShift, 80),
+    driverInvolved: cleanText(payload.driverInvolved, 160),
+    driverInvolvedId: cleanText(payload.driverInvolvedId, 160),
+    description: cleanText(payload.description, 1600)
+  };
+}

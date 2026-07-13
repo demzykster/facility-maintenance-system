@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiTicketCreateForSave } from "./aiAssistActionExecutionModel.js";
+import { prepareAiTicketCreateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -4401,7 +4401,7 @@ function UserApp(p) {
       {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} session={session} canManageUsers={canManageUsers(session)} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return ok; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
-      {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
+      {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} openAiTicketDraft={(prefill) => { setShowAI(false); setAiDraft(null); setOverlay({ type: "new", prefill }); }} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -6987,7 +6987,7 @@ function AdminApp(p) {
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} onAskAI={aiAssistantEnabled(config) ? askAI : null} /></Overlay>}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setTab("tickets"); openTicket(id); }} onGo={(go, ev) => { setShowNotif(false); if (go === "pm") goAsset({ tab: "pm" }); else if (go === "fleet") goAsset({ tab: "fleet", fleetId: ev?.fleetId || null }); else if (go === "ppe") goPpe({ sub: ev?.ppeSub || "dash" }); else setTab(go === "cleaning" ? "cleaning" : go === "tasks" ? "tasks" : go === "team" ? "team" : "bi"); }} />}
-      {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
+      {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} openAiTicketDraft={(prefill) => { setShowAI(false); setAiDraft(null); setOverlay({ type: "new", prefill }); }} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
     </div>
   );
@@ -7902,8 +7902,13 @@ function LazyAIPanel(props) {
     if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
     return { ok: true, ticketId: ticket.id, message: `הקריאה נוצרה: ${ticket.subject || ticket.id}` };
   };
+  const editAction = (action) => {
+    const prefill = ticketPrefillFromAiAssistAction(action);
+    if (!prefill || typeof props.openAiTicketDraft !== "function") throw new Error("פתיחת טופס קריאה אינה זמינה במסך זה.");
+    props.openAiTicketDraft(prefill);
+  };
   return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
-    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} />
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={props.openAiTicketDraft ? editAction : null} />
   </Suspense>;
 }
 function NotifPanelFallback({ onClose }) {
@@ -9252,6 +9257,9 @@ body *{visibility:hidden!important;}
 .ai-action-confirm{margin-top:9px;width:100%;min-height:38px;border:1.5px solid var(--primary);border-radius:10px;background:var(--primary);color:#fff;font-weight:750;cursor:pointer;transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),opacity 160ms var(--ease-out);}
 .ai-action-confirm:hover:not(:disabled){background:var(--primary-hover);border-color:var(--primary-hover);}
 .ai-action-confirm:disabled{cursor:not-allowed;opacity:.58;background:var(--surface-2);border-color:var(--line);color:var(--muted);}
+.ai-action-edit{margin-top:7px;width:100%;min-height:36px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--primary);font-weight:750;cursor:pointer;transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),opacity 160ms var(--ease-out);}
+.ai-action-edit:hover:not(:disabled){background:var(--primary-soft);border-color:var(--primary);}
+.ai-action-edit:disabled{cursor:not-allowed;opacity:.55;color:var(--muted);}
 .ai-action-result{margin-top:8px;font-size:12.5px;font-weight:650;line-height:1.4;}
 .ai-action-result.ok{color:#166534;}
 .ai-action-result.err{color:#B91C1C;}

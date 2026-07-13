@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiTicketCreateForSave } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiTicketCreateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -61,5 +61,36 @@ describe("AI assist action execution model", () => {
   it("refuses to prepare incomplete or unsupported actions", () => {
     expect(() => prepareAiTicketCreateForSave({ ...readyAction, missingFields: ["forkliftId"] })).toThrow("ai_action_not_executable");
     expect(() => prepareAiTicketCreateForSave({ ...readyAction, execute: { method: "DELETE", path: "/api/tickets" } })).toThrow("ai_action_not_executable");
+  });
+
+  it("builds a normal TicketForm prefill from incomplete ticket proposals", () => {
+    const prefill = ticketPrefillFromAiAssistAction({
+      ...readyAction,
+      missingFields: ["forkliftId", "downtimeType"],
+      payload: {
+        track: "transport",
+        subject: "רעש בהרמה",
+        description: "המלגזה מרעישה בזמן הרמה",
+        priority: "high",
+        forkliftId: "fork-1",
+        downtimeType: "critical",
+        incidentShift: "night",
+        driverInvolved: "אבי",
+        driverInvolvedId: "11032"
+      }
+    });
+
+    expect(prefill).toMatchObject({
+      track: "transport",
+      subject: "רעש בהרמה",
+      description: "המלגזה מרעישה בזמן הרמה",
+      priority: "high",
+      forkliftId: "fork-1",
+      downtimeType: "critical",
+      incidentShift: "night",
+      driverInvolved: "אבי",
+      driverInvolvedId: "11032"
+    });
+    expect(ticketPrefillFromAiAssistAction({ ...readyAction, type: "ticket.delete" })).toBeNull();
   });
 });
