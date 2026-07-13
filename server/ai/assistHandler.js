@@ -2,12 +2,13 @@ import { aiAssistAuditEvent } from "../../src/auditEventModel.js";
 import { buildAiIntakeDraft } from "../../src/aiIntakeModel.js";
 import { buildAiAssistActionProposals } from "../../src/aiAssistActionModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
+import { AI_PROVIDER_PLAN_SCHEMA, providerPlanPrompt, sanitizeAiProviderPlan } from "../../src/aiAssistProviderPlanModel.js";
 import { aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { authorizeAiRequest } from "./auth.js";
-import { callAiProvider } from "./providerClient.js";
+import { callAiProvider, callAiProviderObject } from "./providerClient.js";
 
 const MAX_BODY_BYTES = 64_000;
 const MAX_TEXT_CHARS = 2_000;
@@ -136,6 +137,7 @@ export function createAiAssistHandler({
   pinSessionClient = null,
   auditDriver = null,
   providerCall = callAiProvider,
+  providerObjectCall = callAiProviderObject,
   now = () => Date.now(),
   rateBuckets = AI_ASSIST_RATE_BUCKETS
 } = {}) {
@@ -196,6 +198,26 @@ export function createAiAssistHandler({
         });
       }
 
+      let providerPlan = null;
+      let providerPlanErrorCode = "";
+      if (body.includeProviderPlan === true || body.structuredPlan === true) {
+        const planResult = await providerObjectCall({
+          config,
+          system: SYSTEM_PROMPT,
+          prompt: providerPlanPrompt({ draft, actions, context, workflow }),
+          schema: AI_PROVIDER_PLAN_SCHEMA,
+          schemaName: "cmms_ai_non_writing_action_plan",
+          schemaDescription: "Non-writing CMMS assistant plan. It must never execute or persist changes.",
+          fetchImpl,
+          maxTokens: Number(env.CMMS_AI_PLAN_MAX_TOKENS || 900) || 900
+        });
+        if (planResult?.ok) {
+          providerPlan = sanitizeAiProviderPlan(planResult.object);
+        } else {
+          providerPlanErrorCode = aiProviderErrorCode(planResult?.error);
+        }
+      }
+
       await writeAuditEvent(backendAuditDriver, aiAssistAuditEvent({
         draft,
         context,
@@ -213,7 +235,9 @@ export function createAiAssistHandler({
           provider: result.provider,
           model: result.model,
           text: cleanText(result.text, 4_000)
-        }
+        },
+        ...(providerPlan ? { providerPlan } : {}),
+        ...(providerPlanErrorCode ? { providerPlanErrorCode } : {})
       });
     } catch (error) {
       if (error?.message === "payload_too_large") return sendJson(res, 413, { error: "payload_too_large" });

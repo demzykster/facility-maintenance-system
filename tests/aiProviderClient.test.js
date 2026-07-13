@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { callAiProvider, __test } from "../server/ai/providerClient.js";
+import { callAiProvider, callAiProviderObject, __test } from "../server/ai/providerClient.js";
 
 function sdkFactory(providerName) {
   return vi.fn((options) => (modelId) => ({
@@ -110,6 +110,54 @@ describe("ai provider client", () => {
     expect(JSON.stringify(result)).not.toContain("google-secret");
   });
 
+  it("uses the Vercel AI SDK object seam without returning provider secrets", async () => {
+    const createGoogleGenerativeAI = sdkFactory("google");
+    const generateObjectImpl = vi.fn().mockResolvedValue({
+      object: {
+        summary: "בדיקה",
+        items: [{ type: "ticket.update", title: "עדכון לבדיקה" }]
+      },
+      finishReason: "stop",
+      usage: { inputTokens: 7, outputTokens: 5 }
+    });
+
+    const result = await callAiProviderObject({
+      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-2.0-flash" },
+      system: "system",
+      prompt: "prompt",
+      schema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
+      schemaName: "cmms_test_schema",
+      schemaDescription: "test schema",
+      generateObjectImpl,
+      sdk: { createGoogleGenerativeAI },
+      maxTokens: 24
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      provider: "google",
+      model: "gemini-2.0-flash",
+      object: {
+        summary: "בדיקה",
+        items: [{ type: "ticket.update", title: "עדכון לבדיקה" }]
+      },
+      raw: {
+        finishReason: "stop",
+        usage: { inputTokens: 7, outputTokens: 5 }
+      }
+    });
+    expect(createGoogleGenerativeAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "google-secret" }));
+    expect(generateObjectImpl).toHaveBeenCalledWith(expect.objectContaining({
+      model: expect.objectContaining({ modelId: "gemini-2.0-flash", providerName: "google" }),
+      system: "system",
+      prompt: "prompt",
+      schemaName: "cmms_test_schema",
+      schemaDescription: "test schema",
+      maxOutputTokens: 64
+    }));
+    expect(JSON.stringify(result)).not.toContain("google-secret");
+  });
+
   it("fails closed when required provider keys are missing", async () => {
     await expect(callAiProvider({ config: { provider: "anthropic" } })).resolves.toMatchObject({
       ok: false,
@@ -122,6 +170,10 @@ describe("ai provider client", () => {
     await expect(callAiProvider({ config: { provider: "gemini" } })).resolves.toMatchObject({
       ok: false,
       error: "google_api_key_required"
+    });
+    await expect(callAiProviderObject({ config: { provider: "openai" } })).resolves.toMatchObject({
+      ok: false,
+      error: "openai_api_key_required"
     });
   });
 

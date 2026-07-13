@@ -91,12 +91,16 @@ Current implementation uses Vercel AI SDK Core behind `server/ai/providerClient.
 
 This is acceptable for the current controlled rollout because model text is not trusted for database writes. The provider returns assistant text only; executable actions are built by deterministic server-side code from role-filtered context and explicit user wording, remain `writesData: false`, and execute only through existing app operations after a human confirms them in the UI.
 
+The first SDK-native structured-output seam now exists as an optional, non-writing provider plan path. `/api/ai/assist` can request `includeProviderPlan` / `structuredPlan`; the server calls `callAiProviderObject()` with `AI_PROVIDER_PLAN_SCHEMA`, then sanitizes the result through `sanitizeAiProviderPlan()`. The sanitized plan deliberately strips executable paths, ignores unsupported operation types, forces `writesData: false`, and keeps `writePolicy: "human_confirmation_required"`. It is only a review/planning artifact and does not replace the deterministic action layer.
+
+`generateObject` is currently used for this first seam because it is the shortest safe adapter over the already installed Vercel AI SDK providers. AI SDK v7 marks that API as transitional in favor of `generateText` with structured output settings; a future cleanup can move the same schema/sanitizer contract to the newer output API without changing the CMMS safety invariant.
+
 The important safety decision is that provider-native tool/function calling must not be allowed to write directly to CMMS storage. Future SDK-native tools may be used for planning, extraction, or structured proposals, but every business mutation must still become a reviewable app action and run only after user confirmation through the existing authenticated API paths.
 
 The recommended next path is:
 
 1. Keep the current deterministic action layer as the safety boundary.
-2. Add SDK-native structured output/tool calls only for non-writing proposal generation.
+2. Deepen SDK-native structured output/tool calls only for non-writing proposal generation.
 3. Keep CMMS mutations as proposed actions requiring human confirmation; do not let provider-native tools write directly to the database.
 4. Add one operation at a time under the same tests before enabling any multi-step agent loop.
 5. Continue exposing only explicit provider/model options in settings; secrets remain server/Vercel-only.

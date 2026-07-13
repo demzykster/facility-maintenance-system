@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { generateObject, generateText, jsonSchema } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -60,6 +60,68 @@ export async function callAiProvider({ config = {}, system = "", prompt = "", fe
       provider,
       model,
       text: String(result?.text || "").trim(),
+      raw: {
+        finishReason: result?.finishReason || "",
+        usage: result?.usage || null
+      }
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      provider,
+      model,
+      error: providerError(error, `${provider}_provider_failed`)
+    };
+  }
+}
+
+export async function callAiProviderObject({
+  config = {},
+  system = "",
+  prompt = "",
+  schema = {},
+  schemaName = "cmms_ai_object",
+  schemaDescription = "",
+  fetchImpl = globalThis.fetch,
+  maxTokens = 900,
+  generateObjectImpl = generateObject,
+  sdk = {}
+} = {}) {
+  const provider = normalizeAiProvider(config.provider);
+  if (!provider) return { ok: false, error: "ai_provider_required" };
+
+  const model = String(config.model || DEFAULT_AI_MODELS[provider] || "").trim();
+  const safeSystem = compactText(system);
+  const safePrompt = compactText(prompt);
+
+  if (provider === AI_PROVIDERS.anthropic) {
+    if (!config.anthropicApiKey) return { ok: false, error: "anthropic_api_key_required" };
+  }
+  if (provider === AI_PROVIDERS.google) {
+    if (!config.googleApiKey) return { ok: false, error: "google_api_key_required" };
+  }
+  if (provider === AI_PROVIDERS.openai) {
+    if (!config.openaiApiKey) return { ok: false, error: "openai_api_key_required" };
+  }
+
+  const sdkModel = createSdkModel({ provider, model, config, fetchImpl, sdk });
+  if (!sdkModel) return { ok: false, error: "ai_provider_unsupported" };
+
+  try {
+    const result = await generateObjectImpl({
+      model: sdkModel,
+      system: safeSystem,
+      prompt: safePrompt,
+      schema: jsonSchema(schema),
+      schemaName: compactText(schemaName, 80) || "cmms_ai_object",
+      schemaDescription: compactText(schemaDescription, 400),
+      maxOutputTokens: safeTokenLimit(maxTokens, 64)
+    });
+    return {
+      ok: true,
+      provider,
+      model,
+      object: result?.object || {},
       raw: {
         finishReason: result?.finishReason || "",
         usage: result?.usage || null

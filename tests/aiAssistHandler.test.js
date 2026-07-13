@@ -232,6 +232,130 @@ describe("AI assist handler", () => {
     }));
   });
 
+  it("can request a provider structured plan but only returns sanitized non-writing suggestions", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר להכין תוכנית פעולה."
+    });
+    const providerObjectCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      object: {
+        summary: "תוכנית מוצעת",
+        items: [
+          {
+            type: "ticket.update",
+            title: "עדכן עדיפות",
+            reason: "יש קריאה יחידה בהקשר",
+            confidence: 0.8,
+            execute: { method: "POST", path: "/api/tickets" },
+            writesData: true
+          },
+          { type: "sql.delete", title: "מחיקה אסורה" }
+        ]
+      }
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      providerObjectCall,
+      now: () => 125,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "תכין תוכנית טיפול",
+        includeProviderPlan: true,
+        context: {
+          tickets: [
+            { id: "T-1", subject: "דליפת מים", priority: "medium", status: "new", department: "הפצה" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload).toMatchObject({
+      ok: true,
+      providerPlan: {
+        summary: "תוכנית מוצעת",
+        writesData: false,
+        writePolicy: "human_confirmation_required",
+        providerTextTrusted: false,
+        items: [
+          expect.objectContaining({
+            type: "ticket.update",
+            title: "עדכן עדיפות",
+            requiresConfirmation: true,
+            writesData: false,
+            writePolicy: "human_confirmation_required"
+          })
+        ]
+      }
+    });
+    expect(payload.providerPlan.items).toHaveLength(1);
+    expect(JSON.stringify(payload)).not.toContain("/api/tickets");
+    expect(JSON.stringify(payload)).not.toContain("sql.delete");
+    expect(JSON.stringify(payload)).not.toContain("server-secret");
+    expect(providerObjectCall).toHaveBeenCalledWith(expect.objectContaining({
+      schemaName: "cmms_ai_non_writing_action_plan",
+      prompt: expect.stringContaining("allowedToWrite")
+    }));
+  });
+
+  it("does not fail the main assistant response when optional provider plan generation fails", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-2.0-flash",
+      text: "אפשר להמשיך."
+    });
+    const providerObjectCall = vi.fn().mockResolvedValue({
+      ok: false,
+      provider: "google",
+      model: "gemini-2.0-flash",
+      error: "quota exceeded"
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "gemini",
+        GOOGLE_GENERATIVE_AI_API_KEY: "google-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(),
+      providerCall,
+      providerObjectCall,
+      now: () => 126,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "בדוק מה לעשות",
+        structuredPlan: true
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      assistant: { provider: "google", model: "gemini-2.0-flash", text: "אפשר להמשיך." },
+      providerPlanErrorCode: "ai_provider_quota_exceeded"
+    });
+  });
+
   it("can call the Gemini server provider without returning provider secrets", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
