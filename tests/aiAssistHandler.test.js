@@ -316,6 +316,57 @@ describe("AI assist handler", () => {
     ]);
   });
 
+  it("prefills transport ticket drafts from role-filtered fleet context", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: "אפשר להכין טיוטת קריאה לכלי לאחר אישור."
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "הפצה", departments: ["הפצה"] }),
+      providerCall,
+      now: () => 445,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "מלגזה 120823 תקועה באזור טעינה",
+        context: {
+          fleet: [
+            { id: "fleet-120823", code: "120823", type: "מלגזת היגש", department: "הפצה" },
+            { id: "fleet-hidden", code: "120823", type: "מלגזת היגש", department: "קבלה" }
+          ]
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "needs_human_input",
+        requiresConfirmation: true,
+        writesData: false,
+        missingFields: ["downtimeType"],
+        payload: expect.objectContaining({
+          track: "transport",
+          forkliftId: "fleet-120823",
+          asset: "120823",
+          zone: "טעינה"
+        })
+      })
+    ]);
+  });
+
   it("returns deterministic ticket zone updates from role-filtered single-ticket context", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

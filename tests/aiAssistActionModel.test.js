@@ -67,6 +67,77 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("prefills a unique visible fleet unit in transport ticket drafts without writing", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "מלגזה 120823 תקועה באזור טעינה",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        fleet: [
+          { id: "fleet-120823", code: "120823", type: "מלגזת היגש", department: "הפצה" },
+          { id: "fleet-178040", code: "178040", type: "מלגזת משקל נגדי", department: "הפצה" }
+        ]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "needs_human_input",
+        requiresConfirmation: true,
+        writesData: false,
+        missingFields: ["downtimeType"],
+        payload: expect.objectContaining({
+          track: "transport",
+          forkliftId: "fleet-120823",
+          asset: "120823",
+          zone: "טעינה"
+        })
+      })
+    ]);
+  });
+
+  it("does not guess a transport fleet unit when the mentioned code is ambiguous", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "מלגזה 120823 תקועה באזור טעינה",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        fleet: [
+          { id: "fleet-120823-a", code: "120823", type: "מלגזת היגש", department: "הפצה" },
+          { id: "fleet-120823-b", code: "120823", type: "מלגזת היגש", department: "הפצה" }
+        ]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "needs_human_input",
+        missingFields: expect.arrayContaining(["forkliftId", "downtimeType"]),
+        payload: expect.objectContaining({
+          track: "transport",
+          forkliftId: "",
+          asset: ""
+        })
+      })
+    ]);
+  });
+
   it("does not propose write actions for clarification-only drafts or unsupported modules", () => {
     const draft = buildAiIntakeDraft({
       rawText: "משהו לא ברור",

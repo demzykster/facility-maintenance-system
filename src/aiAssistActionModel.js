@@ -195,10 +195,20 @@ function fleetUnitMatchesText(unit = {}, raw = "") {
 function requestedFleetUnitFromText(text = "", fleet = []) {
   const raw = cleanText(text, 800);
   if (!raw || !hasFleetUnitUpdateIntent(raw)) return null;
+  return uniqueFleetUnitMentionFromText(raw, fleet);
+}
+
+function uniqueFleetUnitMentionFromText(text = "", fleet = []) {
+  const raw = cleanText(text, 800);
+  if (!raw || !/(כלי|מלגזה|ציוד|forklift|vehicle|unit|asset)/i.test(raw)) return null;
   const matches = cleanArray(fleet)
     .filter((unit) => unit && unit.id)
     .filter((unit) => fleetUnitMatchesText(unit, raw));
   return matches.length === 1 ? matches[0] : null;
+}
+
+function draftFleetUnitFromText(text = "", fleet = []) {
+  return uniqueFleetUnitMentionFromText(text, fleet);
 }
 
 const WAITING_REASON_BALLS = Object.freeze({
@@ -439,7 +449,7 @@ function buildAiMeetingUpdateProposal({ draft = {}, context = {}, now = Date.now
   };
 }
 
-export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.now() } = {}) {
+export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.now(), context = {} } = {}) {
   const module = cleanText(draft.module, 40);
   const track = ticketTrackForModule(module);
   const location = locationFromDraft(draft);
@@ -447,6 +457,8 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   const description = cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
   const priority = priorityFromSeverity(draft.severity);
   const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const fleetUnit = track === "transport" ? draftFleetUnitFromText(draft.rawText, context.fleet) : null;
+  const fleetAsset = fleetUnit ? cleanText(fleetUnit.code || fleetUnit.number || fleetUnit.asset || fleetUnit.id, 160) : "";
   const payload = {
     track,
     subject,
@@ -454,8 +466,8 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
     categoryLabel: "",
     priority,
     zone: location,
-    asset: "",
-    forkliftId: "",
+    asset: fleetAsset,
+    forkliftId: fleetUnit ? cleanText(fleetUnit.id, 160) : "",
     downtimeType: "",
     description,
     status: "new",
@@ -667,7 +679,7 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
     }];
   }
   if (safeDraft.action !== "draft_ticket") return [];
-  const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now });
+  const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now, context });
   const missingFields = missingFieldsForTicketPayload(payload, safeDraft);
   const status = missingFields.length ? "needs_human_input" : "ready_for_confirmation";
   return [{

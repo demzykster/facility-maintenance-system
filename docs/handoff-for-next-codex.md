@@ -59,6 +59,11 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Prefill AI transport ticket fleet unit` (current local slice)
+  - `src/aiAssistActionModel.js` now uses role-filtered `context.fleet` while building transport `ticket.create` drafts.
+  - If the user's new-ticket text explicitly names a unique visible fleet unit code/id, such as `מלגזה 120823 תקועה באזור טעינה`, the draft pre-fills `forkliftId` and `asset`.
+  - Hidden, ambiguous, or absent fleet codes are not guessed. The draft remains `writesData: false`, still requires human confirmation or normal form submission, and still leaves `downtimeType` for a human to complete.
+  - `tests/aiAssistActionModel.test.js` covers unique and ambiguous fleet matching at the model seam; `tests/aiAssistHandler.test.js` covers the same behavior after server role filtering.
 - `Add AI transport unit update proposals` (current local slice)
   - `src/aiAssistActionModel.js` can now propose a constrained `ticket.update` for explicit transport-unit wording, such as `תעדכן את הקריאה לכלי 120823`.
   - The proposal requires exactly one role-visible target ticket and exactly one matching fleet unit code/id in the already role-filtered `context.fleet`; hidden, ambiguous, unchanged, or absent fleet codes produce no action.
