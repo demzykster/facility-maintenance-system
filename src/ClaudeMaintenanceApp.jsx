@@ -32,7 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
+import { prepareAiMeetingCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7898,6 +7898,13 @@ function AIPanelFallback({ onClose }) {
 }
 function LazyAIPanel(props) {
   const executeAction = async (action) => {
+    if (action?.type === "meeting.create") {
+      if (typeof props.saveMeeting !== "function") throw new Error("שמירת פגישות אינה זמינה במסך זה.");
+      const meeting = prepareAiMeetingCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
+      const ok = await props.saveMeeting(meeting);
+      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+      return { ok: true, meetingId: meeting.id, message: `הפגישה נוצרה: ${meeting.title || meeting.id}` };
+    }
     if (action?.type === "task.create") {
       if (typeof props.saveTask !== "function") throw new Error("שמירת משימות אינה זמינה במסך זה.");
       const task = prepareAiTaskCreateForSave(action, props.session, { now: Date.now(), makeId: uid });

@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, expected clean after the latest push.
-- Latest app/UI commit before this handoff: first-login password session stabilization and structured AI context for management tasks/meetings, after explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, human-confirmed task creation/update, and AI ticket proposal form handoff.
+- Latest app/UI commit before this handoff: first-login password session stabilization and structured AI context for management tasks/meetings, after explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, human-confirmed task creation/update, human-confirmed meeting creation, and AI ticket proposal form handoff.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -50,7 +50,7 @@ The current strategy is:
 - Staging residual KV report previously reached `cmms_kv_records=0`.
 - Route budget is `19/24` after grouping AI URLs through one dynamic `api/ai/[action].js` route.
 - Known product/performance risk remains the large main JS chunk. The latest builds pass but still warn about a chunk above 500 kB.
-- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 232.50 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `ManageHub` around 19.82 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
+- First startup splits after that warning are done: `html2canvas` is no longer part of the initial app chunk and loads only when the app issue screenshot capture is used; the AI chat panel now lives in `src/AIPanel.jsx` and loads only when the AI UI is opened; the unified BI overview now lives in `src/BIOverview.jsx` and loads through a lazy wrapper from the app shell; the fleet/transport and periodic-maintenance screen now lives in `src/FleetAssetsModule.jsx` and loads only when `כלי שינוע` is opened; management tasks/meetings live in the lazy `src/ManageHub.jsx` module. React and lucide icons are split into stable vendor chunks for better cache behavior across deploys. The latest local build has the main app chunk around 232.73 kB gzip, with vendor React around 57 kB gzip, vendor icons around 101 kB gzip, a `BIOverview` chunk around 9.15 kB gzip, `ManageHub` around 19.81 kB gzip, and `FleetAssetsModule` around 26.00 kB gzip.
 - BI now includes a ticket heatmap (`מפת חום קריאות`) by department / area and risk type. The calculation lives in `src/biScopeModel.js` (`biTicketHeatmapRows`, `ticketMatchesBiHeatmapMetric`) with coverage in `tests/biScopeModel.test.js`; rendering lives in `src/BIHeatmapPanel.jsx`, and `src/BIOverview.jsx` wires it into BI and routes heatmap clicks through the existing ticket list focus mechanism.
 - The live public Vercel app is staging/pilot/controlled rollout. Treat live data carefully.
 
@@ -58,7 +58,13 @@ The current strategy is:
 
 Recent commits on `main`:
 
-- `Add human-confirmed AI task due-date updates` (current local slice)
+- `Add human-confirmed AI meeting creation` (current local slice)
+  - `src/aiAssistActionModel.js` now detects explicit meeting/ישיבה/פגישה intent from deterministic `draft_task` intake and can return a `meeting.create` proposal.
+  - The action remains `writesData: false`, requires human confirmation, and targets the existing `/api/work` contract with `resource: "meetings"` / `bodyField: "meeting"`.
+  - `src/aiAssistActionExecutionModel.js` prepares the confirmed meeting for the existing `saveMeeting` path and adds `ai.confirmedByHuman` plus an `ai_confirmed_meeting` log entry.
+  - `src/AIPanel.jsx` renders the meeting action as a separate confirmation card, and `LazyAIPanel` executes it through `saveMeeting`, not through a parallel AI write path.
+  - This first slice intentionally defaults the current actor as owner/participant, requires deterministic relative date wording, and does not infer extra participants, rooms, recurring rules, meeting updates, or meeting deletes.
+- `Add human-confirmed AI task due-date updates`
   - `src/aiAssistActionModel.js` now extends constrained `task.update` proposals from status/priority to deterministic due-date updates.
   - Due dates are intentionally accepted only from explicit relative wording: `היום` / `today`, `מחר` / `tomorrow`, or `בעוד` / `תוך` / `in N days`.
   - The proposal still requires exactly one role-visible task in the filtered context. If more than one task is visible, or if the user gives a free-form calendar date, the assistant does not guess.
@@ -71,7 +77,7 @@ Recent commits on `main`:
   - `src/aiAssistActionModel.js` can also return a constrained `task.update` proposal when the role-filtered context has exactly one visible task and the user asks for a deterministic status/priority change. The later due-date slice above adds explicit relative due dates to the same confirmed path. If there are multiple tasks, the assistant does not guess and does not create a new task as a fallback.
   - `src/aiAssistActionExecutionModel.js` allows `task.create` and constrained `task.update` only through that work API contract and prepares the confirmed records for the existing `saveTask` path, adding `ai.confirmedByHuman` / `ai_confirmed_task` or `ai_confirmed_task_update` metadata.
   - `src/AIPanel.jsx` renders task action cards separately from ticket action cards, and `LazyAIPanel` executes confirmed task create/update actions via `saveTask`, not via a parallel AI write path.
-  - This does not add responsible changes, task delete, free-form date parsing, or meeting writes yet. Those should be added as separate deterministic slices with confirmation, allow-lists, and tests.
+  - This does not add responsible changes, task delete, free-form date parsing, meeting updates/deletes, or richer participant/room inference yet. Those should be added as separate deterministic slices with confirmation, allow-lists, and tests.
 - `Add task and meeting records to AI context`
   - `src/AIPanel.jsx` now passes tasks and meetings into the shared `buildAIContextSnapshot()` call instead of sending only tickets/fleet/PM/config.
   - `src/aiAssistSnapshotModel.js` now includes compact task and meeting records for AI: open tasks, overdue/waiting counts, due days, responsible ids, waiting reason, linked meeting id, planned meetings, needs-summary meetings, and open task counts per meeting.
@@ -454,7 +460,7 @@ Visual polish still likely needed:
 
 Technical/performance watch:
 
-- Main bundle still triggers Vite's raw-size warning. Latest local build after the AI due-date update slice produced the main app chunk at about 926.11 kB raw / 232.50 kB gzip, plus separate lazy screen chunks and stable vendor chunks.
+- Main bundle still triggers Vite's raw-size warning. Latest local build after the AI meeting-create slice produced the main app chunk at about 927.88 kB raw / 232.73 kB gzip, plus separate lazy screen chunks and stable vendor chunks.
 - Next meaningful performance work should continue reducing initial JS and defer post-login work where safe, not start from visual rewrites.
 - Live controlled-rollout baseline exists, but headless Chromium does not prove native iOS/Safari push-banner behavior.
 

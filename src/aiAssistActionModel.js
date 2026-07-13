@@ -107,6 +107,10 @@ function requestedTaskDueAtFromText(text = "", now = Date.now()) {
   return null;
 }
 
+function hasMeetingCreateIntent(text = "") {
+  return /פגישה|ישיבה|meeting/i.test(cleanText(text, 800));
+}
+
 function hasUpdateIntent(text = "") {
   return /תעדכן|עדכן|העבר|שנה|סיים|סגור|בטל|update|change|set|mark/i.test(cleanText(text, 800));
 }
@@ -395,11 +399,64 @@ export function buildAiTaskCreatePayload({ draft = {}, user = {}, now = Date.now
   };
 }
 
+export function buildAiMeetingCreatePayload({ draft = {}, user = {}, now = Date.now() } = {}) {
+  const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const actorId = cleanText(user.id || user.authUserId || user.workerNo, 120);
+  const actorName = cleanText(user.name, 120);
+  const actorRole = cleanText(user.role, 40);
+  const title = subjectFromDraft(draft);
+  const at = requestedTaskDueAtFromText(draft.rawText, createdAt);
+  return {
+    title,
+    type: "boss",
+    purpose: cleanText(draft.rawText, MAX_DESCRIPTION_CHARS),
+    at,
+    participantIds: actorId ? [actorId] : [],
+    agenda: "",
+    decisions: "",
+    recur: null,
+    standingTopics: [],
+    topicMarks: {},
+    status: "planned",
+    ownerId: actorId,
+    createdBy: {
+      id: actorId,
+      name: actorName,
+      role: actorRole,
+      dept: cleanText(user.dept || user.department, 120),
+      phone: cleanText(user.phone, 80),
+      email: cleanText(user.email, 160)
+    },
+    createdAt,
+    updatedAt: createdAt,
+    log: [{
+      at: createdAt,
+      by: actorName,
+      byRole: actorRole,
+      text: "טיוטת פגישה הוכנה על ידי AI וממתינה לאישור משתמש",
+      kind: "ai_draft"
+    }],
+    ai: {
+      drafted: true,
+      source: "ai_assist",
+      draftVersion: Number(draft.version || 1)
+    }
+  };
+}
+
 function missingFieldsForTaskPayload(payload = {}) {
   const missing = [];
   if (!payload.title) missing.push("title");
   if (!payload.desc) missing.push("desc");
   if (!cleanArray(payload.responsibleIds).length) missing.push("responsibleIds");
+  return [...new Set(missing)];
+}
+
+function missingFieldsForMeetingPayload(payload = {}) {
+  const missing = [];
+  if (!payload.title) missing.push("title");
+  if (!Number.isFinite(Number(payload.at))) missing.push("at");
+  if (!cleanArray(payload.participantIds).length) missing.push("participantIds");
   return [...new Set(missing)];
 }
 
@@ -418,6 +475,33 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasUpdateIntent(safeDraft.rawText) && cleanArray(context.tasks).filter((task) => task && task.id).length > 0) return [];
   if (safeDraft.action === "draft_task") {
+    if (hasMeetingCreateIntent(safeDraft.rawText)) {
+      const payload = buildAiMeetingCreatePayload({ draft: safeDraft, user, now });
+      const missingFields = missingFieldsForMeetingPayload(payload);
+      return [{
+        id: "create_meeting",
+        type: "meeting.create",
+        label: "יצירת פגישה",
+        status: missingFields.length ? "needs_human_input" : "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        writePolicy: "human_confirmation_required",
+        missingFields,
+        payload,
+        execute: {
+          method: "POST",
+          path: "/api/work",
+          resource: "meetings",
+          bodyField: "meeting"
+        },
+        safety: {
+          deterministic: true,
+          providerTextTrusted: false,
+          serverMustRevalidate: true,
+          auditRequired: true
+        }
+      }];
+    }
     const payload = buildAiTaskCreatePayload({ draft: safeDraft, user, now });
     const missingFields = missingFieldsForTaskPayload(payload);
     return [{

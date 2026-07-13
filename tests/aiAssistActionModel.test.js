@@ -127,6 +127,50 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("turns a clear meeting draft into a human-confirmed meeting proposal without writing", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "פגישה מחר ב-09:00 לעבור על תקלות בטיחות",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({ draft, user: actor, now: 2000 });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_meeting",
+        type: "meeting.create",
+        label: "יצירת פגישה",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        writePolicy: "human_confirmation_required",
+        missingFields: [],
+        execute: {
+          method: "POST",
+          path: "/api/work",
+          resource: "meetings",
+          bodyField: "meeting"
+        },
+        payload: expect.objectContaining({
+          title: "פגישה מחר ב-09:00 לעבור על תקלות בטיחות",
+          type: "boss",
+          status: "planned",
+          ownerId: "u1",
+          participantIds: ["u1"],
+          at: 2000 + 86400000,
+          createdAt: 2000,
+          updatedAt: 2000,
+          ai: expect.objectContaining({
+            drafted: true,
+            source: "ai_assist"
+          })
+        })
+      })
+    ]);
+  });
+
   it("proposes a constrained task.update only when a single visible task target is clear", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעדכן את המשימה לעדיפות גבוהה וסטטוס בטיפול",

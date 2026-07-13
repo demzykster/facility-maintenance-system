@@ -43,6 +43,13 @@ function hasTasksApiExecuteContract(action = {}) {
     && action.execute?.bodyField === "task";
 }
 
+function hasMeetingsApiExecuteContract(action = {}) {
+  return action.execute?.method === "POST"
+    && action.execute?.path === "/api/work"
+    && action.execute?.resource === "meetings"
+    && action.execute?.bodyField === "meeting";
+}
+
 export function canExecuteAiAssistAction(action = {}) {
   if (!action || typeof action !== "object") return false;
   if (action.requiresConfirmation !== true) return false;
@@ -51,6 +58,11 @@ export function canExecuteAiAssistAction(action = {}) {
   const payload = cleanObject(action.payload);
   if (action.type === "task.create") {
     return hasTasksApiExecuteContract(action) && !!cleanText(payload.title, 200);
+  }
+  if (action.type === "meeting.create") {
+    return hasMeetingsApiExecuteContract(action)
+      && !!cleanText(payload.title, 200)
+      && Number.isFinite(Number(payload.at));
   }
   if (action.type === "task.update") {
     return hasTasksApiExecuteContract(action)
@@ -71,6 +83,57 @@ export function canExecuteAiAssistAction(action = {}) {
     return !!cleanText(payload.ticketId, 160) && !!cleanText(payload.note, 1000);
   }
   return false;
+}
+
+export function prepareAiMeetingCreateForSave(action = {}, actor = {}, options = {}) {
+  if (!canExecuteAiAssistAction(action) || action.type !== "meeting.create") throw new Error("ai_action_not_executable");
+  const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+  const makeId = typeof options.makeId === "function" ? options.makeId : () => `ai-meeting-${now.toString(36)}`;
+  const payload = cleanObject(action.payload);
+  const actorId = cleanText(actor.id || actor.authUserId || actor.workerNo, 120);
+  const actorName = cleanText(actor.name, 120) || "AI";
+  const actorRole = cleanText(actor.role, 40);
+  const id = cleanText(payload.id || makeId(), 160);
+  if (!id) throw new Error("ai_action_meeting_id_required");
+  const participantIds = Array.isArray(payload.participantIds)
+    ? payload.participantIds.map((value) => cleanText(value, 160)).filter(Boolean)
+    : [];
+  return {
+    ...payload,
+    id,
+    title: cleanText(payload.title, 200),
+    type: cleanText(payload.type, 40) || "boss",
+    purpose: cleanText(payload.purpose, 1600),
+    at: Number(payload.at),
+    participantIds: participantIds.length ? participantIds : (actorId ? [actorId] : []),
+    agenda: cleanText(payload.agenda, 1600),
+    decisions: cleanText(payload.decisions, 1600),
+    recur: cleanText(payload.recur, 40) || null,
+    standingTopics: Array.isArray(payload.standingTopics) ? payload.standingTopics : [],
+    topicMarks: cleanObject(payload.topicMarks),
+    status: cleanText(payload.status, 40) || "planned",
+    ownerId: cleanText(payload.ownerId, 160) || actorId,
+    createdAt: Number.isFinite(Number(payload.createdAt)) ? Number(payload.createdAt) : now,
+    updatedAt: now,
+    ai: {
+      ...cleanObject(payload.ai),
+      drafted: true,
+      source: "ai_assist",
+      confirmedByHuman: true,
+      confirmedAt: now,
+      actionId: cleanText(action.id, 120)
+    },
+    log: [
+      ...(Array.isArray(payload.log) ? payload.log : []),
+      {
+        at: now,
+        by: actorName,
+        byRole: actorRole,
+        text: "משתמש אישר יצירת פגישה שהוכנה על ידי AI",
+        kind: "ai_confirmed_meeting"
+      }
+    ]
+  };
 }
 
 export function prepareAiTaskUpdateForSave(action = {}, existingTask = {}, actor = {}, options = {}) {

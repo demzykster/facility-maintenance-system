@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canExecuteAiAssistAction, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
+import { canExecuteAiAssistAction, prepareAiMeetingCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "../src/aiAssistActionExecutionModel.js";
 
 const readyAction = {
   id: "create_ticket",
@@ -85,6 +85,27 @@ const taskCreateAction = {
   execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "task" }
 };
 
+const meetingCreateAction = {
+  id: "create_meeting",
+  type: "meeting.create",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    title: "פגישת תקלות בטיחות",
+    type: "boss",
+    purpose: "לעבור על תקלות בטיחות פתוחות",
+    at: 86402000,
+    status: "planned",
+    ownerId: "u1",
+    participantIds: ["u1"],
+    createdAt: 1000,
+    updatedAt: 1000,
+    log: [{ at: 1000, by: "AI", byRole: "system", text: "draft", kind: "ai_draft" }],
+    ai: { drafted: true, source: "ai_assist" }
+  },
+  execute: { method: "POST", path: "/api/work", resource: "meetings", bodyField: "meeting" }
+};
+
 const taskUpdateAction = {
   id: "update_task_priority",
   type: "task.update",
@@ -142,6 +163,7 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction(updateAction)).toBe(true);
     expect(canExecuteAiAssistAction(commentAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskCreateAction)).toBe(true);
+    expect(canExecuteAiAssistAction(meetingCreateAction)).toBe(true);
     expect(canExecuteAiAssistAction(taskUpdateAction)).toBe(true);
     expect(canExecuteAiAssistAction({ ...readyAction, requiresConfirmation: false })).toBe(false);
     expect(canExecuteAiAssistAction({ ...readyAction, missingFields: ["zone"] })).toBe(false);
@@ -152,6 +174,8 @@ describe("AI assist action execution model", () => {
     expect(canExecuteAiAssistAction({ ...commentAction, payload: { ticketId: "ticket-1", note: "" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskCreateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "task" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskCreateAction, payload: { desc: "missing title" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...meetingCreateAction, execute: { method: "POST", path: "/api/work", resource: "tasks", bodyField: "meeting" } })).toBe(false);
+    expect(canExecuteAiAssistAction({ ...meetingCreateAction, payload: { purpose: "missing title" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskUpdateAction, payload: { taskId: "task-1" } })).toBe(false);
     expect(canExecuteAiAssistAction({ ...taskUpdateAction, execute: { method: "POST", path: "/api/tickets", bodyField: "task" } })).toBe(false);
   });
@@ -218,6 +242,42 @@ describe("AI assist action execution model", () => {
         byRole: "admin",
         text: "משתמש אישר יצירת משימה שהוכנה על ידי AI",
         kind: "ai_confirmed_task"
+      }
+    ]);
+  });
+
+  it("prepares a confirmed AI meeting for the existing saveMeeting path", () => {
+    const meeting = prepareAiMeetingCreateForSave(meetingCreateAction, { id: "u1", name: "Vadim", role: "admin" }, {
+      now: 2000,
+      makeId: () => "ai-meeting-1"
+    });
+
+    expect(meeting).toMatchObject({
+      id: "ai-meeting-1",
+      title: "פגישת תקלות בטיחות",
+      type: "boss",
+      purpose: "לעבור על תקלות בטיחות פתוחות",
+      at: 86402000,
+      status: "planned",
+      ownerId: "u1",
+      participantIds: ["u1"],
+      updatedAt: 2000,
+      ai: {
+        drafted: true,
+        source: "ai_assist",
+        confirmedByHuman: true,
+        confirmedAt: 2000,
+        actionId: "create_meeting"
+      }
+    });
+    expect(meeting.log).toEqual([
+      { at: 1000, by: "AI", byRole: "system", text: "draft", kind: "ai_draft" },
+      {
+        at: 2000,
+        by: "Vadim",
+        byRole: "admin",
+        text: "משתמש אישר יצירת פגישה שהוכנה על ידי AI",
+        kind: "ai_confirmed_meeting"
       }
     ]);
   });
