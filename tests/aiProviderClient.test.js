@@ -93,7 +93,7 @@ describe("ai provider client", () => {
     const generateTextImpl = vi.fn().mockResolvedValue({ text: "gemini ready" });
 
     const result = await callAiProvider({
-      config: { provider: "gemini", googleApiKey: "google-secret", model: "gemini-2.0-flash" },
+      config: { provider: "gemini", googleApiKey: "google-secret", model: "gemini-3.1-flash-lite" },
       system: "system",
       prompt: "prompt",
       generateTextImpl,
@@ -101,10 +101,10 @@ describe("ai provider client", () => {
       maxTokens: 120
     });
 
-    expect(result).toMatchObject({ ok: true, provider: "google", model: "gemini-2.0-flash", text: "gemini ready" });
+    expect(result).toMatchObject({ ok: true, provider: "google", model: "gemini-3.1-flash-lite", text: "gemini ready" });
     expect(createGoogleGenerativeAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "google-secret" }));
     expect(generateTextImpl).toHaveBeenCalledWith(expect.objectContaining({
-      model: expect.objectContaining({ modelId: "gemini-2.0-flash", providerName: "google" }),
+      model: expect.objectContaining({ modelId: "gemini-3.1-flash-lite", providerName: "google" }),
       maxOutputTokens: 120
     }));
     expect(JSON.stringify(result)).not.toContain("google-secret");
@@ -122,7 +122,7 @@ describe("ai provider client", () => {
     });
 
     const result = await callAiProviderObject({
-      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-2.0-flash" },
+      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-3.1-flash-lite" },
       system: "system",
       prompt: "prompt",
       schema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
@@ -136,7 +136,7 @@ describe("ai provider client", () => {
     expect(result).toEqual({
       ok: true,
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-3.1-flash-lite",
       object: {
         summary: "בדיקה",
         items: [{ type: "ticket.update", title: "עדכון לבדיקה" }]
@@ -148,7 +148,7 @@ describe("ai provider client", () => {
     });
     expect(createGoogleGenerativeAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "google-secret" }));
     expect(generateObjectImpl).toHaveBeenCalledWith(expect.objectContaining({
-      model: expect.objectContaining({ modelId: "gemini-2.0-flash", providerName: "google" }),
+      model: expect.objectContaining({ modelId: "gemini-3.1-flash-lite", providerName: "google" }),
       system: "system",
       prompt: "prompt",
       schemaName: "cmms_test_schema",
@@ -182,7 +182,7 @@ describe("ai provider client", () => {
     const generateTextImpl = vi.fn().mockRejectedValue(new Error("quota exceeded for this project"));
 
     const result = await callAiProvider({
-      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-2.0-flash" },
+      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-3.1-flash-lite" },
       generateTextImpl,
       sdk: { createGoogleGenerativeAI }
     });
@@ -190,7 +190,7 @@ describe("ai provider client", () => {
     expect(result).toEqual({
       ok: false,
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-3.1-flash-lite",
       error: "quota exceeded for this project"
     });
     expect(JSON.stringify(result)).not.toContain("google-secret");

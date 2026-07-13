@@ -318,13 +318,13 @@ describe("AI assist handler", () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-3.1-flash-lite",
       text: "אפשר להמשיך."
     });
     const providerObjectCall = vi.fn().mockResolvedValue({
       ok: false,
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-3.1-flash-lite",
       error: "quota exceeded"
     });
     const handler = createAiAssistHandler({
@@ -351,7 +351,7 @@ describe("AI assist handler", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       ok: true,
-      assistant: { provider: "google", model: "gemini-2.0-flash", text: "אפשר להמשיך." },
+      assistant: { provider: "google", model: "gemini-3.1-flash-lite", text: "אפשר להמשיך." },
       providerPlanErrorCode: "ai_provider_quota_exceeded"
     });
   });
@@ -360,7 +360,7 @@ describe("AI assist handler", () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-3.1-flash-lite",
       text: "צריך לציין מספר כלי ומצב כלי."
     });
     const handler = createAiAssistHandler({
@@ -390,7 +390,7 @@ describe("AI assist handler", () => {
       ok: true,
       assistant: {
         provider: "google",
-        model: "gemini-2.0-flash",
+        model: "gemini-3.1-flash-lite",
         text: "צריך לציין מספר כלי ומצב כלי."
       }
     });

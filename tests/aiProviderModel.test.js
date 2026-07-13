@@ -118,8 +118,8 @@ describe("aiProviderModel", () => {
     });
     expect(AI_PROVIDER_LABELS[AI_PROVIDERS.openai]).toContain("Codex");
     expect(AI_PROVIDER_OPTIONS.find((option) => option.id === AI_PROVIDERS.google)?.models).toEqual([
-      expect.objectContaining({ id: "gemini-2.5-flash", label: expect.stringContaining("Gemini") }),
-      expect.objectContaining({ id: "gemini-2.0-flash", label: expect.stringContaining("Gemini") })
+      expect.objectContaining({ id: "gemini-3.5-flash", label: expect.stringContaining("Gemini") }),
+      expect.objectContaining({ id: "gemini-3.1-flash-lite", label: expect.stringContaining("Gemini") })
     ]);
     expect(AI_PROVIDER_MODEL_OPTIONS[AI_PROVIDERS.openai]).toEqual([
       expect.objectContaining({ id: "gpt-5.2", label: expect.stringContaining("GPT") })
@@ -131,7 +131,7 @@ describe("aiProviderModel", () => {
     })).toMatchObject({
       mode: AI_MODES.server,
       provider: AI_PROVIDERS.google,
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       providerKeyConfigured: true,
       serverReady: true,
       errors: []
