@@ -7,6 +7,7 @@ import {
 } from "../src/facilityTicketRouteModel.js";
 
 const appSource = readFileSync(new URL("../src/ClaudeMaintenanceApp.jsx", import.meta.url), "utf8");
+const ticketDetailSource = readFileSync(new URL("../src/TicketDetail.jsx", import.meta.url), "utf8");
 
 describe("facility ticket route model", () => {
   it("routes supplier-handled facility tickets into the supplier queue", () => {
@@ -74,15 +75,15 @@ describe("facility ticket route model", () => {
   });
 
   it("keeps the admin facility panel separate from the executor workflow", () => {
-    expect(appSource).toContain('isAdmin && track !== "facility"');
-    expect(appSource).toContain("admin-ticket-manual-shell");
+    expect(ticketDetailSource).toContain('isAdmin && track !== "facility"');
+    expect(ticketDetailSource).toContain("admin-ticket-manual-shell");
     expect(appSource).toContain("ניהול חריג של מנהל מערכת");
   });
 
   it("keeps facility admin status controls available without technician takeover", () => {
-    expect(appSource).toContain("סיבות המתנה");
-    expect(appSource).toContain("סיבת המתנה");
-    expect(appSource).toContain("setWaiting(r.id)");
+    expect(ticketDetailSource).toContain("סיבות המתנה");
+    expect(ticketDetailSource).toContain("סיבת המתנה");
+    expect(ticketDetailSource).toContain("setWaiting(r.id)");
     expect(appSource).not.toContain("FACILITY_ADMIN_STATUS_OPTIONS");
     expect(appSource).not.toContain("setFacilityAdminStatus");
     expect(appSource).not.toContain("admin-status-grid");

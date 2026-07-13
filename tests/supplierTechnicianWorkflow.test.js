@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("../src/ClaudeMaintenanceApp.jsx", import.meta.url), "utf8");
 const supplierSource = readFileSync(new URL("../src/SuppliersPanel.jsx", import.meta.url), "utf8");
+const ticketDetailSource = readFileSync(new URL("../src/TicketDetail.jsx", import.meta.url), "utf8");
 const ticketVisibilitySource = readFileSync(new URL("../src/ticketVisibilityModel.js", import.meta.url), "utf8");
 
 describe("supplier technician workflow wiring", () => {
@@ -41,9 +42,9 @@ describe("supplier technician workflow wiring", () => {
     const formStart = source.indexOf("function TicketForm(");
     const formEnd = source.indexOf("/* ============================================================ TICKET DETAIL */", formStart);
     const formSource = source.slice(formStart, formEnd);
-    const detailStart = source.indexOf("function TicketDetail(");
-    const detailEnd = source.indexOf("function CloseModal(", detailStart);
-    const detailSource = source.slice(detailStart, detailEnd);
+    const detailStart = ticketDetailSource.indexOf("export function TicketDetail(");
+    const detailEnd = ticketDetailSource.indexOf("function AdminTicketManualPanel(", detailStart);
+    const detailSource = ticketDetailSource.slice(detailStart, detailEnd);
 
     expect(formSource).toContain("supplierAssign");
     expect(formSource).toContain("supplier: routedSupplier || \"\"");
