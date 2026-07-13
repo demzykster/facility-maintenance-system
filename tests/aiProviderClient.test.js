@@ -110,6 +110,36 @@ describe("ai provider client", () => {
     expect(JSON.stringify(result)).not.toContain("google-secret");
   });
 
+  it("falls back to the next Google model on temporary high-demand failures", async () => {
+    const createGoogleGenerativeAI = sdkFactory("google");
+    const generateTextImpl = vi.fn()
+      .mockRejectedValueOnce(new Error("This model is currently experiencing high demand. Please try again later."))
+      .mockResolvedValueOnce({ text: "fallback ready" });
+
+    const result = await callAiProvider({
+      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-3.5-flash" },
+      system: "system",
+      prompt: "prompt",
+      generateTextImpl,
+      sdk: { createGoogleGenerativeAI }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.1-flash-lite",
+      text: "fallback ready",
+      raw: { fallbackFrom: "gemini-3.5-flash" }
+    });
+    expect(generateTextImpl).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      model: expect.objectContaining({ modelId: "gemini-3.5-flash" })
+    }));
+    expect(generateTextImpl).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      model: expect.objectContaining({ modelId: "gemini-3.1-flash-lite" })
+    }));
+    expect(JSON.stringify(result)).not.toContain("google-secret");
+  });
+
   it("uses the Vercel AI SDK object seam without returning provider secrets", async () => {
     const createGoogleGenerativeAI = sdkFactory("google");
     const generateObjectImpl = vi.fn().mockResolvedValue({
@@ -154,6 +184,40 @@ describe("ai provider client", () => {
       schemaName: "cmms_test_schema",
       schemaDescription: "test schema",
       maxOutputTokens: 64
+    }));
+    expect(JSON.stringify(result)).not.toContain("google-secret");
+  });
+
+  it("falls back for Google structured object calls on temporary failures", async () => {
+    const createGoogleGenerativeAI = sdkFactory("google");
+    const generateObjectImpl = vi.fn()
+      .mockRejectedValueOnce(new Error("temporary high demand"))
+      .mockResolvedValueOnce({
+        object: { summary: "fallback object" },
+        finishReason: "stop"
+      });
+
+    const result = await callAiProviderObject({
+      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-3.5-flash" },
+      system: "system",
+      prompt: "prompt",
+      schema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
+      generateObjectImpl,
+      sdk: { createGoogleGenerativeAI }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.1-flash-lite",
+      object: { summary: "fallback object" },
+      raw: { fallbackFrom: "gemini-3.5-flash" }
+    });
+    expect(generateObjectImpl).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      model: expect.objectContaining({ modelId: "gemini-3.5-flash" })
+    }));
+    expect(generateObjectImpl).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      model: expect.objectContaining({ modelId: "gemini-3.1-flash-lite" })
     }));
     expect(JSON.stringify(result)).not.toContain("google-secret");
   });
