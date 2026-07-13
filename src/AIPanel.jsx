@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Send, Sparkles, X } from "lucide-react";
+import { canExecuteAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
 import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "./aiAssistQuickPromptModel.js";
 
@@ -31,9 +32,10 @@ function missingLabel(field) {
   return MISSING_LABELS[field] || field;
 }
 
-function AiActionCard({ action }) {
+function AiActionCard({ action, busy, result, onExecute }) {
   const payload = action?.payload || {};
   const missing = Array.isArray(action?.missingFields) ? action.missingFields : [];
+  const executable = canExecuteAiAssistAction(action);
   if (action?.type !== "ticket.create") return null;
   return <div className="ai-action-card">
     <div className="ai-action-top">
@@ -45,16 +47,27 @@ function AiActionCard({ action }) {
     {missing.length > 0
       ? <div className="ai-action-missing">להשלמה לפני אישור: {missing.map(missingLabel).join(" · ")}</div>
       : <div className="ai-action-ready">הפעולה תישלח לאישור לפני יצירת הקריאה.</div>}
+    {result && <div className={"ai-action-result " + (result.ok ? "ok" : "err")}>{result.message}</div>}
+    <button
+      type="button"
+      className="ai-action-confirm"
+      disabled={!executable || busy || result?.ok}
+      onClick={() => onExecute?.(action)}
+    >
+      {missing.length ? "השלימו פרטים לפני יצירה" : busy ? "יוצר קריאה…" : result?.ok ? "הקריאה נוצרה" : "אישור ויצירת קריאה"}
+    </button>
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
   const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config), [session, vis, pm, fleet, config, buildContext]);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
   const [input, setInput] = useState(initialText || "");
   const [inputWorkflow, setInputWorkflow] = useState(initialWorkflow || AI_ASSIST_WORKFLOWS.general);
   const [busy, setBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState("");
+  const [actionResults, setActionResults] = useState({});
   const endRef = useRef(null);
   const quick = useMemo(() => aiAssistQuickPrompts(session, contextPreview), [session, contextPreview]);
 
@@ -94,6 +107,27 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
     }
   };
 
+  const runAction = async (action) => {
+    if (!executeAction || !canExecuteAiAssistAction(action) || actionBusy) return;
+    const key = action.id || action.type;
+    setActionBusy(key);
+    setActionResults((current) => ({ ...current, [key]: null }));
+    try {
+      const result = await executeAction(action);
+      setActionResults((current) => ({
+        ...current,
+        [key]: { ok: true, message: result?.message || "הקריאה נוצרה ונשמרה במערכת." }
+      }));
+    } catch (error) {
+      setActionResults((current) => ({
+        ...current,
+        [key]: { ok: false, message: error?.message || "הפעולה לא הושלמה. בדקו פרטים ונסו שוב." }
+      }));
+    } finally {
+      setActionBusy("");
+    }
+  };
+
   return <div className="ovl-backdrop ai-back" onClick={onClose}>
     <div className="ai-panel" onClick={(e) => e.stopPropagation()}>
       <div className="ai-head">
@@ -103,7 +137,10 @@ export function AIPanel({ session, tickets, pm, fleet, config, onClose, visibleT
       <div className="ai-msgs">
         {msgs.map((m, i) => <div key={i} className={"ai-msg-wrap " + m.role}>
           <div className={"ai-msg " + m.role}>{m.content}</div>
-          {m.role === "assistant" && Array.isArray(m.actions) && m.actions.length > 0 && <div className="ai-actions">{m.actions.map((action) => <AiActionCard key={action.id || action.type} action={action} />)}</div>}
+          {m.role === "assistant" && Array.isArray(m.actions) && m.actions.length > 0 && <div className="ai-actions">{m.actions.map((action) => {
+            const key = action.id || action.type;
+            return <AiActionCard key={key} action={action} busy={actionBusy === key} result={actionResults[key]} onExecute={runAction} />;
+          })}</div>}
         </div>)}
         {busy && <div className="ai-msg assistant"><span className="spinner sm dark" /> חושב…</div>}
         <div ref={endRef} />

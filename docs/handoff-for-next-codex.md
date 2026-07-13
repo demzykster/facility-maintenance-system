@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add human-confirmed AI ticket creation`
+  - Adds `src/aiAssistActionExecutionModel.js`, the first browser-side execution guard for AI-produced actions.
+  - `ticket.create` proposals can now be executed only when complete, only after a human presses the confirmation button, and only through the existing `saveTicket` / `/api/tickets` path.
+  - `/api/ai/assist` remains read-only by itself. Provider text still does not write data and does not control payload execution.
+  - `src/AIPanel.jsx` now shows disabled/ready/created/error states for action cards.
+  - The next AI action slice should add guided completion for incomplete proposals, especially transport tickets that need a specific fleet unit and downtime type before creation.
 - `Fix transport ticket forms and AI action cards`
   - Fixed the white-screen regression when opening a new transport ticket from `פתיחת קריאה`.
   - Root cause: after the fleet/PM lazy split, `TicketForm` and the worker report form still rendered `UnitPicker`, but the component only existed inside `src/FleetAssetsModule.jsx`. Facility/building ticket creation still worked; transport creation crashed with `UnitPicker is not defined`.

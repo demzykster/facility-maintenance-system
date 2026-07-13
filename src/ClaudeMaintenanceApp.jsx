@@ -32,6 +32,7 @@ import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBro
 import { resolveIdentifier } from "./loginIdentifierModel.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
+import { prepareAiTicketCreateForSave } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -7894,8 +7895,15 @@ function AIPanelFallback({ onClose }) {
   </div>;
 }
 function LazyAIPanel(props) {
+  const executeAction = async (action) => {
+    const ticket = prepareAiTicketCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
+    if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
+    const ok = await props.saveTicket(ticket);
+    if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
+    return { ok: true, ticketId: ticket.id, message: `הקריאה נוצרה: ${ticket.subject || ticket.id}` };
+  };
   return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
-    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} />
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} />
   </Suspense>;
 }
 function NotifPanelFallback({ onClose }) {
@@ -9241,6 +9249,12 @@ body *{visibility:hidden!important;}
 .ai-action-meta,.ai-action-missing,.ai-action-ready{color:var(--muted);font-size:12.5px;}
 .ai-action-missing{margin-top:7px;color:#92400E;}
 .ai-action-ready{margin-top:7px;color:var(--primary);}
+.ai-action-confirm{margin-top:9px;width:100%;min-height:38px;border:1.5px solid var(--primary);border-radius:10px;background:var(--primary);color:#fff;font-weight:750;cursor:pointer;transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),opacity 160ms var(--ease-out);}
+.ai-action-confirm:hover:not(:disabled){background:var(--primary-hover);border-color:var(--primary-hover);}
+.ai-action-confirm:disabled{cursor:not-allowed;opacity:.58;background:var(--surface-2);border-color:var(--line);color:var(--muted);}
+.ai-action-result{margin-top:8px;font-size:12.5px;font-weight:650;line-height:1.4;}
+.ai-action-result.ok{color:#166534;}
+.ai-action-result.err{color:#B91C1C;}
 .ai-quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 10px;}
 .ai-quick button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;font-size:12.5px;color:var(--muted);font-weight:500;}
 .ai-input{display:flex;gap:8px;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);}
