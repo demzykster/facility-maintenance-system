@@ -18,6 +18,8 @@ const MISSING_LABELS = Object.freeze({
 const UPDATE_FIELD_LABELS = Object.freeze({
   priority: "עדיפות",
   status: "סטטוס",
+  waitingReason: "סיבת המתנה",
+  waitBall: "אחריות",
   assignee: "מבצע",
   supplier: "ספק",
   description: "תיאור",

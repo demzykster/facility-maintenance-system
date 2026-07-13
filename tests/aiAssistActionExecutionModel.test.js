@@ -36,6 +36,22 @@ const updateAction = {
   execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
 };
 
+const waitingUpdateAction = {
+  id: "update_ticket_waiting",
+  type: "ticket.update",
+  requiresConfirmation: true,
+  missingFields: [],
+  payload: {
+    ticketId: "ticket-1",
+    patch: {
+      status: "waiting",
+      waitingReason: "parts",
+      waitBall: "executor"
+    }
+  },
+  execute: { method: "POST", path: "/api/tickets", bodyField: "ticket" }
+};
+
 const commentAction = {
   id: "comment_ticket",
   type: "ticket.comment",
@@ -136,6 +152,23 @@ describe("AI assist action execution model", () => {
       text: "משתמש אישר עדכון קריאה שהוכן על ידי AI: priority, status, description",
       kind: "ai_confirmed_update"
     });
+  });
+
+  it("allows confirmed waiting updates to carry a reason and responsibility ball", () => {
+    const { ticket, changes } = prepareAiTicketUpdateForSave(waitingUpdateAction, existingTicket, { name: "Vadim", role: "admin" }, { now: 3500 });
+
+    expect(ticket).toMatchObject({
+      id: "ticket-1",
+      status: "waiting",
+      waitingReason: "parts",
+      waitBall: "executor",
+      updatedAt: 3500
+    });
+    expect(changes).toEqual([
+      { field: "status", before: "new", after: "waiting" },
+      { field: "waitingReason", before: "", after: "parts" },
+      { field: "waitBall", before: "", after: "executor" }
+    ]);
   });
 
   it("refuses ticket updates without a real changed allow-listed field", () => {

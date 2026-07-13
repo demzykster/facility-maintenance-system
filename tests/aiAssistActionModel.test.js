@@ -170,6 +170,79 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("proposes waiting status updates only with an explicit waiting reason", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה להמתנה לחלקים",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", status: "in_progress", waitingReason: "", waitBall: "" }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "update_ticket_T-1",
+        type: "ticket.update",
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "תקלה במלגזה",
+          current: { status: "in_progress", waitingReason: "", waitBall: "" },
+          patch: { status: "waiting", waitingReason: "parts", waitBall: "executor" }
+        }
+      })
+    ]);
+  });
+
+  it("does not propose a generic waiting update without a clear reason", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה להמתנה",
+      actor,
+      language: "he"
+    }, 1000);
+
+    expect(buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", status: "in_progress" }]
+      }
+    })).toEqual([]);
+  });
+
+  it("clears waiting reason fields when moving a waiting ticket back to work", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "תעדכן את הקריאה לסטטוס בטיפול",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      context: {
+        tickets: [{ id: "T-1", subject: "תקלה במלגזה", status: "waiting", waitingReason: "parts", waitBall: "executor" }]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        payload: {
+          ticketId: "T-1",
+          ticketTitle: "תקלה במלגזה",
+          current: { status: "waiting", waitingReason: "parts", waitBall: "executor" },
+          patch: { status: "in_progress", waitingReason: null, waitBall: null }
+        }
+      })
+    ]);
+  });
+
   it("does not guess supplier routing from invisible, ambiguous, or unchanged suppliers", () => {
     const draft = buildAiIntakeDraft({
       rawText: "תעביר את הקריאה לספק Toyota",

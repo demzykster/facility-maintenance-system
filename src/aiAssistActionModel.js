@@ -82,6 +82,35 @@ function requestedStatusFromText(text = "") {
   return "";
 }
 
+const WAITING_REASON_BALLS = Object.freeze({
+  no_equipment: "manager",
+  parts: "executor",
+  supplier: "executor",
+  access: "executor",
+  manager_decision: "manager",
+  budget_approval: "admin",
+  external_contractor: "executor",
+  safety_hold: "manager"
+});
+
+function requestedWaitingReasonFromText(text = "") {
+  const raw = cleanText(text, 800).toLowerCase();
+  if (!raw || !/ממתינ|המתנה|waiting|hold/i.test(raw)) return "";
+  if (/לא התקבל הכלי|אין כלי|הכלי לא|no.?equipment|tool not received/i.test(raw)) return "no_equipment";
+  if (/חלקים|חלפים|parts|spare/i.test(raw)) return "parts";
+  if (/אישור תקציב|תקציב|budget/i.test(raw)) return "budget_approval";
+  if (/גישה|access/i.test(raw)) return "access";
+  if (/החלטת מנהל|החלטה|manager/i.test(raw)) return "manager_decision";
+  if (/קבלן חוץ|contractor/i.test(raw)) return "external_contractor";
+  if (/בטיחות|safety/i.test(raw)) return "safety_hold";
+  if (/ספק|supplier|vendor/i.test(raw)) return "supplier";
+  return "";
+}
+
+function hasWaitingStatusIntent(text = "") {
+  return /ממתינ|המתנה|waiting|hold/i.test(cleanText(text, 800));
+}
+
 function requestedSupplierFromText(text = "", suppliers = []) {
   const raw = cleanText(text, 800).toLowerCase();
   if (!raw || !hasSupplierRoutingIntent(raw)) return "";
@@ -152,7 +181,21 @@ function buildAiTicketUpdateProposal({ draft = {}, context = {} } = {}) {
   const requestedPriority = requestedPriorityFromText(draft.rawText);
   if (requestedPriority && requestedPriority !== ticket.priority) patch.priority = requestedPriority;
   const requestedStatus = requestedStatusFromText(draft.rawText);
-  if (requestedStatus && requestedStatus !== ticket.status) patch.status = requestedStatus;
+  if (requestedStatus === "waiting") {
+    const requestedWaitingReason = requestedWaitingReasonFromText(draft.rawText);
+    if (requestedWaitingReason) {
+      if (ticket.status !== "waiting") patch.status = "waiting";
+      if (requestedWaitingReason !== ticket.waitingReason) patch.waitingReason = requestedWaitingReason;
+      const waitBall = WAITING_REASON_BALLS[requestedWaitingReason] || "executor";
+      if (waitBall !== ticket.waitBall) patch.waitBall = waitBall;
+    }
+  } else if (requestedStatus && requestedStatus !== ticket.status) {
+    patch.status = requestedStatus;
+    if (ticket.status === "waiting") {
+      patch.waitingReason = null;
+      patch.waitBall = null;
+    }
+  }
   const requestedSupplier = requestedSupplierFromText(draft.rawText, context.suppliers);
   if (requestedSupplier && requestedSupplier !== ticket.supplier) patch.supplier = requestedSupplier;
   if (!Object.keys(patch).length) return null;
@@ -247,6 +290,7 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   }
   const updateProposal = buildAiTicketUpdateProposal({ draft: safeDraft, context });
   if (updateProposal) return [updateProposal];
+  if (hasWaitingStatusIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (hasSupplierRoutingIntent(safeDraft.rawText) && cleanArray(context.tickets).filter((ticket) => ticket && ticket.id).length === 1) return [];
   if (safeDraft.action !== "draft_ticket") return [];
   const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now });

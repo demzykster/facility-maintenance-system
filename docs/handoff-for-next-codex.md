@@ -7,7 +7,7 @@ Updated: 2026-07-13
 - Repo: `/Users/Vadim/Documents/CMMS`
 - Source of truth: GitHub `demzykster/facility-maintenance-system`, branch `main`.
 - Current local state at handoff time: `main...origin/main`, clean after the latest push.
-- Latest app/UI commit before this handoff: deterministic AI supplier-routing proposals, after supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
+- Latest app/UI commit before this handoff: explicit AI waiting-reason update proposals, deterministic AI supplier-routing proposals, after supplier summaries in AI context, AI provider connection check, deterministic AI ticket comment proposals, deterministic ticket update proposals, constrained update execution, and AI ticket proposal form handoff.
 - Product line: v1/main only.
 - Active branch: none.
 - Open PRs at last local handoff: none.
@@ -58,6 +58,12 @@ The current strategy is:
 
 Recent commits on `main`:
 
+- `Add explicit AI waiting reason proposals`
+  - `src/aiAssistActionModel.js` now proposes `ticket.update` waiting changes only when the user names a concrete waiting reason such as parts, supplier, access, budget approval, safety hold, or missing equipment.
+  - The proposal adds both `waitingReason` and a deterministic `waitBall`; generic "put it on hold" wording produces no action proposal instead of guessing an unsafe partial status change.
+  - Moving a waiting ticket back to work clears `waitingReason` and `waitBall`.
+  - `src/aiAssistActionExecutionModel.js` allows those waiting fields only through the existing human-confirmed `ticket.update` execution path, so the normal `/api/tickets` validation, authorization, persistence, notifications, and audit behavior still apply.
+  - `src/AIPanel.jsx` labels waiting fields in before/after update previews so the user can review the exact status/reason/responsibility change before confirming.
 - `Improve AI update confirmation previews`
   - `ticket.update` proposals now include a compact `payload.current` snapshot for the fields being changed.
   - `src/AIPanel.jsx` renders update action cards as before/after rows instead of one compact text string, so supplier routing and priority/status changes are easier to review before confirmation.

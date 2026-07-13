@@ -7,6 +7,8 @@ const cleanObject = (value) => value && typeof value === "object" && !Array.isAr
 const AI_TICKET_UPDATE_ALLOWED_FIELDS = Object.freeze([
   "priority",
   "status",
+  "waitingReason",
+  "waitBall",
   "assignee",
   "supplier",
   "description",
