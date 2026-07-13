@@ -66,6 +66,47 @@ export function normalizeAiPanelAssistantOutput(output) {
   return { text, actions, providerPlan, providerPlanErrorCode };
 }
 
+export function aiPanelTextDirection(value, fallback = "rtl") {
+  const text = cleanText(value, "");
+  const rtlIndex = text.search(/[\u0590-\u08FF]/u);
+  const latinIndex = text.search(/[A-Za-z]/u);
+  const cyrillicIndex = text.search(/[\u0400-\u04FF]/u);
+  const firstRtl = rtlIndex >= 0 ? rtlIndex : Infinity;
+  const firstLtr = Math.min(latinIndex >= 0 ? latinIndex : Infinity, cyrillicIndex >= 0 ? cyrillicIndex : Infinity);
+  if (firstRtl === Infinity && firstLtr === Infinity) return fallback === "ltr" ? "ltr" : "rtl";
+  return firstRtl < firstLtr ? "rtl" : "ltr";
+}
+
+export function aiPanelTextBlocks(value) {
+  const text = cleanText(value, "").replace(/\r\n?/g, "\n");
+  if (!text) return [];
+  const displayLine = (line) => line.replace(/\*\*([^*]+)\*\*/gu, "$1").replace(/__([^_]+)__/gu, "$1").trim();
+  const blocks = [];
+  let listItems = [];
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push({ type: "list", items: listItems });
+    listItems = [];
+  };
+
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushList();
+      continue;
+    }
+    const bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/u);
+    if (bullet) {
+      listItems.push(displayLine(bullet[1]));
+      continue;
+    }
+    flushList();
+    blocks.push({ type: "paragraph", text: displayLine(line) });
+  }
+  flushList();
+  return blocks;
+}
+
 export function shouldRequestProviderPlan(workflow = AI_ASSIST_WORKFLOWS.general) {
   return [
     AI_ASSIST_WORKFLOWS.riskSummary,
@@ -224,6 +265,17 @@ function AiProviderPlanCard({ plan }) {
   </div>;
 }
 
+function AiMessage({ role, content }) {
+  const dir = aiPanelTextDirection(content, role === "user" ? "rtl" : "rtl");
+  const blocks = aiPanelTextBlocks(content);
+  return <div className={"ai-msg " + role} dir={dir}>
+    {blocks.length ? blocks.map((block, index) => {
+      if (block.type === "list") return <ul key={`list-${index}`}>{block.items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{item}</li>)}</ul>;
+      return <p key={`p-${index}`}>{block.text}</p>;
+    }) : <p>{cleanText(content, "")}</p>}
+  </div>;
+}
+
 export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
   const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones), [session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones, buildContext]);
@@ -307,7 +359,7 @@ export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], m
       </div>
       <div className="ai-msgs">
         {msgs.map((m, i) => <div key={i} className={"ai-msg-wrap " + m.role}>
-          <div className={"ai-msg " + m.role}>{m.content}</div>
+          <AiMessage role={m.role} content={m.content} />
           {m.role === "assistant" && m.providerPlan && <AiProviderPlanCard plan={m.providerPlan} />}
           {m.role === "assistant" && Array.isArray(m.actions) && m.actions.length > 0 && <div className="ai-actions">{m.actions.map((action) => {
             const key = action.id || action.type;

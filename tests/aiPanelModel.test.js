@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { aiAssistantFailureMessage, aiUpdatePreviewRows, normalizeAiPanelAssistantOutput, shouldRequestProviderPlan } from "../src/AIPanel.jsx";
+import {
+  aiAssistantFailureMessage,
+  aiPanelTextBlocks,
+  aiPanelTextDirection,
+  aiUpdatePreviewRows,
+  normalizeAiPanelAssistantOutput,
+  shouldRequestProviderPlan
+} from "../src/AIPanel.jsx";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 
 describe("AI panel response model", () => {
@@ -56,6 +63,21 @@ describe("AI panel response model", () => {
     expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.draftPreparation)).toBe(true);
     expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.slaExplanation)).toBe(false);
     expect(shouldRequestProviderPlan(AI_ASSIST_WORKFLOWS.general)).toBe(false);
+  });
+
+  it("detects message direction from the first strong script", () => {
+    expect(aiPanelTextDirection("מה מצב הקריאות?")).toBe("rtl");
+    expect(aiPanelTextDirection("Почему повторяется одно и то же?")).toBe("ltr");
+    expect(aiPanelTextDirection("Check ticket F-002")).toBe("ltr");
+    expect(aiPanelTextDirection("12345", "ltr")).toBe("ltr");
+  });
+
+  it("splits assistant text into readable paragraphs and lists", () => {
+    expect(aiPanelTextBlocks("**סיכום קצר**\n\n1. בדקו מסמכים\n2. **פתחו קריאה**\n\nהכול מוכן")).toEqual([
+      { type: "paragraph", text: "סיכום קצר" },
+      { type: "list", items: ["בדקו מסמכים", "פתחו קריאה"] },
+      { type: "paragraph", text: "הכול מוכן" }
+    ]);
   });
 
   it("formats update action previews with before and after values", () => {
