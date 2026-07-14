@@ -90,7 +90,7 @@ import { normalizedPresenceAuthorityEnabled, presenceAuthorityFailureIssue, pres
 import { priorityToken, statusTokenTone, taskStatusToken, ticketStatusToken } from "./statusTokenModel.js";
 import { STARTUP_KV_PREFIXES, startupKvPrefixesForAuthorities } from "./startupDataLoadModel.js";
 import { DEFAULT_DATA_REFRESH_INTERVAL_MS, shouldRunDataRefresh } from "./dataRefreshScheduleModel.js";
-import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibleFleetForSession, visibleTicketsForSession } from "./ticketVisibilityModel.js";
+import { ownsTicketRecord, pmFleet, pmVisibleForSession as pmVisible, techCanSeeFleet, ticketFleetDepartments, ticketUserDepartments, visibleFleetForSession, visibleTicketsForSession } from "./ticketVisibilityModel.js";
 import { canConfirmTicketForSession, managerActionRequiredForTicket, managerScopedTicketNeedsFollowUp, requesterOwnsTicket } from "./ticketActionScopeModel.js";
 import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValueToMs, statusMsToHours } from "./adminTicketManualEditModel.js";
 import { normalizeScopedWorkerForActor, scopedUsersForActor, scopedWorkerDefaultsForActor, userDepartments, userShift } from "./userScopeModel.js";

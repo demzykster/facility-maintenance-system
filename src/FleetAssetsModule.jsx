@@ -5,6 +5,7 @@ import { catalogAwareTypeMaps, fleetUnitsMissingFromVehicleCatalog, vehicleCatal
 import { saveFleetImportAtomically } from "./fleetImportSaveModel.js";
 import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocumentLabels, selectedFleetUnits } from "./fleetBulkActionsModel.js";
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
+import { pmFleet } from "./ticketVisibilityModel.js";
 import { UnitPicker } from "./UnitPicker.jsx";
 
 let AlertTriangle;
@@ -711,7 +712,6 @@ function FleetCard({ fleet, config, tickets, onClose, onAskAI, onEdit, onDelete,
 
 /* ============================================================ INSPECTIONS */
 /* ============================================================ PM — לוח טיפולים תקופתיים (schedule) */
-const pmFleet = (x, fleet) => fleet.find((e) => e.id === x.forkliftId || e.id === x.equipmentId);
 const pmOpenRepairSuggestion = (task, tickets = [], fleet = [], config = {}) => {
   const fleetId = task?.forkliftId || task?.equipmentId;
   if (!fleetId || !task?.nextDue) return null;
@@ -723,14 +723,6 @@ const pmOpenRepairSuggestion = (task, tickets = [], fleet = [], config = {}) => 
   if (!open.length) return null;
   return { ticket: open[0], label: d < 0 ? `באיחור ${-d} ימים` : d === 0 ? "היום" : `בעוד ${d} ימים`, waitLabel: ticketWaitReasonLabel(open[0], config) };
 };
-const pmVisible = (session, pm, fleet) => {
-  const act = pm.filter((x) => x.active !== false);
-  if (session.role === "tech") return act.filter((x) => { const f = pmFleet(x, fleet); return techCanSeeFleet(session, f); });
-  if (session.role === "user") { const md = userDepts(session); if (md.length) return act.filter((x) => { const f = pmFleet(x, fleet); return f && fleetDepts(f).some((d) => md.includes(d)); }); }
-  // admin (ומנהל ללא מחלקה) — כל הטיפולים
-  return act;
-};
-const techCanSeeFleet = (session, f) => { if (!f) return false; if (!session.supplier) return true; return f.supplier === session.supplier; };
 function PMModule(p) {
   const { pm, fleet, tickets, config, savePm, savePmMany, delPm, delPmMany, saveTicket, session, saveConfig } = p;
   const [edit, setEdit] = useState(null), [run, setRun] = useState(null), [bulkRules, setBulkRules] = useState(false);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { visibleFleetForSession, visibleTicketsForSession } from "../src/ticketVisibilityModel.js";
+import { pmVisibleForSession, visibleFleetForSession, visibleTicketsForSession } from "../src/ticketVisibilityModel.js";
 
 describe("ticket visibility model", () => {
   const tickets = [
@@ -84,5 +84,33 @@ describe("ticket visibility model", () => {
     expect(visibleFleetForSession({ role: "user" }, fleetList)).toEqual([]);
     expect(visibleFleetForSession({ role: "admin" }, fleetList)).toEqual(fleetList);
     expect(visibleFleetForSession({ role: "executive" }, fleetList)).toEqual(fleetList);
+  });
+
+  it("keeps PM schedules visible to managers only through their fleet departments", () => {
+    const pm = [
+      { id: "pm-a", forkliftId: "fork-a", active: true },
+      { id: "pm-b", forkliftId: "fork-b", active: true },
+      { id: "pm-inactive", forkliftId: "fork-a", active: false }
+    ];
+    const fleetList = [
+      { id: "fork-a", departments: ["A"] },
+      { id: "fork-b", departments: ["B"] }
+    ];
+
+    expect(pmVisibleForSession({ role: "user", departments: ["A"] }, pm, fleetList).map((task) => task.id)).toEqual(["pm-a"]);
+    expect(pmVisibleForSession({ role: "user" }, pm, fleetList).map((task) => task.id)).toEqual(["pm-a", "pm-b"]);
+  });
+
+  it("keeps supplier technicians scoped to PM schedules for their supplier fleet", () => {
+    const pm = [
+      { id: "pm-liftco", forkliftId: "fork-liftco", active: true },
+      { id: "pm-other", forkliftId: "fork-other", active: true }
+    ];
+    const fleetList = [
+      { id: "fork-liftco", supplier: "LiftCo" },
+      { id: "fork-other", supplier: "Other" }
+    ];
+
+    expect(pmVisibleForSession({ role: "tech", supplier: "LiftCo" }, pm, fleetList).map((task) => task.id)).toEqual(["pm-liftco"]);
   });
 });

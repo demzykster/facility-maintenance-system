@@ -35,6 +35,29 @@ export function visibleFleetForSession(session = {}, fleet = []) {
   );
 }
 
+export const pmFleet = (task = {}, fleet = []) =>
+  (fleet || []).find((unit) => unit.id === task.forkliftId || unit.id === task.equipmentId);
+
+export const techCanSeeFleet = (session = {}, unit = null) => {
+  if (!unit) return false;
+  if (!session.supplier) return true;
+  return unit.supplier === session.supplier;
+};
+
+export function pmVisibleForSession(session = {}, pm = [], fleet = []) {
+  const active = (pm || []).filter((task) => task.active !== false);
+  if (session.role === "tech") return active.filter((task) => techCanSeeFleet(session, pmFleet(task, fleet)));
+  if (session.role === "user") {
+    const departments = ticketUserDepartments(session);
+    if (departments.length) {
+      return active.filter((task) =>
+        ticketFleetDepartments(pmFleet(task, fleet)).some((department) => departments.includes(department))
+      );
+    }
+  }
+  return active;
+}
+
 export const ticketTrack = (ticket = {}) => ticket.track || (ticket.forkliftId ? "transport" : "facility");
 
 export const ownsTicketRecord = (session = {}, ticket = {}) =>

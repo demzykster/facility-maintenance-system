@@ -36,4 +36,12 @@ describe("fleet assets lazy wiring", () => {
     expect(fleetAssetsSource).toContain("ui={unitPickerUi()}");
     expect(fleetAssetsSource).not.toContain("function UnitPicker(");
   });
+
+  it("keeps PM visibility helpers available to shell role views after fleet extraction", () => {
+    expect(appSource).toContain("pmVisibleForSession as pmVisible");
+    expect(appSource).toContain("pmFleet");
+    expect(fleetAssetsSource).toContain('import { pmFleet } from "./ticketVisibilityModel.js";');
+    expect(appSource).toMatch(/const myPm = useMemo\(\(\) => pmVisible\(session, pm, fleet\)/);
+    expect(appSource).toMatch(/const myPm = useMemo\(\(\) => pmVisible\(session, p\.pm, fleet\)/);
+  });
 });
