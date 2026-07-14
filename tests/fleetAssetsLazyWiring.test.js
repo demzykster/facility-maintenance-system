@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 
 const appSource = readFileSync(new URL("../src/ClaudeMaintenanceApp.jsx", import.meta.url), "utf8");
 const fleetAssetsSource = readFileSync(new URL("../src/FleetAssetsModule.jsx", import.meta.url), "utf8");
+const fleetAssetsUiSource = appSource.match(/function fleetAssetsUi\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+
+function lazyUiIconProps(source) {
+  return [...new Set([...source.matchAll(/Icon=\{([A-Z][A-Za-z0-9_]*)\}/g)].map(([, icon]) => icon))].sort();
+}
 
 describe("fleet assets lazy wiring", () => {
   it("keeps fleet and PM screens behind a lazy wrapper", () => {
@@ -11,11 +16,13 @@ describe("fleet assets lazy wiring", () => {
     expect(appSource).toContain("fleetAssetsUi");
     expect(appSource).not.toContain("function FleetModule(");
     expect(appSource).not.toContain("function FleetCard(");
+    expect(appSource).not.toContain("<FleetCard");
     expect(appSource).not.toContain("function PMModule(");
   });
 
   it("keeps the transport, import, detail, and PM workflows in the lazy module", () => {
     expect(fleetAssetsSource).toContain("export function FleetAssetsModule(");
+    expect(fleetAssetsSource).toContain("export function FleetAssetCard(");
     expect(fleetAssetsSource).toContain("function FleetModule(");
     expect(fleetAssetsSource).toContain("function FleetCard(");
     expect(fleetAssetsSource).toContain("function FleetImportWizard(");
@@ -43,5 +50,12 @@ describe("fleet assets lazy wiring", () => {
     expect(fleetAssetsSource).toContain('import { pmFleet } from "./ticketVisibilityModel.js";');
     expect(appSource).toMatch(/const myPm = useMemo\(\(\) => pmVisible\(session, pm, fleet\)/);
     expect(appSource).toMatch(/const myPm = useMemo\(\(\) => pmVisible\(session, p\.pm, fleet\)/);
+  });
+
+  it("passes lazy module Icon prop dependencies through fleetAssetsUi", () => {
+    for (const icon of lazyUiIconProps(fleetAssetsSource)) {
+      expect(fleetAssetsSource).toContain(`let ${icon};`);
+      expect(fleetAssetsUiSource).toMatch(new RegExp(`\\b${icon}\\b`));
+    }
   });
 });

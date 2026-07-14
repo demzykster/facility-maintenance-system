@@ -111,6 +111,7 @@ const ManageHubLazy = lazy(() => import("./ManageHub.jsx").then((module) => ({ d
 const SettingsPanelLazy = lazy(() => import("./SettingsPanel.jsx").then((module) => ({ default: module.SettingsPanel })));
 const TicketDetailLazy = lazy(() => import("./TicketDetail.jsx").then((module) => ({ default: module.TicketDetail })));
 const FleetAssetsModuleLazy = lazy(() => import("./FleetAssetsModule.jsx").then((module) => ({ default: module.FleetAssetsModule })));
+const FleetAssetCardLazy = lazy(() => import("./FleetAssetsModule.jsx").then((module) => ({ default: module.FleetAssetCard })));
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
 const APP_BUILD_TIME = typeof __CMMS_BUILD_TIME__ !== "undefined" ? __CMMS_BUILD_TIME__ : "";
 const SAVE_FAILED_MESSAGE = "השמירה נכשלה. בדקו חיבור ונסו שוב.";
@@ -4743,7 +4744,7 @@ function ManagerFleet(p) {
         {scoped.length === 0 ? <Empty text="אין כלים משויכים למחלקותיך" Icon={Truck} /> : <div className="ftable manager-fleet-table"><div className="ftable-head manager-fleet-row"><span>מספר</span><span>סוג / דגם</span><span>ספק</span><span>נהגים</span></div>{scoped.map((f) => { const dc = DRIVER_SHIFTS.filter((s) => driverActive(driverOf(f, s.id))).length; const blk = unitBlock(f, tickets, config); return <button key={f.id} className={"ftable-row manager-fleet-row" + (blk ? " blocked" : "")} onClick={() => setOpenId(f.id)} style={blk ? { borderInlineStartColor: blk.level.color } : {}}><span className="ft-code">{f.code}</span><span className="ft-model"><b>{unitDesc(f, config)}</b>{blk && <span className="blk-chip" style={{ background: blk.level.color }}><ShieldAlert size={11} /> מושבת</span>}</span><span className="ft-sup">{f.supplier || "—"}</span><span className="ft-doc">{dc}/{DRIVER_SHIFTS.length} נהגים</span></button>; })}</div>}
       </>}
     </div>
-    {openId && <Overlay onClose={() => setOpenId(null)}><FleetCard fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onAskAI={onAskAI} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Overlay>}
+    {openId && <Overlay onClose={() => setOpenId(null)}><Suspense fallback={<div className="ovl-inner"><div className="note">טוען כרטיס כלי…</div></div>}><FleetAssetCardLazy ui={fleetAssetsUi()} fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onAskAI={onAskAI} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Suspense></Overlay>}
     {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
   </>);
 }
@@ -5827,7 +5828,7 @@ function AssetsHub(p) {
 }
 function fleetAssetsUi() {
   return {
-    AlertTriangle, BarChart3, CalendarClock, Check, CheckCircle2, ChevronLeft, ClipboardList, Cog, ConfirmBtn, DateInput, Download, DriversBoard, Empty, ExternalLink, FileSpreadsheet, FileText, ListChecks, Meta, Overlay, PenLine, Plus, Printer, RefreshCw, ReportView, Search, SectionTitle, ShieldAlert, Sparkles, Trash2, Truck, Users, Wrench, X,
+    AlertTriangle, BarChart3, CalendarClock, Check, CheckCircle2, ChevronLeft, ClipboardList, Clock, Cog, ConfirmBtn, DateInput, Download, DriversBoard, Empty, ExternalLink, FileSpreadsheet, FileText, ListChecks, Meta, Overlay, Package, PenLine, Plus, Printer, RefreshCw, ReportView, Search, SectionTitle, ShieldAlert, Sparkles, Trash2, Truck, Users, Wrench, X,
     DOC_DEFS, FORKLIFT_TYPES, FREQS, HE_DOW, HE_MONTHS, PRIORITIES, SAVE_FAILED_MESSAGE, SEED_POLICY, TRACKS, WEAR, XLSX,
     assetHealth, buildBlockTicket, buildVehicleTypes, canManageSettings, clearBlockPatches, compactDocLabel, countLabel, dateToTs, daysLeft, docDaysLabel, docStatus, docWarnColor, downloadXlsx, downtimeMs, esc, fleetDepts, fleetInDept, flattenVehicleTypes, fmtDate, fmtDur, freqOf, ils, isOpen, loadReadExcelFile, machineDocs, mergeFleetCatalogAdditions, modelTypeName, nextWorkdayFrom, notifyUser, pendingDriverReqs, reasonBall, reasonPauses, reasonsForRole, resolveHydraulics, rowsSafe, slaForTicket, stOf, startOfDay, ticketNo, ticketWaitReasonLabel, toWorkday, tsToDate, uid, unitBlock, unitDesc, unitLabel, unitModelCode, unitNote, unitTypeName, waitReasonLabel
   };
