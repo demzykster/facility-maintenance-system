@@ -1,8 +1,11 @@
 import { publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
+import { autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
+import { ticketServerCreateV2Status } from "../../src/ticketServerCreateCutoverModel.js";
 import { canFull } from "../../src/permissionModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { authorizeAiRequest } from "./auth.js";
 import { callAiProvider } from "./providerClient.js";
+import { createSupabaseTicketsDriverFromEnv } from "../tickets/supabaseTicketsDriver.js";
 
 const firstQueryValue = (value) => Array.isArray(value) ? value[0] : value;
 
@@ -46,8 +49,10 @@ export function createAiStatusHandler({
   sessionClient = null,
   pinSessionClient = null,
   providerCall = callAiProvider,
+  ticketsDriver = null,
   now = () => Date.now()
 } = {}) {
+  const backendTicketsDriver = ticketsDriver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   return async function aiStatusHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
     if (method !== "GET") {
@@ -60,6 +65,20 @@ export function createAiStatusHandler({
 
     try {
       const ai = publicAiServerStatusFromEnv(env);
+      const serverCreate = ticketServerCreateV2Status({ env, driver: backendTicketsDriver });
+      const autonomousConfigured = autonomousTicketCreateEnabled(env);
+      ai.capabilities = {
+        autonomousTicketCreate: autonomousConfigured && serverCreate.ready
+      };
+      ai.ticketCreate = {
+        autonomousConfigured,
+        serverCreate,
+        capability: {
+          disabled: !(autonomousConfigured && serverCreate.ready),
+          ready: autonomousConfigured && serverCreate.ready,
+          disabledReason: !autonomousConfigured ? "autonomous_ticket_create_disabled" : serverCreate.disabledReason
+        }
+      };
       if (wantsConnectionCheck(req)) {
         if (!canFull(auth.user, "settings")) return sendJson(res, 403, { error: "settings_full_required" });
         ai.providerCheck = {

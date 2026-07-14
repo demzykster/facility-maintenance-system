@@ -63,29 +63,228 @@ describe("tickets API handler", () => {
     expect(res.json()).toEqual({ error: "tickets_backend_not_configured" });
   });
 
-  it("upserts a normalized ticket and writes an audit event for allowed sessions", async () => {
-    const driver = { upsert: vi.fn().mockResolvedValue({ id: "T-1" }) };
+  it("creates a new normalized ticket through the server-authoritative create path", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        ticketId: "T-1",
+        num: 42,
+        ticketNo: "F-042",
+        status: "new",
+        idempotencyStatus: "created"
+      }),
+      upsert: vi.fn()
+    };
     const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
     const handler = createTicketsApiHandler({
       driver,
       auditDriver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-1", num: 1, status: "open", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      ticket: { id: "T-1", num: 42, ticketNo: "F-042", sourceKvKey: "ticket:T-1" },
+      action: "created",
+      actionResult: { type: "ticket.create", ticketId: "T-1", num: 42, ticketNumber: "F-042", ticketNo: "F-042" }
+    });
+    expect(driver.get).toHaveBeenCalledWith("T-1");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ id: "T-1", num: null, status: "open" }), expect.objectContaining({
+      actorId: "app-user-1",
+      idempotencyKey: "ticket:app-user-1:T-1",
+      requestHash: expect.any(String)
+    }));
+    expect(driver.upsert).not.toHaveBeenCalled();
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "app-user-1",
+      entityType: "ticket",
+      entityId: "T-1",
+      action: "create"
+    }));
+  });
+
+  it("keeps legacy create working without RPC when the server-create cutover is disabled", async () => {
+    const driver = {
+      list: vi.fn().mockResolvedValue([
+        { id: "old-f", track: "facility", num: 7 },
+        { id: "old-t", track: "transport", num: 12, forkliftId: "forklift-1" }
+      ]),
+      get: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
       sessionClient: sessionClientFor({ permissions: { tickets: "manage" } })
     });
 
     const res = await call(handler, {
       headers: { authorization: "Bearer user-token" },
-      body: { id: "T-1", num: 1, status: "open", track: "facility", subject: "Door" }
+      body: { id: "T-legacy", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true, ticket: { id: "T-1", status: "open", sourceKvKey: "ticket:T-1" } });
-    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-1", status: "open" }));
-    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
-      actorId: "app-user-1",
-      entityType: "ticket",
-      entityId: "T-1",
-      action: "update"
-    }));
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "created",
+      numberingMode: "legacy",
+      ticket: { id: "T-legacy", num: 8 }
+    });
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-legacy", num: 8 }));
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps manual create on the legacy path when only the AI autonomous flag is enabled", async () => {
+    const driver = {
+      list: vi.fn().mockResolvedValue([{ id: "old-f", track: "facility", num: 10 }]),
+      get: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "true"
+      }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-ai-flag-manual", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "created",
+      numberingMode: "legacy",
+      ticket: { id: "T-ai-flag-manual", num: 11 }
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-ai-flag-manual", num: 11 }));
+  });
+
+  it("does not save num null in the legacy cutover-off path", async () => {
+    const driver = {
+      list: vi.fn().mockResolvedValue([]),
+      get: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket }))
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-first", track: "transport", subject: "Fan", description: "Fan stopped", category: "transport", forkliftId: "forklift-1", downtimeType: "needs_triage" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ticket.num).toBe(1);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ num: 1 }));
+  });
+
+  it("returns a controlled error without partial write when cutover is enabled but RPC is missing", async () => {
+    const driver = {
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn(),
+      create: vi.fn().mockRejectedValue(new Error("Could not find function public.cmms_create_ticket"))
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-rpc-missing", track: "facility", num: 99, subject: "Door", description: "Door is stuck", category: "doors" }
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "ticket_create_rpc_unavailable" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("restores the legacy create path when the cutover is disabled again", async () => {
+    const driver = {
+      list: vi.fn().mockResolvedValue([{ id: "old", track: "facility", num: 2 }]),
+      get: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn().mockRejectedValue(new Error("cmms_create_ticket missing"))
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "false" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-restored", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ numberingMode: "legacy", ticket: { num: 3 } });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).toHaveBeenCalled();
+  });
+
+  it("updates existing normalized tickets without changing or reallocating num", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue({ id: "T-9", num: 7, status: "new", legacyPayload: { id: "T-9", num: 7, status: "new" } }),
+      upsert: vi.fn().mockResolvedValue({ id: "T-9", status: "open", legacy_payload: { id: "T-9", num: 7, status: "open" } }),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-9", num: 99, status: "open", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, action: "updated", ticket: { id: "T-9", num: 7 } });
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-9", num: 7, status: "open" }));
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("updates existing normalized tickets through the old upsert branch when cutover is disabled", async () => {
+    const driver = {
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({ id: "T-8", num: 5, status: "new", legacyPayload: { id: "T-8", num: 5, status: "new" } }),
+      upsert: vi.fn().mockResolvedValue({ id: "T-8", status: "open", legacy_payload: { id: "T-8", num: 5, status: "open" } }),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "false" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-8", num: 999, status: "open", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, action: "updated", ticket: { id: "T-8", num: 5 } });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.list).not.toHaveBeenCalled();
   });
 
   it("lists normalized tickets for active ticket roles", async () => {
@@ -172,23 +371,50 @@ describe("tickets API handler", () => {
   });
 
   it("accepts CMMS PIN worker sessions for ticket reporting", async () => {
-    const driver = { upsert: vi.fn().mockResolvedValue({ id: "T-2" }) };
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        ticketId: "T-2",
+        num: 1,
+        ticketNo: "F-001",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
     const sessionClient = { getAuthUser: vi.fn(), getAppUserProfile: vi.fn() };
     const token = signCmmsSessionToken("worker-1", "worker", "1042", "session-secret", Date.now()).token;
     const handler = createTicketsApiHandler({
       driver,
       sessionClient,
-      env: { CMMS_SESSION_SECRET: "session-secret" }
+      env: { CMMS_SESSION_SECRET: "session-secret", CMMS_TICKET_SERVER_CREATE_V2: "true" }
     });
 
     const res = await call(handler, {
       headers: { authorization: `Bearer ${token}` },
-      body: { id: "T-2", status: "new" }
+      body: { id: "T-2", status: "new", track: "facility", subject: "Worker report", description: "Worker reported an issue", category: "general" }
     });
 
     expect(res.statusCode).toBe(200);
-    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-2" }));
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ id: "T-2" }), expect.objectContaining({ actorId: "worker-1" }));
     expect(sessionClient.getAuthUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects new normalized creates that do not satisfy the shared create contract", async () => {
+    const driver = { get: vi.fn().mockResolvedValue(null), create: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "T-missing", track: "transport", subject: "Fan", category: "transport", downtimeType: "needs_triage" }
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "ticket_create_fields_required", fields: ["description", "forkliftId"] });
+    expect(driver.create).not.toHaveBeenCalled();
   });
 
   it("blocks roles that cannot write tickets", async () => {

@@ -94,6 +94,7 @@ import { ownsTicketRecord, ticketFleetDepartments, ticketUserDepartments, visibl
 import { canConfirmTicketForSession, managerActionRequiredForTicket, managerScopedTicketNeedsFollowUp, requesterOwnsTicket } from "./ticketActionScopeModel.js";
 import { ADMIN_TICKET_DURATION_FIELDS, applyAdminTicketManualEdit, datetimeValueToMs, statusMsToHours } from "./adminTicketManualEditModel.js";
 import { normalizeScopedWorkerForActor, scopedUsersForActor, scopedWorkerDefaultsForActor, userDepartments, userShift } from "./userScopeModel.js";
+import { downtimeLevelOf, downtimeLevelsWithSystemDefaults, isDowntimeOutOfService, missingTicketCreateFields } from "./ticketCreateContract.js";
 
 const APP_VERSION = packageInfo.version || "0.0.0";
 const AIPanel = lazy(() => import("./AIPanel.jsx").then((module) => ({ default: module.AIPanel })));
@@ -482,8 +483,8 @@ const DOWNTIME = [
   { id: "critical", label: "תקלה קריטית — אין תחליף", desc: "הכלי מושבת ואין תחליף", color: "#DC2626", prio: "high", oos: true },
 ];
 // Уровни тяжести настраиваются админом (config.downtimeLevels); fallback — DOWNTIME. Поиск всегда что-то возвращает (целостность: ссылка на удалённый уровень не уронит экран).
-const dtLevels = (cfg) => (cfg && Array.isArray(cfg.downtimeLevels) && cfg.downtimeLevels.length) ? cfg.downtimeLevels : DOWNTIME;
-const dtOf = (id, cfg) => dtLevels(cfg).find((d) => d.id === id) || DOWNTIME.find((d) => d.id === id) || { id: id || "", label: id || "—", desc: "", color: "#6B7280", prio: "medium", oos: false };
+const dtLevels = (cfg) => downtimeLevelsWithSystemDefaults(cfg, DOWNTIME);
+const dtOf = (id, cfg) => downtimeLevelOf(id, cfg, DOWNTIME);
 const DT_PALETTE = ["#1F4E8C", "#3E6DB0", "#6F7680", "#A4A9B0", "#16A34A", "#CA8A04", "#EA580C", "#DC2626", "#B91C1C"];
 const WEAR = [{ id: "natural", label: "בלאי טבעי" }, { id: "disproportionate", label: "נזק בלתי פרופורציונלי" }];
 
@@ -1008,7 +1009,7 @@ function buildDemoData(config) {
 }
 const isOpen = (t) => t.status !== "done" && t.status !== "cancelled";
 // כלי מושבת = קריאת שינוע פתוחה (לא ממתינה לאישור מנהל/הוחזרה לעובד) ברמת חומרה «מוציאה מכלל שימוש», שלא הוחזרה לשירות ידנית. נגזר מהקריאות — אין דגל נפרד שעלול להתנתק מהמציאות.
-const ticketBlocks = (t, cfg) => t.track === "transport" && isOpen(t) && t.status !== "pending_manager" && t.status !== "rework" && !t.backInServiceAt && !!dtOf(t.downtimeType, cfg).oos;
+const ticketBlocks = (t, cfg) => t.track === "transport" && isOpen(t) && t.status !== "pending_manager" && t.status !== "rework" && !t.backInServiceAt && isDowntimeOutOfService(dtOf(t.downtimeType, cfg));
 const unitBlock = (f, tickets, cfg) => { if (!f) return null; const bs = (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).sort((a, b) => b.createdAt - a.createdAt); if (!bs.length) return null; return { ticket: bs[0], level: dtOf(bs[0].downtimeType, cfg), count: bs.length }; };
 // השבתה ידנית = פתיחת קריאת שינוע ברמה חוסמת. החזרה לשירות = סימון backInServiceAt על כל הקריאות החוסמות (הטיפול בקריאה עצמה נמשך).
 const buildBlockTicket = (f, cfg, by, reason) => { const now = Date.now(); const lvl = dtLevels(cfg).find((d) => d.oos) || DOWNTIME[2]; const rsn = (reason || "").trim(); return { id: uid(), track: "transport", subject: `השבתת כלי · ${f.code}`, category: "transport", priority: lvl.prio || "high", zone: "רחבת מלגזות", asset: f.code, forkliftId: f.id, downtimeType: lvl.id, wearType: null, description: rsn || "הכלי הושבת ידנית — אין להשתמש בו עד לתיקון.", status: "new", assignee: "", routedTech: true, supplier: f.supplier || "", downtimeStart: now, downtimeEnd: null, createdBy: { name: by.name, role: by.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: f.id, priority: lvl.prio || "high" }, cfg, [f]) * 3600000, hasPhoto: false, closure: null, log: [{ at: now, by: by.name, byRole: by.role, text: `הכלי הושבת ידנית${f.supplier ? " · ספק: " + f.supplier : ""}${rsn ? " · סיבה: " + rsn : ""}`, kind: "open" }] }; };
@@ -1433,6 +1434,7 @@ async function callAIAssistant({ text, messages, system, context, workflow, incl
       source: "ui",
       workflow,
       includeProviderPlan,
+      idempotencyKey: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       context
     })
   });
@@ -2896,10 +2898,11 @@ export default function App() {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
     rec = applyTicketStatusTiming(rec, _prev, _now);
-    if (!rec.num) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
+    if (!rec.num && !NORMALIZED_TICKET_AUTHORITY) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
-        await NORMALIZED_TICKET_PROVIDER.upsert(rec);
+        const result = await NORMALIZED_TICKET_PROVIDER.upsert(rec);
+        if (result?.ticket && typeof result.ticket === "object") rec = result.ticket;
       } catch (error) {
         setToast(SAVE_FAILED_MESSAGE);
         void recordAutomaticAppIssue(ticketAuthorityFailureIssue({
@@ -7525,11 +7528,13 @@ function TicketForm(p) {
   };
   const submit = async () => {
     if (busyRef.current) return;
+    const missing = missingTicketCreateFields({ track, subject, description, category, forkliftId, downtimeType });
     if (!subject.trim()) return setErr("נא להזין נושא");
     if (track === "facility" && !category) return setErr("נא לבחור קטגוריה");
     if (track === "transport" && !forkliftId) return setErr("נא לבחור כלי שינוע");
     if (track === "transport" && !downtimeType) return setErr("נא לבחור מצב הכלי");
     if (!description.trim()) return setErr("נא לתאר את התקלה");
+    if (missing.length) return setErr("נא להשלים את שדות החובה");
     setErr("");
     const t = buildTicket();
     const review = transportDuplicateReview(t, tickets || []);

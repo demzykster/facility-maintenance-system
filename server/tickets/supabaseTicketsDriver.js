@@ -23,6 +23,7 @@ export function createSupabaseTicketsDriver({ url, serviceRoleKey, table = "tick
   if (!url || !serviceRoleKey || !fetchImpl) return null;
   const root = String(url).replace(/\/+$/, "");
   const base = `${root}/rest/v1/${encodeURIComponent(table)}`;
+  const rpcBase = `${root}/rest/v1/rpc`;
 
   return {
     async list({ limit = 500 } = {}) {
@@ -56,6 +57,22 @@ export function createSupabaseTicketsDriver({ url, serviceRoleKey, table = "tick
       const data = await readJsonOrText(response);
       if (!response.ok) throw new Error(errorMessage(data, `supabase_ticket_${response.status}`));
       return Array.isArray(data) ? data[0] : data;
+    },
+    async create(ticket, { idempotencyKey = "", requestHash = "", actorId = "" } = {}) {
+      const row = ticketRecordToSupabaseRow(ticket);
+      const response = await fetchImpl(`${rpcBase}/cmms_create_ticket`, {
+        method: "POST",
+        headers: serviceHeaders(serviceRoleKey),
+        body: JSON.stringify({
+          ticket_payload: row,
+          idempotency_key: idempotencyKey,
+          request_hash: requestHash,
+          actor_id: actorId
+        })
+      });
+      const data = await readJsonOrText(response);
+      if (!response.ok) throw new Error(errorMessage(data, `supabase_ticket_create_${response.status}`));
+      return data;
     },
     async delete(id) {
       const ticketId = String(id || "").trim();

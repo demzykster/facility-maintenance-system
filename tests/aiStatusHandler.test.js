@@ -78,6 +78,23 @@ describe("AI status handler", () => {
         model: "gpt-5.2",
         providerKeyConfigured: true,
         serverReady: true,
+        capabilities: {
+          autonomousTicketCreate: false
+        },
+        ticketCreate: {
+          autonomousConfigured: false,
+          serverCreate: {
+            configured: false,
+            dependency: "disabled",
+            ready: false,
+            disabledReason: "ticket_server_create_v2_disabled"
+          },
+          capability: {
+            disabled: true,
+            ready: false,
+            disabledReason: "autonomous_ticket_create_disabled"
+          }
+        },
         supportedProviderOptions: [
           expect.objectContaining({ id: "anthropic", label: expect.stringContaining("Claude") }),
           expect.objectContaining({ id: "google", label: expect.stringContaining("Gemini") }),
@@ -87,6 +104,113 @@ describe("AI status handler", () => {
       }
     });
     expect(JSON.stringify(payload)).not.toContain("server-secret");
+  });
+
+  it("keeps autonomous ticket create disabled when server-create cutover is off", async () => {
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_APP_MODE: "local"
+      },
+      sessionClient: sessionClient()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai).toMatchObject({
+      capabilities: { autonomousTicketCreate: false },
+      ticketCreate: {
+        autonomousConfigured: true,
+        serverCreate: {
+          configured: false,
+          dependency: "disabled",
+          ready: false,
+          disabledReason: "ticket_server_create_v2_disabled"
+        },
+        capability: {
+          disabled: true,
+          ready: false,
+          disabledReason: "ticket_server_create_v2_disabled"
+        }
+      }
+    });
+  });
+
+  it("reports autonomous ticket create ready only when AI and server-create are both ready", async () => {
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local"
+      },
+      ticketsDriver: { create: vi.fn() },
+      sessionClient: sessionClient()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai).toMatchObject({
+      capabilities: { autonomousTicketCreate: true },
+      ticketCreate: {
+        autonomousConfigured: true,
+        serverCreate: {
+          configured: true,
+          dependency: "configured",
+          ready: true,
+          disabledReason: ""
+        },
+        capability: {
+          disabled: false,
+          ready: true,
+          disabledReason: ""
+        }
+      }
+    });
+  });
+
+  it("reports unavailable dependency when cutover is configured but the create driver is missing", async () => {
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_APP_MODE: "local"
+      },
+      ticketsDriver: {},
+      sessionClient: sessionClient()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai).toMatchObject({
+      capabilities: { autonomousTicketCreate: false },
+      ticketCreate: {
+        autonomousConfigured: true,
+        serverCreate: {
+          configured: true,
+          dependency: "unavailable",
+          ready: false,
+          disabledReason: "ticket_create_rpc_unavailable"
+        },
+        capability: {
+          disabled: true,
+          ready: false,
+          disabledReason: "ticket_create_rpc_unavailable"
+        }
+      }
+    });
   });
 
   it("can run an admin-only live provider connection check without leaking keys", async () => {

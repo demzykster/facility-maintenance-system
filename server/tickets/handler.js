@@ -9,6 +9,8 @@ import { kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { createSupabaseTicketsDriverFromEnv } from "./supabaseTicketsDriver.js";
 import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
 import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js";
+import { createTicketRecord, mergeTicketUpdateWithExisting } from "./ticketCreateDomain.js";
+import { ticketServerCreateV2Enabled } from "../../src/ticketServerCreateCutoverModel.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -59,17 +61,19 @@ const writeAuditEvent = async (auditDriver, event) => {
   if (typeof auditDriver.write === "function") return auditDriver.write(event);
 };
 
-const ticketUpsertAuditEvent = (ticket, actor) => normalizeAuditEvent({
+const ticketWriteAuditEvent = (ticket, actor, action = AUDIT_ACTIONS.update) => normalizeAuditEvent({
   at: Date.now(),
   actorId: actor.id,
   actorName: actor.name,
   actorRole: actor.role,
   entityType: AUDIT_ENTITY_TYPES.ticket,
   entityId: ticket.id,
-  action: AUDIT_ACTIONS.update,
-  summary: `Ticket upserted through normalized API: ${ticket.id}`,
+  action,
+  summary: action === AUDIT_ACTIONS.create
+    ? `Ticket created through normalized API: ${ticket.id}`
+    : `Ticket updated through normalized API: ${ticket.id}`,
   after: { status: ticket.status, track: ticket.track, num: ticket.num },
-  metadata: { source: "api/tickets", sourceKvKey: ticket.sourceKvKey }
+  metadata: { source: "api/tickets", sourceKvKey: ticket.sourceKvKey || `ticket:${ticket.id}` }
 });
 
 const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
@@ -88,6 +92,24 @@ const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
 const canReadTickets = (user = {}) => {
   if (!user?.role) return true;
   return ["admin", "executive", "user", "tech", "worker"].includes(user.role);
+};
+
+const ticketNumberNamespace = (ticket = {}) => (ticket?.track === "transport" || (!ticket?.track && ticket?.forkliftId)) ? "T" : "F";
+
+const ticketWithLegacyNumber = async (driver, ticket = {}) => {
+  if (Number.isFinite(Number(ticket.num))) return ticket;
+  if (typeof driver?.list !== "function") throw new Error("tickets_read_not_configured");
+  const existingTickets = await driver.list({ limit: 1000 });
+  const namespace = ticketNumberNamespace(ticket);
+  const max = (existingTickets || [])
+    .filter((item) => ticketNumberNamespace(item) === namespace && Number.isFinite(Number(item.num)))
+    .reduce((highest, item) => Math.max(highest, Number(item.num)), 0);
+  return { ...ticket, num: max + 1 };
+};
+
+const isMissingTicketCreateRpcError = (error = {}) => {
+  const message = String(error?.message || error?.code || "").toLowerCase();
+  return message.includes("cmms_create_ticket") || message.includes("pgrst202") || message.includes("function not found");
 };
 
 const withFiles = async (ticket, metadataDriver) => {
@@ -176,15 +198,76 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         return json(res, 200, { ok: true, ticket: { id }, cleanup });
       }
 
-      const ticket = normalizeTicketRecord(body?.ticket || body);
+      const rawTicket = body?.ticket || body;
+      const ticket = normalizeTicketRecord(rawTicket);
       const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
       if (permissionError) return json(res, 403, { error: permissionError });
 
-      await backendDriver.upsert(ticket.legacyPayload);
-      await writeAuditEvent(backendAuditDriver, ticketUpsertAuditEvent(ticket, auth.user));
-      return json(res, 200, { ok: true, ticket: { id: ticket.id, status: ticket.status, sourceKvKey: ticket.sourceKvKey } });
+      if (typeof backendDriver.get !== "function") return json(res, 503, { error: "tickets_read_not_configured" });
+      const existing = await backendDriver.get(ticket.id);
+      if (existing) {
+        const nextTicket = mergeTicketUpdateWithExisting(ticket.legacyPayload, existing);
+        const next = normalizeTicketRecord(nextTicket);
+        const stored = await backendDriver.upsert(next.legacyPayload);
+        const storedTicket = stored?.legacy_payload ? normalizeTicketRecord(stored.legacy_payload).legacyPayload : next.legacyPayload;
+        await writeAuditEvent(backendAuditDriver, ticketWriteAuditEvent(next, auth.user, AUDIT_ACTIONS.update));
+        return json(res, 200, {
+          ok: true,
+          ticket: {
+            ...storedTicket,
+            id: next.id,
+            status: next.status,
+            num: next.num,
+            ticketNo: nextTicket.ticketNo,
+            sourceKvKey: next.sourceKvKey
+          },
+          action: "updated"
+        });
+      }
+
+      if (!ticketServerCreateV2Enabled(env)) {
+        if (typeof backendDriver.upsert !== "function") return json(res, 503, { error: "tickets_write_not_configured" });
+        const legacyTicket = await ticketWithLegacyNumber(backendDriver, ticket.legacyPayload);
+        const stored = await backendDriver.upsert(legacyTicket);
+        const storedTicket = stored?.legacy_payload ? normalizeTicketRecord(stored.legacy_payload).legacyPayload : legacyTicket;
+        const next = normalizeTicketRecord(storedTicket);
+        await writeAuditEvent(backendAuditDriver, ticketWriteAuditEvent(next, auth.user, AUDIT_ACTIONS.create));
+        return json(res, 200, {
+          ok: true,
+          ticket: {
+            ...storedTicket,
+            id: next.id,
+            status: next.status,
+            num: next.num,
+            sourceKvKey: next.sourceKvKey
+          },
+          action: "created",
+          numberingMode: "legacy"
+        });
+      }
+      if (typeof backendDriver.create !== "function") return json(res, 503, { error: "tickets_create_not_configured" });
+      const created = await createTicketRecord({
+        driver: backendDriver,
+        ticket: ticket.legacyPayload,
+        actor: auth.user,
+        idempotencyKey: req.headers?.["idempotency-key"] || body?.idempotencyKey || body?.idempotency_key
+      });
+      const createdRecord = normalizeTicketRecord(created.ticket);
+      await writeAuditEvent(backendAuditDriver, ticketWriteAuditEvent(createdRecord, auth.user, AUDIT_ACTIONS.create));
+      return json(res, 200, {
+        ok: true,
+        ticket: created.ticket,
+        action: created.result.idempotencyStatus === "replayed" ? "replayed" : "created",
+        actionResult: created.result
+      });
     } catch (error) {
       if (error?.message === "ticket_id_required") return json(res, 400, { error: "ticket_id_required" });
+      if (error?.message === "idempotency_conflict") return json(res, 409, { error: "idempotency_conflict" });
+      if (error?.message === "tickets_create_not_configured") return json(res, 503, { error: "tickets_create_not_configured" });
+      if (isMissingTicketCreateRpcError(error)) return json(res, 503, { error: "ticket_create_rpc_unavailable" });
+      if (String(error?.message || "").startsWith("ticket_create_fields_required:")) {
+        return json(res, 400, { error: "ticket_create_fields_required", fields: String(error.message).split(":")[1]?.split(",").filter(Boolean) || [] });
+      }
       return sendServerError(req, res, error, { code: "tickets_api_error", route: "/api/tickets" });
     }
   };

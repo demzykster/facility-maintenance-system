@@ -40,6 +40,51 @@ describe("Supabase tickets driver", () => {
     });
   });
 
+  it("creates tickets through the service-role RPC with idempotency metadata", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return JSON.stringify({
+          ticketId: "T-10",
+          num: 1842,
+          ticketNo: "T-1842",
+          idempotencyStatus: "created"
+        });
+      }
+    });
+    const driver = createSupabaseTicketsDriver({
+      url: "https://supabase.example",
+      serviceRoleKey: "service",
+      fetchImpl
+    });
+
+    await expect(driver.create({ id: "T-10", num: 99, track: "transport", forkliftId: "226" }, {
+      idempotencyKey: "key-1",
+      requestHash: "hash-1",
+      actorId: "u1"
+    })).resolves.toMatchObject({ ticketId: "T-10", num: 1842, ticketNo: "T-1842" });
+
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/rpc/cmms_create_ticket", {
+      method: "POST",
+      headers: expect.objectContaining({
+        apikey: "service",
+        authorization: "Bearer service",
+        "content-type": "application/json"
+      }),
+      body: expect.any(String)
+    });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
+      idempotency_key: "key-1",
+      request_hash: "hash-1",
+      actor_id: "u1",
+      ticket_payload: {
+        id: "T-10",
+        num: 99,
+        track: "transport"
+      }
+    });
+  });
+
   it("lists normalized tickets as current UI payloads", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,

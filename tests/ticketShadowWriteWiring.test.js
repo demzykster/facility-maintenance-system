@@ -18,6 +18,7 @@ describe("normalized ticket authority wiring", () => {
 
   it("writes normalized tickets without recreating KV mirrors in production authority mode", () => {
     expect(source).toMatch(/if \(NORMALIZED_TICKET_AUTHORITY\) \{[\s\S]*await NORMALIZED_TICKET_PROVIDER\.upsert\(rec\);[\s\S]*\} else \{[\s\S]*persistShared\(`ticket:\$\{rec\.id\}`/);
+    expect(source).toMatch(/const result = await NORMALIZED_TICKET_PROVIDER\.upsert\(rec\);[\s\S]*if \(result\?\.ticket && typeof result\.ticket === "object"\) rec = result\.ticket;/);
     expect(source).not.toMatch(/await NORMALIZED_TICKET_PROVIDER\.upsert\(rec\);[\s\S]*void mirrorTicketToKv\(rec\);/);
     expect(source).toMatch(/if \(!await persistShared\(`ticket:\$\{rec\.id\}`, JSON\.stringify\(rec\)\)\) return false;[\s\S]*void shadowWriteNormalizedTicket\(rec\);/);
   });

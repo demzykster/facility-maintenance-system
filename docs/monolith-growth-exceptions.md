@@ -19,5 +19,9 @@ Each exception must include:
 
 ## Exceptions
 
-No active exceptions.
-
+- Date: 2026-07-14
+- Owner goal: capability-based AI ticket.create vertical slice.
+- New line count: 9962.
+- Why necessary: minimal shell wiring imports the extracted ticket create contract, sends an idempotency key to the server AI boundary, accepts authoritative normalized ticket create results, and stops browser-local ticket numbering in normalized/API-backed mode.
+- Why extraction was not the right move: the new business logic lives in `src/ticketCreateContract.js`, `server/tickets/ticketCreateDomain.js`, and `server/ai/capabilities/`; the shell remains the existing composition point for form submit and API adapter wiring.
+- Follow-up/removal condition: when ticket form/create UI is extracted into its own vertical module, move these wiring lines with that module and reduce the shell back toward the baseline.

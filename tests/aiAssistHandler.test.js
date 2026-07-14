@@ -83,6 +83,173 @@ describe("AI assist handler", () => {
     expect(providerCall).not.toHaveBeenCalled();
   });
 
+  it("executes the allowlisted ticket.create capability when autonomous create is enabled", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-226",
+        num: 1842,
+        ticketNo: "T-1842",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1000,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        idempotencyKey: "idem-226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      assistant: {
+        provider: "cmms-capability",
+        model: "ticket.create",
+        text: "Создал заявку T-1842 по машине 226: Не работает вентилятор"
+      },
+      capabilityResponse: {
+        executionStatus: "created",
+        actionResult: { type: "ticket.create", ticketId: "ticket-226", num: 1842, ticketNumber: "T-1842", ticketNo: "T-1842" }
+      }
+    });
+    expect(ticketsDriver.create).toHaveBeenCalledWith(expect.objectContaining({ downtimeType: "needs_triage" }), expect.objectContaining({
+      idempotencyKey: "idem-226"
+    }));
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
+  it("does not execute autonomous ticket.create when the server-create cutover is disabled", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-test",
+      text: "הכנתי כרטיס לאישור."
+    });
+    const ticketsDriver = {
+      create: vi.fn()
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1000,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("openai");
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
+  it("does not execute autonomous ticket.create when the server-create dependency is unavailable", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-test",
+      text: "הבקשה תישאר לאישור ידני."
+    });
+    const ticketsDriver = {};
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1000,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("openai");
+    expect(providerCall).toHaveBeenCalled();
+  });
+
+  it("falls back to the provider path when the autonomous flag is enabled but intent is not ticket create", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-test",
+      text: "אין חריגות פתוחות."
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1000,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Что сегодня важно?",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("openai");
+    expect(providerCall).toHaveBeenCalled();
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
   it("returns a precise setup error when server AI has no provider key", async () => {
     const providerCall = vi.fn();
     const handler = createAiAssistHandler({

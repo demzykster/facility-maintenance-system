@@ -5,10 +5,15 @@ import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
 import { AI_PROVIDER_PLAN_SCHEMA, providerPlanPrompt, sanitizeAiProviderPlan } from "../../src/aiAssistProviderPlanModel.js";
 import { AI_ASSIST_WORKFLOWS, aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
+import { autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { authorizeAiRequest } from "./auth.js";
 import { callAiProvider, callAiProviderObject } from "./providerClient.js";
+import { createSupabaseTicketsDriverFromEnv } from "../tickets/supabaseTicketsDriver.js";
+import { createAiCapabilityRegistry } from "./capabilities/registry.js";
+import { createTicketCreateCapability } from "./capabilities/ticketCreateCapability.js";
+import { ticketServerCreateV2Status } from "../../src/ticketServerCreateCutoverModel.js";
 
 const MAX_BODY_BYTES = 64_000;
 const MAX_TEXT_CHARS = 2_000;
@@ -391,12 +396,14 @@ export function createAiAssistHandler({
   sessionClient = null,
   pinSessionClient = null,
   auditDriver = null,
+  ticketsDriver = null,
   providerCall = callAiProvider,
   providerObjectCall = callAiProviderObject,
   now = () => Date.now(),
   rateBuckets = AI_ASSIST_RATE_BUCKETS
 } = {}) {
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
+  const backendTicketsDriver = ticketsDriver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   return async function aiAssistHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
     if (method !== "POST") {
@@ -438,6 +445,35 @@ export function createAiAssistHandler({
       const context = buildAiAssistContext(body.context, auth.user);
       const draft = buildAiIntakeDraft(draftInput, currentTime);
       const actions = buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context });
+      const ticketCreateStatus = ticketServerCreateV2Status({ env, driver: backendTicketsDriver });
+      if (autonomousTicketCreateEnabled(env) && ticketCreateStatus.ready) {
+        const registry = createAiCapabilityRegistry([
+          createTicketCreateCapability({ driver: backendTicketsDriver })
+        ]);
+        const capabilityResponse = await registry.execute("create_ticket", {
+          text: draft.rawText,
+          idempotencyKey: body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"]
+        }, {
+          user: auth.user,
+          context,
+          rawContext: body.context,
+          text: draft.rawText,
+          now: currentTime
+        });
+        if (capabilityResponse.executionStatus !== "feature_disabled") {
+          return sendJson(res, 200, {
+            ok: true,
+            draft,
+            actions: [],
+            assistant: {
+              provider: "cmms-capability",
+              model: "ticket.create",
+              text: capabilityResponse.answer || capabilityResponse.blockingQuestion
+            },
+            capabilityResponse
+          });
+        }
+      }
       const config = aiServerConfigFromEnv(env);
       if (config.mode !== AI_MODES.server) {
         return sendJson(res, 503, { error: "ai_server_disabled", draft, actions });
