@@ -58,4 +58,11 @@ describe("fleet assets lazy wiring", () => {
       expect(fleetAssetsUiSource).toMatch(new RegExp(`\\b${icon}\\b`));
     }
   });
+
+  it("passes PM scheduler helper dependencies through fleetAssetsUi", () => {
+    for (const helper of ["clampPmDailyCapacity", "pmFreqForUnit"]) {
+      expect(fleetAssetsSource).toContain(`let ${helper};`);
+      expect(fleetAssetsUiSource).toMatch(new RegExp(`\\b${helper}\\b`));
+    }
+  });
 });
