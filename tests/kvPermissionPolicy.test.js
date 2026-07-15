@@ -16,7 +16,7 @@ describe("KV write permission policy", () => {
   it("maps sensitive record keys to the existing module permissions", () => {
     expect(kvWritePermissionForKey("user:manager-1")).toMatchObject({ module: "users", minLevel: "manage" });
     expect(kvWritePermissionForKey("config:v1")).toMatchObject({ module: "settings", minLevel: "manage" });
-    expect(kvWritePermissionForKey("fleet:truck-1")).toMatchObject({ module: "settings", minLevel: "manage" });
+    expect(kvWritePermissionForKey("pm:pm-1")).toMatchObject({ module: "settings", minLevel: "manage" });
     expect(kvWritePermissionForKey("ppeitem:helmet")).toMatchObject({ module: "ppe", minLevel: "manage" });
     expect(kvWritePermissionForKey("czone:north")).toMatchObject({ module: "settings", minLevel: "manage" });
     expect(kvWritePermissionForKey("location:warehouse-a")).toMatchObject({ module: "settings", minLevel: "manage" });
@@ -24,6 +24,7 @@ describe("KV write permission policy", () => {
 
   it("maps ordinary workflow records to explicit role or module rules", () => {
     expect(kvWritePermissionForKey("ticket:T-001")).toMatchObject({ roles: ["admin", "user", "tech", "worker"], auditSensitive: false });
+    expect(kvWritePermissionForKey("fleet:truck-1")).toMatchObject({ roles: ["admin", "user"] });
     expect(kvWritePermissionForKey("ppereq:req-1")).toMatchObject({ module: "ppe", minLevel: "request", auditSensitive: false });
     expect(kvWritePermissionForKey("cround:round-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
     expect(kvWritePermissionForKey("ccomplaint:issue-1")).toMatchObject({ roles: ["admin", "user"], access: "cleaning:perform", auditSensitive: false });
@@ -77,6 +78,9 @@ describe("KV write permission policy", () => {
     expect(kvWritePermissionError({ id: "worker-2", role: "worker" }, "presence:worker-1")).toBe("permission_required:presence:self");
     expect(sessionHasKvWritePermission({ role: "user" }, "mtask:task-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "worker" }, "mtask:task-1")).toBe(false);
+    expect(sessionHasKvWritePermission({ role: "user" }, "fleet:truck-1")).toBe(true);
+    expect(sessionHasKvWritePermission({ role: "worker" }, "fleet:truck-1")).toBe(false);
+    expect(kvWritePermissionError({ role: "worker" }, "fleet:truck-1")).toBe("permission_required:role:admin|user");
     expect(sessionHasKvWritePermission({ role: "executive" }, "appIssue:issue-1")).toBe(true);
     expect(sessionHasKvWritePermission({ role: "cleaner" }, "appIssue:issue-1")).toBe(true);
   });

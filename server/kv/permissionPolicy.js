@@ -14,7 +14,8 @@ const ACTIVE_ROLES = Object.freeze(["admin", "executive", "user", "tech", "worke
 const WRITE_RULES = Object.freeze([
   { prefixes: ["user:"], module: "users", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.user },
   { prefixes: ["config:v1"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings },
-  { prefixes: ["fleet:", "pm:", "photo:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
+  { prefixes: ["fleet:"], roles: ["admin", "user"], entityType: AUDIT_ENTITY_TYPES.fleet },
+  { prefixes: ["pm:", "photo:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.fleet },
   { prefixes: ["ppe:", "ppeitem:", "ppenorm:", "ppeorder:"], module: "ppe", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.ppe },
   { prefixes: ["czone:", "cabsence:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.cleaning },
   { prefixes: ["location:"], module: "settings", minLevel: "manage", entityType: AUDIT_ENTITY_TYPES.settings },

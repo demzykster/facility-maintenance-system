@@ -4597,16 +4597,16 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
   const scoped = useMemo(() => fleetForSession(session, fleet).slice().sort((a, b) => (a.code > b.code ? 1 : -1)), [session, fleet]);
   const [catF, setCatF] = useState("all"), [presF, setPresF] = useState("all"), [deptF, setDeptF] = useState("all"), [q, setQ] = useState(""), [focus, setFocus] = useState(null);
   const [form, setForm] = useState(null), [move, setMove] = useState(null), [conflict, setConflict] = useState(null), [relocateA, setRelocateA] = useState(null), [access, setAccess] = useState(null), [msg, setMsg] = useState("");
-  const myDept = userDepts(session)[0] || "";
+  const myDept = userDepts(session)[0] || "", saveDriverEvent = async (evt) => !evt || await saveConfig(pushDriverEvent(config, evt), { toastOnFail: false }) !== false;
   const writeDriver = async (unit, cat, d, evt) => {
     if (await saveFleet({ ...unit, drivers: { ...(unit.drivers || {}), [cat]: d } }) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
-    if (evt && await saveConfig(pushDriverEvent(config, evt)) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
+    if (evt) void saveDriverEvent(evt);
     return true;
   };
   const dropDriver = async (unit, cat, evt) => {
     const drivers = { ...(unit.drivers || {}) }; delete drivers[cat];
     if (await saveFleet({ ...unit, drivers }) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
-    if (evt && await saveConfig(pushDriverEvent(config, evt)) === false) { setMsg(SAVE_FAILED_MESSAGE); return false; }
+    if (evt) void saveDriverEvent(evt);
     return true;
   };
   const submitForm = async (v) => {
@@ -4630,7 +4630,7 @@ function DriversBoard({ session, fleet, tickets, config, saveFleet, saveConfig, 
     setMsg("");
     const d = driverOf(unit, cat); if (!d) return;
     if (d.status === "pending_add") await writeDriver(unit, cat, { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }, { type: "approved", sub: "add", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName });
-    else if (d.status === "pending_move" && d.moveTo) { const tgt = fleet.find((x) => x.id === d.moveTo.unitId); const occ = tgt ? driverOf(tgt, d.moveTo.category) : null; if (occ && occ !== d && (driverActive(occ) || driverPending(occ))) { setMsg(`היעד תפוס (${tgt?.code} · ${driverShiftMeta(d.moveTo.category).label}) — יש לאשר/לטפל קודם בהעברת ${occ.name}`); return; } const src = { ...(unit.drivers || {}) }; delete src[cat]; if (await saveFleet({ ...unit, drivers: src }) === false) return setMsg(SAVE_FAILED_MESSAGE); if (tgt) { const nd = { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }; delete nd.moveTo; if (await saveFleet({ ...tgt, drivers: { ...(tgt.drivers || {}), [d.moveTo.category]: nd } }) === false) return setMsg(SAVE_FAILED_MESSAGE); } if (await saveConfig(pushDriverEvent(config, { type: "approved", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: d.moveTo.unitCode, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName })) === false) return setMsg(SAVE_FAILED_MESSAGE); }
+    else if (d.status === "pending_move" && d.moveTo) { const tgt = fleet.find((x) => x.id === d.moveTo.unitId); const occ = tgt ? driverOf(tgt, d.moveTo.category) : null; if (occ && occ !== d && (driverActive(occ) || driverPending(occ))) { setMsg(`היעד תפוס (${tgt?.code} · ${driverShiftMeta(d.moveTo.category).label}) — יש לאשר/לטפל קודם בהעברת ${occ.name}`); return; } const src = { ...(unit.drivers || {}) }; delete src[cat]; if (await saveFleet({ ...unit, drivers: src }) === false) return setMsg(SAVE_FAILED_MESSAGE); if (tgt) { const nd = { ...d, status: "active", decidedAt: Date.now(), decidedBy: session.name }; delete nd.moveTo; if (await saveFleet({ ...tgt, drivers: { ...(tgt.drivers || {}), [d.moveTo.category]: nd } }) === false) return setMsg(SAVE_FAILED_MESSAGE); } void saveDriverEvent({ type: "approved", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, toUnitCode: d.moveTo.unitCode, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); }
   };
   const reject = async (unit, cat) => { const d = driverOf(unit, cat); if (!d) return; if (d.status === "pending_add") await dropDriver(unit, cat, { type: "rejected", sub: "add", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); else if (d.status === "pending_move") { const nd = { ...d, status: "active", decidedAt: Date.now() }; delete nd.moveTo; await writeDriver(unit, cat, nd, { type: "rejected", sub: "move", unitId: unit.id, unitCode: unit.code, category: cat, driverName: d.name, byName: session.name, reqByUid: d.addedByUid, reqByName: d.addedByName }); } };
   const myShift = session.shift || "";

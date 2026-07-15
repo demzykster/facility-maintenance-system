@@ -140,11 +140,28 @@ describe("fleet API handler", () => {
     }));
   });
 
-  it("blocks sessions that cannot manage fleet settings from writing", async () => {
+  it("allows department manager sessions to update operational fleet records", async () => {
+    const driver = { upsert: vi.fn().mockResolvedValue({ id: "fleet-2" }) };
+    const handler = createFleetApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "user", permissions: {} })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: { id: "fleet-2", code: "178040", drivers: { night: { name: "Driver", workNo: "11325" } } }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, unit: { id: "fleet-2", code: "178040", sourceKvKey: "fleet:fleet-2" } });
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "fleet-2", code: "178040" }));
+  });
+
+  it("blocks worker sessions from writing normalized fleet units", async () => {
     const driver = { upsert: vi.fn() };
     const handler = createFleetApiHandler({
       driver,
-      sessionClient: sessionClientFor({ permissions: { settings: "view" } })
+      sessionClient: sessionClientFor({ role: "worker", permissions: {} })
     });
 
     const res = await call(handler, {
@@ -153,7 +170,7 @@ describe("fleet API handler", () => {
     });
 
     expect(res.statusCode).toBe(403);
-    expect(res.json()).toEqual({ error: "permission_required:settings:manage" });
+    expect(res.json()).toEqual({ error: "permission_required:role:admin|user" });
     expect(driver.upsert).not.toHaveBeenCalled();
   });
 
