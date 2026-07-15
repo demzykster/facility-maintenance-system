@@ -32,3 +32,10 @@ Each exception must include:
 - Why necessary: manager department fleet cards still opened the extracted `FleetCard` directly from the shell; one additional lazy component binding is needed so manager transport detail opens through `FleetAssetsModule.jsx` without restoring the detail implementation to the monolith.
 - Why extraction was not the right move: the detail implementation is already extracted; this hotfix only reconnects the existing manager shell trigger to that extracted module.
 - Follow-up/removal condition: when the manager fleet department view is moved into `FleetAssetsModule.jsx`, remove this shell lazy binding and reduce `src/ClaudeMaintenanceApp.jsx` below this exception.
+
+- Date: 2026-07-15
+- Owner goal: PM schedule white-screen hotfix after fleet extraction.
+- New line count: 9965.
+- Why necessary: role shell surfaces for manager and technician still rendered extracted PM schedule/detail components by their old local names, while the admin PM module already used the lazy fleet module. Two lazy bindings reconnect those shell entrypoints to `FleetAssetsModule.jsx` and prevent `PMSchedule is not defined` / `PMEntry is not defined` white screens without moving PM implementation back into the shell.
+- Why extraction was not the right move: the PM implementation is already extracted; this hotfix only reconnects remaining role-shell triggers to the extracted module and passes the existing `fleetAssetsUi()` dependency bundle.
+- Follow-up/removal condition: when manager and technician PM surfaces move fully into `FleetAssetsModule.jsx` or another role module, remove these shell lazy bindings and reduce `src/ClaudeMaintenanceApp.jsx` below this exception.

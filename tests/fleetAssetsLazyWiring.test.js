@@ -12,17 +12,23 @@ function lazyUiIconProps(source) {
 describe("fleet assets lazy wiring", () => {
   it("keeps fleet and PM screens behind a lazy wrapper", () => {
     expect(appSource).toContain('const FleetAssetsModuleLazy = lazy(() => import("./FleetAssetsModule.jsx")');
+    expect(appSource).toContain('const FleetPMScheduleLazy = lazy(() => import("./FleetAssetsModule.jsx")');
+    expect(appSource).toContain('const FleetPMEntryLazy = lazy(() => import("./FleetAssetsModule.jsx")');
     expect(appSource).toContain("<FleetAssetsModuleLazy");
     expect(appSource).toContain("fleetAssetsUi");
     expect(appSource).not.toContain("function FleetModule(");
     expect(appSource).not.toContain("function FleetCard(");
     expect(appSource).not.toContain("<FleetCard");
     expect(appSource).not.toContain("function PMModule(");
+    expect(appSource).not.toContain("<PMSchedule");
+    expect(appSource).not.toContain("<PMEntry");
   });
 
   it("keeps the transport, import, detail, and PM workflows in the lazy module", () => {
     expect(fleetAssetsSource).toContain("export function FleetAssetsModule(");
     expect(fleetAssetsSource).toContain("export function FleetAssetCard(");
+    expect(fleetAssetsSource).toContain("export function FleetPMSchedule(");
+    expect(fleetAssetsSource).toContain("export function FleetPMEntry(");
     expect(fleetAssetsSource).toContain("function FleetModule(");
     expect(fleetAssetsSource).toContain("function FleetCard(");
     expect(fleetAssetsSource).toContain("function FleetImportWizard(");
@@ -60,7 +66,7 @@ describe("fleet assets lazy wiring", () => {
   });
 
   it("passes PM scheduler helper dependencies through fleetAssetsUi", () => {
-    for (const helper of ["clampPmDailyCapacity", "pmFreqForUnit"]) {
+    for (const helper of ["clampPmDailyCapacity", "pmColor", "pmFreqForUnit"]) {
       expect(fleetAssetsSource).toContain(`let ${helper};`);
       expect(fleetAssetsUiSource).toMatch(new RegExp(`\\b${helper}\\b`));
     }

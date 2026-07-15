@@ -112,6 +112,8 @@ const SettingsPanelLazy = lazy(() => import("./SettingsPanel.jsx").then((module)
 const TicketDetailLazy = lazy(() => import("./TicketDetail.jsx").then((module) => ({ default: module.TicketDetail })));
 const FleetAssetsModuleLazy = lazy(() => import("./FleetAssetsModule.jsx").then((module) => ({ default: module.FleetAssetsModule })));
 const FleetAssetCardLazy = lazy(() => import("./FleetAssetsModule.jsx").then((module) => ({ default: module.FleetAssetCard })));
+const FleetPMScheduleLazy = lazy(() => import("./FleetAssetsModule.jsx").then((module) => ({ default: module.FleetPMSchedule })));
+const FleetPMEntryLazy = lazy(() => import("./FleetAssetsModule.jsx").then((module) => ({ default: module.FleetPMEntry })));
 const APP_BUILD_COMMIT = typeof __CMMS_BUILD_COMMIT__ !== "undefined" ? __CMMS_BUILD_COMMIT__ : "local";
 const APP_BUILD_TIME = typeof __CMMS_BUILD_TIME__ !== "undefined" ? __CMMS_BUILD_TIME__ : "";
 const SAVE_FAILED_MESSAGE = "השמירה נכשלה. בדקו חיבור ונסו שוב.";
@@ -4412,7 +4414,7 @@ function UserApp(p) {
       {aiAssistantEnabled(config) && <AIFab onClick={() => askAI(null)} />}
       {overlay?.type === "new" && <Overlay persistent onClose={() => setOverlay(null)}><TicketForm {...p} prefill={overlay.prefill} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onCancel={() => setOverlay(null)} onCreate={async (t) => { const ok = await saveTicket(t); if (ok !== false) setOverlay(null); return ok; }} /></Overlay>}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onRepeat={(pf) => setOverlay({ type: "new", prefill: pf })} onAskAI={aiAssistantEnabled(config) ? askAI : null} /></Overlay>}
-      {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
+      {pmView && <Overlay onClose={() => setPmView(null)}><Suspense fallback={<div className="ovl-inner"><div className="note">טוען שיבוץ טיפול…</div></div>}><FleetPMEntryLazy ui={fleetAssetsUi()} task={pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Suspense></Overlay>}
       {uEdit && <Overlay persistent onClose={() => setUEdit(null)}><UserForm user={uEdit} config={config} users={users} session={session} canManageUsers={canManageUsers(session)} canDelete={!!uEdit.id} lockRole="worker" lockDept={session.dept || ""} canManageWorkerAccess={canManageWorkerAccess(session)} onCancel={() => setUEdit(null)} onSave={async (u) => { const ok = await saveUser(u); if (ok !== false) setUEdit(shouldKeepWorkerFormOpenForActivationLink(u, canManageWorkerAccess(session)) ? u : null); return ok; }} onDelete={async () => { const ok = await delUser(uEdit.id); if (ok !== false) setUEdit(null); return ok; }} /></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); setView("tickets"); openTicket(id); }} onGo={goNotif} />}
       {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} openAiTicketDraft={(prefill) => { setShowAI(false); setAiDraft(null); setOverlay({ type: "new", prefill }); }} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
@@ -4487,14 +4489,14 @@ function TechApp(p) {
           </>) : view === "activity" ? (
             <AuditLog session={session} tickets={tickets} fleet={fleet} config={config} onOpenTicket={openTicket} />
           ) : (
-            <PMSchedule items={myPm} fleet={fleet} onOpen={(x) => setPmRun(x)} config={config} />
+            <Suspense fallback={<div className="cards"><Empty text="טוען לוח טיפולים…" Icon={CalendarClock} /></div>}><FleetPMScheduleLazy ui={fleetAssetsUi()} items={myPm} fleet={fleet} onOpen={(x) => setPmRun(x)} config={config} /></Suspense>
           )}
         </div>
       </div>
       <nav className="bottom-nav"><NavBtn active={view === "tickets"} onClick={() => setView("tickets")} Icon={Truck} label="קריאות" /><NavBtn active={view === "pm"} onClick={() => setView("pm")} Icon={CalendarClock} label="טיפולים" /><NavBtn active={view === "activity"} onClick={() => setView("activity")} Icon={Clock} label="יומן" /></nav>
       {aiAssistantEnabled(config) && <AIFab onClick={() => askAI(null)} />}
       {overlay?.type === "detail" && <Overlay onClose={() => setOverlay(null)}><TicketDetail {...p} ticket={tickets.find((x) => x.id === overlay.id)} onBack={() => setOverlay(null)} onOpenTicket={(id) => setOverlay({ type: "detail", id })} onAskAI={aiAssistantEnabled(config) ? askAI : null} /></Overlay>}
-      {pmRun && <Overlay onClose={() => setPmRun(null)}><PMEntry task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Overlay>}
+      {pmRun && <Overlay onClose={() => setPmRun(null)}><Suspense fallback={<div className="ovl-inner"><div className="note">טוען שיבוץ טיפול…</div></div>}><FleetPMEntryLazy ui={fleetAssetsUi()} task={pm.find((x) => x.id === pmRun.id) || pmRun} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onTicket={saveTicket} onClose={() => setPmRun(null)} onSave={savePm} /></Suspense></Overlay>}
       {showNotif && <NotifPanel notif={notif} language={p.language} onClose={() => setShowNotif(false)} onOpen={(id) => { setShowNotif(false); openTicket(id); }} onGo={(go) => { setShowNotif(false); setView(go === "pm" ? "pm" : "tickets"); }} />}
       {showAI && <LazyAIPanel {...p} initialText={aiDraft?.text || ""} initialWorkflow={aiDraft?.workflow} onClose={() => { setShowAI(false); setAiDraft(null); }} />}
       {notif.toast && <Toast t={notif.toast} onClose={notif.dismissToast} />}
@@ -4737,7 +4739,7 @@ function ManagerFleet(p) {
     <div className="manager-fleet-page">
       <div className="seg-tabs s3 manager-fleet-tabs" style={{ maxWidth: 480, marginBottom: 12 }}><button className={tab === "units" ? "on" : ""} onClick={() => setTab("units")}>כלים</button><button className={tab === "drivers" ? "on" : ""} onClick={() => setTab("drivers")}>נהגים / כיסוי{driverReqCount > 0 && <span className="tab-badge">{driverReqCount}</span>}</button><button className={tab === "pm" ? "on" : ""} onClick={() => setTab("pm")}>לוח טיפולים</button></div>
       {tab === "drivers" ? <DriversBoard session={session} fleet={fleet} tickets={tickets} config={config} saveFleet={saveFleet} saveConfig={saveConfig} users={p.users} saveUser={p.saveUser} />
-        : tab === "pm" ? <><div className="note" style={{ marginBottom: 10 }}>טיפולים תקופתיים לכלי המחלקה. יש להוציא את הכלי לטכנאי במועד; הטכנאי יעדכן ביצוע.</div><PMSchedule items={myPm} fleet={fleet} onOpen={(x) => setPmView(x)} config={config} /></>
+        : tab === "pm" ? <><div className="note" style={{ marginBottom: 10 }}>טיפולים תקופתיים לכלי המחלקה. יש להוציא את הכלי לטכנאי במועד; הטכנאי יעדכן ביצוע.</div><Suspense fallback={<div className="cards"><Empty text="טוען לוח טיפולים…" Icon={CalendarClock} /></div>}><FleetPMScheduleLazy ui={fleetAssetsUi()} items={myPm} fleet={fleet} onOpen={(x) => setPmView(x)} config={config} /></Suspense></>
         : <>
         <ProblemUnitsPanel fleet={scoped} tickets={tickets} config={config} onOpen={(id) => setOpenId(id)} />
         <SectionTitle><Truck size={15} /> כלי השינוע של מחלקותיי ({scoped.length})</SectionTitle>
@@ -4745,7 +4747,7 @@ function ManagerFleet(p) {
       </>}
     </div>
     {openId && <Overlay onClose={() => setOpenId(null)}><Suspense fallback={<div className="ovl-inner"><div className="note">טוען כרטיס כלי…</div></div>}><FleetAssetCardLazy ui={fleetAssetsUi()} fleet={fleet.find((x) => x.id === openId)} config={config} tickets={tickets} canDocs={showDocs} canTickets={showTickets} onClose={() => setOpenId(null)} onAskAI={onAskAI} onBlock={async (reason) => { await p.saveTicket(buildBlockTicket(fleet.find((x) => x.id === openId), config, { name: session.name, role: session.role }, reason)); }} /></Suspense></Overlay>}
-    {pmView && <Overlay onClose={() => setPmView(null)}><PMEntry task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Overlay>}
+    {pmView && <Overlay onClose={() => setPmView(null)}><Suspense fallback={<div className="ovl-inner"><div className="note">טוען שיבוץ טיפול…</div></div>}><FleetPMEntryLazy ui={fleetAssetsUi()} task={p.pm.find((x) => x.id === pmView.id) || pmView} session={session} fleet={fleet} tickets={tickets} config={config} canManage={false} onClose={() => setPmView(null)} onSave={() => {}} /></Suspense></Overlay>}
   </>);
 }
 /* ============================================================ CLEANING TRACK (ניקיון / סבבים) — Phase 1 */
@@ -5830,7 +5832,7 @@ function fleetAssetsUi() {
   return {
     AlertTriangle, BarChart3, CalendarClock, Check, CheckCircle2, ChevronLeft, ClipboardList, Clock, Cog, ConfirmBtn, DateInput, Download, DriversBoard, Empty, ExternalLink, FileSpreadsheet, FileText, ListChecks, Meta, Overlay, Package, PenLine, Plus, Printer, RefreshCw, ReportView, Search, SectionTitle, ShieldAlert, Sparkles, Trash2, Truck, Users, Wrench, X,
     DOC_DEFS, FORKLIFT_TYPES, FREQS, HE_DOW, HE_MONTHS, PRIORITIES, SAVE_FAILED_MESSAGE, SEED_POLICY, TRACKS, WEAR, XLSX,
-    assetHealth, buildBlockTicket, buildVehicleTypes, canManageSettings, clampPmDailyCapacity, clearBlockPatches, compactDocLabel, countLabel, dateToTs, daysLeft, docDaysLabel, docStatus, docWarnColor, downloadXlsx, downtimeMs, esc, fleetDepts, fleetInDept, flattenVehicleTypes, fmtDate, fmtDur, freqOf, ils, isOpen, loadReadExcelFile, machineDocs, mergeFleetCatalogAdditions, modelTypeName, nextWorkdayFrom, notifyUser, pendingDriverReqs, pmFreqForUnit, reasonBall, reasonPauses, reasonsForRole, resolveHydraulics, rowsSafe, slaForTicket, stOf, startOfDay, ticketNo, ticketWaitReasonLabel, toWorkday, tsToDate, uid, unitBlock, unitDesc, unitLabel, unitModelCode, unitNote, unitTypeName, waitReasonLabel
+    assetHealth, buildBlockTicket, buildVehicleTypes, canManageSettings, clampPmDailyCapacity, clearBlockPatches, compactDocLabel, countLabel, dateToTs, daysLeft, docDaysLabel, docStatus, docWarnColor, downloadXlsx, downtimeMs, esc, fleetDepts, fleetInDept, flattenVehicleTypes, fmtDate, fmtDur, freqOf, ils, isOpen, loadReadExcelFile, machineDocs, mergeFleetCatalogAdditions, modelTypeName, nextWorkdayFrom, notifyUser, pendingDriverReqs, pmColor, pmFreqForUnit, reasonBall, reasonPauses, reasonsForRole, resolveHydraulics, rowsSafe, slaForTicket, stOf, startOfDay, ticketNo, ticketWaitReasonLabel, toWorkday, tsToDate, uid, unitBlock, unitDesc, unitLabel, unitModelCode, unitNote, unitTypeName, waitReasonLabel
   };
 }
 

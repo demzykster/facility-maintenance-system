@@ -85,6 +85,7 @@ let modelTypeName;
 let nextWorkdayFrom;
 let notifyUser;
 let pendingDriverReqs;
+let pmColor;
 let pmFreqForUnit;
 let reasonBall;
 let reasonPauses;
@@ -110,7 +111,7 @@ let waitReasonLabel;
 
 function applyFleetAssetsUi(ui = {}) {
   ({
-    AlertTriangle, BarChart3, CalendarClock, Check, CheckCircle2, ChevronLeft, ClipboardList, Clock, Cog, ConfirmBtn, DateInput, Download, DriversBoard, Empty, ExternalLink, FileSpreadsheet, FileText, ListChecks, Meta, Overlay, Package, PenLine, Plus, Printer, RefreshCw, ReportView, Search, SectionTitle, ShieldAlert, Sparkles, Trash2, Truck, Users, Wrench, X, DOC_DEFS, FORKLIFT_TYPES, FREQS, HE_DOW, HE_MONTHS, PRIORITIES, SAVE_FAILED_MESSAGE, SEED_POLICY, TRACKS, WEAR, XLSX, assetHealth, buildBlockTicket, buildVehicleTypes, canManageSettings, clampPmDailyCapacity, clearBlockPatches, compactDocLabel, countLabel, dateToTs, daysLeft, docDaysLabel, docStatus, docWarnColor, downloadXlsx, downtimeMs, esc, fleetDepts, fleetInDept, flattenVehicleTypes, fmtDate, fmtDur, freqOf, ils, isOpen, loadReadExcelFile, machineDocs, mergeFleetCatalogAdditions, modelTypeName, nextWorkdayFrom, notifyUser, pendingDriverReqs, pmFreqForUnit, reasonBall, reasonPauses, reasonsForRole, resolveHydraulics, rowsSafe, slaForTicket, stOf, startOfDay, techCanSeeFleetForSession, ticketNo, ticketWaitReasonLabel, toWorkday, tsToDate, uid, unitBlock, unitDesc, unitLabel, unitModelCode, unitNote, unitTypeName, waitReasonLabel
+    AlertTriangle, BarChart3, CalendarClock, Check, CheckCircle2, ChevronLeft, ClipboardList, Clock, Cog, ConfirmBtn, DateInput, Download, DriversBoard, Empty, ExternalLink, FileSpreadsheet, FileText, ListChecks, Meta, Overlay, Package, PenLine, Plus, Printer, RefreshCw, ReportView, Search, SectionTitle, ShieldAlert, Sparkles, Trash2, Truck, Users, Wrench, X, DOC_DEFS, FORKLIFT_TYPES, FREQS, HE_DOW, HE_MONTHS, PRIORITIES, SAVE_FAILED_MESSAGE, SEED_POLICY, TRACKS, WEAR, XLSX, assetHealth, buildBlockTicket, buildVehicleTypes, canManageSettings, clampPmDailyCapacity, clearBlockPatches, compactDocLabel, countLabel, dateToTs, daysLeft, docDaysLabel, docStatus, docWarnColor, downloadXlsx, downtimeMs, esc, fleetDepts, fleetInDept, flattenVehicleTypes, fmtDate, fmtDur, freqOf, ils, isOpen, loadReadExcelFile, machineDocs, mergeFleetCatalogAdditions, modelTypeName, nextWorkdayFrom, notifyUser, pendingDriverReqs, pmColor, pmFreqForUnit, reasonBall, reasonPauses, reasonsForRole, resolveHydraulics, rowsSafe, slaForTicket, stOf, startOfDay, techCanSeeFleetForSession, ticketNo, ticketWaitReasonLabel, toWorkday, tsToDate, uid, unitBlock, unitDesc, unitLabel, unitModelCode, unitNote, unitTypeName, waitReasonLabel
   } = ui);
 }
 
@@ -127,6 +128,16 @@ export function FleetAssetsModule({ mode = "fleet", assetNav, ui = {}, ...props 
 export function FleetAssetCard({ ui = {}, ...props }) {
   applyFleetAssetsUi(ui);
   return <FleetCard {...props} />;
+}
+
+export function FleetPMSchedule({ ui = {}, ...props }) {
+  applyFleetAssetsUi(ui);
+  return <PMSchedule {...props} />;
+}
+
+export function FleetPMEntry({ ui = {}, ...props }) {
+  applyFleetAssetsUi(ui);
+  return <PMEntry {...props} />;
 }
 
 function FleetTypeSettings({ config, fleet, users = [], saveConfig }) {
