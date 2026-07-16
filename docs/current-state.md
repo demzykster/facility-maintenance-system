@@ -31,12 +31,20 @@ Historical or detailed handoff documents remain useful, but they do not override
 - Current AI implementation uses deterministic proposals, human confirmation, and normal save paths.
 - Server-backed AI exists through `/api/ai/assist`, grouped under `api/ai/[action].js`.
 - AI provider SDK usage is centralized in `server/ai/providerClient.js`.
+- The capability-based AI `ticket.create` foundation is in `main`, but the legacy proposal-confirmation path remains the active user-facing write path.
+- The autonomous AI `create_ticket` capability path is implemented but inert until its server-create and autonomy feature flags are enabled.
+- Server-authoritative ticket numbering and ticket-create idempotency are implemented in code, migration SQL, tests, and CI, but they are not proven against live staging yet.
+- Migration `supabase/migrations/20260714120000_ticket_create_numbering.sql` has not been applied as part of this implementation stage.
+- `CMMS_TICKET_SERVER_CREATE_V2`, `CMMS_TICKET_SERVER_CREATE_V2_READY`, and `CMMS_AI_AUTONOMOUS_TICKET_CREATE` are off by default.
+- The AI capability registry is a useful working experiment and allowlist point, not yet a proven universal framework.
 - BI includes a unified overview and ticket heatmap through `src/BIOverview.jsx`, `src/BIHeatmapPanel.jsx`, and `src/biScopeModel.js`.
 - `src/ClaudeMaintenanceApp.jsx` is still the app shell and composition root. It is not a place for new business logic.
+- External audit and evidence-backlog snapshots are archived under `docs/archive/` as advisory history. They do not override current code, Git state, or this file.
 
 ## Partial, Stale, Or Unknown
 
 - Live AI provider success is not guaranteed by the code alone. Verify `/api/ai/status?check=1` only when the goal allows an authenticated live read.
+- Autonomous ticket create, server-create RPC, sequence numbering, and idempotency still need controlled staging evidence before production rollout or user-value claims.
 - Current staging gate, current load test, backup/restore drill, rollback drill, monitoring/alerts, security advisor output, and app issue report contents require fresh verification before release claims.
 - `docs/current-status.md` is archive/reference.
 - Long sections of `docs/handoff-for-next-codex.md` are historical handoff detail.
@@ -53,9 +61,22 @@ Historical or detailed handoff documents remain useful, but they do not override
 
 Do not start any priority without an explicit owner goal.
 
+## Next Allowed Operational Stage
+
+The next AI ticket-create stage is a separate controlled staging rollout, not a new architecture/framework goal.
+
+Order:
+
+1. Run staging preflight and confirm the current code deploy is healthy with server-create cutover off.
+2. Apply `20260714120000_ticket_create_numbering.sql` to staging only after explicit operational approval.
+3. Enable `CMMS_TICKET_SERVER_CREATE_V2` and `CMMS_TICKET_SERVER_CREATE_V2_READY` in staging after RPC readiness is verified.
+4. Verify manual create/update, server-create numbering, idempotency replay/conflict, and rollback by disabling cutover.
+5. Enable `CMMS_AI_AUTONOMOUS_TICKET_CREATE` last, only after server-create staging evidence is accepted.
+
+Detailed rollout and evidence criteria live in `docs/ai-ticket-create-slice-metrics.md`.
+
 ## Open Decisions
 
 - BFF/service-role versus future user-scoped/RLS boundary remains open. Do not create an ADR until the owner accepts a concrete decision.
 - Future AI action autonomy must be approved per domain command and risk class. Universal confirmation is the current implementation, not the permanent target.
 - Further monolith reduction should proceed by scoped extraction goals, not by a global folder migration.
-

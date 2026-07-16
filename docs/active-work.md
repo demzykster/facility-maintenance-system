@@ -2,7 +2,7 @@
 
 > Canonical Codex entry now starts at `AGENTS.md`.
 > Current project status belongs in `docs/current-state.md`; durable architecture rules belong in `docs/architecture-rules.md`.
-> This file remains a live handoff ledger and may contain detailed recent-work context, but it does not override current code, Git state, or the canonical harness docs.
+> Historical/reference work ledger. This file preserves detailed branch, PR, and work-cycle context, but it does not override current code, Git state, `docs/current-state.md`, or the canonical harness docs.
 
 ## Current Branch
 

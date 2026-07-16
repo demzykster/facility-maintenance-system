@@ -2,7 +2,7 @@
 
 GitHub is the shared source of truth. The active collaborators are the owner and Codex sessions.
 
-Claude is no longer part of the default workflow. Historical Claude notes may remain in docs or git history, but new work should be coordinated through GitHub, `docs/active-work.md`, and `docs/backlog.md`.
+Claude is no longer part of the default workflow. Historical Claude notes may remain in docs or git history, but new work should be coordinated through GitHub, `docs/current-state.md`, and the task-specific docs named by the current goal.
 
 ## Roles
 
@@ -38,15 +38,16 @@ Required checks:
 - Check open PRs if available.
 - Check remote branches, not only open PRs. A pushed branch without PR is still active work.
 - Include draft PRs in the check. A draft PR is still active work and must be named in `docs/active-work.md`.
-- Always read `docs/active-work.md` first, even if `main` looks clean and there are no open PRs.
-- After `docs/active-work.md`, read only the docs needed for the current task.
+- Always read `AGENTS.md` and `docs/current-state.md` for current status, even if `main` looks clean and there are no open PRs.
+- Read `docs/active-work.md` only when you need historical branch, PR, or work-cycle detail.
+- After `docs/current-state.md`, read only the docs needed for the current task.
 
 If `main`, open PRs, remote branches, or docs disagree, treat that as a synchronization problem before doing product work.
 
 ## Documentation Rules
 
-- `docs/active-work.md` is a short live ledger, not a full project diary.
-- Keep `docs/active-work.md` focused on current branch, latest few PRs, next action, blockers, and validation state.
+- `docs/active-work.md` is a historical/reference work ledger, not the current status source.
+- Keep current status in `docs/current-state.md`; use `docs/active-work.md` for branch, PR, next-action, blocker, and validation detail only when that history is relevant.
 - Update `docs/active-work.md` when the active state changes, work pauses mid-branch, strategy changes, a major block closes, or the existing ledger would mislead the next session.
 - Do not create a separate ledger-only PR after every product PR if `main` is clean and the next step is obvious.
 - Update `docs/backlog.md`, `docs/engineering-dialogue.md`, and archive docs only when their content actually changes, not automatically after every PR.
@@ -88,7 +89,8 @@ git log --oneline --decorate -5 origin/main
 gh pr list --state open --limit 10
 
 Read first:
-- docs/active-work.md
+- AGENTS.md
+- docs/current-state.md
 
 Then read only what the task needs:
 - docs/backlog.md for open tasks
@@ -105,6 +107,6 @@ Rules:
 - R10 is allowed only as focused production-data slices with migration/API/adapter/tests/gate evidence.
 - No broad modular split.
 - For code changes run npm test -- --run, npm run build, and browser smoke-check UI behavior changes.
-- Keep docs short: active-work is a live ledger, not full history.
+- Keep current status in docs/current-state.md. Treat active-work and handoff files as historical/reference unless the current goal needs their detail.
 - If blocked, write PROBLEM: and explain safe options.
 ```

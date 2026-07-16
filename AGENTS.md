@@ -8,11 +8,13 @@ This is the repo-local entry point for Codex work on CMMS. It replaces long chat
 2. Schemas, API handlers, tests, and server validation.
 3. `docs/current-state.md`.
 4. `docs/architecture-rules.md` and accepted ADRs in `docs/decisions/`.
-5. Current handoff files such as `docs/active-work.md`.
-6. Historical/reference files, including `docs/current-status.md`, old sections of `docs/handoff-for-next-codex.md`, `docs/codex-main-log.md`, and `docs/archive/`.
+5. Task-specific operational docs, release docs, and module docs.
+6. Historical/reference files, including `docs/active-work.md`, `docs/current-status.md`, old sections of `docs/handoff-for-next-codex.md`, `docs/codex-main-log.md`, and `docs/archive/`.
 7. External local skills and previous chat memory.
 
 Documents never outrank current code and Git state. If sources disagree, verify the live repo before acting.
+
+`docs/current-state.md` is the single current status source. Older handoff, ledger, and archive files preserve history and rationale, but they must not be used as current status when they conflict with Git, code, or `docs/current-state.md`.
 
 ## Startup
 
@@ -32,6 +34,7 @@ At the start of a new CMMS goal:
 - Keep changes scoped to the requested surface.
 - Stop before commit, push, PR, destructive scripts, production data changes, Supabase/Vercel config changes, or live write tests unless the owner explicitly asks.
 - Treat live/staging data as real owner data.
+- Do not create a new process, rule, ADR, or governance layer unless there is evidence that the existing project harness is insufficient. Prefer product work, controlled rollout, and real operational evidence before adding more process.
 
 ## Environments
 
@@ -84,4 +87,3 @@ End each completed goal with:
 - remaining unknowns or open decisions;
 - proposed commit message;
 - explicit note that no next goal was started.
-

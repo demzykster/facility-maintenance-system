@@ -1,5 +1,7 @@
 # AI Ticket Create Slice Metrics
 
+> Specialized operational reference for the AI ticket-create rollout. This is not the general project source of truth; current status and next allowed stage belong in `docs/current-state.md`.
+
 Date: 2026-07-14
 
 Scope: first autonomous `ticket.create` vertical slice only. This file records the baseline/new-result metrics for the owner-approved implementation goal. It is not a rollout approval and does not imply the Supabase migration has been applied.
