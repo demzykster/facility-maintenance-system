@@ -8497,8 +8497,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .track-tag span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tcard-state{display:flex;align-items:center;gap:4px;margin:3px 0 1px;font-size:12px;font-weight:700;}
 .tcard-state svg{flex-shrink:0;}
-.tcard-badges{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:nowrap;min-width:0;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
-.tcard-badges::-webkit-scrollbar{display:none;}
+.tcard-badges{display:flex;align-items:center;justify-content:flex-start;gap:6px;margin-top:7px;flex-wrap:wrap;min-width:0;direction:rtl;}
 .tcard-badges .badge,.tcard-badges .risk-badge{border:1px solid rgba(201,205,209,.72);}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}
