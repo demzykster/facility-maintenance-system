@@ -13,13 +13,14 @@ describe("ticket detail lazy wiring", () => {
     expect(appSource).not.toContain("function AdminTicketManualPanel(");
   });
 
-  it("keeps close, supplier routing, and admin edit workflows in the lazy module", () => {
+  it("keeps close, supplier context, and admin edit workflows in the lazy module", () => {
     expect(ticketDetailSource).toContain("export function TicketDetail(");
     expect(ticketDetailSource).toContain("function AdminTicketManualPanel(");
     expect(ticketDetailSource).toContain("function AdminTicketQuickEdit(");
     expect(ticketDetailSource).toContain("function CloseModal(");
-    expect(ticketDetailSource).toContain("setSupplierRoute");
+    expect(ticketDetailSource).toContain("transportTicketSupplierName");
     expect(ticketDetailSource).toContain("שיוך ספק / קבלן");
+    expect(ticketDetailSource).toContain("ספק השינוע נקבע מכרטיס הכלי");
   });
 
   it("does not pass stale runtime helpers into the lazy ticket detail bridge", () => {

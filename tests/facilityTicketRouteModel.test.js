@@ -75,7 +75,8 @@ describe("facility ticket route model", () => {
   });
 
   it("keeps the admin facility panel separate from the executor workflow", () => {
-    expect(ticketDetailSource).toContain('isAdmin && track !== "facility"');
+    expect(ticketDetailSource).toContain('isAdmin && track === "transport" && adminTransportExecutionOpen');
+    expect(ticketDetailSource).toContain("הצג פעולות ביצוע חריגות");
     expect(ticketDetailSource).toContain("admin-ticket-manual-shell");
     expect(appSource).toContain("ניהול חריג של מנהל מערכת");
   });

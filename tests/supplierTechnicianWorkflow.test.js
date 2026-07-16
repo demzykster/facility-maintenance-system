@@ -49,8 +49,9 @@ describe("supplier technician workflow wiring", () => {
     expect(formSource).toContain("supplierAssign");
     expect(formSource).toContain("supplier: routedSupplier || \"\"");
     expect(formSource).toContain("supplierCandidatesForTicket");
-    expect(detailSource).toContain("setSupplierRoute");
+    expect(detailSource).toContain("transportTicketSupplierName");
     expect(detailSource).toContain("שיוך ספק / קבלן");
+    expect(detailSource).toContain("ספק השינוע נקבע מכרטיס הכלי");
     expect(detailSource).not.toContain("p.techNames.map");
     expect(detailSource).not.toContain("שיוך טכנאי");
   });

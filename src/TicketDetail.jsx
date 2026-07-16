@@ -43,7 +43,6 @@ const Phone = uiComponent("Phone");
 const RefreshCw = uiComponent("RefreshCw");
 const Search = uiComponent("Search");
 const SectionTitle = uiComponent("SectionTitle");
-const Send = uiComponent("Send");
 const ShieldCheck = uiComponent("ShieldCheck");
 const SlaBar = uiComponent("SlaBar");
 const Sparkles = uiComponent("Sparkles");
@@ -176,6 +175,11 @@ export function applyFacilityAdminProcessingDraft(ticket = {}, draft = {}, optio
   };
 }
 
+export function transportTicketSupplierName(ticket = {}, fleet = []) {
+  const linkedUnit = (fleet || []).find((unit) => unit?.id && unit.id === ticket.forkliftId);
+  return text(linkedUnit?.supplier || ticket.supplier) || "לא מוגדר";
+}
+
 export function TicketDetail(p) {
   ticketDetailRuntimeUi = p.ui || ticketDetailRuntimeUi;
   const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
@@ -183,10 +187,12 @@ export function TicketDetail(p) {
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const [adminQuickEdit, setAdminQuickEdit] = useState("");
   const [facilityAdminDraft, setFacilityAdminDraft] = useState(() => facilityAdminProcessingDraft(ticket));
+  const [adminTransportExecutionOpen, setAdminTransportExecutionOpen] = useState(false);
   const afterRef = useRef(null);
   useEffect(() => { let on = true; if (ticket?.hasPhoto) TICKET_PHOTOS.load(ticket, "before").then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto, ticket?.photoPath]);
   useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) TICKET_PHOTOS.load(ticket, "after").then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto, ticket?.afterPhotoPath]);
   useEffect(() => { setFacilityAdminDraft(facilityAdminProcessingDraft(ticket)); }, [ticket?.id, ticket?.status, ticket?.waitingReason, ticket?.supplier]);
+  useEffect(() => { setAdminTransportExecutionOpen(false); }, [ticket?.id]);
   const grabAfter = (file) => { if (!file) return; const r = new FileReader(); r.onload = (ev) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const cv = document.createElement("canvas"); cv.width = width; cv.height = height; cv.getContext("2d").drawImage(img, 0, 0, width, height); setAfterPhoto(cv.toDataURL("image/jpeg", 0.6)); }; img.src = ev.target.result; }; r.readAsDataURL(file); };
   const exactRelated = useMemo(() => ticket?.forkliftId ? tickets.filter((t) => t.id !== ticket.id && t.forkliftId === ticket.forkliftId).sort((a, b) => b.createdAt - a.createdAt) : [], [ticket, tickets]);
   const related = useMemo(() => ticket ? similarTickets(ticket, tickets, { days: 30 }).map((x) => x.t) : [], [ticket, tickets]);
@@ -251,14 +257,6 @@ export function TicketDetail(p) {
   const repeat = () => onRepeat && onRepeat({ track: track, category: ticket.category, forkliftId: ticket.forkliftId, downtimeType: ticket.downtimeType, zone: ticket.zone, asset: ticket.asset, subject: ticket.subject, priority: ticket.priority });
   const ticketSupplierOptions = supplierCandidatesForTicket(config, ticket, p.fleet || []);
   const ticketSupplierSelectOptions = ticket.supplier && !ticketSupplierOptions.includes(ticket.supplier) ? [ticket.supplier, ...ticketSupplierOptions] : ticketSupplierOptions;
-  const setSupplierRoute = (name) => {
-    const supplierName = (name || "").trim();
-    if (track === "facility") {
-      upd(facilityOwnerPatch(ticket, session, { supplier: supplierName, status: ticket.status }), supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
-      return;
-    }
-    upd({ supplier: supplierName, assignee: "", routedTech: true, mgrExec: false, status: ticket.status === "new" && supplierName ? "in_progress" : ticket.status }, supplierName ? `שויך לספק: ${supplierName}` : "שיוך הספק הוסר");
-  };
   const adminQuickSave = (label, patch) => {
     setAdminQuickEdit("");
     upd(normalizeFacilitySupplierPatch(ticket, patch, session), `עריכת מנהל: ${label}`, "admin_manual");
@@ -286,7 +284,7 @@ export function TicketDetail(p) {
   const isTech = role === "tech";
   const isAdmin = role === "admin";
   const executorRole = isTech ? "tech" : (isAdmin ? "tech" : role);
-  const canOperateAsExecutor = (isTech || (isAdmin && track !== "facility")) && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework";
+  const canOperateAsExecutor = (isTech || (isAdmin && track === "transport" && adminTransportExecutionOpen)) && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework";
   const canEditExecutorState = isAdmin || ticket.assignee === session.name;
   const mine = !isTech && ownsPendingUserTicket(session, ticket);
   // Менеджер-исполнитель: заявка по зданию назначена ему лично — работает как техник
@@ -297,6 +295,7 @@ export function TicketDetail(p) {
   const canConfirm = !isTech && canConfirmTicketForSession(session, ticket);
   const facilityAdminWaitReasons = track === "facility" ? wReasons(config).filter((r) => r.id !== "no_equipment") : [];
   const facilityAdminProcessingDirty = facilityAdminProcessingHasChanges(ticket, facilityAdminDraft);
+  const fixedTransportSupplier = track === "transport" ? transportTicketSupplierName(ticket, p.fleet || []) : "";
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
   const detailLifecycleOptions = {
     now: Date.now(),
@@ -348,6 +347,7 @@ export function TicketDetail(p) {
         <Meta Icon={User} label="פותח" value={ticket.createdBy?.name} />
         {requesterPhone && <Meta Icon={Phone} label="טלפון פותח" value={<a className="tel-link" href={`tel:${requesterTel || requesterPhone}`}>{requesterPhone}</a>} />}
         <Meta Icon={Clock} label="נפתח" value={`${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`} />
+        {track === "transport" && <Meta Icon={Truck} label="ספק כלי" value={fixedTransportSupplier} />}
         <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || ticket.supplier || "טרם שויך"} action={isAdmin ? () => setAdminQuickEdit("assignee") : null} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
         {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
@@ -458,10 +458,10 @@ export function TicketDetail(p) {
         {track === "facility" && <><SectionTitle>סיבות המתנה</SectionTitle>
           <div className="pr-row">{facilityAdminWaitReasons.map((r) => <button key={r.id} className={"pr-pick" + (facilityAdminDraft.waitingReason === r.id ? " on" : "")} onClick={() => setFacilityAdminDraft((draft) => ({ ...draft, waitingReason: r.id }))} style={facilityAdminDraft.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
           <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={facilityAdminDraft.supplier || ""} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, supplier: ev.target.value }))}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
-        {track === "transport" && <><SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— מאגר שינוע / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">ברירת המחדל מגיעה מספק הכלי, ואפשר לשנות ידנית אם הטיפול עובר לקבלן אחר.</div></>}
+        {track === "transport" && <><SectionTitle>ספק כלי</SectionTitle><div className="desc-box">{fixedTransportSupplier}</div><div className="hint">ספק השינוע נקבע מכרטיס הכלי. שינוי ספק נעשה בכרטיס הכלי ולא מתוך קריאה בודדת.</div></>}
         <SectionTitle>הערה</SectionTitle>
-        {track === "facility" ? <input className="ta" value={facilityAdminDraft.note} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, note: ev.target.value }))} placeholder="עדכון…" /> : <div className="note-row"><input value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" onKeyDown={(ev) => ev.key === "Enter" && addNote()} /><button className="btn-primary" aria-label="שליחת עדכון לקריאה" onClick={addNote}><Send size={16} /></button></div>}
-        {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>}
+        {track === "facility" ? <input className="ta" value={facilityAdminDraft.note} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, note: ev.target.value }))} placeholder="עדכון…" /> : <input className="ta" value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" />}
+        {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={addNote} disabled={!note.trim()}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={() => setAdminTransportExecutionOpen((value) => !value)}><Wrench size={15} /> {adminTransportExecutionOpen ? "הסתר פעולות ביצוע חריגות" : "הצג פעולות ביצוע חריגות"}</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div>}
       </>)}
 
       {role === "admin" && <div className="admin-ticket-manual-shell"><AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} /></div>}

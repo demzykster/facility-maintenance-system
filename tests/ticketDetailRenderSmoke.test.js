@@ -5,6 +5,7 @@ import {
   applyFacilityAdminProcessingDraft,
   facilityAdminProcessingDraft,
   facilityAdminProcessingHasChanges,
+  transportTicketSupplierName,
   TicketDetail
 } from "../src/TicketDetail.jsx";
 
@@ -99,7 +100,7 @@ function smokeTicket(track) {
     asset: track === "transport" ? "194340" : "חדר הפצה",
     forkliftId: track === "transport" ? "fleet-1" : null,
     downtimeType: track === "transport" ? "minor" : null,
-    supplier: track === "transport" ? "טויוטה" : "",
+    supplier: track === "transport" ? "טויוטה ישן" : "",
     createdBy: { id: "admin-1", name: "Vadim", role: "admin" },
     createdAt: now,
     updatedAt: now,
@@ -113,7 +114,7 @@ function renderTicket(track) {
     ui: ticketDetailSmokeUi(),
     ticket: smokeTicket(track),
     tickets: [],
-    fleet: [{ id: "fleet-1", code: "194340" }],
+    fleet: [{ id: "fleet-1", code: "194340", supplier: "טויוטה" }],
     users: [],
     config: {},
     session: { id: "admin-1", name: "Vadim", role: "admin" },
@@ -129,6 +130,36 @@ describe("ticket detail render smoke", () => {
 
   it("renders a transport ticket detail without runtime bridge errors", () => {
     expect(renderTicket("transport")).toContain("כסא לא תקין");
+  });
+
+  it("shows transport supplier as read-only context instead of an editable route selector", () => {
+    const html = renderTicket("transport");
+
+    expect(html).toContain("ספק כלי");
+    expect(html).toContain("טויוטה");
+    expect(html).toContain("ספק השינוע נקבע מכרטיס הכלי");
+    expect(html).not.toContain("שיוך ספק / קבלן");
+  });
+
+  it("keeps transport admin in control mode until execution actions are explicitly shown", () => {
+    const html = renderTicket("transport");
+
+    expect(html).toContain("הצג פעולות ביצוע חריגות");
+    expect(html).toContain("סגירה סופית ואישור עלות");
+    expect(html).not.toContain("קבל לטיפול");
+    expect(html).not.toContain("סיווג מקור התקלה");
+    expect(html).not.toContain("סיום טיפול");
+  });
+
+  it("derives transport supplier from the linked fleet unit before legacy ticket data", () => {
+    expect(transportTicketSupplierName(
+      { track: "transport", forkliftId: "fleet-1", supplier: "Legacy" },
+      [{ id: "fleet-1", supplier: "טויוטה" }]
+    )).toBe("טויוטה");
+    expect(transportTicketSupplierName(
+      { track: "transport", forkliftId: "missing", supplier: "Legacy" },
+      []
+    )).toBe("Legacy");
   });
 
   it("keeps facility admin waiting edits as a draft until explicit save", () => {
