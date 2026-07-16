@@ -1,0 +1,4 @@
+interface:
+  display_name: "Supabase Postgres Safe Migrations"
+  short_description: "Safe CMMS Postgres migration review."
+  default_prompt: "Review a CMMS Supabase migration, RPC, RLS, index, sequence, or rollout plan for safety."

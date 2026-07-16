@@ -1,0 +1,4 @@
+interface:
+  display_name: "React Vertical Slice Extraction"
+  short_description: "Safe React/Vite extraction for CMMS."
+  default_prompt: "Plan or execute a scoped CMMS React/Vite vertical slice extraction without broad rewrites."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "CMMS Security Boundary Review"
+  short_description: "CMMS auth and data boundary review."
+  default_prompt: "Review CMMS auth, permissions, service-role use, secrets, prompt injection, audit, or destructive action boundaries."

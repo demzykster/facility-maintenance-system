@@ -1,0 +1,4 @@
+interface:
+  display_name: "CMMS AI Capability Design"
+  short_description: "CMMS AI capability architecture."
+  default_prompt: "Design or review a CMMS AI capability with registry, permissions, risk-based autonomy, idempotency, authoritative results, and provider boundaries."

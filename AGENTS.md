@@ -27,6 +27,17 @@ At the start of a new CMMS goal:
 5. Read only the subject-specific docs needed for the goal.
 6. Do not continue old work unless the owner gives a new `/goal`.
 
+## Skill routing
+
+Load only the skills relevant to the current task. Before substantial work, briefly state the selected skills and why; before the final report, state which skill checks were completed. If a required skill is missing, stop and report the gap instead of silently bypassing it. This root `AGENTS.md` has priority over global CMMS skills when instructions conflict.
+
+- UI or visual change: `cmms-ui-rtl-design-audit` + `playwright-ui-regression-audit`.
+- React extraction or moving code out of the monolith: `react-vertical-slice-extraction` + `playwright-ui-regression-audit`.
+- Supabase migration, RPC, RLS, or database schema work: `supabase-postgres-safe-migrations` + `cmms-security-boundary-review` + `cmms-controlled-rollout`.
+- AI tool, capability, or autonomous write action: `cmms-ai-capability-design` + `cmms-security-boundary-review`; add `cmms-controlled-rollout` when changing a write path or flags.
+- Runtime or production issue: `cmms-runtime-issue-triage` + the relevant browser or domain skill.
+- Current-state, ADR, handoff, or source-of-truth docs: `project-documentation-hygiene`.
+
 ## Goal Workflow
 
 - Work only on the explicit owner goal.

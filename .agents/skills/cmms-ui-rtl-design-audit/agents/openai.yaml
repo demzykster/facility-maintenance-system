@@ -1,0 +1,4 @@
+interface:
+  display_name: "CMMS UI RTL Design Audit"
+  short_description: "CMMS RTL and mobile UI audit."
+  default_prompt: "Review or modify a CMMS UI change with RTL, mobile, accessibility, screenshot, and browser verification requirements."

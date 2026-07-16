@@ -1,0 +1,4 @@
+interface:
+  display_name: "Playwright UI Regression Audit"
+  short_description: "Browser regression checks for CMMS UI."
+  default_prompt: "Verify a CMMS UI or extraction change in a real browser with desktop/mobile screenshots and console checks."

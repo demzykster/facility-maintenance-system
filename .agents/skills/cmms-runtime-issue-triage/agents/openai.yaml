@@ -1,0 +1,4 @@
+interface:
+  display_name: "CMMS Runtime Issue Triage"
+  short_description: "CMMS runtime issue grouping."
+  default_prompt: "Triage CMMS runtime or production issues by signature, frequency, affected route, severity, reproduction, and regression proof."

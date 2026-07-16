@@ -1,0 +1,4 @@
+interface:
+  display_name: "CMMS Controlled Rollout"
+  short_description: "CMMS flag and staging rollout guard."
+  default_prompt: "Plan or review a CMMS staged rollout with feature flags, migrations, smoke checks, stop points, and rollback."

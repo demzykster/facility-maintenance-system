@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Documentation Hygiene"
+  short_description: "Evidence-first CMMS docs hygiene."
+  default_prompt: "Update or audit CMMS status, handoff, ADR, or harness docs using current code, Git, source hierarchy, and evidence."
