@@ -10,6 +10,10 @@ const numberingMigrationSql = readFileSync(
   new URL("../supabase/migrations/20260714120000_ticket_create_numbering.sql", import.meta.url),
   "utf8"
 );
+const ticketCreateActorConflictFixSql = readFileSync(
+  new URL("../supabase/migrations/20260717003000_ticket_create_actor_id_conflict_fix.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Supabase tickets core migration", () => {
   it("adds tickets to the staging schema gate", () => {
@@ -75,5 +79,21 @@ describe("Supabase tickets core migration", () => {
     expect(numberingMigrationSql).toContain("or nullif(ticket_payload->>'forklift_id', '') is not null");
     expect(numberingMigrationSql).toContain("then 'T'");
     expect(numberingMigrationSql).toContain("else 'F'");
+  });
+
+  it("keeps the lab-proven actor_id conflict fix scoped to the RPC idempotency reservation", () => {
+    expect(ticketCreateActorConflictFixSql).toContain("create or replace function public.cmms_create_ticket");
+    expect(ticketCreateActorConflictFixSql).toContain("on conflict on constraint ticket_create_idempotency_pkey do nothing");
+    expect(ticketCreateActorConflictFixSql).not.toContain("on conflict (operation, actor_id, idempotency_key) do nothing");
+    expect(ticketCreateActorConflictFixSql).toContain("where idem.operation = 'create_ticket'");
+    expect(ticketCreateActorConflictFixSql).toContain("and idem.actor_id = clean_actor");
+    expect(ticketCreateActorConflictFixSql).toContain("raise exception 'idempotency_conflict'");
+    expect(ticketCreateActorConflictFixSql).toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to service_role");
+    expect(ticketCreateActorConflictFixSql).not.toMatch(/\bdelete\s+from\b/i);
+    expect(ticketCreateActorConflictFixSql).not.toMatch(/\btruncate\b/i);
+    expect(ticketCreateActorConflictFixSql).not.toMatch(/alter\s+table\s+public\.\w+\s+disable\s+row\s+level\s+security/i);
+    expect(ticketCreateActorConflictFixSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to public");
+    expect(ticketCreateActorConflictFixSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to anon");
+    expect(ticketCreateActorConflictFixSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to authenticated");
   });
 });

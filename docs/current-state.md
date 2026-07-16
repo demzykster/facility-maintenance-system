@@ -33,8 +33,10 @@ Historical or detailed handoff documents remain useful, but they do not override
 - AI provider SDK usage is centralized in `server/ai/providerClient.js`.
 - The capability-based AI `ticket.create` foundation is in `main`, but the legacy proposal-confirmation path remains the active user-facing write path.
 - The autonomous AI `create_ticket` capability path is implemented but inert until its server-create and autonomy feature flags are enabled.
-- Server-authoritative ticket numbering and ticket-create idempotency are implemented in code, migration SQL, tests, and CI, but they are not proven against live staging yet.
-- Migration `supabase/migrations/20260714120000_ticket_create_numbering.sql` has not been applied as part of this implementation stage.
+- Server-authoritative ticket numbering and ticket-create idempotency are implemented in code, migration SQL, tests, and CI, but they are not applied to the live pilot yet.
+- The isolated lab (`facility-maintenance-system-lab` + Supabase `fokpkmbkwyhcmslcdayw`) was refreshed to current CMMS code and used to verify the ticket-create migration path before live-pilot rollout.
+- Lab verification found the original `cmms_create_ticket` RPC migration failed with `actor_id is ambiguous`; corrective migration `supabase/migrations/20260717003000_ticket_create_actor_id_conflict_fix.sql` is the lab-proven fix.
+- Migration `supabase/migrations/20260714120000_ticket_create_numbering.sql` and the corrective follow-up have not been applied to the live pilot as part of this implementation stage.
 - `CMMS_TICKET_SERVER_CREATE_V2`, `CMMS_TICKET_SERVER_CREATE_V2_READY`, and `CMMS_AI_AUTONOMOUS_TICKET_CREATE` are off by default.
 - The AI capability registry is a useful working experiment and allowlist point, not yet a proven universal framework.
 - BI includes a unified overview and ticket heatmap through `src/BIOverview.jsx`, `src/BIHeatmapPanel.jsx`, and `src/biScopeModel.js`.
