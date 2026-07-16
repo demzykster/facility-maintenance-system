@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  Zap, Droplets, Wind, Cog, ShieldAlert, Monitor, Building2, Sparkles, Wrench, Truck,
+  Zap, Droplets, Wind, Cog, ShieldAlert, Monitor, Building2, Sparkles, Wrench, Forklift as Truck,
   Plus, LogOut, Camera, X, Clock, CheckCircle2, AlertTriangle,
   ListChecks, Settings, ChevronLeft, User, MapPin, Package, Search, Trash2, Send,
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
@@ -8044,9 +8044,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const waitTone = ticketTone("warning");
   const dangerTone = ticketTone("danger");
   const adminTone = ticketTone("info");
-  const statusBadge = waitingForTechAcceptance
-    ? { label: "ממתין לקבלה", color: waitTone.color, bg: waitTone.bg }
-    : s;
+  const statusBadge = waitingForTechAcceptance ? { label: "ממתין לקבלה", color: waitTone.color, bg: waitTone.bg } : s;
   const riskTone = showRiskBadge ? ticketToneForColor(risk.color, risk.level === "red" ? "danger" : "warning") : null;
   const downtimeTone = ticketToneForColor(dtOf(t.downtimeType, config).color, "warning");
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
@@ -8054,9 +8052,10 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const holder = isOpen(t) ? ballHolder(t, fleet || []) : null;
   const stateSince = t.updatedAt || t.createdAt;
   const holderTone = holder ? ticketToneForColor(holder.color, "info") : null;
+  const unit = t.track === "transport" ? (fleet || []).find((f) => f.id === t.forkliftId || f.code === t.asset) : null;
+  const assetLabel = t.track === "transport" ? [unitTypeName(unit, config), unit?.code || t.asset].filter(Boolean).join(" · ") : (t.zone || t.asset || tr?.short);
   const meta = [
-    tr ? <span key="track" className="track-tag" style={{ color: tr.color }}><tr.Icon size={11} /> {tr.short}</span> : null,
-    t.track === "transport" ? t.asset : t.zone,
+    assetLabel ? <span key="asset" className="track-tag" style={{ color: tr?.color }}><tr.Icon size={11} /> {assetLabel}</span> : null,
     showSubAssignee ? <span key="assignee"><Wrench size={11} /> {t.assignee}</span> : null,
     timeAgo(t.createdAt),
     t.closure ? ils(t.closure.costAmount || 0) : null
@@ -8497,7 +8496,7 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .track-tag{display:inline-flex;align-items:center;gap:3px;font-weight:600;}
 .tcard-state{display:flex;align-items:center;gap:4px;margin:3px 0 1px;font-size:12px;font-weight:700;}
 .tcard-state svg{flex-shrink:0;}
-.tcard-badges{display:flex;align-items:center;gap:7px;margin-top:7px;}
+.tcard-badges{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap;min-width:0;}
 .tcard-badges .badge,.tcard-badges .risk-badge{border:1px solid rgba(201,205,209,.72);}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}
