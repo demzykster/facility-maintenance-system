@@ -39,3 +39,10 @@ Each exception must include:
 - Why necessary: role shell surfaces for manager and technician still rendered extracted PM schedule/detail components by their old local names, while the admin PM module already used the lazy fleet module. Two lazy bindings reconnect those shell entrypoints to `FleetAssetsModule.jsx` and prevent `PMSchedule is not defined` / `PMEntry is not defined` white screens without moving PM implementation back into the shell.
 - Why extraction was not the right move: the PM implementation is already extracted; this hotfix only reconnects remaining role-shell triggers to the extracted module and passes the existing `fleetAssetsUi()` dependency bundle.
 - Follow-up/removal condition: when manager and technician PM surfaces move fully into `FleetAssetsModule.jsx` or another role module, remove these shell lazy bindings and reduce `src/ClaudeMaintenanceApp.jsx` below this exception.
+
+- Date: 2026-07-16
+- Owner goal: transport ticket supplier responsibility hotfix.
+- New line count: 9969.
+- Why necessary: transport ticket responsibility is still rendered and routed through shell-local `TicketCard`, `TechApp`, notification fanout, and `saveTicket`; those seams must call the extracted `ticketResponsibilityModel` so new supplier-routed transport tickets do not become assigned to the opener and legacy opener/supplier-assigned tickets stay visible to supplier technicians.
+- Why extraction was not the right move: the ownership rules were extracted into `src/ticketResponsibilityModel.js`; moving `TicketCard`, `TechApp`, and ticket notification fanout out of the shell would be a larger vertical extraction than this live hotfix.
+- Follow-up/removal condition: when ticket card/list surfaces and ticket save/notification wiring move into a ticket module, remove these shell calls and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
