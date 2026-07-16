@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { closedTicketRecord } from "./ticketClosureModel.js";
 import { ticketResponsibleLabel, transportTicketSupplierName as transportTicketSupplierNameModel } from "./ticketResponsibilityModel.js";
 
 let ticketDetailRuntimeUi = {};
@@ -244,15 +245,11 @@ export function TicketDetail(p) {
   };
   const reworkReport = () => { if (!rev.comment.trim()) return; onUpdate({ ...ticket, status: "rework", updatedAt: Date.now(), log: [...(ticket.log || []), e(`הוחזר לעובד לתיקון: ${rev.comment.trim()}`, "reopen")] }); setRev((s) => ({ ...s, mode: "", comment: "" })); };
   const rejectReport = () => { onUpdate({ ...ticket, status: "cancelled", rejectReason: { code: rev.reason, comment: rev.comment.trim() }, updatedAt: Date.now(), log: [...(ticket.log || []), e(`הדיווח נדחה — ${rejectLabel(rev.reason)}${rev.comment.trim() ? `: ${rev.comment.trim()}` : ""}`, "reject")] }); };
-  const doClose = (closure) => {
-    const now = Date.now();
-    const techFinish = [...(ticket.log || [])].reverse().find((l) => /הטיפול הסתיים|הסתיים — הועבר/.test(l.text || ""))?.at;
-    const closedAt = closure.closedAt || techFinish || now;
-    const qualityLabels = { resolved: "טופל לחלוטין", temporary: "פתרון זמני", likely_repeat: "עשוי לחזור", purchase_needed: "נדרשת רכש", external_needed: "נדרש קבלן חוץ" };
-    const qLabel = qualityLabels[closure.quality] || "";
-    const logText = `נסגרה ואושרה ע״י ${session.name} · עלות ${ils(closure.costAmount || 0)}${qLabel ? ` · ${qLabel}` : ""}`;
-    onUpdate({ ...ticket, status: "done", updatedAt: now, downtimeEnd: closedAt, closure: { costAmount: closure.costAmount, costSupplier: closure.costSupplier, costNote: closure.costNote, quality: closure.quality, signedBy: session.name, signedAt: closedAt, recordedAt: now }, log: [...(ticket.log || []), e(logText, "close")] });
-    setClosing(false);
+  const doClose = async (closure) => {
+    const next = closedTicketRecord(ticket, closure, session, { ils, entryFor: (_session, text, kind) => e(text, kind) });
+    const ok = await onUpdate(next);
+    if (ok !== false) setClosing(false);
+    return ok;
   };
   const repeat = () => onRepeat && onRepeat({ track: track, category: ticket.category, forkliftId: ticket.forkliftId, downtimeType: ticket.downtimeType, zone: ticket.zone, asset: ticket.asset, subject: ticket.subject, priority: ticket.priority });
   const ticketSupplierOptions = supplierCandidatesForTicket(config, ticket, p.fleet || []);
@@ -662,7 +659,9 @@ function AdminTicketQuickEdit({ field, ticket, config, fleet, users = [], onCanc
 }
 
 function CloseModal({ ticket, config, session, onCancel, onClose }) {
-  const [step, setStep] = useState(1), [busy, setBusy] = useState(false), [amount, setAmount] = useState(""), [supplier, setSupplier] = useState(config.suppliers[0] || ""), [note, setNote] = useState(""), [realDt, setRealDt] = useState(""), [quality, setQuality] = useState("resolved");
+  const supplierOptions = config.suppliers || [];
+  const [step, setStep] = useState(1), [busy, setBusy] = useState(false), [amount, setAmount] = useState(""), [supplier, setSupplier] = useState(supplierOptions[0] || ""), [note, setNote] = useState(""), [realDt, setRealDt] = useState(""), [quality, setQuality] = useState("resolved");
+  const [err, setErr] = useState("");
   const QUALITY = [
     { id: "resolved", label: "טופל לחלוטין", color: "#16A34A" },
     { id: "temporary", label: "פתרון זמני", color: "#CA8A04" },
@@ -670,7 +669,22 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
     { id: "purchase_needed", label: "נדרשת רכש/החלפה", color: "#1F4E8C" },
     { id: "external_needed", label: "נדרש קבלן חוץ", color: "#3E6DB0" },
   ];
-  const finish = () => { if (busy) return; setBusy(true); const closedAt = realDt ? new Date(realDt).getTime() : null; onClose({ costAmount: Number(amount) || 0, costSupplier: supplier, costNote: note.trim(), closedAt, quality }); };
+  const finish = async () => {
+    if (busy) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const closedAt = realDt ? new Date(realDt).getTime() : null;
+      const ok = await onClose({ costAmount: Number(amount) || 0, costSupplier: supplier, costNote: note.trim(), closedAt, quality });
+      if (ok === false) {
+        setErr("השמירה נכשלה. בדקו חיבור ונסו שוב.");
+        setBusy(false);
+      }
+    } catch {
+      setErr("השמירה נכשלה. בדקו חיבור ונסו שוב.");
+      setBusy(false);
+    }
+  };
   const qItem = QUALITY.find((x) => x.id === quality) || QUALITY[0];
   return (<div className="ovl-backdrop modal2" onClick={onCancel}><div className="modal2-panel" onClick={(e) => e.stopPropagation()}>
     <div className="modal2-head"><div className="form-title">{step === 1 ? "איכות הסגירה" : step === 2 ? "עלויות" : "אישור סגירה"}</div><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={20} /></button></div>
@@ -682,7 +696,7 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
       </>)}
       {step === 2 && (<>
         <label className="field"><span>עלות (₪)</span><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" inputMode="numeric" /></label>
-        <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— ללא ספק —</option>{config.suppliers.map((s) => <option key={s}>{s}</option>)}</select></label>
+        <label className="field"><span>ספק / קבלן</span><select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option value="">— ללא ספק —</option>{supplierOptions.map((s) => <option key={s}>{s}</option>)}</select></label>
         <label className="field"><span>הערה</span><textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></label>
         <div className="budget-placeholder"><DollarSign size={13} /> <span>עלות עתידית משוערת — יהיה זמין במודול תקציב</span></div>
         <div className="row2"><button className="btn-ghost" onClick={() => setStep(1)}>חזרה</button><button className="btn-primary" onClick={() => setStep(3)}>המשך</button></div>
@@ -692,6 +706,7 @@ function CloseModal({ ticket, config, session, onCancel, onClose }) {
         <div className="sign-row"><span>עלות:</span><b>{ils(Number(amount) || 0)}</b></div>
         <div className="sign-row"><span>איכות סגירה:</span><b style={{ color: qItem.color }}>{qItem.label}</b></div>
         <label className="field"><span>מועד סגירה בפועל (אופציונלי)</span><input type="datetime-local" value={realDt} onChange={(e) => setRealDt(e.target.value)} /><div className="hint">ריק = מועד סיום ע״י הטכנאי.</div></label>
+        {err && <div className="err">{err}</div>}
         <div className="row2"><button className="btn-ghost" onClick={() => setStep(2)}>חזרה</button><button className="btn-primary" onClick={finish} disabled={busy}><CheckCircle2 size={16} /> סגירה ואישור</button></div>
       </>)}
     </div>

@@ -263,6 +263,48 @@ describe("tickets API handler", () => {
     expect(driver.create).not.toHaveBeenCalled();
   });
 
+  it("preserves facility close timestamps when updating an existing ticket", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue({ id: "F-2", num: 2, status: "pending_admin", legacyPayload: { id: "F-2", num: 2, status: "pending_admin" } }),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        id: "F-2",
+        num: 99,
+        track: "facility",
+        status: "done",
+        subject: "Door",
+        description: "Door is fixed",
+        category: "doors",
+        closedAt: 3_000,
+        closure: { signedAt: 3_000, recordedAt: 4_000, signedBy: "Admin", costAmount: 0, quality: "resolved" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "F-2",
+      num: 2,
+      status: "done",
+      closedAt: 3_000,
+      closure: expect.objectContaining({ signedAt: 3_000 })
+    }));
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "updated",
+      ticket: { id: "F-2", num: 2, status: "done", closedAt: 3_000 }
+    });
+  });
+
   it("updates existing normalized tickets through the old upsert branch when cutover is disabled", async () => {
     const driver = {
       list: vi.fn(),
