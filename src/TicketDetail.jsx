@@ -296,6 +296,8 @@ export function TicketDetail(p) {
   const facilityAdminWaitReasons = track === "facility" ? wReasons(config).filter((r) => r.id !== "no_equipment") : [];
   const facilityAdminProcessingDirty = facilityAdminProcessingHasChanges(ticket, facilityAdminDraft);
   const fixedTransportSupplier = track === "transport" ? transportTicketSupplierName(ticket, p.fleet || []) : "";
+  const showAdminProcessingPanel = role === "admin" && isOpen(ticket) && !["pending_manager", "pending_user", "rework"].includes(ticket.status);
+  const showTransportExecutionToggle = track === "transport" && !["pending_admin", "pending_user"].includes(ticket.status);
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
   const detailLifecycleOptions = {
     now: Date.now(),
@@ -417,9 +419,10 @@ export function TicketDetail(p) {
       </>)}
 
       {canConfirm && ticket.status === "pending_user" && (<>
-        <div className="banner" style={{ marginTop: 14 }}><AlertTriangle size={16} /> הטכנאי דיווח שהתקלה טופלה. נא לאשר או להחזיר.</div>
-        {!returning ? <div className="row2" style={{ marginTop: 8 }}><button className="btn-danger" onClick={() => { setReturning(true); setNote(""); }}><X size={15} /> הבעיה לא נפתרה</button><button className="btn-close" onClick={confirmUser}><CheckCircle2 size={16} /> אישור — טופל</button></div>
-          : <><label className="field" style={{ marginTop: 8 }}><span>סיבת ההחזרה (חובה)</span><textarea rows={3} value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="תארו מה עדיין לא תקין…" /></label><div className="row2"><button className="btn-ghost" onClick={() => { setReturning(false); setNote(""); }}>ביטול</button><button className="btn-danger" onClick={remarksUser} disabled={!note.trim()}>החזרה לטכנאי</button></div></>}
+        <SectionTitle>אישור ביצוע</SectionTitle>
+        <div className="banner" style={{ marginTop: 8 }}><AlertTriangle size={16} /> הטכנאי דיווח שהתקלה טופלה. נא לאשר או להחזיר לטיפול.</div>
+        {!returning ? <div style={{ display: "grid", gap: 8, marginTop: 12 }}><button className="btn-close full" onClick={confirmUser}><CheckCircle2 size={16} /> אישור — טופל</button><button className="btn-danger full" onClick={() => { setReturning(true); setNote(""); }}><X size={15} /> הבעיה לא נפתרה</button></div>
+          : <><label className="field" style={{ marginTop: 12 }}><span>סיבת ההחזרה (חובה)</span><textarea rows={3} value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="תארו מה עדיין לא תקין…" /></label><div style={{ display: "grid", gap: 8 }}><button className="btn-danger full" onClick={remarksUser} disabled={!note.trim()}>החזרה לטיפול</button><button className="btn-ghost full" onClick={() => { setReturning(false); setNote(""); }}>ביטול</button></div></>}
       </>)}
 
       {isReview && (<>
@@ -454,13 +457,13 @@ export function TicketDetail(p) {
 
       {!isTech && ticket.status === "rework" && <div className="banner" style={{ marginTop: 14, background: "var(--primary-soft)", color: "var(--primary)", borderColor: "var(--primary-line)" }}><AlertTriangle size={16} /> הוחזר לעובד לתיקון — ממתין לשליחה חוזרת.</div>}
 
-      {role === "admin" && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework" && (<>
+      {showAdminProcessingPanel && (<>
         {track === "facility" && <><SectionTitle>סיבות המתנה</SectionTitle>
           <div className="pr-row">{facilityAdminWaitReasons.map((r) => <button key={r.id} className={"pr-pick" + (facilityAdminDraft.waitingReason === r.id ? " on" : "")} onClick={() => setFacilityAdminDraft((draft) => ({ ...draft, waitingReason: r.id }))} style={facilityAdminDraft.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
           <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={facilityAdminDraft.supplier || ""} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, supplier: ev.target.value }))}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
         <SectionTitle>הערה</SectionTitle>
         {track === "facility" ? <input className="ta" value={facilityAdminDraft.note} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, note: ev.target.value }))} placeholder="עדכון…" /> : <input className="ta" value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" />}
-        {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={addNote} disabled={!note.trim()}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={() => setAdminTransportExecutionOpen((value) => !value)}><Wrench size={15} /> {adminTransportExecutionOpen ? "הסתר פעולות ביצוע חריגות" : "הצג פעולות ביצוע חריגות"}</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div>}
+        {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={addNote} disabled={!note.trim()}><CheckCircle2 size={16} /> שמירת שינויים</button>{showTransportExecutionToggle && <button className="btn-ghost full" onClick={() => setAdminTransportExecutionOpen((value) => !value)}><Wrench size={15} /> {adminTransportExecutionOpen ? "הסתר פעולות ביצוע חריגות" : "הצג פעולות ביצוע חריגות"}</button>}<button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div>}
       </>)}
 
       {role === "admin" && <div className="admin-ticket-manual-shell"><AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} /></div>}

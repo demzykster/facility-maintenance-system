@@ -20,7 +20,7 @@ const componentNames = [
   "User", "Wrench", "X"
 ];
 
-function ticketDetailSmokeUi() {
+function ticketDetailSmokeUi(overrides = {}) {
   const components = Object.fromEntries(componentNames.map((name) => [name, Icon]));
   return {
     ...components,
@@ -80,11 +80,12 @@ function ticketDetailSmokeUi() {
     unitLabel: () => "194340",
     waitReasonLabel: () => "",
     waitReasonLifecycleMeta: () => ({}),
-    wReasons: () => []
+    wReasons: () => [],
+    ...overrides
   };
 }
 
-function smokeTicket(track) {
+function smokeTicket(track, patch = {}) {
   const now = Date.now();
   return {
     id: `${track}-1`,
@@ -105,19 +106,20 @@ function smokeTicket(track) {
     createdAt: now,
     updatedAt: now,
     dueAt: now + 86400000,
-    log: [{ at: now, by: "Vadim", text: "נפתחה" }]
+    log: [{ at: now, by: "Vadim", text: "נפתחה" }],
+    ...patch
   };
 }
 
-function renderTicket(track) {
+function renderTicket(track, options = {}) {
   return renderToString(React.createElement(TicketDetail, {
-    ui: ticketDetailSmokeUi(),
-    ticket: smokeTicket(track),
+    ui: ticketDetailSmokeUi(options.ui || {}),
+    ticket: smokeTicket(track, options.ticket || {}),
     tickets: [],
     fleet: [{ id: "fleet-1", code: "194340", supplier: "טויוטה" }],
     users: [],
     config: {},
-    session: { id: "admin-1", name: "Vadim", role: "admin" },
+    session: options.session || { id: "admin-1", name: "Vadim", role: "admin" },
     saveTicket: () => true,
     onBack: () => {}
   }));
@@ -148,6 +150,21 @@ describe("ticket detail render smoke", () => {
     expect(html).not.toContain("קבל לטיפול");
     expect(html).not.toContain("סיווג מקור התקלה");
     expect(html).not.toContain("סיום טיפול");
+  });
+
+  it("shows pending requester approval as a decision screen without admin close controls", () => {
+    const html = renderTicket("transport", {
+      ticket: { status: "pending_user", assignee: "Tech" },
+      ui: { canConfirmTicketForSession: () => true }
+    });
+
+    expect(html).toContain("אישור ביצוע");
+    expect(html).toContain("הטכנאי דיווח שהתקלה טופלה");
+    expect(html).toContain("אישור — טופל");
+    expect(html).toContain("הבעיה לא נפתרה");
+    expect(html).not.toContain("סגירה סופית ואישור עלות");
+    expect(html).not.toContain("הצג פעולות ביצוע חריגות");
+    expect(html).not.toContain("שמירת שינויים");
   });
 
   it("derives transport supplier from the linked fleet unit before legacy ticket data", () => {
