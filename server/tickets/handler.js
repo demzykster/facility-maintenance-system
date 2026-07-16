@@ -9,7 +9,7 @@ import { kvWritePermissionError } from "../kv/permissionPolicy.js";
 import { createSupabaseTicketsDriverFromEnv } from "./supabaseTicketsDriver.js";
 import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMetadataDriver.js";
 import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js";
-import { createTicketRecord, mergeTicketUpdateWithExisting } from "./ticketCreateDomain.js";
+import { createTicketRecord, createTicketReplayResult, mergeTicketUpdateWithExisting } from "./ticketCreateDomain.js";
 import { ticketServerCreateV2Enabled } from "../../src/ticketServerCreateCutoverModel.js";
 
 const json = (res, status, body) => {
@@ -92,6 +92,16 @@ const ticketDeleteAuditEvent = (ticketId, actor) => normalizeAuditEvent({
 const canReadTickets = (user = {}) => {
   if (!user?.role) return true;
   return ["admin", "executive", "user", "tech", "worker"].includes(user.role);
+};
+
+const ticketWriteOperation = (body = {}, req = {}) => {
+  const raw = String(body?.operation || body?.action || req.headers?.["x-cmms-ticket-operation"] || "")
+    .replace(/_/g, ".")
+    .trim()
+    .toLowerCase();
+  if (["create", "ticket.create"].includes(raw)) return "create";
+  if (["update", "ticket.update"].includes(raw)) return "update";
+  return "upsert";
 };
 
 const ticketNumberNamespace = (ticket = {}) => (ticket?.track === "transport" || (!ticket?.track && ticket?.forkliftId)) ? "T" : "F";
@@ -200,12 +210,29 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
 
       const rawTicket = body?.ticket || body;
       const ticket = normalizeTicketRecord(rawTicket);
+      const operation = ticketWriteOperation(body, req);
       const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
       if (permissionError) return json(res, 403, { error: permissionError });
 
       if (typeof backendDriver.get !== "function") return json(res, 503, { error: "tickets_read_not_configured" });
       const existing = await backendDriver.get(ticket.id);
+      const serverCreateEnabled = ticketServerCreateV2Enabled(env);
       if (existing) {
+        if (serverCreateEnabled && operation === "create") {
+          const replay = createTicketReplayResult({ ticket: ticket.legacyPayload, existing, actor: auth.user });
+          if (!replay.replay) {
+            return json(res, 409, {
+              error: "ticket_create_id_conflict",
+              message: "ticket_id_already_used_for_different_content"
+            });
+          }
+          return json(res, 200, {
+            ok: true,
+            ticket: replay.ticket,
+            action: "replayed",
+            actionResult: replay.result
+          });
+        }
         const nextTicket = mergeTicketUpdateWithExisting(ticket.legacyPayload, existing);
         const next = normalizeTicketRecord(nextTicket);
         const stored = await backendDriver.upsert(next.legacyPayload);
@@ -225,7 +252,11 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         });
       }
 
-      if (!ticketServerCreateV2Enabled(env)) {
+      if (operation === "update") {
+        return json(res, 404, { error: "ticket_not_found" });
+      }
+
+      if (!serverCreateEnabled) {
         if (typeof backendDriver.upsert !== "function") return json(res, 503, { error: "tickets_write_not_configured" });
         const legacyTicket = await ticketWithLegacyNumber(backendDriver, ticket.legacyPayload);
         const stored = await backendDriver.upsert(legacyTicket);

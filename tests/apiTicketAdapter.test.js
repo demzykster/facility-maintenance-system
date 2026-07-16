@@ -51,6 +51,49 @@ describe("api ticket adapter", () => {
     });
   });
 
+  it("posts explicit create and update operations without overloading upsert semantics", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(okResponse({ ok: true, action: "created", ticket: { id: "T-1" } }))
+      .mockResolvedValueOnce(okResponse({ ok: true, action: "updated", ticket: { id: "T-1" } }));
+    const provider = createApiTicketProvider({
+      baseUrl: "https://cmms.example/api",
+      fetchImpl,
+      getAccessToken: () => "access-1"
+    });
+
+    await expect(provider.create({ id: "T-1", subject: "Leak" }, { idempotencyKey: "idem-1" }))
+      .resolves.toMatchObject({ action: "created" });
+    await expect(provider.update({ id: "T-1", subject: "Fixed" }))
+      .resolves.toMatchObject({ action: "updated" });
+
+    expect(fetchImpl.mock.calls[0]).toEqual(["https://cmms.example/api/tickets", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer access-1",
+        "idempotency-key": "idem-1"
+      },
+      body: JSON.stringify({
+        ticket: { id: "T-1", subject: "Leak" },
+        operation: "create",
+        idempotencyKey: "idem-1"
+      })
+    }]);
+    expect(fetchImpl.mock.calls[1]).toEqual(["https://cmms.example/api/tickets", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer access-1"
+      },
+      body: JSON.stringify({
+        ticket: { id: "T-1", subject: "Fixed" },
+        operation: "update"
+      })
+    }]);
+  });
+
   it("throws the API error without hiding the backend reason", async () => {
     const provider = createApiTicketProvider({
       baseUrl: "https://cmms.example/api",

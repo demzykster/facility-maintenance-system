@@ -28,6 +28,22 @@ export function createApiTicketProvider({ baseUrl, fetchImpl = globalThis.fetch,
     return assertOk(response);
   };
 
+  const postTicket = async (ticket, operation = "", { idempotencyKey = "" } = {}) => {
+    const cleanOperation = String(operation || "").trim();
+    const cleanIdempotencyKey = String(idempotencyKey || "").trim();
+    const body = {
+      ticket,
+      ...(cleanOperation ? { operation: cleanOperation } : {}),
+      ...(cleanIdempotencyKey ? { idempotencyKey: cleanIdempotencyKey } : {})
+    };
+    const response = await request("/tickets", {
+      method: "POST",
+      headers: cleanIdempotencyKey ? { "idempotency-key": cleanIdempotencyKey } : undefined,
+      body: JSON.stringify(body)
+    });
+    return parseJson(response);
+  };
+
   return {
     async list() {
       const response = await request("/tickets", { method: "GET" });
@@ -39,11 +55,13 @@ export function createApiTicketProvider({ baseUrl, fetchImpl = globalThis.fetch,
       return parseJson(response);
     },
     async upsert(ticket) {
-      const response = await request("/tickets", {
-        method: "POST",
-        body: JSON.stringify({ ticket })
-      });
-      return parseJson(response);
+      return postTicket(ticket);
+    },
+    async create(ticket, options = {}) {
+      return postTicket(ticket, "create", options);
+    },
+    async update(ticket) {
+      return postTicket(ticket, "update");
     },
     async delete(id) {
       await request(`/tickets?id=${encodeURIComponent(id)}`, { method: "DELETE" });

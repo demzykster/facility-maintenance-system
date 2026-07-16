@@ -33,6 +33,13 @@ export function canonicalTicketCreateHash(ticket = {}, actor = {}) {
     .digest("hex");
 }
 
+const existingTicketPayload = (ticket = {}) => {
+  const record = cleanObject(ticket);
+  if (record.legacy_payload && typeof record.legacy_payload === "object" && !Array.isArray(record.legacy_payload)) return record.legacy_payload;
+  if (record.legacyPayload && typeof record.legacyPayload === "object" && !Array.isArray(record.legacyPayload)) return record.legacyPayload;
+  return record;
+};
+
 export function ticketCreateIdempotencyKey(ticket = {}, actor = {}, explicitKey = "") {
   const cleanExplicit = cleanText(explicitKey, 200);
   if (cleanExplicit) return cleanExplicit;
@@ -75,6 +82,36 @@ export async function createTicketRecord({ driver, ticket, actor, idempotencyKey
       ticketNo,
       status: cleanText(result?.status || normalized.status, 40),
       idempotencyStatus: cleanText(result?.idempotencyStatus || "created", 40)
+    }
+  };
+}
+
+export function createTicketReplayResult({ ticket, existing, actor } = {}) {
+  const requested = normalizeTicketRecord(ticket).legacyPayload;
+  const stored = normalizeTicketRecord(existingTicketPayload(existing)).legacyPayload;
+  const requestedHash = canonicalTicketCreateHash(requested, actor);
+  const storedHash = canonicalTicketCreateHash(stored, actor);
+  if (requestedHash !== storedHash) {
+    return {
+      replay: false,
+      requestHash: requestedHash,
+      existingHash: storedHash
+    };
+  }
+
+  const normalized = normalizeTicketRecord(stored);
+  const ticketNo = cleanText(stored.ticketNo || stored.ticketNumber, 40);
+  return {
+    replay: true,
+    ticket: stored,
+    result: {
+      type: "ticket.create",
+      ticketId: normalized.id,
+      num: normalized.num,
+      ticketNumber: ticketNo,
+      ticketNo,
+      status: normalized.status,
+      idempotencyStatus: "replayed"
     }
   };
 }

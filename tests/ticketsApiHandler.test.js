@@ -110,6 +110,156 @@ describe("tickets API handler", () => {
     }));
   });
 
+  it("replays an explicit create when the existing ticket has the same create content", async () => {
+    const existing = {
+      id: "T-replay",
+      num: 11,
+      ticketNo: "F-011",
+      track: "facility",
+      subject: "Door",
+      description: "Door is stuck",
+      category: "doors",
+      status: "new"
+    };
+    const driver = {
+      get: vi.fn().mockResolvedValue({ legacy_payload: existing }),
+      create: vi.fn(),
+      upsert: vi.fn()
+    };
+    const auditDriver = { write: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "create",
+        ticket: { ...existing, num: 999 }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "replayed",
+      ticket: { id: "T-replay", num: 11 },
+      actionResult: {
+        type: "ticket.create",
+        ticketId: "T-replay",
+        idempotencyStatus: "replayed"
+      }
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).not.toHaveBeenCalled();
+    expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
+  it("rejects an explicit create when the same ticket id already has different content", async () => {
+    const existing = {
+      id: "T-conflict",
+      num: 12,
+      track: "facility",
+      subject: "Door",
+      description: "Door is stuck",
+      category: "doors",
+      status: "new"
+    };
+    const driver = {
+      get: vi.fn().mockResolvedValue({ legacy_payload: existing }),
+      create: vi.fn(),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "create",
+        ticket: { ...existing, subject: "Window" }
+      }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      error: "ticket_create_id_conflict",
+      message: "ticket_id_already_used_for_different_content"
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps exact idempotency-key replays on the create RPC path", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        ticketId: "T-idem-original",
+        num: 43,
+        ticketNo: "F-043",
+        status: "new",
+        idempotencyStatus: "replayed"
+      }),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token", "idempotency-key": "idem-1" },
+      body: {
+        operation: "create",
+        ticket: { id: "T-idem-retry", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "replayed",
+      ticket: { id: "T-idem-original", num: 43 },
+      actionResult: { idempotencyStatus: "replayed" }
+    });
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ id: "T-idem-retry" }), expect.objectContaining({
+      idempotencyKey: "idem-1"
+    }));
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("returns conflict when a new id reuses an idempotency key with different create content", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockRejectedValue(new Error("idempotency_conflict")),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token", "idempotency-key": "idem-1" },
+      body: {
+        operation: "create",
+        ticket: { id: "T-new-id", track: "facility", subject: "Window", description: "Window is stuck", category: "doors" }
+      }
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "idempotency_conflict" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
   it("keeps legacy create working without RPC when the server-create cutover is disabled", async () => {
     const driver = {
       list: vi.fn().mockResolvedValue([
@@ -139,6 +289,34 @@ describe("tickets API handler", () => {
     });
     expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-legacy", num: 8 }));
     expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps explicit create on the legacy upsert path when the server-create cutover is disabled", async () => {
+    const driver = {
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({ id: "T-legacy-update", num: 4, status: "new", legacyPayload: { id: "T-legacy-update", num: 4, status: "new" } }),
+      upsert: vi.fn().mockResolvedValue({ legacy_payload: { id: "T-legacy-update", num: 4, status: "open" } }),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "false" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "create",
+        ticket: { id: "T-legacy-update", num: 999, status: "open", track: "facility", subject: "Door", description: "Door changed", category: "doors" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, action: "updated", ticket: { id: "T-legacy-update", num: 4, status: "open" } });
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-legacy-update", num: 4, status: "open" }));
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.list).not.toHaveBeenCalled();
   });
 
   it("keeps manual create on the legacy path when only the AI autonomous flag is enabled", async () => {
@@ -261,6 +439,58 @@ describe("tickets API handler", () => {
     expect(res.json()).toMatchObject({ ok: true, action: "updated", ticket: { id: "T-9", num: 7 } });
     expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-9", num: 7, status: "open" }));
     expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("updates existing normalized tickets only when the caller uses the explicit update operation", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue({ id: "T-update", num: 8, status: "new", legacyPayload: { id: "T-update", num: 8, status: "new" } }),
+      upsert: vi.fn().mockResolvedValue({ legacy_payload: { id: "T-update", num: 8, status: "open" } }),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { id: "T-update", num: 99, status: "open", track: "facility", subject: "Door", description: "Door is fixed", category: "doors" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, action: "updated", ticket: { id: "T-update", num: 8, status: "open" } });
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-update", num: 8, status: "open" }));
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("does not create a ticket through the explicit update operation when the ticket is missing", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { id: "T-missing-update", track: "facility", subject: "Door", description: "Door is fixed", category: "doors" }
+      }
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "ticket_not_found" });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).not.toHaveBeenCalled();
   });
 
   it("preserves facility close timestamps when updating an existing ticket", async () => {

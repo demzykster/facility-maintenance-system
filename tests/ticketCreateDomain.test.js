@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   canonicalTicketCreateHash,
+  createTicketReplayResult,
   createTicketRecord,
   mergeTicketUpdateWithExisting
 } from "../server/tickets/ticketCreateDomain.js";
@@ -142,6 +143,42 @@ describe("ticket create domain", () => {
 
     expect(canonicalTicketCreateHash(base, actor)).toBe(canonicalTicketCreateHash({ ...base, id: "ticket-2", num: 999 }, actor));
     expect(canonicalTicketCreateHash(base, actor)).not.toBe(canonicalTicketCreateHash({ ...base, subject: "Машина не едет" }, actor));
+  });
+
+  it("recognizes an existing ticket as a replayed create only when create content matches", () => {
+    const actor = { id: "u1", role: "user" };
+    const base = {
+      id: "ticket-1",
+      num: 7,
+      ticketNo: "F-007",
+      track: "facility",
+      subject: "Door",
+      description: "Door is stuck",
+      category: "doors",
+      status: "new"
+    };
+
+    expect(createTicketReplayResult({
+      ticket: { ...base, num: 99 },
+      existing: { legacy_payload: base },
+      actor
+    })).toMatchObject({
+      replay: true,
+      ticket: { id: "ticket-1", num: 7 },
+      result: {
+        type: "ticket.create",
+        ticketId: "ticket-1",
+        num: 7,
+        ticketNo: "F-007",
+        idempotencyStatus: "replayed"
+      }
+    });
+
+    expect(createTicketReplayResult({
+      ticket: { ...base, subject: "Window" },
+      existing: { legacy_payload: base },
+      actor
+    })).toMatchObject({ replay: false });
   });
 
   it("preserves existing num for update and does not allocate a new one", () => {

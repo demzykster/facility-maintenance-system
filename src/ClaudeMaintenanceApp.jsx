@@ -2907,7 +2907,7 @@ export default function App() {
     if (!rec.num && !NORMALIZED_TICKET_AUTHORITY) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
     if (NORMALIZED_TICKET_AUTHORITY) {
       try {
-        const result = await NORMALIZED_TICKET_PROVIDER.upsert(rec);
+        const result = await (_prev ? NORMALIZED_TICKET_PROVIDER.update || NORMALIZED_TICKET_PROVIDER.upsert : NORMALIZED_TICKET_PROVIDER.create || NORMALIZED_TICKET_PROVIDER.upsert)(rec);
         if (result?.ticket && typeof result.ticket === "object") rec = result.ticket;
       } catch (error) {
         setToast(SAVE_FAILED_MESSAGE);
