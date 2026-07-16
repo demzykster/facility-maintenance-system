@@ -8055,7 +8055,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const unit = t.track === "transport" ? (fleet || []).find((f) => f.id === t.forkliftId || f.code === t.asset) : null;
   const assetLabel = t.track === "transport" ? [unitTypeName(unit, config), unit?.code || t.asset].filter(Boolean).join(" · ") : (t.zone || t.asset || tr?.short);
   const meta = [
-    assetLabel ? <span key="asset" className="track-tag" style={{ color: tr?.color }}><tr.Icon size={11} /> {assetLabel}</span> : null,
+    assetLabel ? <span key="asset" className="track-tag" style={{ color: tr?.color }}><tr.Icon size={11} /><span>{assetLabel}</span></span> : null,
     showSubAssignee ? <span key="assignee"><Wrench size={11} /> {t.assignee}</span> : null,
     timeAgo(t.createdAt),
     t.closure ? ils(t.closure.costAmount || 0) : null
@@ -8490,13 +8490,15 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .tcard-row1{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
 .tcard-subj{font-weight:650;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:0;}
 .tcard-no{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0;}
-.tcard-sub{display:flex;align-items:center;gap:4px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin:4px 0 7px;}
+.tcard-sub{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;color:var(--muted);font-size:12.5px;margin:4px 0 7px;min-width:0;overflow:hidden;white-space:nowrap;}
 .tcard-sub svg{flex-shrink:0;}
-.tcard-sub .sep{color:var(--line);}
-.track-tag{display:inline-flex;align-items:center;gap:3px;font-weight:600;}
+.tcard-sub .sep{color:var(--line);flex-shrink:0;}
+.track-tag{display:inline-flex;align-items:center;gap:3px;font-weight:600;min-width:0;max-width:100%;}
+.track-tag span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tcard-state{display:flex;align-items:center;gap:4px;margin:3px 0 1px;font-size:12px;font-weight:700;}
 .tcard-state svg{flex-shrink:0;}
-.tcard-badges{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap;min-width:0;}
+.tcard-badges{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:nowrap;min-width:0;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.tcard-badges::-webkit-scrollbar{display:none;}
 .tcard-badges .badge,.tcard-badges .risk-badge{border:1px solid rgba(201,205,209,.72);}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;}

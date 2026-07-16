@@ -49,7 +49,7 @@ Each exception must include:
 
 - Date: 2026-07-16
 - Owner goal: mobile ticket card readability and transport icon hotfix.
-- New line count: 9968.
-- Why necessary: the shared ticket card still lives in `src/ClaudeMaintenanceApp.jsx`; this live UI hotfix must adjust its metadata text and chip wrapping so mobile ticket lists do not overflow and transport cards show the fleet unit instead of a generic track label.
+- New line count: 9970.
+- Why necessary: the shared ticket card still lives in `src/ClaudeMaintenanceApp.jsx`; this live UI hotfix must adjust its metadata text, long-label truncation, and compact chip row so mobile ticket lists do not overflow or become vertically ragged, and transport cards show the fleet unit instead of a generic track label.
 - Why extraction was not the right move: extracting all ticket list/card surfaces would be a larger vertical slice than this production-facing readability fix, and the change reduces the shell line count below the previous exception while touching only the existing card seam.
 - Follow-up/removal condition: when ticket card/list surfaces move into a ticket module, move this metadata formatting and wrapping rule with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
