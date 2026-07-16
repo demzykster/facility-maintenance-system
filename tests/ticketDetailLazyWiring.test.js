@@ -20,7 +20,7 @@ describe("ticket detail lazy wiring", () => {
     expect(ticketDetailSource).toContain("function CloseModal(");
     expect(ticketDetailSource).toContain("transportTicketSupplierName");
     expect(ticketDetailSource).toContain("שיוך ספק / קבלן");
-    expect(ticketDetailSource).toContain("ספק השינוע נקבע מכרטיס הכלי");
+    expect(ticketDetailSource).toContain("ספק כלי");
   });
 
   it("does not pass stale runtime helpers into the lazy ticket detail bridge", () => {

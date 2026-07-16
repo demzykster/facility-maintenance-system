@@ -132,12 +132,11 @@ describe("ticket detail render smoke", () => {
     expect(renderTicket("transport")).toContain("כסא לא תקין");
   });
 
-  it("shows transport supplier as read-only context instead of an editable route selector", () => {
+  it("shows transport supplier once as top read-only context instead of a lower route selector", () => {
     const html = renderTicket("transport");
 
-    expect(html).toContain("ספק כלי");
+    expect(html.match(/ספק כלי/g)).toHaveLength(1);
     expect(html).toContain("טויוטה");
-    expect(html).toContain("ספק השינוע נקבע מכרטיס הכלי");
     expect(html).not.toContain("שיוך ספק / קבלן");
   });
 
