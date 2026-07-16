@@ -110,15 +110,83 @@ export function configureTicketDetailUi(ui) {
   ticketDetailRuntimeUi = ui || {};
 }
 
+const text = (value) => String(value == null ? "" : value).trim();
+
+export function facilityAdminProcessingDraft(ticket = {}) {
+  return {
+    supplier: text(ticket.supplier),
+    waitingReason: ticket.status === "waiting" ? text(ticket.waitingReason) : "",
+    note: ""
+  };
+}
+
+export function facilityAdminProcessingHasChanges(ticket = {}, draft = {}) {
+  const current = facilityAdminProcessingDraft(ticket);
+  return current.supplier !== text(draft.supplier)
+    || current.waitingReason !== text(draft.waitingReason)
+    || !!text(draft.note);
+}
+
+export function applyFacilityAdminProcessingDraft(ticket = {}, draft = {}, options = {}) {
+  const {
+    config = {},
+    session = {},
+    now = Date.now(),
+    entryFor: makeEntry = () => null,
+    normalizeFacilitySupplierPatch: normalizeSupplier = (_ticket, patch) => patch,
+    pausePatch: makePausePatch = () => ({}),
+    reasonBall: getReasonBall = () => "",
+    waitReasonLabel: labelReason = (id) => id
+  } = options;
+  const cleanSupplier = text(draft.supplier);
+  const cleanReason = text(draft.waitingReason);
+  const cleanNote = text(draft.note);
+  const patch = {};
+  const log = [];
+
+  if (cleanSupplier !== text(ticket.supplier)) {
+    Object.assign(patch, normalizeSupplier(ticket, { supplier: cleanSupplier }, session));
+    log.push({ text: cleanSupplier ? `שויך לספק: ${cleanSupplier}` : "שיוך הספק הוסר" });
+  }
+
+  const currentReason = ticket.status === "waiting" ? text(ticket.waitingReason) : "";
+  if (cleanReason && cleanReason !== currentReason) {
+    const waitingPatch = {
+      status: "waiting",
+      waitingReason: cleanReason,
+      waitBall: getReasonBall(config, cleanReason)
+    };
+    Object.assign(patch, waitingPatch, makePausePatch(ticket, waitingPatch, config, now));
+    log.push({ text: `ממתין · ${labelReason(cleanReason, config)}`, kind: "waiting" });
+  }
+
+  if (cleanNote) log.push({ text: cleanNote });
+  if (!Object.keys(patch).length && !log.length) return ticket;
+
+  const entries = log.map((item) => {
+    const entry = makeEntry(session, item.text, item.kind);
+    return entry ? { ...entry, at: entry.at || now } : null;
+  }).filter(Boolean);
+
+  return {
+    ...ticket,
+    ...patch,
+    updatedAt: now,
+    log: [...(ticket.log || []), ...entries]
+  };
+}
+
 export function TicketDetail(p) {
   ticketDetailRuntimeUi = p.ui || ticketDetailRuntimeUi;
   const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
   const role = session.role;
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const [adminQuickEdit, setAdminQuickEdit] = useState("");
+  const [facilityAdminDraft, setFacilityAdminDraft] = useState(() => facilityAdminProcessingDraft(ticket));
   const afterRef = useRef(null);
   useEffect(() => { let on = true; if (ticket?.hasPhoto) TICKET_PHOTOS.load(ticket, "before").then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto, ticket?.photoPath]);
   useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) TICKET_PHOTOS.load(ticket, "after").then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto, ticket?.afterPhotoPath]);
+  useEffect(() => { setFacilityAdminDraft(facilityAdminProcessingDraft(ticket)); }, [ticket?.id, ticket?.status, ticket?.waitingReason, ticket?.supplier]);
   const grabAfter = (file) => { if (!file) return; const r = new FileReader(); r.onload = (ev) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const cv = document.createElement("canvas"); cv.width = width; cv.height = height; cv.getContext("2d").drawImage(img, 0, 0, width, height); setAfterPhoto(cv.toDataURL("image/jpeg", 0.6)); }; img.src = ev.target.result; }; r.readAsDataURL(file); };
   const exactRelated = useMemo(() => ticket?.forkliftId ? tickets.filter((t) => t.id !== ticket.id && t.forkliftId === ticket.forkliftId).sort((a, b) => b.createdAt - a.createdAt) : [], [ticket, tickets]);
   const related = useMemo(() => ticket ? similarTickets(ticket, tickets, { days: 30 }).map((x) => x.t) : [], [ticket, tickets]);
@@ -195,6 +263,25 @@ export function TicketDetail(p) {
     setAdminQuickEdit("");
     upd(normalizeFacilitySupplierPatch(ticket, patch, session), `עריכת מנהל: ${label}`, "admin_manual");
   };
+  const saveFacilityAdminProcessing = () => {
+    const now = Date.now();
+    const next = applyFacilityAdminProcessingDraft(ticket, facilityAdminDraft, {
+      config,
+      session,
+      now,
+      entryFor,
+      normalizeFacilitySupplierPatch,
+      pausePatch,
+      reasonBall,
+      waitReasonLabel
+    });
+    if (next !== ticket) onUpdate(next);
+    setFacilityAdminDraft(facilityAdminProcessingDraft(next));
+  };
+  const cancelFacilityAdminProcessing = () => {
+    setFacilityAdminDraft(facilityAdminProcessingDraft(ticket));
+    onBack();
+  };
 
   const isTech = role === "tech";
   const isAdmin = role === "admin";
@@ -208,6 +295,8 @@ export function TicketDetail(p) {
   const isReview = !isTech && ticket.status === "pending_manager" && (role === "user" || role === "admin");
   // Подтвердить «טופל» может только открывший заявку менеджер или админ. Техник — никогда.
   const canConfirm = !isTech && canConfirmTicketForSession(session, ticket);
+  const facilityAdminWaitReasons = track === "facility" ? wReasons(config).filter((r) => r.id !== "no_equipment") : [];
+  const facilityAdminProcessingDirty = facilityAdminProcessingHasChanges(ticket, facilityAdminDraft);
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
   const detailLifecycleOptions = {
     now: Date.now(),
@@ -367,13 +456,12 @@ export function TicketDetail(p) {
 
       {role === "admin" && isOpen(ticket) && ticket.status !== "pending_manager" && ticket.status !== "rework" && (<>
         {track === "facility" && <><SectionTitle>סיבות המתנה</SectionTitle>
-          <div className="pr-row">{wReasons(config).filter((r) => r.id !== "no_equipment").map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
-          {ticket.status === "waiting" && <label className="field" style={{ marginTop: 10 }}><span>סיבת המתנה נוכחית</span><select value={ticket.waitingReason || "supplier"} onChange={(ev) => setWaiting(ev.target.value)}>{wReasons(config).filter((r) => r.id !== "no_equipment").map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></label>}
-          <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
+          <div className="pr-row">{facilityAdminWaitReasons.map((r) => <button key={r.id} className={"pr-pick" + (facilityAdminDraft.waitingReason === r.id ? " on" : "")} onClick={() => setFacilityAdminDraft((draft) => ({ ...draft, waitingReason: r.id }))} style={facilityAdminDraft.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={facilityAdminDraft.supplier || ""} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, supplier: ev.target.value }))}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
         {track === "transport" && <><SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={ticket.supplier || ""} onChange={(ev) => setSupplierRoute(ev.target.value)}><option value="">— מאגר שינוע / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">ברירת המחדל מגיעה מספק הכלי, ואפשר לשנות ידנית אם הטיפול עובר לקבלן אחר.</div></>}
         <SectionTitle>הערה</SectionTitle>
-        <div className="note-row"><input value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" onKeyDown={(ev) => ev.key === "Enter" && addNote()} /><button className="btn-primary" aria-label="שליחת עדכון לקריאה" onClick={addNote}><Send size={16} /></button></div>
-        <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>
+        {track === "facility" ? <input className="ta" value={facilityAdminDraft.note} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, note: ev.target.value }))} placeholder="עדכון…" /> : <div className="note-row"><input value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" onKeyDown={(ev) => ev.key === "Enter" && addNote()} /><button className="btn-primary" aria-label="שליחת עדכון לקריאה" onClick={addNote}><Send size={16} /></button></div>}
+        {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <button className="btn-close full" style={{ marginTop: 16 }} onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button>}
       </>)}
 
       {role === "admin" && <div className="admin-ticket-manual-shell"><AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} /></div>}

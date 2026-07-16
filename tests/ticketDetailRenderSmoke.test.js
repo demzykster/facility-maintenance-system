@@ -1,7 +1,12 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { TicketDetail } from "../src/TicketDetail.jsx";
+import {
+  applyFacilityAdminProcessingDraft,
+  facilityAdminProcessingDraft,
+  facilityAdminProcessingHasChanges,
+  TicketDetail
+} from "../src/TicketDetail.jsx";
 
 const Icon = ({ children }) => React.createElement("span", null, children);
 const Box = ({ children }) => React.createElement("div", null, children);
@@ -124,5 +129,74 @@ describe("ticket detail render smoke", () => {
 
   it("renders a transport ticket detail without runtime bridge errors", () => {
     expect(renderTicket("transport")).toContain("כסא לא תקין");
+  });
+
+  it("keeps facility admin waiting edits as a draft until explicit save", () => {
+    const ticket = {
+      id: "facility-1",
+      track: "facility",
+      status: "in_progress",
+      waitingReason: "",
+      supplier: "",
+      log: [{ at: 1, by: "Vadim", text: "נפתחה" }]
+    };
+    const draft = facilityAdminProcessingDraft(ticket);
+    const clicked = { ...draft, waitingReason: "supplier" };
+
+    expect(facilityAdminProcessingHasChanges(ticket, clicked)).toBe(true);
+    expect(ticket.status).toBe("in_progress");
+    expect(ticket.log).toHaveLength(1);
+
+    const next = applyFacilityAdminProcessingDraft(ticket, clicked, {
+      now: 2,
+      session: { name: "Vadim", role: "admin" },
+      entryFor: (_session, text, kind) => ({ at: 2, by: "Vadim", text, kind }),
+      pausePatch: () => ({ pauseSince: 2 }),
+      reasonBall: () => "admin",
+      waitReasonLabel: () => "ממתינה לספק"
+    });
+
+    expect(next.status).toBe("waiting");
+    expect(next.waitingReason).toBe("supplier");
+    expect(next.log).toHaveLength(2);
+    expect(next.log[1]).toMatchObject({ text: "ממתין · ממתינה לספק", kind: "waiting" });
+  });
+
+  it("saves facility admin supplier, waiting reason, and note together", () => {
+    const ticket = {
+      id: "facility-1",
+      track: "facility",
+      status: "in_progress",
+      waitingReason: "",
+      supplier: "",
+      log: []
+    };
+    const next = applyFacilityAdminProcessingDraft(ticket, {
+      supplier: "משב מיזוג אוויר",
+      waitingReason: "supplier",
+      note: "נבדק מול ספק"
+    }, {
+      now: 3,
+      session: { name: "Vadim", role: "admin" },
+      entryFor: (_session, text, kind) => ({ at: 3, by: "Vadim", text, kind }),
+      normalizeFacilitySupplierPatch: (_ticket, patch) => ({ ...patch, assignee: "", routedTech: true }),
+      pausePatch: () => ({}),
+      reasonBall: () => "admin",
+      waitReasonLabel: () => "ממתינה לספק"
+    });
+
+    expect(next).toMatchObject({
+      supplier: "משב מיזוג אוויר",
+      assignee: "",
+      routedTech: true,
+      status: "waiting",
+      waitingReason: "supplier",
+      updatedAt: 3
+    });
+    expect(next.log.map((entry) => entry.text)).toEqual([
+      "שויך לספק: משב מיזוג אוויר",
+      "ממתין · ממתינה לספק",
+      "נבדק מול ספק"
+    ]);
   });
 });
