@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ticketResponsibleLabel, transportTicketSupplierName as transportTicketSupplierNameModel } from "./ticketResponsibilityModel.js";
 
 let ticketDetailRuntimeUi = {};
 
@@ -176,8 +177,7 @@ export function applyFacilityAdminProcessingDraft(ticket = {}, draft = {}, optio
 }
 
 export function transportTicketSupplierName(ticket = {}, fleet = []) {
-  const linkedUnit = (fleet || []).find((unit) => unit?.id && unit.id === ticket.forkliftId);
-  return text(linkedUnit?.supplier || ticket.supplier) || "לא מוגדר";
+  return transportTicketSupplierNameModel(ticket, fleet) || "לא מוגדר";
 }
 
 export function TicketDetail(p) {
@@ -296,6 +296,7 @@ export function TicketDetail(p) {
   const facilityAdminWaitReasons = track === "facility" ? wReasons(config).filter((r) => r.id !== "no_equipment") : [];
   const facilityAdminProcessingDirty = facilityAdminProcessingHasChanges(ticket, facilityAdminDraft);
   const fixedTransportSupplier = track === "transport" ? transportTicketSupplierName(ticket, p.fleet || []) : "";
+  const responsibleLabel = ticketResponsibleLabel(ticket, { fleet: p.fleet || [] });
   const showAdminProcessingPanel = role === "admin" && isOpen(ticket) && !["pending_manager", "pending_user", "rework"].includes(ticket.status);
   const showTransportExecutionToggle = track === "transport" && !["pending_admin", "pending_user"].includes(ticket.status);
   const dtMeta = ticket.downtimeType ? dtOf(ticket.downtimeType) : null;
@@ -322,7 +323,7 @@ export function TicketDetail(p) {
       track: tr.label,
       category: ticket.categoryLabel || c.label,
       asset: ticket.asset || ticket.zone || "",
-      assignee: ticket.assignee || ticket.supplier || "",
+      assignee: responsibleLabel,
       waitReason: ticketWaitReasonLabel(ticket, config),
       slaBreached: ticketMissedSla(ticket, config),
       age: ticket.createdAt ? `נפתחה ${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}` : ""
@@ -350,7 +351,7 @@ export function TicketDetail(p) {
         {requesterPhone && <Meta Icon={Phone} label="טלפון פותח" value={<a className="tel-link" href={`tel:${requesterTel || requesterPhone}`}>{requesterPhone}</a>} />}
         <Meta Icon={Clock} label="נפתח" value={`${fmtDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`} />
         {track === "transport" && <Meta Icon={Truck} label="ספק כלי" value={fixedTransportSupplier} />}
-        <Meta Icon={Wrench} label="אחראי" value={ticket.assignee || ticket.supplier || "טרם שויך"} action={isAdmin ? () => setAdminQuickEdit("assignee") : null} />
+        <Meta Icon={Wrench} label="אחראי" value={responsibleLabel} action={isAdmin ? () => setAdminQuickEdit("assignee") : null} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
         {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}

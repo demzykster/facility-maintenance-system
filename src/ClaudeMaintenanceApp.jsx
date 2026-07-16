@@ -78,6 +78,7 @@ import { createApiPresenceProvider } from "./apiPresenceAdapter.js";
 import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
+import { normalizeTransportCreateResponsibility, ticketHolderLabel, transportTechnicianAssignee } from "./ticketResponsibilityModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
 import { cleaningZonesAuthorityFailureIssue, cleaningZonesForAuthority, normalizedCleaningZonesAuthorityEnabled } from "./cleaningZonesAuthorityModel.js";
@@ -1037,11 +1038,11 @@ const ballIn = (t) => {
   }
 };
 // «у кого мяч» — кто сейчас держит заявку, для отображения на карточке
-const ballHolder = (t) => {
+const ballHolder = (t, fleet = []) => {
   const who = ballIn(t);
   if (who === "admin") return { key: "admin", label: "מנהל המערכת", Icon: ShieldCheck, color: "#1F4E8C" };
-  if (who === "manager") return { key: "manager", label: (t.status === "waiting" && t.waitingReason === "no_equipment") ? "מנהל מחלקה · להעביר כלי" : (t.status === "pending_manager" ? "מנהל מחלקה · לאישור דיווח" : (t.status === "pending_user" ? "מנהל מחלקה · לאישור ביצוע" : "מנהל מחלקה")), Icon: User, color: "#0D9488" };
-  if (who === "tech") return { key: "tech", label: t.assignee ? (t.assignee === "טכנאי" ? "טכנאי מטפל" : "טכנאי · " + t.assignee) : (t.supplier ? "ספק · " + t.supplier : "צוות טכני · ממתין לקבלה"), Icon: Wrench, color: "#D97706" };
+  if (who === "manager") return { key: "manager", label: ticketHolderLabel(t, "manager"), Icon: User, color: "#0D9488" };
+  if (who === "tech") return { key: "tech", label: ticketHolderLabel(t, "tech", { fleet }), Icon: Wrench, color: "#D97706" };
   return null; // none — סגורה/בוטלה/הוחזרה לעובד
 };
 // Есть ли активный техник, который МОЖЕТ принять заявку (по типу/поставщику/категории). Пусто → заявка «без принимающего».
@@ -1060,7 +1061,8 @@ const eligibleTechs = (t, users, fleet) => {
 // «Между стульев»: заявка открыта, мяч у бригады техников, но принять некому (нет техника, либо назначенный исчез/неактивен).
 const needsHandler = (t, users, fleet) => {
   if (!isOpen(t) || ballIn(t) !== "tech") return false;
-  if (t.assignee) return !(users || []).some((u) => u.role === "tech" && u.active !== false && u.name === t.assignee);
+  const assignee = transportTechnicianAssignee(t, fleet);
+  if (assignee) return !(users || []).some((u) => u.role === "tech" && u.active !== false && u.name === assignee);
   return eligibleTechs(t, users, fleet).length === 0;
 };
 // Причины ожидания — ДЕФОЛТНЫЙ список (сид). Админ редактирует в настройках (config.waitReasons).
@@ -1164,7 +1166,7 @@ function assetHealth(f, tickets, config) {
   return { score, level, color: colors[level], label: labels[level], rec, count90: last90.length, mttr, cost90 };
 }
 
-const isCriticalEscalated = (t, cfg) => t.track === "transport" && t.downtimeType === "critical" && !t.assignee && isOpen(t) && (Date.now() - t.createdAt) > (cfg?.escalateCriticalHours ?? 2) * 3600000;
+const isCriticalEscalated = (t, cfg) => t.track === "transport" && t.downtimeType === "critical" && !transportTechnicianAssignee(t) && isOpen(t) && (Date.now() - t.createdAt) > (cfg?.escalateCriticalHours ?? 2) * 3600000;
 const HE_STOP = new Set("של את עם על אם כי או גם לא יש אין זה זו הוא היא הם הן אני אתה אנחנו עד אל כל כך מה מי כמו בין אחר אחרי לפני תחת ליד מן אבל אז רק עוד כבר היה היתה להיות יותר פחות מאוד".split(/\s+/));
 const normToken = (w) => (w || "").replace(/[^\u0590-\u05FFa-zA-Z0-9]/g, "");
 const keywordsOf = (text) => Array.from(new Set((text || "").split(/\s+/).map(normToken).filter((w) => w.length >= 3 && !HE_STOP.has(w)).map((w) => w.toLowerCase())));
@@ -2332,8 +2334,8 @@ export default function App() {
     const add = (id) => { if (id) ids.push(id); };
     activeUserList().forEach((u) => {
       if (u.role === "admin") add(u.id);
-      else if (u.role === "tech" && ticket.assignee && u.name === ticket.assignee) add(u.id);
-      else if (u.role === "tech" && !ticket.assignee && u.supplier && ticket.supplier === u.supplier) add(u.id);
+      else if (u.role === "tech" && transportTechnicianAssignee(ticket, fleet) && u.name === transportTechnicianAssignee(ticket, fleet)) add(u.id);
+      else if (u.role === "tech" && !transportTechnicianAssignee(ticket, fleet) && u.supplier && ticket.supplier === u.supplier) add(u.id);
       else if (u.role === "user" && ticket.status === "pending_user" && canConfirmTicketForSession(u, ticket)) add(u.id);
       else if (u.role === "user" && ticket.status !== "pending_user" && visibleTickets(u, [ticket], fleet).length) add(u.id);
     });
@@ -2900,6 +2902,7 @@ export default function App() {
   const saveTicket = async (t) => {
     let rec = t;
     const _prev = tickets.find((x) => x.id === rec.id), _now = Date.now();
+    rec = normalizeTransportCreateResponsibility(rec, _prev);
     rec = applyTicketStatusTiming(rec, _prev, _now);
     if (!rec.num && !NORMALIZED_TICKET_AUTHORITY) { const letter = tkLetter(rec); const sameType = tickets.filter((x) => tkLetter(x) === letter && x.num); const max = sameType.reduce((m, x) => Math.max(m, x.num), 0); rec = { ...rec, num: max + 1 }; }
     if (NORMALIZED_TICKET_AUTHORITY) {
@@ -4433,8 +4436,8 @@ function TechApp(p) {
   const myShift = presenceOf(presence, session.id);
   const myIdle = shiftIdle(myShift, session, config);
   const mine = useMemo(() => visibleTickets(session, tickets, fleet), [tickets, session, fleet]);
-  const pool = mine.filter((t) => !t.assignee && ballIn(t) === "tech");
-  const myOpen = mine.filter((t) => t.assignee === session.name && isOpen(t));
+  const pool = mine.filter((t) => !transportTechnicianAssignee(t, fleet) && ballIn(t) === "tech");
+  const myOpen = mine.filter((t) => transportTechnicianAssignee(t, fleet) === session.name && isOpen(t));
   const waitEquip = myOpen.filter((t) => t.status === "waiting" && t.waitingReason === "no_equipment");
   const returnedToMe = myOpen.filter((t) => t.returned && ballIn(t) === "tech");
   const working = myOpen.filter((t) => ballIn(t) === "tech" && !returnedToMe.includes(t));
@@ -8036,7 +8039,8 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const risk = (isOpen(t) && admin && fleet && config) ? computeRisk(t, fleet, config) : null;
   const showRiskBadge = risk && (risk.level === "orange" || risk.level === "red");
   const showStatusBadge = !(t.status === "waiting" && t.waitingReason);
-  const waitingForTechAcceptance = isOpen(t) && t.status === "new" && ballIn(t) === "tech" && !t.assignee;
+  const effectiveAssignee = transportTechnicianAssignee(t, fleet || []);
+  const waitingForTechAcceptance = isOpen(t) && t.status === "new" && ballIn(t) === "tech" && !effectiveAssignee;
   const waitTone = ticketTone("warning");
   const dangerTone = ticketTone("danger");
   const adminTone = ticketTone("info");
@@ -8047,7 +8051,7 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const downtimeTone = ticketToneForColor(dtOf(t.downtimeType, config).color, "warning");
   const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
-  const holder = isOpen(t) ? ballHolder(t) : null;
+  const holder = isOpen(t) ? ballHolder(t, fleet || []) : null;
   const stateSince = t.updatedAt || t.createdAt;
   const holderTone = holder ? ticketToneForColor(holder.color, "info") : null;
   const meta = [

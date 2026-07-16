@@ -68,6 +68,22 @@ describe("ticket visibility model", () => {
     }, [supplierTicket], []).map((ticket) => ticket.id)).toEqual(["facility-linked"]);
   });
 
+  it("keeps new transport supplier tickets visible when legacy assignee is the opener or supplier", () => {
+    const supplierTickets = [
+      { id: "opener-assigned", track: "transport", status: "new", forkliftId: "fork-liftco", assignee: "Vadim", supplier: "LiftCo", createdBy: { name: "Vadim", role: "user" } },
+      { id: "supplier-assigned", track: "transport", status: "new", forkliftId: "fork-liftco", assignee: "LiftCo", supplier: "LiftCo" },
+      { id: "other-tech", track: "transport", status: "new", forkliftId: "fork-liftco", assignee: "Other Tech", supplier: "LiftCo" }
+    ];
+    const supplierFleet = [{ id: "fork-liftco", supplier: "LiftCo" }];
+
+    expect(visibleTicketsForSession({
+      role: "tech",
+      name: "Tech",
+      techScope: "transport",
+      supplier: "LiftCo"
+    }, supplierTickets, supplierFleet).map((ticket) => ticket.id)).toEqual(["opener-assigned", "supplier-assigned"]);
+  });
+
   it("limits transport choices to the actor departments", () => {
     const fleetList = [
       { id: "fork-a", depts: ["A"] },

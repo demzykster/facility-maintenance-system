@@ -139,7 +139,15 @@ describe("ticket detail render smoke", () => {
 
     expect(html.match(/ספק כלי/g)).toHaveLength(1);
     expect(html).toContain("טויוטה");
+    expect(html).toContain("טויוטה · טרם נלקח ע״י טכנאי");
     expect(html).not.toContain("שיוך ספק / קבלן");
+  });
+
+  it("shows transport responsible as supplier plus technician after technician accepts", () => {
+    const html = renderTicket("transport", { ticket: { assignee: "Igor" } });
+
+    expect(html).toContain("אחראי: ");
+    expect(html).toContain("טויוטה · Igor");
   });
 
   it("keeps transport admin in control mode until execution actions are explicitly shown", () => {

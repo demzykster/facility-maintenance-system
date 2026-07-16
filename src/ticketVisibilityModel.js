@@ -1,3 +1,5 @@
+import { transportTechnicianAssignee } from "./ticketResponsibilityModel.js";
+
 const cleanStringList = (values = []) =>
   [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
 
@@ -79,7 +81,8 @@ const visibleToTechnician = (session = {}, ticket = {}, fleet = []) => {
   const scope = session.techScope || "transport";
   const cats = session.techCats || [];
   const track = ticketTrack(ticket);
-  const mineOrFree = ticket.assignee === session.name || !ticket.assignee;
+  const effectiveAssignee = transportTechnicianAssignee(ticket, fleet);
+  const mineOrFree = effectiveAssignee === session.name || !effectiveAssignee;
   const canHandleTransport = scope === "transport" || scope === "both";
   const canHandleFacility = scope === "facility" || scope === "both";
   if (track === "transport") {
