@@ -560,10 +560,10 @@ describe("tickets API handler", () => {
   });
 
   it("lists normalized tickets for active ticket roles", async () => {
-    const driver = { list: vi.fn().mockResolvedValue([{ id: "T-1", status: "open" }]), get: vi.fn() };
+    const driver = { list: vi.fn().mockResolvedValue([{ id: "T-1", status: "open", track: "facility", routedTech: true }]), get: vi.fn() };
     const handler = createTicketsApiHandler({
       driver,
-      sessionClient: sessionClientFor({ role: "tech" })
+      sessionClient: sessionClientFor({ role: "tech", tech_scope: "facility" })
     });
 
     const res = await call(handler, {
@@ -573,8 +573,70 @@ describe("tickets API handler", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true, tickets: [{ id: "T-1", status: "open" }] });
+    expect(res.json()).toEqual({ ok: true, tickets: [{ id: "T-1", status: "open", track: "facility", routedTech: true }] });
     expect(driver.list).toHaveBeenCalledWith({ limit: "25" });
+  });
+
+  it("scopes worker ticket lists to tickets reported by the worker", async () => {
+    const own = { id: "T-own", status: "open", reportedBy: { id: "worker-1", name: "Worker" } };
+    const other = { id: "T-other", status: "open", reportedBy: { id: "worker-2", name: "Other" } };
+    const driver = { list: vi.fn().mockResolvedValue([own, other]), get: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker", name: "Worker" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer worker-token" },
+      query: { limit: "25" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets: [own] });
+  });
+
+  it("blocks worker direct reads of another worker's ticket", async () => {
+    const driver = {
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({ id: "T-other", status: "open", reportedBy: { id: "worker-2", name: "Other" } })
+    };
+    const metadataDriver = { listActiveByOwner: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker", name: "Worker" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer worker-token" },
+      query: { id: "T-other", includeFiles: "1", limit: "1000" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:view_scope" });
+    expect(metadataDriver.listActiveByOwner).not.toHaveBeenCalled();
+  });
+
+  it("keeps admin full ticket read access", async () => {
+    const tickets = [
+      { id: "T-worker", status: "open", reportedBy: { id: "worker-1" } },
+      { id: "T-other", status: "open", reportedBy: { id: "worker-2" } }
+    ];
+    const driver = { list: vi.fn().mockResolvedValue(tickets), get: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin" })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer admin-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets });
   });
 
   it("lists normalized tickets for executive BI sessions", async () => {
@@ -593,6 +655,53 @@ describe("tickets API handler", () => {
     expect(res.json()).toEqual({ ok: true, tickets: [{ id: "T-1", status: "open" }] });
   });
 
+  it("keeps manager ticket reads scoped to owned, assigned, and department tickets", async () => {
+    const tickets = [
+      { id: "T-own", track: "facility", createdBy: { id: "manager-1", name: "Manager", dept: "Ops" } },
+      { id: "T-assigned", track: "facility", assignee: "Manager" },
+      { id: "T-dept", track: "facility", department: "Ops" },
+      { id: "T-fleet-dept", track: "transport", forkliftId: "forklift-ops" },
+      { id: "T-other", track: "facility", department: "Other" }
+    ];
+    const driver = { list: vi.fn().mockResolvedValue(tickets), get: vi.fn() };
+    const fleetDriver = { list: vi.fn().mockResolvedValue([{ id: "forklift-ops", depts: ["Ops"] }]) };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver,
+      sessionClient: sessionClientFor({ id: "manager-1", role: "user", name: "Manager", department: "Ops", departments: ["Ops"] })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer user-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets: tickets.slice(0, 4) });
+  });
+
+  it("keeps technician ticket reads scoped to assigned or free tickets in tech scope", async () => {
+    const tickets = [
+      { id: "T-assigned", track: "facility", assignee: "Tech One", routedTech: true, category: "electric" },
+      { id: "T-free", track: "facility", routedTech: true, category: "electric" },
+      { id: "T-other-cat", track: "facility", routedTech: true, category: "plumbing" },
+      { id: "T-not-routed", track: "facility", category: "electric" }
+    ];
+    const driver = { list: vi.fn().mockResolvedValue(tickets), get: vi.fn() };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "tech-1", role: "tech", name: "Tech One", tech_scope: "facility", tech_cats: ["electric"] })
+    });
+
+    const res = await call(handler, {
+      method: "GET",
+      headers: { authorization: "Bearer tech-token" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, tickets: tickets.slice(0, 2) });
+  });
+
   it("gets one normalized ticket with active file metadata", async () => {
     const driver = {
       list: vi.fn(),
@@ -604,7 +713,7 @@ describe("tickets API handler", () => {
     const handler = createTicketsApiHandler({
       driver,
       metadataDriver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "view" } })
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "view" } })
     });
 
     const res = await call(handler, {

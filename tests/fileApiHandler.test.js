@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFileApiHandler } from "../server/files/handler.js";
+import { signCmmsSessionToken } from "../server/session/cmmsSessionToken.js";
 
 function createRes() {
   return {
@@ -302,6 +303,93 @@ describe("file API handler", () => {
     expect(del.json()).toEqual({ error: "permission_required:files:ticket" });
     expect(driver.download).not.toHaveBeenCalled();
     expect(driver.delete).not.toHaveBeenCalled();
+  });
+
+  it("requires ticket read scope before downloading active ticket files", async () => {
+    const driver = { download: vi.fn() };
+    const metadataDriver = {
+      findActiveByPath: vi.fn().mockResolvedValue({
+        ownerType: "ticket",
+        ownerId: "T-other",
+        kind: "ticket_before_photo",
+        path: "tickets/T-other/before.jpg"
+      })
+    };
+    const ticketDriver = {
+      get: vi.fn().mockResolvedValue({
+        id: "T-other",
+        track: "facility",
+        status: "open",
+        reportedBy: { id: "worker-2", name: "Other" }
+      })
+    };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      ticketDriver,
+      sessionClient: activeSessionClient({ id: "worker-1", role: "worker", name: "Worker" })
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-other/before.jpg" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:files:ticket_scope" });
+    expect(driver.download).not.toHaveBeenCalled();
+  });
+
+  it("accepts a CMMS session token before applying ticket file read scope", async () => {
+    const secret = "local-session-secret";
+    const token = signCmmsSessionToken("worker-1", "worker", "1042", secret).token;
+    const driver = {
+      download: vi.fn().mockResolvedValue({
+        contentType: "image/jpeg",
+        buffer: Buffer.from("photo-bytes")
+      })
+    };
+    const metadataDriver = {
+      findActiveByPath: vi.fn().mockResolvedValue({
+        ownerType: "ticket",
+        ownerId: "T-own",
+        kind: "ticket_before_photo",
+        path: "tickets/T-own/before.jpg"
+      })
+    };
+    const ticketDriver = {
+      get: vi.fn().mockResolvedValue({
+        id: "T-own",
+        track: "facility",
+        status: "open",
+        reportedBy: { id: "worker-1", name: "Worker" }
+      })
+    };
+    const sessionClient = activeSessionClient();
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      ticketDriver,
+      sessionClient,
+      env: { CMMS_SESSION_SECRET: secret }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      query: { path: "tickets/T-own/before.jpg" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      path: "tickets/T-own/before.jpg",
+      contentType: "image/jpeg",
+      data: Buffer.from("photo-bytes").toString("base64")
+    });
+    expect(sessionClient.getAuthUser).not.toHaveBeenCalled();
+    expect(driver.download).toHaveBeenCalledWith("tickets/T-own/before.jpg", expect.objectContaining({
+      id: "worker-1",
+      role: "worker"
+    }));
   });
 
   it("requires business owner write permission before uploading ticket metadata files", async () => {
