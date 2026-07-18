@@ -41,6 +41,16 @@ function sessionClientFor(profile = {}) {
   };
 }
 
+const ticketRecord = (ticket = {}) => ({
+  id: ticket.id || "T-1",
+  track: ticket.track || "facility",
+  status: ticket.status || "new",
+  subject: ticket.subject || "Door",
+  description: ticket.description || "Door is stuck",
+  category: ticket.category || "doors",
+  ...ticket
+});
+
 describe("tickets API handler", () => {
   it("requires a Supabase or CMMS bearer token", async () => {
     const handler = createTicketsApiHandler({ driver: { upsert: vi.fn() } });
@@ -130,7 +140,7 @@ describe("tickets API handler", () => {
     const handler = createTicketsApiHandler({
       driver,
       auditDriver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
       env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
     });
 
@@ -175,7 +185,7 @@ describe("tickets API handler", () => {
     };
     const handler = createTicketsApiHandler({
       driver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
       env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
     });
 
@@ -300,7 +310,7 @@ describe("tickets API handler", () => {
     };
     const handler = createTicketsApiHandler({
       driver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
       env: { CMMS_TICKET_SERVER_CREATE_V2: "false" }
     });
 
@@ -426,7 +436,7 @@ describe("tickets API handler", () => {
     };
     const handler = createTicketsApiHandler({
       driver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
       env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
     });
 
@@ -449,7 +459,7 @@ describe("tickets API handler", () => {
     };
     const handler = createTicketsApiHandler({
       driver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
       env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
     });
 
@@ -490,6 +500,186 @@ describe("tickets API handler", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: "ticket_not_found" });
     expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks worker updates to tickets outside the worker object scope", async () => {
+    const foreignTicket = ticketRecord({
+      id: "T-worker-foreign",
+      reportedBy: { id: "worker-2", name: "Worker B" },
+      createdBy: { id: "worker-2", name: "Worker B", role: "worker" }
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(foreignTicket),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker", name: "Worker A" }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer worker-token" },
+      body: {
+        operation: "update",
+        ticket: { ...foreignTicket, status: "cancelled" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:write_scope" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("allows worker updates to tickets inside the worker object scope", async () => {
+    const ownTicket = ticketRecord({
+      id: "T-worker-own",
+      reportedBy: { id: "worker-1", name: "Worker A" },
+      createdBy: { id: "worker-1", name: "Worker A", role: "worker" }
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(ownTicket),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker", name: "Worker A" }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer worker-token" },
+      body: {
+        operation: "update",
+        ticket: { ...ownTicket, status: "cancelled" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, action: "updated", ticket: { id: "T-worker-own", status: "cancelled" } });
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-worker-own", status: "cancelled" }));
+  });
+
+  it("blocks worker direct-id and query-param bypasses when updating another worker's ticket", async () => {
+    const foreignTicket = ticketRecord({
+      id: "T-worker-foreign",
+      reportedBy: { id: "worker-2", name: "Worker B" }
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(foreignTicket),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker", name: "Worker A" }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer worker-token" },
+      query: { id: "T-worker-own", includeFiles: "1" },
+      body: {
+        operation: "update",
+        ticket: { ...foreignTicket, status: "cancelled" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:write_scope" });
+    expect(driver.get).toHaveBeenCalledWith("T-worker-foreign");
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks technicians from updating tickets outside their tech scope", async () => {
+    const outsideScope = ticketRecord({
+      id: "T-tech-other",
+      track: "facility",
+      routedTech: true,
+      category: "plumbing"
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(outsideScope),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "tech-1", role: "tech", name: "Tech One", tech_scope: "facility", tech_cats: ["electric"] }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer tech-token" },
+      body: {
+        operation: "update",
+        ticket: { ...outsideScope, status: "in_progress" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:write_scope" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks managers from updating tickets outside department and fleet scope", async () => {
+    const outsideScope = ticketRecord({
+      id: "T-manager-other",
+      track: "facility",
+      department: "Other"
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(outsideScope),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const fleetDriver = { list: vi.fn().mockResolvedValue([]) };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver,
+      sessionClient: sessionClientFor({ id: "manager-1", role: "user", name: "Manager", department: "Ops", departments: ["Ops"] }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...outsideScope, status: "in_progress" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:write_scope" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps executive ticket sessions read-only for updates", async () => {
+    const driver = {
+      get: vi.fn(),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "executive-1", role: "executive" }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" },
+      body: {
+        operation: "update",
+        ticket: ticketRecord({ id: "T-exec", status: "in_progress" })
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:role:admin|user|tech|worker" });
+    expect(driver.get).not.toHaveBeenCalled();
     expect(driver.upsert).not.toHaveBeenCalled();
   });
 
@@ -544,7 +734,7 @@ describe("tickets API handler", () => {
     };
     const handler = createTicketsApiHandler({
       driver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } }),
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
       env: { CMMS_TICKET_SERVER_CREATE_V2: "false" }
     });
 
@@ -815,13 +1005,68 @@ describe("tickets API handler", () => {
     expect(driver.upsert).not.toHaveBeenCalled();
   });
 
-  it("deletes normalized tickets for sessions allowed to write tickets", async () => {
-    const driver = { delete: vi.fn().mockResolvedValue(undefined) };
+  it("keeps DELETE restricted to admin even when a worker owns the ticket", async () => {
+    const ownTicket = ticketRecord({
+      id: "T-worker-own-delete",
+      reportedBy: { id: "worker-1", name: "Worker A" }
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(ownTicket),
+      delete: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker", name: "Worker A" })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer worker-token" },
+      query: { id: "T-worker-own-delete" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:delete" });
+    expect(driver.get).toHaveBeenCalledWith("T-worker-own-delete");
+    expect(driver.delete).not.toHaveBeenCalled();
+  });
+
+  it("blocks worker deletes of tickets outside the worker object scope", async () => {
+    const foreignTicket = ticketRecord({
+      id: "T-worker-foreign-delete",
+      reportedBy: { id: "worker-2", name: "Worker B" }
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue(foreignTicket),
+      delete: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "worker-1", role: "worker", name: "Worker A" })
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer worker-token" },
+      query: { id: "T-worker-foreign-delete", includeFiles: "1" }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "permission_required:tickets:write_scope" });
+    expect(driver.get).toHaveBeenCalledWith("T-worker-foreign-delete");
+    expect(driver.delete).not.toHaveBeenCalled();
+  });
+
+  it("deletes normalized tickets only for admin sessions", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-4" })),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
     const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
     const handler = createTicketsApiHandler({
       driver,
       auditDriver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } })
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", permissions: { tickets: "manage" } })
     });
 
     const res = await call(handler, {
@@ -832,9 +1077,10 @@ describe("tickets API handler", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true, ticket: { id: "T-4" }, cleanup: { files: 0, metadata: false, errors: 0 } });
+    expect(driver.get).toHaveBeenCalledWith("T-4");
     expect(driver.delete).toHaveBeenCalledWith("T-4");
     expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
-      actorId: "app-user-1",
+      actorId: "admin-1",
       entityType: "ticket",
       entityId: "T-4",
       action: "delete"
@@ -842,7 +1088,10 @@ describe("tickets API handler", () => {
   });
 
   it("cleans ticket-owned files when deleting a normalized ticket", async () => {
-    const driver = { delete: vi.fn().mockResolvedValue(undefined) };
+    const driver = {
+      get: vi.fn().mockResolvedValue(ticketRecord({ id: "T-5" })),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
     const metadataDriver = {
       listActiveByOwner: vi.fn().mockResolvedValue([
         { ownerType: "ticket", ownerId: "T-5", path: "tickets/T-5/before.jpg" },
@@ -855,7 +1104,7 @@ describe("tickets API handler", () => {
       driver,
       metadataDriver,
       fileDriver,
-      sessionClient: sessionClientFor({ permissions: { tickets: "manage" } })
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", permissions: { tickets: "manage" } })
     });
 
     const res = await call(handler, {

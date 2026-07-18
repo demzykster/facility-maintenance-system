@@ -2,6 +2,7 @@ import { visibleTicketsForSession } from "../../src/ticketVisibilityModel.js";
 
 const FULL_READ_ROLES = new Set(["admin", "executive"]);
 const FLEET_CONTEXT_ROLES = new Set(["user", "tech"]);
+const TICKET_WRITE_ROLES = new Set(["admin", "user", "tech", "worker"]);
 
 const cleanRole = (session = {}) => String(session?.role || "").trim();
 
@@ -27,4 +28,16 @@ export async function canReadTicketInSessionScope(session = {}, ticket = null, {
   if (FULL_READ_ROLES.has(cleanRole(session))) return true;
   const scoped = await ticketsForSessionReadScope(session, [ticket], { fleetDriver });
   return scoped.length === 1;
+}
+
+export async function ticketWritePermissionError(session = {}, ticket = null, { fleetDriver = null, action = "update" } = {}) {
+  if (!await canReadTicketInSessionScope(session, ticket, { fleetDriver })) {
+    return "permission_required:tickets:write_scope";
+  }
+  const role = cleanRole(session);
+  if (!TICKET_WRITE_ROLES.has(role)) return "permission_required:role:admin|user|tech|worker";
+  if (String(action || "").trim().toLowerCase() === "delete" && role !== "admin") {
+    return "permission_required:tickets:delete";
+  }
+  return null;
 }

@@ -12,7 +12,7 @@ import { createSupabaseFileMetadataDriverFromEnv } from "../files/supabaseFileMe
 import { createSupabaseFileDriverFromEnv } from "../files/supabaseFileDriver.js";
 import { createTicketRecord, createTicketReplayResult, mergeTicketUpdateWithExisting } from "./ticketCreateDomain.js";
 import { ticketServerCreateV2Enabled } from "../../src/ticketServerCreateCutoverModel.js";
-import { canReadTicketInSessionScope, canReadTicketsRole, ticketsForSessionReadScope } from "./ticketReadScope.js";
+import { canReadTicketInSessionScope, canReadTicketsRole, ticketWritePermissionError, ticketsForSessionReadScope } from "./ticketReadScope.js";
 
 const json = (res, status, body) => {
   res.statusCode = status;
@@ -203,7 +203,12 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         if (!id) return json(res, 400, { error: "ticket_id_required" });
         const permissionError = kvWritePermissionError(auth.user, `ticket:${id}`);
         if (permissionError) return json(res, 403, { error: permissionError });
+        if (typeof backendDriver.get !== "function") return json(res, 503, { error: "tickets_read_not_configured" });
         if (typeof backendDriver.delete !== "function") return json(res, 503, { error: "tickets_delete_not_configured" });
+        const existing = await backendDriver.get(id);
+        if (!existing) return json(res, 404, { error: "ticket_not_found" });
+        const scopePermissionError = await ticketWritePermissionError(auth.user, existing, { fleetDriver: backendFleetDriver, action: "delete" });
+        if (scopePermissionError) return json(res, 403, { error: scopePermissionError });
         await backendDriver.delete(id);
         const cleanup = await deleteTicketOwnedFiles({ ticketId: id, fileDriver: backendFileDriver, metadataDriver: backendMetadataDriver });
         await writeAuditEvent(backendAuditDriver, ticketDeleteAuditEvent(id, auth.user));
@@ -213,13 +218,17 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
       const rawTicket = body?.ticket || body;
       const ticket = normalizeTicketRecord(rawTicket);
       const operation = ticketWriteOperation(body, req);
-      const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
-      if (permissionError) return json(res, 403, { error: permissionError });
+      const rolePermissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
+      if (rolePermissionError) return json(res, 403, { error: rolePermissionError });
 
       if (typeof backendDriver.get !== "function") return json(res, 503, { error: "tickets_read_not_configured" });
       const existing = await backendDriver.get(ticket.id);
       const serverCreateEnabled = ticketServerCreateV2Enabled(env);
       if (existing) {
+        const scopePermissionError = await ticketWritePermissionError(auth.user, existing, { fleetDriver: backendFleetDriver, action: "update" });
+        if (scopePermissionError) return json(res, 403, { error: scopePermissionError });
+        const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
+        if (permissionError) return json(res, 403, { error: permissionError });
         if (serverCreateEnabled && operation === "create") {
           const replay = createTicketReplayResult({ ticket: ticket.legacyPayload, existing, actor: auth.user });
           if (!replay.replay) {
