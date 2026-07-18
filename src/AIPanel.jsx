@@ -1,8 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Send, Sparkles, X } from "lucide-react";
 import { canExecuteAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
-import { aiAssistQuickPrompts, aiAssistWelcomeMessage } from "./aiAssistQuickPromptModel.js";
+import { aiAssistQuickPrompts } from "./aiAssistQuickPromptModel.js";
+import { useAIAgentSession } from "./useAIAgentSession.js";
+
+export {
+  aiAssistantFailureMessage,
+  normalizeAiPanelAssistantOutput,
+  shouldRequestProviderPlan
+} from "./aiAgentSessionController.js";
 
 const cleanText = (value, fallback = "") => String(value || fallback || "").trim();
 const pad2 = (value) => String(value).padStart(2, "0");
@@ -57,15 +64,6 @@ const UPDATE_FIELD_LABELS = Object.freeze({
   waitingFor: "ממתין ל"
 });
 
-export function normalizeAiPanelAssistantOutput(output) {
-  if (typeof output === "string") return { text: output, actions: [], providerPlan: null, providerPlanErrorCode: "" };
-  const text = cleanText(output?.text || output?.assistant?.text || output?.draft?.userReply, "לא התקבלה תשובה.");
-  const actions = Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : [];
-  const providerPlan = output?.providerPlan && typeof output.providerPlan === "object" ? output.providerPlan : null;
-  const providerPlanErrorCode = cleanText(output?.providerPlanErrorCode, "");
-  return { text, actions, providerPlan, providerPlanErrorCode };
-}
-
 export function aiPanelTextDirection(value, fallback = "rtl") {
   const text = cleanText(value, "");
   const rtlIndex = text.search(/[\u0590-\u08FF]/u);
@@ -105,29 +103,6 @@ export function aiPanelTextBlocks(value) {
   }
   flushList();
   return blocks;
-}
-
-export function shouldRequestProviderPlan(workflow = AI_ASSIST_WORKFLOWS.general) {
-  return [
-    AI_ASSIST_WORKFLOWS.riskSummary,
-    AI_ASSIST_WORKFLOWS.nextActions,
-    AI_ASSIST_WORKFLOWS.draftPreparation
-  ].includes(workflow);
-}
-
-export function aiAssistantFailureMessage(error = {}) {
-  const code = cleanText(error?.message || error, "");
-  if (code === "ai_server_disabled") return "שרת ה-AI כבוי כרגע. יש להגדיר ב-Vercel את CMMS_AI_MODE=server, ספק ומפתח API.";
-  if (code === "ai_provider_required") return "חסר ספק AI בשרת. יש לבחור ספק ולהגדיר CMMS_AI_PROVIDER.";
-  if (code === "ai_provider_key_required") return "חסר מפתח API לספק ה-AI בשרת / Vercel env.";
-  if (code === "ai_provider_failed") return "השרת מחובר ל-AI, אבל ספק המודל החזיר שגיאה. בדקו את המפתח או המודל.";
-  if (code === "ai_provider_quota_exceeded") return "השרת מחובר ל-AI, אבל מכסת ספק ה-AI / החיוב בחשבון לא מאפשרים כרגע להריץ את המודל.";
-  if (code === "ai_provider_model_unavailable") return "השרת מחובר ל-AI, אבל המודל שהוגדר אינו זמין לחשבון הזה.";
-  if (code === "ai_provider_auth_failed") return "השרת מחובר ל-AI, אבל מפתח הספק נדחה. בדקו את המפתח ב-Vercel.";
-  if (code === "ai_provider_rate_limited") return "ספק ה-AI מגביל כרגע את קצב הבקשות. נסו שוב בעוד רגע.";
-  if (code === "ai_assist_rate_limited") return "נשלחו יותר מדי בקשות AI ברצף. נסו שוב בעוד רגע.";
-  if (code === "access_token_required") return "נדרשת התחברות מחדש לפני שימוש ב-AI.";
-  return "לא הצלחתי להתחבר לשירות ה-AI כרגע.";
 }
 
 function actionStatusLabel(action = {}) {
@@ -278,79 +253,33 @@ function AiMessage({ role, content }) {
 }
 
 export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
-  const vis = useMemo(() => visibleTickets(session, tickets, fleet), [session, tickets, fleet, visibleTickets]);
-  const contextPreview = useMemo(() => buildContext(session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones), [session, vis, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones, buildContext]);
-  const [msgs, setMsgs] = useState([{ role: "assistant", content: aiAssistWelcomeMessage(session) }]);
-  const [input, setInput] = useState(initialText || "");
-  const [inputWorkflow, setInputWorkflow] = useState(initialWorkflow || AI_ASSIST_WORKFLOWS.general);
-  const [busy, setBusy] = useState(false);
-  const [actionBusy, setActionBusy] = useState("");
-  const [actionResults, setActionResults] = useState({});
+  const agent = useAIAgentSession({
+    session,
+    tickets,
+    pm,
+    fleet,
+    users,
+    tasks,
+    meetings,
+    ppeItems,
+    ppeReqs,
+    zones,
+    config,
+    visibleTickets,
+    buildContext,
+    callModel,
+    callAssistant,
+    executeAction,
+    initialText,
+    initialWorkflow
+  });
+  const { msgs, input, inputWorkflow, busy, actionBusy, actionResults, contextPreview, setInput, send, runAction } = agent;
   const endRef = useRef(null);
   const quick = useMemo(() => aiAssistQuickPrompts(session, contextPreview), [session, contextPreview]);
 
   useEffect(() => {
-    if (!initialText) return;
-    setInput(initialText);
-    setInputWorkflow(initialWorkflow || AI_ASSIST_WORKFLOWS.general);
-  }, [initialText, initialWorkflow]);
-
-  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, busy]);
-
-  const send = async (text, workflow = AI_ASSIST_WORKFLOWS.general) => {
-    const q = (text ?? input).trim();
-    if (!q || busy) return;
-    const history = [...msgs, { role: "user", content: q }];
-    setMsgs(history);
-    setInput("");
-    setInputWorkflow(AI_ASSIST_WORKFLOWS.general);
-    setBusy(true);
-    try {
-      const context = contextPreview;
-      const sys = typeof context === "string"
-        ? `אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הנתונים בלבד.\n\n--- נתונים ---\n${context}`
-        : "אתה עוזר אחזקה במרכז לוגיסטי בישראל. ענה בעברית בקצרה על בסיס הקונטקסט המסונן בלבד.";
-      const apiMsgs = history.filter((m, i) => !(i === 0 && m.role === "assistant")).map((m) => ({ role: m.role, content: m.content }));
-      const out = callAssistant
-        ? await callAssistant({ text: q, messages: apiMsgs, system: sys, context, workflow, includeProviderPlan: shouldRequestProviderPlan(workflow) })
-        : await callModel(apiMsgs, sys, 900);
-      const normalized = normalizeAiPanelAssistantOutput(out);
-      setMsgs((s) => [...s, {
-        role: "assistant",
-        content: normalized.text,
-        actions: normalized.actions,
-        providerPlan: normalized.providerPlan,
-        providerPlanErrorCode: normalized.providerPlanErrorCode
-      }]);
-    } catch (error) {
-      setMsgs((s) => [...s, { role: "assistant", content: aiAssistantFailureMessage(error) }]);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const runAction = async (action) => {
-    if (!executeAction || !canExecuteAiAssistAction(action) || actionBusy) return;
-    const key = action.id || action.type;
-    setActionBusy(key);
-    setActionResults((current) => ({ ...current, [key]: null }));
-    try {
-      const result = await executeAction(action);
-      setActionResults((current) => ({
-        ...current,
-        [key]: { ok: true, message: result?.message || "הקריאה נוצרה ונשמרה במערכת." }
-      }));
-    } catch (error) {
-      setActionResults((current) => ({
-        ...current,
-        [key]: { ok: false, message: error?.message || "הפעולה לא הושלמה. בדקו פרטים ונסו שוב." }
-      }));
-    } finally {
-      setActionBusy("");
-    }
-  };
 
   return <div className="ovl-backdrop ai-back" onClick={onClose}>
     <div className="ai-panel" onClick={(e) => e.stopPropagation()}>

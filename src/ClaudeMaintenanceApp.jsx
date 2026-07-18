@@ -30,9 +30,10 @@ import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionM
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
+import { callAiAssistApi } from "./aiAgentApiClient.js";
+import { createAiAgentActionExecutor, createAiAgentTicketDraftEditor } from "./aiAgentActionAdapter.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
-import { prepareAiCleaningComplaintCreateForSave, prepareAiMeetingCreateForSave, prepareAiMeetingUpdateForSave, prepareAiPpeRequestCreateForSave, prepareAiTaskCreateForSave, prepareAiTaskUpdateForSave, prepareAiTicketCommentForSave, prepareAiTicketCreateForSave, prepareAiTicketUpdateForSave, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_MODES, aiModeFromEnv, normalizeAiSettings } from "./aiProviderModel.js";
 import { APP_MODES, appModeFromEnv, builtinLoginsForMode, seedPolicyForMode } from "./seedPolicyModel.js";
 import { isPresenceOnline, presenceRecordForUser, shiftPresenceStatusText, todayPresenceKey, userPresenceStatusText } from "./userPresenceModel.js";
@@ -1425,32 +1426,14 @@ function aiAssistantEnabled(cfg) {
 
 async function callAIAssistant({ text, messages, system, context, workflow, includeProviderPlan = false }) {
   if (BROWSER_AI_ENABLED) return callClaude(messages, system, 900);
-  const accessToken = await productionAccessToken();
-  const headers = { "content-type": "application/json" };
-  if (accessToken) headers.authorization = `Bearer ${accessToken}`;
-  const res = await fetch("/api/ai/assist", {
-    method: "POST",
-    credentials: "include",
-    headers,
-    body: JSON.stringify({
-      text,
-      messages,
-      language: "he",
-      source: "ui",
-      workflow,
-      includeProviderPlan,
-      idempotencyKey: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      context
-    })
+  return callAiAssistApi({
+    text,
+    messages,
+    context,
+    workflow,
+    includeProviderPlan,
+    getAccessToken: productionAccessToken
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.providerErrorCode || data.error || `ai-assist-${res.status}`);
-  return {
-    text: data?.assistant?.text || data?.draft?.userReply || "",
-    actions: Array.isArray(data?.actions) ? data.actions : [],
-    providerPlan: data?.providerPlan || null,
-    providerPlanErrorCode: data?.providerPlanErrorCode || ""
-  };
 }
 
 /* ---------- notifications ---------- */
@@ -7916,82 +7899,10 @@ function AIPanelFallback({ onClose }) {
   </div>;
 }
 function LazyAIPanel(props) {
-  const executeAction = async (action) => {
-    if (action?.type === "meeting.create") {
-      if (typeof props.saveMeeting !== "function") throw new Error("שמירת פגישות אינה זמינה במסך זה.");
-      const meeting = prepareAiMeetingCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
-      const ok = await props.saveMeeting(meeting);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, meetingId: meeting.id, message: `הפגישה נוצרה: ${meeting.title || meeting.id}` };
-    }
-    if (action?.type === "meeting.update") {
-      if (typeof props.saveMeeting !== "function") throw new Error("שמירת פגישות אינה זמינה במסך זה.");
-      const existing = (props.meetings || []).find((meeting) => meeting.id === action?.payload?.meetingId);
-      if (!existing) throw new Error("הפגישה לעדכון לא נמצאה.");
-      const { meeting, changes } = prepareAiMeetingUpdateForSave(action, existing, props.session, { now: Date.now() });
-      const ok = await props.saveMeeting(meeting);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, meetingId: meeting.id, message: `הפגישה עודכנה (${changes.length} שינויים).` };
-    }
-    if (action?.type === "task.create") {
-      if (typeof props.saveTask !== "function") throw new Error("שמירת משימות אינה זמינה במסך זה.");
-      const task = prepareAiTaskCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
-      const ok = await props.saveTask(task);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, taskId: task.id, message: `המשימה נוצרה: ${task.title || task.id}` };
-    }
-    if (action?.type === "task.update") {
-      if (typeof props.saveTask !== "function") throw new Error("שמירת משימות אינה זמינה במסך זה.");
-      const existing = (props.tasks || []).find((task) => task.id === action?.payload?.taskId);
-      if (!existing) throw new Error("המשימה לעדכון לא נמצאה.");
-      const { task, changes } = prepareAiTaskUpdateForSave(action, existing, props.session, { now: Date.now() });
-      const ok = await props.saveTask(task);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, taskId: task.id, message: `המשימה עודכנה (${changes.length} שינויים).` };
-    }
-    if (action?.type === "ppe.request.create") {
-      if (typeof props.savePpeReq !== "function") throw new Error("שמירת בקשות ביגוד אינה זמינה במסך זה.");
-      const request = prepareAiPpeRequestCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
-      const ok = await props.savePpeReq(request);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, requestId: request.id, message: `בקשת הביגוד נשלחה: ${request.lines?.[0]?.itemName || request.id}` };
-    }
-    if (action?.type === "cleaning.complaint.create") {
-      if (typeof props.fileComplaint !== "function") throw new Error("שמירת דיווחי ניקיון אינה זמינה במסך זה.");
-      const complaint = prepareAiCleaningComplaintCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
-      const ok = await props.fileComplaint(complaint);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, complaintId: complaint.id, message: `דיווח הניקיון נשלח: ${complaint.zoneName || complaint.id}` };
-    }
-    if (typeof props.saveTicket !== "function") throw new Error("שמירת קריאות אינה זמינה במסך זה.");
-    if (action?.type === "ticket.comment") {
-      const existing = (props.tickets || []).find((ticket) => ticket.id === action?.payload?.ticketId);
-      if (!existing) throw new Error("הקריאה לעדכון לא נמצאה.");
-      const { ticket } = prepareAiTicketCommentForSave(action, existing, props.session, { now: Date.now() });
-      const ok = await props.saveTicket(ticket);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, ticketId: ticket.id, message: "ההערה נוספה לקריאה." };
-    }
-    if (action?.type === "ticket.update") {
-      const existing = (props.tickets || []).find((ticket) => ticket.id === action?.payload?.ticketId);
-      if (!existing) throw new Error("הקריאה לעדכון לא נמצאה.");
-      const { ticket, changes } = prepareAiTicketUpdateForSave(action, existing, props.session, { now: Date.now() });
-      const ok = await props.saveTicket(ticket);
-      if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-      return { ok: true, ticketId: ticket.id, message: `הקריאה עודכנה (${changes.length} שינויים).` };
-    }
-    const ticket = prepareAiTicketCreateForSave(action, props.session, { now: Date.now(), makeId: uid });
-    const ok = await props.saveTicket(ticket);
-    if (ok === false) throw new Error(SAVE_FAILED_MESSAGE);
-    return { ok: true, ticketId: ticket.id, message: `הקריאה נוצרה: ${ticket.subject || ticket.id}` };
-  };
-  const editAction = (action) => {
-    const prefill = ticketPrefillFromAiAssistAction(action);
-    if (!prefill || typeof props.openAiTicketDraft !== "function") throw new Error("פתיחת טופס קריאה אינה זמינה במסך זה.");
-    props.openAiTicketDraft(prefill);
-  };
+  const executeAction = createAiAgentActionExecutor(props, { makeId: uid, saveFailedMessage: SAVE_FAILED_MESSAGE });
+  const editAction = props.openAiTicketDraft ? createAiAgentTicketDraftEditor({ openAiTicketDraft: props.openAiTicketDraft }) : null;
   return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
-    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={props.openAiTicketDraft ? editAction : null} />
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={editAction} />
   </Suspense>;
 }
 function NotifPanelFallback({ onClose }) {
