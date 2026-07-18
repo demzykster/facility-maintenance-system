@@ -95,7 +95,23 @@ describe("tickets API handler", () => {
 
     const res = await call(handler, {
       headers: { authorization: "Bearer user-token" },
-      body: { id: "T-1", num: 1, status: "open", track: "facility", subject: "Door", description: "Door is stuck", category: "doors" }
+      body: {
+        id: "T-1",
+        num: 1,
+        ticketNo: "F-999",
+        ticketNumber: "F-999",
+        status: "open",
+        createdAt: 1,
+        updatedAt: 2,
+        sourceKvKey: "ticket:attacker",
+        actor_id: "attacker",
+        createdBy: { id: "attacker", name: "Attacker", role: "admin" },
+        reportedBy: { id: "attacker", name: "Attacker", role: "admin" },
+        track: "facility",
+        subject: "Door",
+        description: "Door is stuck",
+        category: "doors"
+      }
     });
 
     expect(res.statusCode).toBe(200);
@@ -106,11 +122,24 @@ describe("tickets API handler", () => {
       actionResult: { type: "ticket.create", ticketId: "T-1", num: 42, ticketNumber: "F-042", ticketNo: "F-042" }
     });
     expect(driver.get).toHaveBeenCalledWith("T-1");
-    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ id: "T-1", num: null, status: "open" }), expect.objectContaining({
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      id: "T-1",
+      num: null,
+      status: "new",
+      createdBy: { id: "app-user-1", name: "Manager", role: "user" },
+      reportedBy: { id: "app-user-1", name: "Manager", role: "user" }
+    }), expect.objectContaining({
       actorId: "app-user-1",
       idempotencyKey: "ticket:app-user-1:T-1",
       requestHash: expect.any(String)
     }));
+    const persistedTicket = driver.create.mock.calls[0][0];
+    expect(persistedTicket.ticketNo).toBeUndefined();
+    expect(persistedTicket.ticketNumber).toBeUndefined();
+    expect(persistedTicket.createdAt).toBeUndefined();
+    expect(persistedTicket.updatedAt).toBeUndefined();
+    expect(persistedTicket.actor_id).toBeUndefined();
+    expect(persistedTicket.sourceKvKey).toBeUndefined();
     expect(driver.upsert).not.toHaveBeenCalled();
     expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
       actorId: "app-user-1",
@@ -166,6 +195,55 @@ describe("tickets API handler", () => {
     expect(driver.create).not.toHaveBeenCalled();
     expect(driver.upsert).not.toHaveBeenCalled();
     expect(auditDriver.write).not.toHaveBeenCalled();
+  });
+
+  it("replays an explicit create when only forbidden system fields differ", async () => {
+    const existing = {
+      id: "T-replay-system",
+      num: 11,
+      ticketNo: "F-011",
+      track: "facility",
+      subject: "Door",
+      description: "Door is stuck",
+      category: "doors",
+      status: "new",
+      reportedBy: { id: "app-user-1", name: "Manager", role: "user" }
+    };
+    const driver = {
+      get: vi.fn().mockResolvedValue({ legacy_payload: existing }),
+      create: vi.fn(),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ role: "admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "create",
+        ticket: {
+          ...existing,
+          status: "done",
+          createdAt: 1,
+          updatedAt: 2,
+          sourceKvKey: "ticket:attacker",
+          actor_id: "attacker",
+          reportedBy: { id: "attacker", name: "Attacker", role: "admin" }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "replayed",
+      ticket: { id: "T-replay-system", num: 11, status: "new" }
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).not.toHaveBeenCalled();
   });
 
   it("rejects an explicit create when the same ticket id already has different content", async () => {

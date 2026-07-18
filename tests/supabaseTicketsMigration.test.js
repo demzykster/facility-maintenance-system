@@ -14,6 +14,10 @@ const ticketCreateActorConflictFixSql = readFileSync(
   new URL("../supabase/migrations/20260717003000_ticket_create_actor_id_conflict_fix.sql", import.meta.url),
   "utf8"
 );
+const ticketCreateSystemFieldHardeningSql = readFileSync(
+  new URL("../supabase/migrations/20260718172000_ticket_create_system_field_hardening.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Supabase tickets core migration", () => {
   it("adds tickets to the staging schema gate", () => {
@@ -95,5 +99,32 @@ describe("Supabase tickets core migration", () => {
     expect(ticketCreateActorConflictFixSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to public");
     expect(ticketCreateActorConflictFixSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to anon");
     expect(ticketCreateActorConflictFixSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to authenticated");
+  });
+
+  it("hardens ticket create RPC against client-supplied system fields without weakening grants", () => {
+    expect(ticketCreateSystemFieldHardeningSql).toContain("create or replace function public.cmms_create_ticket");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("safe_payload");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("coalesce(nullif(actor_profile.name, ''), '')");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("nextval('public.ticket_num_facility_seq')");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("nextval('public.ticket_num_transport_seq')");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("values (");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("'new'");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("now()");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("'ticket:' || ticket_id");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("reported_by_id");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("on conflict on constraint ticket_create_idempotency_pkey do nothing");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("raise exception 'idempotency_conflict'");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("revoke all on function public.cmms_create_ticket(jsonb, text, text, text) from public, anon, authenticated");
+    expect(ticketCreateSystemFieldHardeningSql).toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to service_role");
+    expect(ticketCreateSystemFieldHardeningSql).not.toMatch(/ticket_payload->>'status'/);
+    expect(ticketCreateSystemFieldHardeningSql).not.toMatch(/ticket_payload->>'created_at'/);
+    expect(ticketCreateSystemFieldHardeningSql).not.toMatch(/ticket_payload->>'updated_at'/);
+    expect(ticketCreateSystemFieldHardeningSql).not.toMatch(/ticket_payload->>'source_kv_key'/);
+    expect(ticketCreateSystemFieldHardeningSql).not.toMatch(/\bdelete\s+from\b/i);
+    expect(ticketCreateSystemFieldHardeningSql).not.toMatch(/\btruncate\b/i);
+    expect(ticketCreateSystemFieldHardeningSql).not.toMatch(/disable\s+row\s+level\s+security/i);
+    expect(ticketCreateSystemFieldHardeningSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to public");
+    expect(ticketCreateSystemFieldHardeningSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to anon");
+    expect(ticketCreateSystemFieldHardeningSql).not.toContain("grant execute on function public.cmms_create_ticket(jsonb, text, text, text) to authenticated");
   });
 });

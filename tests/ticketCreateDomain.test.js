@@ -3,7 +3,8 @@ import {
   canonicalTicketCreateHash,
   createTicketReplayResult,
   createTicketRecord,
-  mergeTicketUpdateWithExisting
+  mergeTicketUpdateWithExisting,
+  sanitizeTicketCreatePayload
 } from "../server/tickets/ticketCreateDomain.js";
 
 describe("ticket create domain", () => {
@@ -42,6 +43,87 @@ describe("ticket create domain", () => {
     }));
     expect(result.ticket).toMatchObject({ id: "ticket-1", num: 1842, ticketNo: "T-1842" });
     expect(result.result).toMatchObject({ type: "ticket.create", ticketId: "ticket-1", num: 1842, ticketNumber: "T-1842", ticketNo: "T-1842" });
+  });
+
+  it("scrubs client-supplied system and actor fields before create hashing and persistence", async () => {
+    const actor = { id: "u1", name: "Manager", role: "user", dept: "Ops" };
+    const driver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-1",
+        num: 6,
+        ticketNo: "F-006",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
+
+    const result = await createTicketRecord({
+      driver,
+      actor,
+      ticket: {
+        id: "ticket-1",
+        num: 999,
+        ticketNo: "F-999",
+        ticketNumber: "F-999",
+        status: "done",
+        createdAt: 1,
+        updatedAt: 2,
+        closedAt: 3,
+        created_at: "2000-01-01T00:00:00Z",
+        updated_at: "2000-01-02T00:00:00Z",
+        closed_at: "2000-01-03T00:00:00Z",
+        sourceKvKey: "ticket:attacker",
+        source_kv_key: "ticket:attacker",
+        actor_id: "attacker",
+        actorId: "attacker",
+        createdBy: { id: "attacker", name: "Attacker", role: "admin" },
+        reportedBy: { id: "attacker", name: "Attacker", role: "admin" },
+        reportedById: "attacker",
+        track: "facility",
+        subject: "Door",
+        description: "Door is stuck",
+        category: "doors"
+      },
+      idempotencyKey: "idem-1"
+    });
+
+    const persistedTicket = driver.create.mock.calls[0][0];
+    expect(persistedTicket).toMatchObject({
+      id: "ticket-1",
+      num: null,
+      status: "new",
+      department: "Ops",
+      createdBy: { id: "u1", name: "Manager", role: "user" },
+      reportedBy: { id: "u1", name: "Manager", role: "user" }
+    });
+    expect(persistedTicket.ticketNo).toBeUndefined();
+    expect(persistedTicket.ticketNumber).toBeUndefined();
+    expect(persistedTicket.createdAt).toBeUndefined();
+    expect(persistedTicket.updatedAt).toBeUndefined();
+    expect(persistedTicket.closedAt).toBeUndefined();
+    expect(persistedTicket.actor_id).toBeUndefined();
+    expect(persistedTicket.actorId).toBeUndefined();
+    expect(persistedTicket.reportedById).toBeUndefined();
+    expect(driver.create.mock.calls[0][1]).toMatchObject({
+      actorId: "u1",
+      idempotencyKey: "idem-1",
+      requestHash: canonicalTicketCreateHash(sanitizeTicketCreatePayload({
+        id: "ticket-1",
+        status: "done",
+        track: "facility",
+        subject: "Door",
+        description: "Door is stuck",
+        category: "doors"
+      }, actor), actor)
+    });
+    expect(result.ticket).toMatchObject({
+      id: "ticket-1",
+      num: 6,
+      ticketNo: "F-006",
+      sourceKvKey: "ticket:ticket-1",
+      status: "new",
+      reportedBy: { id: "u1" }
+    });
   });
 
   it("uses replayed authoritative id/number for both action result and returned ticket payload", async () => {
@@ -143,6 +225,30 @@ describe("ticket create domain", () => {
 
     expect(canonicalTicketCreateHash(base, actor)).toBe(canonicalTicketCreateHash({ ...base, id: "ticket-2", num: 999 }, actor));
     expect(canonicalTicketCreateHash(base, actor)).not.toBe(canonicalTicketCreateHash({ ...base, subject: "Машина не едет" }, actor));
+  });
+
+  it("treats changes to forbidden system fields as the same create request", () => {
+    const actor = { id: "u1", role: "user" };
+    const base = {
+      id: "ticket-1",
+      track: "facility",
+      subject: "Door",
+      description: "Door is stuck",
+      category: "doors"
+    };
+
+    expect(canonicalTicketCreateHash(sanitizeTicketCreatePayload(base, actor), actor)).toBe(canonicalTicketCreateHash(sanitizeTicketCreatePayload({
+      ...base,
+      num: 999,
+      ticketNo: "F-999",
+      ticketNumber: "F-999",
+      status: "done",
+      createdAt: 1,
+      updatedAt: 2,
+      sourceKvKey: "ticket:attacker",
+      actor_id: "attacker",
+      reportedBy: { id: "attacker" }
+    }, actor), actor));
   });
 
   it("recognizes an existing ticket as a replayed create only when create content matches", () => {

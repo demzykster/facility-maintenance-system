@@ -9,6 +9,57 @@ const cleanText = (value, limit = 4000) => String(value || "")
 
 const cleanObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
+const SYSTEM_CREATE_FIELDS = [
+  "num",
+  "ticketNo",
+  "ticketNumber",
+  "status",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+  "closedAt",
+  "closed_at",
+  "sourceKvKey",
+  "source_kv_key",
+  "actor_id",
+  "actorId",
+  "createdBy",
+  "createdById",
+  "reportedBy",
+  "reportedById",
+  "reported_by_id",
+  "reportedByName",
+  "reported_by_name",
+  "audit",
+  "auditMetadata",
+  "idempotencyResult"
+];
+
+const actorTicketPayload = (actor = {}) => ({
+  id: cleanText(actor.id || actor.authUserId || actor.workerNo, 160),
+  name: cleanText(actor.name, 160),
+  role: cleanText(actor.role, 40)
+});
+
+const actorDepartment = (actor = {}) => cleanText(
+  actor.dept || actor.department || (Array.isArray(actor.depts) ? actor.depts[0] : "") || (Array.isArray(actor.departments) ? actor.departments[0] : ""),
+  160
+);
+
+export function sanitizeTicketCreatePayload(ticket = {}, actor = {}) {
+  const safe = { ...cleanObject(ticket) };
+  for (const field of SYSTEM_CREATE_FIELDS) delete safe[field];
+  const actorPayload = actorTicketPayload(actor);
+  safe.num = null;
+  safe.status = "new";
+  safe.createdBy = actorPayload;
+  safe.reportedBy = actorPayload;
+  const department = actorDepartment(actor);
+  if (department) safe.department = department;
+  return safe;
+}
+
 export function canonicalTicketCreateHashPayload(ticket = {}, actor = {}) {
   return {
     operation: "create_ticket",
@@ -49,7 +100,7 @@ export function ticketCreateIdempotencyKey(ticket = {}, actor = {}, explicitKey 
 
 export async function createTicketRecord({ driver, ticket, actor, idempotencyKey } = {}) {
   if (!driver || typeof driver.create !== "function") throw new Error("tickets_create_not_configured");
-  const normalized = normalizeTicketRecord({ ...ticket, num: null });
+  const normalized = normalizeTicketRecord(sanitizeTicketCreatePayload(ticket, actor));
   const missingFields = missingTicketCreateFields(normalized.legacyPayload);
   if (missingFields.length) throw new Error(`ticket_create_fields_required:${missingFields.join(",")}`);
   const key = ticketCreateIdempotencyKey(normalized.legacyPayload, actor, idempotencyKey);
@@ -87,10 +138,11 @@ export async function createTicketRecord({ driver, ticket, actor, idempotencyKey
 }
 
 export function createTicketReplayResult({ ticket, existing, actor } = {}) {
-  const requested = normalizeTicketRecord(ticket).legacyPayload;
+  const requested = normalizeTicketRecord(sanitizeTicketCreatePayload(ticket, actor)).legacyPayload;
   const stored = normalizeTicketRecord(existingTicketPayload(existing)).legacyPayload;
+  const storedForHash = normalizeTicketRecord(sanitizeTicketCreatePayload(stored, actor)).legacyPayload;
   const requestedHash = canonicalTicketCreateHash(requested, actor);
-  const storedHash = canonicalTicketCreateHash(stored, actor);
+  const storedHash = canonicalTicketCreateHash(storedForHash, actor);
   if (requestedHash !== storedHash) {
     return {
       replay: false,
