@@ -48,16 +48,47 @@ function unitMatchesIdentifier(unit = {}, identifier = "") {
   return unitIdentifiers(unit).some((value) => value.toLowerCase() === cleanIdentifier);
 }
 
-function findVisibleAsset({ text = "", context = {}, currentEntity = null } = {}) {
+function visibleFleet(context = {}) {
+  return cleanArray(context.fleet).filter((unit) => unit && unit.id);
+}
+
+function currentEntityLooksLikeAsset(current = {}) {
+  return current.type === "fleet"
+    || current.type === "asset"
+    || current.kind === "fleet"
+    || current.id
+    || current.code
+    || current.number
+    || current.asset
+    || current.unitCode;
+}
+
+function findVisibleCurrentAsset({ fleet = [], currentEntity = {} } = {}) {
   const current = cleanObject(currentEntity);
-  if (current.type === "fleet" || current.type === "asset" || current.kind === "fleet" || current.id || current.code) {
-    const id = cleanText(current.id, 160);
-    const code = cleanText(current.code || current.number || current.asset, 160);
-    if (id || code) return { status: "matched", asset: { ...current, id, code: code || id }, source: "current_entity" };
+  if (!currentEntityLooksLikeAsset(current)) return null;
+  const id = cleanText(current.id, 160);
+  const code = cleanText(current.code || current.number || current.asset || current.unitCode, 160);
+  if (!id && !code) return null;
+
+  if (id) {
+    const match = fleet.find((unit) => cleanText(unit.id, 160).toLowerCase() === id.toLowerCase());
+    if (match) return { status: "matched", asset: match, identifiers: [id, code].filter(Boolean), source: "current_entity" };
+    return { status: "not_found", identifiers: [id, code].filter(Boolean), source: "current_entity" };
   }
+
+  const matches = fleet.filter((unit) => unitMatchesIdentifier(unit, code));
+  const unique = [...new Map(matches.map((unit) => [unit.id, unit])).values()];
+  if (unique.length === 1) return { status: "matched", asset: unique[0], identifiers: [code], source: "current_entity" };
+  if (unique.length > 1) return { status: "ambiguous", matches: unique, identifiers: [code], source: "current_entity" };
+  return { status: "not_found", identifiers: [code], source: "current_entity" };
+}
+
+function findVisibleAsset({ text = "", context = {}, currentEntity = null } = {}) {
+  const fleet = visibleFleet(context);
+  const currentMatch = findVisibleCurrentAsset({ fleet, currentEntity });
+  if (currentMatch) return currentMatch;
   const identifiers = identifierCandidates(text);
   if (!identifiers.length) return { status: "missing_identifier", identifiers: [] };
-  const fleet = cleanArray(context.fleet).filter((unit) => unit && unit.id);
   const matches = [];
   for (const identifier of identifiers) {
     fleet.filter((unit) => unitMatchesIdentifier(unit, identifier)).forEach((unit) => matches.push(unit));
@@ -87,6 +118,14 @@ function createBlockingResponse({ answer, question, facts = [], unknowns = [], t
 
 function createTicketPayload({ text = "", user = {}, asset = {}, now = Date.now() } = {}) {
   const subject = wordsForDisplay(text) || cleanText(text, 80) || "תקלה בכלי שינוע";
+  const actor = {
+    id: cleanText(user.id || user.authUserId || user.workerNo, 160),
+    name: cleanText(user.name, 120),
+    role: cleanText(user.role, 40),
+    dept: cleanText(user.dept || user.department, 120),
+    phone: "",
+    email: ""
+  };
   return {
     id: `ticket-${randomUUID()}`,
     track: "transport",
@@ -103,18 +142,13 @@ function createTicketPayload({ text = "", user = {}, asset = {}, now = Date.now(
     assignee: "",
     routedTech: true,
     supplier: cleanText(asset.supplier, 160),
+    department: cleanText(asset.department || asset.dept || user.dept || user.department, 120),
     downtimeStart: now,
     downtimeEnd: null,
     hasPhoto: false,
     closure: null,
-    createdBy: {
-      id: cleanText(user.id || user.authUserId || user.workerNo, 160),
-      name: cleanText(user.name, 120),
-      role: cleanText(user.role, 40),
-      dept: cleanText(user.dept || user.department, 120),
-      phone: "",
-      email: ""
-    },
+    reportedBy: actor,
+    createdBy: actor,
     createdAt: now,
     updatedAt: now,
     dueAt: now + 24 * HOUR,

@@ -136,6 +136,200 @@ describe("AI assist handler", () => {
     expect(providerCall).not.toHaveBeenCalled();
   });
 
+  it("writes an autonomous ticket create audit event for created results without raw request data", async () => {
+    const providerCall = vi.fn();
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const ticketsDriver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-226",
+        num: 1842,
+        ticketNo: "T-1842",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      ticketsDriver,
+      providerCall,
+      auditDriver,
+      now: () => 1000,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer token", "x-request-id": "req-226" },
+      body: {
+        text: "Не работает вентилятор на машине 226 secret-prompt-fragment",
+        idempotencyKey: "idem-226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] },
+        ticket: {
+          id: "client-id",
+          ticketNo: "F-999",
+          status: "done",
+          actor_id: "attacker",
+          createdBy: { id: "attacker" }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      at: 1000,
+      actorId: "u1",
+      actorRole: "user",
+      entityType: "system",
+      action: "ai_assist",
+      metadata: expect.objectContaining({
+        provider: "not_used",
+        model: "not_used",
+        providerStatus: "ok",
+        capability: "create_ticket",
+        autonomous: true,
+        outcome: "created",
+        requestId: "req-226",
+        ticketId: "ticket-226",
+        ticketNumber: "T-1842",
+        resolvedAssetId: "forklift-226",
+        autonomyConfigured: true,
+        serverCreateReady: true,
+        serverCreateConfigured: true
+      })
+    }));
+    const [ticket, createOptions] = ticketsDriver.create.mock.calls[0];
+    expect(ticket.id).toMatch(/^ticket-/);
+    expect(ticket.id).not.toBe("client-id");
+    expect(ticket.ticketNo).toBeUndefined();
+    expect(ticket.status).toBe("new");
+    expect(ticket.createdBy).toMatchObject({ id: "u1", role: "user" });
+    expect(ticket.reportedBy).toMatchObject({ id: "u1", role: "user" });
+    expect(createOptions).toMatchObject({ actorId: "u1", idempotencyKey: "idem-226" });
+    const auditPayload = JSON.stringify(auditDriver.write.mock.calls[0][0]);
+    expect(auditPayload).not.toContain("secret-prompt-fragment");
+    expect(auditPayload).not.toContain("attacker");
+  });
+
+  it("audits replayed, conflict, blocked, and failed autonomous ticket outcomes", async () => {
+    async function runWithDriver({ driver, body = {}, now = 1100 }) {
+      const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+      const handler = createAiAssistHandler({
+        env: {
+          CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+          CMMS_TICKET_SERVER_CREATE_V2: "local",
+          CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+          CMMS_APP_MODE: "local",
+          CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+        },
+        sessionClient: sessionClient({ role: "user" }),
+        ticketsDriver: driver,
+        auditDriver,
+        now: () => now,
+        rateBuckets: new Map()
+      });
+      const res = await call(handler, {
+        body: {
+          text: "Не работает вентилятор на машине 226",
+          idempotencyKey: `idem-${now}`,
+          context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] },
+          ...body
+        }
+      });
+      return { res, auditDriver };
+    }
+
+    const replayed = await runWithDriver({
+      now: 1101,
+      driver: {
+        create: vi.fn().mockResolvedValue({
+          ticketId: "ticket-226",
+          num: 1842,
+          ticketNo: "T-1842",
+          status: "new",
+          idempotencyStatus: "replayed"
+        })
+      }
+    });
+    expect(replayed.res.statusCode).toBe(200);
+    expect(replayed.auditDriver.write.mock.calls[0][0].metadata).toMatchObject({ outcome: "replayed", ticketId: "ticket-226" });
+
+    const conflictDriver = { create: vi.fn().mockRejectedValue(new Error("idempotency_conflict")) };
+    const conflict = await runWithDriver({ now: 1102, driver: conflictDriver });
+    expect(conflict.res.statusCode).toBe(200);
+    expect(conflict.auditDriver.write.mock.calls[0][0].metadata).toMatchObject({ outcome: "conflict", reason: "idempotency_conflict" });
+
+    const blockedDriver = { create: vi.fn() };
+    const blocked = await runWithDriver({
+      now: 1103,
+      driver: blockedDriver,
+      body: {
+        text: "Не работает вентилятор",
+        context: { fleet: [], tickets: [] },
+        currentEntity: { id: "forklift-226", code: "226", department: "הפצה" }
+      }
+    });
+    expect(blocked.res.statusCode).toBe(200);
+    expect(blockedDriver.create).not.toHaveBeenCalled();
+    expect(blocked.auditDriver.write.mock.calls[0][0].metadata).toMatchObject({ outcome: "blocked", reason: "asset" });
+
+    const failed = await runWithDriver({
+      now: 1104,
+      driver: { create: vi.fn().mockRejectedValue(new Error("rpc_down")) }
+    });
+    expect(failed.res.statusCode).toBe(200);
+    expect(failed.auditDriver.write.mock.calls[0][0].metadata).toMatchObject({ outcome: "failed", reason: "create_failed" });
+  });
+
+  it("blocks autonomous create for spoofed currentEntity outside the filtered context before persistence", async () => {
+    const providerCall = vi.fn();
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "worker", id: "worker-a", department: "הפצה", departments: ["הפצה"] }),
+      ticketsDriver,
+      providerCall,
+      auditDriver,
+      now: () => 1200,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор",
+        context: {
+          currentEntity: { id: "forklift-other", code: "226", name: "226", department: "מחסן" },
+          fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }],
+          tickets: []
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().capabilityResponse).toMatchObject({
+      executionStatus: "blocked",
+      unknowns: ["asset"]
+    });
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerCall).not.toHaveBeenCalled();
+    expect(auditDriver.write.mock.calls[0][0].metadata).toMatchObject({
+      outcome: "blocked",
+      reason: "asset"
+    });
+  });
+
   it("does not execute autonomous ticket.create when the server-create cutover is disabled", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

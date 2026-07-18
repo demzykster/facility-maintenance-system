@@ -376,6 +376,83 @@ const writeAuditEvent = async (auditDriver, event) => {
   if (typeof auditDriver.write === "function") return auditDriver.write(event);
 };
 
+const firstHeaderValue = (value) => Array.isArray(value) ? value[0] : value;
+
+function requestCorrelationId(req = {}, body = {}) {
+  return cleanText(
+    firstHeaderValue(req.headers?.["x-request-id"])
+      || firstHeaderValue(req.headers?.["x-correlation-id"])
+      || firstHeaderValue(req.headers?.["x-vercel-id"])
+      || body.requestId
+      || body.request_id
+      || body.idempotencyKey
+      || body.idempotency_key
+      || firstHeaderValue(req.headers?.["idempotency-key"]),
+    200
+  );
+}
+
+function autonomousTicketCreateOutcome(capabilityResponse = {}, capabilityError = null) {
+  if (capabilityError) return { outcome: "failed", reason: cleanText(capabilityError?.message || "capability_error", 120) };
+  const status = cleanText(capabilityResponse.executionStatus, 80);
+  const unknowns = Array.isArray(capabilityResponse.unknowns) ? capabilityResponse.unknowns : [];
+  if (status === "created") return { outcome: "created", reason: "" };
+  if (status === "replayed") return { outcome: "replayed", reason: "" };
+  if (unknowns.includes("idempotency_conflict")) return { outcome: "conflict", reason: "idempotency_conflict" };
+  if (status === "permission_denied") return { outcome: "blocked", reason: "permission_denied" };
+  if (status === "blocked") return { outcome: "blocked", reason: cleanText(unknowns[0] || "blocked", 120) };
+  if (status === "failed") return { outcome: "failed", reason: cleanText(unknowns[0] || "failed", 120) };
+  return { outcome: cleanText(status || "failed", 80), reason: "" };
+}
+
+function firstCapabilityFact(capabilityResponse = {}) {
+  const facts = Array.isArray(capabilityResponse.facts) ? capabilityResponse.facts : [];
+  return facts.find((fact) => fact && typeof fact === "object") || {};
+}
+
+async function writeAutonomousTicketCreateAudit({
+  auditDriver,
+  draft,
+  context,
+  authUser,
+  at,
+  workflow,
+  responseLanguage,
+  draftTelemetry,
+  requestId,
+  ticketCreateStatus,
+  autonomyConfigured,
+  capabilityResponse = null,
+  capabilityError = null
+} = {}) {
+  const actionResult = capabilityResponse?.actionResult && typeof capabilityResponse.actionResult === "object"
+    ? capabilityResponse.actionResult
+    : {};
+  const fact = firstCapabilityFact(capabilityResponse || {});
+  const outcome = autonomousTicketCreateOutcome(capabilityResponse || {}, capabilityError);
+  await writeAuditEvent(auditDriver, aiAssistAuditEvent({
+    draft,
+    context,
+    provider: "not_used",
+    model: "not_used",
+    providerStatus: capabilityError ? "failed" : "ok",
+    capability: "create_ticket",
+    autonomous: true,
+    outcome: outcome.outcome,
+    reason: outcome.reason,
+    requestId,
+    ticketId: actionResult.ticketId || "",
+    ticketNumber: actionResult.ticketNumber || actionResult.ticketNo || "",
+    resolvedAssetId: fact.assetId || actionResult.forkliftId || "",
+    autonomyConfigured,
+    serverCreateReady: ticketCreateStatus?.ready === true,
+    serverCreateConfigured: ticketCreateStatus?.configured === true,
+    workflow,
+    responseLanguage,
+    draftTelemetry
+  }, authUser, { at }));
+}
+
 const SYSTEM_PROMPT = [
   "You are the server-side CMMS assistant.",
   "You must be read-only: do not claim that you created, updated, deleted, assigned, approved, or closed anything.",
@@ -441,26 +518,61 @@ export function createAiAssistHandler({
         conversation,
         fallback: normalized.input.language
       });
+      const requestId = requestCorrelationId(req, body);
 
       const context = buildAiAssistContext(body.context, auth.user);
       const draft = buildAiIntakeDraft(draftInput, currentTime);
       const actions = buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context });
       const ticketCreateStatus = ticketServerCreateV2Status({ env, driver: backendTicketsDriver });
-      if (autonomousTicketCreateEnabled(env) && ticketCreateStatus.ready) {
+      const autonomyConfigured = autonomousTicketCreateEnabled(env);
+      if (autonomyConfigured && ticketCreateStatus.ready) {
         const registry = createAiCapabilityRegistry([
           createTicketCreateCapability({ driver: backendTicketsDriver })
         ]);
-        const capabilityResponse = await registry.execute("create_ticket", {
-          text: draft.rawText,
-          idempotencyKey: body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"]
-        }, {
-          user: auth.user,
-          context,
-          rawContext: body.context,
-          text: draft.rawText,
-          now: currentTime
-        });
+        let capabilityResponse = null;
+        try {
+          capabilityResponse = await registry.execute("create_ticket", {
+            text: draft.rawText,
+            idempotencyKey: body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"]
+          }, {
+            user: auth.user,
+            context,
+            rawContext: body.context,
+            text: draft.rawText,
+            now: currentTime
+          });
+        } catch (error) {
+          await writeAutonomousTicketCreateAudit({
+            auditDriver: backendAuditDriver,
+            draft,
+            context,
+            authUser: auth.user,
+            at: currentTime,
+            workflow,
+            responseLanguage,
+            draftTelemetry,
+            requestId,
+            ticketCreateStatus,
+            autonomyConfigured,
+            capabilityError: error
+          });
+          throw error;
+        }
         if (capabilityResponse.executionStatus !== "feature_disabled") {
+          await writeAutonomousTicketCreateAudit({
+            auditDriver: backendAuditDriver,
+            draft,
+            context,
+            authUser: auth.user,
+            at: currentTime,
+            workflow,
+            responseLanguage,
+            draftTelemetry,
+            requestId,
+            ticketCreateStatus,
+            autonomyConfigured,
+            capabilityResponse
+          });
           return sendJson(res, 200, {
             ok: true,
             draft,

@@ -46,6 +46,7 @@ describe("AI ticket.create capability", () => {
       description: "Не работает вентилятор на машине 226",
       downtimeType: "needs_triage",
       priority: "medium",
+      department: "Ops",
       dueAt: 1000 + 24 * 3600000
     }), expect.objectContaining({ idempotencyKey: "idem-1" }));
     expect(result.toolResults.map((tool) => tool.capability)).toEqual([
@@ -97,14 +98,101 @@ describe("AI ticket.create capability", () => {
     });
   });
 
-  it("uses the current route asset when the user does not repeat the number", async () => {
+  it("uses the current route asset only after matching it to the server-filtered fleet", async () => {
     const { result, driver } = await execute("Не работает вентилятор", {
-      context: { fleet: [], tickets: [] },
+      context: { fleet: [fleet226], tickets: [] },
       rawContext: { currentEntity: fleet226 }
     });
 
     expect(result.executionStatus).toBe("created");
     expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ forkliftId: "forklift-226", asset: "226" }), expect.any(Object));
+  });
+
+  it("blocks spoofed route assets that are absent from the server-filtered fleet", async () => {
+    const { result, driver } = await execute("Не работает вентилятор", {
+      context: { fleet: [], tickets: [] },
+      rawContext: { currentEntity: fleet226 }
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.unknowns).toContain("asset");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["worker", { id: "worker-a", role: "worker", name: "Worker A", department: "Ops" }],
+    ["user", { id: "user-a", role: "user", name: "User A", department: "Ops", departments: ["Ops"] }],
+    ["tech", { id: "tech-a", role: "tech", name: "Tech A", department: "Ops", departments: ["Ops"] }]
+  ])("blocks %s autonomous create for assets outside the filtered fleet", async (_role, scopedUser) => {
+    const outsideAsset = { id: "forklift-999", code: "999", supplier: "OtherCo", department: "Other", status: "active" };
+    const { result, driver } = await execute("Не работает вентилятор", {
+      user: scopedUser,
+      context: { fleet: [fleet226], tickets: [] },
+      rawContext: { currentEntity: outsideAsset }
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.unknowns).toContain("asset");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("does not allow a matching visible name/code to override a spoofed currentEntity id", async () => {
+    const { result, driver } = await execute("Не работает вентилятор", {
+      context: { fleet: [fleet226], tickets: [] },
+      rawContext: { currentEntity: { id: "forklift-999", code: "226", name: "226" } }
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.unknowns).toContain("asset");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("lets admin create for an asset visible in admin filtered context", async () => {
+    const admin = { id: "admin-1", role: "admin", name: "Admin" };
+    const { result, driver } = await execute("Не работает вентилятор", {
+      user: admin,
+      context: { fleet: [fleet226], tickets: [] },
+      rawContext: { currentEntity: fleet226 }
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      createdBy: expect.objectContaining({ id: "admin-1", role: "admin" }),
+      forkliftId: "forklift-226"
+    }), expect.objectContaining({ actorId: "admin-1" }));
+  });
+
+  it("takes actor and system fields from the authenticated session and server payload only", async () => {
+    const maliciousRawContext = {
+      currentEntity: fleet226,
+      ticket: {
+        id: "client-ticket-id",
+        num: 999,
+        ticketNo: "F-999",
+        status: "done",
+        actor_id: "attacker",
+        reportedBy: { id: "attacker" },
+        createdBy: { id: "attacker" },
+        ai: { source: "client" }
+      }
+    };
+    const { result, driver } = await execute("Не работает вентилятор", {
+      context: { fleet: [fleet226], tickets: [] },
+      rawContext: maliciousRawContext
+    });
+
+    expect(result.executionStatus).toBe("created");
+    const [ticket, options] = driver.create.mock.calls[0];
+    expect(ticket.id).toMatch(/^ticket-/);
+    expect(ticket.id).not.toBe("client-ticket-id");
+    expect(ticket.num).toBeNull();
+    expect(ticket.ticketNo).toBeUndefined();
+    expect(ticket.status).toBe("new");
+    expect(ticket.createdBy).toMatchObject({ id: "u1", role: "user" });
+    expect(ticket.reportedBy).toMatchObject({ id: "u1", role: "user" });
+    expect(ticket.actor_id).toBeUndefined();
+    expect(ticket.ai).toMatchObject({ source: "ai_capability", autonomous: true, capability: "create_ticket" });
+    expect(options).toMatchObject({ actorId: "u1" });
   });
 
   it("denies users who cannot create tickets", async () => {
