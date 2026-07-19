@@ -1,4 +1,4 @@
-import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent } from "../../src/auditEventModel.js";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, normalizeAuditEvent, permissionAuditEvent } from "../../src/auditEventModel.js";
 import { sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { kvReadPermissionError, kvReadValueForSession, kvWritePermissionError, redactUserSecrets } from "../kv/permissionPolicy.js";
@@ -42,6 +42,10 @@ const cleanStringArray = (values = []) =>
   [...new Set((Array.isArray(values) ? values : []).map(cleanString).filter(Boolean))];
 const cleanObject = (value) =>
   value && typeof value === "object" && !Array.isArray(value) ? value : {};
+const stableJson = (value) => JSON.stringify(value && typeof value === "object" && !Array.isArray(value)
+  ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+  : {});
+const permissionsChanged = (before = {}, after = {}) => stableJson(before) !== stableJson(after);
 const numberOrNull = (value) => value === null || value === undefined || value === "" ? null : Math.max(0, Number(value) || 0);
 const timestampOrNull = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -333,6 +337,8 @@ const userUpsertAuditEvent = (user, actor) => normalizeAuditEvent({
   metadata: { source: "api/users", sourceKvKey: `user:${user.id}` }
 });
 
+const userPermissionsForAudit = (user = {}) => cleanObject(user.perms || user.permissions);
+
 export function createUsersApiHandler({ driver = null, auditDriver = null, profileClient = null, env = process.env, fetchImpl = globalThis.fetch, sessionClient = null } = {}) {
   const backendDriver = driver || createDefaultDriver(env, fetchImpl);
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
@@ -424,6 +430,12 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       const loginResetRequested = user.loginResetRequested === true;
       let savedUser = user;
       let appUsersHandled = false;
+      let existingUserForAudit = {};
+      let existingProfileForAudit = null;
+      if (isUuid(id) && typeof backendProfileClient?.getAppUserProfileById === "function") {
+        existingProfileForAudit = await backendProfileClient.getAppUserProfileById(id);
+        if (existingProfileForAudit) existingUserForAudit = userRecordFromAppUserProfile(existingProfileForAudit, {});
+      }
       if (user.authUserId) {
         if (!backendProfileClient) return json(res, 503, { error: "users_profile_backend_not_configured" });
         const patch = {
@@ -438,9 +450,10 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
         savedUser = userRecordFromAppUserProfile(profile || {}, {});
         appUsersHandled = true;
       } else if (isUuid(id) && typeof backendProfileClient?.getAppUserProfileById === "function" && typeof backendProfileClient?.updateAppUserProfileById === "function") {
-        const existingProfile = await backendProfileClient.getAppUserProfileById(id);
+        const existingProfile = existingProfileForAudit || await backendProfileClient.getAppUserProfileById(id);
+        const normalizedExistingProfile = existingUserForAudit.id ? existingUserForAudit : (existingProfile ? userRecordFromAppUserProfile(existingProfile, {}) : null);
         if (permissionError && !canUseScopedExistingWorkerWrite(auth.user, user, existingProfile)) return json(res, 403, { error: permissionError });
-        if (existingProfile) {
+        if (normalizedExistingProfile) {
           const patch = {
             ...extendedAppUserPatchFromUserRecord(user),
             ...(loginResetRequested ? userLoginResetPatch(user) : {})
@@ -475,6 +488,11 @@ export function createUsersApiHandler({ driver = null, auditDriver = null, profi
       }
       if (!appUsersHandled) await writeKvMirror(backendDriver, key, JSON.stringify(userKvMirrorRecord(user)));
       await writeAuditEvent(backendAuditDriver, userUpsertAuditEvent(savedUser, auth.user));
+      const beforePerms = userPermissionsForAudit(existingUserForAudit);
+      const afterPerms = userPermissionsForAudit(savedUser);
+      if (permissionsChanged(beforePerms, afterPerms)) {
+        await writeAuditEvent(backendAuditDriver, permissionAuditEvent(savedUser, beforePerms, afterPerms, auth.user, { at: Date.now() }));
+      }
       return json(res, 200, { ok: true, user: redactUserSecrets(savedUser) });
     } catch (error) {
       if (error instanceof SyntaxError) return json(res, 400, { error: "invalid_json" });

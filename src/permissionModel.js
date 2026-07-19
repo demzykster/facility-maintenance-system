@@ -31,7 +31,8 @@ export const USER_PERMISSION_MODULES = [
   { mod: "analytics", label: "BI ואנליטיקה", levels: ["none", "view"], hint: "צפייה בלוח BI, תובנות ודוחות מערכת לפי תחום ההרשאה." },
   { mod: "suppliers", label: "ספקים וקבלנים", levels: ["none", "view", "manage"], hint: "צפייה או ניהול ספקים, אנשי קשר והקשרים לכלים/הזמנות." },
   { mod: "settings", label: "הגדרות מערכת", levels: ["none", "manage", "full"], hint: "ניהול הגדרות, רישומים, SLA וסוגי כלים. מלא שמור לפעולות מערכת רגישות יותר בעתיד." },
-  { mod: "audit", label: "יומן פעילות", levels: ["none", "view"], hint: "צפייה ביומן הפעילות והיסטוריית פעולות." }
+  { mod: "audit", label: "יומן פעילות", levels: ["none", "view"], hint: "צפייה ביומן הפעילות והיסטוריית פעולות." },
+  { mod: "aiMemoryPilot", label: "AI memory pilot", levels: ["none", "request"], hint: "גישה ניסיונית לזיכרון AI אישי מאושר. עובד רק כשדגל השרת הגלובלי פעיל." }
 ];
 
 export const permRank = (level) => {

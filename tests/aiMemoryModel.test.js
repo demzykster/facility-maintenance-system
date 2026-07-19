@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAiMemoryFactInput } from "../src/aiMemoryModel.js";
+import {
+  AI_MEMORY_PILOT_PERMISSION,
+  aiMemoryAccessStatus,
+  aiMemoryEffectiveAccess,
+  normalizeAiMemoryFactInput
+} from "../src/aiMemoryModel.js";
 
 describe("AI memory model", () => {
+  it("requires both the global flag and explicit pilot permission", () => {
+    const pilot = { id: "u1", role: "user", permissions: { [AI_MEMORY_PILOT_PERMISSION]: "request" } };
+    const notPilot = { id: "u2", role: "admin", permissions: {} };
+
+    expect(aiMemoryEffectiveAccess({ CMMS_AI_MEMORY_PILOT: "true" }, pilot)).toBe(true);
+    expect(aiMemoryEffectiveAccess({}, pilot)).toBe(false);
+    expect(aiMemoryEffectiveAccess({ CMMS_AI_MEMORY_PILOT: "true" }, notPilot)).toBe(false);
+    expect(aiMemoryAccessStatus({ CMMS_AI_MEMORY_PILOT: "true" }, pilot)).toEqual({
+      globalEnabled: true,
+      pilotMember: true,
+      effectiveAccess: true
+    });
+  });
+
   it("uses server actor, ids, and timestamps instead of client-supplied system fields", () => {
     const fact = normalizeAiMemoryFactInput({
       id: "client-id",

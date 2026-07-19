@@ -78,6 +78,29 @@ describe("AI memory handler", () => {
     expect((await call(handler)).json()).toEqual({ error: "ai_memory_pilot_disabled" });
   });
 
+  it("keeps the memory API disabled for authenticated users outside the controlled pilot", async () => {
+    const store = memoryStore([
+      { id: "own", scopeType: "personal", scopeId: "u1", status: "active", summary: "Own fact" }
+    ]);
+    const handler = createAiMemoryHandler({
+      env: { CMMS_AI_MEMORY_PILOT: "local" },
+      sessionClient: sessionClient({ permissions: {} }),
+      memoryStore: store
+    });
+
+    const listed = await call(handler);
+    const created = await call(handler, {
+      method: "POST",
+      body: { fact: { scopeType: "personal", summary: "Should not save" } }
+    });
+
+    expect(listed.statusCode).toBe(404);
+    expect(listed.json()).toEqual({ error: "ai_memory_pilot_disabled" });
+    expect(created.statusCode).toBe(404);
+    expect(store.list).not.toHaveBeenCalled();
+    expect(store.create).not.toHaveBeenCalled();
+  });
+
   it("lists only scoped active facts and writes retrieval audit without raw request body", async () => {
     const auditDriver = { write: vi.fn(async () => {}) };
     const store = memoryStore([
@@ -88,7 +111,7 @@ describe("AI memory handler", () => {
     ]);
     const handler = createAiMemoryHandler({
       env: { CMMS_AI_MEMORY_PILOT: "local" },
-      sessionClient: sessionClient(),
+      sessionClient: sessionClient({ permissions: { aiMemoryPilot: "request" } }),
       memoryStore: store,
       fleetDriver,
       auditDriver,
@@ -112,7 +135,7 @@ describe("AI memory handler", () => {
     const store = memoryStore([]);
     const handler = createAiMemoryHandler({
       env: { CMMS_AI_MEMORY_PILOT: "local" },
-      sessionClient: sessionClient({ id: "worker-a", role: "worker", departments: ["Ops"] }),
+      sessionClient: sessionClient({ id: "worker-a", role: "worker", departments: ["Ops"], permissions: { aiMemoryPilot: "request" } }),
       memoryStore: store,
       fleetDriver,
       auditDriver,
@@ -186,7 +209,7 @@ describe("AI memory handler", () => {
     ]);
     const handler = createAiMemoryHandler({
       env: { CMMS_AI_MEMORY_PILOT: "local" },
-      sessionClient: sessionClient({ id: "worker-a", role: "worker", departments: ["Ops"] }),
+      sessionClient: sessionClient({ id: "worker-a", role: "worker", departments: ["Ops"], permissions: { aiMemoryPilot: "request" } }),
       memoryStore: store,
       fleetDriver
     });

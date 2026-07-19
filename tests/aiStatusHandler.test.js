@@ -81,6 +81,11 @@ describe("AI status handler", () => {
         capabilities: {
           autonomousTicketCreate: false
         },
+        memory: {
+          globalEnabled: false,
+          pilotMember: false,
+          effectiveAccess: false
+        },
         ticketCreate: {
           autonomousConfigured: false,
           serverCreate: {
@@ -104,6 +109,28 @@ describe("AI status handler", () => {
       }
     });
     expect(JSON.stringify(payload)).not.toContain("server-secret");
+  });
+
+  it("reports effective memory access without exposing memory text or secrets", async () => {
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_MEMORY_PILOT: "true",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: { aiMemoryPilot: "request" } })
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai.memory).toEqual({
+      globalEnabled: true,
+      pilotMember: true,
+      effectiveAccess: true
+    });
+    expect(JSON.stringify(res.json())).not.toContain("server-secret");
   });
 
   it("keeps autonomous ticket create disabled when server-create cutover is off", async () => {

@@ -1,4 +1,4 @@
-import { AI_MEMORY_SCOPE_TYPES, AI_MEMORY_STATUSES, normalizeAiMemoryFactRow } from "../../../src/aiMemoryModel.js";
+import { AI_MEMORY_SCOPE_TYPES, AI_MEMORY_STATUSES, aiMemoryPilotMember, normalizeAiMemoryFactRow } from "../../../src/aiMemoryModel.js";
 import { visibleFleetForSession, ticketUserDepartments } from "../../../src/ticketVisibilityModel.js";
 
 const cleanText = (value, limit = 160) => String(value || "")
@@ -19,6 +19,10 @@ function actorDepartments(actor = {}) {
 
 function visibleAssetIds(actor = {}, fleet = []) {
   return new Set(visibleFleetForSession(actor, fleet).map((unit) => cleanText(unit?.id, 120)).filter(Boolean));
+}
+
+export function actorHasAiMemoryPilotPermission(actor = {}) {
+  return aiMemoryPilotMember(actor);
 }
 
 export function memoryScopeAllowedForRead(actor = {}, scope = {}, { fleet = [] } = {}) {

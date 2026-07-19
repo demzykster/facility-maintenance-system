@@ -1,5 +1,5 @@
 import { aiMemoryAuditEvent, AUDIT_ACTIONS } from "../../../src/auditEventModel.js";
-import { aiMemoryFactForClient, aiMemoryPilotEnabled } from "../../../src/aiMemoryModel.js";
+import { aiMemoryEffectiveAccess, aiMemoryFactForClient } from "../../../src/aiMemoryModel.js";
 import { visibleMemoryFactsForActor } from "./memoryPolicy.js";
 
 async function writeAudit(auditDriver, event) {
@@ -17,7 +17,7 @@ export async function listMemoryFactsForContext({
   now = () => Date.now(),
   limit = 12
 } = {}) {
-  if (!aiMemoryPilotEnabled(env) || !memoryStore || typeof memoryStore.list !== "function") return [];
+  if (!aiMemoryEffectiveAccess(env, actor) || !memoryStore || typeof memoryStore.list !== "function") return [];
   const visible = visibleMemoryFactsForActor(actor, await memoryStore.list({ limit: 500 }), { fleet })
     .slice(0, Math.min(Math.max(Number(limit) || 12, 1), 24))
     .map(aiMemoryFactForClient);

@@ -6,6 +6,7 @@ import { AI_PROVIDER_PLAN_SCHEMA, providerPlanPrompt, sanitizeAiProviderPlan } f
 import { AI_ASSIST_WORKFLOWS, aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
 import { autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
+import { aiMemoryEffectiveAccess } from "../../src/aiMemoryModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { createSupabaseFleetDriverFromEnv } from "../fleet/supabaseFleetDriver.js";
@@ -218,6 +219,14 @@ function actionStatsForAudit(actions = []) {
     actionTypes,
     missingFields
   };
+}
+
+function actionsAllowedForActor(actions = [], { env = {}, actor = {} } = {}) {
+  const memoryAllowed = aiMemoryEffectiveAccess(env, actor);
+  return (Array.isArray(actions) ? actions : []).filter((action) => {
+    if (action?.type === "memory.fact.create") return memoryAllowed;
+    return true;
+  });
 }
 
 async function writeMemoryProposalAuditEvents({ auditDriver, actions = [], actor = {}, requestId = "", at } = {}) {
@@ -548,7 +557,10 @@ export function createAiAssistHandler({
 
       const context = buildAiAssistContext(body.context, auth.user);
       const draft = buildAiIntakeDraft(draftInput, currentTime);
-      const actions = buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context });
+      const actions = actionsAllowedForActor(
+        buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context }),
+        { env, actor: auth.user }
+      );
       await writeMemoryProposalAuditEvents({
         auditDriver: backendAuditDriver,
         actions,

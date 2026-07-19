@@ -7277,7 +7277,7 @@ function UserForm({ user, config, users, zones, presence = [], session, canManag
   const [manualCleaningAccess, setManualCleaningAccess] = useState(explicitCleaningAccess);
   const cleaningDeptSelected = ["ניקיון", "נקיון", "cleaning"].includes(String(dept || "").trim().toLowerCase());
   const roleIcons = { admin: ShieldCheck, executive: BarChart3, tech: HardHat, user: User, worker: UserPlus };
-  const permIcons = { fleetDocs: FileText, fleetTickets: ClipboardList, ppe: Shirt, workerAccess: KeyRound, users: Users, analytics: BarChart3, suppliers: Truck, settings: Settings, audit: Clock };
+  const permIcons = { fleetDocs: FileText, fleetTickets: ClipboardList, ppe: Shirt, workerAccess: KeyRound, users: Users, analytics: BarChart3, suppliers: Truck, settings: Settings, audit: Clock, aiMemoryPilot: Sparkles };
   const permLevelLabels = { none: "אין", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
   const pickCard = (on, tone = "#1F4E8C") => ({ borderColor: on ? tone : undefined, background: on ? "var(--primary-soft)" : undefined, color: on ? "var(--primary)" : undefined });
   const changeRole = (nextRole) => {

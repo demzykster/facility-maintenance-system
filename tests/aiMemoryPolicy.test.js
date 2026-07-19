@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  actorHasAiMemoryPilotPermission,
   memoryScopeAllowedForRead,
   memoryScopeAllowedForWrite,
   visibleMemoryFactsForActor
@@ -12,6 +13,12 @@ const fleet = [
 ];
 
 describe("AI memory policy", () => {
+  it("treats pilot membership as an explicit user permission, not a role default", () => {
+    expect(actorHasAiMemoryPilotPermission({ role: "admin", permissions: {} })).toBe(false);
+    expect(actorHasAiMemoryPilotPermission({ role: "worker", permissions: { aiMemoryPilot: "request" } })).toBe(true);
+    expect(actorHasAiMemoryPilotPermission({ role: "user", perms: { aiMemoryPilot: "none" } })).toBe(false);
+  });
+
   it("keeps personal memory visible only to the owner", () => {
     const fact = { id: "m1", scopeType: "personal", scopeId: "u1", status: "active", summary: "prefers morning" };
 

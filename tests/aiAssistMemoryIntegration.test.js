@@ -66,7 +66,7 @@ describe("AI assist memory integration", () => {
         OPENAI_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"] }),
+      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"], permissions: { aiMemoryPilot: "request" } }),
       memoryStore,
       fleetDriver: { list: vi.fn(async () => []) },
       auditDriver,
@@ -104,7 +104,7 @@ describe("AI assist memory integration", () => {
         OPENAI_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"] }),
+      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"], permissions: { aiMemoryPilot: "request" } }),
       memoryStore: {
         list: vi.fn(async () => [
           { id: "own", scopeType: "personal", scopeId: "u1", status: "active", summary: "Own fact" },
@@ -148,7 +148,7 @@ describe("AI assist memory integration", () => {
         GOOGLE_GENERATIVE_AI_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"] }),
+      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"], permissions: { aiMemoryPilot: "request" } }),
       memoryStore: {
         list: vi.fn(async () => [
           {
@@ -213,7 +213,7 @@ describe("AI assist memory integration", () => {
         OPENAI_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"] }),
+      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"], permissions: { aiMemoryPilot: "request" } }),
       memoryStore: {
         list: vi.fn(async () => [
           { id: "own", scopeType: "personal", scopeId: "u1", status: "active", summary: "Own fact", sourceLabel: "AI chat" },
@@ -267,7 +267,7 @@ describe("AI assist memory integration", () => {
         ANTHROPIC_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"] }),
+      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"], permissions: { aiMemoryPilot: "request" } }),
       memoryStore: {
         list: vi.fn(async () => [
           {
@@ -368,6 +368,38 @@ describe("AI assist memory integration", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().assistant.text).toBe("null");
+    expect(memoryStore.list).not.toHaveBeenCalled();
+  });
+
+  it("does not retrieve memory or propose memory confirmation outside the controlled pilot", async () => {
+    const memoryStore = { list: vi.fn(async () => [{ id: "own", scopeType: "personal", scopeId: "u1", status: "active", summary: "Own fact" }]) };
+    const providerCall = vi.fn(async ({ prompt }) => ({
+      ok: true,
+      provider: "openai",
+      model: "gpt-5.2",
+      text: JSON.stringify(JSON.parse(prompt).retrievedMemories)
+    }));
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MEMORY_PILOT: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "test-key",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ id: "u1", role: "user", departments: ["Ops"], permissions: {} }),
+      memoryStore,
+      fleetDriver: { list: vi.fn(async () => []) },
+      providerCall,
+      now: () => 5400,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, { text: "Запомни: synthetic maintenance window is Sunday 09:00." });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().actions).toEqual([]);
+    expect(res.json().assistant.text).toBe("[]");
     expect(memoryStore.list).not.toHaveBeenCalled();
   });
 });

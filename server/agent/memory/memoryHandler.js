@@ -2,7 +2,7 @@ import { aiMemoryAuditEvent, AUDIT_ACTIONS } from "../../../src/auditEventModel.
 import {
   AI_MEMORY_STATUSES,
   aiMemoryFactForClient,
-  aiMemoryPilotEnabled,
+  aiMemoryEffectiveAccess,
   aiMemorySameBusinessFact,
   normalizeAiMemoryFactInput,
   normalizeAiMemoryFactRow
@@ -91,7 +91,7 @@ export function createAiMemoryHandler({
 
     const auth = await authorizeAiRequest(req, env, fetchImpl, sessionClient, pinSessionClient);
     if (!auth.ok) return sendJson(res, auth.status, { error: auth.error });
-    if (!aiMemoryPilotEnabled(env)) return sendJson(res, 404, { error: "ai_memory_pilot_disabled" });
+    if (!aiMemoryEffectiveAccess(env, auth.user)) return sendJson(res, 404, { error: "ai_memory_pilot_disabled" });
     if (!backendMemoryStore) return sendJson(res, 503, { error: "ai_memory_store_unavailable" });
 
     let body = {};

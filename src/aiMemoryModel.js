@@ -17,9 +17,18 @@ export const AI_MEMORY_CONFIDENCE = Object.freeze({
   needsReview: "needs_review"
 });
 
+export const AI_MEMORY_PILOT_PERMISSION = "aiMemoryPilot";
+
 const SCOPE_TYPES = new Set(Object.values(AI_MEMORY_SCOPE_TYPES));
 const STATUSES = new Set(Object.values(AI_MEMORY_STATUSES));
 const CONFIDENCE = new Set(Object.values(AI_MEMORY_CONFIDENCE));
+const PILOT_PERMISSION_LEVELS = Object.freeze({
+  none: 0,
+  view: 1,
+  request: 2,
+  manage: 3,
+  full: 4
+});
 const MAX_SUMMARY = 280;
 const MAX_DETAILS = 1200;
 
@@ -44,6 +53,31 @@ function safeMemoryMetadata(value = {}) {
 export function aiMemoryPilotEnabled(env = {}) {
   const raw = String(env.CMMS_AI_MEMORY_PILOT || "").trim().toLowerCase();
   return ["1", "true", "yes", "on", "enabled", "local"].includes(raw);
+}
+
+export function aiMemoryPilotPermissionLevel(actor = {}) {
+  const perms = actor?.permissions && typeof actor.permissions === "object"
+    ? actor.permissions
+    : actor?.perms && typeof actor.perms === "object" ? actor.perms : {};
+  return String(perms[AI_MEMORY_PILOT_PERMISSION] || "none").trim();
+}
+
+export function aiMemoryPilotMember(actor = {}) {
+  return (PILOT_PERMISSION_LEVELS[aiMemoryPilotPermissionLevel(actor)] || 0) >= PILOT_PERMISSION_LEVELS.request;
+}
+
+export function aiMemoryEffectiveAccess(env = {}, actor = {}) {
+  return aiMemoryPilotEnabled(env) && aiMemoryPilotMember(actor);
+}
+
+export function aiMemoryAccessStatus(env = {}, actor = {}) {
+  const globalEnabled = aiMemoryPilotEnabled(env);
+  const pilotMember = aiMemoryPilotMember(actor);
+  return {
+    globalEnabled,
+    pilotMember,
+    effectiveAccess: globalEnabled && pilotMember
+  };
 }
 
 export function aiMemoryFactId({ now = Date.now, random = Math.random } = {}) {

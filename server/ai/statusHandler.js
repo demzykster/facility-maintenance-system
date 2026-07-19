@@ -1,6 +1,7 @@
 import { publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
 import { autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
 import { ticketServerCreateV2Status } from "../../src/ticketServerCreateCutoverModel.js";
+import { aiMemoryAccessStatus } from "../../src/aiMemoryModel.js";
 import { canFull } from "../../src/permissionModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { authorizeAiRequest } from "./auth.js";
@@ -67,6 +68,7 @@ export function createAiStatusHandler({
       const ai = publicAiServerStatusFromEnv(env);
       const serverCreate = ticketServerCreateV2Status({ env, driver: backendTicketsDriver });
       const autonomousConfigured = autonomousTicketCreateEnabled(env);
+      ai.memory = aiMemoryAccessStatus(env, auth.user);
       ai.capabilities = {
         autonomousTicketCreate: autonomousConfigured && serverCreate.ready
       };
