@@ -29,6 +29,7 @@ export function useAIAgentSession({
   callModel,
   callAssistant,
   executeAction,
+  loadConversationAccess,
   loadConversations,
   createConversation,
   openConversation,
@@ -48,6 +49,7 @@ export function useAIAgentSession({
   const [memoryFacts, setMemoryFacts] = useState([]);
   const [memoryError, setMemoryError] = useState("");
   const [conversations, setConversations] = useState([]);
+  const [conversationAccess, setConversationAccess] = useState(() => (typeof loadConversationAccess === "function" ? false : true));
   const [conversationId, setConversationId] = useState("");
   const [conversationError, setConversationError] = useState("");
   const [conversationLoading, setConversationLoading] = useState(false);
@@ -92,8 +94,27 @@ export function useAIAgentSession({
     refreshMemory();
   }, [refreshMemory]);
 
+  const refreshConversationAccess = useCallback(async () => {
+    if (typeof loadConversationAccess !== "function") return true;
+    try {
+      const access = await loadConversationAccess();
+      const effective = access?.effectiveAccess === true;
+      setConversationAccess(effective);
+      if (!effective) {
+        setConversations([]);
+        setConversationId("");
+      }
+      return effective;
+    } catch {
+      setConversationAccess(false);
+      setConversations([]);
+      setConversationId("");
+      return false;
+    }
+  }, [loadConversationAccess]);
+
   const loadConversationById = useCallback(async (id) => {
-    if (typeof openConversation !== "function" || !id) return null;
+    if (!conversationAccess || typeof openConversation !== "function" || !id) return null;
     setConversationLoading(true);
     try {
       const result = await openConversation(id);
@@ -112,10 +133,10 @@ export function useAIAgentSession({
     } finally {
       setConversationLoading(false);
     }
-  }, [openConversation, session, setAgentState]);
+  }, [conversationAccess, openConversation, session, setAgentState]);
 
   const refreshConversations = useCallback(async () => {
-    if (typeof loadConversations !== "function") return [];
+    if (!conversationAccess || typeof loadConversations !== "function") return [];
     try {
       const list = await loadConversations();
       const safeList = Array.isArray(list) ? list : [];
@@ -126,11 +147,13 @@ export function useAIAgentSession({
       setConversationError(error?.message || "conversation_unavailable");
       return [];
     }
-  }, [loadConversations]);
+  }, [conversationAccess, loadConversations]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const access = await refreshConversationAccess();
+      if (!access) return;
       const list = await refreshConversations();
       if (cancelled || didAutoOpenConversationRef.current || !list.length) return;
       didAutoOpenConversationRef.current = true;
@@ -139,10 +162,10 @@ export function useAIAgentSession({
     return () => {
       cancelled = true;
     };
-  }, [refreshConversations, loadConversationById]);
+  }, [refreshConversationAccess, refreshConversations, loadConversationById]);
 
   const startNewConversation = useCallback(async () => {
-    if (typeof createConversation !== "function") {
+    if (!conversationAccess || typeof createConversation !== "function") {
       setConversationId("");
       setAgentState(createAiAgentInitialState({ session }));
       return null;
@@ -161,21 +184,21 @@ export function useAIAgentSession({
     } finally {
       setConversationLoading(false);
     }
-  }, [createConversation, session, setAgentState]);
+  }, [conversationAccess, createConversation, session, setAgentState]);
 
   const ensureConversationForSend = useCallback(async (text) => {
     if (conversationIdRef.current) return conversationIdRef.current;
-    if (typeof createConversation !== "function") return "";
+    if (!conversationAccess || typeof createConversation !== "function") return "";
     const conversation = await createConversation({ title: text || "AI conversation" });
     if (!conversation?.id) return "";
     setConversationId(conversation.id);
     setConversations((items) => [conversation, ...items.filter((item) => item.id !== conversation.id)]);
     return conversation.id;
-  }, [createConversation]);
+  }, [conversationAccess, createConversation]);
 
   const archiveCurrentConversation = useCallback(async () => {
     const id = conversationIdRef.current;
-    if (!id || typeof archiveConversation !== "function") return;
+    if (!conversationAccess || !id || typeof archiveConversation !== "function") return;
     setConversationLoading(true);
     try {
       await archiveConversation(id);
@@ -188,7 +211,7 @@ export function useAIAgentSession({
     } finally {
       setConversationLoading(false);
     }
-  }, [archiveConversation, refreshConversations, session, setAgentState]);
+  }, [archiveConversation, conversationAccess, refreshConversations, session, setAgentState]);
 
   const send = useCallback(async (text, workflow = AI_ASSIST_WORKFLOWS.general) => {
     let effectiveConversationId = "";
@@ -245,6 +268,7 @@ export function useAIAgentSession({
     ...state,
     contextPreview,
     conversations,
+    conversationAccess,
     conversationId,
     conversationError,
     conversationLoading,

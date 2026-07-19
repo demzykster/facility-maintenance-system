@@ -26,6 +26,15 @@ describe("AI UI boundary extraction", () => {
     expect(apiClientSource).toContain('fetchImpl("/api/ai/assist"');
   });
 
+  it("gates durable conversation controls on server-reported effective access", () => {
+    expect(appSource).toContain("getAiConversationAccess");
+    expect(appSource).toContain("loadConversationAccess={loadAIConversationAccess}");
+    expect(aiPanelSource).toContain("conversationAccess && <AiConversationBar");
+    expect(sessionHookSource).toContain("loadConversationAccess");
+    expect(sessionHookSource).toContain("access?.effectiveAccess === true");
+    expect(sessionHookSource).toContain("if (!conversationAccess || typeof createConversation !== \"function\")");
+  });
+
   it("keeps human-confirmed action execution in one UI adapter instead of the monolith", () => {
     expect(appSource).toContain("createAiAgentActionExecutor");
     expect(appSource).not.toContain('if (action?.type === "task.update")');

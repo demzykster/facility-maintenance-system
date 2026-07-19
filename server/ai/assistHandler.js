@@ -7,7 +7,7 @@ import { AI_ASSIST_WORKFLOWS, aiAssistRoleGuidance, aiAssistWorkflowInstruction,
 import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
 import { autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
 import { aiMemoryEffectiveAccess } from "../../src/aiMemoryModel.js";
-import { aiConversationsPilotEnabled, buildAiConversationRecentHistory, normalizeAiConversationMessageInput } from "../../src/aiConversationModel.js";
+import { aiConversationsEffectiveAccess, aiConversationsPilotEnabled, buildAiConversationRecentHistory, normalizeAiConversationMessageInput } from "../../src/aiConversationModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { createSupabaseFleetDriverFromEnv } from "../fleet/supabaseFleetDriver.js";
@@ -545,7 +545,20 @@ export function createAiAssistHandler({
       let conversationRecord = null;
       let persistedUserMessage = null;
       let conversation = cleanConversationMessages(body.messages);
-      if (conversationsEnabled && requestedConversationId) {
+      if (requestedConversationId && !conversationsEnabled) {
+        return sendJson(res, 404, { error: "ai_conversations_pilot_disabled" });
+      }
+      if (requestedConversationId && !aiConversationsEffectiveAccess(env, auth.user)) {
+        await writeAuditEvent(backendAuditDriver, aiConversationAuditEvent({
+          conversation: { id: requestedConversationId },
+          action: AUDIT_ACTIONS.use,
+          outcome: "blocked",
+          reason: "conversation_pilot_permission_required",
+          requestId
+        }, auth.user, { at: currentTime }));
+        return sendJson(res, 403, { error: "ai_conversations_pilot_permission_required" });
+      }
+      if (requestedConversationId) {
         if (!backendConversationStore) return sendJson(res, 503, { error: "ai_conversation_store_unavailable" });
         const ownerUserId = cleanText(auth.user.id || auth.user.authUserId || auth.user.workerNo, 120);
         conversationRecord = await backendConversationStore.getMine({ id: requestedConversationId, ownerUserId });

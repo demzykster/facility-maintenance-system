@@ -33,6 +33,8 @@ function sessionClient(profile = {}) {
   };
 }
 
+const pilotPermissions = { aiConversationsPilot: "request" };
+
 function conversationStore(seed = []) {
   const conversations = [...seed];
   const messages = new Map();
@@ -93,11 +95,68 @@ describe("AI conversation handler", () => {
     expect(disabled.json()).toEqual({ error: "ai_conversations_pilot_disabled" });
   });
 
+  it("requires explicit conversation pilot permission even for manager roles", async () => {
+    const auditDriver = { write: vi.fn(async () => {}) };
+    const store = conversationStore();
+    const handler = createAiConversationHandler({
+      env: { CMMS_AI_CONVERSATIONS_PILOT: "local" },
+      sessionClient: sessionClient({ role: "executive", permissions: {} }),
+      conversationStore: store,
+      auditDriver,
+      now: () => 1500
+    });
+
+    const res = await call(handler, { method: "POST", body: { title: "Should block", permissions: { aiConversationsPilot: "request" } } });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ai_conversations_pilot_permission_required" });
+    expect(store.create).not.toHaveBeenCalled();
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      action: "create",
+      metadata: expect.objectContaining({
+        outcome: "blocked",
+        reason: "conversation_pilot_permission_required"
+      })
+    }));
+    expect(JSON.stringify(auditDriver.write.mock.calls)).not.toContain("Should block");
+  });
+
+  it("does not grant access to worker or tech roles without explicit pilot permission", async () => {
+    for (const role of ["worker", "tech"]) {
+      const store = conversationStore();
+      const handler = createAiConversationHandler({
+        env: { CMMS_AI_CONVERSATIONS_PILOT: "local" },
+        sessionClient: sessionClient({ role, permissions: {} }),
+        conversationStore: store
+      });
+
+      const res = await call(handler);
+
+      expect(res.statusCode).toBe(403);
+      expect(store.listMine).not.toHaveBeenCalled();
+    }
+  });
+
+  it("keeps inactive users out even when they carry the pilot permission", async () => {
+    const store = conversationStore();
+    const handler = createAiConversationHandler({
+      env: { CMMS_AI_CONVERSATIONS_PILOT: "local" },
+      sessionClient: sessionClient({ active: false, permissions: pilotPermissions }),
+      conversationStore: store
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "app_user_disabled" });
+    expect(store.listMine).not.toHaveBeenCalled();
+  });
+
   it("creates conversations only for the authenticated owner and returns safe DTOs", async () => {
     const store = conversationStore();
     const handler = createAiConversationHandler({
       env: { CMMS_AI_CONVERSATIONS_PILOT: "local" },
-      sessionClient: sessionClient(),
+      sessionClient: sessionClient({ permissions: pilotPermissions }),
       conversationStore: store,
       now: () => 1000
     });
@@ -121,7 +180,7 @@ describe("AI conversation handler", () => {
     const store = conversationStore();
     const handler = createAiConversationHandler({
       env: { CMMS_AI_CONVERSATIONS_PILOT: "local" },
-      sessionClient: sessionClient(),
+      sessionClient: sessionClient({ permissions: pilotPermissions }),
       conversationStore: store,
       auditDriver,
       now: () => 2000
@@ -160,7 +219,7 @@ describe("AI conversation handler", () => {
     ]);
     const handler = createAiConversationHandler({
       env: { CMMS_AI_CONVERSATIONS_PILOT: "local" },
-      sessionClient: sessionClient(),
+      sessionClient: sessionClient({ permissions: pilotPermissions }),
       conversationStore: store
     });
 
@@ -178,7 +237,7 @@ describe("AI conversation handler", () => {
     const store = conversationStore([{ id: "own", ownerUserId: "u1", title: "Own", status: "active" }]);
     const handler = createAiConversationHandler({
       env: { CMMS_AI_CONVERSATIONS_PILOT: "local" },
-      sessionClient: sessionClient(),
+      sessionClient: sessionClient({ permissions: pilotPermissions }),
       conversationStore: store,
       auditDriver,
       now: () => 3000

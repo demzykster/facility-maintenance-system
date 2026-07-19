@@ -102,6 +102,33 @@ function memoryHeaders(accessToken = "") {
   return aiHeaders(accessToken);
 }
 
+export async function getAiServerStatus({
+  check = false,
+  getAccessToken = async () => "",
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null
+} = {}) {
+  if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
+  const accessToken = await getAccessToken();
+  const res = await fetchImpl(`/api/ai/status${check ? "?check=1" : ""}`, {
+    method: "GET",
+    credentials: "include",
+    headers: aiHeaders(accessToken)
+  });
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(data.error || `ai-status-${res.status}`);
+  return data.ai || null;
+}
+
+export async function getAiConversationAccess({
+  getAccessToken = async () => "",
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null
+} = {}) {
+  const ai = await getAiServerStatus({ getAccessToken, fetchImpl });
+  return ai?.conversations && typeof ai.conversations === "object"
+    ? ai.conversations
+    : { globalEnabled: false, pilotMember: false, effectiveAccess: false };
+}
+
 export async function listAiConversations({
   getAccessToken = async () => "",
   fetchImpl = typeof fetch !== "undefined" ? fetch : null
@@ -115,6 +142,7 @@ export async function listAiConversations({
   });
   const data = await readJson(res);
   if (res.status === 404 && data?.error === "ai_conversations_pilot_disabled") return [];
+  if (res.status === 403 && data?.error === "ai_conversations_pilot_permission_required") return [];
   if (res.status === 401 && data?.error === "access_token_required") return [];
   if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
   return Array.isArray(data?.conversations) ? data.conversations : [];
@@ -135,6 +163,7 @@ export async function createAiConversation({
   });
   const data = await readJson(res);
   if (res.status === 404 && data?.error === "ai_conversations_pilot_disabled") return null;
+  if (res.status === 403 && data?.error === "ai_conversations_pilot_permission_required") return null;
   if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
   return data.conversation || null;
 }
@@ -153,6 +182,7 @@ export async function getAiConversation({
   });
   const data = await readJson(res);
   if (res.status === 404 && data?.error === "ai_conversations_pilot_disabled") return null;
+  if (res.status === 403 && data?.error === "ai_conversations_pilot_permission_required") return null;
   if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
   return {
     conversation: data.conversation || null,
@@ -174,6 +204,8 @@ export async function archiveAiConversation({
     body: JSON.stringify({ id })
   });
   const data = await readJson(res);
+  if (res.status === 404 && data?.error === "ai_conversations_pilot_disabled") return null;
+  if (res.status === 403 && data?.error === "ai_conversations_pilot_permission_required") return null;
   if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
   return data.conversation || null;
 }

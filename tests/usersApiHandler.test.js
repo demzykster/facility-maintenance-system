@@ -785,6 +785,59 @@ describe("users API handler", () => {
     }));
   });
 
+  it("audits controlled AI conversations pilot permission changes separately", async () => {
+    const appUserId = "550e8400-e29b-41d4-a716-446655440011";
+    const profileClient = {
+      getAppUserProfileById: vi.fn().mockResolvedValue({
+        id: appUserId,
+        role: "user",
+        name: "Pilot Manager",
+        active: true,
+        permissions: { aiMemoryPilot: "request" }
+      }),
+      updateAppUserProfileById: vi.fn().mockResolvedValue({
+        id: appUserId,
+        role: "user",
+        name: "Pilot Manager",
+        active: true,
+        permissions: { aiMemoryPilot: "request", aiConversationsPilot: "request" }
+      })
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createUsersApiHandler({
+      driver: null,
+      profileClient,
+      auditDriver,
+      sessionClient: sessionClientFor({ permissions: { users: "manage" } })
+    });
+
+    const res = await call(handler, {
+      method: "POST",
+      headers: { authorization: "Bearer manager-token" },
+      body: {
+        user: {
+          id: appUserId,
+          name: "Pilot Manager",
+          role: "user",
+          active: true,
+          perms: { aiMemoryPilot: "request", aiConversationsPilot: "request" }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(profileClient.updateAppUserProfileById).toHaveBeenCalledWith(appUserId, expect.objectContaining({
+      permissions: { aiMemoryPilot: "request", aiConversationsPilot: "request" }
+    }));
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "permission",
+      entityId: appUserId,
+      action: "permission_change",
+      before: { aiMemoryPilot: "request" },
+      after: { aiMemoryPilot: "request", aiConversationsPilot: "request" }
+    }));
+  });
+
   it("does not let scoped department managers overwrite existing non-worker profiles", async () => {
     const appUserId = "550e8400-e29b-41d4-a716-446655440099";
     const profileClient = {

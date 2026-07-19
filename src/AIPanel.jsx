@@ -332,7 +332,7 @@ function AiMessage({ role, content }) {
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, loadConversations, createConversation, openConversation, archiveConversation, loadMemoryFacts, updateMemoryFact, deactivateMemoryFact, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, loadConversationAccess, loadConversations, createConversation, openConversation, archiveConversation, loadMemoryFacts, updateMemoryFact, deactivateMemoryFact, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const agent = useAIAgentSession({
     session,
     tickets,
@@ -350,6 +350,7 @@ export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], m
     callModel,
     callAssistant,
     executeAction,
+    loadConversationAccess,
     loadConversations,
     createConversation,
     openConversation,
@@ -360,7 +361,7 @@ export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], m
     initialText,
     initialWorkflow
   });
-  const { msgs, input, inputWorkflow, busy, actionBusy, actionResults, contextPreview, conversations, conversationId, conversationError, conversationLoading, memoryFacts, memoryError, setInput, send, runAction, startNewConversation, openConversation: openAiConversation, archiveConversation: archiveAiConversation, editMemoryFact, forgetMemoryFact } = agent;
+  const { msgs, input, inputWorkflow, busy, actionBusy, actionResults, contextPreview, conversations, conversationAccess, conversationId, conversationError, conversationLoading, memoryFacts, memoryError, setInput, send, runAction, startNewConversation, openConversation: openAiConversation, archiveConversation: archiveAiConversation, editMemoryFact, forgetMemoryFact } = agent;
   const endRef = useRef(null);
   const quick = useMemo(() => aiAssistQuickPrompts(session, contextPreview), [session, contextPreview]);
 
@@ -374,7 +375,7 @@ export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], m
         <div className="ai-title"><span className="ai-orb"><Sparkles size={16} /></span> עוזר AI</div>
         <button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
       </div>
-      <AiConversationBar conversations={conversations} currentId={conversationId} loading={conversationLoading} error={conversationError} onNew={startNewConversation} onOpen={openAiConversation} onArchive={archiveAiConversation} />
+      {conversationAccess && <AiConversationBar conversations={conversations} currentId={conversationId} loading={conversationLoading} error={conversationError} onNew={startNewConversation} onOpen={openAiConversation} onArchive={archiveAiConversation} />}
       <AiMemoryPanel facts={memoryFacts} error={memoryError} onEdit={editMemoryFact} onForget={forgetMemoryFact} />
       <div className="ai-msgs">
         {msgs.map((m, i) => <div key={i} className={"ai-msg-wrap " + m.role}>

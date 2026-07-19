@@ -6,7 +6,7 @@ import {
   ListChecks, Settings, ChevronLeft, User, MapPin, Package, Search, Trash2, Send,
   ShieldCheck, Bell, Check, Moon, Sun, BarChart3, CalendarClock, PenLine, HardHat,
   DollarSign, RefreshCw, Power, Users, UserPlus, ClipboardCheck, ClipboardList,
-  FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon,
+  FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon, MessageSquare,
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
 import { AISettingsCard } from "./AISettingsCard.jsx";
 import { UnitPicker } from "./UnitPicker.jsx";
@@ -30,7 +30,7 @@ import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionM
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { archiveAiConversation, callAiAssistApi, createAiConversation, createAiMemoryFact, deactivateAiMemoryFact, getAiConversation, listAiConversations, listAiMemoryFacts, updateAiMemoryFact } from "./aiAgentApiClient.js";
+import { archiveAiConversation, callAiAssistApi, createAiConversation, createAiMemoryFact, deactivateAiMemoryFact, getAiConversation, getAiConversationAccess, listAiConversations, listAiMemoryFacts, updateAiMemoryFact } from "./aiAgentApiClient.js";
 import { createAiAgentActionExecutor, createAiAgentTicketDraftEditor } from "./aiAgentActionAdapter.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
@@ -1439,6 +1439,10 @@ async function callAIAssistant({ text, messages, conversationId, system, context
 
 async function loadAIConversations() {
   return listAiConversations({ getAccessToken: productionAccessToken });
+}
+
+async function loadAIConversationAccess() {
+  return getAiConversationAccess({ getAccessToken: productionAccessToken });
 }
 
 async function startAIConversation({ title } = {}) {
@@ -7294,7 +7298,7 @@ function UserForm({ user, config, users, zones, presence = [], session, canManag
   const [manualCleaningAccess, setManualCleaningAccess] = useState(explicitCleaningAccess);
   const cleaningDeptSelected = ["ניקיון", "נקיון", "cleaning"].includes(String(dept || "").trim().toLowerCase());
   const roleIcons = { admin: ShieldCheck, executive: BarChart3, tech: HardHat, user: User, worker: UserPlus };
-  const permIcons = { fleetDocs: FileText, fleetTickets: ClipboardList, ppe: Shirt, workerAccess: KeyRound, users: Users, analytics: BarChart3, suppliers: Truck, settings: Settings, audit: Clock, aiMemoryPilot: Sparkles };
+  const permIcons = { fleetDocs: FileText, fleetTickets: ClipboardList, ppe: Shirt, workerAccess: KeyRound, users: Users, analytics: BarChart3, suppliers: Truck, settings: Settings, audit: Clock, aiMemoryPilot: Sparkles, aiConversationsPilot: MessageSquare };
   const permLevelLabels = { none: "אין", view: "צפייה", request: "בקשה", manage: "ניהול", full: "מלא" };
   const pickCard = (on, tone = "#1F4E8C") => ({ borderColor: on ? tone : undefined, background: on ? "var(--primary-soft)" : undefined, color: on ? "var(--primary)" : undefined });
   const changeRole = (nextRole) => {
@@ -7935,7 +7939,7 @@ function LazyAIPanel(props) {
   const executeAction = createAiAgentActionExecutor({ ...props, createMemoryFact: saveAIMemoryFact }, { makeId: uid, saveFailedMessage: SAVE_FAILED_MESSAGE });
   const editAction = props.openAiTicketDraft ? createAiAgentTicketDraftEditor({ openAiTicketDraft: props.openAiTicketDraft }) : null;
   return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
-    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={editAction} loadConversations={loadAIConversations} createConversation={startAIConversation} openConversation={openAIConversation} archiveConversation={archiveAIConversation} loadMemoryFacts={loadAIMemoryFacts} updateMemoryFact={reviseAIMemoryFact} deactivateMemoryFact={forgetAIMemoryFact} />
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={editAction} loadConversationAccess={loadAIConversationAccess} loadConversations={loadAIConversations} createConversation={startAIConversation} openConversation={openAIConversation} archiveConversation={archiveAIConversation} loadMemoryFacts={loadAIMemoryFacts} updateMemoryFact={reviseAIMemoryFact} deactivateMemoryFact={forgetAIMemoryFact} />
   </Suspense>;
 }
 function NotifPanelFallback({ onClose }) {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AI_CONVERSATION_STATUSES,
+  aiConversationsAccessStatus,
+  aiConversationsEffectiveAccess,
   aiConversationForClient,
   aiConversationMessageForClient,
+  aiConversationsPilotMember,
   aiConversationsPilotEnabled,
   buildAiConversationRecentHistory,
   normalizeAiConversationInput,
@@ -17,6 +20,18 @@ describe("AI conversation model", () => {
     expect(aiConversationsPilotEnabled({})).toBe(false);
     expect(aiConversationsPilotEnabled({ CMMS_AI_CONVERSATIONS_PILOT: "true" })).toBe(true);
     expect(aiConversationsPilotEnabled({ CMMS_AI_MEMORY_PILOT: "true" })).toBe(false);
+  });
+
+  it("requires explicit per-user conversation pilot permission in addition to the global flag", () => {
+    expect(aiConversationsPilotMember({ role: "admin" })).toBe(false);
+    expect(aiConversationsEffectiveAccess({ CMMS_AI_CONVERSATIONS_PILOT: "true" }, { role: "executive" })).toBe(false);
+    expect(aiConversationsEffectiveAccess({ CMMS_AI_CONVERSATIONS_PILOT: "true" }, { role: "user", permissions: { aiConversationsPilot: "view" } })).toBe(false);
+    expect(aiConversationsEffectiveAccess({ CMMS_AI_CONVERSATIONS_PILOT: "true" }, { role: "user", permissions: { aiConversationsPilot: "request" } })).toBe(true);
+    expect(aiConversationsAccessStatus({ CMMS_AI_CONVERSATIONS_PILOT: "true" }, { role: "user", perms: { aiConversationsPilot: "request" } })).toEqual({
+      globalEnabled: true,
+      pilotMember: true,
+      effectiveAccess: true
+    });
   });
 
   it("normalizes conversations with server-owned personal ownership", () => {

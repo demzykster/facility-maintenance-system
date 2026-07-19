@@ -3,6 +3,7 @@ import { AUDIT_ACTIONS, aiConversationAuditEvent } from "../../../src/auditEvent
 import {
   aiConversationForClient,
   aiConversationMessageForClient,
+  aiConversationsAccessStatus,
   aiConversationsPilotEnabled,
   normalizeAiConversationInput
 } from "../../../src/aiConversationModel.js";
@@ -72,6 +73,24 @@ async function writeAudit(auditDriver, event) {
   await auditDriver.write(event);
 }
 
+function actionForMethod(method = "GET") {
+  if (method === "POST") return AUDIT_ACTIONS.create;
+  if (method === "DELETE") return AUDIT_ACTIONS.deactivate;
+  return AUDIT_ACTIONS.use;
+}
+
+function conversationIdFromRequest(req = {}, body = {}) {
+  return cleanText(
+    body.id
+      || body.conversationId
+      || body.conversation_id
+      || req.query?.id
+      || req.query?.conversationId
+      || req.query?.conversation_id,
+    120
+  );
+}
+
 export function createAiConversationHandler({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -94,6 +113,17 @@ export function createAiConversationHandler({
     const auth = await authorizeAiRequest(req, env, fetchImpl, sessionClient, pinSessionClient);
     if (!auth.ok) return sendJson(res, auth.status, { error: auth.error });
     if (!aiConversationsPilotEnabled(env)) return sendJson(res, 404, { error: "ai_conversations_pilot_disabled" });
+    const access = aiConversationsAccessStatus(env, auth.user);
+    if (!access.effectiveAccess) {
+      await writeAudit(backendAuditDriver, aiConversationAuditEvent({
+        conversation: { id: conversationIdFromRequest(req) },
+        action: actionForMethod(method),
+        outcome: "blocked",
+        reason: "conversation_pilot_permission_required",
+        requestId: requestIdForConversation(req, {})
+      }, auth.user, { at: now() }));
+      return sendJson(res, 403, { error: "ai_conversations_pilot_permission_required" });
+    }
     if (!backendConversationStore) return sendJson(res, 503, { error: "ai_conversation_store_unavailable" });
 
     let body = {};
@@ -164,7 +194,7 @@ export function createAiConversationHandler({
         return sendJson(res, 201, { ok: true, conversation: aiConversationForClient(saved), messages: [] });
       }
 
-      const conversationId = cleanText(body.id || body.conversationId || body.conversation_id || req.query?.id, 120);
+      const conversationId = conversationIdFromRequest(req, body);
       if (!conversationId) return sendJson(res, 400, { error: "conversation_id_required" });
       const archived = await backendConversationStore.archiveMine({ id: conversationId, ownerUserId, at: now() });
       if (!archived) {

@@ -86,6 +86,11 @@ describe("AI status handler", () => {
           pilotMember: false,
           effectiveAccess: false
         },
+        conversations: {
+          globalEnabled: false,
+          pilotMember: false,
+          effectiveAccess: false
+        },
         ticketCreate: {
           autonomousConfigured: false,
           serverCreate: {
@@ -131,6 +136,50 @@ describe("AI status handler", () => {
       effectiveAccess: true
     });
     expect(JSON.stringify(res.json())).not.toContain("server-secret");
+  });
+
+  it("reports effective durable conversation access without exposing other users", async () => {
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_CONVERSATIONS_PILOT: "true",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: { aiConversationsPilot: "request" } })
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai.conversations).toEqual({
+      globalEnabled: true,
+      pilotMember: true,
+      effectiveAccess: true
+    });
+    expect(JSON.stringify(res.json())).not.toContain("server-secret");
+    expect(JSON.stringify(res.json())).not.toContain("other");
+  });
+
+  it("does not grant durable conversation access from role alone", async () => {
+    const handler = createAiStatusHandler({
+      env: {
+        CMMS_AI_CONVERSATIONS_PILOT: "true",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret"
+      },
+      sessionClient: sessionClient({ role: "admin", permissions: {} })
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ai.conversations).toEqual({
+      globalEnabled: true,
+      pilotMember: false,
+      effectiveAccess: false
+    });
   });
 
   it("keeps autonomous ticket create disabled when server-create cutover is off", async () => {

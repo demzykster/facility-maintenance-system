@@ -7,6 +7,7 @@ import {
   createAiAssistIdempotencyKey,
   createAiMemoryFact,
   getAiConversation,
+  getAiConversationAccess,
   listAiConversations,
   listAiMemoryFacts
 } from "../src/aiAgentApiClient.js";
@@ -126,6 +127,53 @@ describe("AI agent API client", () => {
     await expect(archiveAiConversation({ id: "conv-1", getAccessToken, fetchImpl })).resolves.toEqual({ id: "conv-1", status: "archived" });
     expect(calls.every((call) => call.options.headers.authorization === "Bearer access-token")).toBe(true);
     expect(calls.map((call) => call.options.method)).toEqual(["GET", "POST", "GET", "DELETE"]);
+  });
+
+  it("reads effective conversation access from the authenticated AI status endpoint", async () => {
+    const access = await getAiConversationAccess({
+      getAccessToken: async () => "access-token",
+      fetchImpl: vi.fn(async (url, options) => ({
+        ok: true,
+        json: async () => ({
+          ai: {
+            conversations: {
+              globalEnabled: true,
+              pilotMember: true,
+              effectiveAccess: true
+            }
+          }
+        }),
+        url,
+        options
+      }))
+    });
+
+    expect(access).toEqual({
+      globalEnabled: true,
+      pilotMember: true,
+      effectiveAccess: true
+    });
+  });
+
+  it("treats disabled or unauthorized conversations as unavailable UI controls", async () => {
+    const permissionDenied = await listAiConversations({
+      fetchImpl: async () => ({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "ai_conversations_pilot_permission_required" })
+      })
+    });
+    const disabledCreate = await createAiConversation({
+      title: "No access",
+      fetchImpl: async () => ({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "ai_conversations_pilot_permission_required" })
+      })
+    });
+
+    expect(permissionDenied).toEqual([]);
+    expect(disabledCreate).toBeNull();
   });
 
   it("preserves server error codes for the panel error mapper", async () => {

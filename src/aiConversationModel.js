@@ -13,6 +13,15 @@ const STATUSES = new Set(Object.values(AI_CONVERSATION_STATUSES));
 const ROLES = new Set(Object.values(AI_CONVERSATION_MESSAGE_ROLES));
 const MAX_TITLE = 160;
 const MAX_CONTENT = 8_000;
+export const AI_CONVERSATIONS_PILOT_PERMISSION = "aiConversationsPilot";
+
+const PILOT_PERMISSION_LEVELS = Object.freeze({
+  none: 0,
+  view: 1,
+  request: 2,
+  manage: 3,
+  full: 4
+});
 
 const cleanText = (value, limit = 240) => String(value || "")
   .replace(/\s+/g, " ")
@@ -41,6 +50,31 @@ function cleanMetadata(value = {}) {
 export function aiConversationsPilotEnabled(env = {}) {
   const raw = String(env.CMMS_AI_CONVERSATIONS_PILOT || "").trim().toLowerCase();
   return ["1", "true", "yes", "on", "enabled", "local"].includes(raw);
+}
+
+export function aiConversationsPilotPermissionLevel(actor = {}) {
+  const perms = actor?.permissions && typeof actor.permissions === "object"
+    ? actor.permissions
+    : actor?.perms && typeof actor.perms === "object" ? actor.perms : {};
+  return String(perms[AI_CONVERSATIONS_PILOT_PERMISSION] || "none").trim();
+}
+
+export function aiConversationsPilotMember(actor = {}) {
+  return (PILOT_PERMISSION_LEVELS[aiConversationsPilotPermissionLevel(actor)] || 0) >= PILOT_PERMISSION_LEVELS.request;
+}
+
+export function aiConversationsEffectiveAccess(env = {}, actor = {}) {
+  return aiConversationsPilotEnabled(env) && aiConversationsPilotMember(actor);
+}
+
+export function aiConversationsAccessStatus(env = {}, actor = {}) {
+  const globalEnabled = aiConversationsPilotEnabled(env);
+  const pilotMember = aiConversationsPilotMember(actor);
+  return {
+    globalEnabled,
+    pilotMember,
+    effectiveAccess: globalEnabled && pilotMember
+  };
 }
 
 export function aiConversationId({ now = Date.now, random = Math.random } = {}) {

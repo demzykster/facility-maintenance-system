@@ -34,6 +34,8 @@ function sessionClient(profile = {}) {
   };
 }
 
+const pilotPermissions = { aiConversationsPilot: "request" };
+
 function conversationStore({ ownerUserId = "u1", messages = [] } = {}) {
   const savedMessages = [...messages];
   return {
@@ -94,7 +96,7 @@ describe("AI assist durable conversation integration", () => {
         GOOGLE_GENERATIVE_AI_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient(),
+      sessionClient: sessionClient({ permissions: pilotPermissions }),
       conversationStore: store,
       memoryStore: { list: vi.fn(async () => []) },
       fleetDriver: { list: vi.fn(async () => []) },
@@ -136,7 +138,7 @@ describe("AI assist durable conversation integration", () => {
         OPENAI_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ id: "u1" }),
+      sessionClient: sessionClient({ id: "u1", permissions: pilotPermissions }),
       conversationStore: store,
       providerCall,
       now: () => 7000,
@@ -161,7 +163,7 @@ describe("AI assist durable conversation integration", () => {
         OPENAI_API_KEY: "test-key",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient(),
+      sessionClient: sessionClient({ permissions: pilotPermissions }),
       conversationStore: store,
       memoryStore: { list: vi.fn(async () => []) },
       fleetDriver: { list: vi.fn(async () => []) },
@@ -175,6 +177,57 @@ describe("AI assist durable conversation integration", () => {
     expect(res.statusCode).toBe(502);
     expect(store.savedMessages.filter((message) => message.role === "user")).toHaveLength(1);
     expect(store.savedMessages.filter((message) => message.role === "assistant")).toHaveLength(0);
+  });
+
+  it("blocks conversation IDs when the user lacks pilot permission without calling the provider", async () => {
+    const store = conversationStore();
+    const providerCall = vi.fn();
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_CONVERSATIONS_PILOT: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "test-key",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: {} }),
+      conversationStore: store,
+      providerCall,
+      now: () => 8500,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ai_conversations_pilot_permission_required" });
+    expect(providerCall).not.toHaveBeenCalled();
+    expect(store.appendMessage).not.toHaveBeenCalled();
+  });
+
+  it("blocks conversation IDs when the global conversation flag is off", async () => {
+    const store = conversationStore();
+    const providerCall = vi.fn();
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "test-key",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ permissions: pilotPermissions }),
+      conversationStore: store,
+      providerCall,
+      now: () => 8700,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler);
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "ai_conversations_pilot_disabled" });
+    expect(providerCall).not.toHaveBeenCalled();
+    expect(store.appendMessage).not.toHaveBeenCalled();
   });
 
   it("keeps legacy client-message behavior when the conversation pilot is off", async () => {
@@ -201,7 +254,7 @@ describe("AI assist durable conversation integration", () => {
       rateBuckets: new Map()
     });
 
-    const res = await call(handler);
+    const res = await call(handler, { conversationId: "" });
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(providerCall.mock.calls[0][0].prompt).recentConversation.map((message) => message.content)).toEqual(["FAKE_CLIENT_HISTORY"]);

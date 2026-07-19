@@ -6,7 +6,7 @@ describe("user permission editor modules", () => {
     const keys = USER_PERMISSION_MODULES.map((m) => m.mod);
 
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(["fleetDocs", "fleetTickets", "ppe", "workerAccess", "users", "analytics", "suppliers", "settings", "audit", "aiMemoryPilot"]);
+    expect(keys).toEqual(["fleetDocs", "fleetTickets", "ppe", "workerAccess", "users", "analytics", "suppliers", "settings", "audit", "aiMemoryPilot", "aiConversationsPilot"]);
 
     for (const mod of USER_PERMISSION_MODULES) {
       expect(mod.levels[0]).toBe("none");
@@ -22,6 +22,16 @@ describe("user permission editor modules", () => {
     });
     expect(module.label).toContain("AI");
     expect(module.hint).toContain("ניסיוני");
+  });
+
+  it("exposes durable AI conversations as an explicit opt-in permission", () => {
+    const module = USER_PERMISSION_MODULES.find((item) => item.mod === "aiConversationsPilot");
+
+    expect(module).toMatchObject({
+      levels: ["none", "request"]
+    });
+    expect(module.label).toContain("AI");
+    expect(module.hint).toContain("ניסיונית");
   });
 
   it("keeps the new-manager permission preset aligned with the editor modules", () => {
