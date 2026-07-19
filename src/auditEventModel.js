@@ -158,7 +158,8 @@ export function aiAssistAuditEvent({
   missingFieldCount = 0,
   actionTypes = [],
   missingFields = [],
-  draftTelemetry = {}
+  draftTelemetry = {},
+  memoryGrounding = {}
 } = {}, actor = {}, options = {}) {
   const requestedLanguage = responseLanguage && typeof responseLanguage === "object" ? responseLanguage : {};
   const requestedLanguageCode = requestedLanguage.code || draft.language || "";
@@ -166,6 +167,13 @@ export function aiAssistAuditEvent({
   const safeActionTypes = Array.isArray(actionTypes) ? actionTypes.map((value) => cleanString(value)).filter(Boolean).slice(0, 8) : [];
   const safeMissingFields = Array.isArray(missingFields) ? missingFields.map((value) => cleanString(value)).filter(Boolean).slice(0, 12) : [];
   const telemetry = cleanObject(draftTelemetry);
+  const grounding = cleanObject(memoryGrounding);
+  const usedMemoryIds = Array.isArray(grounding.usedMemoryIds)
+    ? grounding.usedMemoryIds.map((value) => cleanString(value)).filter(Boolean).slice(0, 24)
+    : [];
+  const rejectedMemoryIds = Array.isArray(grounding.rejectedMemoryIds)
+    ? grounding.rejectedMemoryIds.map((value) => cleanString(value)).filter(Boolean).slice(0, 24)
+    : [];
   return normalizeAuditEvent({
     at: options.at,
     actorId: actor.id,
@@ -215,6 +223,12 @@ export function aiAssistAuditEvent({
       serverCreateReady: serverCreateReady === true,
       serverCreateConfigured: serverCreateConfigured === true,
       workflow,
+      memoryGrounding: {
+        mode: cleanString(grounding.mode),
+        retrievedCount: Number(grounding.retrievedCount) || 0,
+        usedMemoryIds,
+        rejectedMemoryIds
+      },
       contextProfile: {
         role: context.profile?.role || actor.role || "",
         department: context.profile?.department || "",

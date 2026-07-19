@@ -264,6 +264,20 @@ function AiProviderPlanCard({ plan }) {
   </div>;
 }
 
+function AiMemoryCitationList({ citations = [] }) {
+  const list = Array.isArray(citations) ? citations.filter((item) => item && typeof item === "object") : [];
+  if (!list.length) return null;
+  return <div className="ai-memory-cites" aria-label="AI memory sources">
+    {list.map((fact) => <div key={fact.id || fact.summary} className="ai-memory-cite">
+      <Brain size={13} />
+      <div>
+        <div className="ai-memory-cite-summary">{cleanText(fact.summary, "—")}</div>
+        <div className="ai-memory-meta">{cleanText(fact.scopeLabel || fact.scopeType, "Scope")} · {cleanText(fact.sourceLabel || fact.sourceType, "Source")} · {formatAiUpdateValue("dueAt", fact.updatedAt)}</div>
+      </div>
+    </div>)}
+  </div>;
+}
+
 function AiMessage({ role, content }) {
   const dir = aiPanelTextDirection(content, role === "user" ? "rtl" : "rtl");
   const blocks = aiPanelTextBlocks(content);
@@ -317,6 +331,7 @@ export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], m
       <div className="ai-msgs">
         {msgs.map((m, i) => <div key={i} className={"ai-msg-wrap " + m.role}>
           <AiMessage role={m.role} content={m.content} />
+          {m.role === "assistant" && <AiMemoryCitationList citations={m.memoryCitations} />}
           {m.role === "assistant" && m.providerPlan && <AiProviderPlanCard plan={m.providerPlan} />}
           {m.role === "assistant" && Array.isArray(m.actions) && m.actions.length > 0 && <div className="ai-actions">{m.actions.map((action) => {
             const key = action.id || action.type;

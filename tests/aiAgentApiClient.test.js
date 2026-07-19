@@ -41,6 +41,8 @@ describe("AI agent API client", () => {
       json: async () => ({
         assistant: { text: "תשובה" },
         actions: [{ id: "a1" }],
+        memoryCitations: [{ id: "mem-1", summary: "עובדה שמורה" }],
+        memoryGrounding: { usedMemoryIds: ["mem-1"] },
         providerPlan: { summary: "תוכנית" },
         providerPlanErrorCode: ""
       }),
@@ -74,6 +76,8 @@ describe("AI agent API client", () => {
     expect(result).toEqual({
       text: "תשובה",
       actions: [{ id: "a1" }],
+      memoryCitations: [{ id: "mem-1", summary: "עובדה שמורה" }],
+      memoryGrounding: { usedMemoryIds: ["mem-1"] },
       providerPlan: { summary: "תוכנית" },
       providerPlanErrorCode: ""
     });
@@ -107,6 +111,8 @@ describe("AI agent API client", () => {
     expect(result).toEqual({
       text: "Provider unavailable",
       actions: [{ id: "create_memory_fact", type: "memory.fact.create" }],
+      memoryCitations: [],
+      memoryGrounding: null,
       providerPlan: null,
       providerPlanErrorCode: "ai_server_disabled"
     });

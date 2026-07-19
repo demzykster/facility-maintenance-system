@@ -4,12 +4,18 @@ import { aiAssistWelcomeMessage } from "./aiAssistQuickPromptModel.js";
 const cleanText = (value, fallback = "") => String(value || fallback || "").trim();
 
 export function normalizeAiPanelAssistantOutput(output) {
-  if (typeof output === "string") return { text: output, actions: [], providerPlan: null, providerPlanErrorCode: "" };
+  if (typeof output === "string") return { text: output, actions: [], memoryCitations: [], memoryGrounding: null, providerPlan: null, providerPlanErrorCode: "" };
   const text = cleanText(output?.text || output?.assistant?.text || output?.draft?.userReply, "לא התקבלה תשובה.");
   const actions = Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : [];
+  const memoryCitations = Array.isArray(output?.memoryCitations)
+    ? output.memoryCitations.filter((citation) => citation && typeof citation === "object")
+    : Array.isArray(output?.assistant?.memoryCitations) ? output.assistant.memoryCitations.filter((citation) => citation && typeof citation === "object") : [];
+  const memoryGrounding = output?.memoryGrounding && typeof output.memoryGrounding === "object"
+    ? output.memoryGrounding
+    : output?.assistant?.memoryGrounding && typeof output.assistant.memoryGrounding === "object" ? output.assistant.memoryGrounding : null;
   const providerPlan = output?.providerPlan && typeof output.providerPlan === "object" ? output.providerPlan : null;
   const providerPlanErrorCode = cleanText(output?.providerPlanErrorCode, "");
-  return { text, actions, providerPlan, providerPlanErrorCode };
+  return { text, actions, memoryCitations, memoryGrounding, providerPlan, providerPlanErrorCode };
 }
 
 export function shouldRequestProviderPlan(workflow = AI_ASSIST_WORKFLOWS.general) {
@@ -108,6 +114,8 @@ export function completeAiAgentSend(state, output) {
       role: "assistant",
       content: normalized.text,
       actions: normalized.actions,
+      memoryCitations: normalized.memoryCitations,
+      memoryGrounding: normalized.memoryGrounding,
       providerPlan: normalized.providerPlan,
       providerPlanErrorCode: normalized.providerPlanErrorCode
     }]

@@ -60,6 +60,8 @@ export async function callAiAssistApi({
       return {
         text: data?.draft?.userReply || "",
         actions: data.actions,
+        memoryCitations: [],
+        memoryGrounding: null,
         providerPlan: null,
         providerPlanErrorCode: data.providerErrorCode || data.error || `ai-assist-${res.status}`
       };
@@ -69,6 +71,12 @@ export async function callAiAssistApi({
   return {
     text: data?.assistant?.text || data?.draft?.userReply || "",
     actions: Array.isArray(data?.actions) ? data.actions : [],
+    memoryCitations: Array.isArray(data?.assistant?.memoryCitations)
+      ? data.assistant.memoryCitations
+      : Array.isArray(data?.memoryCitations) ? data.memoryCitations : [],
+    memoryGrounding: data?.assistant?.memoryGrounding && typeof data.assistant.memoryGrounding === "object"
+      ? data.assistant.memoryGrounding
+      : data?.memoryGrounding && typeof data.memoryGrounding === "object" ? data.memoryGrounding : null,
     providerPlan: data?.providerPlan || null,
     providerPlanErrorCode: data?.providerPlanErrorCode || ""
   };

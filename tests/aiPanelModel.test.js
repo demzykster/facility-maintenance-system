@@ -14,6 +14,8 @@ describe("AI panel response model", () => {
     expect(normalizeAiPanelAssistantOutput("תשובה קצרה")).toEqual({
       text: "תשובה קצרה",
       actions: [],
+      memoryCitations: [],
+      memoryGrounding: null,
       providerPlan: null,
       providerPlanErrorCode: ""
     });
@@ -33,6 +35,8 @@ describe("AI panel response model", () => {
     })).toEqual({
       text: "הכנתי טיוטה.",
       actions: [action],
+      memoryCitations: [],
+      memoryGrounding: null,
       providerPlan: null,
       providerPlanErrorCode: ""
     });
@@ -52,8 +56,27 @@ describe("AI panel response model", () => {
     })).toEqual({
       text: "יש תוכנית.",
       actions: [],
+      memoryCitations: [],
+      memoryGrounding: null,
       providerPlan,
       providerPlanErrorCode: "ai_provider_quota_exceeded"
+    });
+  });
+
+  it("preserves memory citations for source rendering", () => {
+    const citation = { id: "mem-1", summary: "עובדה שמורה", sourceLabel: "AI chat", scopeLabel: "Personal" };
+
+    expect(normalizeAiPanelAssistantOutput({
+      text: "מצאתי זיכרון.",
+      memoryCitations: [citation, null, "bad"],
+      memoryGrounding: { usedMemoryIds: ["mem-1"] }
+    })).toEqual({
+      text: "מצאתי זיכרון.",
+      actions: [],
+      memoryCitations: [citation],
+      memoryGrounding: { usedMemoryIds: ["mem-1"] },
+      providerPlan: null,
+      providerPlanErrorCode: ""
     });
   });
 

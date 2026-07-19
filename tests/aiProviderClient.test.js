@@ -156,6 +156,65 @@ describe("ai provider client", () => {
     expect(JSON.stringify(result)).not.toContain("google-secret");
   });
 
+  it("passes the same retrieved memory contract through Anthropic, Google, and OpenAI text adapters", async () => {
+    const prompt = JSON.stringify({
+      retrievedMemories: [{ id: "mem-1", fact: "Synthetic maintenance window is Sunday 09:00." }],
+      padding: "context ".repeat(4000)
+    });
+    const cases = [
+      {
+        config: { provider: "anthropic", anthropicApiKey: "anthropic-secret", model: "claude-test" },
+        sdk: { createAnthropic: sdkFactory("anthropic") }
+      },
+      {
+        config: { provider: "google", googleApiKey: "google-secret", model: "gemini-3.1-flash-lite" },
+        sdk: { createGoogleGenerativeAI: sdkFactory("google") }
+      },
+      {
+        config: { provider: "openai", openaiApiKey: "openai-secret", model: "gpt-5.2" },
+        sdk: { createOpenAI: sdkFactory("openai") }
+      }
+    ];
+
+    for (const item of cases) {
+      const generateTextImpl = vi.fn().mockResolvedValue({ text: "ok" });
+      await callAiProvider({
+        config: item.config,
+        system: "system",
+        prompt,
+        generateTextImpl,
+        sdk: item.sdk
+      });
+      const sentPrompt = generateTextImpl.mock.calls[0][0].prompt;
+      expect(sentPrompt).toContain("retrievedMemories");
+      expect(sentPrompt).toContain("mem-1");
+      expect(sentPrompt).toContain("Synthetic maintenance window is Sunday 09:00.");
+    }
+  });
+
+  it("keeps retrieved memory context when Google falls back to another model", async () => {
+    const createGoogleGenerativeAI = sdkFactory("google");
+    const generateTextImpl = vi.fn()
+      .mockRejectedValueOnce(new Error("This model is currently experiencing high demand. Please try again later."))
+      .mockResolvedValueOnce({ text: "fallback ready" });
+    const prompt = JSON.stringify({
+      retrievedMemories: [{ id: "mem-front", fact: "Keep this memory marker in the trimmed prompt." }],
+      padding: "context ".repeat(5000)
+    });
+
+    await callAiProvider({
+      config: { provider: "google", googleApiKey: "google-secret", model: "gemini-3.5-flash" },
+      system: "system",
+      prompt,
+      generateTextImpl,
+      sdk: { createGoogleGenerativeAI }
+    });
+
+    expect(generateTextImpl).toHaveBeenCalledTimes(2);
+    expect(generateTextImpl.mock.calls[0][0].prompt).toContain("mem-front");
+    expect(generateTextImpl.mock.calls[1][0].prompt).toContain("mem-front");
+  });
+
   it("uses the Vercel AI SDK object seam without returning provider secrets", async () => {
     const createGoogleGenerativeAI = sdkFactory("google");
     const generateObjectImpl = vi.fn().mockResolvedValue({

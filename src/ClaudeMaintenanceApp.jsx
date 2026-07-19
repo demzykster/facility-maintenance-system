@@ -9307,6 +9307,10 @@ body *{visibility:hidden!important;}
 .ai-memory-meta,.ai-memory-error{font-size:11.5px;color:var(--muted);}
 .ai-memory-edit{min-height:30px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--primary);font-size:11.5px;font-weight:750;padding:0 9px;}
 .ai-memory-forget{width:30px;height:30px;}
+.ai-memory-cites{display:flex;flex-direction:column;gap:6px;width:100%;}
+.ai-memory-cite{display:flex;align-items:flex-start;gap:7px;border:1px solid var(--line-soft);border-radius:8px;background:var(--surface);padding:7px 9px;color:var(--ink);font-size:12px;line-height:1.35;}
+.ai-memory-cite svg{color:var(--primary);flex:0 0 auto;margin-top:1px;}
+.ai-memory-cite-summary{font-weight:750;}
 .ai-quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 10px;}
 .ai-quick button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;font-size:12.5px;color:var(--muted);font-weight:500;}
 .ai-input{display:flex;gap:8px;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);}

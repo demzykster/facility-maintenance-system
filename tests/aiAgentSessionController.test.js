@@ -84,6 +84,8 @@ describe("AI agent session controller", () => {
     const completed = completeAiAgentSend(started, {
       text: "הכנתי טיוטה",
       actions: [{ id: "a1", type: "ticket.create" }],
+      memoryCitations: [{ id: "mem-1", summary: "עובדה", scopeLabel: "Personal", sourceLabel: "AI chat" }],
+      memoryGrounding: { usedMemoryIds: ["mem-1"] },
       providerPlan: { summary: "תוכנית", items: [{ id: "p1" }] }
     });
     expect(completed.busy).toBe(false);
@@ -91,6 +93,8 @@ describe("AI agent session controller", () => {
       role: "assistant",
       content: "הכנתי טיוטה",
       actions: [{ id: "a1", type: "ticket.create" }],
+      memoryCitations: [{ id: "mem-1", summary: "עובדה", scopeLabel: "Personal", sourceLabel: "AI chat" }],
+      memoryGrounding: { usedMemoryIds: ["mem-1"] },
       providerPlan: { summary: "תוכנית", items: [{ id: "p1" }] }
     });
 
