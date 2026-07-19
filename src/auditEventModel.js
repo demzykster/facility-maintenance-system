@@ -287,6 +287,53 @@ export function aiMemoryAuditEvent({
   });
 }
 
+export function aiConversationAuditEvent({
+  conversation = {},
+  action = AUDIT_ACTIONS.use,
+  outcome = "ok",
+  reason = "",
+  requestId = "",
+  messageCount = 0,
+  messageRole = ""
+} = {}, actor = {}, options = {}) {
+  const at = Number(options.at || Date.now());
+  const conversationId = cleanString(conversation.id);
+  const safeRequestId = cleanString(requestId);
+  const safeMessageRole = cleanString(messageRole);
+  return normalizeAuditEvent({
+    id: [
+      at,
+      actor.id || "system",
+      "ai-conversation",
+      conversationId || "global",
+      action,
+      safeRequestId || "request",
+      safeMessageRole || "conversation",
+      cleanString(outcome) || "ok"
+    ].map((part) => cleanString(part).replace(/[:\s]+/g, "-")).join(":"),
+    at,
+    actorId: actor.id,
+    actorName: actor.name,
+    actorRole: actor.role,
+    entityType: AUDIT_ENTITY_TYPES.system,
+    entityId: "ai-conversation",
+    action,
+    summary: `AI conversation ${action}`,
+    after: {
+      conversationId,
+      status: cleanString(conversation.status)
+    },
+    metadata: {
+      outcome: cleanString(outcome),
+      reason: cleanString(reason),
+      requestId: safeRequestId,
+      conversationId,
+      messageCount: Number(messageCount) || 0,
+      messageRole: safeMessageRole
+    }
+  });
+}
+
 export const AUDIT_EVENTS_TABLE_CONTRACT = Object.freeze([
   "id",
   "at",

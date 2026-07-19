@@ -331,12 +331,12 @@ describe("session handler", () => {
     }));
   });
 
-  it("looks up CMMS PIN sessions in app_users with the service role key", async () => {
+  it("looks up CMMS PIN sessions in app_users exactly with the service role key", async () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce({
       ok: true,
       async text() {
         return JSON.stringify([{
-          id: "app-worker-1",
+          id: "123e4567-e89b-12d3-a456-426614174000",
           role: "worker",
           name: "App Worker",
           worker_no: "2042",
@@ -352,10 +352,49 @@ describe("session handler", () => {
       fetchImpl
     });
 
-    const user = await client.findPinSessionUser({ id: "app-worker-1", role: "worker", workerNo: "2042" });
+    const user = await client.findPinSessionUser({
+      id: "123e4567-e89b-12d3-a456-426614174000",
+      role: "worker",
+      workerNo: "2042"
+    });
 
-    expect(user).toMatchObject({ id: "app-worker-1", role: "worker", workerNo: "2042" });
-    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/app_users?select=*&limit=2000", expect.objectContaining({
+    expect(user).toMatchObject({
+      id: "123e4567-e89b-12d3-a456-426614174000",
+      role: "worker",
+      workerNo: "2042"
+    });
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/app_users?id=eq.123e4567-e89b-12d3-a456-426614174000&select=*&limit=1", expect.objectContaining({
+      method: "GET",
+      headers: expect.objectContaining({
+        apikey: "service-role-key",
+        authorization: "Bearer service-role-key"
+      })
+    }));
+  });
+
+  it("falls back to an exact worker number lookup for legacy CMMS PIN token ids", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      async text() {
+        return JSON.stringify([{
+          id: "123e4567-e89b-12d3-a456-426614174000",
+          role: "worker",
+          name: "App Worker",
+          worker_no: "2042",
+          active: true
+        }]);
+      }
+    });
+    const client = createSupabaseCmmsPinSessionClient({
+      url: "https://supabase.example/",
+      serviceRoleKey: "service-role-key",
+      fetchImpl
+    });
+
+    const user = await client.findPinSessionUser({ id: "2042", role: "worker", workerNo: "2042" });
+
+    expect(user).toMatchObject({ workerNo: "2042", role: "worker" });
+    expect(fetchImpl).toHaveBeenCalledWith("https://supabase.example/rest/v1/app_users?worker_no=eq.2042&select=*&limit=1", expect.objectContaining({
       method: "GET",
       headers: expect.objectContaining({
         apikey: "service-role-key",

@@ -30,7 +30,7 @@ import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionM
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { callAiAssistApi, createAiMemoryFact, deactivateAiMemoryFact, listAiMemoryFacts, updateAiMemoryFact } from "./aiAgentApiClient.js";
+import { archiveAiConversation, callAiAssistApi, createAiConversation, createAiMemoryFact, deactivateAiMemoryFact, getAiConversation, listAiConversations, listAiMemoryFacts, updateAiMemoryFact } from "./aiAgentApiClient.js";
 import { createAiAgentActionExecutor, createAiAgentTicketDraftEditor } from "./aiAgentActionAdapter.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
@@ -1424,16 +1424,33 @@ function aiAssistantEnabled(cfg) {
   return BROWSER_AI_ENABLED || normalizeAiSettings(cfg?.ai).mode === AI_MODES.server;
 }
 
-async function callAIAssistant({ text, messages, system, context, workflow, includeProviderPlan = false }) {
+async function callAIAssistant({ text, messages, conversationId, system, context, workflow, includeProviderPlan = false }) {
   if (BROWSER_AI_ENABLED) return callClaude(messages, system, 900);
   return callAiAssistApi({
     text,
     messages,
+    conversationId,
     context,
     workflow,
     includeProviderPlan,
     getAccessToken: productionAccessToken
   });
+}
+
+async function loadAIConversations() {
+  return listAiConversations({ getAccessToken: productionAccessToken });
+}
+
+async function startAIConversation({ title } = {}) {
+  return createAiConversation({ title, getAccessToken: productionAccessToken });
+}
+
+async function openAIConversation(id) {
+  return getAiConversation({ id, getAccessToken: productionAccessToken });
+}
+
+async function archiveAIConversation(id) {
+  return archiveAiConversation({ id, getAccessToken: productionAccessToken });
 }
 
 async function loadAIMemoryFacts() {
@@ -7918,7 +7935,7 @@ function LazyAIPanel(props) {
   const executeAction = createAiAgentActionExecutor({ ...props, createMemoryFact: saveAIMemoryFact }, { makeId: uid, saveFailedMessage: SAVE_FAILED_MESSAGE });
   const editAction = props.openAiTicketDraft ? createAiAgentTicketDraftEditor({ openAiTicketDraft: props.openAiTicketDraft }) : null;
   return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
-    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={editAction} loadMemoryFacts={loadAIMemoryFacts} updateMemoryFact={reviseAIMemoryFact} deactivateMemoryFact={forgetAIMemoryFact} />
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={editAction} loadConversations={loadAIConversations} createConversation={startAIConversation} openConversation={openAIConversation} archiveConversation={archiveAIConversation} loadMemoryFacts={loadAIMemoryFacts} updateMemoryFact={reviseAIMemoryFact} deactivateMemoryFact={forgetAIMemoryFact} />
   </Suspense>;
 }
 function NotifPanelFallback({ onClose }) {
@@ -9248,6 +9265,16 @@ body *{visibility:hidden!important;}
 .ai-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--line);}
 .ai-title{font-family:var(--font-head);font-weight:700;font-size:16px;display:flex;align-items:center;gap:9px;}
 .ai-orb{width:30px;height:30px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;}
+.ai-conversation-bar{border-bottom:1px solid var(--line);padding:9px 16px;display:flex;flex-direction:column;gap:7px;background:var(--surface);}
+.ai-conversation-actions{display:flex;align-items:center;gap:8px;}
+.ai-conversation-new{min-height:34px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--primary);display:inline-flex;align-items:center;gap:6px;padding:0 10px;font-size:12.5px;font-weight:750;cursor:pointer;}
+.ai-conversation-new:disabled,.ai-conversation-archive:disabled,.ai-conversation-pill:disabled{opacity:.55;cursor:not-allowed;}
+.ai-conversation-archive{width:34px;height:34px;}
+.ai-conversation-list{display:flex;gap:6px;overflow-x:auto;padding-bottom:1px;}
+.ai-conversation-pill{min-width:0;max-width:170px;height:30px;border:1px solid var(--line-soft);border-radius:8px;background:var(--surface-2);color:var(--muted);display:inline-flex;align-items:center;gap:5px;padding:0 8px;font-size:11.5px;font-weight:700;white-space:nowrap;cursor:pointer;}
+.ai-conversation-pill span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.ai-conversation-pill.active{border-color:var(--primary);color:var(--primary);background:var(--primary-soft);}
+.ai-conversation-error{font-size:11.5px;color:#B91C1C;}
 .ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
 .ai-msg-wrap{display:flex;flex-direction:column;gap:8px;max-width:min(92%,430px);}
 .ai-msg-wrap.assistant{align-self:flex-start;align-items:flex-start;}

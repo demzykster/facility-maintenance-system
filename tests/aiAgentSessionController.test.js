@@ -3,6 +3,7 @@ import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
 import {
   beginAiAgentAction,
   beginAiAgentSend,
+  aiConversationMessagesToPanelMessages,
   buildAiAgentRequest,
   completeAiAgentAction,
   completeAiAgentSend,
@@ -73,6 +74,17 @@ describe("AI agent session controller", () => {
     expect(sent.msgs).toHaveLength(3);
     expect(reopened.msgs).toHaveLength(1);
     expect(reopened.msgs[0]).toEqual(firstOpen.msgs[0]);
+  });
+
+  it("can hydrate panel messages from server-owned conversation history after reload", () => {
+    const messages = aiConversationMessagesToPanelMessages([
+      { id: "msg-1", role: "user", content: "בדיקה" },
+      { id: "msg-2", role: "assistant", content: "תשובה" }
+    ], { session });
+
+    expect(messages.map((message) => message.role)).toEqual(["assistant", "user", "assistant"]);
+    expect(messages[1]).toMatchObject({ role: "user", content: "בדיקה" });
+    expect(messages[2]).toMatchObject({ role: "assistant", content: "תשובה" });
   });
 
   it("appends normalized assistant output and displays server errors as before", () => {

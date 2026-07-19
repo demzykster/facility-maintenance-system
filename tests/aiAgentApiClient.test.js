@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildAiAssistApiPayload,
+  archiveAiConversation,
   callAiAssistApi,
+  createAiConversation,
   createAiAssistIdempotencyKey,
   createAiMemoryFact,
+  getAiConversation,
+  listAiConversations,
   listAiMemoryFacts
 } from "../src/aiAgentApiClient.js";
 import { AI_ASSIST_WORKFLOWS } from "../src/aiAssistWorkflowModel.js";
@@ -81,6 +85,47 @@ describe("AI agent API client", () => {
       providerPlan: { summary: "תוכנית" },
       providerPlanErrorCode: ""
     });
+  });
+
+  it("passes conversationId through assist only when provided", () => {
+    expect(buildAiAssistApiPayload({
+      text: "בדיקה",
+      messages: [],
+      conversationId: "conv-1",
+      idempotencyKey: "idem-3"
+    })).toMatchObject({
+      text: "בדיקה",
+      conversationId: "conv-1",
+      idempotencyKey: "idem-3"
+    });
+  });
+
+  it("uses the provider-neutral conversations API with auth", async () => {
+    const calls = [];
+    const fetchImpl = vi.fn(async (url, options) => {
+      calls.push({ url, options });
+      if (options.method === "GET" && url === "/api/ai/conversations") {
+        return { ok: true, json: async () => ({ conversations: [{ id: "conv-1", title: "Ops" }] }) };
+      }
+      if (options.method === "POST") {
+        return { ok: true, json: async () => ({ conversation: { id: "conv-2", title: "New" } }) };
+      }
+      if (options.method === "GET" && String(url).includes("id=conv-1")) {
+        return { ok: true, json: async () => ({ conversation: { id: "conv-1" }, messages: [{ id: "msg-1", role: "user", content: "Hi" }] }) };
+      }
+      return { ok: true, json: async () => ({ conversation: { id: "conv-1", status: "archived" } }) };
+    });
+    const getAccessToken = async () => "access-token";
+
+    await expect(listAiConversations({ getAccessToken, fetchImpl })).resolves.toEqual([{ id: "conv-1", title: "Ops" }]);
+    await expect(createAiConversation({ title: "New", getAccessToken, fetchImpl })).resolves.toEqual({ id: "conv-2", title: "New" });
+    await expect(getAiConversation({ id: "conv-1", getAccessToken, fetchImpl })).resolves.toEqual({
+      conversation: { id: "conv-1" },
+      messages: [{ id: "msg-1", role: "user", content: "Hi" }]
+    });
+    await expect(archiveAiConversation({ id: "conv-1", getAccessToken, fetchImpl })).resolves.toEqual({ id: "conv-1", status: "archived" });
+    expect(calls.every((call) => call.options.headers.authorization === "Bearer access-token")).toBe(true);
+    expect(calls.map((call) => call.options.method)).toEqual(["GET", "POST", "GET", "DELETE"]);
   });
 
   it("preserves server error codes for the panel error mapper", async () => {

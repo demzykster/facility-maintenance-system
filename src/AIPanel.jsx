@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import { Brain, Send, Sparkles, Trash2, X } from "lucide-react";
+import { Archive, Brain, MessageSquare, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
 import { canExecuteAiAssistAction } from "./aiAssistActionExecutionModel.js";
 import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
 import { aiAssistQuickPrompts } from "./aiAssistQuickPromptModel.js";
@@ -247,6 +247,49 @@ function AiMemoryPanel({ facts = [], error = "", onEdit, onForget }) {
   </div>;
 }
 
+function AiConversationBar({
+  conversations = [],
+  currentId = "",
+  loading = false,
+  error = "",
+  onNew,
+  onOpen,
+  onArchive
+}) {
+  if (!conversations.length && !currentId && !error) {
+    return <div className="ai-conversation-bar">
+      <button type="button" className="ai-conversation-new" disabled={loading} onClick={onNew}>
+        <Plus size={15} />
+        <span>שיחה חדשה</span>
+      </button>
+    </div>;
+  }
+  return <div className="ai-conversation-bar">
+    <div className="ai-conversation-actions">
+      <button type="button" className="ai-conversation-new" disabled={loading} onClick={onNew}>
+        <Plus size={15} />
+        <span>שיחה חדשה</span>
+      </button>
+      {currentId && <button type="button" className="icon-btn ai-conversation-archive" aria-label="ארכוב שיחה" disabled={loading} onClick={onArchive}>
+        <Archive size={15} />
+      </button>}
+    </div>
+    {conversations.length > 0 && <div className="ai-conversation-list" aria-label="שיחות AI אחרונות">
+      {conversations.slice(0, 4).map((conversation) => <button
+        key={conversation.id}
+        type="button"
+        className={"ai-conversation-pill " + (conversation.id === currentId ? "active" : "")}
+        disabled={loading}
+        onClick={() => onOpen?.(conversation.id)}
+      >
+        <MessageSquare size={13} />
+        <span>{cleanText(conversation.title, "שיחת AI")}</span>
+      </button>)}
+    </div>}
+    {error && <div className="ai-conversation-error">{error}</div>}
+  </div>;
+}
+
 function AiProviderPlanCard({ plan }) {
   const items = Array.isArray(plan?.items) ? plan.items : [];
   if (!plan || items.length === 0) return null;
@@ -289,7 +332,7 @@ function AiMessage({ role, content }) {
   </div>;
 }
 
-export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, loadMemoryFacts, updateMemoryFact, deactivateMemoryFact, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
+export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], meetings = [], ppeItems = [], ppeReqs = [], zones = [], config, onClose, visibleTickets, buildContext, callModel, callAssistant, executeAction, editAction, loadConversations, createConversation, openConversation, archiveConversation, loadMemoryFacts, updateMemoryFact, deactivateMemoryFact, initialText = "", initialWorkflow = AI_ASSIST_WORKFLOWS.general }) {
   const agent = useAIAgentSession({
     session,
     tickets,
@@ -307,13 +350,17 @@ export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], m
     callModel,
     callAssistant,
     executeAction,
+    loadConversations,
+    createConversation,
+    openConversation,
+    archiveConversation,
     loadMemoryFacts,
     updateMemoryFact,
     deactivateMemoryFact,
     initialText,
     initialWorkflow
   });
-  const { msgs, input, inputWorkflow, busy, actionBusy, actionResults, contextPreview, memoryFacts, memoryError, setInput, send, runAction, editMemoryFact, forgetMemoryFact } = agent;
+  const { msgs, input, inputWorkflow, busy, actionBusy, actionResults, contextPreview, conversations, conversationId, conversationError, conversationLoading, memoryFacts, memoryError, setInput, send, runAction, startNewConversation, openConversation: openAiConversation, archiveConversation: archiveAiConversation, editMemoryFact, forgetMemoryFact } = agent;
   const endRef = useRef(null);
   const quick = useMemo(() => aiAssistQuickPrompts(session, contextPreview), [session, contextPreview]);
 
@@ -327,6 +374,7 @@ export function AIPanel({ session, tickets, pm, fleet, users = [], tasks = [], m
         <div className="ai-title"><span className="ai-orb"><Sparkles size={16} /></span> עוזר AI</div>
         <button className="icon-btn" aria-label="סגירה" onClick={onClose}><X size={20} /></button>
       </div>
+      <AiConversationBar conversations={conversations} currentId={conversationId} loading={conversationLoading} error={conversationError} onNew={startNewConversation} onOpen={openAiConversation} onArchive={archiveAiConversation} />
       <AiMemoryPanel facts={memoryFacts} error={memoryError} onEdit={editMemoryFact} onForget={forgetMemoryFact} />
       <div className="ai-msgs">
         {msgs.map((m, i) => <div key={i} className={"ai-msg-wrap " + m.role}>

@@ -1,10 +1,12 @@
 import assistHandler from "../../server/ai/assistHandler.js";
+import conversationHandler from "../../server/agent/conversations/conversationHandler.js";
 import intakeHandler from "../../server/ai/intakeHandler.js";
 import memoryHandler from "../../server/agent/memory/memoryHandler.js";
 import statusHandler from "../../server/ai/statusHandler.js";
 
 const HANDLERS = Object.freeze({
   assist: assistHandler,
+  conversations: conversationHandler,
   intake: intakeHandler,
   memory: memoryHandler,
   status: statusHandler

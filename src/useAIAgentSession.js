@@ -4,6 +4,7 @@ import { AI_ASSIST_WORKFLOWS } from "./aiAssistWorkflowModel.js";
 import {
   beginAiAgentAction,
   beginAiAgentSend,
+  aiConversationMessagesToPanelMessages,
   completeAiAgentAction,
   completeAiAgentSend,
   createAiAgentInitialState,
@@ -28,6 +29,10 @@ export function useAIAgentSession({
   callModel,
   callAssistant,
   executeAction,
+  loadConversations,
+  createConversation,
+  openConversation,
+  archiveConversation,
   loadMemoryFacts,
   updateMemoryFact,
   deactivateMemoryFact,
@@ -42,7 +47,13 @@ export function useAIAgentSession({
   const [state, setState] = useState(() => createAiAgentInitialState({ session, initialText, initialWorkflow }));
   const [memoryFacts, setMemoryFacts] = useState([]);
   const [memoryError, setMemoryError] = useState("");
+  const [conversations, setConversations] = useState([]);
+  const [conversationId, setConversationId] = useState("");
+  const [conversationError, setConversationError] = useState("");
+  const [conversationLoading, setConversationLoading] = useState(false);
   const stateRef = useRef(state);
+  const conversationIdRef = useRef("");
+  const didAutoOpenConversationRef = useRef(false);
 
   const setAgentState = useCallback((next) => {
     stateRef.current = next;
@@ -52,6 +63,10 @@ export function useAIAgentSession({
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   useEffect(() => {
     if (!initialText) return;
@@ -77,8 +92,113 @@ export function useAIAgentSession({
     refreshMemory();
   }, [refreshMemory]);
 
+  const loadConversationById = useCallback(async (id) => {
+    if (typeof openConversation !== "function" || !id) return null;
+    setConversationLoading(true);
+    try {
+      const result = await openConversation(id);
+      if (!result?.conversation?.id) return null;
+      setConversationId(result.conversation.id);
+      setAgentState({
+        ...stateRef.current,
+        msgs: aiConversationMessagesToPanelMessages(result.messages, { session }),
+        busy: false
+      });
+      setConversationError("");
+      return result;
+    } catch (error) {
+      setConversationError(error?.message || "conversation_unavailable");
+      return null;
+    } finally {
+      setConversationLoading(false);
+    }
+  }, [openConversation, session, setAgentState]);
+
+  const refreshConversations = useCallback(async () => {
+    if (typeof loadConversations !== "function") return [];
+    try {
+      const list = await loadConversations();
+      const safeList = Array.isArray(list) ? list : [];
+      setConversations(safeList);
+      setConversationError("");
+      return safeList;
+    } catch (error) {
+      setConversationError(error?.message || "conversation_unavailable");
+      return [];
+    }
+  }, [loadConversations]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = await refreshConversations();
+      if (cancelled || didAutoOpenConversationRef.current || !list.length) return;
+      didAutoOpenConversationRef.current = true;
+      await loadConversationById(list[0].id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshConversations, loadConversationById]);
+
+  const startNewConversation = useCallback(async () => {
+    if (typeof createConversation !== "function") {
+      setConversationId("");
+      setAgentState(createAiAgentInitialState({ session }));
+      return null;
+    }
+    setConversationLoading(true);
+    try {
+      const conversation = await createConversation({ title: "AI conversation" });
+      setConversationId(conversation?.id || "");
+      setAgentState(createAiAgentInitialState({ session }));
+      if (conversation?.id) setConversations((items) => [conversation, ...items.filter((item) => item.id !== conversation.id)]);
+      setConversationError("");
+      return conversation || null;
+    } catch (error) {
+      setConversationError(error?.message || "conversation_unavailable");
+      return null;
+    } finally {
+      setConversationLoading(false);
+    }
+  }, [createConversation, session, setAgentState]);
+
+  const ensureConversationForSend = useCallback(async (text) => {
+    if (conversationIdRef.current) return conversationIdRef.current;
+    if (typeof createConversation !== "function") return "";
+    const conversation = await createConversation({ title: text || "AI conversation" });
+    if (!conversation?.id) return "";
+    setConversationId(conversation.id);
+    setConversations((items) => [conversation, ...items.filter((item) => item.id !== conversation.id)]);
+    return conversation.id;
+  }, [createConversation]);
+
+  const archiveCurrentConversation = useCallback(async () => {
+    const id = conversationIdRef.current;
+    if (!id || typeof archiveConversation !== "function") return;
+    setConversationLoading(true);
+    try {
+      await archiveConversation(id);
+      setConversationId("");
+      setAgentState(createAiAgentInitialState({ session }));
+      await refreshConversations();
+      setConversationError("");
+    } catch (error) {
+      setConversationError(error?.message || "conversation_unavailable");
+    } finally {
+      setConversationLoading(false);
+    }
+  }, [archiveConversation, refreshConversations, session, setAgentState]);
+
   const send = useCallback(async (text, workflow = AI_ASSIST_WORKFLOWS.general) => {
-    const { state: sendingState, request } = beginAiAgentSend(stateRef.current, { text, workflow, context: contextPreview });
+    let effectiveConversationId = "";
+    try {
+      effectiveConversationId = await ensureConversationForSend(text ?? stateRef.current?.input);
+    } catch (error) {
+      setConversationError(error?.message || "conversation_unavailable");
+      return;
+    }
+    const { state: sendingState, request } = beginAiAgentSend(stateRef.current, { text, workflow, context: contextPreview, conversationId: effectiveConversationId });
     if (!request) return;
     setAgentState(sendingState);
     try {
@@ -86,10 +206,14 @@ export function useAIAgentSession({
         ? await callAssistant(request)
         : await callModel(request.messages, request.system, 900);
       setAgentState(completeAiAgentSend(stateRef.current, out));
+      if (out?.conversation?.id) {
+        setConversationId(out.conversation.id);
+        refreshConversations();
+      }
     } catch (error) {
       setAgentState(failAiAgentSend(stateRef.current, error));
     }
-  }, [callAssistant, callModel, contextPreview, setAgentState]);
+  }, [callAssistant, callModel, contextPreview, ensureConversationForSend, refreshConversations, setAgentState]);
 
   const runAction = useCallback(async (action) => {
     if (!executeAction || !canExecuteAiAssistAction(action)) return;
@@ -120,10 +244,18 @@ export function useAIAgentSession({
   return {
     ...state,
     contextPreview,
+    conversations,
+    conversationId,
+    conversationError,
+    conversationLoading,
     memoryFacts,
     memoryError,
     setInput: (input) => setAgentState({ ...stateRef.current, input }),
     setInputWorkflow: (inputWorkflow) => setAgentState({ ...stateRef.current, inputWorkflow }),
+    startNewConversation,
+    openConversation: loadConversationById,
+    archiveConversation: archiveCurrentConversation,
+    refreshConversations,
     send,
     runAction,
     editMemoryFact,

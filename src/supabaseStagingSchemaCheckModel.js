@@ -22,7 +22,9 @@ export const STAGING_SUPABASE_TABLES = [
   "tickets",
   "file_metadata",
   "audit_events",
-  "ai_memory_facts"
+  "ai_memory_facts",
+  "ai_conversations",
+  "ai_conversation_messages"
 ];
 
 export function requiredSupabaseSchemaEnv() {

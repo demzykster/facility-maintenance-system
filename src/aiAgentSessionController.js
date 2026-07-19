@@ -72,10 +72,11 @@ export function aiAgentRecentMessages(messages = []) {
 export function buildAiAgentRequest({
   text,
   messages = [],
+  conversationId = "",
   context,
   workflow = AI_ASSIST_WORKFLOWS.general
 } = {}) {
-  return {
+  const request = {
     text,
     messages: aiAgentRecentMessages(messages),
     system: buildAiAgentSystemPrompt(context),
@@ -83,12 +84,15 @@ export function buildAiAgentRequest({
     workflow,
     includeProviderPlan: shouldRequestProviderPlan(workflow)
   };
+  if (conversationId) request.conversationId = conversationId;
+  return request;
 }
 
 export function beginAiAgentSend(state, {
   text,
   workflow = AI_ASSIST_WORKFLOWS.general,
-  context
+  context,
+  conversationId = ""
 } = {}) {
   const q = cleanText(text ?? state?.input, "");
   if (!q || state?.busy) return { state, request: null };
@@ -101,8 +105,20 @@ export function beginAiAgentSend(state, {
       inputWorkflow: AI_ASSIST_WORKFLOWS.general,
       busy: true
     },
-    request: buildAiAgentRequest({ text: q, messages: history, context, workflow })
+    request: buildAiAgentRequest({ text: q, messages: history, conversationId, context, workflow })
   };
+}
+
+export function aiConversationMessagesToPanelMessages(messages = [], { session } = {}) {
+  const stored = (Array.isArray(messages) ? messages : [])
+    .filter((message) => ["user", "assistant"].includes(message?.role) && cleanText(message.content))
+    .map((message) => ({
+      role: message.role,
+      content: cleanText(message.content),
+      memoryCitations: Array.isArray(message.memoryCitations) ? message.memoryCitations : [],
+      memoryGrounding: message.memoryGrounding || null
+    }));
+  return [{ role: "assistant", content: aiAssistWelcomeMessage(session) }, ...stored];
 }
 
 export function completeAiAgentSend(state, output) {

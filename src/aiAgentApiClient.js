@@ -10,6 +10,7 @@ export function createAiAssistIdempotencyKey({
 export function buildAiAssistApiPayload({
   text,
   messages,
+  conversationId,
   context,
   workflow,
   includeProviderPlan = false,
@@ -18,6 +19,7 @@ export function buildAiAssistApiPayload({
   return {
     text,
     messages,
+    conversationId,
     language: "he",
     source: "ui",
     workflow,
@@ -30,6 +32,7 @@ export function buildAiAssistApiPayload({
 export async function callAiAssistApi({
   text,
   messages,
+  conversationId,
   context,
   workflow,
   includeProviderPlan = false,
@@ -48,6 +51,7 @@ export async function callAiAssistApi({
     body: JSON.stringify(buildAiAssistApiPayload({
       text,
       messages,
+      conversationId,
       context,
       workflow,
       includeProviderPlan,
@@ -68,7 +72,7 @@ export async function callAiAssistApi({
     }
     throw new Error(data.providerErrorCode || data.error || `ai-assist-${res.status}`);
   }
-  return {
+  const normalized = {
     text: data?.assistant?.text || data?.draft?.userReply || "",
     actions: Array.isArray(data?.actions) ? data.actions : [],
     memoryCitations: Array.isArray(data?.assistant?.memoryCitations)
@@ -80,6 +84,14 @@ export async function callAiAssistApi({
     providerPlan: data?.providerPlan || null,
     providerPlanErrorCode: data?.providerPlanErrorCode || ""
   };
+  if (data?.conversation && typeof data.conversation === "object") normalized.conversation = data.conversation;
+  return normalized;
+}
+
+function aiHeaders(accessToken = "") {
+  const headers = { "content-type": "application/json" };
+  if (accessToken) headers.authorization = `Bearer ${accessToken}`;
+  return headers;
 }
 
 async function readJson(response) {
@@ -87,9 +99,83 @@ async function readJson(response) {
 }
 
 function memoryHeaders(accessToken = "") {
-  const headers = { "content-type": "application/json" };
-  if (accessToken) headers.authorization = `Bearer ${accessToken}`;
-  return headers;
+  return aiHeaders(accessToken);
+}
+
+export async function listAiConversations({
+  getAccessToken = async () => "",
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null
+} = {}) {
+  if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
+  const accessToken = await getAccessToken();
+  const res = await fetchImpl("/api/ai/conversations", {
+    method: "GET",
+    credentials: "include",
+    headers: aiHeaders(accessToken)
+  });
+  const data = await readJson(res);
+  if (res.status === 404 && data?.error === "ai_conversations_pilot_disabled") return [];
+  if (res.status === 401 && data?.error === "access_token_required") return [];
+  if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
+  return Array.isArray(data?.conversations) ? data.conversations : [];
+}
+
+export async function createAiConversation({
+  title = "",
+  getAccessToken = async () => "",
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null
+} = {}) {
+  if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
+  const accessToken = await getAccessToken();
+  const res = await fetchImpl("/api/ai/conversations", {
+    method: "POST",
+    credentials: "include",
+    headers: aiHeaders(accessToken),
+    body: JSON.stringify({ title })
+  });
+  const data = await readJson(res);
+  if (res.status === 404 && data?.error === "ai_conversations_pilot_disabled") return null;
+  if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
+  return data.conversation || null;
+}
+
+export async function getAiConversation({
+  id,
+  getAccessToken = async () => "",
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null
+} = {}) {
+  if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
+  const accessToken = await getAccessToken();
+  const res = await fetchImpl(`/api/ai/conversations?id=${encodeURIComponent(id || "")}`, {
+    method: "GET",
+    credentials: "include",
+    headers: aiHeaders(accessToken)
+  });
+  const data = await readJson(res);
+  if (res.status === 404 && data?.error === "ai_conversations_pilot_disabled") return null;
+  if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
+  return {
+    conversation: data.conversation || null,
+    messages: Array.isArray(data.messages) ? data.messages : []
+  };
+}
+
+export async function archiveAiConversation({
+  id,
+  getAccessToken = async () => "",
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null
+} = {}) {
+  if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
+  const accessToken = await getAccessToken();
+  const res = await fetchImpl("/api/ai/conversations", {
+    method: "DELETE",
+    credentials: "include",
+    headers: aiHeaders(accessToken),
+    body: JSON.stringify({ id })
+  });
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(data.error || `ai-conversations-${res.status}`);
+  return data.conversation || null;
 }
 
 export async function listAiMemoryFacts({

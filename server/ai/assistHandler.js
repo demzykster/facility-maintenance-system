@@ -1,4 +1,4 @@
-import { aiAssistAuditEvent, aiMemoryAuditEvent, AUDIT_ACTIONS } from "../../src/auditEventModel.js";
+import { aiAssistAuditEvent, aiConversationAuditEvent, aiMemoryAuditEvent, AUDIT_ACTIONS } from "../../src/auditEventModel.js";
 import { buildAiIntakeDraft, hasAiInformationalIntent } from "../../src/aiIntakeModel.js";
 import { buildAiAssistActionProposals } from "../../src/aiAssistActionModel.js";
 import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
@@ -7,11 +7,13 @@ import { AI_ASSIST_WORKFLOWS, aiAssistRoleGuidance, aiAssistWorkflowInstruction,
 import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
 import { autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
 import { aiMemoryEffectiveAccess } from "../../src/aiMemoryModel.js";
+import { aiConversationsPilotEnabled, buildAiConversationRecentHistory, normalizeAiConversationMessageInput } from "../../src/aiConversationModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabaseAuditDriverFromEnv } from "../audit/supabaseAuditDriver.js";
 import { createSupabaseFleetDriverFromEnv } from "../fleet/supabaseFleetDriver.js";
 import { authorizeAiRequest } from "./auth.js";
 import { callAiProvider, callAiProviderObject } from "./providerClient.js";
+import { createSupabaseAiConversationStoreFromEnv } from "../agent/conversations/conversationStore.js";
 import { createSupabaseAiMemoryStoreFromEnv } from "../agent/memory/memoryStore.js";
 import { listMemoryFactsForContext } from "../agent/memory/memoryRetrieval.js";
 import { groundedAssistantMemoryResponse, retrievedMemoriesForProvider } from "../agent/memory/memoryGrounding.js";
@@ -506,6 +508,7 @@ export function createAiAssistHandler({
   auditDriver = null,
   ticketsDriver = null,
   memoryStore = null,
+  conversationStore = null,
   fleetDriver = null,
   providerCall = callAiProvider,
   providerObjectCall = callAiProviderObject,
@@ -515,6 +518,7 @@ export function createAiAssistHandler({
   const backendAuditDriver = auditDriver || (env.CMMS_AUDIT_DRIVER === "supabase" ? createSupabaseAuditDriverFromEnv(env, fetchImpl) : null);
   const backendTicketsDriver = ticketsDriver || createSupabaseTicketsDriverFromEnv(env, fetchImpl);
   const backendMemoryStore = memoryStore || createSupabaseAiMemoryStoreFromEnv(env, fetchImpl);
+  const backendConversationStore = conversationStore || createSupabaseAiConversationStoreFromEnv(env, fetchImpl);
   const backendFleetDriver = fleetDriver || createSupabaseFleetDriverFromEnv(env, fetchImpl);
   return async function aiAssistHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
@@ -535,7 +539,50 @@ export function createAiAssistHandler({
       const normalized = requestToDraftInput(body, auth.user);
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
       const workflow = normalizeAiAssistWorkflow(body.workflow);
-      const conversation = cleanConversationMessages(body.messages);
+      const requestId = requestCorrelationId(req, body);
+      const conversationsEnabled = aiConversationsPilotEnabled(env);
+      const requestedConversationId = cleanText(body.conversationId || body.conversation_id, 120);
+      let conversationRecord = null;
+      let persistedUserMessage = null;
+      let conversation = cleanConversationMessages(body.messages);
+      if (conversationsEnabled && requestedConversationId) {
+        if (!backendConversationStore) return sendJson(res, 503, { error: "ai_conversation_store_unavailable" });
+        const ownerUserId = cleanText(auth.user.id || auth.user.authUserId || auth.user.workerNo, 120);
+        conversationRecord = await backendConversationStore.getMine({ id: requestedConversationId, ownerUserId });
+        if (!conversationRecord) {
+          await writeAuditEvent(backendAuditDriver, aiConversationAuditEvent({
+            conversation: { id: requestedConversationId },
+            action: AUDIT_ACTIONS.use,
+            outcome: "blocked",
+            reason: "conversation_not_found",
+            requestId
+          }, auth.user, { at: currentTime }));
+          return sendJson(res, 404, { error: "conversation_not_found" });
+        }
+        const baseIdempotencyKey = cleanText(body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"] || requestId, 200);
+        const userAppend = await backendConversationStore.appendMessage(normalizeAiConversationMessageInput({
+          content: normalized.input.rawText,
+          requestId,
+          idempotencyKey: baseIdempotencyKey ? `${baseIdempotencyKey}:user` : ""
+        }, {
+          conversationId: conversationRecord.id,
+          role: "user",
+          actor: auth.user
+        }, { now: () => currentTime }));
+        persistedUserMessage = userAppend?.message || null;
+        const storedMessages = typeof backendConversationStore.listMessages === "function"
+          ? await backendConversationStore.listMessages({ conversationId: conversationRecord.id, limit: 200 })
+          : [];
+        conversation = buildAiConversationRecentHistory(storedMessages, { limit: 8 });
+        await writeAuditEvent(backendAuditDriver, aiConversationAuditEvent({
+          conversation: conversationRecord,
+          action: AUDIT_ACTIONS.update,
+          outcome: userAppend?.action || "created",
+          requestId,
+          messageCount: 1,
+          messageRole: "user"
+        }, auth.user, { at: currentTime }));
+      }
       const latestUserRequest = latestUserTextFromConversation(conversation, normalized.input.rawText);
       const draftRawText = conversationAwareDraftText({ rawText: normalized.input.rawText, conversation });
       const draftInput = {
@@ -553,7 +600,6 @@ export function createAiAssistHandler({
         conversation,
         fallback: normalized.input.language
       });
-      const requestId = requestCorrelationId(req, body);
 
       const context = buildAiAssistContext(body.context, auth.user);
       const draft = buildAiIntakeDraft(draftInput, currentTime);
@@ -733,6 +779,34 @@ export function createAiAssistHandler({
         userRequest: latestUserRequest || draft.rawText
       });
       const assistantText = cleanAssistantText(grounded.text, 4_000);
+      let persistedAssistantMessage = null;
+      if (conversationRecord && backendConversationStore) {
+        const baseIdempotencyKey = cleanText(body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"] || requestId, 200);
+        const assistantAppend = await backendConversationStore.appendMessage(normalizeAiConversationMessageInput({
+          content: assistantText,
+          requestId,
+          idempotencyKey: baseIdempotencyKey ? `${baseIdempotencyKey}:assistant` : "",
+          metadata: {
+            provider: result.provider || config.provider || "",
+            model: result.model || config.model || "",
+            workflow,
+            memoryGroundingMode: grounded.memoryGrounding?.mode || ""
+          }
+        }, {
+          conversationId: conversationRecord.id,
+          role: "assistant",
+          actor: auth.user
+        }, { now: () => currentTime }));
+        persistedAssistantMessage = assistantAppend?.message || null;
+        await writeAuditEvent(backendAuditDriver, aiConversationAuditEvent({
+          conversation: conversationRecord,
+          action: AUDIT_ACTIONS.update,
+          outcome: assistantAppend?.action || "created",
+          requestId,
+          messageCount: 1,
+          messageRole: "assistant"
+        }, auth.user, { at: currentTime }));
+      }
       await writeAuditEvent(backendAuditDriver, aiAssistAuditEvent({
         draft,
         context: providerContext,
@@ -759,6 +833,13 @@ export function createAiAssistHandler({
           memoryCitations: grounded.memoryCitations,
           memoryGrounding: grounded.memoryGrounding
         },
+        ...(conversationRecord ? {
+          conversation: {
+            id: conversationRecord.id,
+            userMessageId: persistedUserMessage?.id || "",
+            assistantMessageId: persistedAssistantMessage?.id || ""
+          }
+        } : {}),
         memoryCitations: grounded.memoryCitations,
         memoryGrounding: grounded.memoryGrounding,
         ...(providerPlan ? { providerPlan } : {}),

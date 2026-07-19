@@ -36,6 +36,7 @@ const parseStoredUser = (record) => {
 };
 
 const trimSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function userRecordFromAppUserProfile(profile = {}) {
   const appUser = normalizeSupabaseAppUserProfile(profile);
@@ -76,20 +77,36 @@ export function createSupabaseCmmsPinSessionClient({ url, serviceRoleKey, fetchI
   if (!root || !key || !fetchImpl) return null;
   const headers = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
 
+  async function findOneBy(column, value) {
+    const cleanValue = String(value || "").trim();
+    if (!cleanValue) return null;
+    const query = `${column}=eq.${encodeURIComponent(cleanValue)}&select=*&limit=1`;
+    const response = await fetchImpl(`${root}/rest/v1/app_users?${query}`, {
+      method: "GET",
+      headers
+    });
+    const data = await responseJson(response);
+    if (!response.ok) throw new Error(data?.message || data?.error || `supabase_pin_session_${response.status}`);
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? userRecordFromAppUserProfile(row) : null;
+  }
+
   return {
     async findPinSessionUser(tokenSession) {
-      const response = await fetchImpl(`${root}/rest/v1/app_users?select=*&limit=2000`, {
-        method: "GET",
-        headers
-      });
-      const data = await responseJson(response);
-      if (!response.ok) throw new Error(data?.message || data?.error || `supabase_pin_session_${response.status}`);
-      return (Array.isArray(data) ? data : [])
-        .map(userRecordFromAppUserProfile)
-        .find((user) => (
-          String(user.id || user.workerNo || "") === tokenSession.id
-          || (tokenSession.workerNo && String(user.workerNo || "") === tokenSession.workerNo)
-        )) || null;
+      const tokenId = String(tokenSession?.id || "").trim();
+      const workerNo = String(tokenSession?.workerNo || "").trim();
+      if (UUID_RE.test(tokenId)) {
+        const byId = await findOneBy("id", tokenId);
+        if (byId) return byId;
+      }
+      if (workerNo) {
+        const byWorkerNo = await findOneBy("worker_no", workerNo);
+        if (byWorkerNo) return byWorkerNo;
+      }
+      if (tokenId && !UUID_RE.test(tokenId)) {
+        return findOneBy("worker_no", tokenId);
+      }
+      return null;
     }
   };
 }
