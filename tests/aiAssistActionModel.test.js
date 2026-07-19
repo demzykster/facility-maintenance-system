@@ -5,6 +5,39 @@ import { buildAiAssistActionProposals } from "../src/aiAssistActionModel.js";
 const actor = { id: "u1", role: "admin", name: "Vadim" };
 
 describe("AI assist action model", () => {
+  it("turns remember-this requests into a human-confirmed personal memory proposal", () => {
+    const actions = buildAiAssistActionProposals({
+      draft: {
+        action: "no_action",
+        rawText: "Запомни: утренние окна обслуживания предпочтительнее для отдела Ops"
+      },
+      user: { id: "u1", role: "user" },
+      now: 1784400000000
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_memory_fact",
+        type: "memory.fact.create",
+        status: "ready_for_confirmation",
+        requiresConfirmation: true,
+        writesData: false,
+        writePolicy: "human_confirmation_required",
+        payload: expect.objectContaining({
+          scopeType: "personal",
+          summary: "утренние окна обслуживания предпочтительнее для отдела Ops",
+          sourceType: "ai_chat",
+          confidence: "confirmed"
+        }),
+        execute: {
+          method: "POST",
+          path: "/api/ai/memory",
+          bodyField: "fact"
+        }
+      })
+    ]);
+  });
+
   it("proposes a cleaning complaint only when a single visible zone is clear", () => {
     const draft = buildAiIntakeDraft({
       rawText: "הרצפה מלוכלכת במטבחון קומה 2",

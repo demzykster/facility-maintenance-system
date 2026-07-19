@@ -60,6 +60,29 @@ describe("AI agent action adapter", () => {
     expect(result.message).toContain("המשימה עודכנה");
   });
 
+  it("saves confirmed memory facts through the AI memory API adapter", async () => {
+    const createMemoryFact = vi.fn(async (fact) => ({ id: "mem-1", ...fact }));
+    const execute = createAiAgentActionExecutor({ session, createMemoryFact });
+
+    const result = await execute({
+      id: "memory-action-1",
+      type: "memory.fact.create",
+      requiresConfirmation: true,
+      execute: { method: "POST", path: "/api/ai/memory", bodyField: "fact" },
+      payload: {
+        scopeType: "personal",
+        summary: "Dana prefers morning maintenance windows",
+        sourceLabel: "AI chat confirmation"
+      }
+    });
+
+    expect(createMemoryFact).toHaveBeenCalledWith(expect.objectContaining({
+      scopeType: "personal",
+      summary: "Dana prefers morning maintenance windows"
+    }));
+    expect(result).toMatchObject({ ok: true, factId: "mem-1" });
+  });
+
   it("opens the existing ticket draft flow for editable AI ticket proposals", () => {
     const openAiTicketDraft = vi.fn();
     const edit = createAiAgentTicketDraftEditor({ openAiTicketDraft });

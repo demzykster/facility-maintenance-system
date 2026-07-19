@@ -1,4 +1,5 @@
 import {
+  canExecuteAiAssistAction,
   prepareAiCleaningComplaintCreateForSave,
   prepareAiMeetingCreateForSave,
   prepareAiMeetingUpdateForSave,
@@ -17,6 +18,12 @@ export function createAiAgentActionExecutor(props = {}, {
   saveFailedMessage = "השמירה נכשלה. בדקו חיבור ונסו שוב."
 } = {}) {
   return async function executeAiAgentAction(action) {
+    if (action?.type === "memory.fact.create") {
+      if (!canExecuteAiAssistAction(action)) throw new Error("ai_action_not_executable");
+      if (typeof props.createMemoryFact !== "function") throw new Error("שמירת זיכרון אינה זמינה במסך זה.");
+      const fact = await props.createMemoryFact(action.payload || {});
+      return { ok: true, factId: fact?.id || "", message: `הזיכרון נשמר: ${fact?.summary || action?.payload?.summary || ""}` };
+    }
     if (action?.type === "meeting.create") {
       if (typeof props.saveMeeting !== "function") throw new Error("שמירת פגישות אינה זמינה במסך זה.");
       const meeting = prepareAiMeetingCreateForSave(action, props.session, { now: now(), makeId });

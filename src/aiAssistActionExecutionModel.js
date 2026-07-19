@@ -68,6 +68,12 @@ function hasCleaningComplaintsApiExecuteContract(action = {}) {
     && action.execute?.bodyField === "complaint";
 }
 
+function hasAiMemoryApiExecuteContract(action = {}) {
+  return action.execute?.method === "POST"
+    && action.execute?.path === "/api/ai/memory"
+    && action.execute?.bodyField === "fact";
+}
+
 export function canExecuteAiAssistAction(action = {}) {
   if (!action || typeof action !== "object") return false;
   if (action.requiresConfirmation !== true) return false;
@@ -113,6 +119,9 @@ export function canExecuteAiAssistAction(action = {}) {
       && !!cleanText(payload.zoneName, 160)
       && !!cleanText(payload.kind, 40)
       && !!cleanText(payload.text || payload.noPhotoReason, 1000);
+  }
+  if (action.type === "memory.fact.create") {
+    return hasAiMemoryApiExecuteContract(action) && !!cleanText(payload.summary, 280);
   }
   if (!hasTicketsApiExecuteContract(action)) return false;
   if (action.type === "ticket.create") return true;

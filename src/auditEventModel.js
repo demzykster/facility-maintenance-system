@@ -9,6 +9,7 @@ export const AUDIT_ENTITY_TYPES = Object.freeze({
   ppe: "ppe",
   task: "task",
   meeting: "meeting",
+  memory: "memory",
   system: "system"
 });
 
@@ -25,7 +26,10 @@ export const AUDIT_ACTIONS = Object.freeze({
   logout: "logout",
   bootstrap: "bootstrap",
   clientError: "client_error",
-  aiAssist: "ai_assist"
+  aiAssist: "ai_assist",
+  propose: "propose",
+  use: "use",
+  deactivate: "deactivate"
 });
 
 const ENTITY_TYPES = new Set(Object.values(AUDIT_ENTITY_TYPES));
@@ -225,6 +229,46 @@ export function aiAssistAuditEvent({
         meetings: countArray(context.meetings),
         metrics: context.metrics && typeof context.metrics === "object" ? Object.keys(context.metrics).length : 0
       }
+    }
+  });
+}
+
+export function aiMemoryAuditEvent({
+  fact = {},
+  action = AUDIT_ACTIONS.create,
+  outcome = "ok",
+  reason = "",
+  requestId = "",
+  usedFactIds = []
+} = {}, actor = {}, options = {}) {
+  const safeUsedFactIds = Array.isArray(usedFactIds)
+    ? usedFactIds.map((value) => cleanString(value)).filter(Boolean).slice(0, 24)
+    : [];
+  return normalizeAuditEvent({
+    at: options.at,
+    actorId: actor.id,
+    actorName: actor.name,
+    actorRole: actor.role,
+    entityType: AUDIT_ENTITY_TYPES.memory,
+    entityId: cleanString(fact.id) || "memory",
+    action,
+    summary: `AI memory ${action}`,
+    before: options.before,
+    after: {
+      scopeType: cleanString(fact.scopeType || fact.scope_type),
+      scopeId: cleanString(fact.scopeId || fact.scope_id),
+      factType: cleanString(fact.factType || fact.fact_type),
+      confidence: cleanString(fact.confidence),
+      status: cleanString(fact.status)
+    },
+    metadata: {
+      outcome: cleanString(outcome),
+      reason: cleanString(reason),
+      requestId: cleanString(requestId),
+      sourceType: cleanString(fact.sourceType || fact.source_type),
+      sourceId: cleanString(fact.sourceId || fact.source_id),
+      sourceLabel: cleanString(fact.sourceLabel || fact.source_label),
+      usedFactIds: safeUsedFactIds
     }
   });
 }

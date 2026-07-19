@@ -28,6 +28,9 @@ export function useAIAgentSession({
   callModel,
   callAssistant,
   executeAction,
+  loadMemoryFacts,
+  updateMemoryFact,
+  deactivateMemoryFact,
   initialText = "",
   initialWorkflow = AI_ASSIST_WORKFLOWS.general
 } = {}) {
@@ -37,6 +40,8 @@ export function useAIAgentSession({
     [session, scopedTickets, pm, fleet, config, tasks, meetings, users, ppeItems, ppeReqs, zones, buildContext]
   );
   const [state, setState] = useState(() => createAiAgentInitialState({ session, initialText, initialWorkflow }));
+  const [memoryFacts, setMemoryFacts] = useState([]);
+  const [memoryError, setMemoryError] = useState("");
   const stateRef = useRef(state);
 
   const setAgentState = useCallback((next) => {
@@ -56,6 +61,21 @@ export function useAIAgentSession({
       inputWorkflow: initialWorkflow || AI_ASSIST_WORKFLOWS.general
     });
   }, [initialText, initialWorkflow, setAgentState]);
+
+  const refreshMemory = useCallback(async () => {
+    if (typeof loadMemoryFacts !== "function") return;
+    try {
+      const facts = await loadMemoryFacts();
+      setMemoryFacts(Array.isArray(facts) ? facts : []);
+      setMemoryError("");
+    } catch (error) {
+      setMemoryError(error?.message || "memory_unavailable");
+    }
+  }, [loadMemoryFacts]);
+
+  useEffect(() => {
+    refreshMemory();
+  }, [refreshMemory]);
 
   const send = useCallback(async (text, workflow = AI_ASSIST_WORKFLOWS.general) => {
     const { state: sendingState, request } = beginAiAgentSend(stateRef.current, { text, workflow, context: contextPreview });
@@ -79,17 +99,35 @@ export function useAIAgentSession({
     try {
       const result = await executeAction(action);
       setAgentState(completeAiAgentAction(stateRef.current, key, result));
+      if (action?.type === "memory.fact.create") await refreshMemory();
     } catch (error) {
       setAgentState(failAiAgentAction(stateRef.current, key, error));
     }
-  }, [executeAction, setAgentState]);
+  }, [executeAction, refreshMemory, setAgentState]);
+
+  const editMemoryFact = useCallback(async (fact, summary) => {
+    if (typeof updateMemoryFact !== "function" || !fact?.id) return;
+    const updated = await updateMemoryFact(fact.id, { ...fact, summary });
+    setMemoryFacts((items) => items.map((item) => item.id === fact.id ? updated : item).filter(Boolean));
+  }, [updateMemoryFact]);
+
+  const forgetMemoryFact = useCallback(async (fact) => {
+    if (typeof deactivateMemoryFact !== "function" || !fact?.id) return;
+    await deactivateMemoryFact(fact.id);
+    setMemoryFacts((items) => items.filter((item) => item.id !== fact.id));
+  }, [deactivateMemoryFact]);
 
   return {
     ...state,
     contextPreview,
+    memoryFacts,
+    memoryError,
     setInput: (input) => setAgentState({ ...stateRef.current, input }),
     setInputWorkflow: (inputWorkflow) => setAgentState({ ...stateRef.current, inputWorkflow }),
     send,
-    runAction
+    runAction,
+    editMemoryFact,
+    forgetMemoryFact,
+    refreshMemory
   };
 }

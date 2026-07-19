@@ -856,8 +856,54 @@ function buildAiCleaningComplaintCreateProposal({ draft = {}, user = {}, context
   };
 }
 
+function requestedMemoryFactFromText(text = "") {
+  const raw = cleanText(text, MAX_DESCRIPTION_CHARS);
+  if (!raw) return "";
+  const match = raw.match(/(?:запомни|сохрани(?:\s+факт)?|важный\s+факт|remember|save(?:\s+this)?(?:\s+fact)?|important\s+fact|תזכור|זכור|שמור|חשוב\s+לזכור)\s*[:\-–—]?\s*(.+)$/iu);
+  return match ? cleanText(match[1], 280) : "";
+}
+
+function buildAiMemoryFactCreateProposal({ draft = {}, user = {}, now = Date.now() } = {}) {
+  const summary = requestedMemoryFactFromText(draft.rawText);
+  if (!summary) return null;
+  return {
+    id: "create_memory_fact",
+    type: "memory.fact.create",
+    label: "שמירת זיכרון",
+    status: "ready_for_confirmation",
+    requiresConfirmation: true,
+    writesData: false,
+    writePolicy: "human_confirmation_required",
+    missingFields: [],
+    payload: {
+      scopeType: "personal",
+      summary,
+      details: "",
+      factType: "note",
+      sourceType: "ai_chat",
+      sourceLabel: "AI chat confirmation",
+      confidence: "confirmed",
+      requestedBy: cleanText(user.id || user.workerNo || user.name, 120),
+      requestedAt: Number(now)
+    },
+    execute: {
+      method: "POST",
+      path: "/api/ai/memory",
+      bodyField: "fact"
+    },
+    safety: {
+      deterministic: true,
+      providerTextTrusted: false,
+      serverMustRevalidate: true,
+      auditRequired: true
+    }
+  };
+}
+
 export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date.now(), context = {} } = {}) {
   const safeDraft = cleanObject(draft);
+  const memoryProposal = buildAiMemoryFactCreateProposal({ draft: safeDraft, user, now });
+  if (memoryProposal) return [memoryProposal];
   const requestedComment = requestedCommentFromText(safeDraft.rawText);
   if (requestedComment) {
     const commentProposal = buildAiTicketCommentProposal({ draft: safeDraft, context });

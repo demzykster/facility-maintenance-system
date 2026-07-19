@@ -21,7 +21,8 @@ export const STAGING_SUPABASE_TABLES = [
   "periodic_maintenance",
   "tickets",
   "file_metadata",
-  "audit_events"
+  "audit_events",
+  "ai_memory_facts"
 ];
 
 export function requiredSupabaseSchemaEnv() {

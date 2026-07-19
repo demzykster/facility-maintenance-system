@@ -30,7 +30,7 @@ import { normalizeTaskActionRecord, taskActionSourceFields } from "./taskActionM
 import { DEFAULT_NOTIFY_CONFIG } from "./notificationModel.js";
 import { browserNotificationEvents, DEFAULT_LOCAL_NOTIFICATION_PREFS, initialBrowserNotificationState, mergeNotificationReadStates, nextBrowserNotificationEvent, notificationReadStateForEvents, notificationReadStorageKeys, parseBrowserNotificationState, parseLocalNotificationPrefs, unreadNotificationKeySet } from "./notificationPrefsModel.js";
 import { resolveIdentifier } from "./loginIdentifierModel.js";
-import { callAiAssistApi } from "./aiAgentApiClient.js";
+import { callAiAssistApi, createAiMemoryFact, deactivateAiMemoryFact, listAiMemoryFacts, updateAiMemoryFact } from "./aiAgentApiClient.js";
 import { createAiAgentActionExecutor, createAiAgentTicketDraftEditor } from "./aiAgentActionAdapter.js";
 import { buildAIContextSnapshot as buildAIContextSnapshotModel } from "./aiAssistSnapshotModel.js";
 import { biHeatmapAiPrompt, cleaningDashboardAiPrompt, fleetAiPrompt, ticketAiPrompt } from "./aiAssistEntryPointModel.js";
@@ -1434,6 +1434,22 @@ async function callAIAssistant({ text, messages, system, context, workflow, incl
     includeProviderPlan,
     getAccessToken: productionAccessToken
   });
+}
+
+async function loadAIMemoryFacts() {
+  return listAiMemoryFacts({ getAccessToken: productionAccessToken });
+}
+
+async function saveAIMemoryFact(fact) {
+  return createAiMemoryFact({ fact, getAccessToken: productionAccessToken });
+}
+
+async function reviseAIMemoryFact(id, fact) {
+  return updateAiMemoryFact({ id, fact, getAccessToken: productionAccessToken });
+}
+
+async function forgetAIMemoryFact(id) {
+  return deactivateAiMemoryFact({ id, getAccessToken: productionAccessToken });
 }
 
 /* ---------- notifications ---------- */
@@ -7899,10 +7915,10 @@ function AIPanelFallback({ onClose }) {
   </div>;
 }
 function LazyAIPanel(props) {
-  const executeAction = createAiAgentActionExecutor(props, { makeId: uid, saveFailedMessage: SAVE_FAILED_MESSAGE });
+  const executeAction = createAiAgentActionExecutor({ ...props, createMemoryFact: saveAIMemoryFact }, { makeId: uid, saveFailedMessage: SAVE_FAILED_MESSAGE });
   const editAction = props.openAiTicketDraft ? createAiAgentTicketDraftEditor({ openAiTicketDraft: props.openAiTicketDraft }) : null;
   return <Suspense fallback={<AIPanelFallback onClose={props.onClose} />}>
-    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={editAction} />
+    <AIPanel {...props} visibleTickets={visibleTickets} buildContext={buildAIContextSnapshot} callModel={callClaude} callAssistant={callAIAssistant} executeAction={executeAction} editAction={editAction} loadMemoryFacts={loadAIMemoryFacts} updateMemoryFact={reviseAIMemoryFact} deactivateMemoryFact={forgetAIMemoryFact} />
   </Suspense>;
 }
 function NotifPanelFallback({ onClose }) {
@@ -9283,6 +9299,14 @@ body *{visibility:hidden!important;}
 .ai-action-result{margin-top:8px;font-size:12.5px;font-weight:650;line-height:1.4;}
 .ai-action-result.ok{color:#166534;}
 .ai-action-result.err{color:#B91C1C;}
+.ai-memory-panel{border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-direction:column;gap:7px;background:var(--surface-2);}
+.ai-memory-head{display:flex;align-items:center;gap:6px;color:var(--primary);font-size:12px;font-weight:800;}
+.ai-memory-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;border:1px solid var(--line-soft);border-radius:8px;background:var(--surface);padding:7px 8px;}
+.ai-memory-copy{min-width:0;}
+.ai-memory-summary{font-size:12.5px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ai-memory-meta,.ai-memory-error{font-size:11.5px;color:var(--muted);}
+.ai-memory-edit{min-height:30px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--primary);font-size:11.5px;font-weight:750;padding:0 9px;}
+.ai-memory-forget{width:30px;height:30px;}
 .ai-quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 10px;}
 .ai-quick button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;font-size:12.5px;color:var(--muted);font-weight:500;}
 .ai-input{display:flex;gap:8px;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);}

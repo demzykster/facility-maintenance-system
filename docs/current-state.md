@@ -7,9 +7,9 @@ Last repo-local harness update: 2026-07-18.
 - Repository: `demzykster/facility-maintenance-system`.
 - Primary local path: `/Users/Vadim/Documents/CMMS`.
 - Primary branch: `main`.
-- Current verified local `HEAD = origin/main`: `5142ffc482aededf73f70205525684169681d9c9`.
+- Current verified local `HEAD = origin/main`: `b0520825cfdbfe8a358e7f773ae54976d84abba5`.
 - Public deployment: `https://facility-maintenance-system.vercel.app`.
-- Current verified live version endpoint: `/cmms-version.json` reports `5142ffc`.
+- Current verified live version endpoint: `/cmms-version.json` reports `b052082`.
 - Deployment label: live pilot / production-like controlled rollout, not final production.
 
 Verify Git, GitHub, Vercel, Supabase, and live health again before using these facts for release or production claims.
@@ -58,15 +58,16 @@ Historical or detailed handoff documents remain useful, but they do not override
 - Current supported provider families are Anthropic, Google/Gemini, and OpenAI-compatible providers through the server boundary.
 - `/api/ai/status` is authenticated and does not expose provider secrets. A live provider connection check requires an authenticated user with settings access.
 - AI context is assembled from the current app snapshot, then filtered server-side by authenticated role and scope through `src/aiAssistContextModel.js`.
-- Current conversation memory is panel/request-local only:
+- Current conversation memory remains panel/request-local:
   - `src/AIPanel.jsx` keeps open-panel messages in React state;
   - `/api/ai/assist` accepts recent messages in the request and sanitizes/truncates them;
   - messages are not durably stored as conversations.
-- Durable AI memory is not implemented:
-  - no AI memory facts table;
-  - no conversation table;
-  - no embedding/vector retrieval layer;
-  - no memory update/delete/forget flow.
+- Scoped AI Memory Pilot v1 is prepared in the current checkout behind `CMMS_AI_MEMORY_PILOT`:
+  - memory facts are a CMMS-owned subsystem under `server/agent/memory/`;
+  - memory facts use explicit personal/department/organization/asset scope and server-side scope checks;
+  - UI save/update/deactivate remains human-confirmed;
+  - the new migration `20260718203000_ai_memory_facts.sql` is pending and has not been applied to live;
+  - no conversation table or embedding/vector retrieval layer exists.
 - AI assist audit diagnostics exist through `audit_events` and protected system diagnostics, but audit is not counted as AI memory unless a future retrieval layer explicitly uses it as memory.
 - The AI capability registry is a useful working allowlist point, not yet a proven universal Agent Core framework.
 - BI includes a unified overview and ticket heatmap through `src/BIOverview.jsx`, `src/BIHeatmapPanel.jsx`, and `src/biScopeModel.js`.
@@ -89,7 +90,7 @@ Historical or detailed handoff documents remain useful, but they do not override
 
 - Live AI provider success is not guaranteed by code or env-name evidence alone. Verify `/api/ai/status?check=1` only when the goal allows an authenticated live read.
 - AI autonomous ticket create has lab/local evidence and code hardening, but it has not been enabled in the live pilot.
-- Durable AI memory, memory retrieval, memory retention/deletion, and memory permission tests are not implemented.
+- Scoped AI Memory Pilot v1 still needs controlled lab/live rollout before it can be treated as deployed behavior.
 - The current AI rate limit is in-process. It is not a durable cross-instance quota.
 - The current provider boundary does not define an explicit provider timeout, token-budget governance beyond configured max tokens, or durable loop protection.
 - Provider-specific model options are normalized in `src/aiProviderModel.js`, but future provider-native tool calls must not become business writes.
@@ -104,7 +105,7 @@ Historical or detailed handoff documents remain useful, but they do not override
 1. Keep the current live pilot stable and usable.
 2. Keep server-side authorization, audit, idempotency, and rollback evidence ahead of every write-path expansion.
 3. Improve AI toward a contextual assistant that uses normal product operations.
-4. Add durable AI memory only after scope, audit, source, update/delete, and retrieval boundaries are defined.
+4. Roll out durable AI memory only after the scoped pilot migration, flag, and lab/live verification are explicitly approved.
 5. Reduce the monolith incrementally through vertical slices.
 6. Finish heatmap/BI work as a unified decision shell.
 7. Fix real owner-reported or independently verified active problems.
@@ -118,7 +119,7 @@ The next AI stage is not a broad AI rollout. The safe sequence is:
 1. Keep live AI autonomy off until a new owner-approved rollout goal.
 2. Re-check live provider readiness with authenticated `/api/ai/status?check=1` only when explicitly allowed.
 3. If autonomy is considered, run a controlled lab/live preflight and one synthetic smoke for the exact low-risk `create_ticket` path.
-4. Build the first durable memory pilot as a separate vertical slice before depending on memory for autonomous decisions.
+4. Keep `CMMS_AI_MEMORY_PILOT` off until the scoped memory pilot migration and lab verification are separately approved.
 
 Detailed older ticket-create rollout criteria live in `docs/ai-ticket-create-slice-metrics.md`; use current Git/live evidence before treating older rollout wording as current.
 
@@ -126,5 +127,5 @@ Detailed older ticket-create rollout criteria live in `docs/ai-ticket-create-sli
 
 - BFF/service-role versus future user-scoped/RLS boundary remains open. Do not create an ADR until the owner accepts a concrete decision.
 - Future AI action autonomy must be approved per domain command and risk class. Universal confirmation is the current implementation for most actions, not the permanent target.
-- First durable AI memory storage and retrieval design remains to be implemented.
+- Scoped AI Memory Pilot v1 rollout remains open: migration apply, feature flag enablement, and lab/live verification need separate owner approval.
 - Further monolith reduction should proceed by scoped extraction goals, not by a global folder migration.
