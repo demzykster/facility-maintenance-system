@@ -246,6 +246,97 @@ describe("tickets API handler", () => {
     expect(driver.upsert).not.toHaveBeenCalled();
   });
 
+  it("allows executive sessions to create new tickets without granting update rights", async () => {
+    const driver = {
+      get: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        ticketId: "T-exec-create",
+        num: 44,
+        ticketNo: "F-044",
+        status: "new",
+        idempotencyStatus: "created"
+      }),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "executive-1", role: "executive", name: "Executive" }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" },
+      body: {
+        operation: "create",
+        ticket: ticketRecord({
+          id: "T-exec-create",
+          track: "facility",
+          subject: "Executive facility report",
+          description: "Executive opened a facility issue",
+          category: "doors",
+          status: "pending_manager"
+        })
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "created",
+      ticket: { id: "T-exec-create", num: 44, ticketNo: "F-044" }
+    });
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      id: "T-exec-create",
+      status: "new",
+      createdBy: { id: "executive-1", name: "Executive", role: "executive" },
+      reportedBy: { id: "executive-1", name: "Executive", role: "executive" }
+    }), expect.objectContaining({
+      actorId: "executive-1",
+      idempotencyKey: "ticket:executive-1:T-exec-create"
+    }));
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("allows executive exact create replays without turning them into updates", async () => {
+    const existing = ticketRecord({
+      id: "T-exec-replay",
+      num: 45,
+      ticketNo: "F-045",
+      track: "facility",
+      subject: "Executive facility report",
+      description: "Executive opened a facility issue",
+      category: "doors",
+      status: "new"
+    });
+    const driver = {
+      get: vi.fn().mockResolvedValue({ legacy_payload: existing }),
+      create: vi.fn(),
+      upsert: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "executive-1", role: "executive", name: "Executive" }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer executive-token" },
+      body: {
+        operation: "create",
+        ticket: existing
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      action: "replayed",
+      ticket: { id: "T-exec-replay", num: 45, status: "new" }
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
   it("rejects an explicit create when the same ticket id already has different content", async () => {
     const existing = {
       id: "T-conflict",

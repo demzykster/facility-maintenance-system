@@ -2,6 +2,7 @@ import { visibleTicketsForSession } from "../../src/ticketVisibilityModel.js";
 
 const FULL_READ_ROLES = new Set(["admin", "executive"]);
 const FLEET_CONTEXT_ROLES = new Set(["user", "tech"]);
+const TICKET_CREATE_ROLES = new Set(["admin", "executive", "user", "tech", "worker"]);
 const TICKET_WRITE_ROLES = new Set(["admin", "user", "tech", "worker"]);
 
 const cleanRole = (session = {}) => String(session?.role || "").trim();
@@ -28,6 +29,11 @@ export async function canReadTicketInSessionScope(session = {}, ticket = null, {
   if (FULL_READ_ROLES.has(cleanRole(session))) return true;
   const scoped = await ticketsForSessionReadScope(session, [ticket], { fleetDriver });
   return scoped.length === 1;
+}
+
+export function ticketCreatePermissionError(session = {}) {
+  if (!TICKET_CREATE_ROLES.has(cleanRole(session))) return "permission_required:role:admin|executive|user|tech|worker";
+  return null;
 }
 
 export async function ticketWritePermissionError(session = {}, ticket = null, { fleetDriver = null, action = "update" } = {}) {
