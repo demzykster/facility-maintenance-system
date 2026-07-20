@@ -2253,7 +2253,7 @@ describe("AI assist handler", () => {
 
     expect(res.statusCode).toBe(200);
     const payload = res.json();
-    expect(payload.assistant.text).toBe("באיזה אזור או מקום התקלה? למשל מחסן, חדר טעינה או קו ייצור.");
+    expect(payload.assistant.text).toBe("באיזה אזור או מחלקה נמצאת התקלה?");
     expect(payload.actions).toEqual([
       expect.objectContaining({
         type: "ticket.create",
@@ -2267,7 +2267,7 @@ describe("AI assist handler", () => {
     ]);
   });
 
-  it("uses a natural room-specific location question for inline facility ticket intake", async () => {
+  it("uses a natural location question for inline facility ticket intake without exposing field keys", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
       provider: "google",
@@ -2302,7 +2302,7 @@ describe("AI assist handler", () => {
 
     expect(res.statusCode).toBe(200);
     const payload = res.json();
-    expect(payload.assistant.text).toBe("באיזה אזור או מחלקה נמצא חדר המפעיל?");
+    expect(payload.assistant.text).toBe("באיזה אזור או מחלקה נמצאת התקלה?");
     expect(payload.assistant.text).not.toContain("zone");
     expect(payload.actions[0]).toMatchObject({
       type: "ticket.create",
@@ -2317,7 +2317,7 @@ describe("AI assist handler", () => {
     });
   });
 
-  it("uses the latest location answer to complete a prior inline facility ticket intake", async () => {
+  it("uses the pinned latest location answer to complete a prior inline facility ticket intake", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,
       provider: "google",
@@ -2339,29 +2339,48 @@ describe("AI assist handler", () => {
 
     const res = await call(handler, {
       body: {
-        text: "משרדים",
+        text: "משרדי הפצה",
         language: "he",
         workflow: "ticket_intake",
         messages: [
           { role: "assistant", content: "תארו בקצרה מה קרה. אפשר לציין מספר כלי, אזור או ציוד." },
           { role: "user", content: "מזגן לא עובד בחדר מפעיל מערכת" },
-          { role: "assistant", content: "באיזה אזור או מחלקה נמצא חדר המפעיל?" },
-          { role: "user", content: "משרדים" }
+          { role: "assistant", content: "באיזה אזור או מחלקה נמצאת התקלה?" },
+          { role: "user", content: "משרדי הפצה" }
         ],
         context: {
           intent: "create_ticket",
           uiSurface: "inline_ticket_create",
-          taskSession: { type: "ticket_intake", transient: true }
+          taskSession: {
+            type: "ticket_intake",
+            transient: true,
+            intake: {
+              domain: "facility",
+              pendingField: "location",
+              status: "pending",
+              draft: {
+                track: "facility",
+                subject: "מזגן לא עובד בחדר מפעיל מערכת",
+                category: "hvac",
+                priority: "medium",
+                zone: "",
+                description: "דווח כי המזגן בחדר מפעיל המערכת אינו עובד. יש לבדוק את התקלה."
+              }
+            }
+          }
         }
       }
     });
 
     expect(res.statusCode).toBe(200);
     const payload = res.json();
-    expect(payload.draft.rawText).toBe("מזגן לא עובד בחדר מפעיל מערכת. באזור משרדים");
+    expect(payload.draft.rawText).toBe("מזגן לא עובד בחדר מפעיל מערכת. באזור משרדי הפצה");
+    expect(payload.draft.module).toBe("facility");
     expect(payload.assistant.text).toContain("הכנתי טיוטה לטופס הקריאה.");
     expect(payload.assistant.text).toContain("קטגוריה: מיזוג אוויר");
-    expect(payload.assistant.text).toContain("מקום: משרדים");
+    expect(payload.assistant.text).toContain("מקום: משרדי הפצה");
+    expect(payload.assistant.text).not.toContain("כלי");
+    expect(payload.assistant.text).not.toContain("מלגזה");
     expect(payload.assistant.text).not.toContain("תמונה");
     expect(payload.actions[0]).toMatchObject({
       type: "ticket.create",
@@ -2371,11 +2390,16 @@ describe("AI assist handler", () => {
         track: "facility",
         category: "hvac",
         priority: "medium",
-        zone: "משרדים",
+        zone: "משרדי הפצה",
         subject: "מזגן לא עובד בחדר מפעיל מערכת"
       }
     });
     expect(payload.actions[0].payload.description).not.toBe(payload.actions[0].payload.subject);
+    const prompt = JSON.parse(providerCall.mock.calls[0][0].prompt);
+    expect(prompt.draftInput).toMatchObject({
+      rawText: "מזגן לא עובד בחדר מפעיל מערכת. באזור משרדי הפצה",
+      mergedFromRecentConversation: true
+    });
   });
 
   it("does not merge a short non-operational latest message into an older action request", async () => {

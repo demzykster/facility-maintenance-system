@@ -120,6 +120,14 @@ function providerSafeConversationMessages(conversation = []) {
 
 const ACTIONABLE_REQUEST_RE = /(создай|создать|открой|открыть|сделай|добавь|добавить|заявк|тикет|קריאה|פתח|תפתח|צור|create|open|draft|ticket|request|report)/iu;
 const ACTION_COMPLETION_HINT_RE = /(?:^|[\s,.;:])(?:в|на|у|около|возле)(?=[\s,.;:]|$)|комнат|склад|отдел|зона|корпус|f-\d+|\d{2,}|באזור|באיזור|במחלקת|במחסן|במבנה|בקו|משרדים|קבלה|מחסן|טעינה|רציף|חניון|כללי|zone|area|department|warehouse|building/iu;
+const TICKET_INTAKE_DOMAINS = new Set(["facility", "transport", "unresolved"]);
+const TICKET_INTAKE_FIELD_ALIASES = Object.freeze({
+  zone: "location",
+  location: "location",
+  forkliftId: "asset",
+  asset: "asset",
+  downtimeType: "downtimeType"
+});
 
 function previousActionableUserText(conversation = [], latestText = "") {
   const users = conversation
@@ -164,6 +172,72 @@ function conversationAwareDraftText({ rawText = "", conversation = [], ticketInt
   if (!previousText) return latestText;
   const looksLikeCompletion = latestText.length <= 180 && ACTION_COMPLETION_HINT_RE.test(latestText);
   return looksLikeCompletion ? `${previousText}. ${draftCompletionText(latestText)}` : latestText;
+}
+
+function cleanPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function normalizeTicketIntakeSession(body = {}) {
+  const context = cleanPlainObject(body.context);
+  const taskSession = cleanPlainObject(context.taskSession);
+  const intake = cleanPlainObject(taskSession.intake);
+  const domain = cleanText(intake.domain, 40);
+  if (!TICKET_INTAKE_DOMAINS.has(domain)) return null;
+  const pendingField = TICKET_INTAKE_FIELD_ALIASES[cleanText(intake.pendingField, 80)] || "";
+  const draft = cleanPlainObject(intake.draft);
+  return {
+    domain,
+    pendingField,
+    status: cleanText(intake.status, 40),
+    draft: {
+      track: cleanText(draft.track, 40),
+      subject: cleanText(draft.subject, 240),
+      description: cleanText(draft.description, 800),
+      category: cleanText(draft.category, 80),
+      priority: cleanText(draft.priority, 40),
+      zone: cleanText(draft.zone, 160),
+      asset: cleanText(draft.asset, 160),
+      forkliftId: cleanText(draft.forkliftId, 160),
+      downtimeType: cleanText(draft.downtimeType, 80)
+    }
+  };
+}
+
+function ticketIntakeBaseDraftText(intake = {}, conversation = [], latestText = "") {
+  const draft = cleanPlainObject(intake.draft);
+  return cleanText(draft.subject || draft.description, MAX_TEXT_CHARS)
+    || previousTicketIntakeUserText(conversation, latestText);
+}
+
+function pinnedTicketIntakeDraftText({
+  rawText = "",
+  conversation = [],
+  ticketIntakeRequest = false,
+  intake = null
+} = {}) {
+  const latestText = latestUserTextFromConversation(conversation, rawText);
+  if (!ticketIntakeRequest || !intake?.pendingField || !latestText) {
+    return conversationAwareDraftText({ rawText, conversation, ticketIntakeRequest });
+  }
+  if (hasAiInformationalIntent(latestText)) return latestText;
+  if (intake.domain === "facility" && intake.pendingField === "location") {
+    const base = ticketIntakeBaseDraftText(intake, conversation, latestText);
+    if (!base) return conversationAwareDraftText({ rawText, conversation, ticketIntakeRequest });
+    const completion = /^(?:באזור|באיזור|במחלקת|במחסן|במבנה|בקו)\s+/iu.test(latestText)
+      ? latestText
+      : `באזור ${latestText}`;
+    return `${base}. ${completion}`;
+  }
+  if (intake.domain === "transport" && intake.pendingField === "asset") {
+    const base = ticketIntakeBaseDraftText(intake, conversation, latestText);
+    if (!base) return conversationAwareDraftText({ rawText, conversation, ticketIntakeRequest });
+    const completion = /(?:כלי|מלגזה|רכב|משאית|forklift|truck|vehicle|unit|asset)/iu.test(latestText)
+      ? latestText
+      : `מלגזה ${latestText}`;
+    return `${base}. ${completion}`;
+  }
+  return conversationAwareDraftText({ rawText, conversation, ticketIntakeRequest });
 }
 
 function capabilityGuidanceForContext(context = {}) {
@@ -223,9 +297,7 @@ function ticketIntakeMissingFieldQuestion(actions = []) {
     return "מה מספר הכלי או המלגזה שעליה לפתוח את הקריאה?";
   }
   if (track === "facility" && missing.has("zone")) {
-    const subject = cleanText(ticketAction?.payload?.subject || ticketAction?.payload?.description, 240);
-    if (/חדר\s+מפעיל/u.test(subject)) return "באיזה אזור או מחלקה נמצא חדר המפעיל?";
-    return "באיזה אזור או מקום התקלה? למשל מחסן, חדר טעינה או קו ייצור.";
+    return "באיזה אזור או מחלקה נמצאת התקלה?";
   }
   if (missing.size) return `חסר לי פרט אחד לפתיחת הקריאה: ${[...missing].join(", ")}.`;
   return "";
@@ -701,13 +773,23 @@ export function createAiAssistHandler({
       }
       const latestUserRequest = latestUserTextFromConversation(conversation, normalized.input.rawText);
       const ticketIntakeRequest = isTicketIntakeRequestBody(body, workflow);
-      const draftRawText = conversationAwareDraftText({ rawText: normalized.input.rawText, conversation, ticketIntakeRequest });
+      const pinnedIntake = normalizeTicketIntakeSession(body);
+      const draftRawText = pinnedTicketIntakeDraftText({
+        rawText: normalized.input.rawText,
+        conversation,
+        ticketIntakeRequest,
+        intake: pinnedIntake
+      });
       const draftInput = {
         ...normalized.input,
+        ...(pinnedIntake?.domain === "facility" ? { module: "facility" } : {}),
+        ...(pinnedIntake?.domain === "transport" ? { module: "transport" } : {}),
         rawText: draftRawText
       };
       const draftTelemetry = {
         mergedFromRecentConversation: Boolean(latestUserRequest && draftRawText && latestUserRequest !== draftRawText),
+        pinnedIntakeDomain: pinnedIntake?.domain || "",
+        pinnedIntakePendingField: pinnedIntake?.pendingField || "",
         recentConversationCount: conversation.length,
         latestUserMessageChars: latestUserRequest.length,
         draftInputChars: draftRawText.length

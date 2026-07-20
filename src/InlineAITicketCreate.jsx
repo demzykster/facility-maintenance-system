@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { CheckCircle2, ChevronLeft, Send, Sparkles, X } from "lucide-react";
 import { canExecuteAiAssistAction, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
-import { INLINE_AI_TICKET_COPY, inlineAiTicketActionMode, inlineAiTicketEffectiveAccess, inlineAiTicketPrimaryActionLabel } from "./inlineAiTicketCreateModel.js";
+import { INLINE_AI_TICKET_COPY, inlineAiTicketActionMode, inlineAiTicketEffectiveAccess, inlineAiTicketPlaceholder, inlineAiTicketPrimaryActionLabel } from "./inlineAiTicketCreateModel.js";
 import { useInlineAITicketSession } from "./useInlineAITicketSession.js";
 
 const trackLabel = (track = "") => track === "transport" ? "שינוע" : "מבנה";
@@ -169,7 +169,7 @@ export function InlineAITicketCreate({
         <textarea
           value={agent.input}
           rows={2}
-          placeholder={INLINE_AI_TICKET_COPY.placeholder}
+          placeholder={inlineAiTicketPlaceholder(agent)}
           onChange={(event) => agent.setInput(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {

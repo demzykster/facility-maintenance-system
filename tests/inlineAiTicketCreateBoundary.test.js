@@ -41,7 +41,9 @@ describe("inline AI ticket create boundary", () => {
   it("renders the requested Hebrew copy and compact result controls", () => {
     expect(inlineSource).toContain("פתיחת קריאה בעזרת AI");
     expect(modelSource).toContain("תארו בקצרה מה קרה");
-    expect(modelSource).toContain("לדוגמה: במלגזה 123 לא עובד הצופר");
+    expect(modelSource).toContain("תארו בקצרה את התקלה");
+    expect(modelSource).toContain("לדוגמה: משרדי הפצה");
+    expect(modelSource).toContain("לדוגמה: מלגזה 210");
     expect(inlineSource).toContain("פתיחת הקריאה");
   });
 

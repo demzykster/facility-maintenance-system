@@ -8,8 +8,10 @@ import {
   inlineAiTicketActionMode,
   inlineAiTicketEffectiveAccess,
   inlineAiTicketFromCapabilityResponse,
+  inlineAiTicketPlaceholder,
   inlineAiTicketPrimaryActionLabel,
   inlineAiTicketRecentMessages,
+  inlineTicketIntakeStateFromActions,
   inlineAiTicketVisibleActions
 } from "../src/inlineAiTicketCreateModel.js";
 
@@ -54,6 +56,91 @@ describe("inline AI ticket create model", () => {
     });
     expect(request).not.toHaveProperty("conversationId");
     expect(request.context.currentEntity).toEqual({ id: "asset-123" });
+  });
+
+  it("carries server-derived pending facility intake state into the next transient request", () => {
+    const firstState = {
+      ...createInlineAiTicketInitialState(),
+      msgs: [
+        { role: "assistant", content: "תארו בקצרה מה קרה. אפשר לציין מספר כלי, אזור או ציוד." },
+        { role: "user", content: "מזגן לא עובד בחדר מפעיל מערכת" }
+      ]
+    };
+    const completed = completeInlineAiTicketSend(firstState, {
+      text: "באיזה אזור או מחלקה נמצאת התקלה?",
+      actions: [{
+        id: "create_ticket",
+        type: "ticket.create",
+        status: "needs_human_input",
+        missingFields: ["zone"],
+        payload: {
+          track: "facility",
+          subject: "מזגן לא עובד בחדר מפעיל מערכת",
+          category: "hvac",
+          priority: "medium",
+          zone: "",
+          description: "דווח כי המזגן בחדר מפעיל המערכת אינו עובד. יש לבדוק את התקלה."
+        }
+      }]
+    });
+
+    expect(completed.intake).toMatchObject({
+      domain: "facility",
+      pendingField: "location",
+      draft: {
+        track: "facility",
+        subject: "מזגן לא עובד בחדר מפעיל מערכת",
+        category: "hvac",
+        priority: "medium"
+      }
+    });
+    expect(inlineAiTicketPlaceholder(completed)).toBe("לדוגמה: משרדי הפצה");
+
+    const request = buildInlineAiTicketRequest({
+      text: "משרדי הפצה",
+      messages: completed.msgs,
+      context: {},
+      intake: completed.intake,
+      idempotencyKey: "idem-facility-followup"
+    });
+
+    expect(request.context.taskSession).toMatchObject({
+      type: "ticket_intake",
+      transient: true,
+      intake: {
+        domain: "facility",
+        pendingField: "location",
+        draft: {
+          track: "facility",
+          subject: "מזגן לא עובד בחדר מפעיל מערכת",
+          category: "hvac",
+          priority: "medium"
+        }
+      }
+    });
+  });
+
+  it("uses context-aware placeholders and resets intake after a completed ticket", () => {
+    expect(inlineAiTicketPlaceholder(createInlineAiTicketInitialState())).toBe("תארו בקצרה את התקלה");
+    expect(inlineAiTicketPlaceholder({
+      intake: inlineTicketIntakeStateFromActions([{
+        type: "ticket.create",
+        missingFields: ["forkliftId"],
+        payload: { track: "transport", subject: "גלגל שבור" }
+      }])
+    })).toBe("לדוגמה: מלגזה 210");
+
+    const completed = completeInlineAiTicketSend({
+      ...createInlineAiTicketInitialState(),
+      intake: { domain: "facility", pendingField: "location", draft: { track: "facility" }, status: "pending" }
+    }, {
+      capabilityResponse: {
+        executionStatus: "created",
+        actionResult: { ticketId: "ticket-1", ticketNumber: "T-001" }
+      }
+    });
+
+    expect(completed.intake).toBeNull();
   });
 
   it("marks plain inline problem descriptions as ticket-intake instead of general chat", () => {

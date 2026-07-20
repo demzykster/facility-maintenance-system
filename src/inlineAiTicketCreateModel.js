@@ -11,8 +11,77 @@ export const INLINE_AI_TICKET_COPY = Object.freeze({
   title: "פתיחת קריאה בעזרת AI",
   subtitle: "תארו את התקלה בכמה מילים והעוזר יעזור לפתוח קריאה",
   welcome: "תארו בקצרה מה קרה. אפשר לציין מספר כלי, אזור או ציוד.",
-  placeholder: "לדוגמה: במלגזה 123 לא עובד הצופר"
+  placeholder: "תארו בקצרה את התקלה",
+  facilityLocationPlaceholder: "לדוגמה: משרדי הפצה",
+  transportAssetPlaceholder: "לדוגמה: מלגזה 210"
 });
+
+const INTAKE_DOMAINS = new Set(["facility", "transport", "unresolved"]);
+const FIELD_ALIASES = Object.freeze({
+  zone: "location",
+  location: "location",
+  forkliftId: "asset",
+  asset: "asset",
+  downtimeType: "downtimeType"
+});
+
+function cleanTicketPayload(payload = {}) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
+  return {
+    track: cleanText(payload.track, 40),
+    subject: cleanText(payload.subject, 160),
+    category: cleanText(payload.category, 80),
+    priority: cleanText(payload.priority, 40),
+    zone: cleanText(payload.zone || payload.location, 160),
+    asset: cleanText(payload.asset, 160),
+    forkliftId: cleanText(payload.forkliftId, 160),
+    downtimeType: cleanText(payload.downtimeType, 80),
+    description: cleanText(payload.description, 1000)
+  };
+}
+
+export function normalizeInlineTicketIntakeState(value = null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const domain = cleanText(value.domain, 40);
+  if (!INTAKE_DOMAINS.has(domain)) return null;
+  const rawField = cleanText(value.pendingField, 80);
+  const pendingField = FIELD_ALIASES[rawField] || "";
+  const draft = cleanTicketPayload(value.draft || value.payload || {});
+  const status = cleanText(value.status, 40) || (pendingField ? "pending" : "ready");
+  return {
+    intakeId: cleanText(value.intakeId, 120),
+    domain,
+    pendingField,
+    draft,
+    status
+  };
+}
+
+export function inlineTicketIntakeStateFromActions(actions = [], previous = null) {
+  const ticketAction = (Array.isArray(actions) ? actions : [])
+    .find((action) => action?.type === "ticket.create" && action.payload && typeof action.payload === "object");
+  if (!ticketAction) return previous || null;
+  const payload = cleanTicketPayload(ticketAction.payload);
+  const domain = payload.track === "facility" || payload.track === "transport" ? payload.track : "unresolved";
+  const missingFields = Array.isArray(ticketAction.missingFields)
+    ? ticketAction.missingFields.map((field) => FIELD_ALIASES[cleanText(field, 80)] || "").filter(Boolean)
+    : [];
+  const status = missingFields.length ? "pending" : (ticketAction.status === "needs_form_review" ? "ready_for_form" : "ready");
+  return normalizeInlineTicketIntakeState({
+    intakeId: ticketAction.id || previous?.intakeId || "create_ticket",
+    domain,
+    pendingField: missingFields[0] || "",
+    draft: payload,
+    status
+  });
+}
+
+export function inlineAiTicketPlaceholder(state = {}) {
+  const intake = normalizeInlineTicketIntakeState(state?.intake);
+  if (intake?.domain === "facility" && intake.pendingField === "location") return INLINE_AI_TICKET_COPY.facilityLocationPlaceholder;
+  if (intake?.domain === "transport" && intake.pendingField === "asset") return INLINE_AI_TICKET_COPY.transportAssetPlaceholder;
+  return INLINE_AI_TICKET_COPY.placeholder;
+}
 
 export function inlineAiTicketEffectiveAccess({ aiEnabled = false, session = {} } = {}) {
   const role = cleanText(session.role, 40).toLowerCase();
@@ -24,6 +93,7 @@ export function createInlineAiTicketInitialState() {
   return {
     msgs: [{ role: "assistant", content: INLINE_AI_TICKET_COPY.welcome }],
     input: "",
+    intake: null,
     busy: false,
     actionBusy: "",
     actionResults: {},
@@ -44,10 +114,12 @@ export function buildInlineAiTicketRequest({
   text,
   messages = [],
   context,
+  intake = null,
   idempotencyKey = ""
 } = {}) {
   const q = cleanText(text, 2000);
   if (!q) return null;
+  const normalizedIntake = normalizeInlineTicketIntakeState(intake);
   return {
     text: q,
     messages: inlineAiTicketRecentMessages([...messages, { role: "user", content: q }]),
@@ -55,7 +127,11 @@ export function buildInlineAiTicketRequest({
       ...(context && typeof context === "object" && !Array.isArray(context) ? context : {}),
       intent: "create_ticket",
       uiSurface: "inline_ticket_create",
-      taskSession: { type: "ticket_intake", transient: true },
+      taskSession: {
+        type: "ticket_intake",
+        transient: true,
+        ...(normalizedIntake ? { intake: normalizedIntake } : {})
+      },
       currentEntityHintOnly: true
     },
     workflow: AI_ASSIST_WORKFLOWS.ticketIntake,
@@ -71,6 +147,7 @@ export function beginInlineAiTicketSend(state = {}, { text, context, idempotency
     text: q,
     messages: state.msgs || [],
     context,
+    intake: state.intake,
     idempotencyKey
   });
   if (!request) return { state, request: null };
@@ -126,13 +203,16 @@ export function inlineAiTicketPrimaryActionLabel(action = {}) {
 
 export function completeInlineAiTicketSend(state = {}, output = {}) {
   const text = cleanText(output?.text || output?.assistant?.text || output?.draft?.userReply, 4000) || "הכנתי תשובה קצרה.";
+  const allActions = Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : [];
   const actions = inlineAiTicketVisibleActions(
-    Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : []
+    allActions
   );
   const createdTicket = inlineAiTicketFromCapabilityResponse(output);
+  const intake = createdTicket ? null : inlineTicketIntakeStateFromActions(allActions, state.intake);
   return {
     ...state,
     busy: false,
+    intake,
     createdTicket: createdTicket || state.createdTicket || null,
     msgs: [...(state.msgs || []), {
       role: "assistant",

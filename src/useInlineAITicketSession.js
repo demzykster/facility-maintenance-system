@@ -100,6 +100,7 @@ export function useInlineAITicketSession({
     const mode = inlineAiTicketActionMode(action);
     if (mode === "form") {
       onOpenDraft?.(action);
+      reset();
       return null;
     }
     if (!executeAction || !canExecuteAiAssistAction(action) || stateRef.current.actionBusy || stateRef.current.createdTicket) return null;
@@ -133,7 +134,7 @@ export function useInlineAITicketSession({
       setState(failed);
       return null;
     }
-  }, [executeAction, hydrateCreatedTicket, onOpenDraft]);
+  }, [executeAction, hydrateCreatedTicket, onOpenDraft, reset]);
 
   return useMemo(() => ({
     ...state,
