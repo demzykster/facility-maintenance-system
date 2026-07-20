@@ -53,11 +53,12 @@ export function buildInlineAiTicketRequest({
     messages: inlineAiTicketRecentMessages([...messages, { role: "user", content: q }]),
     context: {
       ...(context && typeof context === "object" && !Array.isArray(context) ? context : {}),
+      intent: "create_ticket",
       uiSurface: "inline_ticket_create",
       taskSession: { type: "ticket_intake", transient: true },
       currentEntityHintOnly: true
     },
-    workflow: AI_ASSIST_WORKFLOWS.draftPreparation,
+    workflow: AI_ASSIST_WORKFLOWS.ticketIntake,
     includeProviderPlan: true,
     idempotencyKey: cleanText(idempotencyKey, 200)
   };

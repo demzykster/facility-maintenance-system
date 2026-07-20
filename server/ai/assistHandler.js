@@ -24,6 +24,7 @@ import { ticketServerCreateV2Status } from "../../src/ticketServerCreateCutoverM
 
 const MAX_BODY_BYTES = 64_000;
 const MAX_TEXT_CHARS = 2_000;
+const TICKET_INTAKE_FLEET_LIMIT = 2_000;
 const DEFAULT_RATE_LIMIT_MS = 10_000;
 const AI_ASSIST_RATE_BUCKETS = new Map();
 
@@ -190,6 +191,22 @@ function actionGuidanceForProvider(actions = []) {
   };
 }
 
+function ticketIntakeMissingFieldQuestion(actions = []) {
+  const ticketAction = (Array.isArray(actions) ? actions : [])
+    .find((action) => action?.type === "ticket.create" && Array.isArray(action.missingFields) && action.missingFields.length);
+  if (!ticketAction) return "";
+  const missing = new Set(ticketAction.missingFields.map((field) => cleanText(field, 80)).filter(Boolean));
+  const track = cleanText(ticketAction?.payload?.track, 40);
+  if (track === "transport" && missing.has("forkliftId")) {
+    return "מה מספר הכלי או המלגזה שעליה לפתוח את הקריאה?";
+  }
+  if (track === "facility" && missing.has("zone")) {
+    return "באיזה אזור או מקום התקלה? למשל מחסן, חדר טעינה או קו ייצור.";
+  }
+  if (missing.size) return `חסר לי פרט אחד לפתיחת הקריאה: ${[...missing].join(", ")}.`;
+  return "";
+}
+
 function assistantCapabilityGuidanceForProvider() {
   return {
     writeModel: "The language model text is read-only, but the CMMS app can show deterministic action cards that the human may confirm in the interface.",
@@ -229,6 +246,28 @@ function actionsAllowedForActor(actions = [], { env = {}, actor = {} } = {}) {
     if (action?.type === "memory.fact.create") return memoryAllowed;
     return true;
   });
+}
+
+function isTicketIntakeRequestBody(body = {}, workflow = "") {
+  const context = body?.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {};
+  const taskSession = context?.taskSession && typeof context.taskSession === "object" && !Array.isArray(context.taskSession) ? context.taskSession : {};
+  return workflow === AI_ASSIST_WORKFLOWS.ticketIntake
+    || context.intent === "create_ticket"
+    || context.uiSurface === "inline_ticket_create"
+    || taskSession.type === "ticket_intake";
+}
+
+async function buildServerFleetActionContext({ body = {}, authUser = {}, backendFleetDriver = null } = {}) {
+  if (!backendFleetDriver || typeof backendFleetDriver.list !== "function") return { context: null, fullVisibleFleet: [] };
+  const serverFleet = await backendFleetDriver.list({ limit: TICKET_INTAKE_FLEET_LIMIT });
+  const context = buildAiAssistContext({
+    ...(body.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {}),
+    fleet: serverFleet
+  }, authUser, { limits: { fleet: TICKET_INTAKE_FLEET_LIMIT } });
+  return {
+    context,
+    fullVisibleFleet: Array.isArray(context?.fleet) ? context.fleet : []
+  };
 }
 
 async function writeMemoryProposalAuditEvents({ auditDriver, actions = [], actor = {}, requestId = "", at } = {}) {
@@ -621,9 +660,28 @@ export function createAiAssistHandler({
       });
 
       const context = buildAiAssistContext(body.context, auth.user);
+      const ticketIntakeRequest = isTicketIntakeRequestBody(body, workflow);
+      let actionContext = context;
+      let fullVisibleFleet = [];
+      if (ticketIntakeRequest) {
+        try {
+          const serverFleetContext = await buildServerFleetActionContext({
+            body,
+            authUser: auth.user,
+            backendFleetDriver
+          });
+          if (serverFleetContext.context) {
+            actionContext = serverFleetContext.context;
+            fullVisibleFleet = serverFleetContext.fullVisibleFleet;
+          }
+        } catch {
+          actionContext = context;
+          fullVisibleFleet = [];
+        }
+      }
       const draft = buildAiIntakeDraft(draftInput, currentTime);
       const actions = actionsAllowedForActor(
-        buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context }),
+        buildAiAssistActionProposals({ draft, user: auth.user, now: currentTime, context: actionContext }),
         { env, actor: auth.user }
       );
       await writeMemoryProposalAuditEvents({
@@ -646,10 +704,12 @@ export function createAiAssistHandler({
             idempotencyKey: body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"]
           }, {
             user: auth.user,
-            context,
+            context: actionContext,
+            fullVisibleFleet,
             rawContext: body.context,
             text: draft.rawText,
             module: draft.module,
+            workflow,
             now: currentTime
           });
         } catch (error) {
@@ -798,7 +858,10 @@ export function createAiAssistHandler({
         providerUsedMemoryIds: result.usedMemoryIds,
         userRequest: latestUserRequest || draft.rawText
       });
-      const assistantText = cleanAssistantText(grounded.text, 4_000);
+      const deterministicTicketIntakeQuestion = ticketIntakeRequest
+        ? ticketIntakeMissingFieldQuestion(actions)
+        : "";
+      const assistantText = cleanAssistantText(deterministicTicketIntakeQuestion || grounded.text, 4_000);
       let persistedAssistantMessage = null;
       if (conversationRecord && backendConversationStore) {
         const baseIdempotencyKey = cleanText(body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"] || requestId, 200);

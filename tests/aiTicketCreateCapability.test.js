@@ -25,6 +25,7 @@ async function execute(text, options = {}) {
   }, {
     user: options.user || user,
     context: options.context || { fleet: [fleet226], tickets: options.tickets || [] },
+    fullVisibleFleet: options.fullVisibleFleet || [],
     rawContext: options.rawContext || {},
     text,
     module: options.module || "transport",
@@ -57,6 +58,52 @@ describe("AI ticket.create capability", () => {
       "get_ticket_create_contract"
     ]);
     expect(JSON.stringify(driver.create.mock.calls[0][0])).not.toMatch(/мотор|ремень|перегрев/i);
+  });
+
+  it("resolves a visible display number beyond the compact provider fleet snapshot", async () => {
+    const compactFleet = Array.from({ length: 18 }, (_, index) => ({
+      id: `visible-${index + 1}`,
+      code: String(100 + index),
+      department: "Ops"
+    }));
+    const fullVisibleFleet = [
+      ...compactFleet,
+      { id: "forklift-210", code: "210", supplier: "LiftCo", department: "Ops", status: "active" }
+    ];
+
+    const { result, driver } = await execute("במלגזה 210 הגלגלים שבורים", {
+      context: { fleet: compactFleet, tickets: [] },
+      fullVisibleFleet
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      track: "transport",
+      asset: "210",
+      forkliftId: "forklift-210",
+      description: "במלגזה 210 הגלגלים שבורים"
+    }), expect.any(Object));
+  });
+
+  it("matches numeric and alias-like asset identifiers only inside visible fleet", async () => {
+    const visibleAlias = { id: "forklift-a", vehicleNumber: 210, department: "Ops", status: "active" };
+    const { result, driver } = await execute("Forklift 210 not working", {
+      context: { fleet: [], tickets: [] },
+      fullVisibleFleet: [visibleAlias]
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      forkliftId: "forklift-a",
+      asset: "210"
+    }), expect.any(Object));
+
+    const blocked = await execute("Forklift 210 not working", {
+      context: { fleet: [], tickets: [] },
+      fullVisibleFleet: []
+    });
+    expect(blocked.result.executionStatus).toBe("blocked");
+    expect(blocked.driver.create).not.toHaveBeenCalled();
   });
 
   it("does not create facility tickets through the transport-only autonomous capability", async () => {

@@ -1,5 +1,6 @@
 export const AI_ASSIST_WORKFLOWS = Object.freeze({
   general: "general",
+  ticketIntake: "ticket_intake",
   riskSummary: "risk_summary",
   slaExplanation: "sla_explanation",
   nextActions: "next_actions",
@@ -23,6 +24,9 @@ export function aiAssistWorkflowInstruction(workflow = AI_ASSIST_WORKFLOWS.gener
   }
   if (normalized === AI_ASSIST_WORKFLOWS.nextActions) {
     return "Return 3-5 practical next actions grouped by responsible role. Do not claim any action has been performed.";
+  }
+  if (normalized === AI_ASSIST_WORKFLOWS.ticketIntake) {
+    return "Treat the current request as a task-focused ticket intake. Resolve entities only from server-filtered CMMS context, ask one precise missing question when needed, and do not drift into general chat.";
   }
   if (normalized === AI_ASSIST_WORKFLOWS.draftPreparation) {
     return "Prepare a human-reviewable draft or missing-information checklist. Do not create, update, approve, assign, or close records.";
@@ -55,6 +59,7 @@ export function aiAssistWorkflowLabel(workflow = AI_ASSIST_WORKFLOWS.general) {
   if (normalized === AI_ASSIST_WORKFLOWS.riskSummary) return "סיכום סיכונים";
   if (normalized === AI_ASSIST_WORKFLOWS.slaExplanation) return "הסבר SLA";
   if (normalized === AI_ASSIST_WORKFLOWS.nextActions) return "מה לעשות עכשיו";
+  if (normalized === AI_ASSIST_WORKFLOWS.ticketIntake) return "פתיחת קריאה";
   if (normalized === AI_ASSIST_WORKFLOWS.draftPreparation) return "הכנת טיוטה";
   return "כללי";
 }

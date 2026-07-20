@@ -11,7 +11,7 @@ export function normalizeFleetRecord(unit = {}) {
   const id = cleanString(unit.id);
   if (!id) throw new Error("fleet_id_required");
   const now = Date.now();
-  const code = cleanString(unit.code || unit.num || unit.number || unit.licensePlate || id);
+  const code = cleanString(unit.code || unit.num || unit.number || unit.unitCode || unit.workerNo || unit.workerNumber || unit.vehicleNo || unit.vehicleNumber || unit.registration || unit.registrationNumber || unit.licensePlate || unit.displayNumber || unit.displayNo || id);
   return {
     id,
     code,

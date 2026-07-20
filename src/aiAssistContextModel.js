@@ -150,7 +150,7 @@ function sanitizeFleet(unit = {}) {
   const docsDueDays = numberOrNull(unit.docsDueDays ?? unit.documentsDueDays ?? unit.docDays ?? unit.daysLeft);
   const clean = {
     id: compactId(unit.id),
-    code: compactText(unit.code || unit.number || unit.asset || unit.unitCode, 80),
+    code: compactText(unit.code || unit.num || unit.number || unit.asset || unit.unitCode || unit.workerNo || unit.workerNumber || unit.vehicleNo || unit.vehicleNumber || unit.registration || unit.registrationNumber || unit.licensePlate || unit.displayNumber || unit.displayNo, 80),
     type: compactText(unit.type || unit.model || unit.title, 80),
     department: recordDepartments(unit)[0] || "",
     supplier: compactText(unit.supplier, 120),
@@ -359,9 +359,16 @@ function sanitizeBiSummary(bi = {}, profile) {
   return heatmap.length ? { heatmap } : {};
 }
 
-export function buildAiAssistContext(rawContext = {}, user = {}) {
+function contextLimit(overrides = {}, key = "", fallback = 0) {
+  const value = Number(overrides?.[key]);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+export function buildAiAssistContext(rawContext = {}, user = {}, options = {}) {
   const profile = aiRoleProfile(user);
   const source = rawContext && typeof rawContext === "object" ? rawContext : {};
+  const limitOverrides = options?.limits && typeof options.limits === "object" ? options.limits : {};
+  const maxFleet = contextLimit(limitOverrides, "fleet", MAX_FLEET);
   const fleetSource = Array.isArray(source.fleet)
     ? source.fleet
     : asArray(source.fleet?.docs || source.fleet?.units || source.fleet?.items);
@@ -371,7 +378,7 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     .map((ticket) => sanitizeTicket(ticket, profile));
   const fleet = fleetSource
     .filter((unit) => fleetAllowed(unit, profile))
-    .slice(0, MAX_FLEET)
+    .slice(0, maxFleet)
     .map(sanitizeFleet);
   const pm = asArray(source.pm)
     .filter((item) => profile.canSeeCompany || departmentAllowed(item, profile) || isAssignedToUser(item, profile))
@@ -447,7 +454,7 @@ export function buildAiAssistContext(rawContext = {}, user = {}) {
     },
     limits: {
       tickets: MAX_TICKETS,
-      fleet: MAX_FLEET,
+      fleet: maxFleet,
       users: MAX_USERS,
       pm: MAX_PM,
       tasks: MAX_TASKS,

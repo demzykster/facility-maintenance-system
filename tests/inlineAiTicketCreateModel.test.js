@@ -40,10 +40,11 @@ describe("inline AI ticket create model", () => {
 
     expect(request).toMatchObject({
       text: "במלגזה 123 לא עובד הצופר",
-      workflow: AI_ASSIST_WORKFLOWS.draftPreparation,
+      workflow: AI_ASSIST_WORKFLOWS.ticketIntake,
       includeProviderPlan: true,
       idempotencyKey: "idem-inline",
       context: {
+        intent: "create_ticket",
         uiSurface: "inline_ticket_create",
         taskSession: { type: "ticket_intake", transient: true },
         currentEntityHintOnly: true
@@ -51,6 +52,22 @@ describe("inline AI ticket create model", () => {
     });
     expect(request).not.toHaveProperty("conversationId");
     expect(request.context.currentEntity).toEqual({ id: "asset-123" });
+  });
+
+  it("marks plain inline problem descriptions as ticket-intake instead of general chat", () => {
+    const request = buildInlineAiTicketRequest({
+      text: "המזגן במחסן לא עובד",
+      context: {},
+      idempotencyKey: "idem-facility"
+    });
+
+    expect(request).toMatchObject({
+      workflow: AI_ASSIST_WORKFLOWS.ticketIntake,
+      context: {
+        intent: "create_ticket",
+        taskSession: { type: "ticket_intake", transient: true }
+      }
+    });
   });
 
   it("keeps only transient recent messages and never needs durable conversations", () => {

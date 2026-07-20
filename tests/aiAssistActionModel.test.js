@@ -292,6 +292,68 @@ describe("AI assist action model", () => {
     ]);
   });
 
+  it("treats plain inline transport problem text as ticket intake and resolves visible number 210", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "במלגזה 210 הגלגלים שבורים",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        fleet: [
+          { id: "fleet-210", code: "210", type: "מלקטת", department: "נפחי" }
+        ]
+      }
+    });
+
+    expect(draft).toMatchObject({
+      module: "transport",
+      action: "draft_ticket"
+    });
+    expect(actions).toEqual([
+      expect.objectContaining({
+        type: "ticket.create",
+        payload: expect.objectContaining({
+          track: "transport",
+          forkliftId: "fleet-210",
+          asset: "210"
+        })
+      })
+    ]);
+  });
+
+  it("keeps plain inline facility issues in the ticket flow and asks for a real location instead of guessing from problem words", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "המזגן במחסן לא עובד",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({ draft, user: actor, now: 2000 });
+
+    expect(draft).toMatchObject({
+      module: "facility",
+      action: "draft_ticket"
+    });
+    expect(actions).toEqual([
+      expect.objectContaining({
+        type: "ticket.create",
+        status: "needs_human_input",
+        missingFields: expect.arrayContaining(["zone"]),
+        payload: expect.objectContaining({
+          track: "facility",
+          zone: ""
+        })
+      })
+    ]);
+  });
+
   it("prefills a unique visible fleet unit and routes the last downtime detail to the normal ticket form", () => {
     const draft = buildAiIntakeDraft({
       rawText: "מלגזה 120823 תקועה באזור טעינה",

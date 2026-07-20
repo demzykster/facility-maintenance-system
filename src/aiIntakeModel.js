@@ -27,7 +27,7 @@ const HEBREW_KEYWORDS = {
   cleaning: ["ניקיון", "נקיון", "לכלוך", "מלוכלך", "מלוכלכת", "מלוכלכים", "פסולת", "אשפה", "זבל", "שירותים", "רטוב", "נזילה", "ריח"],
   ppe: ["ביגוד", "נעליים", "נעלי", "קסדה", "כפפות", "אפוד", "מידה"],
   safety: ["סכנה", "מסוכן", "אש", "עשן", "חשמל", "ניצוץ", "פציעה", "חירום"],
-  facility: ["דלת", "שער", "מזגן", "תאורה", "חשמל", "מים", "קיר", "רצפה", "בניין"],
+  facility: ["דלת", "שער", "מזגן", "תאורה", "חשמל", "מים", "נזילה", "קיר", "רצפה", "בניין"],
   supplier: ["ספק", "קבלן", "חשבונית", "הזמנה"],
   task: ["משימה", "פגישה", "תזכורת", "בדיקה"]
 };
@@ -59,6 +59,7 @@ const LOCATION_PATTERNS = [
   /(?:zone|area|department|warehouse|building)\s+([^\n,.]+)/i,
   /(?:в\s+зоне|в\s+отделе|на\s+складе|в\s+складе|в\s+здании|в\s+корпусе|в\s+комнате|в|на|у|около|возле)\s+([^\n,.]+)/iu
 ];
+const LOCATION_PROBLEM_ONLY_RE = /^(?:לא\s+עובד|לא\s+עובדת|שבור|שבורה|שבורים|תקול|תקולה|broken|not\s+working|не\s+работ|сломал)/iu;
 
 const KEYWORDS_BY_MODULE = Object.freeze(
   AI_INTAKE_MODULES.reduce((acc, module) => {
@@ -75,6 +76,12 @@ const STRONG_TASK_WORDS = Object.freeze(["משימה", "פגישה", "תזכור
 
 export function normalizeAiIntakeText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function cleanLocationHint(value = "") {
+  const location = normalizeAiIntakeText(value);
+  if (!location || LOCATION_PROBLEM_ONLY_RE.test(location.toLowerCase())) return "";
+  return location;
 }
 
 export function detectAiIntakeModule(text = "") {
@@ -117,13 +124,14 @@ export function extractAiIntakeSignals(text = "") {
   const normalized = normalizeAiIntakeText(text);
   const lower = normalized.toLowerCase();
   const locationMatch = LOCATION_PATTERNS.map((pattern) => normalized.match(pattern)).find(Boolean);
+  const locationHint = locationMatch ? cleanLocationHint(locationMatch[1]) : "";
   return {
     hasPhotoHint: /תמונה|צילום|photo|picture|image/i.test(normalized),
     hasQrHint: /qr|קוד|ברקוד/i.test(normalized),
     hasPeopleRisk: /אנשים|עובדים|סביב|near people|workers/i.test(normalized),
     hasProductionImpact: /ייצור|קו|חוסם|השבתה|production|line|blocked/i.test(normalized),
-    hasExactLocation: Boolean(locationMatch),
-    locationHint: locationMatch ? locationMatch[1].trim() : "",
+    hasExactLocation: Boolean(locationHint),
+    locationHint,
     hasAssetHint: /#?\d{2,}|מלגזה|רכב|משאית|forklift|truck|vehicle/i.test(normalized),
     riskWords: [...CRITICAL_WORDS, ...HIGH_WORDS].filter((word) => lower.includes(word.toLowerCase()))
   };

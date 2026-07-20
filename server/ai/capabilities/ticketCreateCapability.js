@@ -19,9 +19,9 @@ const cleanArray = (value) => Array.isArray(value) ? value : [];
 const cleanObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
 const CREATE_INTENT_RE = /(заявк|тикет|создай|создать|открой|открыть|פתח|תפתח|צור|קריאה|create|open|ticket|request|report)/iu;
-const PROBLEM_RE = /(не\s+работ|сломал|полом|проблем|בעיה|תקלה|לא\s+עובד|broken|not\s+working|fault|problem)/iu;
+const PROBLEM_RE = /(не\s+работ|сломал|полом|проблем|בעיה|תקלה|לא\s+עובד|שבור|שבורה|שבורים|שבר|broken|not\s+working|fault|problem)/iu;
 const RECURRENCE_RE = /(снова|опять|та\s+же|уже\s+открывал|כבר|שוב|again|same\s+issue|already\s+opened)/iu;
-const DANGEROUS_RE = /(тормоз|дым|искра|искрен|не\s+едет|утеч|подъ[её]м|בלמ|עשן|ניצו|לא\s+נוסע|דליפ|הרמה|brake|smoke(?!\s+test)|spark|won'?t\s+move|leak|lift)/iu;
+const DANGEROUS_RE = /(тормоз|дым|искра|искрен|не\s+едет|утеч|подъ[её]м|בלמ|עשן|ניצו|לא\s+נוסע|דליפ|הרמה|brake|smoke(?!\s+test)|spark|won'?t\s+move|leak|\blift\b)/iu;
 
 function wordsForDisplay(text = "") {
   return cleanText(text, 120)
@@ -37,19 +37,41 @@ function identifierCandidates(text = "") {
     .filter(Boolean);
 }
 
+function normalizeIdentifier(value = "") {
+  return cleanText(value, 160).toLowerCase();
+}
+
 function unitIdentifiers(unit = {}) {
-  return [unit.id, unit.code, unit.number, unit.asset, unit.unitCode]
+  return [
+    unit.id,
+    unit.code,
+    unit.num,
+    unit.number,
+    unit.asset,
+    unit.unitCode,
+    unit.workerNo,
+    unit.workerNumber,
+    unit.vehicleNo,
+    unit.vehicleNumber,
+    unit.registration,
+    unit.registrationNumber,
+    unit.licensePlate,
+    unit.displayNumber,
+    unit.displayNo,
+    ...(Array.isArray(unit.aliases) ? unit.aliases : [])
+  ]
     .map((value) => cleanText(value, 160))
     .filter(Boolean);
 }
 
 function unitMatchesIdentifier(unit = {}, identifier = "") {
-  const cleanIdentifier = cleanText(identifier, 160).toLowerCase();
-  return unitIdentifiers(unit).some((value) => value.toLowerCase() === cleanIdentifier);
+  const cleanIdentifier = normalizeIdentifier(identifier);
+  return unitIdentifiers(unit).some((value) => normalizeIdentifier(value) === cleanIdentifier);
 }
 
-function visibleFleet(context = {}) {
-  return cleanArray(context.fleet).filter((unit) => unit && unit.id);
+function visibleFleet(context = {}, fullVisibleFleet = null) {
+  const source = Array.isArray(fullVisibleFleet) && fullVisibleFleet.length ? fullVisibleFleet : context.fleet;
+  return cleanArray(source).filter((unit) => unit && unit.id);
 }
 
 function currentEntityLooksLikeAsset(current = {}) {
@@ -58,16 +80,21 @@ function currentEntityLooksLikeAsset(current = {}) {
     || current.kind === "fleet"
     || current.id
     || current.code
+    || current.num
     || current.number
     || current.asset
-    || current.unitCode;
+    || current.unitCode
+    || current.workerNo
+    || current.vehicleNumber
+    || current.licensePlate
+    || current.displayNumber;
 }
 
 function findVisibleCurrentAsset({ fleet = [], currentEntity = {} } = {}) {
   const current = cleanObject(currentEntity);
   if (!currentEntityLooksLikeAsset(current)) return null;
   const id = cleanText(current.id, 160);
-  const code = cleanText(current.code || current.number || current.asset || current.unitCode, 160);
+  const code = cleanText(current.code || current.num || current.number || current.asset || current.unitCode || current.workerNo || current.vehicleNumber || current.licensePlate || current.displayNumber, 160);
   if (!id && !code) return null;
 
   if (id) {
@@ -83,8 +110,8 @@ function findVisibleCurrentAsset({ fleet = [], currentEntity = {} } = {}) {
   return { status: "not_found", identifiers: [code], source: "current_entity" };
 }
 
-function findVisibleAsset({ text = "", context = {}, currentEntity = null } = {}) {
-  const fleet = visibleFleet(context);
+function findVisibleAsset({ text = "", context = {}, currentEntity = null, fullVisibleFleet = null } = {}) {
+  const fleet = visibleFleet(context, fullVisibleFleet);
   const currentMatch = findVisibleCurrentAsset({ fleet, currentEntity });
   if (currentMatch) return currentMatch;
   const identifiers = identifierCandidates(text);
@@ -99,9 +126,19 @@ function findVisibleAsset({ text = "", context = {}, currentEntity = null } = {}
   return { status: "not_found", identifiers };
 }
 
-function shouldAutonomousCreate(text = "") {
+function isTicketIntakeContext(context = {}) {
+  const rawContext = cleanObject(context.rawContext);
+  const taskSession = cleanObject(rawContext.taskSession);
+  return rawContext.intent === "create_ticket"
+    || rawContext.uiSurface === "inline_ticket_create"
+    || taskSession.type === "ticket_intake"
+    || cleanText(context.workflow, 80) === "ticket_intake";
+}
+
+function shouldAutonomousCreate(text = "", context = {}) {
   const raw = cleanText(text, 1000);
-  return CREATE_INTENT_RE.test(raw) || PROBLEM_RE.test(raw) || DANGEROUS_RE.test(raw);
+  if (CREATE_INTENT_RE.test(raw) || PROBLEM_RE.test(raw) || DANGEROUS_RE.test(raw)) return true;
+  return isTicketIntakeContext(context) && raw.length > 0;
 }
 
 function createBlockingResponse({ answer, question, facts = [], unknowns = [], toolResults = [], status = AI_CAPABILITY_EXECUTION_STATUS.blocked } = {}) {
@@ -134,7 +171,7 @@ function createTicketPayload({ text = "", user = {}, asset = {}, now = Date.now(
     categoryLabel: "",
     priority: SYSTEM_DOWNTIME_NEEDS_TRIAGE.prio,
     zone: "",
-    asset: cleanText(asset.code || asset.number || asset.asset || asset.id, 160),
+    asset: cleanText(asset.code || asset.num || asset.number || asset.asset || asset.unitCode || asset.workerNo || asset.vehicleNumber || asset.licensePlate || asset.displayNumber || asset.id, 160),
     forkliftId: cleanText(asset.id, 160),
     downtimeType: SYSTEM_DOWNTIME_NEEDS_TRIAGE.id,
     description: cleanText(text, 1200),
@@ -225,6 +262,7 @@ export function createTicketReadCapabilities() {
         const result = findVisibleAsset({
           text: args.text,
           context: cleanObject(context.context),
+          fullVisibleFleet: cleanArray(context.fullVisibleFleet || context.serverVisibleFleet),
           currentEntity: cleanObject(context.rawContext).currentEntity
             || cleanObject(context.rawContext).routeEntity
             || cleanObject(context.rawContext).currentAsset
@@ -257,7 +295,7 @@ export function createTicketReadCapabilities() {
           ok: true,
           result: {
             id: cleanText(asset.id, 160),
-            code: cleanText(asset.code || asset.number || asset.asset, 160),
+            code: cleanText(asset.code || asset.num || asset.number || asset.asset || asset.unitCode || asset.workerNo || asset.vehicleNumber || asset.licensePlate || asset.displayNumber, 160),
             department: cleanText(asset.department || asset.dept, 160),
             supplier: cleanText(asset.supplier, 160),
             status: cleanText(asset.status, 80)
@@ -361,7 +399,7 @@ export function createTicketCreateCapability({ driver = null } = {}) {
       };
       await executeRead("get_current_user_context");
 
-      if (!shouldAutonomousCreate(text)) {
+      if (!shouldAutonomousCreate(text, executionContext)) {
         return normalizeAiCapabilityResponse({
           answer: "",
           unknowns: ["intent"],
@@ -414,7 +452,7 @@ export function createTicketCreateCapability({ driver = null } = {}) {
       }
 
       let asset = cleanObject(assetResult.asset);
-      if (!cleanText(asset.id, 160) || !cleanText(asset.code || asset.number || asset.asset, 160)) {
+      if (!cleanText(asset.id, 160) || !cleanText(asset.code || asset.num || asset.number || asset.asset || asset.unitCode || asset.workerNo || asset.vehicleNumber || asset.licensePlate || asset.displayNumber, 160)) {
         const assetSummary = await executeRead("get_asset_summary", { asset });
         asset = { ...asset, ...assetSummary };
       }

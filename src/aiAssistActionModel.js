@@ -17,13 +17,20 @@ const LOCATION_PATTERNS = [
   /(?:zone|area|department|warehouse|building)\s+([^\n,.]+)/i,
   /(?:в\s+зоне|в\s+отделе|на\s+складе|в\s+складе|в\s+здании|в\s+корпусе|в\s+комнате|в|на|у|около|возле)\s+([^\n,.]+)/iu
 ];
+const LOCATION_PROBLEM_ONLY_RE = /^(?:לא\s+עובד|לא\s+עובדת|שבור|שבורה|שבורים|תקול|תקולה|broken|not\s+working|не\s+работ|сломал)/iu;
+
+function cleanLocationHint(value = "") {
+  const location = cleanText(value, 120);
+  if (!location || LOCATION_PROBLEM_ONLY_RE.test(location.toLowerCase())) return "";
+  return location;
+}
 
 function locationFromDraft(draft = {}) {
-  const signalLocation = cleanText(draft.signals?.locationHint, 120);
+  const signalLocation = cleanLocationHint(draft.signals?.locationHint);
   if (signalLocation) return signalLocation;
   const raw = cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
   const match = LOCATION_PATTERNS.map((pattern) => raw.match(pattern)).find(Boolean);
-  return match ? cleanText(match[1], 120) : "";
+  return match ? cleanLocationHint(match[1]) : "";
 }
 
 function subjectFromDraft(draft = {}) {
@@ -274,8 +281,19 @@ function fleetUnitMatchesText(unit = {}, raw = "") {
   const identifiers = [
     cleanText(unit.id, 120),
     cleanText(unit.code, 120),
+    cleanText(unit.num, 120),
     cleanText(unit.number, 120),
-    cleanText(unit.asset, 120)
+    cleanText(unit.asset, 120),
+    cleanText(unit.unitCode, 120),
+    cleanText(unit.workerNo, 120),
+    cleanText(unit.workerNumber, 120),
+    cleanText(unit.vehicleNo, 120),
+    cleanText(unit.vehicleNumber, 120),
+    cleanText(unit.registration, 120),
+    cleanText(unit.registrationNumber, 120),
+    cleanText(unit.licensePlate, 120),
+    cleanText(unit.displayNumber, 120),
+    cleanText(unit.displayNo, 120)
   ].filter((value) => value.length >= 2);
   return identifiers.some((value) => {
     const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -602,7 +620,7 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   const priority = priorityFromDowntimeType(downtimeType) || priorityFromSeverity(draft.severity);
   const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   const fleetUnit = track === "transport" ? draftFleetUnitFromText(draft.rawText, context.fleet) : null;
-  const fleetAsset = fleetUnit ? cleanText(fleetUnit.code || fleetUnit.number || fleetUnit.asset || fleetUnit.id, 160) : "";
+  const fleetAsset = fleetUnit ? cleanText(fleetUnit.code || fleetUnit.num || fleetUnit.number || fleetUnit.asset || fleetUnit.unitCode || fleetUnit.workerNo || fleetUnit.vehicleNumber || fleetUnit.licensePlate || fleetUnit.displayNumber || fleetUnit.id, 160) : "";
   const payload = {
     track,
     subject,

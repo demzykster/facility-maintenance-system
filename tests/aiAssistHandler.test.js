@@ -138,6 +138,69 @@ describe("AI assist handler", () => {
     expect(providerCall).not.toHaveBeenCalled();
   });
 
+  it("resolves inline ticket intake assets from server-visible fleet beyond compact client context", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-210",
+        num: 2101,
+        ticketNo: "T-2101",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
+    const fleetDriver = {
+      list: vi.fn().mockResolvedValue([
+        ...Array.from({ length: 18 }, (_, index) => ({
+          id: `fleet-${100 + index}`,
+          code: String(100 + index),
+          department: "נפחי"
+        })),
+        { id: "fleet-210", code: "210", type: "מלקטת", department: "נפחי" }
+      ])
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", department: "נפחי", departments: ["נפחי"], permissions: autonomyPermission }),
+      ticketsDriver,
+      fleetDriver,
+      providerCall,
+      now: () => 1001,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "במלגזה 210 הגלגלים שבורים",
+        idempotencyKey: "idem-inline-210",
+        workflow: "ticket_intake",
+        context: {
+          uiSurface: "inline_ticket_create",
+          taskSession: { type: "ticket_intake", transient: true },
+          fleet: [{ id: "fleet-100", code: "100", department: "נפחי" }],
+          tickets: []
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().capabilityResponse).toMatchObject({
+      executionStatus: "created",
+      actionResult: { ticketId: "ticket-210", ticketNumber: "T-2101" }
+    });
+    expect(ticketsDriver.create).toHaveBeenCalledWith(expect.objectContaining({
+      forkliftId: "fleet-210",
+      asset: "210"
+    }), expect.any(Object));
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
   it("blocks autonomous create when global flag is on but the server-side user lacks explicit autonomy permission", async () => {
     const providerCall = vi.fn();
     const ticketsDriver = { create: vi.fn() };
@@ -2151,6 +2214,55 @@ describe("AI assist handler", () => {
       readyActionCount: 1,
       missingFields: []
     });
+  });
+
+  it("uses a deterministic missing-location question for inline facility ticket intake", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "היי, אני יכול להכין עבורך טיוטה לפתיחת קריאת שירות על המזגן"
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      providerCall,
+      now: () => 656,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "המזגן במחסן לא עובד",
+        language: "he",
+        workflow: "ticket_intake",
+        context: {
+          intent: "create_ticket",
+          uiSurface: "inline_ticket_create",
+          taskSession: { type: "ticket_intake", transient: true }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload.assistant.text).toBe("באיזה אזור או מקום התקלה? למשל מחסן, חדר טעינה או קו ייצור.");
+    expect(payload.actions).toEqual([
+      expect.objectContaining({
+        type: "ticket.create",
+        status: "needs_human_input",
+        missingFields: expect.arrayContaining(["zone"]),
+        payload: expect.objectContaining({
+          track: "facility",
+          zone: ""
+        })
+      })
+    ]);
   });
 
   it("does not merge a short non-operational latest message into an older action request", async () => {

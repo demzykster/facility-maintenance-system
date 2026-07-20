@@ -22,7 +22,8 @@ export function shouldRequestProviderPlan(workflow = AI_ASSIST_WORKFLOWS.general
   return [
     AI_ASSIST_WORKFLOWS.riskSummary,
     AI_ASSIST_WORKFLOWS.nextActions,
-    AI_ASSIST_WORKFLOWS.draftPreparation
+    AI_ASSIST_WORKFLOWS.draftPreparation,
+    AI_ASSIST_WORKFLOWS.ticketIntake
   ].includes(workflow);
 }
 
