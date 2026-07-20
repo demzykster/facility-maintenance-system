@@ -16,7 +16,9 @@ describe("inline AI ticket create boundary", () => {
   });
 
   it("uses the existing AI API client and never talks to providers or Supabase directly from the inline slice", () => {
-    expect(hookSource).toContain("callAssistant(request)");
+    expect(hookSource).toContain("callAssistant({ ...request");
+    expect(hookSource).toContain("AbortController");
+    expect(hookSource).toContain("timeoutMs");
     expect(hookSource).not.toContain("createAiConversation");
     expect(hookSource).not.toContain("listAiConversations");
     expect(hookSource).not.toContain("supabase");
@@ -49,5 +51,14 @@ describe("inline AI ticket create boundary", () => {
 
   it("preserves autonomous server ticket results through the existing API client", () => {
     expect(apiClientSource).toContain("capabilityResponse");
+  });
+
+  it("guards the inline session lifecycle against stale or late responses", () => {
+    expect(hookSource).toContain("requestSeqRef");
+    expect(hookSource).toContain("requestSeqRef.current += 1");
+    expect(hookSource).toContain("abortRef.current?.abort?.()");
+    expect(hookSource).toContain("if (requestSeqRef.current !== requestSeq) return null");
+    expect(hookSource).toContain("if (timeout) clearTimeout(timeout)");
+    expect(hookSource).toContain("idempotencyKeyRef.current = \"\"");
   });
 });

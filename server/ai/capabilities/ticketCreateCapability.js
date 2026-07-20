@@ -139,18 +139,15 @@ function findVisibleAsset({ text = "", context = {}, currentEntity = null, fullV
 }
 
 function isTicketIntakeContext(context = {}) {
-  const rawContext = cleanObject(context.rawContext);
-  const taskSession = cleanObject(rawContext.taskSession);
-  return rawContext.intent === "create_ticket"
-    || rawContext.uiSurface === "inline_ticket_create"
-    || taskSession.type === "ticket_intake"
-    || cleanText(context.workflow, 80) === "ticket_intake";
+  return cleanText(context.workflow, 80) === "ticket_intake";
 }
 
 function shouldAutonomousCreate(text = "", context = {}) {
   const raw = cleanText(text, 1000);
+  if (!isTicketIntakeContext(context)) return false;
   const previousIntake = normalizeInlineTicketIntakeSession(context.intake || cleanObject(context.rawContext).taskSession?.intake);
   if (previousIntake?.pendingField && raw.length > 0) return true;
+  if (raw.length > 0) return true;
   return CREATE_INTENT_RE.test(raw) || PROBLEM_RE.test(raw) || DANGEROUS_RE.test(raw);
 }
 
@@ -605,7 +602,7 @@ export function createTicketCreateCapability({ driver = null } = {}) {
             question: "",
             unknowns: ["idempotency_conflict"],
             toolResults,
-            status: AI_CAPABILITY_EXECUTION_STATUS.failed
+            status: AI_CAPABILITY_EXECUTION_STATUS.conflict
           });
         }
         return createBlockingResponse({

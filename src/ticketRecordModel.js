@@ -26,7 +26,7 @@ export function normalizeTicketRecord(ticket = {}) {
     priority: cleanString(ticket.priority),
     category: cleanString(ticket.category || ticket.cat),
     location: cleanString(ticket.location || ticket.zone),
-    assetId: cleanString(ticket.assetId || ticket.asset_id || ticket.fleetId),
+    assetId: cleanString(ticket.assetId || ticket.asset_id || ticket.fleetId || ticket.forkliftId),
     assigneeId: cleanString(ticket.assigneeId || ticket.assignee_id),
     assigneeName: cleanString(ticket.assignee || ticket.assigneeName),
     reportedById: cleanString(ticket.reportedBy?.id || ticket.reportedById || ticket.createdBy?.id),

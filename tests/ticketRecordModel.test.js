@@ -38,6 +38,17 @@ describe("ticketRecordModel", () => {
     });
   });
 
+  it("maps transport forkliftId into the normalized asset column", () => {
+    expect(ticketRecordToSupabaseRow({
+      id: "T-210",
+      track: "transport",
+      subject: "Fork head",
+      forkliftId: "fleet-210"
+    })).toMatchObject({
+      asset_id: "fleet-210"
+    });
+  });
+
   it("does not send legacy non-UUID user ids into UUID foreign-key columns", () => {
     expect(ticketRecordToSupabaseRow({
       id: "T-legacy",

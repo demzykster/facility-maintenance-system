@@ -60,11 +60,19 @@ export function createSupabaseTicketsDriver({ url, serviceRoleKey, table = "tick
     },
     async create(ticket, { idempotencyKey = "", requestHash = "", actorId = "" } = {}) {
       const row = ticketRecordToSupabaseRow(ticket);
+      const rpcPayload = {
+        ...row,
+        legacy_payload: {
+          ...(row.legacy_payload || {}),
+          location: row.location,
+          asset_id: row.asset_id
+        }
+      };
       const response = await fetchImpl(`${rpcBase}/cmms_create_ticket`, {
         method: "POST",
         headers: serviceHeaders(serviceRoleKey),
         body: JSON.stringify({
-          ticket_payload: row,
+          ticket_payload: rpcPayload,
           idempotency_key: idempotencyKey,
           request_hash: requestHash,
           actor_id: actorId

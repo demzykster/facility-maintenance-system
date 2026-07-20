@@ -493,10 +493,10 @@ describe("AI ticket.create capability", () => {
     expect(result.answer).toContain("T-1842");
   });
 
-  it("returns failed when the create capability cannot persist or idempotency conflicts", async () => {
+  it("returns conflict for idempotency conflicts and failed for persistence errors", async () => {
     const conflict = { create: vi.fn().mockRejectedValue(new Error("idempotency_conflict")) };
     expect((await execute("Не работает вентилятор на машине 226", { driver: conflict })).result).toMatchObject({
-      executionStatus: "failed",
+      executionStatus: "conflict",
       unknowns: ["idempotency_conflict"]
     });
 

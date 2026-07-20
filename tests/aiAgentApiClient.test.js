@@ -117,6 +117,55 @@ describe("AI agent API client", () => {
     expect(fetchImpl.mock.calls[0][0]).toBe("/api/ai/assist");
   });
 
+  it("aborts slow assist requests with a stable timeout error", async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn((_url, options = {}) => new Promise((_resolve, reject) => {
+      options.signal?.addEventListener("abort", () => {
+        reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+      });
+    }));
+
+    const pending = callAiAssistApi({
+      text: "בדיקה",
+      getAccessToken: async () => "token",
+      fetchImpl,
+      timeoutMs: 25,
+      idempotencyKey: "idem-timeout"
+    });
+    const expectation = expect(pending).rejects.toThrow("ai_assist_timeout");
+    await vi.advanceTimersByTimeAsync(25);
+    await expectation;
+    expect(fetchImpl.mock.calls[0][1].signal).toBeTruthy();
+    vi.useRealTimers();
+  });
+
+  it("keeps the caller idempotency key intact when an external abort stops client waiting", async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn((_url, options = {}) => new Promise((_resolve, reject) => {
+      options.signal?.addEventListener("abort", () => {
+        reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+      });
+    }));
+
+    const pending = callAiAssistApi({
+      text: "מזגן מטפטף",
+      workflow: AI_ASSIST_WORKFLOWS.ticketIntake,
+      getAccessToken: async () => "token",
+      fetchImpl,
+      signal: controller.signal,
+      timeoutMs: 0,
+      idempotencyKey: "idem-client-abort"
+    });
+    await vi.waitUntil(() => fetchImpl.mock.calls.length === 1);
+    controller.abort();
+
+    await expect(pending).rejects.toThrow("ai_assist_timeout");
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({
+      workflow: AI_ASSIST_WORKFLOWS.ticketIntake,
+      idempotencyKey: "idem-client-abort"
+    });
+  });
+
   it("passes conversationId through assist only when provided", () => {
     expect(buildAiAssistApiPayload({
       text: "בדיקה",

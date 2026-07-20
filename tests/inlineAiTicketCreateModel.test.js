@@ -321,4 +321,20 @@ describe("inline AI ticket create model", () => {
       idempotencyKey: "same-key"
     });
   });
+
+  it("uses a controlled timeout message and keeps retry on the same idempotency key", () => {
+    const failed = failInlineAiTicketSend({
+      ...createInlineAiTicketInitialState(),
+      busy: true,
+      input: "מזגן מטפטף"
+    }, new Error("ai_assist_timeout"));
+
+    expect(failed.busy).toBe(false);
+    expect(failed.error).toBe("ai_assist_timeout");
+    expect(failed.msgs.at(-1).content).toBe("הבקשה מתעכבת. אפשר לנסות שוב בלי ליצור קריאה כפולה.");
+    expect(beginInlineAiTicketSend({ ...failed, input: "מזגן מטפטף" }, {
+      context: {},
+      idempotencyKey: "same-key"
+    }).request).toMatchObject({ idempotencyKey: "same-key" });
+  });
 });

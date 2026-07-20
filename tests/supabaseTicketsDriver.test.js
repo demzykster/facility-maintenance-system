@@ -58,7 +58,7 @@ describe("Supabase tickets driver", () => {
       fetchImpl
     });
 
-    await expect(driver.create({ id: "T-10", num: 99, track: "transport", forkliftId: "226" }, {
+    await expect(driver.create({ id: "T-10", num: 99, track: "facility", zone: "בקרי איכות", fleetId: "fleet-210" }, {
       idempotencyKey: "key-1",
       requestHash: "hash-1",
       actorId: "u1"
@@ -80,7 +80,14 @@ describe("Supabase tickets driver", () => {
       ticket_payload: {
         id: "T-10",
         num: 99,
-        track: "transport"
+        track: "facility",
+        location: "בקרי איכות",
+        asset_id: "fleet-210",
+        legacy_payload: expect.objectContaining({
+          zone: "בקרי איכות",
+          location: "בקרי איכות",
+          asset_id: "fleet-210"
+        })
       }
     });
   });

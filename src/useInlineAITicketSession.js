@@ -37,17 +37,23 @@ export function useInlineAITicketSession({
   executeAction,
   readTicket,
   onOpenDraft,
-  makeIdempotencyKey = createAiAssistIdempotencyKey
+  makeIdempotencyKey = createAiAssistIdempotencyKey,
+  requestTimeoutMs = 25000
 } = {}) {
   const [state, setState] = useState(() => createInlineAiTicketInitialState());
   const stateRef = useRef(state);
   const idempotencyKeyRef = useRef("");
+  const abortRef = useRef(null);
+  const requestSeqRef = useRef(0);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
   const reset = useCallback(() => {
+    requestSeqRef.current += 1;
+    abortRef.current?.abort?.();
+    abortRef.current = null;
     idempotencyKeyRef.current = "";
     setState(createInlineAiTicketInitialState());
   }, []);
@@ -86,20 +92,34 @@ export function useInlineAITicketSession({
     if (!request) return null;
     stateRef.current = sendingState;
     setState(sendingState);
+    const requestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = requestSeq;
+    abortRef.current?.abort?.();
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    let timeout = null;
+    abortRef.current = controller;
+    if (controller && Number(requestTimeoutMs) > 0) {
+      timeout = setTimeout(() => controller.abort(), Number(requestTimeoutMs));
+    }
     try {
-      const output = await callAssistant(request);
+      const output = await callAssistant({ ...request, signal: controller?.signal || null, timeoutMs: requestTimeoutMs });
+      if (requestSeqRef.current !== requestSeq) return null;
       const completed = completeInlineAiTicketSend(stateRef.current, output);
       stateRef.current = completed;
       setState(completed);
       if (completed.createdTicket?.id) await hydrateCreatedTicket(completed.createdTicket);
       return output;
     } catch (error) {
+      if (requestSeqRef.current !== requestSeq) return null;
       const failed = failInlineAiTicketSend(stateRef.current, error);
       stateRef.current = failed;
       setState(failed);
       return null;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+      if (requestSeqRef.current === requestSeq) abortRef.current = null;
     }
-  }, [callAssistant, context, ensureIdempotencyKey, hydrateCreatedTicket]);
+  }, [callAssistant, context, ensureIdempotencyKey, hydrateCreatedTicket, requestTimeoutMs]);
 
   const runAction = useCallback(async (action) => {
     const mode = inlineAiTicketActionMode(action);

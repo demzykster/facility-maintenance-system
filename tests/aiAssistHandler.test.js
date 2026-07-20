@@ -450,6 +450,370 @@ describe("AI assist handler", () => {
     expect(ticketsDriver.create).not.toHaveBeenCalled();
   });
 
+  it("completes deterministic inline facility intake without calling the provider when config is authoritative", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-facility-qa",
+        num: 42,
+        ticketNo: "F-042",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
+    const appConfigDriver = {
+      get: vi.fn().mockResolvedValue({
+        config: {
+          categories: [{ id: "hvac", label: "מיזוג אוויר" }],
+          zones: ["בקרי איכות"]
+        }
+      })
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      appConfigDriver,
+      providerCall,
+      now: () => 1005,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: inlineTicketBody({
+        text: "מזגן מטפטף אצל בקרי איכות",
+        idempotencyKey: "idem-facility-qa",
+        context: { tickets: [] }
+      })
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().capabilityResponse).toMatchObject({
+      executionStatus: "created",
+      actionResult: {
+        ticketId: "ticket-facility-qa",
+        track: "facility",
+        category: "hvac",
+        zone: "בקרי איכות"
+      }
+    });
+    expect(ticketsDriver.create).toHaveBeenCalledTimes(1);
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
+  it("does not run deterministic create for inline-looking context unless the workflow is ticket_intake", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-test",
+      text: "אפשר לפתוח קריאה רק מתוך תהליך פתיחת קריאה."
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      now: () => 10051,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "מזגן מטפטף אצל בקרי איכות",
+        workflow: "general",
+        idempotencyKey: "idem-inline-looking-general",
+        context: {
+          intent: "create_ticket",
+          uiSurface: "inline_ticket_create",
+          taskSession: { type: "ticket_intake", transient: true },
+          tickets: []
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("google");
+    expect(res.json().capabilityResponse).toBeUndefined();
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not continue spoofed pending ticket intake unless the workflow is ticket_intake", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-test",
+      text: "תשובה רגילה ללא פתיחת קריאה."
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      now: () => 100511,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "בקרי איכות",
+        workflow: "general",
+        context: {
+          taskSession: {
+            type: "ticket_intake",
+            transient: true,
+            intake: {
+              domain: "facility",
+              pendingField: "location",
+              draft: { track: "facility", subject: "מזגן מטפטף", category: "hvac", priority: "medium" }
+            }
+          },
+          tickets: []
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("google");
+    expect(res.json().capabilityResponse).toBeUndefined();
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["global AIPanel", "מזגן מטפטף אצל בקרי איכות"],
+    ["ordinary AI chat", "צריך ליצור קריאה על מזגן מטפטף אצל בקרי איכות"],
+    ["old tickets question", "איך רואים קריאות ישנות?"],
+    ["informational request", "מה המשמעות של SLA בקריאות אחזקה?"]
+  ])("keeps %s on the non-writing provider path", async (_label, text) => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-test",
+      text: "תשובה ללא כתיבה."
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      now: () => 10052,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text,
+        workflow: "general",
+        context: { tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("google");
+    expect(res.json().capabilityResponse).toBeUndefined();
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
+  it("does not let provider text or structured plans elevate a general request into ticket create", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-test",
+      text: "I created ticket F-999."
+    });
+    const providerObjectCall = vi.fn().mockResolvedValue({
+      ok: true,
+      object: {
+        intent: "create_ticket",
+        actions: [{ type: "ticket.create", status: "ready_for_confirmation", payload: { track: "facility" } }]
+      }
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      providerObjectCall,
+      now: () => 10053,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "מזגן מטפטף אצל בקרי איכות",
+        workflow: "general",
+        includeProviderPlan: true,
+        context: { tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.text).toBe("I created ticket F-999.");
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerObjectCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed without ticket create when facility config lookup times out before planning", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = { create: vi.fn() };
+    const appConfigDriver = {
+      get: vi.fn(() => new Promise(() => {}))
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_INLINE_TICKET_BOUNDARY_TIMEOUT_MS: "5",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      appConfigDriver,
+      providerCall,
+      now: () => 1006,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: inlineTicketBody({
+        text: "מזגן מטפטף אצל בקרי איכות",
+        idempotencyKey: "idem-facility-timeout",
+        context: { tickets: [] }
+      })
+    });
+
+    expect(res.statusCode).toBe(504);
+    expect(res.json()).toMatchObject({
+      error: "inline_ticket_intake_timeout",
+      stage: "config"
+    });
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
+  it("fails closed without ticket create when fleet lookup times out before transport planning", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = { create: vi.fn() };
+    const fleetDriver = {
+      list: vi.fn(() => new Promise(() => {}))
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_INLINE_TICKET_BOUNDARY_TIMEOUT_MS: "5",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      fleetDriver,
+      providerCall,
+      now: () => 10061,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: inlineTicketBody({
+        text: "במלגזה 210 ראש קילש לא עובד",
+        idempotencyKey: "idem-fleet-timeout",
+        context: { tickets: [] }
+      })
+    });
+
+    expect(res.statusCode).toBe(504);
+    expect(res.json()).toMatchObject({
+      error: "inline_ticket_intake_timeout",
+      stage: "fleet"
+    });
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
+  it("returns a controlled provider timeout instead of hanging a general assist request", async () => {
+    const providerCall = vi.fn(() => new Promise(() => {}));
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_PROVIDER_TIMEOUT_MS: "5",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      providerCall,
+      now: () => 1007,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "מה מצב התחזוקה?",
+        language: "he",
+        workflow: "general",
+        context: { tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toMatchObject({
+      error: "ai_provider_failed",
+      providerErrorCode: "ai_provider_timeout"
+    });
+  });
+
   it("blocks inactive authenticated users before autonomous permission can be used", async () => {
     const handler = createAiAssistHandler({
       sessionClient: sessionClient({ active: false, role: "user", permissions: autonomyPermission }),

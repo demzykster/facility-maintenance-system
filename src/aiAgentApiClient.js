@@ -29,6 +29,37 @@ export function buildAiAssistApiPayload({
   };
 }
 
+const DEFAULT_AI_ASSIST_TIMEOUT_MS = 30000;
+
+function abortErrorMessage(error = {}) {
+  const message = String(error?.message || error || "");
+  if (error?.name === "AbortError" || /abort|timeout/i.test(message)) return "ai_assist_timeout";
+  return message || "ai_assist_failed";
+}
+
+async function fetchWithTimeout(fetchImpl, url, options = {}, timeoutMs = DEFAULT_AI_ASSIST_TIMEOUT_MS, externalSignal = null) {
+  const ms = Number(timeoutMs || 0);
+  if ((!ms && !externalSignal) || typeof AbortController === "undefined") {
+    return fetchImpl(url, { ...options, ...(externalSignal ? { signal: externalSignal } : {}) });
+  }
+  const controller = new AbortController();
+  let timeout = null;
+  const abort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener("abort", abort, { once: true });
+  }
+  if (ms > 0) timeout = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetchImpl(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    throw new Error(abortErrorMessage(error));
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    if (externalSignal) externalSignal.removeEventListener?.("abort", abort);
+  }
+}
+
 export async function callAiAssistApi({
   text,
   messages,
@@ -38,13 +69,15 @@ export async function callAiAssistApi({
   includeProviderPlan = false,
   idempotencyKey = createAiAssistIdempotencyKey(),
   getAccessToken = async () => "",
-  fetchImpl = typeof fetch !== "undefined" ? fetch : null
+  fetchImpl = typeof fetch !== "undefined" ? fetch : null,
+  signal = null,
+  timeoutMs = DEFAULT_AI_ASSIST_TIMEOUT_MS
 } = {}) {
   if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
   const accessToken = await getAccessToken();
   const headers = { "content-type": "application/json" };
   if (accessToken) headers.authorization = `Bearer ${accessToken}`;
-  const res = await fetchImpl("/api/ai/assist", {
+  const res = await fetchWithTimeout(fetchImpl, "/api/ai/assist", {
     method: "POST",
     credentials: "include",
     headers,
@@ -57,7 +90,7 @@ export async function callAiAssistApi({
       includeProviderPlan,
       idempotencyKey
     }))
-  });
+  }, timeoutMs, signal);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (Array.isArray(data?.actions) && data.actions.length) {

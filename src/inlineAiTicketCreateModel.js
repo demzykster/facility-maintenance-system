@@ -229,13 +229,16 @@ export function completeInlineAiTicketSend(state = {}, output = {}) {
 
 export function failInlineAiTicketSend(state = {}, error = {}) {
   const code = cleanText(error?.message || error, 200);
+  const timeout = code === "ai_assist_timeout" || /timeout|abort/i.test(code);
   return {
     ...state,
     busy: false,
     error: code || "inline_ai_ticket_failed",
     msgs: [...(state.msgs || []), {
       role: "assistant",
-      content: "לא הצלחתי להשלים את פתיחת הקריאה כרגע. אפשר לנסות שוב."
+      content: timeout
+        ? "הבקשה מתעכבת. אפשר לנסות שוב בלי ליצור קריאה כפולה."
+        : "לא הצלחתי להשלים את פתיחת הקריאה כרגע. אפשר לנסות שוב."
     }]
   };
 }

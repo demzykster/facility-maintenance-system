@@ -56,7 +56,7 @@ Each exception must include:
 
 - Date: 2026-07-20
 - Owner goal: unified inline AI ticket creation for transport and facility intake.
-- New line count: 10013.
-- Why necessary: the existing new-ticket type picker and AI API adapter wiring still live in `src/ClaudeMaintenanceApp.jsx`; the shell needs minimal wiring to mount the extracted inline AI intake and pass its idempotency key to the server AI boundary so UI replay protection uses the same server-owned create contract.
+- New line count: 10015.
+- Why necessary: the existing new-ticket type picker and AI API adapter wiring still live in `src/ClaudeMaintenanceApp.jsx`; the shell needs minimal wiring to mount the extracted inline AI intake and pass its idempotency key, abort signal, and bounded request timeout to the server AI boundary so UI replay protection and latency handling use the same server-owned create contract.
 - Why extraction was not the right move: the intake orchestration, transient request state, capability validation, and compact UI live outside the shell in `src/inlineAiTicketIntakeOrchestrator.js`, `src/InlineAITicketCreate.jsx`, `src/useInlineAITicketSession.js`, `src/inlineAiTicketCreateModel.js`, and `server/ai/capabilities/`; extracting the whole ticket form/modal would be a larger ticket-module vertical slice than this focused correction.
 - Follow-up/removal condition: when the ticket create modal/form is extracted into a ticket module, move this inline AI mount and API adapter wiring with it and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

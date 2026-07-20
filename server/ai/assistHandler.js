@@ -27,6 +27,8 @@ const MAX_BODY_BYTES = 64_000;
 const MAX_TEXT_CHARS = 2_000;
 const TICKET_INTAKE_FLEET_LIMIT = 2_000;
 const DEFAULT_RATE_LIMIT_MS = 10_000;
+const DEFAULT_INLINE_TICKET_BOUNDARY_TIMEOUT_MS = 8_000;
+const DEFAULT_AI_PROVIDER_TIMEOUT_MS = 25_000;
 const AI_ASSIST_RATE_BUCKETS = new Map();
 const INLINE_TICKET_CREATE_BUCKET_PREFIX = "inlineTicketCreate";
 
@@ -61,6 +63,7 @@ const cleanConversationMessages = (value) => {
 function aiProviderErrorCode(error = "") {
   const raw = cleanText(error, 800).toLowerCase();
   if (!raw) return "ai_provider_failed";
+  if (/timeout|timed out|abort/i.test(raw)) return "ai_provider_timeout";
   if (/quota|billing|insufficient_quota|exceeded your current quota|plan and billing/i.test(raw)) return "ai_provider_quota_exceeded";
   if (/model|not found|does not exist|unsupported/i.test(raw)) return "ai_provider_model_unavailable";
   if (/key|api.?key|unauthorized|permission|forbidden|401|403/i.test(raw)) return "ai_provider_auth_failed";
@@ -380,13 +383,29 @@ function actionsAllowedForActor(actions = [], { env = {}, actor = {} } = {}) {
   });
 }
 
-function isTicketIntakeRequestBody(body = {}, workflow = "") {
-  const context = body?.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {};
-  const taskSession = context?.taskSession && typeof context.taskSession === "object" && !Array.isArray(context.taskSession) ? context.taskSession : {};
-  return workflow === AI_ASSIST_WORKFLOWS.ticketIntake
-    || context.intent === "create_ticket"
-    || context.uiSurface === "inline_ticket_create"
-    || taskSession.type === "ticket_intake";
+function timeoutMsFromEnv(env = {}, key = "", fallback = 0) {
+  const value = Number(env[key]);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return Math.min(Math.max(value, 1), 60_000);
+}
+
+async function withTimeout(promise, ms, code = "operation_timeout") {
+  if (!Number(ms) || Number(ms) <= 0) return promise;
+  let timeout = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(code)), Number(ms));
+      })
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function isTicketIntakeRequestBody(_body = {}, workflow = "") {
+  return workflow === AI_ASSIST_WORKFLOWS.ticketIntake;
 }
 
 async function buildServerFleetActionContext({ body = {}, authUser = {}, backendFleetDriver = null } = {}) {
@@ -854,24 +873,38 @@ export function createAiAssistHandler({
       let actionContext = context;
       let fullVisibleFleet = [];
       let serverAppConfig = {};
+      const inlineBoundaryTimeoutMs = timeoutMsFromEnv(env, "CMMS_AI_INLINE_TICKET_BOUNDARY_TIMEOUT_MS", DEFAULT_INLINE_TICKET_BOUNDARY_TIMEOUT_MS);
+      const providerTimeoutMs = timeoutMsFromEnv(env, "CMMS_AI_PROVIDER_TIMEOUT_MS", DEFAULT_AI_PROVIDER_TIMEOUT_MS);
       if (ticketIntakeRequest) {
         try {
-          const serverFleetContext = await buildServerFleetActionContext({
+          const serverFleetContext = await withTimeout(buildServerFleetActionContext({
             body,
             authUser: auth.user,
             backendFleetDriver
-          });
+          }), inlineBoundaryTimeoutMs, "inline_ticket_fleet_timeout");
           if (serverFleetContext.context) {
             actionContext = serverFleetContext.context;
             fullVisibleFleet = serverFleetContext.fullVisibleFleet;
           }
-        } catch {
+        } catch (error) {
+          if (error?.message === "inline_ticket_fleet_timeout") {
+            return sendJson(res, 504, {
+              error: "inline_ticket_intake_timeout",
+              stage: "fleet"
+            });
+          }
           actionContext = context;
           fullVisibleFleet = [];
         }
         try {
-          serverAppConfig = await readServerAppConfig(backendAppConfigDriver);
-        } catch {
+          serverAppConfig = await withTimeout(readServerAppConfig(backendAppConfigDriver), inlineBoundaryTimeoutMs, "inline_ticket_config_timeout");
+        } catch (error) {
+          if (error?.message === "inline_ticket_config_timeout") {
+            return sendJson(res, 504, {
+              error: "inline_ticket_intake_timeout",
+              stage: "config"
+            });
+          }
           serverAppConfig = {};
         }
       }
@@ -977,7 +1010,8 @@ export function createAiAssistHandler({
       }
       const readiness = publicAiServerStatusFromEnv(env);
       if (!readiness.serverReady) {
-        return sendJson(res, 503, { error: readiness.errors[0] || "ai_server_not_ready", draft, actions });
+        const readinessErrors = Array.isArray(readiness.errors) ? readiness.errors : [];
+        return sendJson(res, 503, { error: readinessErrors[0] || "ai_server_not_ready", draft, actions });
       }
 
       let providerContext = context;
@@ -1002,7 +1036,7 @@ export function createAiAssistHandler({
         retrievedMemories = [];
       }
 
-      const result = await providerCall({
+      const result = await withTimeout(providerCall({
         config,
         system: SYSTEM_PROMPT,
         prompt: providerPrompt({
@@ -1018,7 +1052,10 @@ export function createAiAssistHandler({
         }),
         fetchImpl,
         maxTokens: Number(env.CMMS_AI_ASSIST_MAX_TOKENS || 700) || 700
-      });
+      }), providerTimeoutMs, "ai_provider_timeout").catch((error) => ({
+        ok: false,
+        error: error?.message === "ai_provider_timeout" ? "ai_provider_timeout" : error
+      }));
       if (!result?.ok) {
         await writeAuditEvent(backendAuditDriver, aiAssistAuditEvent({
           draft,
@@ -1049,7 +1086,7 @@ export function createAiAssistHandler({
       let providerPlan = null;
       let providerPlanErrorCode = "";
       if (body.includeProviderPlan === true || body.structuredPlan === true) {
-        const planResult = await providerObjectCall({
+        const planResult = await withTimeout(providerObjectCall({
           config,
           system: SYSTEM_PROMPT,
           prompt: providerPlanPrompt({ draft, actions, context: providerContext, workflow, conversation }),
@@ -1058,7 +1095,10 @@ export function createAiAssistHandler({
           schemaDescription: "Non-writing CMMS assistant plan. It must never execute or persist changes.",
           fetchImpl,
           maxTokens: Number(env.CMMS_AI_PLAN_MAX_TOKENS || 900) || 900
-        });
+        }), providerTimeoutMs, "ai_provider_plan_timeout").catch((error) => ({
+          ok: false,
+          error: error?.message === "ai_provider_plan_timeout" ? "ai_provider_plan_timeout" : error
+        }));
         if (planResult?.ok) {
           providerPlan = sanitizeAiProviderPlan(planResult.object);
         } else {

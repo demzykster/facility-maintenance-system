@@ -23,7 +23,7 @@ describe("AI UI boundary extraction", () => {
     expect(apiClientSource).toContain("createAiAssistIdempotencyKey");
     expect(apiClientSource).toContain('source: "ui"');
     expect(apiClientSource).toContain('language: "he"');
-    expect(apiClientSource).toContain('fetchImpl("/api/ai/assist"');
+    expect(apiClientSource).toContain('fetchWithTimeout(fetchImpl, "/api/ai/assist"');
   });
 
   it("gates durable conversation controls on server-reported effective access", () => {

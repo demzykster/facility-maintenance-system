@@ -8,6 +8,7 @@ const cleanObject = (value) => value && typeof value === "object" && !Array.isAr
 
 export const AI_CAPABILITY_EXECUTION_STATUS = Object.freeze({
   blocked: "blocked",
+  conflict: "conflict",
   created: "created",
   failed: "failed",
   featureDisabled: "feature_disabled",
