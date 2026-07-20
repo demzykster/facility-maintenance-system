@@ -58,6 +58,7 @@
     "staging:load:test": "node tools/staging-load-test.mjs",
     "staging:gate": "node tools/staging-gate.mjs",
     "smoke:demo-ui": "node tools/demo-ui-smoke.mjs",
+    "smoke:demo-bi-heatmap": "node tools/demo-bi-heatmap-layout-smoke.mjs",
     "smoke:demo-ai-ticket": "node tools/demo-ai-ticket-create-smoke.mjs",
     "fleet:import:preview": "node tools/fleet-license-import-preview.mjs",
     "project:harness:check": "node tools/project-harness-check.mjs",

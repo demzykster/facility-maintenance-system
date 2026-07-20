@@ -67,3 +67,10 @@ Each exception must include:
 - Why necessary: the compact inline AI component now renders server-offered location choices as small RTL chips, and the existing shell stylesheet is still where inline modal styles are hosted.
 - Why extraction was not the right move: the clarification state, candidate resolution, and choice handling live in extracted inline AI modules; this exception only covers three shell CSS rules for the already-mounted component.
 - Follow-up/removal condition: when the ticket create modal/form styles move into a ticket module, move these chip styles with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-20
+- Owner goal: BI heatmap mobile RTL layout fix.
+- New line count: 10023.
+- Why necessary: the heatmap layout styles still live in the shell stylesheet; the fix needs a small set of RTL/mobile CSS constraints so the `תחום` column remains aligned with rows, long labels and risk tags stay compact, and the heatmap does not add external horizontal overflow.
+- Why extraction was not the right move: BI heatmap rendering and data preparation are already outside the shell in `src/BIHeatmapPanel.jsx`, `src/BIOverview.jsx`, and `src/biScopeModel.js`; moving the stylesheet out would be a broader styling extraction than this owner-reported visual bug.
+- Follow-up/removal condition: when BI styles move into a BI module stylesheet or CSS slice, move these heatmap rules with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
