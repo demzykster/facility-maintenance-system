@@ -81,6 +81,7 @@ import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { normalizeTransportCreateResponsibility, ticketHolderLabel, transportTechnicianAssignee } from "./ticketResponsibilityModel.js";
+import { supplierCandidatesForTicket, supplierHasFacilityCategory, supplierHasPpeScope, supplierHasTransportScope, supplierMeta as supMeta, supplierTypeFromMeta } from "./ticketSupplierFilterModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
 import { cleaningZonesAuthorityFailureIssue, cleaningZonesForAuthority, normalizedCleaningZonesAuthorityEnabled } from "./cleaningZonesAuthorityModel.js";
@@ -6724,58 +6725,6 @@ function PpeRequests({ ppe, reqs, items, norms, users, config, session, savePpe,
   </>);
 }
 
-const supMeta = (config, name) => (config && config.supplierMeta && config.supplierMeta[name]) || {};
-const SUPPLIER_TYPES = [
-  { id: "facility", label: "אחזקת מבנה", short: "מבנה", Icon: Wrench },
-  { id: "transport", label: "אחזקת כלי שינוע", short: "שינוע", Icon: Truck },
-  { id: "goods", label: "ספק ציוד", short: "ציוד", Icon: Package }
-];
-const supplierFacilityScope = (id) => `facility:${id}`;
-const supplierFacilityScopeOptions = (config) => (config?.categories || CATEGORIES).map((c) => ({ id: supplierFacilityScope(c.id), label: c.label, group: "facility" }));
-const supplierScopesFromMeta = (industries, config) => {
-  const raw = Array.isArray(industries) ? industries : [];
-  const out = new Set(raw.filter((id) => id && id !== "facility" && id !== "transport" && id !== "clothing" && id !== "goods"));
-  if (raw.includes("facility")) (config?.categories || CATEGORIES).forEach((c) => out.add(supplierFacilityScope(c.id)));
-  return [...out];
-};
-const supplierTypeFromMeta = (meta = {}, config) => {
-  if (SUPPLIER_TYPES.some((item) => item.id === meta.type)) return meta.type;
-  const raw = Array.isArray(meta.industries) ? meta.industries : [];
-  const scopes = supplierScopesFromMeta(raw, config);
-  if (raw.includes("transport")) return "transport";
-  if (raw.includes("clothing") || raw.includes("goods")) return "goods";
-  if (raw.includes("facility") || scopes.some((id) => id.startsWith("facility:"))) return "facility";
-  return "";
-};
-const supplierTypeLabel = (type) => SUPPLIER_TYPES.find((item) => item.id === type)?.label || "ללא סוג";
-const supplierTypeShort = (type) => SUPPLIER_TYPES.find((item) => item.id === type)?.short || "ללא סוג";
-const supIndLabel = (id, config) => {
-  const option = supplierFacilityScopeOptions(config).find((x) => x.id === id);
-  if (option) return option.group === "facility" ? `מבנה · ${option.label}` : option.label;
-  if (id === "facility") return "מבנה ותחזוקה";
-  return id;
-};
-const supplierHasTransportScope = (config, name) => supplierTypeFromMeta(supMeta(config, name), config) === "transport";
-const supplierHasPpeScope = (config, name) => supplierTypeFromMeta(supMeta(config, name), config) === "goods";
-const supplierHasFacilityCategory = (config, name, category) => {
-  const meta = supMeta(config, name);
-  if (supplierTypeFromMeta(meta, config) !== "facility") return false;
-  const scopes = supplierScopesFromMeta(meta.industries, config).filter((id) => id.startsWith("facility:"));
-  return scopes.length === 0 || (!!category && scopes.includes(supplierFacilityScope(category)));
-};
-const supplierCandidatesForTicket = (config, ticket, fleet = []) => {
-  const names = config?.suppliers || [];
-  const track = ticket?.track || (ticket?.forkliftId ? "transport" : "facility");
-  const scored = names.map((name) => {
-    const f = track === "transport" && ticket?.forkliftId ? (fleet || []).find((x) => x.id === ticket.forkliftId) : null;
-    const exactFleet = !!(f && f.supplier === name);
-    const scoped = track === "transport" ? supplierHasTransportScope(config, name) : supplierHasFacilityCategory(config, name, ticket?.category);
-    return { name, exactFleet, scoped };
-  });
-  const preferred = scored.filter((x) => x.exactFleet || x.scoped).map((x) => x.name);
-  const fallback = scored.filter((x) => !preferred.includes(x.name)).map((x) => x.name);
-  return [...preferred, ...fallback];
-};
 const ppeOrderUi = () => ({
   ConfirmBtn,
   DateInput,
@@ -7165,28 +7114,8 @@ function SuppliersPanel(props) {
     <SuppliersPanelLazy
       {...props}
       ui={{
-        Empty,
-        Overlay,
-        SectionTitle,
-        SUPPLIER_TYPES,
-        UserForm,
-        catOf,
-        countLabel,
-        fmtDate,
-        ils,
-        isOpen,
-        stOf,
-        supIndLabel,
-        supMeta,
-        supplierFacilityScopeOptions,
-        supplierScopesFromMeta,
-        supplierTypeFromMeta,
-        supplierTypeLabel,
-        supplierTypeShort,
-        ticketNo,
-        uid,
-        unitDesc,
-        unitNote
+        Empty, Overlay, SectionTitle, UserForm, catOf, countLabel, fmtDate, ils, isOpen, stOf,
+        ticketNo, uid, unitDesc, unitNote
       }}
     />
   </Suspense>;

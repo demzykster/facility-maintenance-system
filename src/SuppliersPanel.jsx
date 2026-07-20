@@ -1,15 +1,27 @@
 import React, { useEffect, useState } from "react";
-import { Building2, ChevronLeft, ClipboardList, HardHat, Package, Plus, Search, Sparkles, Trash2, Truck, X } from "lucide-react";
+import { Building2, ChevronLeft, ClipboardList, HardHat, Package, Plus, Search, Sparkles, Trash2, Truck, Wrench, X } from "lucide-react";
 
 import { supplierQueueAiPrompt } from "./aiAssistEntryPointModel.js";
 import { supplierActivityCounts } from "./supplierActivityModel.js";
+import {
+  SUPPLIER_TYPE_DEFINITIONS,
+  supplierFacilityScopeOptions,
+  supplierIndustryLabel as supIndLabel,
+  supplierMeta as supMeta,
+  supplierScopesFromMeta,
+  supplierTypeFromMeta,
+  supplierTypeLabel,
+  supplierTypeShort
+} from "./ticketSupplierFilterModel.js";
+
+const SUPPLIER_TYPE_ICONS = { facility: Wrench, transport: Truck, goods: Package };
+const SUPPLIER_TYPES = SUPPLIER_TYPE_DEFINITIONS.map((item) => ({ ...item, Icon: SUPPLIER_TYPE_ICONS[item.id] }));
 
 export function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, users, saveFleet, saveUser, savePpeOrder, onOpenTicket, onOpenFleet, canManage, onAskAI, ui }) {
   const {
     Empty,
     Overlay,
     SectionTitle,
-    SUPPLIER_TYPES,
     UserForm,
     catOf,
     countLabel,
@@ -17,13 +29,6 @@ export function SuppliersPanel({ config, saveConfig, orders, fleet, tickets, use
     ils,
     isOpen,
     stOf,
-    supIndLabel,
-    supMeta,
-    supplierFacilityScopeOptions,
-    supplierScopesFromMeta,
-    supplierTypeFromMeta,
-    supplierTypeLabel,
-    supplierTypeShort,
     ticketNo,
     uid,
     unitDesc,

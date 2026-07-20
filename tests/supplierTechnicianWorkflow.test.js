@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("../src/ClaudeMaintenanceApp.jsx", import.meta.url), "utf8");
 const supplierSource = readFileSync(new URL("../src/SuppliersPanel.jsx", import.meta.url), "utf8");
+const supplierFilterSource = readFileSync(new URL("../src/ticketSupplierFilterModel.js", import.meta.url), "utf8");
 const ticketDetailSource = readFileSync(new URL("../src/TicketDetail.jsx", import.meta.url), "utf8");
 const ticketVisibilitySource = readFileSync(new URL("../src/ticketVisibilityModel.js", import.meta.url), "utf8");
 
@@ -57,10 +58,10 @@ describe("supplier technician workflow wiring", () => {
   });
 
   it("uses live supplier scopes for facility and PPE categories", () => {
-    expect(source).toContain("SUPPLIER_TYPES");
+    expect(supplierSource).toContain("SUPPLIER_TYPE_DEFINITIONS");
     expect(source).toContain("supplierTypeFromMeta");
-    expect(source).toContain("supplierFacilityScope");
-    expect(source).toContain("supplierFacilityScopeOptions");
+    expect(supplierFilterSource).toContain("supplierFacilityScope");
+    expect(supplierSource).toContain("supplierFacilityScopeOptions");
     expect(supplierSource).toContain("supplier-scope-picker");
     expect(source).toContain("supplierHasPpeScope");
     expect(source).toContain("supplierHasFacilityCategory");

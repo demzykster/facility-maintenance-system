@@ -8,6 +8,7 @@ import {
   transportTicketSupplierName,
   TicketDetail
 } from "../src/TicketDetail.jsx";
+import { supplierCandidatesForTicket } from "../src/ticketSupplierFilterModel.js";
 
 const Icon = ({ children }) => React.createElement("span", null, children);
 const Box = ({ children }) => React.createElement("div", null, children);
@@ -118,7 +119,7 @@ function renderTicket(track, options = {}) {
     tickets: [],
     fleet: [{ id: "fleet-1", code: "194340", supplier: "טויוטה" }],
     users: [],
-    config: {},
+    config: options.config || {},
     session: options.session || { id: "admin-1", name: "Vadim", role: "admin" },
     saveTicket: () => true,
     onBack: () => {}
@@ -253,5 +254,39 @@ describe("ticket detail render smoke", () => {
       "ממתין · ממתינה לספק",
       "נבדק מול ספק"
     ]);
+  });
+
+  it("shows only category-relevant suppliers for facility routing", () => {
+    const config = {
+      suppliers: ["Building Co", "Toyota"],
+      supplierMeta: {
+        "Building Co": { type: "facility", industries: ["facility:building"] },
+        Toyota: { type: "transport", industries: ["transport"] }
+      }
+    };
+    const html = renderTicket("facility", {
+      config,
+      ui: { supplierCandidatesForTicket }
+    });
+
+    expect(html).toContain("Building Co");
+    expect(html).not.toContain(">Toyota<");
+  });
+
+  it("keeps an existing legacy supplier selectable on a facility ticket", () => {
+    const config = {
+      suppliers: ["Building Co", "Legacy Co"],
+      supplierMeta: {
+        "Building Co": { type: "facility", industries: ["facility:building"] }
+      }
+    };
+    const html = renderTicket("facility", {
+      config,
+      ticket: { supplier: "Legacy Co" },
+      ui: { supplierCandidatesForTicket }
+    });
+
+    expect(html).toContain("Building Co");
+    expect(html).toContain("Legacy Co");
   });
 });

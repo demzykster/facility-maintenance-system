@@ -527,7 +527,7 @@ function AdminTicketManualPanel({ ticket, config, session, fleet, onSave }) {
   const set = (key, value) => setForm((s) => ({ ...s, [key]: value }));
   const setHours = (key, value) => setForm((s) => ({ ...s, statusHours: { ...(s.statusHours || {}), [key]: value } }));
   const track = trackOf(ticket);
-  const supplierOptions = Array.from(new Set([...(config.suppliers || []), ...supplierCandidatesForTicket(config, ticket, fleet), ticket.supplier].filter(Boolean)));
+  const supplierOptions = Array.from(new Set([...supplierCandidatesForTicket(config, ticket, fleet), ticket.supplier].filter(Boolean)));
   const save = () => {
     if (!form.subject.trim()) return setErr("נושא הקריאה לא יכול להיות ריק");
     const created = datetimeValueToMs(form.createdAt, null);
