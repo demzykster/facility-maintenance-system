@@ -9462,17 +9462,17 @@ body *{visibility:hidden!important;}
   .bi-period-switch button{flex:1;min-width:max-content;padding-inline:10px;}
   .bi-grid{grid-template-columns:1fr;}
   .bi-heatmap{margin-inline:0;padding-inline:0;}
-  .bi-heatmap-head,.bi-heatmap-row{grid-template-columns:112px repeat(6,56px);gap:5px;min-width:477px;}
+  .bi-heatmap-head,.bi-heatmap-row{grid-template-columns:128px repeat(6,56px);gap:5px;min-width:493px;}
   .bi-heatmap-insight{align-items:flex-start;flex-direction:column;gap:2px;}
   .bi-heatmap-head span{padding:0 4px;}
-  .bi-heatmap-name,.bi-heatmap-cell{min-height:56px;border-radius:10px;}
-  .bi-heatmap-name{height:74px;position:relative;padding:6px 7px 19px;align-items:flex-start;flex-direction:column;gap:3px;}
-  .bi-heatmap-name-main{width:100%;align-items:flex-start;flex-direction:column;gap:2px;}
-  .bi-heatmap-name b{max-width:100%;}
+  .bi-heatmap-name,.bi-heatmap-cell{min-height:72px;border-radius:10px;}
+  .bi-heatmap-name{height:104px;padding:7px 8px;display:grid;grid-template-rows:minmax(0,1fr) auto auto;align-items:start;justify-items:start;gap:5px;}
+  .bi-heatmap-name-main{width:100%;min-width:0;align-items:flex-start;flex-direction:column;gap:2px;}
+  .bi-heatmap-name b{max-width:100%;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;}
   .bi-heatmap-name small{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
-  .bi-heatmap-risk-tags{max-width:calc(100% - 34px);justify-content:flex-start;}
-  .bi-heatmap-risk-tags i{max-width:48px;padding:1px 4px;font-size:9.5px;}
-  .bi-heatmap-ai{position:absolute;inset-inline-end:6px;bottom:5px;padding:1px 5px;font-size:9.5px;}
+  .bi-heatmap-risk-tags{width:100%;max-width:100%;justify-content:flex-start;flex-wrap:wrap;max-height:34px;}
+  .bi-heatmap-risk-tags i{max-width:52px;padding:1px 4px;font-size:9.5px;}
+  .bi-heatmap-ai{position:static;justify-self:start;padding:1px 5px;font-size:9.5px;}
   .bi-heatmap-cell b{font-size:17px;}
   .bi-heatmap-cell small{font-size:9.5px;}
   .bi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}

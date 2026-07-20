@@ -10,7 +10,7 @@ const LOGIN_ID = process.env.CMMS_DEMO_BI_HEATMAP_LOGIN || "owner@example.local"
 const LOGIN_PASSWORD = process.env.CMMS_DEMO_BI_HEATMAP_PASSWORD || "demo1234";
 const WATCHDOG_MS = Number(process.env.CMMS_DEMO_BI_HEATMAP_TIMEOUT_MS || 90000);
 const MAX_DOC_OVERFLOW = 2;
-const MAX_MOBILE_ROW_HEIGHT = 78;
+const MAX_MOBILE_ROW_HEIGHT = 112;
 
 const heatmapRows = [
   {
@@ -178,7 +178,11 @@ async function measureLayout(page) {
     const firstName = document.querySelector(".bi-heatmap-name");
     const firstCell = document.querySelector(".bi-heatmap-cell");
     const secondRowName = document.querySelectorAll(".bi-heatmap-name")[1];
+    const nameMain = document.querySelector(".bi-heatmap-name-main");
+    const domainTitle = document.querySelector(".bi-heatmap-name b");
+    const domainCount = document.querySelector(".bi-heatmap-name small");
     const riskTags = document.querySelector(".bi-heatmap-risk-tags");
+    const riskTagItems = [...document.querySelectorAll(".bi-heatmap-risk-tags i")];
     const aiChip = document.querySelector(".bi-heatmap-ai");
     return {
       direction: document.dir || getComputedStyle(document.body).direction,
@@ -191,7 +195,11 @@ async function measureLayout(page) {
       firstName: rect(firstName),
       firstCell: rect(firstCell),
       secondRowName: rect(secondRowName),
+      nameMain: rect(nameMain),
+      domainTitle: rect(domainTitle),
+      domainCount: rect(domainCount),
       riskTags: rect(riskTags),
+      riskTagItems: riskTagItems.map(rect),
       aiChip: rect(aiChip),
       headerVisible: visible(firstHeader),
       firstNameVisible: visible(firstName),
@@ -237,8 +245,24 @@ async function runViewport(browser, name, viewport) {
   assertClose(layout.firstHeader.right, layout.firstName.right, 1.5, `${name}:first_column_right_alignment`);
   if (layout.firstCell.right > layout.firstName.left) throw new Error(`${name}:first_metric_overlaps_domain_column`);
   if (viewport.width <= 760 && layout.rowHeight > MAX_MOBILE_ROW_HEIGHT) throw new Error(`${name}:mobile_row_too_tall:${layout.rowHeight}`);
-  if (viewport.width <= 390 && horizontalOverlap(layout.riskTags, layout.aiChip) > 1) {
-    throw new Error(`${name}:risk_tags_overlap_ai_chip:${JSON.stringify({ riskTags: layout.riskTags, aiChip: layout.aiChip })}`);
+  if (viewport.width <= 390) {
+    const inside = (container, child) =>
+      child.left >= container.left - 1 &&
+      child.right <= container.right + 1 &&
+      child.top >= container.top - 1 &&
+      child.bottom <= container.bottom + 1;
+    if (!inside(layout.firstName, layout.domainTitle)) throw new Error(`${name}:domain_title_outside_cell`);
+    if (!inside(layout.firstName, layout.riskTags)) throw new Error(`${name}:risk_tags_outside_cell`);
+    if (!inside(layout.firstName, layout.aiChip)) throw new Error(`${name}:ai_chip_outside_cell`);
+    if (layout.domainTitle.height < 12) throw new Error(`${name}:domain_title_clipped:${layout.domainTitle.height}`);
+    if (layout.riskTags.height < 14) throw new Error(`${name}:risk_tags_clipped:${layout.riskTags.height}`);
+    if (layout.riskTagItems.some((item) => item.height < 12)) throw new Error(`${name}:risk_tag_item_clipped`);
+    if (layout.riskTags.bottom > layout.aiChip.top + 1) {
+      throw new Error(`${name}:risk_tags_overlap_ai_chip:${JSON.stringify({ riskTags: layout.riskTags, aiChip: layout.aiChip })}`);
+    }
+    if (horizontalOverlap(layout.riskTags, layout.aiChip) > 1 && layout.riskTags.bottom > layout.aiChip.top) {
+      throw new Error(`${name}:risk_tags_horizontal_layer_overlap_ai_chip`);
+    }
   }
   if (consoleMessages.length) throw new Error(`${name}:console:${consoleMessages.slice(0, 3).join(" | ")}`);
   if (pageErrors.length) throw new Error(`${name}:pageerror:${pageErrors.slice(0, 3).join(" | ")}`);
