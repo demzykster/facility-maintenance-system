@@ -69,9 +69,16 @@ function unitMatchesIdentifier(unit = {}, identifier = "") {
   return unitIdentifiers(unit).some((value) => normalizeIdentifier(value) === cleanIdentifier);
 }
 
+function unitAvailableForTicketCreate(unit = {}) {
+  const status = normalizeIdentifier(unit.status || unit.state);
+  return !["archived", "inactive", "disabled", "deleted", "decommissioned"].includes(status);
+}
+
 function visibleFleet(context = {}, fullVisibleFleet = null) {
   const source = Array.isArray(fullVisibleFleet) && fullVisibleFleet.length ? fullVisibleFleet : context.fleet;
-  return cleanArray(source).filter((unit) => unit && unit.id);
+  return cleanArray(source)
+    .filter((unit) => unit && unit.id)
+    .filter(unitAvailableForTicketCreate);
 }
 
 function currentEntityLooksLikeAsset(current = {}) {

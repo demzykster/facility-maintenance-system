@@ -220,7 +220,7 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "ready_for_confirmation",
+        status: "needs_form_review",
         requiresConfirmation: true,
         writesData: false,
         execute: expect.objectContaining({
@@ -229,7 +229,9 @@ describe("AI assist action model", () => {
         }),
         payload: expect.objectContaining({
           track: "facility",
-          subject: "המזגן מטפטף באזור משרדים",
+          subject: "המזגן מטפטף",
+          category: "hvac",
+          priority: "medium",
           zone: "משרדים",
           status: "new",
           createdBy: expect.objectContaining({
@@ -255,11 +257,12 @@ describe("AI assist action model", () => {
       expect.objectContaining({
         id: "create_ticket",
         type: "ticket.create",
-        status: "ready_for_confirmation",
+        status: "needs_form_review",
         missingFields: [],
         payload: expect.objectContaining({
           track: "facility",
           zone: "холодильной комнате F-002",
+          priority: "medium",
           description: "сломалась ручка двери холодильника в холодильной комнате F-002"
         })
       })
@@ -348,10 +351,71 @@ describe("AI assist action model", () => {
         missingFields: expect.arrayContaining(["zone"]),
         payload: expect.objectContaining({
           track: "facility",
-          zone: ""
+          zone: "",
+          priority: "medium"
         })
       })
     ]);
+  });
+
+  it("classifies air conditioner facility intake without guessing zone or urgency", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "מזגן לא עובד בחדר מפעיל מערכת",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({ draft, user: actor, now: 2000 });
+
+    expect(draft).toMatchObject({
+      module: "facility",
+      action: "draft_ticket"
+    });
+    expect(actions).toEqual([
+      expect.objectContaining({
+        type: "ticket.create",
+        status: "needs_human_input",
+        missingFields: ["zone"],
+        payload: expect.objectContaining({
+          track: "facility",
+          category: "hvac",
+          priority: "medium",
+          zone: "",
+          subject: "מזגן לא עובד בחדר מפעיל מערכת"
+        })
+      })
+    ]);
+    const payload = actions[0].payload;
+    expect(payload.description).toContain("המזגן");
+    expect(payload.description).not.toBe(payload.subject);
+  });
+
+  it("resolves an explicit facility zone answer into a safe form prefill", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "מזגן לא עובד בחדר מפעיל מערכת. באזור משרדים",
+      actor,
+      language: "he",
+      source: "ui"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({ draft, user: actor, now: 2000 });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        type: "ticket.create",
+        status: "needs_form_review",
+        missingFields: [],
+        payload: expect.objectContaining({
+          track: "facility",
+          category: "hvac",
+          priority: "medium",
+          zone: "משרדים",
+          subject: "מזגן לא עובד בחדר מפעיל מערכת"
+        })
+      })
+    ]);
+    expect(actions[0].payload.description).not.toBe(actions[0].payload.subject);
   });
 
   it("prefills a unique visible fleet unit and routes the last downtime detail to the normal ticket form", () => {
@@ -491,6 +555,38 @@ describe("AI assist action model", () => {
           track: "transport",
           forkliftId: "",
           asset: ""
+        })
+      })
+    ]);
+  });
+
+  it("ignores archived fleet units when resolving a visible transport code", () => {
+    const draft = buildAiIntakeDraft({
+      rawText: "במלגזה 210 הגלגלים שבורים",
+      actor,
+      language: "he"
+    }, 1000);
+
+    const actions = buildAiAssistActionProposals({
+      draft,
+      user: actor,
+      now: 2000,
+      context: {
+        fleet: [
+          { id: "fleet-210-active", code: "210", type: "מלגזה", department: "הפצה", status: "active" },
+          { id: "fleet-210-archived", code: "210", type: "מלגזה", department: "הפצה", status: "archived" }
+        ]
+      }
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        id: "create_ticket",
+        type: "ticket.create",
+        payload: expect.objectContaining({
+          track: "transport",
+          forkliftId: "fleet-210-active",
+          asset: "210"
         })
       })
     ]);

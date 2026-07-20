@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { CheckCircle2, ChevronLeft, Send, Sparkles, X } from "lucide-react";
 import { canExecuteAiAssistAction, ticketPrefillFromAiAssistAction } from "./aiAssistActionExecutionModel.js";
-import { INLINE_AI_TICKET_COPY, inlineAiTicketActionMode, inlineAiTicketEffectiveAccess } from "./inlineAiTicketCreateModel.js";
+import { INLINE_AI_TICKET_COPY, inlineAiTicketActionMode, inlineAiTicketEffectiveAccess, inlineAiTicketPrimaryActionLabel } from "./inlineAiTicketCreateModel.js";
 import { useInlineAITicketSession } from "./useInlineAITicketSession.js";
 
 const trackLabel = (track = "") => track === "transport" ? "שינוע" : "מבנה";
@@ -38,9 +38,11 @@ function InlineMessage({ role, content }) {
 function InlineActionCard({ action, busy, result, onExecute, onEdit }) {
   const payload = action?.payload || {};
   const missing = Array.isArray(action?.missingFields) ? action.missingFields : [];
+  const mode = inlineAiTicketActionMode(action);
   const executable = canExecuteAiAssistAction(action);
   const title = cleanText(payload.subject, "קריאה חדשה");
   const meta = `${payload.track === "transport" ? "כלי שינוע" : "מבנה"}${payload.asset ? ` · ${payload.asset}` : ""}${payload.zone ? ` · ${payload.zone}` : ""}`;
+  const primaryLabel = inlineAiTicketPrimaryActionLabel(action);
   return <div className="ai-action-card inline-ai-action-card">
     <div className="ai-action-top">
       <span>פתיחת קריאה</span>
@@ -50,15 +52,17 @@ function InlineActionCard({ action, busy, result, onExecute, onEdit }) {
     <div className="ai-action-meta">{meta}</div>
     {payload.description && <div className="ai-action-diff">{payload.description}</div>}
     {missing.length > 0
-      ? <div className="ai-action-missing">להשלמה לפני אישור: {missing.join(" · ")}</div>
+      ? <div className="ai-action-missing">נשלים את הפרטים החסרים בטופס הקריאה.</div>
       : <div className="ai-action-ready">הקריאה תישמר רק אחרי אישור משתמש.</div>}
     {result && <div className={"ai-action-result " + (result.ok ? "ok" : "err")}>{result.message}</div>}
-    <button type="button" className="ai-action-confirm" disabled={!executable || busy || result?.ok} onClick={() => onExecute?.(action)}>
-      {missing.length ? "השלמה בטופס קריאה" : busy ? "שומר…" : result?.ok ? "הפעולה בוצעה" : "אישור ויצירת קריאה"}
-    </button>
-    {onEdit && <button type="button" className="ai-action-edit" disabled={busy || result?.ok} onClick={() => onEdit?.(action)}>
-      {missing.length ? "השלמה בטופס קריאה" : "עריכה בטופס לפני יצירה"}
-    </button>}
+    {mode === "form"
+      ? <button type="button" className="ai-action-confirm" disabled={busy || result?.ok} onClick={() => onEdit?.(action)}>{primaryLabel}</button>
+      : <>
+        <button type="button" className="ai-action-confirm" disabled={!executable || busy || result?.ok} onClick={() => onExecute?.(action)}>
+          {busy ? "שומר…" : result?.ok ? "הפעולה בוצעה" : primaryLabel}
+        </button>
+        {onEdit && <button type="button" className="ai-action-edit" disabled={busy || result?.ok} onClick={() => onEdit?.(action)}>עריכה בטופס לפני יצירה</button>}
+      </>}
   </div>;
 }
 

@@ -8,7 +8,9 @@ import {
   inlineAiTicketActionMode,
   inlineAiTicketEffectiveAccess,
   inlineAiTicketFromCapabilityResponse,
-  inlineAiTicketRecentMessages
+  inlineAiTicketPrimaryActionLabel,
+  inlineAiTicketRecentMessages,
+  inlineAiTicketVisibleActions
 } from "../src/inlineAiTicketCreateModel.js";
 
 describe("inline AI ticket create model", () => {
@@ -91,6 +93,29 @@ describe("inline AI ticket create model", () => {
     expect(inlineAiTicketActionMode({ type: "ticket.create", status: "needs_form_review" })).toBe("form");
     expect(inlineAiTicketActionMode({ type: "ticket.create", missingFields: ["forkliftId"] })).toBe("needs_input");
     expect(inlineAiTicketActionMode({ type: "ticket.update" })).toBe("ignore");
+  });
+
+  it("does not render blocked missing-field actions as technical inline cards", () => {
+    const actions = inlineAiTicketVisibleActions([
+      { id: "facility-missing-zone", type: "ticket.create", status: "needs_human_input", missingFields: ["zone"], payload: { track: "facility" } },
+      { id: "facility-ready", type: "ticket.create", status: "ready_for_confirmation", missingFields: [], payload: { track: "facility" } }
+    ]);
+
+    expect(actions.map((action) => action.id)).toEqual(["facility-ready"]);
+    expect(JSON.stringify(actions)).not.toContain("zone");
+  });
+
+  it("uses one clear form-review action label instead of duplicate completion buttons", () => {
+    const formAction = {
+      type: "ticket.create",
+      status: "needs_form_review",
+      reviewMode: "ticket_form",
+      missingFields: ["downtimeType"],
+      payload: { track: "transport" }
+    };
+
+    expect(inlineAiTicketActionMode(formAction)).toBe("form");
+    expect(inlineAiTicketPrimaryActionLabel(formAction)).toBe("המשך לטופס הקריאה");
   });
 
   it("normalizes server-created autonomous ticket results for the compact success card", () => {

@@ -723,4 +723,27 @@ describe("AI assist action execution model", () => {
     });
     expect(ticketPrefillFromAiAssistAction({ ...readyAction, type: "ticket.delete" })).toBeNull();
   });
+
+  it("preserves validated facility category and neutral priority in TicketForm prefill", () => {
+    const prefill = ticketPrefillFromAiAssistAction({
+      ...readyAction,
+      payload: {
+        track: "facility",
+        subject: "מזגן לא עובד בחדר מפעיל מערכת",
+        description: "דווח כי המזגן בחדר מפעיל מערכת אינו עובד. יש לבדוק את התקלה.",
+        category: "hvac",
+        priority: "medium",
+        zone: "משרדים"
+      }
+    });
+
+    expect(prefill).toMatchObject({
+      track: "facility",
+      subject: "מזגן לא עובד בחדר מפעיל מערכת",
+      description: "דווח כי המזגן בחדר מפעיל מערכת אינו עובד. יש לבדוק את התקלה.",
+      category: "hvac",
+      priority: "medium",
+      zone: "משרדים"
+    });
+  });
 });

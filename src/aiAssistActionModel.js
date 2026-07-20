@@ -39,6 +39,21 @@ function subjectFromDraft(draft = {}) {
   return raw.length > MAX_SUBJECT_CHARS ? `${raw.slice(0, MAX_SUBJECT_CHARS - 1).trim()}…` : raw;
 }
 
+function escapeRegExp(value = "") {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function ticketSubjectFromDraft(draft = {}, { track = "", location = "" } = {}) {
+  const raw = cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
+  if (!raw) return "";
+  let subject = raw;
+  const safeLocation = cleanText(location, 120);
+  if (track === "facility" && safeLocation) {
+    subject = subject.replace(new RegExp(`[.\\s]+(?:באזור|באיזור|במחלקת|במחסן|במבנה|בקו)\\s+${escapeRegExp(safeLocation)}\\s*$`, "iu"), "");
+  }
+  return subjectFromDraft({ ...draft, rawText: subject });
+}
+
 function priorityFromSeverity(severity = "normal") {
   if (severity === "critical" || severity === "high") return "high";
   if (severity === "low") return "low";
@@ -65,6 +80,50 @@ function ticketCategoryForModule(module = "") {
   return "";
 }
 
+function facilityCategoryFromText(text = "") {
+  const raw = cleanText(text, 800).toLowerCase();
+  if (!raw) return "";
+  if (/מזגן|מיזוג|קירור|חימום|אוורור|טמפרטורה|air\s*condition|a\/c|hvac/i.test(raw)) return "hvac";
+  if (/נזילה|מים|ברז|כיור|ביוב|סתימה|plumb|leak|water/i.test(raw)) return "plumbing";
+  if (/חשמל|תאורה|נורה|שקע|מפסק|electric|light/i.test(raw)) return "electric";
+  if (/דלת|שער|קיר|רצפה|תקרה|building|door|gate|wall|floor/i.test(raw)) return "building";
+  if (/מחשב|מדפסת|רשת|מסך|it|network|printer/i.test(raw)) return "it";
+  return "";
+}
+
+function ticketCategoryForDraft(draft = {}, track = "") {
+  const module = cleanText(draft.module, 40);
+  if (track === "facility" && module === "facility") return facilityCategoryFromText(draft.rawText);
+  return ticketCategoryForModule(module);
+}
+
+function ticketPriorityForDraft({ draft = {}, track = "", downtimeType = "" } = {}) {
+  const explicitPriority = requestedPriorityFromText(draft.rawText);
+  if (explicitPriority) return explicitPriority;
+  if (track === "transport") return priorityFromDowntimeType(downtimeType) || priorityFromSeverity(draft.severity);
+  if (draft.module === "safety" || draft.severity === "critical") return "high";
+  return "medium";
+}
+
+function facilityDescriptionFromDraft(draft = {}, category = "") {
+  const raw = cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
+  if (!raw) return "";
+  if (!/[\u0590-\u05FF]/u.test(raw)) return raw;
+  const withoutTrailingZone = raw.replace(/[.\s]+(?:באזור|באיזור|במחלקת|במחסן|במבנה|בקו)\s+[^\n,.]+$/iu, "").trim();
+  if (category === "hvac" && /מזגן|מיזוג|קירור|חימום|אוורור/i.test(withoutTrailingZone)) {
+    const normalized = withoutTrailingZone
+      .replace(/^ה?מזגן/u, "המזגן")
+      .replace(/\s+לא\s+עובד/u, " אינו עובד");
+    return cleanText(`דווח כי ${normalized}. יש לבדוק את התקלה.`, MAX_DESCRIPTION_CHARS);
+  }
+  return cleanText(`דווח על תקלה: ${withoutTrailingZone || raw}. יש לבדוק את הפרטים בשטח.`, MAX_DESCRIPTION_CHARS);
+}
+
+function ticketDescriptionFromDraft(draft = {}, { track = "", category = "" } = {}) {
+  if (track === "facility") return facilityDescriptionFromDraft(draft, category);
+  return cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
+}
+
 function missingFieldsForTicketPayload(payload = {}, draft = {}) {
   const missing = [];
   if (!payload.track) missing.push("track");
@@ -79,6 +138,7 @@ function missingFieldsForTicketPayload(payload = {}, draft = {}) {
 
 function shouldReviewTicketCreateInForm(payload = {}, missingFields = []) {
   const missing = Array.isArray(missingFields) ? missingFields : [];
+  if (payload.track === "facility" && missing.length === 0) return true;
   if (payload.track === "transport"
     && payload.forkliftId
     && missing.length === 1
@@ -301,6 +361,11 @@ function fleetUnitMatchesText(unit = {}, raw = "") {
   });
 }
 
+function fleetUnitAvailableForTicket(unit = {}) {
+  const status = cleanText(unit.status || unit.state, 80).toLowerCase();
+  return !["archived", "inactive", "disabled", "deleted", "decommissioned"].includes(status);
+}
+
 function requestedFleetUnitFromText(text = "", fleet = []) {
   const raw = cleanText(text, 800);
   if (!raw || !hasFleetUnitUpdateIntent(raw)) return null;
@@ -312,6 +377,7 @@ function uniqueFleetUnitMentionFromText(text = "", fleet = []) {
   if (!raw || !/(כלי|מלגזה|ציוד|forklift|vehicle|unit|asset)/i.test(raw)) return null;
   const matches = cleanArray(fleet)
     .filter((unit) => unit && unit.id)
+    .filter(fleetUnitAvailableForTicket)
     .filter((unit) => fleetUnitMatchesText(unit, raw));
   return matches.length === 1 ? matches[0] : null;
 }
@@ -614,17 +680,18 @@ export function buildAiTicketCreatePayload({ draft = {}, user = {}, now = Date.n
   const module = cleanText(draft.module, 40);
   const track = ticketTrackForModule(module);
   const location = locationFromDraft(draft);
-  const subject = subjectFromDraft(draft);
-  const description = cleanText(draft.rawText, MAX_DESCRIPTION_CHARS);
   const downtimeType = track === "transport" ? requestedDowntimeTypeFromText(draft.rawText) : "";
-  const priority = priorityFromDowntimeType(downtimeType) || priorityFromSeverity(draft.severity);
+  const category = ticketCategoryForDraft(draft, track);
+  const subject = ticketSubjectFromDraft(draft, { track, location });
+  const description = ticketDescriptionFromDraft(draft, { track, category });
+  const priority = ticketPriorityForDraft({ draft, track, downtimeType });
   const createdAt = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   const fleetUnit = track === "transport" ? draftFleetUnitFromText(draft.rawText, context.fleet) : null;
   const fleetAsset = fleetUnit ? cleanText(fleetUnit.code || fleetUnit.num || fleetUnit.number || fleetUnit.asset || fleetUnit.unitCode || fleetUnit.workerNo || fleetUnit.vehicleNumber || fleetUnit.licensePlate || fleetUnit.displayNumber || fleetUnit.id, 160) : "";
   const payload = {
     track,
     subject,
-    category: ticketCategoryForModule(module),
+    category,
     categoryLabel: "",
     priority,
     zone: location,
@@ -1004,7 +1071,7 @@ export function buildAiAssistActionProposals({ draft = {}, user = {}, now = Date
   const payload = buildAiTicketCreatePayload({ draft: safeDraft, user, now, context });
   const missingFields = missingFieldsForTicketPayload(payload, safeDraft);
   const reviewInForm = shouldReviewTicketCreateInForm(payload, missingFields);
-  const status = missingFields.length ? (reviewInForm ? "needs_form_review" : "needs_human_input") : "ready_for_confirmation";
+  const status = reviewInForm ? "needs_form_review" : (missingFields.length ? "needs_human_input" : "ready_for_confirmation");
   return [{
     id: "create_ticket",
     type: "ticket.create",

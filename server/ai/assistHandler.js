@@ -119,7 +119,7 @@ function providerSafeConversationMessages(conversation = []) {
 }
 
 const ACTIONABLE_REQUEST_RE = /(создай|создать|открой|открыть|сделай|добавь|добавить|заявк|тикет|קריאה|פתח|תפתח|צור|create|open|draft|ticket|request|report)/iu;
-const ACTION_COMPLETION_HINT_RE = /(?:^|[\s,.;:])(?:в|на|у|около|возле)(?=[\s,.;:]|$)|комнат|склад|отдел|зона|корпус|f-\d+|\d{2,}|באזור|באיזור|במחלקת|במחסן|במבנה|בקו|zone|area|department|warehouse|building/iu;
+const ACTION_COMPLETION_HINT_RE = /(?:^|[\s,.;:])(?:в|на|у|около|возле)(?=[\s,.;:]|$)|комнат|склад|отдел|зона|корпус|f-\d+|\d{2,}|באזור|באיזור|במחלקת|במחסן|במבנה|בקו|משרדים|קבלה|מחסן|טעינה|רציף|חניון|כללי|zone|area|department|warehouse|building/iu;
 
 function previousActionableUserText(conversation = [], latestText = "") {
   const users = conversation
@@ -133,15 +133,37 @@ function previousActionableUserText(conversation = [], latestText = "") {
     .find((content) => content !== latest && ACTIONABLE_REQUEST_RE.test(content)) || "";
 }
 
-function conversationAwareDraftText({ rawText = "", conversation = [] } = {}) {
+function previousTicketIntakeUserText(conversation = [], latestText = "") {
+  const users = conversation
+    .filter((message) => message.role === "user")
+    .map((message) => cleanText(message.content))
+    .filter(Boolean);
+  const latest = cleanText(latestText);
+  return users
+    .slice(0, -1)
+    .reverse()
+    .find((content) => content !== latest && !hasAiInformationalIntent(content)) || "";
+}
+
+function draftCompletionText(latestText = "") {
+  const latest = cleanText(latestText);
+  if (!latest) return "";
+  if (/^(?:באזור|באיזור|במחלקת|במחסן|במבנה|בקו)\s+/iu.test(latest)) return latest;
+  if (/[\u0590-\u05FF]/u.test(latest) && ACTION_COMPLETION_HINT_RE.test(latest)) return `באזור ${latest}`;
+  return latest;
+}
+
+function conversationAwareDraftText({ rawText = "", conversation = [], ticketIntakeRequest = false } = {}) {
   const latestText = latestUserTextFromConversation(conversation, rawText);
   if (!latestText) return cleanText(rawText);
   if (hasAiInformationalIntent(latestText)) return latestText;
   if (ACTIONABLE_REQUEST_RE.test(latestText)) return latestText;
-  const previousText = previousActionableUserText(conversation, latestText);
+  const previousText = ticketIntakeRequest
+    ? previousTicketIntakeUserText(conversation, latestText)
+    : previousActionableUserText(conversation, latestText);
   if (!previousText) return latestText;
   const looksLikeCompletion = latestText.length <= 180 && ACTION_COMPLETION_HINT_RE.test(latestText);
-  return looksLikeCompletion ? `${previousText}. ${latestText}` : latestText;
+  return looksLikeCompletion ? `${previousText}. ${draftCompletionText(latestText)}` : latestText;
 }
 
 function capabilityGuidanceForContext(context = {}) {
@@ -201,10 +223,46 @@ function ticketIntakeMissingFieldQuestion(actions = []) {
     return "מה מספר הכלי או המלגזה שעליה לפתוח את הקריאה?";
   }
   if (track === "facility" && missing.has("zone")) {
+    const subject = cleanText(ticketAction?.payload?.subject || ticketAction?.payload?.description, 240);
+    if (/חדר\s+מפעיל/u.test(subject)) return "באיזה אזור או מחלקה נמצא חדר המפעיל?";
     return "באיזה אזור או מקום התקלה? למשל מחסן, חדר טעינה או קו ייצור.";
   }
   if (missing.size) return `חסר לי פרט אחד לפתיחת הקריאה: ${[...missing].join(", ")}.`;
   return "";
+}
+
+function ticketCategoryLabel(category = "") {
+  const key = cleanText(category, 80);
+  if (key === "hvac") return "מיזוג אוויר";
+  if (key === "plumbing") return "אינסטלציה";
+  if (key === "electric") return "חשמל";
+  if (key === "building") return "מבנה";
+  if (key === "it") return "IT";
+  if (key === "transport") return "כלי שינוע / מלגזות";
+  return key;
+}
+
+function ticketIntakeFormReviewText(actions = []) {
+  const ticketAction = (Array.isArray(actions) ? actions : [])
+    .find((action) => action?.type === "ticket.create" && (action.status === "needs_form_review" || action.reviewMode === "ticket_form"));
+  const payload = ticketAction?.payload && typeof ticketAction.payload === "object" ? ticketAction.payload : null;
+  if (!payload) return "";
+  const track = cleanText(payload.track, 40);
+  const typeLabel = track === "transport" ? "כלי שינוע / מלגזות" : "אחזקת מבנה ומתקנים";
+  const category = ticketCategoryLabel(payload.category || payload.categoryLabel);
+  const location = track === "transport"
+    ? cleanText(payload.asset || payload.forkliftId, 120)
+    : cleanText(payload.zone || payload.location, 120);
+  const description = cleanText(payload.subject || payload.description, 240);
+  const lines = [
+    "הכנתי טיוטה לטופס הקריאה.",
+    `סוג: ${typeLabel}`,
+    category ? `קטגוריה: ${category}` : "",
+    location ? `מקום: ${location}` : "",
+    description ? `תיאור: ${description}` : "",
+    "אפשר להמשיך לטופס הקריאה כדי לבדוק ולשלוח."
+  ].filter(Boolean);
+  return lines.join("\n");
 }
 
 function assistantCapabilityGuidanceForProvider() {
@@ -642,7 +700,8 @@ export function createAiAssistHandler({
         }, auth.user, { at: currentTime }));
       }
       const latestUserRequest = latestUserTextFromConversation(conversation, normalized.input.rawText);
-      const draftRawText = conversationAwareDraftText({ rawText: normalized.input.rawText, conversation });
+      const ticketIntakeRequest = isTicketIntakeRequestBody(body, workflow);
+      const draftRawText = conversationAwareDraftText({ rawText: normalized.input.rawText, conversation, ticketIntakeRequest });
       const draftInput = {
         ...normalized.input,
         rawText: draftRawText
@@ -660,7 +719,6 @@ export function createAiAssistHandler({
       });
 
       const context = buildAiAssistContext(body.context, auth.user);
-      const ticketIntakeRequest = isTicketIntakeRequestBody(body, workflow);
       let actionContext = context;
       let fullVisibleFleet = [];
       if (ticketIntakeRequest) {
@@ -861,7 +919,10 @@ export function createAiAssistHandler({
       const deterministicTicketIntakeQuestion = ticketIntakeRequest
         ? ticketIntakeMissingFieldQuestion(actions)
         : "";
-      const assistantText = cleanAssistantText(deterministicTicketIntakeQuestion || grounded.text, 4_000);
+      const deterministicTicketIntakeReview = ticketIntakeRequest
+        ? ticketIntakeFormReviewText(actions)
+        : "";
+      const assistantText = cleanAssistantText(deterministicTicketIntakeQuestion || deterministicTicketIntakeReview || grounded.text, 4_000);
       let persistedAssistantMessage = null;
       if (conversationRecord && backendConversationStore) {
         const baseIdempotencyKey = cleanText(body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"] || requestId, 200);

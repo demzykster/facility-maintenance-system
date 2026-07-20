@@ -156,6 +156,7 @@ describe("AI assist handler", () => {
           code: String(100 + index),
           department: "נפחי"
         })),
+        { id: "fleet-210-archived", code: "210", type: "מלקטת", department: "נפחי", status: "archived" },
         { id: "fleet-210", code: "210", type: "מלקטת", department: "נפחי" }
       ])
     };
@@ -2192,7 +2193,7 @@ describe("AI assist handler", () => {
     expect(payload.actions).toEqual([
       expect.objectContaining({
         type: "ticket.create",
-        status: "ready_for_confirmation",
+        status: "needs_form_review",
         missingFields: [],
         payload: expect.objectContaining({
           track: "facility",
@@ -2211,7 +2212,8 @@ describe("AI assist handler", () => {
     expect(prompt.latestMessageGuidance.operationalDigestAllowed).toBe(false);
     expect(prompt.actionGuidance).toMatchObject({
       hasActionProposal: true,
-      readyActionCount: 1,
+      readyActionCount: 0,
+      reviewInFormCount: 1,
       missingFields: []
     });
   });
@@ -2263,6 +2265,117 @@ describe("AI assist handler", () => {
         })
       })
     ]);
+  });
+
+  it("uses a natural room-specific location question for inline facility ticket intake", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "אפשר להכין טיוטת קריאה"
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      providerCall,
+      now: () => 656,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "מזגן לא עובד בחדר מפעיל מערכת",
+        language: "he",
+        workflow: "ticket_intake",
+        context: {
+          intent: "create_ticket",
+          uiSurface: "inline_ticket_create",
+          taskSession: { type: "ticket_intake", transient: true }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload.assistant.text).toBe("באיזה אזור או מחלקה נמצא חדר המפעיל?");
+    expect(payload.assistant.text).not.toContain("zone");
+    expect(payload.actions[0]).toMatchObject({
+      type: "ticket.create",
+      status: "needs_human_input",
+      missingFields: ["zone"],
+      payload: {
+        track: "facility",
+        category: "hvac",
+        priority: "medium",
+        zone: ""
+      }
+    });
+  });
+
+  it("uses the latest location answer to complete a prior inline facility ticket intake", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "google",
+      model: "gemini-3.5-flash",
+      text: "הטיוטה מוכנה להשלמה בטופס הקריאה. האם תרצה לצרף תמונה?"
+    });
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user" }),
+      providerCall,
+      now: () => 657,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "משרדים",
+        language: "he",
+        workflow: "ticket_intake",
+        messages: [
+          { role: "assistant", content: "תארו בקצרה מה קרה. אפשר לציין מספר כלי, אזור או ציוד." },
+          { role: "user", content: "מזגן לא עובד בחדר מפעיל מערכת" },
+          { role: "assistant", content: "באיזה אזור או מחלקה נמצא חדר המפעיל?" },
+          { role: "user", content: "משרדים" }
+        ],
+        context: {
+          intent: "create_ticket",
+          uiSurface: "inline_ticket_create",
+          taskSession: { type: "ticket_intake", transient: true }
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const payload = res.json();
+    expect(payload.draft.rawText).toBe("מזגן לא עובד בחדר מפעיל מערכת. באזור משרדים");
+    expect(payload.assistant.text).toContain("הכנתי טיוטה לטופס הקריאה.");
+    expect(payload.assistant.text).toContain("קטגוריה: מיזוג אוויר");
+    expect(payload.assistant.text).toContain("מקום: משרדים");
+    expect(payload.assistant.text).not.toContain("תמונה");
+    expect(payload.actions[0]).toMatchObject({
+      type: "ticket.create",
+      status: "needs_form_review",
+      missingFields: [],
+      payload: {
+        track: "facility",
+        category: "hvac",
+        priority: "medium",
+        zone: "משרדים",
+        subject: "מזגן לא עובד בחדר מפעיל מערכת"
+      }
+    });
+    expect(payload.actions[0].payload.description).not.toBe(payload.actions[0].payload.subject);
   });
 
   it("does not merge a short non-operational latest message into an older action request", async () => {
@@ -2357,7 +2470,7 @@ describe("AI assist handler", () => {
         assistantLanguage: "ru",
         languageMismatch: false,
         actionCount: 1,
-        readyActionCount: 1,
+        readyActionCount: 0,
         missingFieldCount: 0,
         actionTypes: ["ticket.create"],
         missingFields: [],

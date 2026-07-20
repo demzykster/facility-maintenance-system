@@ -108,14 +108,27 @@ export function inlineAiTicketFromCapabilityResponse(output = {}) {
 
 export function inlineAiTicketActionMode(action = {}) {
   if (action?.type !== "ticket.create") return "ignore";
-  if (Array.isArray(action.missingFields) && action.missingFields.length) return "needs_input";
   if (action.status === "needs_form_review" || action.reviewMode === "ticket_form") return "form";
+  if (Array.isArray(action.missingFields) && action.missingFields.length) return "needs_input";
   return "confirm";
+}
+
+export function inlineAiTicketVisibleActions(actions = []) {
+  return (Array.isArray(actions) ? actions : [])
+    .filter((action) => ["confirm", "form"].includes(inlineAiTicketActionMode(action)));
+}
+
+export function inlineAiTicketPrimaryActionLabel(action = {}) {
+  const mode = inlineAiTicketActionMode(action);
+  if (mode === "form") return "המשך לטופס הקריאה";
+  return "אישור ויצירת קריאה";
 }
 
 export function completeInlineAiTicketSend(state = {}, output = {}) {
   const text = cleanText(output?.text || output?.assistant?.text || output?.draft?.userReply, 4000) || "הכנתי תשובה קצרה.";
-  const actions = Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : [];
+  const actions = inlineAiTicketVisibleActions(
+    Array.isArray(output?.actions) ? output.actions.filter((action) => action && typeof action === "object") : []
+  );
   const createdTicket = inlineAiTicketFromCapabilityResponse(output);
   return {
     ...state,
