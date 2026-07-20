@@ -191,10 +191,35 @@ function normalizeTicketIntakeSession(body = {}) {
   if (!TICKET_INTAKE_DOMAINS.has(domain)) return null;
   const pendingField = TICKET_INTAKE_FIELD_ALIASES[cleanText(intake.pendingField, 80)] || "";
   const draft = cleanPlainObject(intake.draft);
+  const clarification = cleanPlainObject(intake.clarification);
+  const candidates = Array.isArray(clarification.candidates)
+    ? clarification.candidates.map((candidate, index) => {
+      const label = cleanText(candidate?.label || candidate?.location || candidate?.name || candidate, 160);
+      if (!label) return null;
+      return {
+        token: cleanText(candidate?.token, 80) || `location-choice-${index + 1}`,
+        label,
+        location: cleanText(candidate?.location || label, 160),
+        order: index + 1
+      };
+    }).filter(Boolean).slice(0, 8)
+    : [];
   return {
+    intakeId: cleanText(intake.intakeId, 120),
     domain,
     pendingField,
+    choiceToken: cleanText(taskSession.choiceToken || intake.choiceToken, 80),
+    originalMessage: cleanText(intake.originalMessage, MAX_TEXT_CHARS),
     status: cleanText(intake.status, 40),
+    clarification: cleanText(clarification.questionType, 40) === "choose_one" && candidates.length >= 2
+      ? {
+        questionType: "choose_one",
+        field: cleanText(clarification.field, 40) || "location",
+        originalFragment: cleanText(clarification.originalFragment, 160),
+        attemptCount: Number(clarification.attemptCount || 0) || 0,
+        candidates
+      }
+      : null,
     draft: {
       track: cleanText(draft.track, 40),
       subject: cleanText(draft.subject, 240),

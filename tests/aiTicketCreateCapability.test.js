@@ -8,6 +8,10 @@ const defaultConfig = {
   categories: [{ id: "hvac", label: "מיזוג אוויר" }, { id: "building", label: "בניין" }, { id: "other", label: "אחר" }],
   zones: ["משרדי הפצה", "מחסן ראשי", "משרדי הנהלה"]
 };
+const distributionAmbiguousConfig = {
+  ...defaultConfig,
+  zones: ["משרדי הפצה", "רחבת הפצה", "קבלה"]
+};
 
 function capability(driver = null) {
   return createTicketCreateCapability({ driver });
@@ -253,8 +257,129 @@ describe("AI ticket.create capability", () => {
       config: { ...defaultConfig, zones: ["משרדי הפצה", "משרדי הנהלה"] }
     });
     expect(ambiguous.result.executionStatus).toBe("blocked");
-    expect(ambiguous.result.blockingQuestion).toContain("מצאתי כמה מיקומים");
+    expect(ambiguous.result.blockingQuestion).toContain("מצאתי שני אזורים");
     expect(ambiguous.driver.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps ambiguous facility location candidates in stable order for follow-up choice", async () => {
+    const { result, driver } = await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה", {
+      module: "facility",
+      config: distributionAmbiguousConfig
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.blockingQuestion).toContain("מצאתי שני אזורים");
+    expect(result.blockingQuestion).toContain("• משרדי הפצה");
+    expect(result.blockingQuestion).toContain("• רחבת הפצה");
+    expect(result.intake).toMatchObject({
+      domain: "facility",
+      pendingField: "location",
+      clarification: {
+        questionType: "choose_one",
+        originalFragment: "הפצה",
+        candidates: [
+          { token: "location-choice-1", label: "משרדי הפצה", location: "משרדי הפצה", order: 1 },
+          { token: "location-choice-2", label: "רחבת הפצה", location: "רחבת הפצה", order: 2 }
+        ]
+      }
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["משרדים", "משרדי הפצה"],
+    ["זה עם המשרדים", "משרדי הפצה"],
+    ["משרדי הפצה", "משרדי הפצה"],
+    ["הראשון", "משרדי הפצה"],
+    ["1", "משרדי הפצה"],
+    ["רחבה", "רחבת הפצה"],
+    ["זה עם הרחבה", "רחבת הפצה"],
+    ["השני", "רחבת הפצה"],
+    ["2", "רחבת הפצה"]
+  ])("resolves pending location clarification reply %s inside the offered candidates", async (reply, expectedLocation) => {
+    const pending = (await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה", {
+      module: "facility",
+      config: distributionAmbiguousConfig
+    })).result.intake;
+    const { result, driver } = await execute(`מזגן לא עובד בחדר מפעיל מערכת. באזור ${reply}`, {
+      latestText: reply,
+      intake: pending,
+      module: "facility",
+      config: distributionAmbiguousConfig
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      track: "facility",
+      zone: expectedLocation,
+      category: "hvac",
+      priority: "medium"
+    }), expect.any(Object));
+  });
+
+  it("uses a server-offered location choice token only within the pending candidate set", async () => {
+    const pending = (await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה", {
+      module: "facility",
+      config: distributionAmbiguousConfig
+    })).result.intake;
+    const { result, driver } = await execute("רחבת הפצה", {
+      latestText: "רחבת הפצה",
+      intake: { ...pending, choiceToken: "location-choice-2" },
+      module: "facility",
+      config: distributionAmbiguousConfig
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({ zone: "רחבת הפצה" }), expect.any(Object));
+  });
+
+  it("does not select unrelated global locations while a candidate choice is pending", async () => {
+    const pending = (await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה", {
+      module: "facility",
+      config: distributionAmbiguousConfig
+    })).result.intake;
+    const { result, driver } = await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור קבלה", {
+      latestText: "קבלה",
+      intake: pending,
+      module: "facility",
+      config: distributionAmbiguousConfig
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.blockingQuestion).toContain("בחרו אחד מהאזורים");
+    expect(result.blockingQuestion).toContain("משרדי הפצה");
+    expect(result.blockingQuestion).toContain("רחבת הפצה");
+    expect(result.blockingQuestion).not.toContain("לאיזה מספר כלי");
+    expect(result.intake.clarification.candidates.map((candidate) => candidate.label)).toEqual(["משרדי הפצה", "רחבת הפצה"]);
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps candidate state on unknown replies and blocks stale candidates before create", async () => {
+    const pending = (await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה", {
+      module: "facility",
+      config: distributionAmbiguousConfig
+    })).result.intake;
+    const unknown = await execute("מקום אחר", {
+      latestText: "מקום אחר",
+      intake: pending,
+      module: "facility",
+      config: distributionAmbiguousConfig
+    });
+
+    expect(unknown.result.executionStatus).toBe("blocked");
+    expect(unknown.result.blockingQuestion).toContain("בחרו אחד מהאזורים");
+    expect(unknown.result.intake.clarification.candidates).toHaveLength(2);
+    expect(unknown.driver.create).not.toHaveBeenCalled();
+
+    const stale = await execute("משרדים", {
+      latestText: "משרדים",
+      intake: pending,
+      module: "facility",
+      config: { ...distributionAmbiguousConfig, zones: ["רחבת הפצה", "קבלה"] }
+    });
+    expect(stale.result.executionStatus).toBe("blocked");
+    expect(stale.result.unknowns).toContain("location_config_changed");
+    expect(stale.driver.create).not.toHaveBeenCalled();
   });
 
   it("fails closed for facility intake when authoritative config categories are unavailable", async () => {

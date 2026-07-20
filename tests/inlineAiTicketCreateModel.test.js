@@ -7,6 +7,7 @@ import {
   createInlineAiTicketInitialState,
   failInlineAiTicketSend,
   inlineAiTicketActionMode,
+  inlineAiTicketChoiceOptions,
   inlineAiTicketEffectiveAccess,
   inlineAiTicketFromCapabilityResponse,
   inlineAiTicketPlaceholder,
@@ -116,6 +117,58 @@ describe("inline AI ticket create model", () => {
           subject: "מזגן לא עובד בחדר מפעיל מערכת",
           category: "hvac",
           priority: "medium"
+        }
+      }
+    });
+  });
+
+  it("carries pending location choices and a selected choice token into the next request", () => {
+    const completed = completeInlineAiTicketSend(createInlineAiTicketInitialState(), {
+      capabilityResponse: {
+        executionStatus: "blocked",
+        intake: {
+          domain: "facility",
+          pendingField: "location",
+          status: "collecting",
+          draft: { track: "facility", subject: "מזגן לא עובד", category: "hvac", priority: "medium" },
+          clarification: {
+            questionType: "choose_one",
+            originalFragment: "הפצה",
+            candidates: [
+              { token: "location-choice-1", label: "משרדי הפצה", location: "משרדי הפצה", order: 1 },
+              { token: "location-choice-2", label: "רחבת הפצה", location: "רחבת הפצה", order: 2 }
+            ]
+          }
+        }
+      },
+      assistant: { text: "מצאתי שני אזורים. למה התכוונת?" }
+    });
+
+    expect(inlineAiTicketChoiceOptions(completed)).toEqual([
+      { token: "location-choice-1", label: "משרדי הפצה", value: "משרדי הפצה" },
+      { token: "location-choice-2", label: "רחבת הפצה", value: "רחבת הפצה" }
+    ]);
+    expect(completed.msgs.at(-1).choices).toEqual(inlineAiTicketChoiceOptions(completed));
+
+    const request = buildInlineAiTicketRequest({
+      text: "רחבת הפצה",
+      context: {},
+      intake: completed.intake,
+      choiceToken: "location-choice-2",
+      idempotencyKey: "idem-choice"
+    });
+
+    expect(request.context.taskSession).toMatchObject({
+      choiceToken: "location-choice-2",
+      intake: {
+        domain: "facility",
+        pendingField: "location",
+        clarification: {
+          questionType: "choose_one",
+          candidates: [
+            { token: "location-choice-1", label: "משרדי הפצה" },
+            { token: "location-choice-2", label: "רחבת הפצה" }
+          ]
         }
       }
     });

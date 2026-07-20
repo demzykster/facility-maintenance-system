@@ -60,3 +60,10 @@ Each exception must include:
 - Why necessary: the existing new-ticket type picker and AI API adapter wiring still live in `src/ClaudeMaintenanceApp.jsx`; the shell needs minimal wiring to mount the extracted inline AI intake and pass its idempotency key, abort signal, and bounded request timeout to the server AI boundary so UI replay protection and latency handling use the same server-owned create contract.
 - Why extraction was not the right move: the intake orchestration, transient request state, capability validation, and compact UI live outside the shell in `src/inlineAiTicketIntakeOrchestrator.js`, `src/InlineAITicketCreate.jsx`, `src/useInlineAITicketSession.js`, `src/inlineAiTicketCreateModel.js`, and `server/ai/capabilities/`; extracting the whole ticket form/modal would be a larger ticket-module vertical slice than this focused correction.
 - Follow-up/removal condition: when the ticket create modal/form is extracted into a ticket module, move this inline AI mount and API adapter wiring with it and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-20
+- Owner goal: inline AI location clarification for facility intake.
+- New line count: 10018.
+- Why necessary: the compact inline AI component now renders server-offered location choices as small RTL chips, and the existing shell stylesheet is still where inline modal styles are hosted.
+- Why extraction was not the right move: the clarification state, candidate resolution, and choice handling live in extracted inline AI modules; this exception only covers three shell CSS rules for the already-mounted component.
+- Follow-up/removal condition: when the ticket create modal/form styles move into a ticket module, move these chip styles with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

@@ -25,6 +25,32 @@ const FIELD_ALIASES = Object.freeze({
   downtimeType: "downtimeType"
 });
 
+function normalizeClarificationCandidate(candidate = {}, index = 0) {
+  const label = cleanText(candidate.label || candidate.location || candidate.name || candidate, 160);
+  if (!label) return null;
+  return {
+    token: cleanText(candidate.token, 80) || `location-choice-${index + 1}`,
+    label,
+    location: cleanText(candidate.location || label, 160) || label,
+    order: Number.isFinite(Number(candidate.order)) ? Number(candidate.order) : index + 1
+  };
+}
+
+function normalizeClarification(value = null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidates = Array.isArray(value.candidates)
+    ? value.candidates.map(normalizeClarificationCandidate).filter(Boolean).slice(0, 8)
+    : [];
+  if (cleanText(value.questionType, 40) !== "choose_one" || candidates.length < 2) return null;
+  return {
+    questionType: "choose_one",
+    field: cleanText(value.field, 40) || "location",
+    originalFragment: cleanText(value.originalFragment, 160),
+    attemptCount: Math.max(0, Math.min(Number(value.attemptCount || 0) || 0, 10)),
+    candidates: candidates.map((candidate, index) => ({ ...candidate, token: candidate.token || `location-choice-${index + 1}`, order: index + 1 }))
+  };
+}
+
 function cleanTicketPayload(payload = {}) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
   return {
@@ -53,7 +79,8 @@ export function normalizeInlineTicketIntakeState(value = null) {
     domain,
     pendingField,
     draft,
-    status
+    status,
+    clarification: normalizeClarification(value.clarification)
   };
 }
 
@@ -72,8 +99,20 @@ export function inlineTicketIntakeStateFromActions(actions = [], previous = null
     domain,
     pendingField: missingFields[0] || "",
     draft: payload,
-    status
+    status,
+    clarification: previous?.clarification || null
   });
+}
+
+export function inlineAiTicketChoiceOptions(state = {}) {
+  const intake = normalizeInlineTicketIntakeState(state?.intake || state);
+  if (intake?.domain !== "facility" || intake.pendingField !== "location") return [];
+  const candidates = intake.clarification?.candidates || [];
+  return candidates.map((candidate) => ({
+    token: candidate.token,
+    label: candidate.label,
+    value: candidate.location || candidate.label
+  }));
 }
 
 export function inlineAiTicketPlaceholder(state = {}) {
@@ -115,6 +154,7 @@ export function buildInlineAiTicketRequest({
   messages = [],
   context,
   intake = null,
+  choiceToken = "",
   idempotencyKey = ""
 } = {}) {
   const q = cleanText(text, 2000);
@@ -130,7 +170,8 @@ export function buildInlineAiTicketRequest({
       taskSession: {
         type: "ticket_intake",
         transient: true,
-        ...(normalizedIntake ? { intake: normalizedIntake } : {})
+        ...(normalizedIntake ? { intake: normalizedIntake } : {}),
+        ...(choiceToken ? { choiceToken: cleanText(choiceToken, 80) } : {})
       },
       currentEntityHintOnly: true
     },
@@ -140,7 +181,7 @@ export function buildInlineAiTicketRequest({
   };
 }
 
-export function beginInlineAiTicketSend(state = {}, { text, context, idempotencyKey } = {}) {
+export function beginInlineAiTicketSend(state = {}, { text, context, idempotencyKey, choiceToken = "" } = {}) {
   const q = cleanText(text ?? state.input, 2000);
   if (!q || state.busy || state.createdTicket) return { state, request: null };
   const request = buildInlineAiTicketRequest({
@@ -148,6 +189,7 @@ export function beginInlineAiTicketSend(state = {}, { text, context, idempotency
     messages: state.msgs || [],
     context,
     intake: state.intake,
+    choiceToken,
     idempotencyKey
   });
   if (!request) return { state, request: null };
@@ -213,6 +255,7 @@ export function completeInlineAiTicketSend(state = {}, output = {}) {
   const createdTicket = inlineAiTicketFromCapabilityResponse(output);
   const capabilityIntake = normalizeInlineTicketIntakeState(output?.capabilityResponse?.intake);
   const intake = createdTicket ? null : (capabilityIntake || inlineTicketIntakeStateFromActions(allActions, state.intake));
+  const choices = inlineAiTicketChoiceOptions(intake);
   return {
     ...state,
     busy: false,
@@ -222,6 +265,7 @@ export function completeInlineAiTicketSend(state = {}, output = {}) {
       role: "assistant",
       content: text,
       actions,
+      choices,
       capabilityResponse: output?.capabilityResponse || null
     }]
   };

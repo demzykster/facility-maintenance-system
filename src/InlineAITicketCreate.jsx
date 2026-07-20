@@ -24,7 +24,7 @@ function inlineTextBlocks(value) {
   return text.split("\n").map((line) => line.trim()).filter(Boolean).map((textLine) => ({ type: "paragraph", text: textLine.replace(/\*\*([^*]+)\*\*/gu, "$1") }));
 }
 
-function InlineMessage({ role, content }) {
+function InlineMessage({ role, content, choices = [], onChoose }) {
   const dir = inlineTextDirection(content, "rtl");
   const blocks = inlineTextBlocks(content);
   return <div className={"inline-ai-msg " + role} dir={dir}>
@@ -32,6 +32,14 @@ function InlineMessage({ role, content }) {
       if (block.type === "list") return <ul key={`list-${index}`}>{block.items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{item}</li>)}</ul>;
       return <p key={`p-${index}`}>{block.text}</p>;
     }) : <p>{content}</p>}
+    {Array.isArray(choices) && choices.length > 0 && <div className="inline-ai-choice-row" aria-label="בחירת אזור">
+      {choices.map((choice) => <button
+        key={choice.token || choice.label}
+        type="button"
+        className="inline-ai-choice-chip"
+        onClick={() => onChoose?.(choice)}
+      >{choice.label}</button>)}
+    </div>}
   </div>;
 }
 
@@ -143,7 +151,7 @@ export function InlineAITicketCreate({
     {expanded && <div id="inline-ai-ticket-chat" className="inline-ai-chat" aria-label="פתיחת קריאה בעזרת AI">
       <div className="inline-ai-msgs">
         {visibleMessages.map((message, index) => <div key={index} className={"inline-ai-msg-wrap " + message.role}>
-          <InlineMessage role={message.role} content={message.content} />
+          <InlineMessage role={message.role} content={message.content} choices={message.choices} onChoose={agent.choose} />
           {message.role === "assistant" && Array.isArray(message.actions) && message.actions.length > 0 && <div className="inline-ai-actions">
             {message.actions.filter((action) => action?.type === "ticket.create").map((action) => {
               const key = action.id || action.type;

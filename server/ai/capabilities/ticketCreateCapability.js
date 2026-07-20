@@ -490,6 +490,7 @@ export function createTicketCreateCapability({ driver = null } = {}) {
             domain: plan.domain,
             status: plan.status,
             pendingField: plan.pendingField,
+            clarification: plan.clarification,
             originalMessage: plan.originalMessage,
             draft: plan.draft
           }

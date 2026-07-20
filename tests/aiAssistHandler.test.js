@@ -2928,6 +2928,90 @@ describe("AI assist handler", () => {
     });
   });
 
+  it("resolves a follow-up facility location fragment inside the previously offered candidate set", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-office-distribution",
+        num: 43,
+        ticketNo: "F-043",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
+    const appConfigDriver = {
+      get: vi.fn().mockResolvedValue({
+        config: {
+          categories: [{ id: "hvac", label: "מיזוג אוויר" }],
+          zones: ["משרדי הפצה", "רחבת הפצה", "קבלה"]
+        }
+      })
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "google",
+        GOOGLE_GENERATIVE_AI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      appConfigDriver,
+      providerCall,
+      now: () => 658,
+      rateBuckets: new Map()
+    });
+
+    const ambiguous = await call(handler, {
+      body: inlineTicketBody({
+        text: "מזגן לא עובד בחדר מפעיל מערכת. באזור הפצה",
+        idempotencyKey: "idem-location-ambiguous",
+        context: { tickets: [] }
+      })
+    });
+    expect(ambiguous.statusCode).toBe(200);
+    expect(ambiguous.json().assistant.text).toContain("משרדי הפצה");
+    expect(ambiguous.json().assistant.text).toContain("רחבת הפצה");
+    const pending = ambiguous.json().capabilityResponse.intake;
+
+    const selected = await call(handler, {
+      body: inlineTicketBody({
+        text: "משרדים",
+        idempotencyKey: "idem-location-ambiguous",
+        messages: [
+          { role: "user", content: "מזגן לא עובד בחדר מפעיל מערכת" },
+          { role: "assistant", content: ambiguous.json().assistant.text },
+          { role: "user", content: "משרדים" }
+        ],
+        context: {
+          tickets: [],
+          taskSession: {
+            intake: pending
+          }
+        }
+      })
+    });
+
+    expect(selected.statusCode).toBe(200);
+    expect(selected.json().capabilityResponse).toMatchObject({
+      executionStatus: "created",
+      actionResult: {
+        ticketId: "ticket-office-distribution",
+        track: "facility",
+        zone: "משרדי הפצה",
+        category: "hvac"
+      }
+    });
+    expect(selected.json().assistant.text).not.toContain("כלי");
+    expect(selected.json().assistant.text).not.toContain("מלגזה");
+    expect(providerCall).not.toHaveBeenCalled();
+    expect(ticketsDriver.create).toHaveBeenCalledTimes(1);
+  });
+
   it("does not merge a short non-operational latest message into an older action request", async () => {
     const providerCall = vi.fn().mockResolvedValue({
       ok: true,

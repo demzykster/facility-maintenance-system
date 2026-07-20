@@ -83,11 +83,12 @@ export function useInlineAITicketSession({
     return verified;
   }, [readTicket]);
 
-  const send = useCallback(async (text) => {
+  const send = useCallback(async (text, options = {}) => {
     const { state: sendingState, request } = beginInlineAiTicketSend(stateRef.current, {
       text,
       context,
-      idempotencyKey: ensureIdempotencyKey()
+      idempotencyKey: ensureIdempotencyKey(),
+      choiceToken: cleanText(options.choiceToken, 80)
     });
     if (!request) return null;
     stateRef.current = sendingState;
@@ -120,6 +121,12 @@ export function useInlineAITicketSession({
       if (requestSeqRef.current === requestSeq) abortRef.current = null;
     }
   }, [callAssistant, context, ensureIdempotencyKey, hydrateCreatedTicket, requestTimeoutMs]);
+
+  const choose = useCallback((choice = {}) => {
+    const label = cleanText(choice.label || choice.value, 160);
+    if (!label) return null;
+    return send(label, { choiceToken: cleanText(choice.token, 80) });
+  }, [send]);
 
   const runAction = useCallback(async (action) => {
     const mode = inlineAiTicketActionMode(action);
@@ -165,7 +172,8 @@ export function useInlineAITicketSession({
     ...state,
     setInput,
     send,
+    choose,
     runAction,
     reset
-  }), [reset, runAction, send, setInput, state]);
+  }), [choose, reset, runAction, send, setInput, state]);
 }

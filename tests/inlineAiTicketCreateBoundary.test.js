@@ -49,6 +49,13 @@ describe("inline AI ticket create boundary", () => {
     expect(inlineSource).toContain("פתיחת הקריאה");
   });
 
+  it("renders location clarification choices as compact buttons without exposing internal field keys", () => {
+    expect(inlineSource).toContain("inline-ai-choice-chip");
+    expect(inlineSource).toContain("onChoose?.(choice)");
+    expect(modelSource).toContain("inlineAiTicketChoiceOptions");
+    expect(modelSource).not.toContain("rawCandidateId");
+  });
+
   it("preserves autonomous server ticket results through the existing API client", () => {
     expect(apiClientSource).toContain("capabilityResponse");
   });

@@ -89,6 +89,25 @@ function lookupTokens(value = "") {
   return lookupText(value).split(" ").filter(Boolean);
 }
 
+function normalizeHebrewChoiceToken(value = "") {
+  const raw = lookupText(value);
+  if (!raw) return "";
+  let token = raw;
+  if (/^[הבכלוש][\u0590-\u05FF]{2,}$/u.test(token)) token = token.slice(1);
+  if (token.endsWith("יים") && token.length > 4) token = token.slice(0, -3);
+  else if (token.endsWith("ים") && token.length > 3) token = token.slice(0, -2);
+  else if (token.endsWith("ות") && token.length > 3) token = token.slice(0, -2);
+  if (token.endsWith("י") && token.length > 3) token = token.slice(0, -1);
+  if ((token.endsWith("ה") || token.endsWith("ת")) && token.length > 3) token = token.slice(0, -1);
+  return token;
+}
+
+function candidateLookupTokens(value = "") {
+  return [...new Set(lookupTokens(value)
+    .flatMap((token) => [token, normalizeHebrewChoiceToken(token)])
+    .filter((token) => token && token.length >= 2))];
+}
+
 function includesTerm(text = "", term = "") {
   const clean = lookupText(text);
   const candidate = lookupText(term);
@@ -265,6 +284,61 @@ function maintenanceZones(config = {}) {
     .filter(Boolean);
 }
 
+function locationCandidateToken(index = 0) {
+  return `location-choice-${Number(index) + 1}`;
+}
+
+function normalizeLocationClarificationCandidate(candidate = {}, index = 0) {
+  const label = cleanText(candidate.label || candidate.location || candidate.name || candidate, 160);
+  if (!label) return null;
+  return {
+    token: cleanText(candidate.token, 80) || locationCandidateToken(index),
+    label,
+    location: cleanText(candidate.location || label, 160) || label,
+    order: Number.isFinite(Number(candidate.order)) ? Number(candidate.order) : index + 1
+  };
+}
+
+function normalizeLocationClarification(value = null) {
+  const source = cleanObject(value);
+  const questionType = cleanText(source.questionType, 40);
+  const candidates = cleanArray(source.candidates)
+    .map(normalizeLocationClarificationCandidate)
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((candidate, index) => ({ ...candidate, token: candidate.token || locationCandidateToken(index), order: index + 1 }));
+  if (questionType !== "choose_one" || candidates.length < 2) return null;
+  return {
+    questionType: "choose_one",
+    field: "location",
+    originalFragment: cleanText(source.originalFragment, 160),
+    attemptCount: Math.max(0, Math.min(Number(source.attemptCount || 0) || 0, 10)),
+    candidates
+  };
+}
+
+function locationClarificationForMatches(matches = [], originalFragment = "", attemptCount = 0) {
+  const candidates = cleanArray(matches)
+    .map((location, index) => normalizeLocationClarificationCandidate({ location, label: location, token: locationCandidateToken(index), order: index + 1 }, index))
+    .filter(Boolean);
+  if (candidates.length < 2) return null;
+  return {
+    questionType: "choose_one",
+    field: "location",
+    originalFragment: cleanText(originalFragment, 160),
+    attemptCount: Math.max(0, Math.min(Number(attemptCount) || 0, 10)),
+    candidates
+  };
+}
+
+function locationChoiceQuestion(clarification = null, prefix = "") {
+  const state = normalizeLocationClarification(clarification);
+  const candidates = state?.candidates || [];
+  const list = candidates.map((candidate) => `• ${candidate.label}`).join("\n");
+  const lead = cleanText(prefix, 200) || (candidates.length === 2 ? "מצאתי שני אזורים. למה התכוונת?" : "מצאתי כמה אזורים. למה התכוונת?");
+  return [lead, list].filter(Boolean).join("\n");
+}
+
 function facilityCategoryFromText(text = "", config = {}) {
   const categories = facilityCategories(config);
   const matches = categories.filter((category) => [
@@ -337,6 +411,66 @@ function resolveFacilityLocation({ text = "", latestText = "", config = {}, pend
   if (unique.length > 1) return { status: "ambiguous", matches: unique, candidates, zones };
   if (candidates.length) return { status: "not_found", candidates, zones };
   return { status: "missing", candidates: [], zones };
+}
+
+const ORDINAL_CHOICES = Object.freeze({
+  "1": 1,
+  "אחד": 1,
+  "ראשון": 1,
+  "הראשון": 1,
+  "2": 2,
+  "שתיים": 2,
+  "שניים": 2,
+  "שני": 2,
+  "השני": 2,
+  "3": 3,
+  "שלוש": 3,
+  "שלישי": 3,
+  "השלישי": 3
+});
+
+function matchingCandidateScores(reply = "", candidates = [], choiceToken = "") {
+  const cleanReply = lookupText(reply);
+  const replyTokens = candidateLookupTokens(reply);
+  const scores = [];
+  const tokenChoice = cleanText(choiceToken, 80) || (/^location-choice-\d+$/u.test(cleanReply) ? cleanReply : "");
+  for (const candidate of candidates) {
+    const labelLookup = lookupText(candidate.label);
+    const locationLookup = lookupText(candidate.location);
+    const candidateTokens = candidateLookupTokens(`${candidate.label} ${candidate.location}`);
+    let score = 0;
+    if (tokenChoice && candidate.token === tokenChoice) score = Math.max(score, 100);
+    if (cleanReply && (cleanReply === labelLookup || cleanReply === locationLookup)) score = Math.max(score, 90);
+    if (cleanReply && (labelLookup.includes(cleanReply) || locationLookup.includes(cleanReply)) && cleanReply.length >= 3) score = Math.max(score, 55);
+    const tokenHits = replyTokens.filter((token) => candidateTokens.includes(token));
+    if (tokenHits.length) score = Math.max(score, 70 + tokenHits.length);
+    if (score > 0) scores.push({ candidate, score });
+  }
+  return scores;
+}
+
+function resolvePendingLocationChoice({ reply = "", clarification = null, config = {}, choiceToken = "" } = {}) {
+  const state = normalizeLocationClarification(clarification);
+  if (!state) return null;
+  const candidates = state.candidates;
+  const cleanReply = lookupText(reply);
+  const ordinal = ORDINAL_CHOICES[cleanReply] || ORDINAL_CHOICES[normalizeHebrewChoiceToken(cleanReply)];
+  let matches = [];
+  if (ordinal && candidates[ordinal - 1]) {
+    matches = [{ candidate: candidates[ordinal - 1], score: 100 }];
+  } else {
+    matches = matchingCandidateScores(reply, candidates, choiceToken);
+  }
+  const bestScore = Math.max(0, ...matches.map((item) => item.score));
+  const best = matches.filter((item) => item.score === bestScore);
+  if (best.length === 1) {
+    const location = best[0].candidate.location;
+    const authoritative = maintenanceZones(config).some((zone) => lookupText(zone) === lookupText(location));
+    if (!authoritative) return { status: "stale", location, clarification: state };
+    return { status: "matched", location, clarification: state, candidate: best[0].candidate };
+  }
+  if (best.length > 1) return { status: "ambiguous", matches: best.map((item) => item.candidate.location), clarification: state };
+  return { status: "unknown", clarification: state };
 }
 
 function roomHintFromText(text = "") {
@@ -510,12 +644,14 @@ export function normalizeInlineTicketIntakeSession(value = null) {
     domain,
     status: cleanText(source.status, 40) || INLINE_TICKET_INTAKE_STATUSES.collecting,
     pendingField,
+    choiceToken: cleanText(source.choiceToken, 80),
+    clarification: normalizeLocationClarification(source.clarification),
     originalMessage: cleanText(source.originalMessage, MAX_DESCRIPTION_CHARS),
     draft: draftFromTicket(source.draft || source.payload || {})
   };
 }
 
-function collectingPlan({ domain, pendingField, question, unknowns = [], facts = [], draft = {}, originalMessage = "" } = {}) {
+function collectingPlan({ domain, pendingField, question, unknowns = [], facts = [], draft = {}, originalMessage = "", clarification = null } = {}) {
   return {
     workflow: INLINE_TICKET_INTAKE_WORKFLOW,
     domain,
@@ -526,6 +662,7 @@ function collectingPlan({ domain, pendingField, question, unknowns = [], facts =
     question,
     unknowns,
     facts,
+    clarification: normalizeLocationClarification(clarification),
     draft: draftFromTicket(draft)
   };
 }
@@ -706,21 +843,30 @@ export function buildInlineTicketIntakePlan({
       config,
       pendingLocation: pendingFacilityLocation
     });
+    const pendingChoice = pendingFacilityLocation
+      ? resolvePendingLocationChoice({
+        reply: latest,
+        clarification: previous?.clarification,
+        config,
+        choiceToken: previous?.choiceToken
+      })
+      : null;
+    const locationResult = pendingChoice || location;
     const draftBase = {
       track: "facility",
-      subject: compactSubject(stripTrailingLocation(baseText || rawText, location.location || "")),
-      description: facilityDescriptionFromText(baseText || rawText, resolvedCategory.id, location.location || ""),
+      subject: compactSubject(stripTrailingLocation(baseText || rawText, locationResult.location || "")),
+      description: facilityDescriptionFromText(baseText || rawText, resolvedCategory.id, locationResult.location || ""),
       category: resolvedCategory.id,
       categoryLabel: resolvedCategory.label,
       priority: priorityFromText(baseText || rawText, resolvedCategory.id),
-      zone: location.location || ""
+      zone: locationResult.location || ""
     };
-    if (location.status === "matched") {
+    if (locationResult.status === "matched") {
       const ticket = buildFacilityTicket({
         text: rawText,
         baseText: baseText || rawText,
         category: resolvedCategory,
-        location: location.location,
+        location: locationResult.location,
         user,
         now,
         ticketId
@@ -736,22 +882,51 @@ export function buildInlineTicketIntakePlan({
         }]
       });
     }
-    if (location.status === "ambiguous") {
+    if (locationResult.status === "ambiguous") {
+      const clarification = pendingChoice?.clarification
+        || locationClarificationForMatches(locationResult.matches, location.candidates?.[0] || latest || rawText);
       return collectingPlan({
         domain: "facility",
         pendingField: "location",
-        question: `מצאתי כמה מיקומים אפשריים: ${location.matches.slice(0, 5).join(", ")}. באיזה מהם לפתוח את הקריאה?`,
+        question: locationChoiceQuestion(clarification),
         unknowns: ["location"],
-        facts: location.matches.slice(0, 5).map((item) => ({ location: item })),
+        facts: cleanArray(locationResult.matches).slice(0, 5).map((item) => ({ location: item })),
         draft: draftBase,
+        originalMessage: baseText || rawText,
+        clarification
+      });
+    }
+    if (locationResult.status === "unknown") {
+      const clarification = {
+        ...locationResult.clarification,
+        attemptCount: Number(locationResult.clarification?.attemptCount || 0) + 1
+      };
+      return collectingPlan({
+        domain: "facility",
+        pendingField: "location",
+        question: locationChoiceQuestion(clarification, "לא הצלחתי לבחור מתוך האפשרויות. בחרו אחד מהאזורים האלה:"),
+        unknowns: ["location"],
+        facts: cleanArray(clarification.candidates).map((item) => ({ location: item.location })),
+        draft: draftBase,
+        originalMessage: baseText || rawText,
+        clarification
+      });
+    }
+    if (locationResult.status === "stale") {
+      return collectingPlan({
+        domain: "facility",
+        pendingField: "location",
+        question: "המיקום שהוצע כבר לא זמין בהגדרות. בחרו אזור או מחלקה מחדש.",
+        unknowns: ["location_config_changed"],
+        draft: { ...draftBase, zone: "" },
         originalMessage: baseText || rawText
       });
     }
-    if (location.status === "not_found") {
+    if (locationResult.status === "not_found") {
       return collectingPlan({
         domain: "facility",
         pendingField: "location",
-        question: `לא מצאתי מיקום מותר בשם ${location.candidates[0]}. באיזה אזור או מחלקה לפתוח את הקריאה?`,
+        question: `לא מצאתי מיקום מותר בשם ${locationResult.candidates[0]}. באיזה אזור או מחלקה לפתוח את הקריאה?`,
         unknowns: ["location"],
         draft: draftBase,
         originalMessage: baseText || rawText
