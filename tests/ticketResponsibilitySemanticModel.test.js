@@ -107,7 +107,34 @@ describe("ticket responsibility semantic model", () => {
       pauseSla: true,
       hasExplicitTarget: false,
       targetType: "none",
+      requiredTargetType: "none",
+      targetSatisfied: true,
       target: null
+    });
+  });
+
+  it("reports an explicit waiting supplier without replacing execution routing", () => {
+    const ticket = {
+      track: "facility",
+      status: "waiting",
+      waitingReason: "supplier",
+      supplier: "Execution Co",
+      waitingTargetType: "supplier",
+      waitingSupplier: "Quote Co"
+    };
+
+    expect(getTicketAssignedSupplier(ticket)).toMatchObject({
+      name: "Execution Co",
+      isWaitingTarget: false
+    });
+    expect(getTicketWaitingContext(ticket)).toMatchObject({
+      requiredTargetType: "supplier",
+      targetSatisfied: true,
+      targetType: "supplier",
+      target: {
+        supplier: "Quote Co",
+        sourceField: "waitingSupplier"
+      }
     });
   });
 

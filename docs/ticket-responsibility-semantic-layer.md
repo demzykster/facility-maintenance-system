@@ -37,6 +37,12 @@ It does not introduce a workflow, UI behavior, database field, migration, or rou
 - `waitingReason` gives the reason when `status === "waiting"`.
 - `waitBall` gives the current action owner for normal waiting states.
 - `pending_user` is treated as requester approval, not as a generic waiting reason.
-- No helper invents `waitingSupplier`, `waitingUser`, or `scheduledUntil`.
+- `requiredTargetType` describes which future target a reason needs: supplier, user, manager, date, or none.
+- Optional `waitingTargetType`, `waitingSupplier`, `waitingUser`, and `waitingUntil` values are read only when they already exist.
+- `ticket.supplier` is never used as a fallback for `waitingSupplier`; execution routing and waiting dependencies remain separate.
+- Legacy tickets without target fields remain readable and report an unsatisfied target requirement when the reason needs one.
+
+The target model does not persist these optional fields or make them mandatory. UI validation, storage authority, notifications,
+and transitions require a separately approved workflow change.
 
 The semantic layer is intentionally read-only so existing transport, facility, supplier routing, SLA, BI, notifications, and AI-created ticket behavior remain unchanged.

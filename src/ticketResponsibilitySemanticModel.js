@@ -2,6 +2,7 @@ import {
   ticketTrack,
   transportTechnicianAssignee
 } from "./ticketResponsibilityModel.js";
+import { getTicketWaitingTargetState } from "./ticketWaitingTargetModel.js";
 
 const text = (value) => String(value == null ? "" : value).trim();
 
@@ -67,6 +68,7 @@ export function getTicketWaitingContext(ticket = {}, {
   waitReasonMeta = () => ({})
 } = {}) {
   if (ticket.status === "pending_user") {
+    const target = requesterTarget(ticket);
     return {
       isWaiting: true,
       status: "pending_user",
@@ -74,9 +76,11 @@ export function getTicketWaitingContext(ticket = {}, {
       reasonSource: "status",
       actionOwner: "requester",
       pauseSla: false,
-      hasExplicitTarget: true,
+      hasExplicitTarget: !!target,
       targetType: "requester",
-      target: requesterTarget(ticket)
+      requiredTargetType: "user",
+      targetSatisfied: !!target,
+      target
     };
   }
 
@@ -90,6 +94,8 @@ export function getTicketWaitingContext(ticket = {}, {
       pauseSla: false,
       hasExplicitTarget: false,
       targetType: "none",
+      requiredTargetType: "none",
+      targetSatisfied: true,
       target: null
     };
   }
@@ -97,6 +103,8 @@ export function getTicketWaitingContext(ticket = {}, {
   const reason = text(ticket.waitingReason) || "other";
   const meta = waitReasonMeta(reason) || {};
   const actionOwner = text(ticket.waitBall || meta.ball || (reason === "no_equipment" ? "manager" : "executor"));
+  const targetState = getTicketWaitingTargetState(ticket);
+  const target = targetState.target.type === "none" ? null : targetState.target;
   return {
     isWaiting: true,
     status: "waiting",
@@ -104,8 +112,10 @@ export function getTicketWaitingContext(ticket = {}, {
     reasonSource: "waitingReason",
     actionOwner,
     pauseSla: !!meta.pauseSla,
-    hasExplicitTarget: false,
-    targetType: "none",
-    target: null
+    hasExplicitTarget: targetState.target.complete,
+    targetType: targetState.target.type,
+    requiredTargetType: targetState.requiredType,
+    targetSatisfied: targetState.satisfied,
+    target
   };
 }
