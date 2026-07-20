@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 
 const PORT = Number(process.env.CMMS_DEMO_BI_HEATMAP_PORT || 5174);
 const HOST = "127.0.0.1";
@@ -136,6 +136,10 @@ function horizontalOverlap(leftRect, rightRect) {
   return Math.max(0, Math.min(leftRect.right, rightRect.right) - Math.max(leftRect.left, rightRect.left));
 }
 
+function verticalOverlap(topRect, bottomRect) {
+  return Math.max(0, Math.min(topRect.bottom, bottomRect.bottom) - Math.max(topRect.top, bottomRect.top));
+}
+
 async function injectHeatmap(page) {
   await page.waitForSelector(".bi-heatmap-panel", { timeout: 10000 });
   const result = await page.evaluate((markup) => {
@@ -214,7 +218,7 @@ async function measureLayout(page) {
   });
 }
 
-async function runViewport(browser, name, viewport) {
+async function runViewport(browserTypeName, browser, name, viewport) {
   const page = await browser.newPage({ viewport, locale: "he-IL" });
   const consoleMessages = [];
   const pageErrors = [];
@@ -231,65 +235,80 @@ async function runViewport(browser, name, viewport) {
   const baselineDocumentOverflowX = await measureDocumentOverflow(page);
   await injectHeatmap(page);
   const layout = await measureLayout(page);
-  await page.screenshot({ path: `/tmp/cmms-bi-heatmap-layout-${name}.png`, fullPage: true });
+  await page.screenshot({ path: `/tmp/cmms-bi-heatmap-layout-${browserTypeName}-${name}.png`, fullPage: true });
   await page.close();
 
-  if (layout.direction !== "rtl") throw new Error(`${name}:direction_not_rtl:${layout.direction}`);
+  const checkName = `${browserTypeName}:${name}`;
+  if (layout.direction !== "rtl") throw new Error(`${checkName}:direction_not_rtl:${layout.direction}`);
   const allowedDocumentOverflow = Math.max(MAX_DOC_OVERFLOW, baselineDocumentOverflowX);
   if (layout.documentOverflowX > allowedDocumentOverflow) {
-    throw new Error(`${name}:document_overflow_added:${JSON.stringify({ before: baselineDocumentOverflowX, after: layout.documentOverflowX })}`);
+    throw new Error(`${checkName}:document_overflow_added:${JSON.stringify({ before: baselineDocumentOverflowX, after: layout.documentOverflowX })}`);
   }
-  if (!layout.headerVisible) throw new Error(`${name}:domain_header_not_visible`);
-  if (!layout.firstNameVisible) throw new Error(`${name}:first_column_not_visible`);
-  assertClose(layout.firstHeader.left, layout.firstName.left, 1.5, `${name}:first_column_left_alignment`);
-  assertClose(layout.firstHeader.right, layout.firstName.right, 1.5, `${name}:first_column_right_alignment`);
-  if (layout.firstCell.right > layout.firstName.left) throw new Error(`${name}:first_metric_overlaps_domain_column`);
-  if (viewport.width <= 760 && layout.rowHeight > MAX_MOBILE_ROW_HEIGHT) throw new Error(`${name}:mobile_row_too_tall:${layout.rowHeight}`);
+  if (!layout.headerVisible) throw new Error(`${checkName}:domain_header_not_visible`);
+  if (!layout.firstNameVisible) throw new Error(`${checkName}:first_column_not_visible`);
+  assertClose(layout.firstHeader.left, layout.firstName.left, 1.5, `${checkName}:first_column_left_alignment`);
+  assertClose(layout.firstHeader.right, layout.firstName.right, 1.5, `${checkName}:first_column_right_alignment`);
+  if (layout.firstCell.right > layout.firstName.left) throw new Error(`${checkName}:first_metric_overlaps_domain_column`);
+  if (viewport.width <= 760 && layout.rowHeight > MAX_MOBILE_ROW_HEIGHT) throw new Error(`${checkName}:mobile_row_too_tall:${layout.rowHeight}`);
+  if (layout.domainTitle.width < 12) throw new Error(`${checkName}:domain_title_collapsed:${layout.domainTitle.width}`);
+  if (layout.domainTitle.height < 12) throw new Error(`${checkName}:domain_title_clipped:${layout.domainTitle.height}`);
+  if (layout.riskTags.height < 14) throw new Error(`${checkName}:risk_tags_clipped:${layout.riskTags.height}`);
+  if (layout.riskTagItems.some((item) => item.height < 12 || item.width < 12)) throw new Error(`${checkName}:risk_tag_item_clipped`);
+  for (let i = 0; i < layout.riskTagItems.length; i += 1) {
+    for (let j = i + 1; j < layout.riskTagItems.length; j += 1) {
+      const left = layout.riskTagItems[i];
+      const right = layout.riskTagItems[j];
+      if (horizontalOverlap(left, right) > 1 && verticalOverlap(left, right) > 1) {
+        throw new Error(`${checkName}:risk_tag_items_overlap:${JSON.stringify({ left, right })}`);
+      }
+    }
+  }
+  if (layout.riskTags.bottom > layout.aiChip.top + 1) {
+    throw new Error(`${checkName}:risk_tags_overlap_ai_chip:${JSON.stringify({ riskTags: layout.riskTags, aiChip: layout.aiChip })}`);
+  }
   if (viewport.width <= 390) {
     const inside = (container, child) =>
       child.left >= container.left - 1 &&
       child.right <= container.right + 1 &&
       child.top >= container.top - 1 &&
       child.bottom <= container.bottom + 1;
-    if (!inside(layout.firstName, layout.domainTitle)) throw new Error(`${name}:domain_title_outside_cell`);
-    if (!inside(layout.firstName, layout.riskTags)) throw new Error(`${name}:risk_tags_outside_cell`);
-    if (!inside(layout.firstName, layout.aiChip)) throw new Error(`${name}:ai_chip_outside_cell`);
-    if (layout.domainTitle.height < 12) throw new Error(`${name}:domain_title_clipped:${layout.domainTitle.height}`);
-    if (layout.riskTags.height < 14) throw new Error(`${name}:risk_tags_clipped:${layout.riskTags.height}`);
-    if (layout.riskTagItems.some((item) => item.height < 12)) throw new Error(`${name}:risk_tag_item_clipped`);
-    if (layout.riskTags.bottom > layout.aiChip.top + 1) {
-      throw new Error(`${name}:risk_tags_overlap_ai_chip:${JSON.stringify({ riskTags: layout.riskTags, aiChip: layout.aiChip })}`);
-    }
+    if (!inside(layout.firstName, layout.domainTitle)) throw new Error(`${checkName}:domain_title_outside_cell`);
+    if (!inside(layout.firstName, layout.riskTags)) throw new Error(`${checkName}:risk_tags_outside_cell`);
+    if (!inside(layout.firstName, layout.aiChip)) throw new Error(`${checkName}:ai_chip_outside_cell`);
     if (horizontalOverlap(layout.riskTags, layout.aiChip) > 1 && layout.riskTags.bottom > layout.aiChip.top) {
-      throw new Error(`${name}:risk_tags_horizontal_layer_overlap_ai_chip`);
+      throw new Error(`${checkName}:risk_tags_horizontal_layer_overlap_ai_chip`);
     }
   }
-  if (consoleMessages.length) throw new Error(`${name}:console:${consoleMessages.slice(0, 3).join(" | ")}`);
-  if (pageErrors.length) throw new Error(`${name}:pageerror:${pageErrors.slice(0, 3).join(" | ")}`);
-  if (failedResponses.length) throw new Error(`${name}:responses:${failedResponses.slice(0, 3).join(" | ")}`);
+  if (consoleMessages.length) throw new Error(`${checkName}:console:${consoleMessages.slice(0, 3).join(" | ")}`);
+  if (pageErrors.length) throw new Error(`${checkName}:pageerror:${pageErrors.slice(0, 3).join(" | ")}`);
+  if (failedResponses.length) throw new Error(`${checkName}:responses:${failedResponses.slice(0, 3).join(" | ")}`);
 
-  return { name, viewport, baselineDocumentOverflowX, layout };
+  return { browser: browserTypeName, name, viewport, baselineDocumentOverflowX, layout };
 }
 
 async function main() {
   const server = SHOULD_START_DEV ? startDevServer() : null;
   try {
     await waitForServer(APP_URL);
-    const browser = await chromium.launch({ headless: true });
-    try {
-      const results = [];
-      for (const [name, viewport] of Object.entries({
-        desktop1440: { width: 1440, height: 900 },
-        tablet760: { width: 760, height: 900 },
-        mobile390: { width: 390, height: 844 },
-        mobile360: { width: 360, height: 780 }
-      })) {
-        results.push(await runViewport(browser, name, viewport));
+    const results = [];
+    const browserTypes = { chromium, webkit };
+    const viewports = {
+      desktop1440: { width: 1440, height: 900 },
+      tablet760: { width: 760, height: 900 },
+      mobile390: { width: 390, height: 844 },
+      mobile360: { width: 360, height: 780 }
+    };
+    for (const [browserTypeName, browserType] of Object.entries(browserTypes)) {
+      const browser = await browserType.launch({ headless: true });
+      try {
+        for (const [name, viewport] of Object.entries(viewports)) {
+          results.push(await runViewport(browserTypeName, browser, name, viewport));
+        }
+      } finally {
+        await browser.close();
       }
-      console.log(JSON.stringify({ ok: true, url: APP_URL, results }, null, 2));
-    } finally {
-      await browser.close();
     }
+    console.log(JSON.stringify({ ok: true, url: APP_URL, results }, null, 2));
   } catch (error) {
     console.error("[demo-bi-heatmap-layout-smoke] failed", error?.message || error);
     const output = server?.output?.() || "";

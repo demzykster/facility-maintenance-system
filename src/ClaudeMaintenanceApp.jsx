@@ -8400,13 +8400,13 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .bi-heatmap-head,.bi-heatmap-row{display:grid;grid-template-columns:minmax(150px,1.25fr) repeat(6,minmax(76px,1fr));gap:6px;min-width:720px;}
 .bi-heatmap-head span{min-width:0;font-size:var(--bi-caption);font-weight:var(--bi-weight);color:var(--muted);padding:0 6px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bi-heatmap-head span:first-child{text-align:start;}
-.bi-heatmap-name,.bi-heatmap-cell{min-height:48px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink);box-shadow:var(--control-shadow);transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),box-shadow 160ms var(--ease-out);}
-.bi-heatmap-name{min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:start;padding:8px 10px;}
-.bi-heatmap-name-main{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;flex:1;}
-.bi-heatmap-name b{font-size:var(--bi-row);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.bi-heatmap-name small{color:var(--muted);font-size:var(--bi-caption);white-space:nowrap;}
-.bi-heatmap-risk-tags{min-width:0;display:flex;gap:4px;flex-wrap:nowrap;justify-content:flex-end;overflow:hidden;}
-.bi-heatmap-risk-tags i{max-width:72px;overflow:hidden;text-overflow:ellipsis;font-style:normal;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:2px 6px;font-size:10.5px;line-height:1.2;white-space:nowrap;}
+.bi-heatmap-name,.bi-heatmap-cell{min-height:64px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink);box-shadow:var(--control-shadow);transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out),box-shadow 160ms var(--ease-out);}
+.bi-heatmap-name{min-width:0;overflow:hidden;display:grid;grid-template-rows:minmax(0,1fr) auto auto;align-items:start;justify-items:start;gap:5px;text-align:start;padding:8px 10px;}
+.bi-heatmap-name-main{width:100%;min-width:0;display:flex;align-items:flex-start;flex-direction:column;gap:2px;}
+.bi-heatmap-name b{max-width:100%;font-size:var(--bi-row);line-height:1.25;white-space:normal;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;}
+.bi-heatmap-name small{max-width:100%;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:var(--bi-caption);white-space:nowrap;}
+.bi-heatmap-risk-tags{width:100%;max-width:100%;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;justify-content:stretch;max-height:39px;overflow:hidden;}
+.bi-heatmap-risk-tags i{display:block;min-width:0;max-width:none;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;font-style:normal;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:2px 6px;font-size:10.5px;line-height:1.2;white-space:nowrap;}
 .bi-heatmap-ai{display:inline-flex;align-items:center;gap:3px;border-radius:999px;border:1px solid rgba(31,78,140,.18);background:rgba(31,78,140,.06);color:var(--primary);padding:2px 6px;font-size:10.5px;font-weight:600;white-space:nowrap;}
 .bi-heatmap-ai:hover{background:rgba(31,78,140,.10);border-color:rgba(31,78,140,.28);}
 .bi-heatmap-cell{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;background:var(--surface);}
@@ -9466,13 +9466,10 @@ body *{visibility:hidden!important;}
   .bi-heatmap-insight{align-items:flex-start;flex-direction:column;gap:2px;}
   .bi-heatmap-head span{padding:0 4px;}
   .bi-heatmap-name,.bi-heatmap-cell{min-height:72px;border-radius:10px;}
-  .bi-heatmap-name{height:104px;padding:7px 8px;display:grid;grid-template-rows:minmax(0,1fr) auto auto;align-items:start;justify-items:start;gap:5px;}
-  .bi-heatmap-name-main{width:100%;min-width:0;align-items:flex-start;flex-direction:column;gap:2px;}
-  .bi-heatmap-name b{max-width:100%;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;}
-  .bi-heatmap-name small{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
-  .bi-heatmap-risk-tags{width:100%;max-width:100%;justify-content:flex-start;flex-wrap:wrap;max-height:34px;}
-  .bi-heatmap-risk-tags i{max-width:52px;padding:1px 4px;font-size:9.5px;}
-  .bi-heatmap-ai{position:static;justify-self:start;padding:1px 5px;font-size:9.5px;}
+  .bi-heatmap-name{height:104px;padding:7px 8px;}
+  .bi-heatmap-risk-tags{max-height:35px;}
+  .bi-heatmap-risk-tags i{padding:1px 4px;font-size:9.5px;}
+  .bi-heatmap-ai{justify-self:start;padding:1px 5px;font-size:9.5px;}
   .bi-heatmap-cell b{font-size:17px;}
   .bi-heatmap-cell small{font-size:9.5px;}
   .bi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}

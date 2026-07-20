@@ -74,3 +74,10 @@ Each exception must include:
 - Why necessary: the heatmap layout styles still live in the shell stylesheet; the fix needs a small set of RTL/mobile CSS constraints so the `תחום` column remains aligned with rows, long labels and risk tags stay compact, and the heatmap does not add external horizontal overflow.
 - Why extraction was not the right move: BI heatmap rendering and data preparation are already outside the shell in `src/BIHeatmapPanel.jsx`, `src/BIOverview.jsx`, and `src/biScopeModel.js`; moving the stylesheet out would be a broader styling extraction than this owner-reported visual bug.
 - Follow-up/removal condition: when BI styles move into a BI module stylesheet or CSS slice, move these heatmap rules with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-21
+- Owner goal: BI heatmap Safari RTL chips layout.
+- New line count: 10020.
+- Why necessary: the heatmap `תחום` cell still uses shell-hosted styles, and the owner-reported Chrome/Safari regression required a bounded card layout so title, risk tags, and the AI chip no longer collapse into one compressed RTL row.
+- Why extraction was not the right move: BI rendering and smoke coverage remain in extracted BI files and tooling; moving the shared shell stylesheet into a BI CSS slice would be broader than this browser compatibility fix.
+- Follow-up/removal condition: when BI styles move into a BI module stylesheet or CSS slice, move these heatmap domain-cell rules with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
