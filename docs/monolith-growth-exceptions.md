@@ -53,3 +53,10 @@ Each exception must include:
 - Why necessary: the shared ticket card still lives in `src/ClaudeMaintenanceApp.jsx`; this live UI hotfix must adjust its metadata text, long-label truncation, and compact chip row so mobile ticket lists do not overflow or become vertically ragged, and transport cards show the fleet unit instead of a generic track label.
 - Why extraction was not the right move: extracting all ticket list/card surfaces would be a larger vertical slice than this production-facing readability fix, and the change reduces the shell line count below the previous exception while touching only the existing card seam.
 - Follow-up/removal condition: when ticket card/list surfaces move into a ticket module, move this metadata formatting and wrapping rule with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-20
+- Owner goal: inline AI ticket creation in the new-ticket type modal.
+- New line count: 10012.
+- Why necessary: the existing new-ticket type picker and ticket save/readback wiring still live in `src/ClaudeMaintenanceApp.jsx`; the shell needs minimal wiring to mount the extracted inline AI intake, pass the existing AI assist/action adapters, and open the existing ticket form for safe facility fallback without launching the global AI panel.
+- Why extraction was not the right move: the new intake state, transient AI request contract, and compact UI live in `src/InlineAITicketCreate.jsx`, `src/useInlineAITicketSession.js`, and `src/inlineAiTicketCreateModel.js`; extracting the whole ticket form/modal would be a larger ticket-module vertical slice than this UX goal.
+- Follow-up/removal condition: when the ticket create modal/form is extracted into a ticket module, move this inline AI mount and prefill/readback wiring with it and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

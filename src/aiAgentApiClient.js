@@ -84,6 +84,7 @@ export async function callAiAssistApi({
     providerPlan: data?.providerPlan || null,
     providerPlanErrorCode: data?.providerPlanErrorCode || ""
   };
+  if (data?.capabilityResponse && typeof data.capabilityResponse === "object") normalized.capabilityResponse = data.capabilityResponse;
   if (data?.conversation && typeof data.conversation === "object") normalized.conversation = data.conversation;
   return normalized;
 }

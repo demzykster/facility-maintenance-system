@@ -88,6 +88,35 @@ describe("AI agent API client", () => {
     });
   });
 
+  it("preserves autonomous capability responses for focused inline ticket results", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        assistant: { text: "הקריאה נוצרה." },
+        actions: [],
+        capabilityResponse: {
+          executionStatus: "created",
+          actionResult: { ticketId: "ticket-1", ticketNumber: "T-007" }
+        }
+      })
+    }));
+
+    await expect(callAiAssistApi({
+      text: "פתח קריאה",
+      getAccessToken: async () => "token",
+      fetchImpl,
+      idempotencyKey: "idem-1"
+    })).resolves.toMatchObject({
+      text: "הקריאה נוצרה.",
+      capabilityResponse: {
+        executionStatus: "created",
+        actionResult: { ticketId: "ticket-1", ticketNumber: "T-007" }
+      }
+    });
+    expect(fetchImpl.mock.calls[0][0]).toBe("/api/ai/assist");
+  });
+
   it("passes conversationId through assist only when provided", () => {
     expect(buildAiAssistApiPayload({
       text: "בדיקה",

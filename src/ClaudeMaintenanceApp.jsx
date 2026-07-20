@@ -9,6 +9,7 @@ import {
   FileText, ExternalLink, Gauge, SlidersHorizontal, Copy, Hexagon, MessageSquare,
   FileSpreadsheet, Printer, Shirt, Footprints, Hand, Glasses, Headphones, Coins, PackageX, PackageCheck, Bug, Phone, KeyRound, Mail, Smartphone, Download, MonitorDown, MoreHorizontal, History} from "lucide-react";
 import { AISettingsCard } from "./AISettingsCard.jsx";
+import { InlineAITicketCreate } from "./InlineAITicketCreate.jsx";
 import { UnitPicker } from "./UnitPicker.jsx";
 import packageInfo from "../package.json";
 import { XLSX } from "./xlsxWorkbookModel.js";
@@ -7451,7 +7452,7 @@ function UserForm({ user, config, users, zones, presence = [], session, canManag
 
 /* ============================================================ TICKET FORM */
 function TicketForm(p) {
-  const { config, session, fleet, tickets, users, saveUser, onCreate, onCancel, onOpenTicket, prefill } = p;
+  const { config, session, fleet, tickets, users, saveUser, saveTicket, onCreate, onCancel, onOpenTicket, prefill } = p;
   const isAdmin = session.role === "admin";
   const [track, setTrack] = useState(prefill?.track || null);
   const [subject, setSubject] = useState(prefill?.subject || "");
@@ -7467,6 +7468,7 @@ function TicketForm(p) {
   const [description, setDescription] = useState(prefill?.description || "");
   const [assignTo, setAssignTo] = useState("self");
   const [supplierAssign, setSupplierAssign] = useState("");
+  const [inlineAiOpen, setInlineAiOpen] = useState(false);
   const [slaOn, setSlaOn] = useState(false), [slaH, setSlaH] = useState(8);
   const [retro, setRetro] = useState({ on: false, createdAt: "", updatedAt: "", dueAt: "", status: "done", waitingReason: "parts", closedAt: "", downtimeStart: "", downtimeEnd: "", costAmount: "", costSupplier: "", costNote: "", quality: "resolved" });
   const [dupeReview, setDupeReview] = useState(null), [pendingT, setPendingT] = useState(null);
@@ -7477,6 +7479,32 @@ function TicketForm(p) {
   const facilityZoneOptions = managerMaintZones.length ? managerMaintZones : configuredMaintZones;
   const facilityZone = facilityZoneOptions.includes(zone) ? zone : (facilityZoneOptions[0] || zone);
   const ticketFleet = useMemo(() => visibleFleetForSession(session, fleet), [session, fleet]);
+  const inlineAiContext = useMemo(() => buildAIContextSnapshot(session, visibleTickets(session, tickets, fleet), p.pm, fleet, config, p.tasks, p.meetings, users, p.ppeItems, p.ppeReqs, p.zones), [session, tickets, fleet, p.pm, config, p.tasks, p.meetings, users, p.ppeItems, p.ppeReqs, p.zones]);
+  const inlineAiExecuteAction = useMemo(() => createAiAgentActionExecutor({ ...p, saveTicket: saveTicket || onCreate, createMemoryFact: saveAIMemoryFact }, { makeId: uid, saveFailedMessage: SAVE_FAILED_MESSAGE }), [p, saveTicket, onCreate]);
+  const readTicketById = async (id) => {
+    if (!id) return null;
+    if (NORMALIZED_TICKET_PROVIDER && typeof NORMALIZED_TICKET_PROVIDER.get === "function") {
+      const record = await NORMALIZED_TICKET_PROVIDER.get(id);
+      if (record?.ticket) return record.ticket;
+      if (record?.id) return record;
+    }
+    return (tickets || []).find((ticket) => ticket.id === id) || null;
+  };
+  const applyAiTicketPrefill = (draft = {}) => {
+    setSubject(draft.subject || "");
+    setCategory(draft.category || "");
+    setPriority(draft.priority || "medium");
+    setZone(draft.zone || config.zones[0]);
+    setAsset(draft.asset || "");
+    setForkliftId(draft.forkliftId || "");
+    setDowntimeType(draft.downtimeType || "");
+    setIncShift(draft.incidentShift || "");
+    setDriverInv(draft.driverInvolved || "");
+    setDriverInvId(draft.driverInvolvedId || "");
+    setDescription(draft.description || "");
+    setInlineAiOpen(false);
+    setTrack(draft.track || "facility");
+  };
   useEffect(() => {
     if (track === "transport" && forkliftId && !ticketFleet.some((unit) => unit.id === forkliftId)) {
       setForkliftId("");
@@ -7572,6 +7600,23 @@ function TicketForm(p) {
   if (!track) return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" aria-label="סגירה" onClick={onCancel}><X size={22} /></button><div className="form-title">פתיחת קריאה</div></div>
     <div className="body"><div className="track-q">על מה הקריאה?</div>
       {Object.values(TRACKS).map((tr) => <button key={tr.id} className="track-pick" onClick={() => setTrack(tr.id)} style={{ borderColor: tr.color }}><span className="track-ic" style={{ background: tr.color + "22", color: tr.color }}><tr.Icon size={24} /></span><div><div className="track-name">{tr.label}</div><div className="track-desc">{tr.id === "transport" ? "מלגזות וכלי שינוע — מועבר לטכנאי" : "מבנה, חשמל, אינסטלציה, IT ועוד"}</div></div><ChevronLeft size={18} className="role-chev" /></button>)}
+      <InlineAITicketCreate
+        aiEnabled={aiAssistantEnabled(config)}
+        expanded={inlineAiOpen}
+        onToggle={() => setInlineAiOpen((open) => !open)}
+        onClose={onCancel}
+        session={session}
+        context={inlineAiContext}
+        callAssistant={callAIAssistant}
+        executeAction={inlineAiExecuteAction}
+        readTicket={readTicketById}
+        onOpenTicket={(id) => {
+          setInlineAiOpen(false);
+          onCancel();
+          onOpenTicket?.(id);
+        }}
+        onOpenDraft={applyAiTicketPrefill}
+      />
     </div></div>);
   const trMeta = TRACKS[track];
   return (<div className="ovl-inner"><div className="form-head"><button className="icon-btn" onClick={() => prefill ? onCancel() : setTrack(null)} aria-label={prefill ? "ביטול פתיחת קריאה" : "חזרה לבחירת סוג קריאה"}><ChevronLeft size={24} style={{ transform: "scaleX(-1)" }} /></button><div className="form-title">קריאה · {trMeta.short}</div></div>
@@ -8181,7 +8226,7 @@ a{color:inherit;}
 .motion-press,
 .btn-primary,.btn-ghost,.btn-danger,.btn-close,.icon-btn,.tb-logout,.bell,.role-btn,.login-alt,.install-btn,.install-x,
 .chip,.wtoggle,.tcard,.supplier-card,.attn-row,.insight-row.clickable,.doc-line-click,.pm-card,.task-row,.ppe-request-row,
-.track-pick,.cat-pick,.pr-pick,.seg,.dt-pick,.wk-card,.wk-track,.navbtn,.nav-more-item,.notif-item.clk,.notif-markall,
+.track-pick,.inline-ai-collapse,.cat-pick,.pr-pick,.seg,.dt-pick,.wk-card,.wk-track,.navbtn,.nav-more-item,.notif-item.clk,.notif-markall,
 .pub-zone,.pub-chip,.qchip,.side-item,.side-newbtn,.side-logout,.worker-action-btn,.unit-pick-btn,.unit-pick-row{
   transition-property:transform,box-shadow,border-color,background-color,color,opacity;
   transition-duration:160ms;
@@ -8191,7 +8236,7 @@ a{color:inherit;}
 .icon-btn:active:not(:disabled),.tb-logout:active:not(:disabled),.bell:active:not(:disabled),.role-btn:active:not(:disabled),
 .chip:active:not(:disabled),.wtoggle:active:not(:disabled),.tcard:active:not(:disabled),.supplier-card:active:not(:disabled),.attn-row:active:not(:disabled),
 .insight-row.clickable:active:not(:disabled),.doc-line-click:active:not(:disabled),.pm-card:active:not(:disabled),
-.task-row:active:not(:disabled),.track-pick:active:not(:disabled),.cat-pick:active:not(:disabled),.pr-pick:active:not(:disabled),
+.task-row:active:not(:disabled),.track-pick:active:not(:disabled),.inline-ai-collapse:active:not(:disabled),.cat-pick:active:not(:disabled),.pr-pick:active:not(:disabled),
 .seg:active:not(:disabled),.dt-pick:active:not(:disabled),.wk-card:active:not(:disabled),.wk-track:active:not(:disabled),
 .navbtn:active:not(:disabled),.nav-more-item:active:not(:disabled),.notif-item.clk:active:not(:disabled),.notif-markall:active:not(:disabled),
 .pub-zone:active:not(:disabled),.pub-chip:active:not(:disabled),.qchip:active:not(:disabled),.side-item:active:not(:disabled),
@@ -8519,6 +8564,34 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .track-pick{display:flex;align-items:center;gap:13px;width:100%;text-align:right;background:var(--surface);border:1.5px solid var(--line);border-radius:15px;padding:16px;margin-bottom:12px;color:var(--ink);}
 .track-ic{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .track-name{font-weight:600;font-size:16px;}.track-desc{color:var(--muted);font-size:12.5px;margin-top:3px;}
+.inline-ai-ticket{margin-top:2px;}
+.inline-ai-ticket.open .inline-ai-ticket-card{margin-bottom:0;border-color:var(--primary);border-bottom-left-radius:0;border-bottom-right-radius:0;background:var(--primary-soft);}
+.inline-ai-ticket-ic{background:var(--primary)!important;color:#fff!important;}
+.inline-ai-ticket-chev{transition:transform 160ms var(--ease-out);}
+.inline-ai-ticket.open .inline-ai-ticket-chev{transform:rotate(-90deg);}
+.inline-ai-chat{border:1.5px solid var(--primary);border-top:0;border-radius:0 0 15px 15px;background:var(--surface);padding:9px;display:flex;flex-direction:column;gap:7px;margin-bottom:12px;box-shadow:var(--shadow-sm);}
+.inline-ai-msgs{height:126px;max-height:24dvh;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px;overscroll-behavior:contain;}
+.inline-ai-msg-wrap{display:flex;flex-direction:column;gap:7px;max-width:100%;}
+.inline-ai-msg-wrap.assistant{align-items:flex-start;}.inline-ai-msg-wrap.user{align-items:flex-end;}
+.inline-ai-msg{max-width:88%;padding:9px 11px;border-radius:12px;font-size:13px;line-height:1.48;unicode-bidi:plaintext;}
+.inline-ai-msg.assistant{background:var(--surface-2);color:var(--ink);border-bottom-right-radius:4px;}
+.inline-ai-msg.user{background:var(--primary);color:#fff;border-bottom-left-radius:4px;}
+.inline-ai-msg[dir="rtl"]{text-align:right;}.inline-ai-msg[dir="ltr"]{text-align:left;}
+.inline-ai-msg p{margin:0;}.inline-ai-msg p+p,.inline-ai-msg p+ul,.inline-ai-msg ul+p{margin-top:6px;}
+.inline-ai-msg ul{margin:0;padding-inline-end:18px;padding-inline-start:0;display:flex;flex-direction:column;gap:4px;}
+.inline-ai-actions{width:min(100%,360px);display:flex;flex-direction:column;gap:7px;}
+.inline-ai-input{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:end;}
+.inline-ai-input textarea{min-height:46px;max-height:86px;resize:vertical;border:1.5px solid var(--line);border-radius:11px;background:var(--input);padding:9px 10px;line-height:1.35;}
+.inline-ai-input .btn-primary{width:44px;height:44px;padding:0;display:flex;align-items:center;justify-content:center;}
+.inline-ai-error{font-size:12.5px;color:#B91C1C;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:8px 10px;}
+.inline-ai-collapse{min-height:30px;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);padding:0 10px;font-size:12px;font-weight:700;}
+.inline-ai-result{border:1.5px solid rgba(22,101,52,.25);border-radius:12px;background:rgba(22,101,52,.08);padding:10px;display:flex;flex-direction:column;gap:7px;}
+.inline-ai-result-head{display:flex;align-items:center;gap:7px;color:#166534;font-weight:800;font-size:13px;}
+.inline-ai-result-no{font-family:var(--font-head);font-size:18px;font-weight:800;color:var(--ink);}
+.inline-ai-result-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 10px;font-size:12.5px;}
+.inline-ai-result-grid span{color:var(--muted);}.inline-ai-result-grid b{min-width:0;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.inline-ai-result-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.inline-ai-result-actions .btn-primary,.inline-ai-result-actions .btn-ghost{min-height:38px;padding:0 12px;}
 .cat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .cat-pick{display:flex;flex-direction:column;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);border-radius:11px;padding:11px 6px;font-size:12.5px;font-weight:500;color:var(--ink);}
 .pr-row,.status-seg{display:flex;gap:7px;flex-wrap:wrap;}
