@@ -25,6 +25,7 @@ export function normalizeAiCapabilityResponse(input = {}) {
     unknowns: cleanArray(input.unknowns).map((item) => cleanText(item, 200)).filter(Boolean),
     toolResults: cleanArray(input.toolResults).map((item) => cleanObject(item)),
     actionResult: cleanObject(input.actionResult),
+    intake: cleanObject(input.intake),
     blockingQuestion: cleanText(input.blockingQuestion, 600),
     requiresConfirmation: input.requiresConfirmation === true,
     executionStatus: status

@@ -22,6 +22,9 @@ function ticketSummary(ticket = {}) {
     num: ticket.num,
     track: cleanText(ticket.track, 40),
     asset: cleanText(ticket.asset || ticket.forkliftCode || ticket.forkliftId || ticket.zone, 160),
+    zone: cleanText(ticket.zone, 160),
+    category: cleanText(ticket.category, 80),
+    categoryLabel: cleanText(ticket.categoryLabel, 120),
     subject: cleanText(ticket.subject || ticket.title, 160),
     description: cleanText(ticket.description || ticket.summary, 500),
     source: ticket.source || "server"
@@ -91,7 +94,9 @@ export function useInlineAITicketSession({
       if (completed.createdTicket?.id) await hydrateCreatedTicket(completed.createdTicket);
       return output;
     } catch (error) {
-      setState(failInlineAiTicketSend(stateRef.current, error));
+      const failed = failInlineAiTicketSend(stateRef.current, error);
+      stateRef.current = failed;
+      setState(failed);
       return null;
     }
   }, [callAssistant, context, ensureIdempotencyKey, hydrateCreatedTicket]);

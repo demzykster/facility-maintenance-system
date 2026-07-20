@@ -68,12 +68,14 @@ function InlineActionCard({ action, busy, result, onExecute, onEdit }) {
 
 function InlineTicketResult({ ticket, onOpenTicket, onClose }) {
   if (!ticket?.id) return null;
+  const isTransport = ticket.track === "transport";
   return <div className="inline-ai-result" aria-label="AI ticket create result">
     <div className="inline-ai-result-head"><CheckCircle2 size={16} /> הקריאה נוצרה</div>
     <div className="inline-ai-result-no">{ticket.ticketNo || ticket.id}</div>
     <div className="inline-ai-result-grid">
       <span>סוג</span><b>{trackLabel(ticket.track)}</b>
-      <span>אובייקט</span><b>{ticket.asset || "—"}</b>
+      <span>{isTransport ? "כלי" : "מקום"}</span><b>{isTransport ? (ticket.asset || "—") : (ticket.zone || ticket.asset || "—")}</b>
+      {!isTransport && <><span>קטגוריה</span><b>{ticket.categoryLabel || ticket.category || "—"}</b></>}
       <span>תיאור</span><b>{ticket.description || ticket.subject || "—"}</b>
     </div>
     <div className="inline-ai-result-actions">
@@ -164,7 +166,7 @@ export function InlineAITicketCreate({
         <div ref={endRef} />
       </div>
       <InlineTicketResult ticket={agent.createdTicket} onOpenTicket={onOpenTicket} onClose={onClose} />
-      {agent.error && <div className="inline-ai-error">אפשר לנסות שוב או לפתוח את הטופס הרגיל.</div>}
+      {agent.error && <div className="inline-ai-error">אפשר לנסות שוב או לפנות למנהל המערכת.</div>}
       {!agent.createdTicket && <div className="inline-ai-input">
         <textarea
           value={agent.input}

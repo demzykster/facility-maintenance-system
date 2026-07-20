@@ -18,6 +18,7 @@ import { createSupabaseAiMemoryStoreFromEnv } from "../agent/memory/memoryStore.
 import { listMemoryFactsForContext } from "../agent/memory/memoryRetrieval.js";
 import { groundedAssistantMemoryResponse, retrievedMemoriesForProvider } from "../agent/memory/memoryGrounding.js";
 import { createSupabaseTicketsDriverFromEnv } from "../tickets/supabaseTicketsDriver.js";
+import { createSupabaseAppConfigDriverFromEnv } from "../settings/supabaseAppConfigDriver.js";
 import { createAiCapabilityRegistry } from "./capabilities/registry.js";
 import { createTicketCreateCapability } from "./capabilities/ticketCreateCapability.js";
 import { ticketServerCreateV2Status } from "../../src/ticketServerCreateCutoverModel.js";
@@ -27,6 +28,7 @@ const MAX_TEXT_CHARS = 2_000;
 const TICKET_INTAKE_FLEET_LIMIT = 2_000;
 const DEFAULT_RATE_LIMIT_MS = 10_000;
 const AI_ASSIST_RATE_BUCKETS = new Map();
+const INLINE_TICKET_CREATE_BUCKET_PREFIX = "inlineTicketCreate";
 
 const cleanText = (value, limit = MAX_TEXT_CHARS) => String(value || "")
   .replace(/\s+/g, " ")
@@ -400,6 +402,12 @@ async function buildServerFleetActionContext({ body = {}, authUser = {}, backend
   };
 }
 
+async function readServerAppConfig(configDriver = null) {
+  if (!configDriver || typeof configDriver.get !== "function") return {};
+  const record = await configDriver.get();
+  return record?.config && typeof record.config === "object" && !Array.isArray(record.config) ? record.config : {};
+}
+
 async function writeMemoryProposalAuditEvents({ auditDriver, actions = [], actor = {}, requestId = "", at } = {}) {
   const memoryActions = (Array.isArray(actions) ? actions : []).filter((action) => action?.type === "memory.fact.create");
   for (const action of memoryActions) {
@@ -498,6 +506,39 @@ function rateLimitError({ user, env, now, buckets }) {
   if (last && now - last < rateLimitMs) return "ai_assist_rate_limited";
   buckets.set(key, now);
   return "";
+}
+
+function inlineTicketCreateRateLimitMs(env = {}) {
+  const configuredMs = env.CMMS_AI_INLINE_TICKET_CREATE_RATE_LIMIT_MS === undefined
+    ? NaN
+    : Number(env.CMMS_AI_INLINE_TICKET_CREATE_RATE_LIMIT_MS);
+  if (Number.isFinite(configuredMs)) return configuredMs;
+  return DEFAULT_RATE_LIMIT_MS;
+}
+
+function inlineTicketCreateBucketKey(user = {}) {
+  return `${INLINE_TICKET_CREATE_BUCKET_PREFIX}:${user.id || user.authUserId || user.workerNo || "unknown"}`;
+}
+
+function inlineTicketCreateRateLimitError({ user, env, now, buckets, idempotencyKey = "" }) {
+  const rateLimitMs = inlineTicketCreateRateLimitMs(env);
+  if (rateLimitMs <= 0) return "";
+  const key = inlineTicketCreateBucketKey(user);
+  const last = buckets.get(key);
+  if (!last || typeof last !== "object") return "";
+  const lastAt = Number(last.at || 0);
+  const lastIdempotencyKey = cleanText(last.idempotencyKey, 200);
+  const currentIdempotencyKey = cleanText(idempotencyKey, 200);
+  if (currentIdempotencyKey && lastIdempotencyKey && currentIdempotencyKey === lastIdempotencyKey) return "";
+  if (lastAt && now - lastAt < rateLimitMs) return "inline_ticket_create_rate_limited";
+  return "";
+}
+
+function recordInlineTicketCreateRateLimit({ user, now, buckets, idempotencyKey = "" }) {
+  buckets.set(inlineTicketCreateBucketKey(user), {
+    at: now,
+    idempotencyKey: cleanText(idempotencyKey, 200)
+  });
 }
 
 function requestToDraftInput(body = {}, user = {}) {
@@ -647,6 +688,9 @@ async function writeAutonomousTicketCreateAudit({
     ticketId: actionResult.ticketId || "",
     ticketNumber: actionResult.ticketNumber || actionResult.ticketNo || "",
     resolvedAssetId: fact.assetId || actionResult.forkliftId || "",
+    domain: fact.domain || actionResult.domain || actionResult.track || "",
+    resolvedLocation: fact.location || actionResult.zone || "",
+    category: fact.category || actionResult.category || "",
     autonomyConfigured,
     autonomyPermissionKey: autonomyAccess.permissionKey,
     autonomyPermissionLevel: autonomyAccess.permissionLevel,
@@ -685,6 +729,7 @@ export function createAiAssistHandler({
   memoryStore = null,
   conversationStore = null,
   fleetDriver = null,
+  appConfigDriver = null,
   providerCall = callAiProvider,
   providerObjectCall = callAiProviderObject,
   now = () => Date.now(),
@@ -695,6 +740,7 @@ export function createAiAssistHandler({
   const backendMemoryStore = memoryStore || createSupabaseAiMemoryStoreFromEnv(env, fetchImpl);
   const backendConversationStore = conversationStore || createSupabaseAiConversationStoreFromEnv(env, fetchImpl);
   const backendFleetDriver = fleetDriver || createSupabaseFleetDriverFromEnv(env, fetchImpl);
+  const backendAppConfigDriver = appConfigDriver || createSupabaseAppConfigDriverFromEnv(env, fetchImpl);
   return async function aiAssistHandler(req, res) {
     const method = String(req.method || "GET").toUpperCase();
     if (method !== "POST") {
@@ -707,14 +753,19 @@ export function createAiAssistHandler({
 
     try {
       const currentTime = now();
-      const rateError = rateLimitError({ user: auth.user, env, now: currentTime, buckets: rateBuckets });
-      if (rateError) return sendJson(res, 429, { error: rateError });
-
       const body = await readBody(req);
       const normalized = requestToDraftInput(body, auth.user);
       if (!normalized.ok) return sendJson(res, normalized.status, { error: normalized.error });
       const workflow = normalizeAiAssistWorkflow(body.workflow);
       const requestId = requestCorrelationId(req, body);
+      const ticketIntakeRequest = isTicketIntakeRequestBody(body, workflow);
+      const ticketCreateStatus = ticketServerCreateV2Status({ env, driver: backendTicketsDriver });
+      const autonomyConfigured = autonomousTicketCreateEnabled(env);
+      const deterministicTicketIntakeReady = ticketIntakeRequest && autonomyConfigured && ticketCreateStatus.ready;
+      const rateError = deterministicTicketIntakeReady
+        ? ""
+        : rateLimitError({ user: auth.user, env, now: currentTime, buckets: rateBuckets });
+      if (rateError) return sendJson(res, 429, { error: rateError });
       const conversationsEnabled = aiConversationsPilotEnabled(env);
       const requestedConversationId = cleanText(body.conversationId || body.conversation_id, 120);
       let conversationRecord = null;
@@ -772,7 +823,6 @@ export function createAiAssistHandler({
         }, auth.user, { at: currentTime }));
       }
       const latestUserRequest = latestUserTextFromConversation(conversation, normalized.input.rawText);
-      const ticketIntakeRequest = isTicketIntakeRequestBody(body, workflow);
       const pinnedIntake = normalizeTicketIntakeSession(body);
       const draftRawText = pinnedTicketIntakeDraftText({
         rawText: normalized.input.rawText,
@@ -803,6 +853,7 @@ export function createAiAssistHandler({
       const context = buildAiAssistContext(body.context, auth.user);
       let actionContext = context;
       let fullVisibleFleet = [];
+      let serverAppConfig = {};
       if (ticketIntakeRequest) {
         try {
           const serverFleetContext = await buildServerFleetActionContext({
@@ -818,6 +869,11 @@ export function createAiAssistHandler({
           actionContext = context;
           fullVisibleFleet = [];
         }
+        try {
+          serverAppConfig = await readServerAppConfig(backendAppConfigDriver);
+        } catch {
+          serverAppConfig = {};
+        }
       }
       const draft = buildAiIntakeDraft(draftInput, currentTime);
       const actions = actionsAllowedForActor(
@@ -831,25 +887,43 @@ export function createAiAssistHandler({
         requestId,
         at: currentTime
       });
-      const ticketCreateStatus = ticketServerCreateV2Status({ env, driver: backendTicketsDriver });
-      const autonomyConfigured = autonomousTicketCreateEnabled(env);
       if (autonomyConfigured && ticketCreateStatus.ready) {
         const registry = createAiCapabilityRegistry([
           createTicketCreateCapability({ driver: backendTicketsDriver })
         ]);
         let capabilityResponse = null;
         try {
+          const baseIdempotencyKey = cleanText(body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"] || requestId, 200);
           capabilityResponse = await registry.execute("create_ticket", {
             text: draft.rawText,
-            idempotencyKey: body.idempotencyKey || body.idempotency_key || req.headers?.["idempotency-key"]
+            idempotencyKey: baseIdempotencyKey
           }, {
             user: auth.user,
             context: actionContext,
             fullVisibleFleet,
             rawContext: body.context,
             text: draft.rawText,
+            latestText: latestUserRequest || normalized.input.rawText,
+            intake: pinnedIntake,
+            config: serverAppConfig,
             module: draft.module,
             workflow,
+            idempotencyKey: baseIdempotencyKey,
+            inlineTicketCreateGuard: {
+              check: () => inlineTicketCreateRateLimitError({
+                user: auth.user,
+                env,
+                now: currentTime,
+                buckets: rateBuckets,
+                idempotencyKey: baseIdempotencyKey
+              }),
+              record: () => recordInlineTicketCreateRateLimit({
+                user: auth.user,
+                now: currentTime,
+                buckets: rateBuckets,
+                idempotencyKey: baseIdempotencyKey
+              })
+            },
             now: currentTime
           });
         } catch (error) {

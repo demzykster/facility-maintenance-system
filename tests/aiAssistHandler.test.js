@@ -48,6 +48,19 @@ async function call(handler, req = {}) {
   return res;
 }
 
+function inlineTicketBody(body = {}) {
+  const context = body.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {};
+  return {
+    ...body,
+    workflow: "ticket_intake",
+    context: {
+      ...context,
+      uiSurface: "inline_ticket_create",
+      taskSession: { type: "ticket_intake", transient: true, ...(context.taskSession || {}) }
+    }
+  };
+}
+
 describe("AI assist handler", () => {
   it("requires POST and an authenticated user session", async () => {
     const handler = createAiAssistHandler({ rateBuckets: new Map() });
@@ -112,11 +125,11 @@ describe("AI assist handler", () => {
     });
 
     const res = await call(handler, {
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор на машине 226",
         idempotencyKey: "idem-226",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(200);
@@ -125,7 +138,7 @@ describe("AI assist handler", () => {
       assistant: {
         provider: "cmms-capability",
         model: "ticket.create",
-        text: "Создал заявку T-1842 по машине 226: Не работает вентилятор"
+        text: expect.stringContaining("נפתחה קריאה T-1842")
       },
       capabilityResponse: {
         executionStatus: "created",
@@ -202,6 +215,117 @@ describe("AI assist handler", () => {
     expect(providerCall).not.toHaveBeenCalled();
   });
 
+  it("creates facility tickets through the same inline capability after resolving server config location", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = {
+      create: vi.fn().mockResolvedValue({
+        ticketId: "ticket-facility",
+        num: 3001,
+        ticketNo: "F-3001",
+        status: "new",
+        idempotencyStatus: "created"
+      })
+    };
+    const appConfigDriver = {
+      get: vi.fn().mockResolvedValue({
+        config: {
+          categories: [{ id: "hvac", label: "מיזוג אוויר" }, { id: "other", label: "אחר" }],
+          zones: ["משרדי הפצה", "מחסן ראשי"]
+        }
+      })
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      appConfigDriver,
+      providerCall,
+      now: () => 1002,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: inlineTicketBody({
+        text: "מזגן לא עובד בחדר מפעיל מערכת. באזור משרדי הפצה",
+        idempotencyKey: "idem-facility",
+        module: "facility",
+        context: { fleet: [], tickets: [] }
+      })
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      assistant: {
+        provider: "cmms-capability",
+        model: "ticket.create",
+        text: expect.stringContaining("נפתחה קריאה F-3001")
+      },
+      capabilityResponse: {
+        executionStatus: "created",
+        actionResult: {
+          ticketId: "ticket-facility",
+          track: "facility",
+          zone: "משרדי הפצה",
+          category: "hvac",
+          categoryLabel: "מיזוג אוויר"
+        }
+      }
+    });
+    expect(ticketsDriver.create).toHaveBeenCalledWith(expect.objectContaining({
+      track: "facility",
+      zone: "משרדי הפצה",
+      priority: "medium"
+    }), expect.objectContaining({ idempotencyKey: "idem-facility" }));
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
+  it("does not create facility tickets when server app config cannot validate category or zone", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = { create: vi.fn() };
+    const appConfigDriver = { get: vi.fn().mockRejectedValue(new Error("app_config_down")) };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      appConfigDriver,
+      providerCall,
+      now: () => 1003,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: inlineTicketBody({
+        text: "מזגן לא עובד בחדר מפעיל מערכת. באזור קבלה",
+        idempotencyKey: "idem-facility-config-down",
+        module: "facility",
+        context: { fleet: [], tickets: [] }
+      })
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().capabilityResponse).toMatchObject({
+      executionStatus: "blocked",
+      unknowns: ["category_config_unavailable"]
+    });
+    expect(res.json().assistant.text).toBe("לא ניתן כרגע לאמת את קטגוריית הקריאה. נסו שוב בעוד זמן קצר.");
+    expect(res.json().assistant.text).not.toContain("zone");
+    expect(res.json().assistant.text).not.toContain("app_config");
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
   it("blocks autonomous create when global flag is on but the server-side user lacks explicit autonomy permission", async () => {
     const providerCall = vi.fn();
     const ticketsDriver = { create: vi.fn() };
@@ -223,11 +347,11 @@ describe("AI assist handler", () => {
     });
 
     const res = await call(handler, {
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор на машине 226",
         idempotencyKey: "idem-no-perm",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(200);
@@ -267,7 +391,7 @@ describe("AI assist handler", () => {
     });
 
     const res = await call(handler, {
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор на машине 226",
         idempotencyKey: "idem-spoof",
         role: "admin",
@@ -277,7 +401,7 @@ describe("AI assist handler", () => {
           fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }],
           tickets: []
         }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(200);
@@ -315,10 +439,10 @@ describe("AI assist handler", () => {
     });
 
     const res = await call(handler, {
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор на машине 226",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(200);
@@ -334,10 +458,10 @@ describe("AI assist handler", () => {
     });
 
     const res = await call(handler, {
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор на машине 226",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(403);
@@ -365,10 +489,10 @@ describe("AI assist handler", () => {
     });
 
     const res = await call(handler, {
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор на машине 226",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(200);
@@ -418,6 +542,44 @@ describe("AI assist handler", () => {
     expect(ticketsDriver.create).not.toHaveBeenCalled();
   });
 
+  it("keeps general transport create wording on the no-write provider path without dedicated ticket intake", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-test",
+      text: "אפשר להכין טיוטת קריאה לאישור."
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1007,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "פתח קריאה במלגזה 226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("openai");
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
   it("writes an autonomous ticket create audit event for created results without raw request data", async () => {
     const providerCall = vi.fn();
     const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
@@ -448,7 +610,7 @@ describe("AI assist handler", () => {
 
     const res = await call(handler, {
       headers: { authorization: "Bearer token", "x-request-id": "req-226" },
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор на машине 226 secret-prompt-fragment",
         idempotencyKey: "idem-226",
         context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] },
@@ -459,7 +621,7 @@ describe("AI assist handler", () => {
           actor_id: "attacker",
           createdBy: { id: "attacker" }
         }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(200);
@@ -480,6 +642,7 @@ describe("AI assist handler", () => {
         ticketId: "ticket-226",
         ticketNumber: "T-1842",
         resolvedAssetId: "forklift-226",
+        domain: "transport",
         autonomyConfigured: true,
         serverCreateReady: true,
         serverCreateConfigured: true
@@ -516,12 +679,12 @@ describe("AI assist handler", () => {
         rateBuckets: new Map()
       });
       const res = await call(handler, {
-        body: {
+        body: inlineTicketBody({
           text: "Не работает вентилятор на машине 226",
           idempotencyKey: `idem-${now}`,
           context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] },
           ...body
-        }
+        })
       });
       return { res, auditDriver };
     }
@@ -552,8 +715,7 @@ describe("AI assist handler", () => {
       driver: blockedDriver,
       body: {
         text: "Не работает вентилятор",
-        context: { fleet: [], tickets: [] },
-        currentEntity: { id: "forklift-226", code: "226", department: "הפצה" }
+        context: { fleet: [], tickets: [], currentEntity: { id: "forklift-226", code: "226", department: "הפצה" } }
       }
     });
     expect(blocked.res.statusCode).toBe(200);
@@ -589,14 +751,14 @@ describe("AI assist handler", () => {
     });
 
     const res = await call(handler, {
-      body: {
+      body: inlineTicketBody({
         text: "Не работает вентилятор",
         context: {
           currentEntity: { id: "forklift-other", code: "226", name: "226", department: "מחסן" },
           fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }],
           tickets: []
         }
-      }
+      })
     });
 
     expect(res.statusCode).toBe(200);
@@ -2713,6 +2875,76 @@ describe("AI assist handler", () => {
     expect(second.statusCode).toBe(429);
     expect(second.json()).toEqual({ error: "ai_assist_rate_limited" });
     expect(providerCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies a server-side inline ticket create burst guard without using the provider bucket", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = {
+      create: vi.fn()
+        .mockResolvedValueOnce({
+          ticketId: "ticket-226-a",
+          num: 2261,
+          ticketNo: "T-2261",
+          status: "new",
+          idempotencyStatus: "created"
+        })
+        .mockResolvedValueOnce({
+          ticketId: "ticket-226-a",
+          num: 2261,
+          ticketNo: "T-2261",
+          status: "new",
+          idempotencyStatus: "replayed"
+        })
+    };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "10000",
+        CMMS_AI_INLINE_TICKET_CREATE_RATE_LIMIT_MS: "10000"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      now: () => 5000,
+      rateBuckets: new Map()
+    });
+
+    const first = await call(handler, {
+      body: inlineTicketBody({
+        text: "במלגזה 226 תקלה בבדיקה",
+        idempotencyKey: "inline-rate-a",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      })
+    });
+    const replay = await call(handler, {
+      body: inlineTicketBody({
+        text: "במלגזה 226 תקלה בבדיקה",
+        idempotencyKey: "inline-rate-a",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      })
+    });
+    const burst = await call(handler, {
+      body: inlineTicketBody({
+        text: "במלגזה 226 תקלה נוספת בבדיקה",
+        idempotencyKey: "inline-rate-b",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      })
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(replay.statusCode).toBe(200);
+    expect(burst.statusCode).toBe(200);
+    expect(first.json().capabilityResponse.executionStatus).toBe("created");
+    expect(replay.json().capabilityResponse.executionStatus).toBe("replayed");
+    expect(burst.json().capabilityResponse).toMatchObject({
+      executionStatus: "blocked",
+      unknowns: ["inline_ticket_create_rate_limited"]
+    });
+    expect(ticketsDriver.create).toHaveBeenCalledTimes(2);
+    expect(providerCall).not.toHaveBeenCalled();
   });
 
   it("handles invalid JSON without leaking internals", async () => {

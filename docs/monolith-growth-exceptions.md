@@ -55,8 +55,8 @@ Each exception must include:
 - Follow-up/removal condition: when ticket card/list surfaces move into a ticket module, move this metadata formatting and wrapping rule with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
 
 - Date: 2026-07-20
-- Owner goal: inline AI ticket creation in the new-ticket type modal.
-- New line count: 10012.
-- Why necessary: the existing new-ticket type picker and ticket save/readback wiring still live in `src/ClaudeMaintenanceApp.jsx`; the shell needs minimal wiring to mount the extracted inline AI intake, pass the existing AI assist/action adapters, and open the existing ticket form for safe facility fallback without launching the global AI panel.
-- Why extraction was not the right move: the new intake state, transient AI request contract, and compact UI live in `src/InlineAITicketCreate.jsx`, `src/useInlineAITicketSession.js`, and `src/inlineAiTicketCreateModel.js`; extracting the whole ticket form/modal would be a larger ticket-module vertical slice than this UX goal.
-- Follow-up/removal condition: when the ticket create modal/form is extracted into a ticket module, move this inline AI mount and prefill/readback wiring with it and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+- Owner goal: unified inline AI ticket creation for transport and facility intake.
+- New line count: 10013.
+- Why necessary: the existing new-ticket type picker and AI API adapter wiring still live in `src/ClaudeMaintenanceApp.jsx`; the shell needs minimal wiring to mount the extracted inline AI intake and pass its idempotency key to the server AI boundary so UI replay protection uses the same server-owned create contract.
+- Why extraction was not the right move: the intake orchestration, transient request state, capability validation, and compact UI live outside the shell in `src/inlineAiTicketIntakeOrchestrator.js`, `src/InlineAITicketCreate.jsx`, `src/useInlineAITicketSession.js`, `src/inlineAiTicketCreateModel.js`, and `server/ai/capabilities/`; extracting the whole ticket form/modal would be a larger ticket-module vertical slice than this focused correction.
+- Follow-up/removal condition: when the ticket create modal/form is extracted into a ticket module, move this inline AI mount and API adapter wiring with it and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

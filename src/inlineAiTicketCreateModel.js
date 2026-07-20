@@ -173,12 +173,15 @@ export function inlineAiTicketFromCapabilityResponse(output = {}) {
   if (!result?.ticketId) return null;
   return {
     id: cleanText(result.ticketId, 160),
-    track: cleanText(result.track, 40) || "transport",
+    track: cleanText(result.track || result.domain || output?.draft?.module, 40) || "transport",
     ticketNo: cleanText(result.ticketNumber || result.ticketNo, 80),
     num: result.num,
     subject: cleanText(result.subject || output?.draft?.subject, 160),
     description: cleanText(result.description || output?.draft?.description, 500),
-    asset: cleanText(result.asset || result.forkliftCode || result.forkliftId, 160),
+    asset: cleanText(result.asset || result.zone || result.forkliftCode || result.forkliftId, 160),
+    zone: cleanText(result.zone, 160),
+    category: cleanText(result.category, 80),
+    categoryLabel: cleanText(result.categoryLabel, 120),
     source: "server"
   };
 }
@@ -192,7 +195,7 @@ export function inlineAiTicketActionMode(action = {}) {
 
 export function inlineAiTicketVisibleActions(actions = []) {
   return (Array.isArray(actions) ? actions : [])
-    .filter((action) => ["confirm", "form"].includes(inlineAiTicketActionMode(action)));
+    .filter((action) => ["confirm"].includes(inlineAiTicketActionMode(action)));
 }
 
 export function inlineAiTicketPrimaryActionLabel(action = {}) {
@@ -208,7 +211,8 @@ export function completeInlineAiTicketSend(state = {}, output = {}) {
     allActions
   );
   const createdTicket = inlineAiTicketFromCapabilityResponse(output);
-  const intake = createdTicket ? null : inlineTicketIntakeStateFromActions(allActions, state.intake);
+  const capabilityIntake = normalizeInlineTicketIntakeState(output?.capabilityResponse?.intake);
+  const intake = createdTicket ? null : (capabilityIntake || inlineTicketIntakeStateFromActions(allActions, state.intake));
   return {
     ...state,
     busy: false,
@@ -231,7 +235,7 @@ export function failInlineAiTicketSend(state = {}, error = {}) {
     error: code || "inline_ai_ticket_failed",
     msgs: [...(state.msgs || []), {
       role: "assistant",
-      content: "לא הצלחתי להשלים את הבדיקה כרגע. אפשר לנסות שוב או לפתוח קריאה בטופס הרגיל."
+      content: "לא הצלחתי להשלים את פתיחת הקריאה כרגע. אפשר לנסות שוב."
     }]
   };
 }

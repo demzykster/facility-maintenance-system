@@ -4,6 +4,10 @@ import { createTicketCreateCapability } from "../server/ai/capabilities/ticketCr
 const autonomyPermission = { aiAutonomousTicketCreate: "request" };
 const user = { id: "u1", role: "user", name: "Vadim", department: "Ops", permissions: autonomyPermission };
 const fleet226 = { id: "forklift-226", code: "226", supplier: "LiftCo", department: "Ops", status: "active" };
+const defaultConfig = {
+  categories: [{ id: "hvac", label: "מיזוג אוויר" }, { id: "building", label: "בניין" }, { id: "other", label: "אחר" }],
+  zones: ["משרדי הפצה", "מחסן ראשי", "משרדי הנהלה"]
+};
 
 function capability(driver = null) {
   return createTicketCreateCapability({ driver });
@@ -26,9 +30,13 @@ async function execute(text, options = {}) {
     user: options.user || user,
     context: options.context || { fleet: [fleet226], tickets: options.tickets || [] },
     fullVisibleFleet: options.fullVisibleFleet || [],
-    rawContext: options.rawContext || {},
+    rawContext: options.rawContext || { uiSurface: "inline_ticket_create", taskSession: { type: "ticket_intake", transient: true } },
     text,
+    latestText: options.latestText || text,
+    intake: options.intake || null,
+    config: options.config || defaultConfig,
     module: options.module || "transport",
+    workflow: options.workflow || "ticket_intake",
     now: 1000
   });
   return { result, driver };
@@ -39,13 +47,13 @@ describe("AI ticket.create capability", () => {
     const { result, driver } = await execute("Не работает вентилятор на машине 226");
 
     expect(result.executionStatus).toBe("created");
-    expect(result.answer).toBe("Создал заявку T-1842 по машине 226: Не работает вентилятор");
-    expect(result.actionResult).toMatchObject({ type: "ticket.create", ticketId: "ticket-226", ticketNumber: "T-1842", ticketNo: "T-1842" });
+    expect(result.answer).toContain("נפתחה קריאה T-1842");
+    expect(result.actionResult).toMatchObject({ type: "ticket.create", ticketId: "ticket-226", ticketNumber: "T-1842", ticketNo: "T-1842", track: "transport" });
     expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
       track: "transport",
       asset: "226",
       forkliftId: "forklift-226",
-      subject: "Не работает вентилятор",
+      subject: "Не работает вентилятор на машине 226",
       description: "Не работает вентилятор на машине 226",
       downtimeType: "needs_triage",
       priority: "medium",
@@ -54,8 +62,8 @@ describe("AI ticket.create capability", () => {
     }), expect.objectContaining({ idempotencyKey: "idem-1" }));
     expect(result.toolResults.map((tool) => tool.capability)).toEqual([
       "get_current_user_context",
-      "find_asset_by_visible_identifier",
-      "get_ticket_create_contract"
+      "get_ticket_create_contract",
+      "resolve_inline_ticket_intake"
     ]);
     expect(JSON.stringify(driver.create.mock.calls[0][0])).not.toMatch(/мотор|ремень|перегрев/i);
   });
@@ -85,6 +93,55 @@ describe("AI ticket.create capability", () => {
     }), expect.any(Object));
   });
 
+  it("locks transport when a visible asset and transport entity are deterministic even if provider/module says facility", async () => {
+    const { result, driver } = await execute("במלגזה 210 ראש קילש לא עובד", {
+      module: "facility",
+      context: { fleet: [{ id: "forklift-210", code: "210", type: "מלגזה", department: "Ops" }], tickets: [] }
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(result.actionResult).toMatchObject({ track: "transport", forkliftId: "forklift-210", asset: "210" });
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      track: "transport",
+      description: "במלגזה 210 ראש קילש לא עובד",
+      priority: "medium"
+    }), expect.any(Object));
+  });
+
+  it("asks only for the transport asset number when a forklift problem omits it", async () => {
+    const { result, driver } = await execute("הגלגלים במלגזה שבורים", {
+      context: { fleet: [{ id: "forklift-210", code: "210", type: "מלגזה", department: "Ops" }], tickets: [] }
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.blockingQuestion).toBe("מה מספר המלגזה?");
+    expect(result.intake).toMatchObject({ domain: "transport", pendingField: "asset" });
+    expect(result.blockingQuestion).not.toContain("אזור");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("does not default unresolved ticket-intake text to facility", async () => {
+    const { result, driver } = await execute("יש תקלה", { module: "unknown" });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.unknowns).toContain("domain");
+    expect(result.blockingQuestion).toContain("כלי שינוע");
+    expect(result.intake).toMatchObject({ domain: "unresolved", pendingField: "domain" });
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("does not grant general AI chat automatic ticket-create authority", async () => {
+    const { result, driver } = await execute("פתח קריאה במלגזה 226", {
+      workflow: "general",
+      rawContext: {},
+      context: { fleet: [fleet226], tickets: [] }
+    });
+
+    expect(result.executionStatus).toBe("feature_disabled");
+    expect(result.unknowns).toContain("workflow");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
   it("matches numeric and alias-like asset identifiers only inside visible fleet", async () => {
     const visibleAlias = { id: "forklift-a", vehicleNumber: 210, department: "Ops", status: "active" };
     const { result, driver } = await execute("Forklift 210 not working", {
@@ -106,15 +163,155 @@ describe("AI ticket.create capability", () => {
     expect(blocked.driver.create).not.toHaveBeenCalled();
   });
 
-  it("does not create facility tickets through the transport-only autonomous capability", async () => {
-    const { result, driver } = await execute("Создай facility заявку по кондиционеру в офисе", {
+  it("keeps facility intake in chat until a canonical location is supplied", async () => {
+    const { result, driver } = await execute("מזגן לא עובד בחדר מפעיל מערכת", {
       module: "facility",
-      rawContext: { currentEntity: fleet226 }
+      config: defaultConfig
     });
 
-    expect(result.executionStatus).toBe("feature_disabled");
-    expect(result.unknowns).toContain("module");
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.unknowns).toContain("location");
+    expect(result.blockingQuestion).toBe("באיזה אזור או מחלקה נמצא חדר מפעיל המערכת?");
+    expect(result.intake).toMatchObject({
+      domain: "facility",
+      pendingField: "location",
+      draft: {
+        track: "facility",
+        category: "hvac",
+        categoryLabel: "מיזוג אוויר",
+        priority: "medium",
+        zone: ""
+      }
+    });
     expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("creates a facility ticket from the follow-up location without opening the normal form", async () => {
+    const pending = {
+      domain: "facility",
+      status: "collecting",
+      pendingField: "location",
+      originalMessage: "מזגן לא עובד בחדר מפעיל מערכת",
+      draft: {
+        track: "facility",
+        subject: "מזגן לא עובד בחדר מפעיל מערכת",
+        description: "דווח כי המזגן בחדר מפעיל המערכת אינו עובד. יש לבדוק את התקלה.",
+        category: "hvac",
+        categoryLabel: "מיזוג אוויר",
+        priority: "medium",
+        zone: ""
+      }
+    };
+    const { result, driver } = await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור משרדי הפצה", {
+      latestText: "משרדי הפצה",
+      intake: pending,
+      module: "facility",
+      config: defaultConfig
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(result.answer).toContain("נפתחה קריאה T-1842");
+    expect(result.answer).toContain("סוג: אחזקת מבנה ומתקנים");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      track: "facility",
+      category: "hvac",
+      categoryLabel: "מיזוג אוויר",
+      zone: "משרדי הפצה",
+      priority: "medium",
+      subject: "מזגן לא עובד בחדר מפעיל מערכת",
+      description: expect.stringContaining("המזגן")
+    }), expect.any(Object));
+    expect(driver.create.mock.calls[0][0].description).not.toBe(driver.create.mock.calls[0][0].subject);
+  });
+
+  it("does not guess reception or high priority for facility intake without explicit evidence", async () => {
+    const { result, driver } = await execute("מזגן לא עובד בחדר מפעיל מערכת", {
+      module: "facility",
+      config: { ...defaultConfig, zones: ["קבלה", "משרדי הפצה"] }
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.intake.draft).toMatchObject({
+      category: "hvac",
+      priority: "medium",
+      zone: ""
+    });
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("does not create a facility ticket for unknown or ambiguous locations", async () => {
+    const unknown = await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור מקום לא קיים", {
+      module: "facility",
+      config: defaultConfig
+    });
+    expect(unknown.result.executionStatus).toBe("blocked");
+    expect(unknown.result.unknowns).toContain("location");
+    expect(unknown.driver.create).not.toHaveBeenCalled();
+
+    const ambiguous = await execute("מזגן לא עובד במשרדי", {
+      module: "facility",
+      config: { ...defaultConfig, zones: ["משרדי הפצה", "משרדי הנהלה"] }
+    });
+    expect(ambiguous.result.executionStatus).toBe("blocked");
+    expect(ambiguous.result.blockingQuestion).toContain("מצאתי כמה מיקומים");
+    expect(ambiguous.driver.create).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for facility intake when authoritative config categories are unavailable", async () => {
+    const { result, driver } = await execute("מזגן לא עובד", {
+      module: "facility",
+      config: { categories: [], zones: ["קבלה"] }
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.unknowns).toContain("category_config_unavailable");
+    expect(result.blockingQuestion).toBe("לא ניתן כרגע לאמת את קטגוריית הקריאה. נסו שוב בעוד זמן קצר.");
+    expect(JSON.stringify(result)).not.toContain("stack");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for facility intake when authoritative zones are unavailable or empty", async () => {
+    for (const config of [
+      { categories: defaultConfig.categories, zones: [] },
+      { categories: defaultConfig.categories }
+    ]) {
+      const { result, driver } = await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור קבלה", {
+        module: "facility",
+        config
+      });
+
+      expect(result.executionStatus).toBe("blocked");
+      expect(result.unknowns).toContain("location_config_unavailable");
+      expect(result.blockingQuestion).toBe("לא ניתן כרגע לאמת את האזור. נסו שוב בעוד זמן קצר.");
+      expect(result.answer || result.blockingQuestion).not.toContain("zone");
+      expect(driver.create).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does not use a hardcoded category fallback when the category is absent from config", async () => {
+    const { result, driver } = await execute("מזגן לא עובד בחדר מפעיל מערכת. באזור קבלה", {
+      module: "facility",
+      config: { categories: [{ id: "other", label: "אחר" }], zones: ["קבלה"] }
+    });
+
+    expect(result.executionStatus).toBe("blocked");
+    expect(result.unknowns).toContain("category");
+    expect(result.blockingQuestion).toBe("לאיזו קטגוריית אחזקה זה שייך?");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps transport asset resolution independent from facility config authority", async () => {
+    const { result, driver } = await execute("במלגזה 210 הגלגלים שבורים", {
+      context: { fleet: [{ id: "forklift-210", code: "210", department: "Ops" }], tickets: [] },
+      config: {}
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      track: "transport",
+      forkliftId: "forklift-210",
+      asset: "210"
+    }), expect.any(Object));
   });
 
   it("treats controlled smoke test wording as a rollout label, not a smoke hazard", async () => {
@@ -269,7 +466,7 @@ describe("AI ticket.create capability", () => {
     expect(ticket.createdBy).toMatchObject({ id: "u1", role: "user" });
     expect(ticket.reportedBy).toMatchObject({ id: "u1", role: "user" });
     expect(ticket.actor_id).toBeUndefined();
-    expect(ticket.ai).toMatchObject({ source: "ai_capability", autonomous: true, capability: "create_ticket" });
+    expect(ticket.ai).toMatchObject({ source: "inline_ai_ticket_intake", autonomous: true, capability: "create_ticket" });
     expect(options).toMatchObject({ actorId: "u1" });
   });
 

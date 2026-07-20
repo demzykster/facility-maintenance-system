@@ -5,6 +5,7 @@ import {
   buildInlineAiTicketRequest,
   completeInlineAiTicketSend,
   createInlineAiTicketInitialState,
+  failInlineAiTicketSend,
   inlineAiTicketActionMode,
   inlineAiTicketEffectiveAccess,
   inlineAiTicketFromCapabilityResponse,
@@ -192,7 +193,7 @@ describe("inline AI ticket create model", () => {
     expect(JSON.stringify(actions)).not.toContain("zone");
   });
 
-  it("uses one clear form-review action label instead of duplicate completion buttons", () => {
+  it("does not render form-review actions inside the inline ticket intake", () => {
     const formAction = {
       type: "ticket.create",
       status: "needs_form_review",
@@ -203,6 +204,7 @@ describe("inline AI ticket create model", () => {
 
     expect(inlineAiTicketActionMode(formAction)).toBe("form");
     expect(inlineAiTicketPrimaryActionLabel(formAction)).toBe("המשך לטופס הקריאה");
+    expect(inlineAiTicketVisibleActions([formAction])).toEqual([]);
   });
 
   it("normalizes server-created autonomous ticket results for the compact success card", () => {
@@ -220,8 +222,73 @@ describe("inline AI ticket create model", () => {
       subject: "צופר",
       description: "בדיקה",
       asset: "asset-123",
+      zone: "",
+      category: "",
+      categoryLabel: "",
       source: "server"
     });
+  });
+
+  it("normalizes facility-created autonomous ticket results with location and category", () => {
+    expect(inlineAiTicketFromCapabilityResponse({
+      capabilityResponse: {
+        executionStatus: "created",
+        actionResult: {
+          ticketId: "ticket-f1",
+          ticketNumber: "F-008",
+          num: 8,
+          track: "facility",
+          zone: "משרדי הפצה",
+          category: "hvac",
+          categoryLabel: "מיזוג אוויר",
+          subject: "מזגן לא עובד בחדר מפעיל מערכת",
+          description: "דווח כי המזגן בחדר מפעיל המערכת אינו עובד. יש לבדוק את התקלה."
+        }
+      }
+    })).toMatchObject({
+      id: "ticket-f1",
+      track: "facility",
+      ticketNo: "F-008",
+      asset: "משרדי הפצה",
+      zone: "משרדי הפצה",
+      category: "hvac",
+      categoryLabel: "מיזוג אוויר"
+    });
+  });
+
+  it("stores server-owned pending intake from capability responses without rendering technical actions", () => {
+    const state = {
+      ...createInlineAiTicketInitialState(),
+      msgs: [{ role: "assistant", content: "שלום" }, { role: "user", content: "מזגן לא עובד בחדר מפעיל מערכת" }]
+    };
+    const completed = completeInlineAiTicketSend(state, {
+      assistant: { text: "באיזה אזור או מחלקה נמצא חדר מפעיל המערכת?" },
+      actions: [],
+      capabilityResponse: {
+        executionStatus: "blocked",
+        intake: {
+          domain: "facility",
+          status: "collecting",
+          pendingField: "location",
+          draft: {
+            track: "facility",
+            subject: "מזגן לא עובד בחדר מפעיל מערכת",
+            category: "hvac",
+            priority: "medium",
+            zone: ""
+          }
+        }
+      }
+    });
+
+    expect(completed.intake).toMatchObject({
+      domain: "facility",
+      pendingField: "location",
+      draft: { track: "facility", category: "hvac", zone: "" }
+    });
+    expect(completed.msgs.at(-1).actions).toEqual([]);
+    expect(completed.msgs.at(-1).content).not.toContain("zone");
+    expect(JSON.stringify(completed.msgs.at(-1).actions)).not.toContain("zone");
   });
 
   it("marks the session as created once a server result is returned so retry cannot create a second ticket", () => {
@@ -239,5 +306,19 @@ describe("inline AI ticket create model", () => {
 
     expect(completed.createdTicket).toMatchObject({ id: "ticket-1", ticketNo: "T-001" });
     expect(beginInlineAiTicketSend({ ...completed, input: "שלח שוב" }, { context: {} }).request).toBeNull();
+  });
+
+  it("clears busy state after a failed send so the same inline session can retry safely", () => {
+    const failed = failInlineAiTicketSend({
+      ...createInlineAiTicketInitialState(),
+      busy: true,
+      input: "מזגן לא עובד"
+    }, new Error("network"));
+
+    expect(failed.busy).toBe(false);
+    expect(failed.error).toBe("network");
+    expect(beginInlineAiTicketSend({ ...failed, input: "מזגן לא עובד" }, { context: {}, idempotencyKey: "same-key" }).request).toMatchObject({
+      idempotencyKey: "same-key"
+    });
   });
 });

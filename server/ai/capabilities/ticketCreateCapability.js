@@ -7,6 +7,11 @@ import {
   SYSTEM_DOWNTIME_NEEDS_TRIAGE,
   ticketCreateContractSummary
 } from "../../../src/ticketCreateContract.js";
+import {
+  buildInlineTicketIntakePlan,
+  createdInlineTicketAnswer,
+  normalizeInlineTicketIntakeSession
+} from "../../../src/inlineAiTicketIntakeOrchestrator.js";
 
 const HOUR = 3600000;
 
@@ -144,16 +149,18 @@ function isTicketIntakeContext(context = {}) {
 
 function shouldAutonomousCreate(text = "", context = {}) {
   const raw = cleanText(text, 1000);
-  if (CREATE_INTENT_RE.test(raw) || PROBLEM_RE.test(raw) || DANGEROUS_RE.test(raw)) return true;
-  return isTicketIntakeContext(context) && raw.length > 0;
+  const previousIntake = normalizeInlineTicketIntakeSession(context.intake || cleanObject(context.rawContext).taskSession?.intake);
+  if (previousIntake?.pendingField && raw.length > 0) return true;
+  return CREATE_INTENT_RE.test(raw) || PROBLEM_RE.test(raw) || DANGEROUS_RE.test(raw);
 }
 
-function createBlockingResponse({ answer, question, facts = [], unknowns = [], toolResults = [], status = AI_CAPABILITY_EXECUTION_STATUS.blocked } = {}) {
+function createBlockingResponse({ answer, question, facts = [], unknowns = [], toolResults = [], status = AI_CAPABILITY_EXECUTION_STATUS.blocked, intake = null } = {}) {
   return normalizeAiCapabilityResponse({
     answer: answer || question,
     facts,
     unknowns,
     toolResults,
+    intake,
     blockingQuestion: question,
     requiresConfirmation: false,
     executionStatus: status
@@ -364,7 +371,7 @@ export function createTicketReadCapabilities() {
 export function createTicketCreateCapability({ driver = null } = {}) {
   return {
     name: "create_ticket",
-    purpose: "Create one low-risk transport ticket from deterministic user input and visible asset facts.",
+    purpose: "Create one low-risk inline ticket-intake request from deterministic transport or facility facts.",
     inputSchema: {
       type: "object",
       required: ["text"],
@@ -397,6 +404,8 @@ export function createTicketCreateCapability({ driver = null } = {}) {
       const text = cleanText(args.text || executionContext.text, 1200);
       const module = cleanText(executionContext.module, 80).toLowerCase();
       const now = Number.isFinite(Number(executionContext.now)) ? Number(executionContext.now) : Date.now();
+      const rawContext = cleanObject(executionContext.rawContext);
+      const previousIntake = normalizeInlineTicketIntakeSession(executionContext.intake || cleanObject(rawContext.taskSession).intake);
       const reads = createAiCapabilityRegistry(createTicketReadCapabilities());
       const toolResults = [];
       const executeRead = async (capability, readArgs = {}) => {
@@ -405,6 +414,15 @@ export function createTicketCreateCapability({ driver = null } = {}) {
         return response.result;
       };
       await executeRead("get_current_user_context");
+
+      if (!isTicketIntakeContext(executionContext)) {
+        return normalizeAiCapabilityResponse({
+          answer: "",
+          unknowns: ["workflow"],
+          toolResults,
+          executionStatus: AI_CAPABILITY_EXECUTION_STATUS.featureDisabled
+        });
+      }
 
       if (!shouldAutonomousCreate(text, executionContext)) {
         return normalizeAiCapabilityResponse({
@@ -415,7 +433,7 @@ export function createTicketCreateCapability({ driver = null } = {}) {
         });
       }
 
-      if (module && module !== "transport" && module !== "unknown") {
+      if (module && !["transport", "facility", "unknown"].includes(module)) {
         return normalizeAiCapabilityResponse({
           answer: "",
           unknowns: ["module"],
@@ -434,47 +452,68 @@ export function createTicketCreateCapability({ driver = null } = {}) {
         });
       }
 
-      const assetResult = await executeRead("find_asset_by_visible_identifier", { text });
-      if (assetResult.status === "missing_identifier") {
-        return createBlockingResponse({
-          question: "לאיזה מספר כלי/מכונה לפתוח את הקריאה?",
-          unknowns: ["asset"],
-          toolResults
-        });
-      }
-      if (assetResult.status === "not_found") {
-        return createBlockingResponse({
-          question: `לא מצאתי כלי גלוי במספר ${assetResult.identifiers?.[0] || ""}. מה המספר הנכון?`,
-          unknowns: ["asset"],
-          toolResults
-        });
-      }
-      if (assetResult.status === "ambiguous") {
-        return createBlockingResponse({
-          question: "מצאתי כמה כלים מתאימים. באיזה כלי מדובר?",
-          facts: assetResult.matches.map((asset) => ({ id: asset.id, code: asset.code })),
-          unknowns: ["asset"],
-          toolResults
-        });
-      }
-
-      let asset = cleanObject(assetResult.asset);
-      if (!cleanText(asset.id, 160) || !cleanText(asset.code || asset.num || asset.number || asset.asset || asset.unitCode || asset.workerNo || asset.vehicleNumber || asset.licensePlate || asset.displayNumber, 160)) {
-        const assetSummary = await executeRead("get_asset_summary", { asset });
-        asset = { ...asset, ...assetSummary };
-      }
       await executeRead("get_ticket_create_contract");
-
-      if (RECURRENCE_RE.test(text)) {
-        await executeRead("get_open_tickets_for_asset", { assetId: asset.id });
+      const plan = buildInlineTicketIntakePlan({
+        text,
+        latestText: executionContext.latestText || text,
+        previousIntake,
+        context,
+        fullVisibleFleet: cleanArray(executionContext.fullVisibleFleet || executionContext.serverVisibleFleet),
+        currentEntity: rawContext.currentEntity || rawContext.routeEntity || rawContext.currentAsset,
+        config: cleanObject(executionContext.config),
+        user,
+        now,
+        ticketId: `ticket-${randomUUID()}`
+      });
+      toolResults.push({
+        capability: "resolve_inline_ticket_intake",
+        ok: plan.status === "ready",
+        result: {
+          workflow: plan.workflow,
+          domain: plan.domain,
+          status: plan.status,
+          pendingField: plan.pendingField,
+          missingFields: plan.missingFields,
+          facts: plan.facts
+        }
+      });
+      if (plan.domain === "transport" && plan.ticket?.forkliftId && RECURRENCE_RE.test(text)) {
+        await executeRead("get_open_tickets_for_asset", { assetId: plan.ticket.forkliftId });
       }
 
-      if (DANGEROUS_RE.test(text)) {
+      if (!plan.ticket) {
+        return createBlockingResponse({
+          question: plan.question,
+          facts: plan.facts,
+          unknowns: plan.unknowns,
+          toolResults,
+          intake: {
+            intakeId: "create_ticket",
+            workflow: plan.workflow,
+            domain: plan.domain,
+            status: plan.status,
+            pendingField: plan.pendingField,
+            originalMessage: plan.originalMessage,
+            draft: plan.draft
+          }
+        });
+      }
+
+      if (plan.domain === "transport" && DANGEROUS_RE.test(text)) {
         return createBlockingResponse({
           question: "זה נשמע כמו תקלה שעלולה להשפיע על בטיחות או השבתה. האם הכלי מושבת ואין להשתמש בו?",
-          facts: [{ assetId: asset.id, assetCode: asset.code }],
+          facts: plan.facts,
           unknowns: ["safe_downtime_state"],
-          toolResults
+          toolResults,
+          intake: {
+            intakeId: "create_ticket",
+            workflow: plan.workflow,
+            domain: plan.domain,
+            status: plan.status,
+            pendingField: "",
+            originalMessage: plan.originalMessage,
+            draft: plan.draft
+          }
         });
       }
 
@@ -488,24 +527,71 @@ export function createTicketCreateCapability({ driver = null } = {}) {
         });
       }
 
-      const ticket = createTicketPayload({ text, user, asset, now });
+      const ticket = plan.ticket;
+      const idempotencyKey = cleanText(args.idempotencyKey || executionContext.idempotencyKey, 200);
+      const guardError = typeof executionContext.inlineTicketCreateGuard?.check === "function"
+        ? cleanText(executionContext.inlineTicketCreateGuard.check({ domain: plan.domain, idempotencyKey }), 120)
+        : "";
+      if (guardError) {
+        return createBlockingResponse({
+          answer: "נוצרה קריאה ממש עכשיו. המתינו רגע לפני פתיחת קריאה נוספת.",
+          question: "",
+          facts: plan.facts,
+          unknowns: [guardError],
+          toolResults,
+          status: AI_CAPABILITY_EXECUTION_STATUS.blocked,
+          intake: {
+            intakeId: "create_ticket",
+            workflow: plan.workflow,
+            domain: plan.domain,
+            status: plan.status,
+            pendingField: "",
+            originalMessage: plan.originalMessage,
+            draft: plan.draft
+          }
+        });
+      }
       try {
         const created = await createTicketRecord({
           driver,
           ticket,
           actor: user,
-          idempotencyKey: cleanText(args.idempotencyKey || executionContext.idempotencyKey, 200)
+          idempotencyKey
         });
+        if (typeof executionContext.inlineTicketCreateGuard?.record === "function"
+          && ["created", "replayed"].includes(cleanText(created.result?.idempotencyStatus, 40))) {
+          executionContext.inlineTicketCreateGuard.record({ domain: plan.domain, idempotencyKey });
+        }
         const ticketNo = cleanText(created.result.ticketNumber || created.result.ticketNo, 60);
         const answer = created.result.idempotencyStatus === "replayed"
-          ? `כבר נוצרה קריאה ${ticketNo} לכלי ${ticket.asset}: ${ticket.subject}`
-          : `Создал заявку ${ticketNo} по машине ${ticket.asset}: ${ticket.subject}`;
+          ? `כבר נוצרה קריאה ${ticketNo}`
+          : createdInlineTicketAnswer(ticket, created.result);
         return normalizeAiCapabilityResponse({
           answer,
-          facts: [{ assetId: ticket.forkliftId, assetCode: ticket.asset }],
+          facts: plan.facts,
           unknowns: [],
           toolResults,
-          actionResult: created.result,
+          actionResult: {
+            ...created.result,
+            track: ticket.track,
+            subject: ticket.subject,
+            description: ticket.description,
+            asset: ticket.asset,
+            forkliftId: ticket.forkliftId,
+            zone: ticket.zone,
+            category: ticket.category,
+            categoryLabel: ticket.categoryLabel,
+            domain: plan.domain
+          },
+          intake: {
+            intakeId: "create_ticket",
+            workflow: plan.workflow,
+            domain: plan.domain,
+            status: AI_CAPABILITY_EXECUTION_STATUS.created,
+            pendingField: "",
+            originalMessage: plan.originalMessage,
+            draft: plan.draft
+          },
           blockingQuestion: "",
           requiresConfirmation: false,
           executionStatus: created.result.idempotencyStatus === "replayed"

@@ -1425,7 +1425,7 @@ function aiAssistantEnabled(cfg) {
   return BROWSER_AI_ENABLED || normalizeAiSettings(cfg?.ai).mode === AI_MODES.server;
 }
 
-async function callAIAssistant({ text, messages, conversationId, system, context, workflow, includeProviderPlan = false }) {
+async function callAIAssistant({ text, messages, conversationId, system, context, workflow, includeProviderPlan = false, idempotencyKey }) {
   if (BROWSER_AI_ENABLED) return callClaude(messages, system, 900);
   return callAiAssistApi({
     text,
@@ -1434,6 +1434,7 @@ async function callAIAssistant({ text, messages, conversationId, system, context
     context,
     workflow,
     includeProviderPlan,
+    idempotencyKey,
     getAccessToken: productionAccessToken
   });
 }
