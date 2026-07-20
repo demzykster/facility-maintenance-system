@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildTicketWaitingTargetPatch,
   getTicketWaitingTargetState,
   readTicketWaitingTarget,
+  ticketWaitingTargetDraft,
+  validateTicketWaitingTargetDraft,
   waitingTargetRequirementForReason
 } from "../src/ticketWaitingTargetModel.js";
 
@@ -83,6 +86,59 @@ describe("ticket waiting target model", () => {
       supplier: "",
       user: null,
       until: Date.parse(waitingUntil)
+    });
+  });
+
+  it("builds an explicit waiting supplier patch without copying the execution supplier", () => {
+    expect(buildTicketWaitingTargetPatch("supplier", {
+      waitingSupplier: "Quote Co"
+    })).toEqual({
+      waitingTargetType: "supplier",
+      waitingSupplier: "Quote Co",
+      waitingUser: null,
+      waitingUntil: null
+    });
+  });
+
+  it("builds user, manager, and date targets while clearing unrelated target fields", () => {
+    expect(buildTicketWaitingTargetPatch("requester_confirmation", {
+      waitingUser: { id: "requester-1", name: "Requester" }
+    })).toEqual({
+      waitingTargetType: "user",
+      waitingSupplier: null,
+      waitingUser: { id: "requester-1", name: "Requester" },
+      waitingUntil: null
+    });
+    expect(buildTicketWaitingTargetPatch("manager_decision", {
+      waitingUser: { id: "manager-1", name: "Manager" }
+    })).toMatchObject({
+      waitingTargetType: "manager",
+      waitingUser: { id: "manager-1", name: "Manager" }
+    });
+    expect(buildTicketWaitingTargetPatch("scheduled_date", {
+      waitingUntil: "2026-07-25T09:00"
+    })).toMatchObject({
+      waitingTargetType: "date",
+      waitingSupplier: null,
+      waitingUser: null,
+      waitingUntil: Date.parse("2026-07-25T09:00")
+    });
+  });
+
+  it("requires only the target that belongs to the selected waiting reason", () => {
+    expect(validateTicketWaitingTargetDraft("supplier", {})).toEqual({ valid: false, requiredType: "supplier" });
+    expect(validateTicketWaitingTargetDraft("supplier", { waitingSupplier: "Quote Co" })).toEqual({ valid: true, requiredType: "supplier" });
+    expect(validateTicketWaitingTargetDraft("parts", {})).toEqual({ valid: true, requiredType: "none" });
+  });
+
+  it("creates an editable draft from optional persisted target fields", () => {
+    expect(ticketWaitingTargetDraft({
+      waitingTargetType: "manager",
+      waitingUser: { id: "manager-1", name: "Manager" }
+    })).toEqual({
+      waitingSupplier: "",
+      waitingUser: { id: "manager-1", name: "Manager" },
+      waitingUntil: ""
     });
   });
 });

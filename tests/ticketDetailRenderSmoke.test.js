@@ -197,7 +197,7 @@ describe("ticket detail render smoke", () => {
       log: [{ at: 1, by: "Vadim", text: "נפתחה" }]
     };
     const draft = facilityAdminProcessingDraft(ticket);
-    const clicked = { ...draft, waitingReason: "supplier" };
+    const clicked = { ...draft, waitingReason: "supplier", waitingSupplier: "Quote Co" };
 
     expect(facilityAdminProcessingHasChanges(ticket, clicked)).toBe(true);
     expect(ticket.status).toBe("in_progress");
@@ -214,6 +214,8 @@ describe("ticket detail render smoke", () => {
 
     expect(next.status).toBe("waiting");
     expect(next.waitingReason).toBe("supplier");
+    expect(next.waitingSupplier).toBe("Quote Co");
+    expect(next.waitingTargetType).toBe("supplier");
     expect(next.log).toHaveLength(2);
     expect(next.log[1]).toMatchObject({ text: "ממתין · ממתינה לספק", kind: "waiting" });
   });
@@ -230,6 +232,7 @@ describe("ticket detail render smoke", () => {
     const next = applyFacilityAdminProcessingDraft(ticket, {
       supplier: "משב מיזוג אוויר",
       waitingReason: "supplier",
+      waitingSupplier: "משב מיזוג אוויר",
       note: "נבדק מול ספק"
     }, {
       now: 3,
@@ -247,6 +250,8 @@ describe("ticket detail render smoke", () => {
       routedTech: true,
       status: "waiting",
       waitingReason: "supplier",
+      waitingTargetType: "supplier",
+      waitingSupplier: "משב מיזוג אוויר",
       updatedAt: 3
     });
     expect(next.log.map((entry) => entry.text)).toEqual([
@@ -254,6 +259,58 @@ describe("ticket detail render smoke", () => {
       "ממתין · ממתינה לספק",
       "נבדק מול ספק"
     ]);
+  });
+
+  it("stores a waiting supplier without changing the assigned execution supplier", () => {
+    const ticket = {
+      id: "facility-1",
+      track: "facility",
+      status: "in_progress",
+      supplier: "Execution Co",
+      assignee: "Technician",
+      routedTech: true,
+      log: []
+    };
+
+    const next = applyFacilityAdminProcessingDraft(ticket, {
+      ...facilityAdminProcessingDraft(ticket),
+      waitingReason: "supplier",
+      waitingSupplier: "Quote Co"
+    }, {
+      now: 4,
+      session: { name: "Vadim", role: "admin" },
+      entryFor: (_session, text, kind) => ({ at: 4, by: "Vadim", text, kind }),
+      normalizeFacilitySupplierPatch: () => { throw new Error("routing must not change"); },
+      pausePatch: () => ({}),
+      reasonBall: () => "admin",
+      waitReasonLabel: () => "ממתינה לספק"
+    });
+
+    expect(next).toMatchObject({
+      supplier: "Execution Co",
+      assignee: "Technician",
+      routedTech: true,
+      waitingTargetType: "supplier",
+      waitingSupplier: "Quote Co"
+    });
+  });
+
+  it("displays the explicit waiting target separately from the wait reason", () => {
+    const html = renderTicket("facility", {
+      ticket: {
+        status: "waiting",
+        waitingReason: "supplier",
+        waitingTargetType: "supplier",
+        waitingSupplier: "Quote Co"
+      },
+      ui: {
+        waitReasonLabel: () => "ממתינה לספק",
+        ticketWaitReasonLabel: () => "ממתינה לספק"
+      }
+    });
+
+    expect(html).toContain("יעד המתנה");
+    expect(html).toContain("Quote Co");
   });
 
   it("shows only category-relevant suppliers for facility routing", () => {

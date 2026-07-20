@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { closedTicketRecord } from "./ticketClosureModel.js";
 import { ticketResponsibleLabel, transportTicketSupplierName as transportTicketSupplierNameModel } from "./ticketResponsibilityModel.js";
+import {
+  buildTicketWaitingTargetPatch,
+  readTicketWaitingTarget,
+  ticketWaitingTargetDraft,
+  validateTicketWaitingTargetDraft,
+  waitingTargetRequirementForReason
+} from "./ticketWaitingTargetModel.js";
 
 let ticketDetailRuntimeUi = {};
 
@@ -117,14 +124,20 @@ export function facilityAdminProcessingDraft(ticket = {}) {
   return {
     supplier: text(ticket.supplier),
     waitingReason: ticket.status === "waiting" ? text(ticket.waitingReason) : "",
+    ...ticketWaitingTargetDraft(ticket),
     note: ""
   };
 }
+
+const sameWaitingUser = (left, right) => text(left?.id) === text(right?.id) && text(left?.name) === text(right?.name);
 
 export function facilityAdminProcessingHasChanges(ticket = {}, draft = {}) {
   const current = facilityAdminProcessingDraft(ticket);
   return current.supplier !== text(draft.supplier)
     || current.waitingReason !== text(draft.waitingReason)
+    || current.waitingSupplier !== text(draft.waitingSupplier)
+    || !sameWaitingUser(current.waitingUser, draft.waitingUser)
+    || current.waitingUntil !== text(draft.waitingUntil)
     || !!text(draft.note);
 }
 
@@ -151,11 +164,16 @@ export function applyFacilityAdminProcessingDraft(ticket = {}, draft = {}, optio
   }
 
   const currentReason = ticket.status === "waiting" ? text(ticket.waitingReason) : "";
-  if (cleanReason && cleanReason !== currentReason) {
+  const waitingTargetPatch = buildTicketWaitingTargetPatch(cleanReason, draft);
+  const currentTargetPatch = buildTicketWaitingTargetPatch(currentReason, ticketWaitingTargetDraft(ticket));
+  const targetChanged = JSON.stringify(waitingTargetPatch) !== JSON.stringify(currentTargetPatch);
+  if (cleanReason && (cleanReason !== currentReason || targetChanged)) {
+    if (!validateTicketWaitingTargetDraft(cleanReason, draft).valid) return ticket;
     const waitingPatch = {
       status: "waiting",
       waitingReason: cleanReason,
-      waitBall: getReasonBall(config, cleanReason)
+      waitBall: getReasonBall(config, cleanReason),
+      ...waitingTargetPatch
     };
     Object.assign(patch, waitingPatch, makePausePatch(ticket, waitingPatch, config, now));
     log.push({ text: `ממתין · ${labelReason(cleanReason, config)}`, kind: "waiting" });
@@ -181,6 +199,38 @@ export function transportTicketSupplierName(ticket = {}, fleet = []) {
   return transportTicketSupplierNameModel(ticket, fleet) || "לא מוגדר";
 }
 
+function waitingDraftForReason(ticket, reason, session) {
+  const currentTarget = readTicketWaitingTarget(ticket);
+  const requirement = waitingTargetRequirementForReason(reason);
+  const draft = currentTarget.type === requirement.type ? ticketWaitingTargetDraft(ticket) : {
+    waitingSupplier: "",
+    waitingUser: null,
+    waitingUntil: ""
+  };
+  if (reason === "requester_confirmation") {
+    draft.waitingUser = ticket.createdBy || ticket.reportedBy || null;
+  } else if (reason === "manager_decision" && !draft.waitingUser && session?.role === "user") {
+    draft.waitingUser = { id: session.id || "", name: session.name || "" };
+  }
+  return { reason, ...draft };
+}
+
+function WaitingTargetEditor({ draft, onChange, suppliers = [], managers = [], ticket }) {
+  const requirement = waitingTargetRequirementForReason(draft?.reason);
+  if (!requirement.required) return null;
+  if (requirement.type === "supplier") {
+    return <label className="field" style={{ marginTop: 10 }}><span>ספק שממתינים לו *</span><select className="ta" value={draft.waitingSupplier || ""} onChange={(event) => onChange({ ...draft, waitingSupplier: event.target.value })}><option value="">— בחירת ספק —</option>{suppliers.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>;
+  }
+  if (requirement.type === "date") {
+    return <label className="field" style={{ marginTop: 10 }}><span>מועד חזרה לקריאה *</span><input type="datetime-local" value={draft.waitingUntil || ""} onChange={(event) => onChange({ ...draft, waitingUntil: event.target.value })} /></label>;
+  }
+  if (requirement.type === "user") {
+    const requester = draft.waitingUser || ticket.createdBy || ticket.reportedBy;
+    return <div className="hint" style={{ marginTop: 10 }}>ממתינים לאישור: <b>{requester?.name || "פותח הקריאה"}</b></div>;
+  }
+  return <label className="field" style={{ marginTop: 10 }}><span>מנהל שממתינים להחלטתו *</span><select className="ta" value={draft.waitingUser?.id || draft.waitingUser?.name || ""} onChange={(event) => { const manager = managers.find((user) => (user.id || user.name) === event.target.value); onChange({ ...draft, waitingUser: manager ? { id: manager.id || "", name: manager.name || "" } : null }); }}><option value="">— בחירת מנהל —</option>{managers.map((manager) => <option key={manager.id || manager.name} value={manager.id || manager.name}>{manager.name}</option>)}</select></label>;
+}
+
 export function TicketDetail(p) {
   ticketDetailRuntimeUi = p.ui || ticketDetailRuntimeUi;
   const { ticket, config, session, saveTicket: onUpdate, onBack, onRepeat, onOpenTicket, onAskAI, tickets } = p;
@@ -188,11 +238,12 @@ export function TicketDetail(p) {
   const [photo, setPhoto] = useState(null), [afterPhoto, setAfterPhoto] = useState(null), [note, setNote] = useState(""), [closing, setClosing] = useState(false), [showSim, setShowSim] = useState(false), [returning, setReturning] = useState(false), [recvAt, setRecvAt] = useState("");
   const [adminQuickEdit, setAdminQuickEdit] = useState("");
   const [facilityAdminDraft, setFacilityAdminDraft] = useState(() => facilityAdminProcessingDraft(ticket));
+  const [waitingDraft, setWaitingDraft] = useState(null);
   const [adminTransportExecutionOpen, setAdminTransportExecutionOpen] = useState(false);
   const afterRef = useRef(null);
   useEffect(() => { let on = true; if (ticket?.hasPhoto) TICKET_PHOTOS.load(ticket, "before").then((d) => on && setPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasPhoto, ticket?.photoPath]);
   useEffect(() => { let on = true; setAfterPhoto(null); if (ticket?.hasAfterPhoto) TICKET_PHOTOS.load(ticket, "after").then((d) => on && setAfterPhoto(d)); return () => { on = false; }; }, [ticket?.id, ticket?.hasAfterPhoto, ticket?.afterPhotoPath]);
-  useEffect(() => { setFacilityAdminDraft(facilityAdminProcessingDraft(ticket)); }, [ticket?.id, ticket?.status, ticket?.waitingReason, ticket?.supplier]);
+  useEffect(() => { setFacilityAdminDraft(facilityAdminProcessingDraft(ticket)); setWaitingDraft(null); }, [ticket?.id, ticket?.status, ticket?.waitingReason, ticket?.waitingTargetType, ticket?.waitingSupplier, ticket?.waitingUser, ticket?.waitingUntil, ticket?.supplier]);
   useEffect(() => { setAdminTransportExecutionOpen(false); }, [ticket?.id]);
   const grabAfter = (file) => { if (!file) return; const r = new FileReader(); r.onload = (ev) => { const img = new Image(); img.onload = () => { const max = 1000; let { width, height } = img; if (width > height && width > max) { height = height * max / width; width = max; } else if (height > max) { width = width * max / height; height = max; } const cv = document.createElement("canvas"); cv.width = width; cv.height = height; cv.getContext("2d").drawImage(img, 0, 0, width, height); setAfterPhoto(cv.toDataURL("image/jpeg", 0.6)); }; img.src = ev.target.result; }; r.readAsDataURL(file); };
   const exactRelated = useMemo(() => ticket?.forkliftId ? tickets.filter((t) => t.id !== ticket.id && t.forkliftId === ticket.forkliftId).sort((a, b) => b.createdAt - a.createdAt) : [], [ticket, tickets]);
@@ -216,11 +267,22 @@ export function TicketDetail(p) {
     upd({ assignee: session.name, status: "in_progress", waitingReason: null, equipWaitSince: null, equipWaitMs: (ticket.equipWaitMs || 0) + addWait }, wasWaitingEquip ? `הכלי התקבל — הטכנאי קיבל לטיפול (המתנה לכלי: ${fmtDur(addWait)})${backNote}` : "הטכנאי קיבל את הקריאה לטיפול", "accept", pivot);
   };
   const noEquipment = () => upd({ status: "waiting", waitingReason: "no_equipment", waitBall: "manager", assignee: ticket.assignee || session.name, equipWaitSince: Date.now() }, "הטכנאי דיווח: הכלי לא התקבל — ממתין לקבלת הכלי מהמנהל", "waiting");
-  const setStatus = (ns) => upd(ns === "waiting" ? { status: ns } : { status: ns, waitingReason: null }, `סטטוס: ${stOf(ns).label}`);
-  const setWaiting = (reason) => onUpdate({ ...ticket, status: "waiting", waitingReason: reason, waitBall: reasonBall(config, reason), ...pausePatch(ticket, { status: "waiting", waitingReason: reason }, config), updatedAt: Date.now(), log: [...(ticket.log || []), e(`ממתין · ${waitReasonLabel(reason, config)}`, "waiting")] });
+  const clearWaitingTargetPatch = () => buildTicketWaitingTargetPatch("", {});
+  const setStatus = (ns) => upd(ns === "waiting" ? { status: ns } : { status: ns, waitingReason: null, ...clearWaitingTargetPatch() }, `סטטוס: ${stOf(ns).label}`);
+  const setWaiting = (reason, targetDraft = {}) => {
+    const targetPatch = buildTicketWaitingTargetPatch(reason, targetDraft);
+    const waitingPatch = { status: "waiting", waitingReason: reason, waitBall: reasonBall(config, reason), ...targetPatch };
+    onUpdate({ ...ticket, ...waitingPatch, ...pausePatch(ticket, waitingPatch, config), updatedAt: Date.now(), log: [...(ticket.log || []), e(`ממתין · ${waitReasonLabel(reason, config)}`, "waiting")] });
+    setWaitingDraft(null);
+  };
+  const chooseWaitingReason = (reason) => {
+    const draft = waitingDraftForReason(ticket, reason, session);
+    if (validateTicketWaitingTargetDraft(reason, draft).valid) setWaiting(reason, draft);
+    else setWaitingDraft(draft);
+  };
   const setWear = (wt) => upd({ wearType: wt }, `סיווג: ${WEAR.find((x) => x.id === wt).label}`, "classify");
   const finishTech = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_user", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים — הועבר לאישור הפותח" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
-  const takeMgr = () => upd({ status: "in_progress", waitingReason: null }, "המנהל קיבל את הקריאה לטיפול", "accept");
+  const takeMgr = () => upd({ status: "in_progress", waitingReason: null, ...clearWaitingTargetPatch() }, "המנהל קיבל את הקריאה לטיפול", "accept");
   const finishMgr = async () => { let photoPatch = {}; if (afterPhoto && !ticket.hasAfterPhoto) { try { photoPatch = await TICKET_PHOTOS.save(ticket.id, "after", afterPhoto); } catch (e) {} } upd({ status: "pending_admin", hasAfterPhoto: !!afterPhoto || !!ticket.hasAfterPhoto, ...photoPatch }, "הטיפול הסתיים ע״י המנהל — הועבר לסגירת מנהל מערכת" + (afterPhoto ? " (צורפה תמונת ביצוע)" : ""), "treat"); };
   const confirmUser = () => upd({ status: "pending_admin" }, "הפותח אישר שהתקלה טופלה", "approve");
   const remarksUser = () => { if (!note.trim()) return; onUpdate({ ...ticket, status: "in_progress", returned: true, returnReason: note.trim(), updatedAt: Date.now(), log: [...(ticket.log || []), e(`⤺ הוחזר לטיפול — הבעיה לא נפתרה: ${note.trim()}`, "reopen")] }); setNote(""); setReturning(false); };
@@ -254,6 +316,9 @@ export function TicketDetail(p) {
   const repeat = () => onRepeat && onRepeat({ track: track, category: ticket.category, forkliftId: ticket.forkliftId, downtimeType: ticket.downtimeType, zone: ticket.zone, asset: ticket.asset, subject: ticket.subject, priority: ticket.priority });
   const ticketSupplierOptions = supplierCandidatesForTicket(config, ticket, p.fleet || []);
   const ticketSupplierSelectOptions = ticket.supplier && !ticketSupplierOptions.includes(ticket.supplier) ? [ticket.supplier, ...ticketSupplierOptions] : ticketSupplierOptions;
+  const waitingSupplierOptions = facilityAdminDraft.waitingSupplier && !ticketSupplierOptions.includes(facilityAdminDraft.waitingSupplier) ? [facilityAdminDraft.waitingSupplier, ...ticketSupplierOptions] : ticketSupplierOptions;
+  const managerOptions = (p.users || []).filter((user) => user.active !== false && (user.role === "user" || user.role === "admin"));
+  if ((session.role === "user" || session.role === "admin") && !managerOptions.some((user) => (user.id && user.id === session.id) || user.name === session.name)) managerOptions.unshift(session);
   const adminQuickSave = (label, patch) => {
     setAdminQuickEdit("");
     upd(normalizeFacilitySupplierPatch(ticket, patch, session), `עריכת מנהל: ${label}`, "admin_manual");
@@ -277,6 +342,10 @@ export function TicketDetail(p) {
     setFacilityAdminDraft(facilityAdminProcessingDraft(ticket));
     onBack();
   };
+  const selectFacilityWaitingReason = (reason) => {
+    const targetDraft = waitingDraftForReason(ticket, reason, session);
+    setFacilityAdminDraft((draft) => ({ ...draft, ...targetDraft, waitingReason: reason }));
+  };
 
   const isTech = role === "tech";
   const isAdmin = role === "admin";
@@ -292,6 +361,7 @@ export function TicketDetail(p) {
   const canConfirm = !isTech && canConfirmTicketForSession(session, ticket);
   const facilityAdminWaitReasons = track === "facility" ? wReasons(config).filter((r) => r.id !== "no_equipment") : [];
   const facilityAdminProcessingDirty = facilityAdminProcessingHasChanges(ticket, facilityAdminDraft);
+  const facilityAdminWaitingValid = !facilityAdminDraft.waitingReason || validateTicketWaitingTargetDraft(facilityAdminDraft.waitingReason, facilityAdminDraft).valid;
   const fixedTransportSupplier = track === "transport" ? transportTicketSupplierName(ticket, p.fleet || []) : "";
   const responsibleLabel = ticketResponsibleLabel(ticket, { fleet: p.fleet || [] });
   const showAdminProcessingPanel = role === "admin" && isOpen(ticket) && !["pending_manager", "pending_user", "rework"].includes(ticket.status);
@@ -309,6 +379,10 @@ export function TicketDetail(p) {
   const detailPausedTotal = normalizedTicketLifecycleStages(ticket, detailLifecycleOptions)
     .filter((stage) => stage.countsOperationalSla === false)
     .reduce((sum, stage) => sum + (stage.ms || 0), 0);
+  const waitingTarget = readTicketWaitingTarget(ticket);
+  const waitingTargetLabel = waitingTarget.type === "supplier" ? waitingTarget.supplier
+    : waitingTarget.type === "user" || waitingTarget.type === "manager" ? waitingTarget.user?.name
+      : waitingTarget.type === "date" && waitingTarget.until ? `${fmtDate(waitingTarget.until)} ${fmtTime(waitingTarget.until)}` : "";
   const requesterPhone = String(ticket.createdBy?.phone || ticket.reportedBy?.phone || "").trim();
   const requesterTel = requesterPhone.replace(/[^\d+]/g, "");
   const askTicketAI = onAskAI ? () => onAskAI(ticketAiPrompt({
@@ -351,6 +425,7 @@ export function TicketDetail(p) {
         <Meta Icon={Wrench} label="אחראי" value={responsibleLabel} action={isAdmin ? () => setAdminQuickEdit("assignee") : null} />
         {ticket.wearType && <Meta Icon={Gauge} label="סיווג" value={WEAR.find((x) => x.id === ticket.wearType)?.label} />}
         {ticket.status === "waiting" && ticket.waitingReason && <Meta Icon={CalendarClock} label="סיבת המתנה" value={waitReasonLabel(ticket.waitingReason, config)} />}
+        {ticket.status === "waiting" && waitingTargetLabel && <Meta Icon={CalendarClock} label="יעד המתנה" value={waitingTargetLabel} />}
         {detailPausedTotal > 0 && <Meta Icon={CalendarClock} label="זמן המתנה (לא נספר ל-SLA)" value={fmtDur(detailPausedTotal)} />}
         {(() => { const r = computeRisk(ticket, p.fleet || [], config); return r.level !== "green" ? <div className="meta"><AlertTriangle size={15} color={r.color} /><div><div className="meta-lbl">רמת סיכון</div><div className="meta-val" style={{ color: r.color, fontWeight: 700 }}>{r.label}</div></div></div> : null; })()}
       </div>
@@ -390,7 +465,8 @@ export function TicketDetail(p) {
           <SectionTitle>סטטוס</SectionTitle>
           <div className="status-seg"><button className={"seg" + (ticket.status === "in_progress" ? " on" : "")} onClick={() => setStatus("in_progress")} style={ticket.status === "in_progress" ? { background: stOf("in_progress").color, color: "#fff", borderColor: stOf("in_progress").color } : {}}>בעבודה</button></div>
           <div className="hint" style={{ marginTop: 8 }}>תקוע? סמן מה חוסם:</div>
-          <div className="pr-row">{reasonsForRole(config, executorRole).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <div className="pr-row">{reasonsForRole(config, executorRole).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => chooseWaitingReason(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          {waitingDraft && <div className="note"><WaitingTargetEditor draft={waitingDraft} onChange={setWaitingDraft} suppliers={ticketSupplierOptions} managers={managerOptions} ticket={ticket} /><div className="row2" style={{ marginTop: 10 }}><button className="btn-ghost" onClick={() => setWaitingDraft(null)}>ביטול</button><button className="btn-primary" disabled={!validateTicketWaitingTargetDraft(waitingDraft.reason, waitingDraft).valid} onClick={() => setWaiting(waitingDraft.reason, waitingDraft)}>שמירת המתנה</button></div></div>}
           <SectionTitle>תמונת ביצוע (אופציונלי)</SectionTitle>
           <input ref={afterRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(ev) => grabAfter(ev.target.files?.[0])} />
           {afterPhoto ? <div className="photo-prev"><img src={afterPhoto} alt="" /><button className="photo-x" onClick={() => setAfterPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => afterRef.current?.click()}><Camera size={20} /> צירוף תמונת ביצוע</button>}
@@ -407,7 +483,8 @@ export function TicketDetail(p) {
           <SectionTitle>סטטוס</SectionTitle>
           <div className="status-seg"><button className={"seg" + (ticket.status === "in_progress" ? " on" : "")} onClick={() => setStatus("in_progress")} style={ticket.status === "in_progress" ? { background: stOf("in_progress").color, color: "#fff", borderColor: stOf("in_progress").color } : {}}>בעבודה</button></div>
           <div className="hint" style={{ marginTop: 8 }}>תקוע? סמן מה חוסם:</div>
-          <div className="pr-row">{reasonsForRole(config, session.role).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => setWaiting(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <div className="pr-row">{reasonsForRole(config, session.role).map((r) => <button key={r.id} className={"pr-pick" + (ticket.status === "waiting" && ticket.waitingReason === r.id ? " on" : "")} onClick={() => chooseWaitingReason(r.id)} style={ticket.status === "waiting" && ticket.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          {waitingDraft && <div className="note"><WaitingTargetEditor draft={waitingDraft} onChange={setWaitingDraft} suppliers={ticketSupplierOptions} managers={managerOptions} ticket={ticket} /><div className="row2" style={{ marginTop: 10 }}><button className="btn-ghost" onClick={() => setWaitingDraft(null)}>ביטול</button><button className="btn-primary" disabled={!validateTicketWaitingTargetDraft(waitingDraft.reason, waitingDraft).valid} onClick={() => setWaiting(waitingDraft.reason, waitingDraft)}>שמירת המתנה</button></div></div>}
           <SectionTitle>תמונת ביצוע (אופציונלי)</SectionTitle>
           <input ref={afterRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(ev) => grabAfter(ev.target.files?.[0])} />
           {afterPhoto ? <div className="photo-prev"><img src={afterPhoto} alt="" /><button className="photo-x" onClick={() => setAfterPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => afterRef.current?.click()}><Camera size={20} /> צירוף תמונת ביצוע</button>}
@@ -457,11 +534,12 @@ export function TicketDetail(p) {
 
       {showAdminProcessingPanel && (<>
         {track === "facility" && <><SectionTitle>סיבות המתנה</SectionTitle>
-          <div className="pr-row">{facilityAdminWaitReasons.map((r) => <button key={r.id} className={"pr-pick" + (facilityAdminDraft.waitingReason === r.id ? " on" : "")} onClick={() => setFacilityAdminDraft((draft) => ({ ...draft, waitingReason: r.id }))} style={facilityAdminDraft.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <div className="pr-row">{facilityAdminWaitReasons.map((r) => <button key={r.id} className={"pr-pick" + (facilityAdminDraft.waitingReason === r.id ? " on" : "")} onClick={() => selectFacilityWaitingReason(r.id)} style={facilityAdminDraft.waitingReason === r.id ? { background: "#B45309", color: "#fff", borderColor: "#B45309" } : {}}>{r.label}</button>)}</div>
+          <WaitingTargetEditor draft={{ ...facilityAdminDraft, reason: facilityAdminDraft.waitingReason }} onChange={(targetDraft) => setFacilityAdminDraft((draft) => ({ ...draft, ...targetDraft }))} suppliers={waitingSupplierOptions} managers={managerOptions} ticket={ticket} />
           <SectionTitle>שיוך ספק / קבלן</SectionTitle><select className="ta" value={facilityAdminDraft.supplier || ""} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, supplier: ev.target.value }))}><option value="">— טיפול פנימי / ללא ספק —</option>{ticketSupplierSelectOptions.map((n) => <option key={n} value={n}>{n}</option>)}</select><div className="hint">הקריאה נפתחת לספק. כל הטכנאים המשויכים אליו יראו אותה ויוכלו לקבל לטיפול.</div></>}
         <SectionTitle>הערה</SectionTitle>
         {track === "facility" ? <input className="ta" value={facilityAdminDraft.note} onChange={(ev) => setFacilityAdminDraft((draft) => ({ ...draft, note: ev.target.value }))} placeholder="עדכון…" /> : <input className="ta" value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="עדכון…" />}
-        {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={addNote} disabled={!note.trim()}><CheckCircle2 size={16} /> שמירת שינויים</button>{showTransportExecutionToggle && <button className="btn-ghost full" onClick={() => setAdminTransportExecutionOpen((value) => !value)}><Wrench size={15} /> {adminTransportExecutionOpen ? "הסתר פעולות ביצוע חריגות" : "הצג פעולות ביצוע חריגות"}</button>}<button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div>}
+        {track === "facility" ? <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={saveFacilityAdminProcessing} disabled={!facilityAdminProcessingDirty || !facilityAdminWaitingValid}><CheckCircle2 size={16} /> שמירת שינויים</button><button className="btn-ghost full" onClick={cancelFacilityAdminProcessing}><X size={15} /> ביטול ויציאה</button><button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div> : <div style={{ display: "grid", gap: 8, marginTop: 16 }}><button className="btn-primary full" onClick={addNote} disabled={!note.trim()}><CheckCircle2 size={16} /> שמירת שינויים</button>{showTransportExecutionToggle && <button className="btn-ghost full" onClick={() => setAdminTransportExecutionOpen((value) => !value)}><Wrench size={15} /> {adminTransportExecutionOpen ? "הסתר פעולות ביצוע חריגות" : "הצג פעולות ביצוע חריגות"}</button>}<button className="btn-close full" onClick={() => setClosing(true)}><PenLine size={16} /> סגירה סופית ואישור עלות</button></div>}
       </>)}
 
       {role === "admin" && <div className="admin-ticket-manual-shell"><AdminTicketManualPanel ticket={ticket} config={config} session={session} fleet={p.fleet || []} onSave={onUpdate} /></div>}

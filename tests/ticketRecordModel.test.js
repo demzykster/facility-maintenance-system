@@ -38,6 +38,20 @@ describe("ticketRecordModel", () => {
     });
   });
 
+  it("preserves optional waiting target fields in the legacy payload", () => {
+    const ticket = {
+      id: "T-waiting-target",
+      status: "waiting",
+      waitingReason: "supplier",
+      waitingTargetType: "supplier",
+      waitingSupplier: "Quote Co"
+    };
+
+    const row = ticketRecordToSupabaseRow(ticket);
+    expect(row.legacy_payload).toMatchObject(ticket);
+    expect(ticketRecordFromSupabaseRow(row)).toMatchObject(ticket);
+  });
+
   it("maps transport forkliftId into the normalized asset column", () => {
     expect(ticketRecordToSupabaseRow({
       id: "T-210",

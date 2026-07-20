@@ -32,6 +32,14 @@ function waitingUntilTimestamp(value) {
   return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
 }
 
+function waitingUntilInputValue(value) {
+  const timestamp = waitingUntilTimestamp(value);
+  if (timestamp === null) return "";
+  const date = new Date(timestamp);
+  const local = new Date(timestamp - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 export function waitingTargetRequirementForReason(reason = "") {
   const type = TARGET_TYPE_BY_REASON[text(reason)] || WAITING_TARGET_TYPES.none;
   return { required: type !== WAITING_TARGET_TYPES.none, type };
@@ -69,5 +77,43 @@ export function getTicketWaitingTargetState(ticket = {}) {
     requiredType: requirement.type,
     satisfied: !requirement.required || (target.type === requirement.type && target.complete),
     target
+  };
+}
+
+export function ticketWaitingTargetDraft(ticket = {}) {
+  const target = readTicketWaitingTarget(ticket);
+  return {
+    waitingSupplier: target.supplier,
+    waitingUser: target.user,
+    waitingUntil: waitingUntilInputValue(target.until)
+  };
+}
+
+export function buildTicketWaitingTargetPatch(reason = "", draft = {}) {
+  const { type } = waitingTargetRequirementForReason(reason);
+  const patch = {
+    waitingTargetType: type,
+    waitingSupplier: null,
+    waitingUser: null,
+    waitingUntil: null
+  };
+
+  if (type === WAITING_TARGET_TYPES.supplier) {
+    patch.waitingSupplier = text(draft.waitingSupplier);
+  } else if (type === WAITING_TARGET_TYPES.user || type === WAITING_TARGET_TYPES.manager) {
+    patch.waitingUser = waitingUserTarget(draft.waitingUser);
+  } else if (type === WAITING_TARGET_TYPES.date) {
+    patch.waitingUntil = waitingUntilTimestamp(draft.waitingUntil);
+  }
+
+  return patch;
+}
+
+export function validateTicketWaitingTargetDraft(reason = "", draft = {}) {
+  const requirement = waitingTargetRequirementForReason(reason);
+  const target = readTicketWaitingTarget(buildTicketWaitingTargetPatch(reason, draft));
+  return {
+    valid: !requirement.required || (target.type === requirement.type && target.complete),
+    requiredType: requirement.type
   };
 }

@@ -1,7 +1,7 @@
 # Ticket Responsibility Semantic Layer
 
-This note defines the read-only responsibility terms used by `src/ticketResponsibilitySemanticModel.js`.
-It does not introduce a workflow, UI behavior, database field, migration, or routing change.
+This note defines the responsibility terms used by `src/ticketResponsibilitySemanticModel.js` and the optional waiting-target fields used by `src/ticketWaitingTargetModel.js`.
+It does not introduce a new workflow, database migration, routing change, or SLA change.
 
 ## Responsible User
 
@@ -38,11 +38,12 @@ It does not introduce a workflow, UI behavior, database field, migration, or rou
 - `waitBall` gives the current action owner for normal waiting states.
 - `pending_user` is treated as requester approval, not as a generic waiting reason.
 - `requiredTargetType` describes which future target a reason needs: supplier, user, manager, date, or none.
-- Optional `waitingTargetType`, `waitingSupplier`, `waitingUser`, and `waitingUntil` values are read only when they already exist.
+- Optional `waitingTargetType`, `waitingSupplier`, `waitingUser`, and `waitingUntil` values identify the explicit dependency selected with a normal waiting reason.
 - `ticket.supplier` is never used as a fallback for `waitingSupplier`; execution routing and waiting dependencies remain separate.
 - Legacy tickets without target fields remain readable and report an unsatisfied target requirement when the reason needs one.
 
-The target model does not persist these optional fields or make them mandatory. UI validation, storage authority, notifications,
-and transitions require a separately approved workflow change.
+The ticket detail UI requires an explicit target for supplier, manager, requester-confirmation, and scheduled-date waiting reasons. These optional values are persisted inside the existing ticket `legacy_payload`; no schema migration is required. Requester confirmation stores the creator as `waitingUser` only for a normal `waiting` state. The existing `pending_user` completion-approval workflow remains separate and unchanged.
 
-The semantic layer is intentionally read-only so existing transport, facility, supplier routing, SLA, BI, notifications, and AI-created ticket behavior remain unchanged.
+Selecting a waiting supplier does not alter `supplier`, `assignee`, `routedTech`, or `mgrExec`. Selecting a manager does not assign that manager as executor. `waitingUntil` is display-only context and does not alter `dueAt`, SLA calculation, or automatic resume behavior.
+
+Legacy tickets, transport supplier queues, facility supplier routing, BI, notifications, and AI-created ticket behavior remain compatible with the semantic layer.
