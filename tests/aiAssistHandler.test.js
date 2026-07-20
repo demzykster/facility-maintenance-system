@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createAiAssistHandler } from "../server/ai/assistHandler.js";
 import { signCmmsSessionToken } from "../server/session/cmmsSessionToken.js";
 
+const autonomyPermission = { aiAutonomousTicketCreate: "request" };
+
 function createRes() {
   return {
     headers: {},
@@ -102,7 +104,7 @@ describe("AI assist handler", () => {
         CMMS_APP_MODE: "local",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ role: "user" }),
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
       ticketsDriver,
       providerCall,
       now: () => 1000,
@@ -136,6 +138,222 @@ describe("AI assist handler", () => {
     expect(providerCall).not.toHaveBeenCalled();
   });
 
+  it("blocks autonomous create when global flag is on but the server-side user lacks explicit autonomy permission", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = { create: vi.fn() };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: {} }),
+      ticketsDriver,
+      auditDriver,
+      providerCall,
+      now: () => 1001,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        idempotencyKey: "idem-no-perm",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().capabilityResponse).toMatchObject({
+      executionStatus: "permission_denied",
+      unknowns: ["autonomy_permission"]
+    });
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerCall).not.toHaveBeenCalled();
+    expect(auditDriver.write.mock.calls[0][0].metadata).toMatchObject({
+      outcome: "blocked",
+      reason: "permission_denied",
+      autonomyPermissionKey: "aiAutonomousTicketCreate",
+      autonomyPermissionLevel: "none",
+      autonomyPermissionRequired: "request",
+      autonomyPermitted: false,
+      autonomyEffectiveAccess: false
+    });
+  });
+
+  it("does not trust role or permission values supplied in the AI request body", async () => {
+    const providerCall = vi.fn();
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: {} }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1002,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        idempotencyKey: "idem-spoof",
+        role: "admin",
+        permissions: { aiAutonomousTicketCreate: "request" },
+        context: {
+          profile: { role: "admin", permissions: { aiAutonomousTicketCreate: "request" } },
+          fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }],
+          tickets: []
+        }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().capabilityResponse).toMatchObject({
+      executionStatus: "permission_denied",
+      unknowns: ["autonomy_permission"]
+    });
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+    expect(providerCall).not.toHaveBeenCalled();
+  });
+
+  it("keeps autonomous create blocked when the global flag is off even if the user has permission", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-test",
+      text: "הכנתי כרטיס לאישור."
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1003,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("openai");
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
+  it("blocks inactive authenticated users before autonomous permission can be used", async () => {
+    const handler = createAiAssistHandler({
+      sessionClient: sessionClient({ active: false, role: "user", permissions: autonomyPermission }),
+      now: () => 1004,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "app_user_disabled" });
+  });
+
+  it.each([
+    ["worker", { id: "worker-a", role: "worker", permissions: {} }],
+    ["tech", { id: "tech-a", role: "tech", permissions: {} }],
+    ["manager", { id: "manager-no-perm", role: "user", permissions: {} }]
+  ])("blocks %s autonomous create without explicit management permission", async (_label, profile) => {
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient(profile),
+      ticketsDriver,
+      now: () => 1005,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Не работает вентилятор на машине 226",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().capabilityResponse).toMatchObject({
+      executionStatus: "permission_denied",
+      unknowns: ["autonomy_permission"]
+    });
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps facility autonomous requests on the normal no-write provider path", async () => {
+    const providerCall = vi.fn().mockResolvedValue({
+      ok: true,
+      provider: "openai",
+      model: "gpt-test",
+      text: "אפשר להכין קריאת אחזקה לאישור ידני."
+    });
+    const ticketsDriver = { create: vi.fn() };
+    const handler = createAiAssistHandler({
+      env: {
+        CMMS_AI_AUTONOMOUS_TICKET_CREATE: "local",
+        CMMS_TICKET_SERVER_CREATE_V2: "local",
+        CMMS_TICKET_SERVER_CREATE_V2_READY: "local",
+        CMMS_APP_MODE: "local",
+        CMMS_AI_MODE: "server",
+        CMMS_AI_PROVIDER: "openai",
+        OPENAI_API_KEY: "server-secret",
+        CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
+      },
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
+      ticketsDriver,
+      providerCall,
+      now: () => 1006,
+      rateBuckets: new Map()
+    });
+
+    const res = await call(handler, {
+      body: {
+        text: "Создай facility заявку по кондиционеру в офисе",
+        module: "facility",
+        context: { fleet: [{ id: "forklift-226", code: "226", department: "הפצה" }], tickets: [] }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().assistant.provider).toBe("openai");
+    expect(ticketsDriver.create).not.toHaveBeenCalled();
+  });
+
   it("writes an autonomous ticket create audit event for created results without raw request data", async () => {
     const providerCall = vi.fn();
     const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
@@ -156,7 +374,7 @@ describe("AI assist handler", () => {
         CMMS_APP_MODE: "local",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ role: "user" }),
+      sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
       ticketsDriver,
       providerCall,
       auditDriver,
@@ -227,7 +445,7 @@ describe("AI assist handler", () => {
           CMMS_APP_MODE: "local",
           CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
         },
-        sessionClient: sessionClient({ role: "user" }),
+        sessionClient: sessionClient({ role: "user", permissions: autonomyPermission }),
         ticketsDriver: driver,
         auditDriver,
         now: () => now,
@@ -298,7 +516,7 @@ describe("AI assist handler", () => {
         CMMS_APP_MODE: "local",
         CMMS_AI_ASSIST_RATE_LIMIT_MS: "0"
       },
-      sessionClient: sessionClient({ role: "worker", id: "worker-a", department: "הפצה", departments: ["הפצה"] }),
+      sessionClient: sessionClient({ role: "user", id: "manager-a", department: "הפצה", departments: ["הפצה"], permissions: autonomyPermission }),
       ticketsDriver,
       providerCall,
       auditDriver,

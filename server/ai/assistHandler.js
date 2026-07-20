@@ -5,7 +5,7 @@ import { buildAiAssistContext } from "../../src/aiAssistContextModel.js";
 import { AI_PROVIDER_PLAN_SCHEMA, providerPlanPrompt, sanitizeAiProviderPlan } from "../../src/aiAssistProviderPlanModel.js";
 import { AI_ASSIST_WORKFLOWS, aiAssistRoleGuidance, aiAssistWorkflowInstruction, normalizeAiAssistWorkflow } from "../../src/aiAssistWorkflowModel.js";
 import { AI_MODES, aiServerConfigFromEnv, publicAiServerStatusFromEnv } from "../../src/aiProviderModel.js";
-import { autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
+import { aiAutonomousTicketCreateAccessStatus, autonomousTicketCreateEnabled } from "../../src/aiAutonomousCapabilityFlagModel.js";
 import { aiMemoryEffectiveAccess } from "../../src/aiMemoryModel.js";
 import { aiConversationsEffectiveAccess, aiConversationsPilotEnabled, buildAiConversationRecentHistory, normalizeAiConversationMessageInput } from "../../src/aiConversationModel.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
@@ -463,6 +463,7 @@ async function writeAutonomousTicketCreateAudit({
     : {};
   const fact = firstCapabilityFact(capabilityResponse || {});
   const outcome = autonomousTicketCreateOutcome(capabilityResponse || {}, capabilityError);
+  const autonomyAccess = aiAutonomousTicketCreateAccessStatus({ CMMS_AI_AUTONOMOUS_TICKET_CREATE: autonomyConfigured ? "true" : "false" }, authUser);
   await writeAuditEvent(auditDriver, aiAssistAuditEvent({
     draft,
     context,
@@ -478,6 +479,11 @@ async function writeAutonomousTicketCreateAudit({
     ticketNumber: actionResult.ticketNumber || actionResult.ticketNo || "",
     resolvedAssetId: fact.assetId || actionResult.forkliftId || "",
     autonomyConfigured,
+    autonomyPermissionKey: autonomyAccess.permissionKey,
+    autonomyPermissionLevel: autonomyAccess.permissionLevel,
+    autonomyPermissionRequired: autonomyAccess.permissionRequired,
+    autonomyPermitted: autonomyAccess.permitted,
+    autonomyEffectiveAccess: autonomyAccess.effectiveAccess,
     serverCreateReady: ticketCreateStatus?.ready === true,
     serverCreateConfigured: ticketCreateStatus?.configured === true,
     workflow,
@@ -643,6 +649,7 @@ export function createAiAssistHandler({
             context,
             rawContext: body.context,
             text: draft.rawText,
+            module: draft.module,
             now: currentTime
           });
         } catch (error) {

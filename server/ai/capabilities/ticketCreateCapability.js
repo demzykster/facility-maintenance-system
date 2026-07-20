@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { kvWritePermissionError } from "../../kv/permissionPolicy.js";
 import { createTicketRecord } from "../../tickets/ticketCreateDomain.js";
 import { CAPABILITY_RISK, createAiCapabilityRegistry } from "./registry.js";
 import { AI_CAPABILITY_EXECUTION_STATUS, normalizeAiCapabilityResponse } from "../../../src/aiCapabilityResponseModel.js";
+import { aiAutonomousTicketCreatePermitted } from "../../../src/aiAutonomousCapabilityFlagModel.js";
 import {
   SYSTEM_DOWNTIME_NEEDS_TRIAGE,
   ticketCreateContractSummary
@@ -21,7 +21,7 @@ const cleanObject = (value) => value && typeof value === "object" && !Array.isAr
 const CREATE_INTENT_RE = /(заявк|тикет|создай|создать|открой|открыть|פתח|תפתח|צור|קריאה|create|open|ticket|request|report)/iu;
 const PROBLEM_RE = /(не\s+работ|сломал|полом|проблем|בעיה|תקלה|לא\s+עובד|broken|not\s+working|fault|problem)/iu;
 const RECURRENCE_RE = /(снова|опять|та\s+же|уже\s+открывал|כבר|שוב|again|same\s+issue|already\s+opened)/iu;
-const DANGEROUS_RE = /(тормоз|дым|искра|искрен|не\s+едет|утеч|подъ[её]м|בלמ|עשן|ניצו|לא\s+נוסע|דליפ|הרמה|brake|smoke|spark|won'?t\s+move|leak|lift)/iu;
+const DANGEROUS_RE = /(тормоз|дым|искра|искрен|не\s+едет|утеч|подъ[её]м|בלמ|עשן|ניצו|לא\s+נוסע|דליפ|הרמה|brake|smoke(?!\s+test)|spark|won'?t\s+move|leak|lift)/iu;
 
 function wordsForDisplay(text = "") {
   return cleanText(text, 120)
@@ -350,6 +350,7 @@ export function createTicketCreateCapability({ driver = null } = {}) {
       const user = cleanObject(executionContext.user);
       const context = cleanObject(executionContext.context);
       const text = cleanText(args.text || executionContext.text, 1200);
+      const module = cleanText(executionContext.module, 80).toLowerCase();
       const now = Number.isFinite(Number(executionContext.now)) ? Number(executionContext.now) : Date.now();
       const reads = createAiCapabilityRegistry(createTicketReadCapabilities());
       const toolResults = [];
@@ -369,12 +370,20 @@ export function createTicketCreateCapability({ driver = null } = {}) {
         });
       }
 
-      const permissionError = kvWritePermissionError(user, "ticket:ai-create-probe");
-      if (permissionError) {
+      if (module && module !== "transport" && module !== "unknown") {
+        return normalizeAiCapabilityResponse({
+          answer: "",
+          unknowns: ["module"],
+          toolResults,
+          executionStatus: AI_CAPABILITY_EXECUTION_STATUS.featureDisabled
+        });
+      }
+
+      if (!aiAutonomousTicketCreatePermitted(user)) {
         return createBlockingResponse({
-          answer: "אין לך הרשאה לפתוח קריאה.",
+          answer: "אין לך הרשאה לפתוח קריאה אוטונומית דרך AI.",
           question: "",
-          unknowns: ["permission"],
+          unknowns: ["autonomy_permission"],
           toolResults,
           status: AI_CAPABILITY_EXECUTION_STATUS.permissionDenied
         });

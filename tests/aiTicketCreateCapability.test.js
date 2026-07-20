@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTicketCreateCapability } from "../server/ai/capabilities/ticketCreateCapability.js";
 
-const user = { id: "u1", role: "user", name: "Vadim", department: "Ops" };
+const autonomyPermission = { aiAutonomousTicketCreate: "request" };
+const user = { id: "u1", role: "user", name: "Vadim", department: "Ops", permissions: autonomyPermission };
 const fleet226 = { id: "forklift-226", code: "226", supplier: "LiftCo", department: "Ops", status: "active" };
 
 function capability(driver = null) {
@@ -26,6 +27,7 @@ async function execute(text, options = {}) {
     context: options.context || { fleet: [fleet226], tickets: options.tickets || [] },
     rawContext: options.rawContext || {},
     text,
+    module: options.module || "transport",
     now: 1000
   });
   return { result, driver };
@@ -55,6 +57,25 @@ describe("AI ticket.create capability", () => {
       "get_ticket_create_contract"
     ]);
     expect(JSON.stringify(driver.create.mock.calls[0][0])).not.toMatch(/мотор|ремень|перегрев/i);
+  });
+
+  it("does not create facility tickets through the transport-only autonomous capability", async () => {
+    const { result, driver } = await execute("Создай facility заявку по кондиционеру в офисе", {
+      module: "facility",
+      rawContext: { currentEntity: fleet226 }
+    });
+
+    expect(result.executionStatus).toBe("feature_disabled");
+    expect(result.unknowns).toContain("module");
+    expect(driver.create).not.toHaveBeenCalled();
+  });
+
+  it("treats controlled smoke test wording as a rollout label, not a smoke hazard", async () => {
+    const { result, driver } = await execute("Создай тестовую транспортную заявку для 226: Controlled autonomous AI smoke test.");
+
+    expect(result.executionStatus).toBe("created");
+    expect(result.actionResult).toMatchObject({ ticketId: "ticket-226", ticketNumber: "T-1842" });
+    expect(driver.create).toHaveBeenCalledTimes(1);
   });
 
   it("looks up open tickets only for recurrence wording and still blocks dangerous safety cases", async () => {
@@ -119,11 +140,8 @@ describe("AI ticket.create capability", () => {
     expect(driver.create).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["worker", { id: "worker-a", role: "worker", name: "Worker A", department: "Ops" }],
-    ["user", { id: "user-a", role: "user", name: "User A", department: "Ops", departments: ["Ops"] }],
-    ["tech", { id: "tech-a", role: "tech", name: "Tech A", department: "Ops", departments: ["Ops"] }]
-  ])("blocks %s autonomous create for assets outside the filtered fleet", async (_role, scopedUser) => {
+  it("blocks a permitted manager from creating for assets outside the filtered fleet", async () => {
+    const scopedUser = { id: "user-a", role: "user", name: "User A", department: "Ops", departments: ["Ops"], permissions: autonomyPermission };
     const outsideAsset = { id: "forklift-999", code: "999", supplier: "OtherCo", department: "Other", status: "active" };
     const { result, driver } = await execute("Не работает вентилятор", {
       user: scopedUser,
@@ -148,7 +166,7 @@ describe("AI ticket.create capability", () => {
   });
 
   it("lets admin create for an asset visible in admin filtered context", async () => {
-    const admin = { id: "admin-1", role: "admin", name: "Admin" };
+    const admin = { id: "admin-1", role: "admin", name: "Admin", permissions: autonomyPermission };
     const { result, driver } = await execute("Не работает вентилятор", {
       user: admin,
       context: { fleet: [fleet226], tickets: [] },
@@ -160,6 +178,19 @@ describe("AI ticket.create capability", () => {
       createdBy: expect.objectContaining({ id: "admin-1", role: "admin" }),
       forkliftId: "forklift-226"
     }), expect.objectContaining({ actorId: "admin-1" }));
+  });
+
+  it("lets an executive with explicit autonomy permission create a transport ticket", async () => {
+    const executive = { id: "exec-1", role: "executive", name: "Executive", permissions: autonomyPermission };
+    const { result, driver } = await execute("Не работает вентилятор на машине 226", {
+      user: executive
+    });
+
+    expect(result.executionStatus).toBe("created");
+    expect(driver.create).toHaveBeenCalledWith(expect.objectContaining({
+      createdBy: expect.objectContaining({ id: "exec-1", role: "executive" }),
+      forkliftId: "forklift-226"
+    }), expect.objectContaining({ actorId: "exec-1" }));
   });
 
   it("takes actor and system fields from the authenticated session and server payload only", async () => {
@@ -195,12 +226,19 @@ describe("AI ticket.create capability", () => {
     expect(options).toMatchObject({ actorId: "u1" });
   });
 
-  it("denies users who cannot create tickets", async () => {
-    const { result, driver } = await execute("Не работает вентилятор на машине 226", {
-      user: { id: "cleaner-1", role: "cleaner", name: "Cleaner" }
-    });
+  it.each([
+    ["admin without explicit autonomy permission", { id: "admin-no-perm", role: "admin", name: "Admin" }, "autonomy_permission"],
+    ["manager without explicit autonomy permission", { id: "manager-no-perm", role: "user", name: "Manager" }, "autonomy_permission"],
+    ["worker without autonomy permission", { id: "worker-1", role: "worker", name: "Worker" }, "autonomy_permission"],
+    ["tech without autonomy permission", { id: "tech-1", role: "tech", name: "Tech" }, "autonomy_permission"],
+    ["worker with accidental autonomy permission", { id: "worker-2", role: "worker", name: "Worker", permissions: autonomyPermission }, "autonomy_permission"],
+    ["tech with accidental autonomy permission", { id: "tech-2", role: "tech", name: "Tech", permissions: autonomyPermission }, "autonomy_permission"],
+    ["inactive manager with autonomy permission", { id: "inactive-1", role: "user", name: "Inactive", active: false, permissions: autonomyPermission }, "autonomy_permission"]
+  ])("denies %s before persistence", async (_label, scopedUser, unknown) => {
+    const { result, driver } = await execute("Не работает вентилятор на машине 226", { user: scopedUser });
 
     expect(result.executionStatus).toBe("permission_denied");
+    expect(result.unknowns).toContain(unknown);
     expect(driver.create).not.toHaveBeenCalled();
   });
 
