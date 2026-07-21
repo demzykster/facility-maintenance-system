@@ -3950,14 +3950,14 @@ function PublicReport({ zones, onSubmit, onClose, scannedZoneId = "", allowManua
         <div className="pub-sub">{t("public.scanRequired")}</div>
         {active.length === 0 ? <div className="note">{t("public.noZones")}</div>
           : <><button className="btn-primary full pub-scan-btn" onClick={() => { setErr(""); setShowScanner(true); }}><Camera size={16} /> {t("cleaningQr.scanButton")}</button><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setErr(""); setShowManual((v) => !v); }}>{t("cleaningQr.manualToggle")}</button>{showManual && <div className="field" style={{ marginTop: 8 }}><span>{t("cleaningQr.manualLabel")}</span><input value={manualCode} onChange={(e) => { setManualCode(e.target.value); setErr(""); }} placeholder={t("cleaningQr.manualPlaceholder")} /><button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={submitManualQr}>{t("cleaningQr.manualSubmit")}</button></div>}{allowManualZonePick ? <div className="pub-zones">{active.map((z) => <button key={z.id} className="pub-zone" onClick={() => setZone(z)}><div className="pub-zone-n">{z.name}</div><div className="pub-zone-l">{zoneLoc(z) || "—"}</div></button>)}</div> : <div className="note">{scannedZoneId ? t("public.wrongQr") : t("public.qrOnly")}</div>}</>}
-        {err && <div className="err">{err}</div>}
+        {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
       </> : <>
         <div className="pub-title">{zone.name}</div>
         <div className="pub-sub">{zoneLoc(zone) || ""}</div>
         <div className="field"><span>{t("public.problem")}</span><div className="pub-chips">{ANON_PROBLEMS.map((p) => <button key={p.label} className={"pub-chip" + (prob === p ? " on" : "")} onClick={() => { setProb(p); setErr(""); }}>{p.label}</button>)}</div></div>
         <div className="field"><span>{t("public.photoRequired")}</span><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => grab(e.target.files?.[0])} />{photo ? <div className="photo-prev"><img src={photo} alt="" /><button className="photo-x" onClick={() => setPhoto(null)}><X size={16} /></button></div> : <button className="photo-add" onClick={() => fileRef.current?.click()}><Camera size={20} /> {t("public.addPhoto")}</button>}</div>
         <label className="field"><span>{t("public.detailsOptional")}</span><input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("public.detailsPlaceholder")} /></label>
-        {err && <div className="err">{err}</div>}
+        {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
         <button className="btn-primary full" onClick={submit} disabled={busy}>{t("public.submit")}</button>
         <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setZone(null); setProb(null); setPhoto(null); setText(""); }}>{t("common.back")}</button>
         <div className="pub-foot">{t("public.approvalFoot")}</div>
@@ -4313,7 +4313,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <div className="hint" style={{ marginBottom: 10 }}>נדרש להגדיר סיסמה חדשה לפני כניסה למערכת.</div>
           <label className="field"><span>{t("login.newPassword")}</span><input className="ltr-input" dir="ltr" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" placeholder="לפחות 6 תווים" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} autoFocus /><div className="hint">לפחות 6 תווים. מומלץ לשלב אות גדולה או סימן, אבל אין דרישת מורכבות קשיחה.</div></label>
           <label className="field"><span>{t("login.confirmPassword")}</span><input className="ltr-input" dir="ltr" value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" placeholder="הקלידו שוב" onKeyDown={(e) => e.key === "Enter" && submitNewPassword()} /></label>
-          {err && <div className="err">{err}</div>}
+          {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button className="btn-primary full" onClick={submitNewPassword} disabled={busy}>{busy ? "שומר…" : t("login.saveAndEnter")}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setPasswordChange(null); setResolved(null); setPassword(""); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : initialSetup ? (<>
@@ -4321,14 +4321,14 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <div className="hint" style={{ marginBottom: 10 }}>שלום {initialSetup.user?.name || ""}. הגדירו {isPasswordActivationRole(initialSetup.user?.role) ? "סיסמה אישית" : "קוד אישי"} לכניסה עם {initialSecretIdentifierLabel()} <bdi dir="ltr">{initialSecretIdentifierValue()}</bdi>.</div>
           <label className="field"><span>{isPasswordActivationRole(initialSetup.user?.role) ? "סיסמה חדשה" : "קוד אישי חדש"}</span><input className="ltr-input" dir="ltr" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setErr(""); }} type="password" inputMode={isPasswordActivationRole(initialSetup.user?.role) ? undefined : "numeric"} placeholder="" onKeyDown={(e) => e.key === "Enter" && submitInitialSecret()} autoFocus /></label>
           <label className="field"><span>{isPasswordActivationRole(initialSetup.user?.role) ? "אישור סיסמה" : "אישור קוד"}</span><input className="ltr-input" dir="ltr" value={newPasswordConfirm} onChange={(e) => { setNewPasswordConfirm(e.target.value); setErr(""); }} type="password" inputMode={isPasswordActivationRole(initialSetup.user?.role) ? undefined : "numeric"} placeholder="" onKeyDown={(e) => e.key === "Enter" && submitInitialSecret()} /></label>
-          {err && <div className="err">{err}</div>}
+          {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button className="btn-primary full" onClick={submitInitialSecret} disabled={busy}>{busy ? "שומר…" : "שמירה וכניסה"}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setInitialSetup(null); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : !resolved ? (<>
           <div className="login-q">{t("login.title")}</div>
           <label className="field login-identity-field"><span>{t("login.identity")}</span><div className="login-input-wrap"><User size={17} aria-hidden="true" /><input className="ltr-input" dir="ltr" value={identifier} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" autoComplete="username" name="login-identifier" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} autoFocus /></div></label>
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
-          {err && <div className="err">{err}</div>}
+          {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button type="button" className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
         </>) : (<>
           <div className="login-q">{t("login.hello", { name: resolved.user.name })}</div>
@@ -4336,7 +4336,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           {resolved.auth === "password" ? <label className="field"><span>{t("login.password")}</span><input className="ltr-input" dir="ltr" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>
             : <label className="field"><span>{t("login.pinCode")}</span><input className="ltr-input" dir="ltr" value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
           <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
-          {err && <div className="err">{err}</div>}
+          {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? t("login.connecting") : t("login.signIn")}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>{t("login.back")}</button>
         </>)}
@@ -5643,9 +5643,9 @@ function QRScannerOverlay({ onScan, onCancel, onManual }) {
     const timeout = setTimeout(() => alive && setTimedOut(true), 15000);
     return () => { alive = false; clearTimeout(timeout); stop(); };
   }, [onScan]);
-  return <div className="qr-overlay">
+  return <div className="qr-overlay" role="dialog" aria-modal="true" aria-label="סריקת QR של האזור">
     <div className="qr-viewfinder">
-      <video ref={videoRef} playsInline muted />
+      <video ref={videoRef} playsInline muted aria-label="תצוגת מצלמה לסריקת QR" />
       <canvas ref={canvasRef} style={{ display: "none" }} />
       <div className="qr-frame"><span /></div>
     </div>
@@ -5654,8 +5654,8 @@ function QRScannerOverlay({ onScan, onCancel, onManual }) {
       <span>{err || (timedOut ? "לא מצליח לסרוק?" : "כוונו את המצלמה לקוד ה-QR")}</span>
     </div>
     <div className="qr-btns">
-      <button className="btn-primary" onClick={onManual}>לא מצליח לסרוק</button>
-      <button className="btn-ghost" onClick={onCancel}>ביטול</button>
+      <button type="button" className="btn-primary" onClick={onManual}>לא מצליח לסרוק</button>
+      <button type="button" className="btn-ghost" onClick={onCancel}>ביטול</button>
     </div>
   </div>;
 }
@@ -8193,6 +8193,7 @@ a{color:inherit;}
 .login-visual-copy b{font-family:var(--font-head);font-size:30px;line-height:1.12;font-weight:750;}
 .login-public-panel{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:26px;background:var(--surface);}
 .login-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:2px;}
+.login-toolbar .language-picker{margin:0;}
 .login-card{background:var(--surface);color:var(--ink);border-radius:20px;padding:26px 22px;width:100%;max-width:none;box-shadow:0 0 0 1px rgba(201,205,209,.64),var(--control-shadow);}
 .login-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
 .login-theme{width:44px;height:44px;border-radius:11px;color:var(--muted);background:var(--surface-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -8228,6 +8229,8 @@ a{color:inherit;}
 .login-foot{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.45;}
 .login-foot>span{display:block;}
 .login-credit{opacity:.58;}
+.app-dark .login-shell{background:rgba(27,32,39,.78);border-color:rgba(52,59,69,.88);box-shadow:0 24px 70px rgba(0,0,0,.38);}
+.app-dark .login-visual{background-image:linear-gradient(90deg,rgba(4,8,13,.82),rgba(4,8,13,.32)),url("/visuals/warehouse-entry.jpg");}
 .install-prompt{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:9px;margin-top:12px;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--ink);text-align:start;}
 .install-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(31,78,140,.09);color:var(--primary);flex-shrink:0;}
 .install-copy{min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.35;}
@@ -8246,6 +8249,10 @@ a{color:inherit;}
   .login-visual-copy b{font-size:21px;}.login-visual-copy span{font-size:10px;}
   .login-public-panel{padding:18px 16px calc(22px + env(safe-area-inset-bottom));justify-content:flex-start;}
   .login-card{border-radius:18px;padding:22px 18px;}
+}
+@media (min-width:861px) and (max-height:760px){
+  .login-visual{min-height:540px;}
+  .login-public-panel{padding:22px;}
 }
 
 .field{display:block;margin-bottom:15px;}
@@ -9036,6 +9043,10 @@ body.modal-open .ai-fab,body.modal-open .fab{pointer-events:none;}
 .qr-copy{text-align:center;margin:18px 0 12px;display:flex;flex-direction:column;gap:5px;}
 .qr-copy b{font-size:18px;}.qr-copy span{font-size:13px;color:#CBD5E1;}
 .qr-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:min(82vw,360px);}
+@media(max-width:520px){
+  .qr-overlay{padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));}
+  .qr-btns .btn-primary,.qr-btns .btn-ghost{min-height:44px;}
+}
 .scan-required,.manual-entry,.scan-public{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center;}
 .manual-entry{text-align:start;}
 .done-hero{display:flex;align-items:center;gap:12px;background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;border-radius:14px;padding:14px;margin-bottom:14px;font-weight:800;}
@@ -9220,6 +9231,10 @@ body *{visibility:hidden!important;}
 .pub-entry small{display:block;margin-top:2px;font-size:12px;font-weight:600;line-height:1.35;color:var(--muted);overflow-wrap:anywhere;}
 .pub-wrap{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;}
 .pub-card{position:relative;width:100%;max-width:420px;background:var(--surface);border-radius:18px;padding:22px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:cmmsSurfaceIn 220ms var(--ease-out) both;will-change:transform,opacity;}
+@media(max-width:520px){
+  .pub-wrap{padding:12px 12px calc(12px + env(safe-area-inset-bottom));}
+  .pub-card{margin:auto 0;border-radius:16px;padding:20px 18px;max-width:100%;}
+}
 .pub-x{position:absolute;inset-inline-end:12px;top:12px;}
 .pub-logo{width:52px;height:52px;border-radius:14px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
 .pub-title{font-size:20px;font-weight:800;}

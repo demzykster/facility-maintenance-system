@@ -81,3 +81,10 @@ Each exception must include:
 - Why necessary: the heatmap `תחום` cell still uses shell-hosted styles, and the owner-reported Chrome/Safari regression required a bounded card layout so title, risk tags, and the AI chip no longer collapse into one compressed RTL row.
 - Why extraction was not the right move: BI rendering and smoke coverage remain in extracted BI files and tooling; moving the shared shell stylesheet into a BI CSS slice would be broader than this browser compatibility fix.
 - Follow-up/removal condition: when BI styles move into a BI module stylesheet or CSS slice, move these heatmap domain-cell rules with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-21
+- Owner goal: Ogen safe visual refinement for public entry screen, ticket cards, and responsive UI.
+- New line count: 10026.
+- Why necessary: the public entry shell, QR scanner overlay, and shared ticket-card presentation styles still live in `src/ClaudeMaintenanceApp.jsx`; this goal adds a local warehouse visual, responsive/safe-area constraints, focus/alert affordances, and compact card presentation without changing auth, scanner, ticket semantics, SLA, or workflow behavior.
+- Why extraction was not the right move: extracting the login/public-report surface or the shared ticket card would be a broader vertical-slice task than this bounded visual refinement; the goal intentionally leaves existing data contracts, handlers, semantic helpers, and API calls in place.
+- Follow-up/removal condition: when public entry, public cleaning report, and ticket-card surfaces move into dedicated modules/stylesheets, move these presentation rules with those modules and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

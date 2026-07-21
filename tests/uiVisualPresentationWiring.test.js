@@ -38,6 +38,10 @@ describe("safe visual presentation wiring", () => {
 
   it("adds presentation-only accessibility and wrapping affordances", () => {
     expect(appSource).toContain("aria-label={`${ticketNo(t)} · ${t.subject || \"קריאה\"}`}");
+    expect(appSource).toContain('role="dialog" aria-modal="true" aria-label="סריקת QR של האזור"');
+    expect(appSource).toContain('role="alert" aria-live="polite"');
+    expect(appSource).toContain(".app-dark .login-shell");
+    expect(appSource).toContain("env(safe-area-inset-bottom)");
     expect(appSource).toContain(".tcard:focus-visible");
     expect(appSource).toContain("-webkit-line-clamp:2");
     expect(appSource).toContain("overflow-x:hidden");
