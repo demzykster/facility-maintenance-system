@@ -8,6 +8,7 @@ describe("Vercel API route policy", () => {
     expect(VERCEL_API_ROUTE_FILES).toContain("api/brand-icon.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/[diagnostic].js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/cleaning/records.js");
+    expect(VERCEL_API_ROUTE_FILES).toContain("api/health.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/manifest.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/presence/index.js");
     expect(VERCEL_API_ROUTE_FILES).toContain("api/ppe/index.js");
@@ -62,6 +63,6 @@ describe("Vercel API route policy", () => {
     ]);
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toContain("api_route_count_exceeds_limit:33/24");
+    expect(result.errors).toContain("api_route_count_exceeds_limit:34/24");
   });
 });
