@@ -1,0 +1,39 @@
+name: Manual Health Monitor
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Base URL to check, for example https://example.vercel.app"
+        required: true
+        type: string
+
+jobs:
+  health-check:
+    name: Manual health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      INPUT_HEALTH_URL: ${{ inputs.url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run manual health smoke
+        run: |
+          HEALTH_URL="$INPUT_HEALTH_URL"
+          if [ -z "$HEALTH_URL" ]; then
+            echo "Provide a URL input."
+            exit 1
+          fi
+          npm run health:check -- --url "$HEALTH_URL" --timeout 5000
