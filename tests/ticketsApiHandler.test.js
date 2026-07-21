@@ -965,7 +965,7 @@ describe("tickets API handler", () => {
   });
 
   it("allows manager rework to return transport tickets to the accepted technician", async () => {
-    const existing = ticketRecord({ id: "T-rework-return", status: "pending_user", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true });
+    const existing = ticketRecord({ id: "T-rework-return", status: "pending_user", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
     const driver = {
       get: vi.fn().mockResolvedValue(existing),
       upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
@@ -995,6 +995,313 @@ describe("tickets API handler", () => {
       routedTech: true,
       returned: true
     }));
+  });
+
+  it("allows an eligible supplier technician to accept a transport ticket through the API", async () => {
+    const existing = ticketRecord({ id: "T-accept", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "", routedTech: true });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const token = signCmmsSessionToken("tech-sharon", "tech", "", "session-secret", Date.now()).token;
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      pinSessionClient: pinSessionClientFor({ id: "tech-sharon", name: "Sharon", supplier: "Toyota", techScope: "transport" }),
+      env: { CMMS_SESSION_SECRET: "session-secret", CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "in_progress", assignee: "Sharon" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "T-accept",
+      status: "in_progress",
+      assignee: "Sharon",
+      supplier: "Toyota"
+    }));
+  });
+
+  it("rejects transport acceptance by a manager before supplier technician acceptance", async () => {
+    const existing = ticketRecord({ id: "T-manager-accept", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "manager-1", role: "user", name: "Manager", dept: "Ops", departments: ["Ops"], permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "in_progress", assignee: "Manager" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "transport_acceptance_actor_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects transport acceptance when the technician assigns another person", async () => {
+    const existing = ticketRecord({ id: "T-assignee-mismatch", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "", routedTech: true });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const token = signCmmsSessionToken("tech-sharon", "tech", "", "session-secret", Date.now()).token;
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      pinSessionClient: pinSessionClientFor({ id: "tech-sharon", name: "Sharon", supplier: "Toyota", techScope: "transport" }),
+      env: { CMMS_SESSION_SECRET: "session-secret", CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "in_progress", assignee: "Dana" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "transport_acceptance_assignee_mismatch" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects admin attempts to imitate supplier technician acceptance", async () => {
+    const existing = ticketRecord({ id: "T-admin-accept", status: "new", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "", routedTech: true });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", name: "Admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "in_progress", assignee: "Admin" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "transport_acceptance_actor_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks direct API rework reassignment to a different transport technician", async () => {
+    const existing = ticketRecord({ id: "T-rework-hijack", status: "pending_user", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "manager-1", role: "user", name: "Manager", dept: "Ops", departments: ["Ops"], permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "in_progress", assignee: "Dana", returned: true }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_rework_assignee_change_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks technician cancellation of active tickets through the API", async () => {
+    const existing = ticketRecord({ id: "T-tech-cancel", status: "in_progress", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const token = signCmmsSessionToken("tech-sharon", "tech", "", "session-secret", Date.now()).token;
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      pinSessionClient: pinSessionClientFor({ id: "tech-sharon", name: "Sharon", supplier: "Toyota", techScope: "transport" }),
+      env: { CMMS_SESSION_SECRET: "session-secret", CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: `Bearer ${token}` },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "cancelled" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_transition_technician_cancel_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("allows an authorized admin cancellation and records update audit", async () => {
+    const existing = ticketRecord({ id: "T-admin-cancel", status: "in_progress", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const auditDriver = { write: vi.fn().mockResolvedValue(undefined) };
+    const handler = createTicketsApiHandler({
+      driver,
+      auditDriver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", name: "Admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "cancelled" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "T-admin-cancel", status: "cancelled" }));
+    expect(auditDriver.write).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "admin-1",
+      action: "update"
+    }));
+  });
+
+  it("requires the actual manager owner for direct API approval", async () => {
+    const existing = ticketRecord({ id: "T-approval-owner", status: "pending_user", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "manager-2", role: "user", name: "Other Manager", dept: "Ops", departments: ["Ops"], permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "pending_admin" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_transition_manager_ownership_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks admin approval shortcuts before final closure", async () => {
+    const existing = ticketRecord({ id: "T-admin-shortcut", status: "pending_user", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", name: "Admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "pending_admin" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_admin_shortcut_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks admin shortcuts from active work directly to pending admin", async () => {
+    const existing = ticketRecord({ id: "T-admin-active-shortcut", status: "in_progress", track: "transport", forkliftId: "fork-ops", supplier: "Toyota", assignee: "Sharon", routedTech: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn(),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      fleetDriver: { list: vi.fn().mockResolvedValue([{ id: "fork-ops", depts: ["Ops"], supplier: "Toyota" }]) },
+      sessionClient: sessionClientFor({ id: "admin-1", role: "admin", name: "Admin", permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "pending_admin" }
+      }
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "ticket_admin_shortcut_forbidden" });
+    expect(driver.upsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps ordinary facility execution updates out of the transport acceptance guard", async () => {
+    const existing = ticketRecord({ id: "F-manager-exec", status: "new", track: "facility", assignee: "Manager", mgrExec: true, createdBy: { id: "manager-1", name: "Manager", role: "user", dept: "Ops" } });
+    const driver = {
+      get: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockImplementation(async (ticket) => ({ legacy_payload: ticket })),
+      create: vi.fn()
+    };
+    const handler = createTicketsApiHandler({
+      driver,
+      sessionClient: sessionClientFor({ id: "manager-1", role: "user", name: "Manager", dept: "Ops", departments: ["Ops"], permissions: { tickets: "manage" } }),
+      env: { CMMS_TICKET_SERVER_CREATE_V2: "true" }
+    });
+
+    const res = await call(handler, {
+      headers: { authorization: "Bearer user-token" },
+      body: {
+        operation: "update",
+        ticket: { ...existing, status: "in_progress" }
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(driver.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "F-manager-exec", status: "in_progress", track: "facility" }));
   });
 
   it("updates existing normalized tickets through the old upsert branch when cutover is disabled", async () => {

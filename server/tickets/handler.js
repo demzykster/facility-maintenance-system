@@ -135,6 +135,19 @@ const ticketWriteOperation = (body = {}, req = {}) => {
 
 const ticketNumberNamespace = (ticket = {}) => (ticket?.track === "transport" || (!ticket?.track && ticket?.forkliftId)) ? "T" : "F";
 
+const lifecycleErrorStatus = (error = "") => {
+  const code = String(error || "");
+  if (code.startsWith("ticket_transition_required_fields_missing")) return 400;
+  if (code.includes("role_forbidden")
+    || code.includes("actor_forbidden")
+    || code.includes("supplier_mismatch")
+    || code.includes("assignee")
+    || code.includes("manager_ownership")
+    || code.includes("technician_cancel")
+    || code.includes("admin_shortcut")) return 403;
+  return 409;
+};
+
 const ticketWithLegacyNumber = async (driver, ticket = {}) => {
   if (Number.isFinite(Number(ticket.num))) return ticket;
   if (typeof driver?.list !== "function") throw new Error("tickets_read_not_configured");
@@ -290,8 +303,16 @@ export function createTicketsApiHandler({ driver = null, auditDriver = null, met
         const permissionError = kvWritePermissionError(auth.user, `ticket:${ticket.id}`);
         if (permissionError) return json(res, 403, { error: permissionError });
         const nextTicket = mergeTicketUpdateWithExisting(ticket.legacyPayload, existing);
-        const transitionError = ticketLifecycleTransitionError(auth.user, existing, nextTicket);
-        if (transitionError) return json(res, transitionError.includes("role_forbidden") ? 403 : 409, { error: transitionError });
+        let lifecycleFleet = [];
+        if (typeof backendFleetDriver?.list === "function") {
+          try {
+            lifecycleFleet = await backendFleetDriver.list({ limit: 2000 });
+          } catch {
+            lifecycleFleet = [];
+          }
+        }
+        const transitionError = ticketLifecycleTransitionError(auth.user, existing, nextTicket, { fleet: lifecycleFleet });
+        if (transitionError) return json(res, lifecycleErrorStatus(transitionError), { error: transitionError });
         const next = normalizeTicketRecord(nextTicket);
         const stored = await backendDriver.upsert(next.legacyPayload);
         const storedTicket = stored?.legacy_payload ? normalizeTicketRecord(stored.legacy_payload).legacyPayload : next.legacyPayload;
