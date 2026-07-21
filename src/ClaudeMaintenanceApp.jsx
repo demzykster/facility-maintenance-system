@@ -84,6 +84,7 @@ import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } f
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { normalizeTransportCreateResponsibility, ticketHolderLabel, transportTechnicianAssignee } from "./ticketResponsibilityModel.js";
 import { ticketListCardSemantics } from "./ticketListSemanticModel.js";
+import { ticketNextResponsibilityKey } from "./ticketNextResponsibilityModel.js";
 import { supplierCandidatesForTicket, supplierHasFacilityCategory, supplierHasPpeScope, supplierHasTransportScope, supplierMeta as supMeta, supplierTypeFromMeta } from "./ticketSupplierFilterModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
@@ -1019,25 +1020,8 @@ const unitBlock = (f, tickets, cfg) => { if (!f) return null; const bs = (ticket
 // השבתה ידנית = פתיחת קריאת שינוע ברמה חוסמת. החזרה לשירות = סימון backInServiceAt על כל הקריאות החוסמות (הטיפול בקריאה עצמה נמשך).
 const buildBlockTicket = (f, cfg, by, reason) => { const now = Date.now(); const lvl = dtLevels(cfg).find((d) => d.oos) || DOWNTIME[2]; const rsn = (reason || "").trim(); return { id: uid(), track: "transport", subject: `השבתת כלי · ${f.code}`, category: "transport", priority: lvl.prio || "high", zone: "רחבת מלגזות", asset: f.code, forkliftId: f.id, downtimeType: lvl.id, wearType: null, description: rsn || "הכלי הושבת ידנית — אין להשתמש בו עד לתיקון.", status: "new", assignee: "", routedTech: true, supplier: f.supplier || "", downtimeStart: now, downtimeEnd: null, createdBy: { name: by.name, role: by.role }, createdAt: now, updatedAt: now, dueAt: now + slaForTicket({ track: "transport", forkliftId: f.id, priority: lvl.prio || "high" }, cfg, [f]) * 3600000, hasPhoto: false, closure: null, log: [{ at: now, by: by.name, byRole: by.role, text: `הכלי הושבת ידנית${f.supplier ? " · ספק: " + f.supplier : ""}${rsn ? " · סיבה: " + rsn : ""}`, kind: "open" }] }; };
 const clearBlockPatches = (f, tickets, cfg, by) => { const now = Date.now(); return (tickets || []).filter((t) => t.forkliftId === f.id && ticketBlocks(t, cfg)).map((t) => ({ ...t, backInServiceAt: now, updatedAt: now, log: [...(t.log || []), { at: now, by: by.name, byRole: by.role, text: "הכלי הוחזר לשירות (ידנית) — הטיפול בקריאה נמשך", kind: "other" }] })); };
-// Жёсткая модель: чей сейчас «мяч» (кто должен действовать). Единый источник правды для всех экранов.
-const ballIn = (t) => {
-  const track = t.track || (t.forkliftId ? "transport" : "facility");
-  const exec = t.mgrExec ? "manager" : "tech"; // кто исполнитель: менеджер (по зданию) или техник
-  switch (t.status) {
-    case "new": case "in_progress": case "waiting":
-      // Во время ожидания мяч определяется причиной (waitBall, записан при установке причины). Старые заявки: no_equipment→менеджер.
-      if (t.status === "waiting") { const wb = t.waitBall || (t.waitingReason === "no_equipment" ? "manager" : "executor"); if (wb === "manager") return "manager"; if (wb === "admin") return "admin"; }
-      // facility-заявка на админском маршруте остаётся у админа, даже если выбран поставщик.
-      // НО возвращённая заявка (t.returned) уже была у исполнителя — её НЕ диспетчеризуем заново через админа.
-      if (track === "facility" && !t.routedTech && !t.mgrExec && !t.returned) return "admin";
-      return exec;
-    case "pending_user": return "manager";
-    case "pending_admin": return "admin";
-    case "pending_manager": return "manager"; // דיווח עובד — ממתין לאישור מנהל המחלקה
-    case "rework": return "none";              // הוחזר לעובד — מחוץ למשפך עד שליחה חוזרת
-    default: return "none"; // done / cancelled
-  }
-};
+// Legacy compact key for older dashboards; source is the semantic lifecycle/execution/waiting model.
+const ballIn = (t) => ticketNextResponsibilityKey(t);
 // «у кого мяч» — кто сейчас держит заявку, для отображения на карточке
 const ballHolder = (t, fleet = []) => {
   const who = ballIn(t);
