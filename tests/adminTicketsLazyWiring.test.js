@@ -15,6 +15,9 @@ describe("admin ticket list lazy wiring", () => {
   it("keeps ticket filtering and export behavior in the lazy screen module", () => {
     expect(adminTicketsSource).toContain("export function AdminTickets(");
     expect(adminTicketsSource).toContain("ticketLifecycleSummary");
+    expect(adminTicketsSource).toContain("semanticTicketListGroups");
+    expect(adminTicketsSource).not.toContain("ballIn(t)");
+    expect(appSource).toContain("ticketListCardSemantics");
     expect(adminTicketsSource).toContain("ייצוא ל-Excel");
   });
 });

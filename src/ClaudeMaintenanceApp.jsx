@@ -81,6 +81,7 @@ import { createApiUserProvider } from "./apiUserAdapter.js";
 import { storageApiBaseUrlFromEnv, storageProviderFromEnv, STORAGE_PROVIDERS } from "./storageProviderModel.js";
 import { normalizedTicketAuthorityEnabled, ticketAuthorityFailureIssue, ticketsForAuthority } from "./ticketAuthorityModel.js";
 import { normalizeTransportCreateResponsibility, ticketHolderLabel, transportTechnicianAssignee } from "./ticketResponsibilityModel.js";
+import { ticketListCardSemantics } from "./ticketListSemanticModel.js";
 import { supplierCandidatesForTicket, supplierHasFacilityCategory, supplierHasPpeScope, supplierHasTransportScope, supplierMeta as supMeta, supplierTypeFromMeta } from "./ticketSupplierFilterModel.js";
 import { fleetAuthorityFailureIssue, fleetForAuthority, normalizedFleetAuthorityEnabled } from "./fleetAuthorityModel.js";
 import { normalizedPmAuthorityEnabled, pmAuthorityFailureIssue, pmForAuthority } from "./pmAuthorityModel.js";
@@ -6992,24 +6993,9 @@ function ReportView({ html, count, onClose }) {
 }
 
 const adminTicketsUi = () => ({
-  CheckCircle2,
-  Empty,
-  FileSpreadsheet,
-  ListChecks,
-  PRIORITIES,
-  Printer,
-  ReportView,
-  STATUSES,
-  Search,
-  SectionTitle,
-  ShieldCheck,
-  SlidersHorizontal,
-  TicketCard,
-  Truck,
-  WEAR,
-  Wrench,
-  X,
-  ballIn,
+  Building2, CalendarClock, CheckCircle2, Clock, Empty, FileSpreadsheet, ListChecks,
+  PRIORITIES, Printer, ReportView, STATUSES, Search, SectionTitle, ShieldCheck, SlidersHorizontal,
+  TicketCard, Truck, User, WEAR, Wrench, X,
   catOf,
   countLabel,
   downloadXlsx,
@@ -7971,11 +7957,11 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
   const statusBadge = waitingForTechAcceptance ? { label: "ממתין לקבלה", color: waitTone.color, bg: waitTone.bg } : s;
   const riskTone = showRiskBadge ? ticketToneForColor(risk.color, risk.level === "red" ? "danger" : "warning") : null;
   const downtimeTone = ticketToneForColor(dtOf(t.downtimeType, config).color, "warning");
-  const missingHandler = users ? needsHandler(t, users, fleet || []) : false;
+  const missingHandler = users && t.status !== "waiting" ? needsHandler(t, users, fleet || []) : false;
   const showSubAssignee = admin && t.assignee && !isOpen(t);
-  const holder = isOpen(t) ? ballHolder(t, fleet || []) : null;
   const stateSince = t.updatedAt || t.createdAt;
-  const holderTone = holder ? ticketToneForColor(holder.color, "info") : null;
+  const semantics = ticketListCardSemantics(t, { fleet: fleet || [], waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id), formatDate: fmtDate });
+  const responsibilityTone = semantics.responsibility.mode === "admin_triage" ? ticketTone("info") : semantics.responsibility.mode === "manager_execution" ? ticketTone("success") : semantics.responsibility.mode === "supplier_queue" ? ticketTone("warning") : ticketTone("process");
   const unit = t.track === "transport" ? (fleet || []).find((f) => f.id === t.forkliftId || f.code === t.asset) : null;
   const assetLabel = t.track === "transport" ? [unitTypeName(unit, config), unit?.code || t.asset].filter(Boolean).join(" · ") : (t.zone || t.asset || tr?.short);
   const meta = [
@@ -7989,9 +7975,8 @@ function TicketCard({ t, admin, onClick, fleet, users, config }) {
     <div className="tcard-main">
       <div className="tcard-row1"><span className="tcard-subj">{t.subject}</span><span className="tcard-no">#{ticketNo(t)}</span></div>
       <div className="tcard-sub">{meta.map((x, i) => <React.Fragment key={i}>{i > 0 && <span className="sep">·</span>}{x}</React.Fragment>)}</div>
-      {holder
-        ? <div className="tcard-state" style={{ color: holderTone.color }}><holder.Icon size={12} /> אצל: {holder.label} · {fmtDur(Date.now() - stateSince)}</div>
-        : <div className="tcard-state" style={{ color: s.color }}>סטטוס: {s.label}</div>}
+      <div className="tcard-state tcard-responsibility" style={{ color: responsibilityTone.color }}><User size={12} /><span>{semantics.responsibility.label}: <b>{semantics.responsibility.value}</b>{isOpen(t) ? <> · {fmtDur(Date.now() - stateSince)}</> : null}</span></div>
+      {semantics.waiting && <div className="tcard-state tcard-waiting" style={{ color: waitTone.color }}><CalendarClock size={12} /><span>{semantics.waiting.label}: <b>{semantics.waiting.value}</b></span></div>}
       {isOpen(t) && <SlaBar t={t} config={config} />}
       <div className="tcard-badges">
         {showStatusBadge && <span className="badge sm" style={{ color: statusBadge.color, background: statusBadge.bg }}>{statusBadge.label}</span>}
@@ -8427,6 +8412,8 @@ select:hover,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]
 .track-tag span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tcard-state{display:flex;align-items:center;gap:4px;margin:3px 0 1px;font-size:12px;font-weight:700;}
 .tcard-state svg{flex-shrink:0;}
+.tcard-state span{min-width:0;overflow-wrap:anywhere;}
+.tcard-waiting{align-items:flex-start;}
 .tcard-badges{display:flex;align-items:center;justify-content:flex-start;gap:6px;margin-top:7px;flex-wrap:wrap;min-width:0;direction:rtl;}
 .tcard-badges .badge,.tcard-badges .risk-badge{border:1px solid rgba(201,205,209,.72);}
 .tcard-time{margin-inline-start:auto;color:var(--muted);font-size:11.5px;}
@@ -9945,6 +9932,7 @@ body *{visibility:hidden!important;}
 .fleet-unit-table .doc-chip{max-width:none;min-height:28px;grid-template-columns:7px minmax(0,1fr) auto;padding:4px 8px;}
 .fleet-unit-table .doc-chip-days{text-align:end;}
 }
+@media(max-width:380px){.tb-logout{width:44px;padding:0;}.tb-logout span{display:none;}}
 @media(max-width:390px){
   .worker-top{padding-inline:8px;}
   .worker-top-actions{gap:3px;}

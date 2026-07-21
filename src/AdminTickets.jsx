@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { semanticTicketListGroups } from "./ticketListSemanticModel.js";
 
 export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, users, zones = [], config, ui }) {
   const {
+    Building2,
+    CalendarClock,
     CheckCircle2,
+    Clock,
     Empty,
     FileSpreadsheet,
     ListChecks,
@@ -16,10 +20,10 @@ export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, flee
     SlidersHorizontal,
     TicketCard,
     Truck,
+    User,
     WEAR,
     Wrench,
     X,
-    ballIn,
     catOf,
     countLabel,
     downloadXlsx,
@@ -66,12 +70,21 @@ export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, flee
   });
   const list = sortByImportance(f, config);
   const grouped = st === "open";
-  const G = [
-    { key: "needEquip", label: "יש להעביר כלי לטכנאי", Icon: Truck, color: "#DC2626", test: (t) => t.status === "waiting" && t.waitingReason === "no_equipment" },
-    { key: "admin", label: "לטיפול / סגירה על ידך", Icon: ShieldCheck, color: "#1F4E8C", test: (t) => ballIn(t) === "admin" },
-    { key: "tech", label: "בטיפול הטכנאי", Icon: Wrench, color: "#D97706", test: (t) => ballIn(t) === "tech" },
-    { key: "manager", label: "ממתינות לאישור מנהל מחלקה", Icon: CheckCircle2, color: "#0D9488", test: (t) => ballIn(t) === "manager" && !(t.status === "waiting" && t.waitingReason === "no_equipment") },
-  ];
+  const groups = semanticTicketListGroups(list, {
+    fleet,
+    waitReasonMeta: (id) => waitReasonLifecycleMeta(config, id)
+  });
+  const groupIcons = {
+    equipment: Truck,
+    supplier: Building2,
+    technician: Wrench,
+    requester: User,
+    manager: CheckCircle2,
+    scheduled: CalendarClock,
+    waiting: Clock,
+    admin: ShieldCheck,
+    unassigned: ListChecks
+  };
   const trackOf = (t) => t.track || (t.forkliftId ? "transport" : "facility");
   const trLabel = (t) => (trackOf(t) === "transport" ? "שינוע" : "מבנה");
   const catSource = tickets.filter((t) => track === "all" || trackOf(t) === track);
@@ -144,7 +157,7 @@ export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, flee
     <div className="export-bar"><button className="btn-ghost sm" onClick={exportXlsx}><FileSpreadsheet size={15} /> ייצוא ל-Excel</button><button className="btn-ghost sm" onClick={() => setReport(buildHtml())}><Printer size={15} /> דוח / הדפסה</button>{hasFilters && <button className="btn-ghost sm" onClick={resetFilters}><X size={15} /> נקה כל הסינונים</button>}</div>
     <div className="count-line">{countLabel(list.length, "קריאה", "קריאות")} · {list.length === 1 ? "ממוינת" : "ממוינות"} לפי דחיפות</div>
     {list.length === 0 ? <Empty text="לא נמצאו קריאות" Icon={ListChecks} />
-      : grouped ? <>{G.map((g) => { const items = list.filter(g.test); if (!items.length) return null; return <div key={g.key}><SectionTitle><g.Icon size={15} color={g.color} /> {g.label} ({items.length})</SectionTitle><div className="cards">{items.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div></div>; })}</>
+      : grouped ? <>{groups.map((group) => { const Icon = groupIcons[group.icon] || ListChecks; return <div key={group.key} data-ticket-group={group.key}><SectionTitle><Icon size={15} color={group.color} /> {group.label} ({group.tickets.length})</SectionTitle><div className="cards">{group.tickets.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div></div>; })}</>
       : <div className="cards">{list.map((t) => <TicketCard key={t.id} t={t} admin fleet={fleet} users={users} config={config} onClick={() => onOpen(t.id)} />)}</div>}
     {report && <ReportView html={report} count={countLabel(list.length, "קריאה", "קריאות")} onClose={() => setReport(null)} />}
   </>);
