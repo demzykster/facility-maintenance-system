@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { BIHeatmapPanel } from "./BIHeatmapPanel.jsx";
+import { BIProblematicTransportPanel } from "./BIProblematicTransportPanel.jsx";
 import { biHeatmapAiPrompt } from "./aiAssistEntryPointModel.js";
 import { BI_PERIOD_OPTIONS } from "./biScopeModel.js";
+import { problematicTransportTicketRows } from "./problematicTransportTicketsModel.js";
 
 export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complaints, users, ppe, ppeItems, ppeReqs, ppeOrders, tasks, meetings, config, onOpenTicket, onGoTickets, onGoAssets, onGoCleaning, onGoPpe, onGoTasks, onAskAI, ui = {} }) {
   const {
@@ -160,6 +162,13 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
     maxRows: scope.kind === "company" ? 8 : 6
   });
   const ticketHeatmapMax = Math.max(1, ...ticketHeatmapRows.flatMap((row) => row.cells.map((cell) => cell.value)));
+  const problematicTransportRows = problematicTransportTicketRows(scope.tickets, {
+    fleet: scope.fleet,
+    zones: scope.zones,
+    allowedFleetIds: scope.kind === "department" ? scope.fleet.map((unit) => unit.id) : undefined,
+    now: biNow,
+    maxRows: scope.kind === "company" ? 8 : 6
+  });
   const closedInEvidence = scope.canViewFinancialBI ? scope.tickets.filter((ticket) => ticket.closure && (ticket.closure.signedAt || 0) >= period.evidenceStart) : [];
   const periodCost = closedInEvidence.reduce((sum, ticket) => sum + (ticket.closure.costAmount || 0), 0);
   const avgClosedCost = closedInEvidence.length ? Math.round(periodCost / closedInEvidence.length) : 0;
@@ -382,6 +391,17 @@ export function BIOverview({ session, tickets, fleet, pm, zones, rounds, complai
           <ChevronLeft size={15} />
         </button>) : <div className="note">אין כרגע חריגות מרכזיות בתחום הזה.</div>}
       </section>
+
+      <BIProblematicTransportPanel
+        rows={problematicTransportRows}
+        onOpenTicket={onOpenTicket}
+        ticketNo={ticketNo}
+        statusLabel={(status) => stOf(status).label}
+        unitLabel={(unit) => unitLabel(unit, config)}
+        formatDuration={fmtDur}
+        formatCost={ils}
+        formatDate={fmtDate}
+      />
 
       <section className="panel bi-panel">
         <div className="bi-panel-head"><div><b>סיבות עומס</b><span>מה מסביר את מצב הקריאות</span></div></div>

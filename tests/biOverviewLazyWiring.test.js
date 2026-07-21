@@ -18,6 +18,7 @@ describe("BI overview lazy wiring", () => {
   it("keeps BI heatmap, drilldowns, and AI entry points in the lazy module", () => {
     expect(biOverviewSource).toContain("export function BIOverview(");
     expect(biOverviewSource).toContain("<BIHeatmapPanel");
+    expect(biOverviewSource).toContain("<BIProblematicTransportPanel");
     expect(biOverviewSource).toContain("biHeatmapAiPrompt");
     expect(biOverviewSource).toContain("ticketHeatmapRows");
     expect(biOverviewSource).toContain("onGoTickets");

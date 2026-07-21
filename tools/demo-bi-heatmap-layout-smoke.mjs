@@ -126,6 +126,28 @@ function heatmapMarkup() {
   `;
 }
 
+function problematicTransportMarkup() {
+  return `
+    <div class="bi-transport-problem-list">
+      <button type="button" class="bi-transport-problem-row" data-ticket-id="synthetic-transport-ticket">
+        <span class="bi-transport-problem-main">
+          <span class="bi-transport-problem-title">
+            <b>T-908 · 194340</b>
+            <small>נזק לתורן עקב העמסה שגויה עם תיאור ארוך לבדיקת קיטום</small>
+          </span>
+          <span class="bi-transport-problem-meta">
+            <span>סגורה</span><span>מחסן</span><span>השבתה: 4 ימים</span><span>עלות: ₪420</span><span>21.07.26</span>
+          </span>
+          <span class="bi-transport-problem-reasons" aria-label="סיבות לחריגה">
+            <em>נזק לא טבעי</em><em>השבתה מעל יומיים</em><em>נסגרה עם עלות</em>
+          </span>
+        </span>
+        <span aria-hidden="true">‹</span>
+      </button>
+    </div>
+  `;
+}
+
 function assertClose(actual, expected, tolerance, label) {
   if (Math.abs(actual - expected) > tolerance) {
     throw new Error(`${label}:${actual.toFixed(2)}!=${expected.toFixed(2)}`);
@@ -152,6 +174,18 @@ async function injectHeatmap(page) {
   if (!result.ok) throw new Error(`heatmap_injection_failed:${result.reason}`);
   await page.locator(".bi-heatmap-panel").scrollIntoViewIfNeeded();
   await page.waitForTimeout(250);
+}
+
+async function injectProblematicTransportRow(page) {
+  await page.waitForSelector(".bi-transport-problem-panel", { timeout: 10000 });
+  const result = await page.evaluate((markup) => {
+    const panel = document.querySelector(".bi-transport-problem-panel");
+    if (!panel) return { ok: false, reason: "panel_missing" };
+    panel.querySelectorAll(".bi-transport-problem-list,.note").forEach((element) => element.remove());
+    panel.insertAdjacentHTML("beforeend", markup);
+    return { ok: true };
+  }, problematicTransportMarkup());
+  if (!result.ok) throw new Error(`problematic_transport_injection_failed:${result.reason}`);
 }
 
 async function measureDocumentOverflow(page) {
@@ -218,6 +252,38 @@ async function measureLayout(page) {
   });
 }
 
+async function measureProblematicTransportLayout(page) {
+  return page.evaluate(() => {
+    const rect = (element) => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width, height: box.height };
+    };
+    const panel = document.querySelector(".bi-transport-problem-panel");
+    const row = panel?.querySelector(".bi-transport-problem-row");
+    const main = row?.querySelector(".bi-transport-problem-main");
+    const title = row?.querySelector(".bi-transport-problem-title b");
+    const subject = row?.querySelector(".bi-transport-problem-title small");
+    const reasons = [...(row?.querySelectorAll(".bi-transport-problem-reasons em") || [])];
+    if (!panel || !row || !main || !title || !subject || !reasons.length) {
+      return { ok: false, reason: "problematic_transport_panel_incomplete" };
+    }
+    return {
+      ok: true,
+      direction: getComputedStyle(panel).direction,
+      panel: rect(panel),
+      row: rect(row),
+      main: rect(main),
+      title: rect(title),
+      subject: rect(subject),
+      reasons: reasons.map((reason) => ({ ...rect(reason), text: reason.textContent.trim() })),
+      rowScrollWidth: row.scrollWidth,
+      rowClientWidth: row.clientWidth,
+      mainScrollWidth: main.scrollWidth,
+      mainClientWidth: main.clientWidth
+    };
+  });
+}
+
 async function runViewport(browserTypeName, browser, name, viewport) {
   const page = await browser.newPage({ viewport, locale: "he-IL" });
   const consoleMessages = [];
@@ -234,9 +300,10 @@ async function runViewport(browserTypeName, browser, name, viewport) {
   await login(page);
   const baselineDocumentOverflowX = await measureDocumentOverflow(page);
   await injectHeatmap(page);
+  await injectProblematicTransportRow(page);
   const layout = await measureLayout(page);
+  const problematicTransport = await measureProblematicTransportLayout(page);
   await page.screenshot({ path: `/tmp/cmms-bi-heatmap-layout-${browserTypeName}-${name}.png`, fullPage: true });
-  await page.close();
 
   const checkName = `${browserTypeName}:${name}`;
   if (layout.direction !== "rtl") throw new Error(`${checkName}:direction_not_rtl:${layout.direction}`);
@@ -279,11 +346,39 @@ async function runViewport(browserTypeName, browser, name, viewport) {
       throw new Error(`${checkName}:risk_tags_horizontal_layer_overlap_ai_chip`);
     }
   }
+  if (!problematicTransport.ok) throw new Error(`${checkName}:${problematicTransport.reason}`);
+  if (problematicTransport.direction !== "rtl") throw new Error(`${checkName}:problematic_transport_not_rtl`);
+  if (problematicTransport.rowScrollWidth > problematicTransport.rowClientWidth + 1) {
+    throw new Error(`${checkName}:problematic_transport_row_overflow`);
+  }
+  if (problematicTransport.mainScrollWidth > problematicTransport.mainClientWidth + 1) {
+    throw new Error(`${checkName}:problematic_transport_content_overflow`);
+  }
+  if (problematicTransport.title.width < 12 || problematicTransport.subject.width < 12) {
+    throw new Error(`${checkName}:problematic_transport_text_collapsed`);
+  }
+  const expectedReasons = ["נזק לא טבעי", "השבתה מעל יומיים", "נסגרה עם עלות"];
+  if (!expectedReasons.every((reason) => problematicTransport.reasons.some((item) => item.text === reason))) {
+    throw new Error(`${checkName}:problematic_transport_reasons_missing`);
+  }
+  for (let i = 0; i < problematicTransport.reasons.length; i += 1) {
+    const reason = problematicTransport.reasons[i];
+    if (reason.left < problematicTransport.main.left - 1 || reason.right > problematicTransport.main.right + 1) {
+      throw new Error(`${checkName}:problematic_transport_reason_outside_row`);
+    }
+    for (let j = i + 1; j < problematicTransport.reasons.length; j += 1) {
+      if (horizontalOverlap(reason, problematicTransport.reasons[j]) > 1 && verticalOverlap(reason, problematicTransport.reasons[j]) > 1) {
+        throw new Error(`${checkName}:problematic_transport_reasons_overlap`);
+      }
+    }
+  }
   if (consoleMessages.length) throw new Error(`${checkName}:console:${consoleMessages.slice(0, 3).join(" | ")}`);
   if (pageErrors.length) throw new Error(`${checkName}:pageerror:${pageErrors.slice(0, 3).join(" | ")}`);
   if (failedResponses.length) throw new Error(`${checkName}:responses:${failedResponses.slice(0, 3).join(" | ")}`);
 
-  return { browser: browserTypeName, name, viewport, baselineDocumentOverflowX, layout };
+  await page.close();
+
+  return { browser: browserTypeName, name, viewport, baselineDocumentOverflowX, layout, problematicTransport };
 }
 
 async function main() {
