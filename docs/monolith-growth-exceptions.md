@@ -95,3 +95,10 @@ Each exception must include:
 - Why necessary: the compact public-entry language control and language-direction split-layout rules are still shell-hosted beside the existing login/public cleaning scanner presentation; this bounded UI correction keeps the list of languages behind a globe trigger and flips the visual panel by text direction without touching authentication, scanner behavior, branding data, or ticket workflow.
 - Why extraction was not the right move: extracting the public entry screen would be broader than this owner-requested presentation correction, and the change reuses the existing language model, brand model, and shell stylesheet.
 - Follow-up/removal condition: when the public entry screen moves into a dedicated module/stylesheet, move this language picker and split-layout presentation with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.
+
+- Date: 2026-07-21
+- Owner goal: public login remember-default simplification.
+- New line count: 10024.
+- Why necessary: the public login shell still owns the identifier form and production-auth remember option; this owner-requested simplification removes the visible remember-device checkbox while preserving the existing remembered-login behavior as the default.
+- Why extraction was not the right move: extracting the public login form would be broader than this focused UI/auth-preference correction, and the change leaves existing login APIs, session storage adapter, and production auth store contracts intact.
+- Follow-up/removal condition: when the public login form moves into a dedicated module, move this default remember behavior with that module and reduce `src/ClaudeMaintenanceApp.jsx` back toward the baseline.

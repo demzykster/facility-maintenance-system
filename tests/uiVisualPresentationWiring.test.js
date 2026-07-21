@@ -16,6 +16,9 @@ describe("safe visual presentation wiring", () => {
     expect(appSource).toContain("placeholder={identifierActive || identifier ? \"\" : t(\"login.identity\")}");
     expect(appSource).toContain("aria-label={t(\"login.identity\")}");
     expect(appSource).toContain(".login-input-wrap{display:flex;align-items:center;gap:9px;direction:ltr;");
+    expect(appSource).toContain("remember = true");
+    expect(appSource).not.toContain("setRemember");
+    expect(appSource).not.toContain("checked={remember}");
     expect(appSource).toContain("login-public-panel");
     expect(appSource).toContain("login-toolbar");
     expect(appSource).toContain("<div className=\"login-bg\" dir={languageDirection(language)}>");

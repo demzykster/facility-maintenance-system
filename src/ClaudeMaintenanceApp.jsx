@@ -4035,7 +4035,7 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE, companyName = DEFAULT_C
 
 function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language = DEFAULT_LANGUAGE, setLanguage = () => {}, zones, onAnonReport, builtinLogins = [], seedPolicy = SEED_POLICY, productionLoginConfig = PRODUCTION_LOGIN_CONFIG }) {
   const t = (key, vars) => uiText(language, key, vars);
-  const [identifier, setIdentifier] = useState(""), [identifierActive, setIdentifierActive] = useState(false), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), [remember, setRemember] = useState(true), [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
+  const [identifier, setIdentifier] = useState(""), [identifierActive, setIdentifierActive] = useState(false), [resolved, setResolved] = useState(null), [password, setPassword] = useState(""), [code, setCode] = useState(""), [err, setErr] = useState(""), remember = true, [pub, setPub] = useState(false), [busy, setBusy] = useState(false);
   const [skipScanLanding, setSkipScanLanding] = useState(false);
   const [initialSetup, setInitialSetup] = useState(null);
   const [passwordChange, setPasswordChange] = useState(null), [newPassword, setNewPassword] = useState(""), [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -4328,7 +4328,6 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setInitialSetup(null); setNewPassword(""); setNewPasswordConfirm(""); setErr(""); }}>{t("login.back")}</button>
         </>) : !resolved ? (<>
           <label className="field login-identity-field"><div className="login-input-wrap"><User size={17} aria-hidden="true" /><input className="ltr-input" dir="ltr" value={identifier} onPointerDown={() => setIdentifierActive(true)} onFocus={() => setIdentifierActive(true)} onBlur={() => setIdentifierActive(false)} onChange={(e) => { setIdentifier(e.target.value); setErr(""); }} autoCapitalize="off" autoComplete="username" name="login-identifier" aria-label={t("login.identity")} placeholder={identifierActive || identifier ? "" : t("login.identity")} onKeyDown={(e) => e.key === "Enter" && submitIdentifier()} /></div></label>
-          <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button type="button" className="btn-primary full" onClick={submitIdentifier} disabled={busy}>{busy ? "בודק…" : t("login.continue")}</button>
         </>) : (<>
@@ -4336,7 +4335,6 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
           <div className="hint" style={{ marginBottom: 10 }}>{resolved.identifierType === "email" ? t("login.enterPassword") : t("login.enterPin")}</div>
           {resolved.auth === "password" ? <label className="field"><span>{t("login.password")}</span><input className="ltr-input" dir="ltr" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} type="password" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>
             : <label className="field"><span>{t("login.pinCode")}</span><input className="ltr-input" dir="ltr" value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} type="password" inputMode="numeric" placeholder="" onKeyDown={(e) => e.key === "Enter" && submitSecret()} autoFocus /></label>}
-          <label className="chk-line"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> {t("login.remember")}</label>
           {err && <div className="err" role="alert" aria-live="polite">{err}</div>}
           <button className="btn-primary full" onClick={submitSecret} disabled={busy}>{busy ? t("login.connecting") : t("login.signIn")}</button>
           <button className="btn-ghost full sm" style={{ marginTop: 8 }} onClick={() => { setResolved(null); setPassword(""); setCode(""); setErr(""); }}>{t("login.back")}</button>
