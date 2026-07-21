@@ -7,6 +7,7 @@ import { applyFleetBulkDepartment, applyFleetBulkDocumentDate, bulkFleetDocument
 import { buildMaintenanceScheduleFromRules, fleetRuleTargetMatchesUnit, maintenanceIntervalMonthsForTask, maintenanceRulesForUnit, maintenanceTitleForTask, nextMaintenanceDueFrom, normalizeFleetUnitRef, normalizeMaintenanceRules } from "./fleetMaintenancePolicyModel.js";
 import { pmFleet } from "./ticketVisibilityModel.js";
 import { UnitPicker } from "./UnitPicker.jsx";
+import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
 
 let AlertTriangle;
 let BarChart3;
@@ -923,7 +924,7 @@ function PMHistory({ pm, fleet, onOpen, config }) {
   };
   const exportPdf = () => {
     const rowsHtml = filtered.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${r.f ? esc(unitLabel(r.f, config)) : ""}</td><td>${esc(r.ruleTitle || "")}</td><td>${r.type === "missed" ? "לא הגיע" : "בוצע"}</td><td>${r.hadPaid ? "כן" : ""}</td><td>${esc(r.by || "")}</td><td>${esc(r.paidNote || "")}</td></tr>`).join("");
-    const html = `<html dir="rtl"><head><meta charset="utf8"><style>body{font-family:Arial;padding:20px}h2{color:#16202E}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f3f4f6}</style></head><body><h2>היסטוריית טיפולים תקופתיים</h2><div>${config?.companyName ? esc(config.companyName) + (config?.siteName ? " · " + esc(config.siteName) : "") + " · " : ""}${filtered.length} רשומות · ${fmtDate(Date.now())}</div><table><tr><th>תאריך</th><th>כלי</th><th>רגולציה</th><th>תוצאה</th><th>עבודות המשך</th><th>בוצע ע״י</th><th>הערה</th></tr>${rowsHtml}</table></body></html>`;
+    const html = `<html dir="rtl"><head><meta charset="utf8"><style>body{font-family:Arial;padding:20px}h2{color:#16202E}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f3f4f6}</style></head><body><h2>היסטוריית טיפולים תקופתיים</h2><div>${esc(brandCompanyName(config))}${brandSiteSubtitle(config) ? " · " + esc(brandSiteSubtitle(config)) : ""} · ${filtered.length} רשומות · ${fmtDate(Date.now())}</div><table><tr><th>תאריך</th><th>כלי</th><th>רגולציה</th><th>תוצאה</th><th>עבודות המשך</th><th>בוצע ע״י</th><th>הערה</th></tr>${rowsHtml}</table></body></html>`;
     setReport(html);
   };
   return (<>

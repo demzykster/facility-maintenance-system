@@ -110,7 +110,7 @@ export function normalizePushNotificationRequest(input = {}) {
   const targetUserIds = [...new Set((Array.isArray(input.targetUserIds) ? input.targetUserIds : [])
     .map((id) => String(id || "").trim())
     .filter(Boolean))].slice(0, 50);
-  const title = String(input.title || "CMMS CDSL").trim().slice(0, 80);
+  const title = String(input.title || DEFAULT_COMPANY_NAME).trim().slice(0, 80);
   const body = String(input.body || "יש עדכון חדש במערכת").trim().slice(0, 180);
   const rawUrl = String(input.url || "/").trim();
   const url = rawUrl.startsWith("/") && !rawUrl.startsWith("//") ? rawUrl.slice(0, 220) : "/";
@@ -141,10 +141,11 @@ export function selectPushNotificationTargets(subscriptions = [], targetUserIds 
 
 export function pushPayload(input = {}) {
   return JSON.stringify({
-    title: String(input.title || "CMMS CDSL").slice(0, 80),
+    title: String(input.title || DEFAULT_COMPANY_NAME).slice(0, 80),
     body: String(input.body || "יש עדכון חדש במערכת").slice(0, 180),
     url: String(input.url || "/").slice(0, 220),
     tag: String(input.tag || "cmms-update").slice(0, 80),
     kind: PUSH_EVENT_KINDS.has(input.kind) ? input.kind : "system"
   });
 }
+import { DEFAULT_COMPANY_NAME } from "./brandConfigModel.js";

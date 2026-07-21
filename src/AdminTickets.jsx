@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { semanticTicketListGroups } from "./ticketListSemanticModel.js";
+import { brandCompanyName } from "./brandConfigModel.js";
 
 export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, fleet, users, zones = [], config, ui }) {
   const {
@@ -114,7 +115,7 @@ export function AdminTickets({ tickets, onOpen, initial, onInitialConsumed, flee
       const life = ticketLifecycleSummary(t, options);
       return `<tr><td>${ticketNo(t)}</td><td>${trLabel(t)}</td><td>${esc(t.subject)}</td><td>${esc(life.description || "—")}</td><td>${esc(catOf(t).label)}</td><td>${prOf(t.priority).label}</td><td>${stOf(t.status).label}</td><td>${esc(ticketWaitReasonLabel(t, config) || "—")}</td><td>${esc(life.waitingDurations || "—")}</td><td>${esc(t.asset || "—")}</td><td>${fmtDate(t.createdAt)}</td><td style="text-align:left">${t.closure?.costAmount ? "₪" + t.closure.costAmount.toLocaleString("he-IL") : "—"}</td></tr>`;
     }).join("");
-    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right;vertical-align:top}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}רשימת קריאות</h2><div class="sub">${countLabel(list.length, "קריאה", "קריאות")} · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>תיאור התקלה</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>סיבת המתנה נוכחית</th><th>פירוט זמני המתנה</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
+    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>קריאות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right;vertical-align:top}th{background:#F4F6F9}@media print{.noprint{display:none}}</style></head><body><h2>${esc(brandCompanyName(config))} · רשימת קריאות</h2><div class="sub">${countLabel(list.length, "קריאה", "קריאות")} · ${fmtDate(Date.now())}</div><table><tr><th>מספר</th><th>מסלול</th><th>נושא</th><th>תיאור התקלה</th><th>קטגוריה</th><th>עדיפות</th><th>סטטוס</th><th>סיבת המתנה נוכחית</th><th>פירוט זמני המתנה</th><th>כלי/ציוד</th><th>נפתח</th><th>עלות</th></tr>${rowsHtml}</table></body></html>`;
   };
   const exportXlsx = () => {
     const options = lifecycleOptions();

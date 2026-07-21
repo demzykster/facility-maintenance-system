@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/manifest.webmanifest",
+      "destination": "/api/manifest"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

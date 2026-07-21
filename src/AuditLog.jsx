@@ -3,6 +3,7 @@ import { Clock, ExternalLink, FileSpreadsheet, Printer, Search, X } from "lucide
 
 import { DEFAULT_LANGUAGE } from "./languageModel.js";
 import { uiText } from "./uiI18nModel.js";
+import { brandCompanyName } from "./brandConfigModel.js";
 
 function TicketHistory({ ticket, onClose, onOpen, ui }) {
   const { ExternalLink: ExternalLinkIcon, ROLE_LABEL, X: XIcon, fmtDate, fmtTime, logKindMeta, logKindOf, stOf, ticketNo, trackOf } = ui;
@@ -83,7 +84,7 @@ export function AuditLog({ session, tickets, fleet, config, rounds, onOpenTicket
   const buildHtml = () => {
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
     const rh = filtered.slice(0, 800).map((e) => `<tr><td>${fmtDate(e.at)} ${fmtTime(e.at)}</td><td>${esc(e.no)}</td><td>${esc(logKindMeta(e.kind).label)}</td><td>${esc(e.text)}</td><td>${esc(e.by)}</td><td>${esc(ROLE_LABEL[e.byRole] || e.byRole || "")}</td><td>${esc(e.asset)}</td></tr>`).join("");
-    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>יומן פעילות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right}th{background:#F4F6F9}</style></head><body><h2>${config?.companyName ? esc(config.companyName) + " · " : ""}יומן פעילות</h2><div class="sub">${filtered.length} פעולות · ${fmtDate(Date.now())}</div><table><tr><th>מתי</th><th>קריאה</th><th>פעולה</th><th>תיאור</th><th>מבצע</th><th>תפקיד</th><th>כלי</th></tr>${rh}</table></body></html>`;
+    return `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>יומן פעילות</title><style>body{font-family:Arial,sans-serif;padding:18px;direction:rtl;color:#16202E}h2{margin:0 0 4px}.sub{color:#64748B;font-size:12px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #E2E7ED;padding:6px;text-align:right}th{background:#F4F6F9}</style></head><body><h2>${esc(brandCompanyName(config))} · יומן פעילות</h2><div class="sub">${filtered.length} פעולות · ${fmtDate(Date.now())}</div><table><tr><th>מתי</th><th>קריאה</th><th>פעולה</th><th>תיאור</th><th>מבצע</th><th>תפקיד</th><th>כלי</th></tr>${rh}</table></body></html>`;
   };
   return (<>
     <SectionTitle><Clock size={15} /> {t("audit.title")}</SectionTitle>

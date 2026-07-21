@@ -4,6 +4,7 @@ import { bearerToken } from "../session/authCookie.js";
 import { createSupabaseKvDriverFromEnv } from "../kv/supabaseDriver.js";
 import { sendJson, sendServerError } from "../httpErrors.js";
 import { createSupabasePushSubscriptionDriverFromEnv } from "./supabasePushSubscriptionDriver.js";
+import { createSupabaseAppConfigDriverFromEnv } from "../settings/supabaseAppConfigDriver.js";
 import {
   parsePushSubscriptions,
   PUSH_SUBSCRIPTIONS_KEY,
@@ -15,6 +16,7 @@ import {
   upsertPushSubscription
 } from "../../src/pushNotificationModel.js";
 import { retiredKvWriteKey } from "../../src/retiredKvWriteModel.js";
+import { brandCompanyName } from "../../src/brandConfigModel.js";
 
 const readBody = async (req) => {
   if (req.body && typeof req.body === "object") return req.body;
@@ -135,7 +137,8 @@ export function createPushHandler({
   push = webPush,
   env = process.env,
   fetchImpl = globalThis.fetch,
-  sessionClient = null
+  sessionClient = null,
+  configDriver = null
 } = {}) {
   const backendKvDriver = driver
     || (env.CMMS_KV_DRIVER === "supabase" ? createSupabaseKvDriverFromEnv(env, fetchImpl) : null);
@@ -152,6 +155,14 @@ export function createPushHandler({
     })
     || createKvPushSubscriptionStore(backendKvDriver);
   const enabled = pushRuntimeReady(env);
+  const backendConfigDriver = configDriver || createSupabaseAppConfigDriverFromEnv(env, fetchImpl);
+  const currentBrandTitle = async () => {
+    try {
+      return brandCompanyName((await backendConfigDriver?.get?.())?.config || {});
+    } catch {
+      return brandCompanyName({});
+    }
+  };
 
   if (enabled && push?.setVapidDetails) {
     push.setVapidDetails(
@@ -205,10 +216,11 @@ export function createPushHandler({
 
       if (action === "test") {
         const targets = current.filter((item) => item.userId === auth.user.id);
+        const brandTitle = await currentBrandTitle();
         let sent = 0;
         for (const target of targets) {
           await push.sendNotification(target.subscription, pushPayload({
-            title: "CMMS CDSL",
+            title: brandTitle,
             body: "התראות לטלפון הופעלו",
             url: "/",
             tag: "cmms-push-test"
@@ -220,7 +232,8 @@ export function createPushHandler({
 
       if (action === "notify") {
         if (!canSendBusinessPush(auth.user)) return sendJson(res, 403, { error: "permission_required:push:notify" });
-        const normalized = normalizePushNotificationRequest(body.event || body);
+        const brandTitle = await currentBrandTitle();
+        const normalized = normalizePushNotificationRequest({ ...(body.event || body), title: brandTitle });
         if (!normalized.ok) return sendJson(res, 400, { error: normalized.error });
         if (!normalized.interrupting) {
           return sendJson(res, 200, { ok: true, sent: 0, targets: 0, skipped: "non_interrupting" });

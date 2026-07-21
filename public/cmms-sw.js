@@ -7,7 +7,7 @@ self.addEventListener("push", (event) => {
   }
   if (["doc", "pm", "ppe"].includes(data.kind)) return;
   if (typeof data.tag === "string" && (data.tag.startsWith("sh-on-") || data.tag.startsWith("sh-off-"))) return;
-  const title = data.title || "CMMS CDSL";
+  const title = data.title || "Maintenance";
   const options = {
     body: data.body || "יש עדכון חדש במערכת",
     tag: data.tag || "cmms-update",

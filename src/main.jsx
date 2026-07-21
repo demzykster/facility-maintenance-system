@@ -2,8 +2,11 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./ClaudeMaintenanceApp.jsx";
 import "./reset.css";
+import { applyBrandDocumentMetadata } from "./brandConfigModel.js";
 
 const storagePrefix = "facility-maintenance:";
+
+applyBrandDocumentMetadata({});
 
 if (typeof window !== "undefined" && !window.storage) {
   window.storage = {

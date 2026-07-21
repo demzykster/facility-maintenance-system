@@ -65,7 +65,7 @@ import { cleaningZoneBlockerCount, cleaningZoneDeleteBlockers, cleaningZoneDelet
 import { appIssueScreenContext, captureAppIssueScreenshot } from "./appIssueScreenshot.js";
 import { canPerformCleaning, canReceiveCleaningComplaints, hasCleaningAccess, isWorkerLike, normalizeCleaningAccess } from "./cleaningAccessModel.js";
 import { defaultWorkerView } from "./workerProfileModel.js";
-import { brandCompanyName, brandSiteSubtitle } from "./brandConfigModel.js";
+import { applyBrandDocumentMetadata, brandCompanyName, brandSiteSubtitle, DEFAULT_COMPANY_NAME, DEFAULT_SITE_SUBTITLE } from "./brandConfigModel.js";
 import { parseStoredAppConfigValue } from "./appConfigRecordModel.js";
 import { createApiTicketProvider } from "./apiTicketAdapter.js";
 import { createApiFleetProvider } from "./apiFleetAdapter.js";
@@ -584,7 +584,7 @@ const WIDGETS = [
   { id: "pm", label: "תחזוקה מונעת" }, { id: "presence", label: "נוכחות טכנאים" }, { id: "costs", label: "עלויות החודש" },
 ];
 const DEFAULT_CONFIG = {
-  companyName: "CMMS CDSL", siteName: "ניהול אחזקה, צי, ניקיון וביגוד",
+  companyName: DEFAULT_COMPANY_NAME, siteName: DEFAULT_SITE_SUBTITLE,
   departments: ["נפחי", "גלרייה", "מחסן", "קבלה", "החזרות", "הפצה", "שיגור", "בקרי איכות", "אחזקה", "ניקיון"],
   zones: ["אזור קבלת סחורה", "אזור משלוחים", "מחסן ראשי", "אזור קירור", "רחבת מלגזות", "רציפי טעינה", "משרדים", "חניון", "כללי"],
   suppliers: ["טויוטה", "במת הרמה", "קידמה", "Still", "קבלן חשמל א.ב.", "שירות מזגנים בע״מ", "ספק חלקים", "פנימי"],
@@ -1754,6 +1754,7 @@ export default function App() {
   };
   const [rolePreviewRole, setRolePreviewRole] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
+  useEffect(() => { applyBrandDocumentMetadata(config); }, [config.companyName]);
   TASK_STATUS_META = config.taskStatusMeta || {};
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -3982,7 +3983,7 @@ function ScanPublicLanding({ zone, invalid, onReport, onLogin, language = DEFAUL
   </div>;
 }
 
-function InstallAppPrompt({ language = DEFAULT_LANGUAGE }) {
+function InstallAppPrompt({ language = DEFAULT_LANGUAGE, companyName = DEFAULT_COMPANY_NAME }) {
   const t = (key, vars) => uiText(language, key, vars);
   const [installEvent, setInstallEvent] = useState(null);
   const [dismissed, setDismissed] = useState(false);
@@ -4030,7 +4031,7 @@ function InstallAppPrompt({ language = DEFAULT_LANGUAGE }) {
     <div className="install-ic">{installIcon}</div>
     <div className="install-copy">
       <b>{t("install.title")}</b>
-      <span>{mode === "ios" ? t("install.iosHint") : t("install.browserHint")}</span>
+      <span>{mode === "ios" ? t("install.iosHint") : t("install.browserHint", { company: companyName })}</span>
     </div>
     {mode === "browser" && <button className="install-btn" type="button" onClick={install} aria-label={t("install.button")} title={t("install.button")}><Download size={16} /></button>}
     <button className="install-x" type="button" onClick={() => setDismissed(true)} aria-label={t("common.close")}><X size={15} /></button>
@@ -4336,7 +4337,7 @@ function Login({ users, config, onLogin, saveUser, theme, toggleTheme, language 
         </>)}
         {seedPolicy.allowBuiltinDemoUsers && <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 12, lineHeight: 1.6, background: "var(--surface-2)", padding: "8px 10px", borderRadius: 8 }}>גישת הדגמה: owner@example.local + סיסמה demo1234 · עובד 1042 + קוד 1234 · טכנאי 1234</div>}
         <div className="login-foot">{seedPolicy.allowBuiltinDemoUsers ? "גרסת הדגמה · ה-PIN/סיסמה אינם אבטחה אמיתית" : <><span><span>{t("login.developedBy")} </span><bdi dir="ltr">Vadim Demchuk</bdi><span> · </span><bdi dir="ltr">2026</bdi></span><span><span>{t("login.version")} </span><bdi dir="ltr">v{APP_VERSION}</bdi></span></>}</div>
-        <InstallAppPrompt language={language} />
+        <InstallAppPrompt language={language} companyName={brandCompanyName(config)} />
         <button className="pub-entry" onClick={() => setPub(true)}><AlertTriangle size={15} /> {t("login.reportWithoutLogin")}</button>
       </div>
       {pub && <PublicReport zones={zones} scannedZoneId={scannedZoneId} allowManualZonePick={seedPolicy.allowDemoData} language={language} onSubmit={onAnonReport} onClose={() => setPub(false)} />}
@@ -6168,9 +6169,9 @@ function ppeDocBody(recs, worker, config) {
   const processedBy = (((recs || []).find((r) => r.by && r.by.name) || {}).by || {}).name || "";
   const initiator = ((recs || []).find((r) => r.initiatedByName) || {}).initiatedByName || "";
   const initAt = ((recs || []).find((r) => r.initiatedAt) || {}).initiatedAt || (((recs || [])[0] || {}).at);
-  const company = (config && config.companyName) || "";
+  const company = brandCompanyName(config);
   return '<div style="font-family:Arial,Helvetica,sans-serif;direction:rtl;color:#111;padding:18px;background:#fff">'
-    + '<div style="font-size:18px;font-weight:700">אישור קבלת ציוד מגן' + (company ? ' · ' + company : '') + '</div>'
+    + '<div style="font-size:18px;font-weight:700">אישור קבלת ציוד מגן · ' + esc(company) + '</div>'
     + '<div style="color:#555;font-size:13px;margin-top:2px">תאריך: ' + today + ' · עובד: ' + (w.name || '') + (w.workerNo ? ' · מספר ' + w.workerNo : '') + (dept ? ' · ' + dept : '') + '</div>'
     + '<table style="width:100%;border-collapse:collapse;margin:16px 0"><thead><tr><th ' + th + '>פריט</th><th ' + th + '>מידה</th><th ' + th + '>כמות</th><th ' + th + '>חיוב</th></tr></thead><tbody>' + rows + '</tbody></table>'
     + '<div style="font-size:14px;font-weight:700;margin-top:6px">תנאי קיזוז בעזיבה (לפריטים שאינם מוחזרים)</div>'
@@ -6961,7 +6962,7 @@ function AdminApp(p) {
     <div className="app-root">
       <Sidebar session={session} config={config} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} nav={nav} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onReportIssue={p.onReportIssue} onProfile={p.onProfile} primary={{ label: "פתיחת קריאה", onClick: () => setOverlay({ type: "new" }) }} />
       <div className="main-col">
-        <TopBar title="CMMS CDSL" subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
+        <TopBar title={brandCompanyName(config)} subtitle={session.name} onLogout={onLogout} notif={notif} onBell={() => setShowNotif((v) => !v)} rolePreview={p.rolePreview} theme={theme} toggleTheme={toggleTheme} onProfile={p.onProfile} onReportIssue={p.onReportIssue} demoActive={p.demoActive} />
         <div className="content with-nav">
           {activeTab === "bi" && <BIOverview {...p} onOpenTicket={openTicket} onGoTickets={(focus) => goFilter(focus || {})} onGoAssets={(nav) => goAsset(nav || {})} onGoCleaning={isAdminRole ? () => setTab("cleaning") : null} onGoPpe={isAdminRole ? () => setTab("ppe") : null} onGoTasks={isAdminRole ? (nav) => { setTaskNav(nav || null); setTab("tasks"); } : null} onAskAI={aiAssistantEnabled(config) ? askAI : null} />}
           {activeTab === "tickets" && <><div className="row-between" style={{ marginBottom: 12 }}><SectionTitle>קריאות</SectionTitle><button className="btn-primary sm" onClick={() => setOverlay({ type: "new" })}><Plus size={15} /> קריאה חדשה</button></div><AdminTickets tickets={tickets} fleet={fleet} users={users} zones={zones} config={config} onOpen={openTicket} initial={tFilter} onInitialConsumed={clearTicketFilter} /></>}
@@ -7857,7 +7858,7 @@ function Sidebar({ session, config, onLogout, nav = [], primary, notif, onBell, 
       <button className="side-logout" onClick={onLogout}><LogOut size={18} /> יציאה</button>
       <RolePreviewBox rolePreview={rolePreview} />
       {onReportIssue && <button className="side-report" onClick={onReportIssue}><Bug size={14} /> דיווח על בעיה</button>}
-      <div className="side-version" title={APP_BUILD_TIME ? `Build ${APP_BUILD_COMMIT} · ${APP_BUILD_TIME}` : `Build ${APP_BUILD_COMMIT}`}>CMMS CDSL · v{APP_VERSION} · {APP_BUILD_COMMIT}</div>
+      <div className="side-version" title={APP_BUILD_TIME ? `Build ${APP_BUILD_COMMIT} · ${APP_BUILD_TIME}` : `Build ${APP_BUILD_COMMIT}`}>{brandCompanyName(config)} · v{APP_VERSION} · {APP_BUILD_COMMIT}</div>
     </div>
   </aside>);
 }

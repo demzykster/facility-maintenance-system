@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { buildAppManifest } from "./src/appManifestModel.js";
 
 const packageInfo = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -14,6 +15,15 @@ const gitCommit = () => {
 
 const buildCommit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || gitCommit();
 const buildTime = new Date().toISOString();
+
+const localManifestMiddleware = (req, res, next) => {
+  if (new URL(req.url || "/", "http://localhost").pathname !== "/manifest.webmanifest") return next();
+  res.statusCode = 200;
+  res.setHeader("content-type", "application/manifest+json; charset=utf-8");
+  res.setHeader("cache-control", "no-store");
+  if (String(req.method || "GET").toUpperCase() === "HEAD") return res.end();
+  return res.end(JSON.stringify(buildAppManifest({})));
+};
 
 export default defineConfig({
   cacheDir: "vite-cache",
@@ -32,20 +42,31 @@ export default defineConfig({
   optimizeDeps: {
     include: ["jsqr"]
   },
-  plugins: [{
-    name: "cmms-version-manifest",
-    generateBundle() {
-      this.emitFile({
-        type: "asset",
-        fileName: "cmms-version.json",
-        source: JSON.stringify({
-          version: packageInfo.version || "0.0.0",
-          commit: buildCommit,
-          buildTime
-        }, null, 2)
-      });
+  plugins: [
+    {
+      name: "cmms-local-manifest",
+      configureServer(server) {
+        server.middlewares.use(localManifestMiddleware);
+      },
+      configurePreviewServer(server) {
+        server.middlewares.use(localManifestMiddleware);
+      }
+    },
+    {
+      name: "cmms-version-manifest",
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: "cmms-version.json",
+          source: JSON.stringify({
+            version: packageInfo.version || "0.0.0",
+            commit: buildCommit,
+            buildTime
+          }, null, 2)
+        });
+      }
     }
-  }],
+  ],
   define: {
     __CMMS_BUILD_COMMIT__: JSON.stringify(buildCommit),
     __CMMS_BUILD_TIME__: JSON.stringify(buildTime)

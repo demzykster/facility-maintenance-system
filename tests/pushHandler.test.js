@@ -93,7 +93,13 @@ describe("push API handler", () => {
       setVapidDetails: vi.fn(),
       sendNotification: vi.fn().mockResolvedValue(undefined)
     };
-    const handler = createPushHandler({ driver, push, env, sessionClient: activeSessionClient });
+    const handler = createPushHandler({
+      driver,
+      push,
+      env,
+      sessionClient: activeSessionClient,
+      configDriver: { get: vi.fn().mockResolvedValue({ config: { companyName: "Ogen | עוגן" } }) }
+    });
 
     const subscribe = await call(handler, {
       method: "POST",
@@ -110,7 +116,10 @@ describe("push API handler", () => {
     expect(subscribe.json()).toMatchObject({ ok: true, id: expect.any(String) });
     expect(test.json()).toEqual({ ok: true, sent: 1 });
     expect(push.setVapidDetails).toHaveBeenCalledWith("mailto:owner@example.com", "public-key", "private-key");
-    expect(push.sendNotification).toHaveBeenCalledWith(subscription, expect.stringContaining("התראות לטלפון הופעלו"));
+    expect(JSON.parse(push.sendNotification.mock.calls[0][1])).toMatchObject({
+      title: "Ogen | עוגן",
+      body: "התראות לטלפון הופעלו"
+    });
   });
 
   it("can store subscriptions through the normalized subscription store", async () => {
@@ -186,7 +195,13 @@ describe("push API handler", () => {
       setVapidDetails: vi.fn(),
       sendNotification: vi.fn().mockResolvedValue(undefined)
     };
-    const handler = createPushHandler({ driver, push, env, sessionClient: activeSessionClient });
+    const handler = createPushHandler({
+      driver,
+      push,
+      env,
+      sessionClient: activeSessionClient,
+      configDriver: { get: vi.fn().mockResolvedValue({ config: { companyName: "Ogen | עוגן" } }) }
+    });
 
     await call(handler, {
       method: "POST",
@@ -211,7 +226,10 @@ describe("push API handler", () => {
 
     expect(notify.statusCode).toBe(200);
     expect(notify.json()).toEqual({ ok: true, sent: 1, targets: 1 });
-    expect(push.sendNotification).toHaveBeenLastCalledWith(subscription, expect.stringContaining("קריאה חדשה"));
+    expect(JSON.parse(push.sendNotification.mock.calls.at(-1)[1])).toMatchObject({
+      title: "Ogen | עוגן",
+      body: "נפתחה קריאה חדשה"
+    });
   });
 
   it("blocks business notification sends from worker sessions", async () => {
