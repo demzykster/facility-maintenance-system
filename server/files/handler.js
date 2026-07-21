@@ -117,6 +117,15 @@ const requireActiveMetadata = async (metadataDriver, path) => {
   return { ok: true, metadata };
 };
 
+const isFileMissingError = (error) => {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("404")
+    || message.includes("not_found")
+    || message.includes("not found")
+    || message.includes("not exist")
+    || message.includes("does not exist");
+};
+
 const hasModuleLevel = (user = {}, module, minLevel = "view") => (
   permissionLevelRank(sessionPermissionLevel(user, module)) >= permissionLevelRank(minLevel)
 );
@@ -234,13 +243,22 @@ export function createFileApiHandler({ driver = null, auditDriver = null, metada
       }
       if (method === "DELETE") {
         const metadata = await requireActiveMetadata(backendMetadataDriver, path);
-        if (!metadata.ok) return json(res, metadata.status, { error: metadata.error });
+        if (!metadata.ok) {
+          if (metadata.status === 404) return json(res, 200, { ok: true, path, missing: true });
+          return json(res, metadata.status, { error: metadata.error });
+        }
         const permissionError = await fileOwnerPermissionError({ metadata: metadata.metadata, user: auth.user, action: "delete", ticketDriver: backendTicketDriver, fleetDriver: backendFleetDriver });
         if (permissionError) return json(res, 403, { error: permissionError });
-        await backendDriver.delete(path, auth.user);
+        let missing = false;
+        try {
+          await backendDriver.delete(path, auth.user);
+        } catch (error) {
+          if (!isFileMissingError(error)) throw error;
+          missing = true;
+        }
         await backendMetadataDriver?.markDeletedByPath?.(path);
         await writeAuditEvent(backendAuditDriver, fileAuditEvent({ path }, AUDIT_ACTIONS.delete, auth.user));
-        return json(res, 200, { ok: true, path });
+        return json(res, 200, { ok: true, path, ...(missing ? { missing: true } : {}) });
       }
 
       res.setHeader("allow", "GET, POST, PUT, DELETE");

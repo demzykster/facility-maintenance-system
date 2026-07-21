@@ -235,7 +235,7 @@ describe("file API handler", () => {
     expect(metadataDriver.markDeletedByPath).toHaveBeenCalledWith("tickets/T-1/before.jpg");
   });
 
-  it("requires active file metadata before download or delete when metadata lookup is configured", async () => {
+  it("requires active file metadata before download and treats repeated delete as idempotent", async () => {
     const driver = {
       download: vi.fn(),
       delete: vi.fn()
@@ -261,11 +261,41 @@ describe("file API handler", () => {
 
     expect(download.statusCode).toBe(404);
     expect(download.json()).toEqual({ error: "file_metadata_not_found" });
-    expect(del.statusCode).toBe(404);
-    expect(del.json()).toEqual({ error: "file_metadata_not_found" });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toEqual({ ok: true, path: "tickets/T-1/before.jpg", missing: true });
     expect(metadataDriver.findActiveByPath).toHaveBeenCalledTimes(2);
     expect(driver.download).not.toHaveBeenCalled();
     expect(driver.delete).not.toHaveBeenCalled();
+  });
+
+  it("treats a missing storage object as successful cleanup after owner authorization", async () => {
+    const driver = {
+      delete: vi.fn().mockRejectedValue(new Error("supabase_file_delete_404"))
+    };
+    const metadataDriver = {
+      findActiveByPath: vi.fn().mockResolvedValue({
+        ownerType: "ticket",
+        ownerId: "T-1",
+        kind: "ticket_before_photo",
+        path: "tickets/T-1/before.jpg"
+      }),
+      markDeletedByPath: vi.fn().mockResolvedValue(undefined)
+    };
+    const handler = createFileApiHandler({
+      driver,
+      metadataDriver,
+      sessionClient: activeSessionClient()
+    });
+
+    const res = await call(handler, {
+      method: "DELETE",
+      headers: { authorization: "Bearer user-token" },
+      query: { path: "tickets/T-1/before.jpg" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, path: "tickets/T-1/before.jpg", missing: true });
+    expect(metadataDriver.markDeletedByPath).toHaveBeenCalledWith("tickets/T-1/before.jpg");
   });
 
   it("requires business owner permission before downloading or deleting active ticket files", async () => {
